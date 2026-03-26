@@ -1,18 +1,17 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, setDoc, doc, serverTimestamp, getDocs, getDoc, orderBy, limit } from 'firebase/firestore';
-import { DailyReport, CenterMembership, StudyPlanItem, StudyLogDay } from '@/lib/types';
+import { AttendanceCurrent, DailyReport, CenterMembership, StudyPlanItem, StudyLogDay } from '@/lib/types';
 import { 
   Card, 
   CardContent, 
   CardHeader, 
-  CardTitle, 
-  CardDescription 
+  CardTitle
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,8 +36,6 @@ import {
   Sparkles,
   Zap,
   Wand2,
-  Save,
-  Trophy,
   AlertCircle,
   TrendingUp,
   Calendar,
@@ -52,7 +49,26 @@ import { cn } from '@/lib/utils';
 import { generateDailyReport } from '@/ai/flows/generate-daily-report';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { parseDateInputValue } from '@/lib/dashboard-access';
-import { toDateSafe } from '@/lib/attendance-auto';
+import { buildAttendanceRoutineInfo, deriveAttendanceDisplayState, toDateSafe } from '@/lib/attendance-auto';
+import { deriveDailyReportSignals } from '@/lib/daily-report-ai';
+
+type StudyLogDayDoc = StudyLogDay & {
+  updatedAt?: unknown;
+  createdAt?: unknown;
+};
+
+type DailyStudentStatDoc = {
+  todayPlanCompletionRate?: number;
+  studyTimeGrowthRate?: number;
+};
+
+type AttendanceRecordDoc = {
+  status?: 'requested' | 'confirmed_present' | 'confirmed_late' | 'confirmed_absent' | 'excused_absent';
+  statusSource?: 'auto' | 'manual' | string;
+  checkInAt?: unknown;
+  updatedAt?: unknown;
+  routineMissingAtCheckIn?: boolean;
+};
 
 export default function DailyReportsPage() {
   const { user } = useUser();
@@ -75,20 +91,7 @@ export default function DailyReportsPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [reportContent, setReportContent] = useState('');
   const [teacherNote, setTeacherNote] = useState('');
-  const [aiReportMeta, setAiReportMeta] = useState<null | {
-    teacherOneLiner: string;
-    strengths: string[];
-    improvements: string[];
-    metrics: {
-      growthRate: number;
-      deltaMinutesFromAvg: number;
-      avg7StudyMinutes: number;
-      isNewRecord: boolean;
-      alertLow: boolean;
-      streakBadge: boolean;
-      trendSummary: string;
-    };
-  }>(null);
+  const [aiReportMeta, setAiReportMeta] = useState<DailyReport['aiMeta'] | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const formatTimestampLabel = (value: unknown, fallback: string) => {
@@ -133,16 +136,54 @@ export default function DailyReportsPage() {
     if (!selectedStudent || !firestore || !centerId || !dateKey) return;
     setAiLoading(true);
     try {
+      const existingReport = dailyReports?.find((report) => report.studentId === selectedStudent.id) || null;
+      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const isTodayTarget = dateKey === todayKey;
+      const targetDate = selectedDate ?? parseDateInputValue(dateKey) ?? new Date();
+
       const plansRef = collection(firestore, 'centers', centerId, 'plans', selectedStudent.id, 'weeks', weekKey, 'items');
-      const plansSnap = await getDocs(query(plansRef, where('dateKey', '==', dateKey)));
-      const plans = plansSnap.docs.map(d => d.data() as StudyPlanItem);
-
       const logRef = doc(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days', dateKey);
-      const logSnap = await getDoc(logRef);
-      const todayLog = logSnap.exists() ? (logSnap.data() as StudyLogDay) : null;
-
       const lastLogsRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days');
-      const historySnap = await getDocs(query(lastLogsRef, orderBy('dateKey', 'desc'), limit(14)));
+      const dailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', selectedStudent.id);
+      const attendanceRecordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', selectedStudent.id);
+      const liveSeatQuery = query(
+        collection(firestore, 'centers', centerId, 'attendanceCurrent'),
+        where('studentId', '==', selectedStudent.id),
+        limit(1)
+      );
+      const recentReportsQuery = query(
+        collection(firestore, 'centers', centerId, 'dailyReports'),
+        where('studentId', '==', selectedStudent.id),
+        limit(20)
+      );
+
+      const [
+        plansSnap,
+        logSnap,
+        historySnap,
+        dailyStatSnap,
+        attendanceRecordSnap,
+        liveSeatSnap,
+        recentReportsSnap,
+      ] = await Promise.all([
+        getDocs(query(plansRef, where('dateKey', '==', dateKey))),
+        getDoc(logRef),
+        getDocs(query(lastLogsRef, orderBy('dateKey', 'desc'), limit(14))),
+        getDoc(dailyStatRef),
+        getDoc(attendanceRecordRef),
+        isTodayTarget ? getDocs(liveSeatQuery) : Promise.resolve(null),
+        getDocs(recentReportsQuery),
+      ]);
+
+      const plans = plansSnap.docs.map(d => d.data() as StudyPlanItem);
+      const todayLog = logSnap.exists() ? (logSnap.data() as StudyLogDayDoc) : null;
+      const dailyStat = dailyStatSnap.exists() ? (dailyStatSnap.data() as DailyStudentStatDoc) : null;
+      const attendanceRecord = attendanceRecordSnap.exists() ? (attendanceRecordSnap.data() as AttendanceRecordDoc) : null;
+      const liveSeatDoc = liveSeatSnap?.docs?.[0];
+      const liveSeat = liveSeatDoc
+        ? ({ id: liveSeatDoc.id, ...liveSeatDoc.data() } as AttendanceCurrent)
+        : null;
+
       const history7Days = historySnap.docs
         .map(d => ({
           date: d.data().dateKey,
@@ -152,24 +193,93 @@ export default function DailyReportsPage() {
         .slice(0, 7);
 
       const studyTasks = plans.filter(p => p.category === 'study' || !p.category);
-      const completionRate = studyTasks.length > 0 
+      const completionFromPlans = studyTasks.length > 0
         ? Math.round((studyTasks.filter(t => t.done).length / studyTasks.length) * 100)
         : 0;
+      const completionRate = typeof dailyStat?.todayPlanCompletionRate === 'number'
+        ? Math.round(dailyStat.todayPlanCompletionRate)
+        : completionFromPlans;
+      const scheduleItems = plans.filter(p => p.category === 'schedule');
+      const routineInfo = buildAttendanceRoutineInfo(scheduleItems.map((item) => item.title));
+
+      const recordCheckedAt = toDateSafe(attendanceRecord?.checkInAt || attendanceRecord?.updatedAt);
+      const liveCheckedAt = toDateSafe(liveSeat?.lastCheckInAt || liveSeat?.updatedAt);
+      const studyCheckedAt = toDateSafe(todayLog?.updatedAt || todayLog?.createdAt);
+      const studyMinutes = todayLog?.totalMinutes || 0;
+      const hasAttendanceEvidence = Boolean(recordCheckedAt || liveCheckedAt || studyCheckedAt || studyMinutes > 0);
+      const attendanceState = deriveAttendanceDisplayState({
+        selectedDate: targetDate,
+        dateKey,
+        todayDateKey: todayKey,
+        routine: routineInfo,
+        recordStatus: attendanceRecord?.status,
+        recordStatusSource: attendanceRecord?.statusSource,
+        recordRoutineMissingAtCheckIn: Boolean(attendanceRecord?.routineMissingAtCheckIn),
+        recordCheckedAt,
+        liveCheckedAt,
+        accessCheckedAt: recordCheckedAt,
+        studyCheckedAt,
+        studyMinutes,
+        hasStudyLog: studyMinutes > 0,
+      });
+
+      const sortedRecentReports = recentReportsSnap.docs
+        .map((snapshot) => snapshot.data() as DailyReport)
+        .filter((report) => report.dateKey && report.dateKey !== dateKey)
+        .sort((a, b) => (b.dateKey || '').localeCompare(a.dateKey || ''));
+      const recentVariationKeys = sortedRecentReports
+        .map((report) => report.aiMeta?.variationKey)
+        .filter((key): key is string => Boolean(key))
+        .slice(0, 5);
+
+      const signals = deriveDailyReportSignals({
+        studentId: selectedStudent.id,
+        dateKey,
+        totalStudyMinutes: studyMinutes,
+        completionRate,
+        history7Days,
+        growthRateOverridePercent:
+          typeof dailyStat?.studyTimeGrowthRate === 'number'
+            ? dailyStat.studyTimeGrowthRate * 100
+            : null,
+        attendanceDisplayStatus: attendanceState.status,
+        currentSeatStatus: liveSeat?.status,
+        isTodayTarget,
+        hasAttendanceEvidence,
+        recentVariationKeys,
+        preferredVariationKey:
+          aiReportMeta?.variationKey || existingReport?.aiMeta?.variationKey || null,
+      });
 
       const aiInput = {
+        studentId: selectedStudent.id,
         studentName: selectedStudent.name,
         date: dateKey,
-        totalStudyMinutes: todayLog?.totalMinutes || 0,
+        totalStudyMinutes: studyMinutes,
         completionRate,
         plans: studyTasks.map(p => ({ title: p.title, done: p.done })),
-        schedule: plans
-          .filter(p => p.category === 'schedule')
-          .map(p => {
+        schedule: scheduleItems.map(p => {
             const parts = p.title.split(': ');
             return { title: parts[0], time: parts[1] || '-' };
           }),
         history7Days,
-        teacherNote: teacherNote.trim() || undefined
+        teacherNote: teacherNote.trim() || undefined,
+        attendanceLabel: signals.attendanceLabel,
+        studyBand: signals.studyBand,
+        growthBand: signals.growthBand,
+        completionBand: signals.completionBand,
+        volatilityBand: signals.volatilityBand,
+        routineBand: signals.routineBand,
+        continuityBand: signals.continuityBand,
+        pedagogyLens: signals.pedagogyLens,
+        secondaryLens: signals.secondaryLens,
+        stateBucket: signals.stateBucket,
+        variationKey: signals.variationKey,
+        variationStyle: signals.variationStyle,
+        variationGuide: signals.variationGuide,
+        coachingFocus: signals.coachingFocus,
+        homeTip: signals.homeTip,
+        metrics: signals.metrics,
       };
 
       const result = await generateDailyReport(aiInput);
@@ -178,9 +288,25 @@ export default function DailyReportsPage() {
         teacherOneLiner: result.teacherOneLiner,
         strengths: result.strengths,
         improvements: result.improvements,
+        pedagogyLens: result.pedagogyLens,
+        secondaryLens: result.secondaryLens,
+        stateBucket: result.stateBucket,
+        variationKey: result.variationKey,
+        variationStyle: result.variationStyle,
+        coachingFocus: result.coachingFocus,
+        homeTip: result.homeTip,
+        studyBand: result.studyBand,
+        growthBand: result.growthBand,
+        completionBand: result.completionBand,
+        routineBand: result.routineBand,
+        volatilityBand: result.volatilityBand,
+        continuityBand: result.continuityBand,
         metrics: result.metrics,
       });
-      toast({ title: `인공지능 리포트 생성 완료 (진단: Lv.${result.level})` });
+      toast({
+        title: `인공지능 리포트 생성 완료 (Lv.${result.level})`,
+        description: `${result.pedagogyLens} 렌즈 기준으로 코칭 포인트를 정리했습니다.`,
+      });
     } catch (e: any) {
       toast({ 
         variant: "destructive", 
@@ -436,22 +562,73 @@ export default function DailyReportsPage() {
 
                 {!isMobile && (
                   <div className="md:col-span-2 grid gap-4">
-                    {[
-                      { icon: TrendingUp, label: '최근 7일 비교', desc: '학습 추세 자동 대조', color: 'text-blue-600', bg: 'bg-blue-50' },
-                      { icon: Trophy, label: '10단계 진단', desc: '정량적 성취 수준 분석', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                      { icon: Zap, label: '맞춤형 피드백', desc: '학생별 약점 보완 조언', color: 'text-amber-600', bg: 'bg-amber-50' },
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center gap-4 p-4 rounded-[1.5rem] bg-white border border-primary/5 shadow-md hover:shadow-xl transition-all">
-                        <div className={cn("p-2.5 rounded-2xl", item.bg)}><item.icon className={cn("h-5 w-5", item.color)} /></div>
-                        <div>
-                          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-0.5">{item.label}</p>
-                          <p className="text-xs font-bold">{item.desc}</p>
+                    <div className="flex items-start gap-4 p-4 rounded-[1.5rem] bg-white border border-primary/5 shadow-md hover:shadow-xl transition-all">
+                      <div className="p-2.5 rounded-2xl bg-blue-50">
+                        <TrendingUp className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">교육 렌즈</p>
+                        <p className="text-sm font-black leading-snug">
+                          {aiReportMeta?.pedagogyLens || '생성 대기'}
+                          {aiReportMeta?.secondaryLens ? ` · ${aiReportMeta.secondaryLens}` : ''}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {aiReportMeta?.studyBand && <Badge className="rounded-full border-none bg-blue-50 text-blue-700 font-black text-[10px]">{aiReportMeta.studyBand}</Badge>}
+                          {aiReportMeta?.growthBand && <Badge className="rounded-full border-none bg-emerald-50 text-emerald-700 font-black text-[10px]">{aiReportMeta.growthBand}</Badge>}
+                          {aiReportMeta?.routineBand && <Badge className="rounded-full border-none bg-amber-50 text-amber-700 font-black text-[10px]">{aiReportMeta.routineBand}</Badge>}
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="flex items-start gap-4 p-4 rounded-[1.5rem] bg-white border border-primary/5 shadow-md hover:shadow-xl transition-all">
+                      <div className="p-2.5 rounded-2xl bg-amber-50">
+                        <Zap className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">내일 코칭 포인트</p>
+                        <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                          {aiReportMeta?.coachingFocus || 'AI 생성 후 교실에서 바로 실행할 코칭 포인트가 여기에 표시됩니다.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-4 p-4 rounded-[1.5rem] bg-white border border-primary/5 shadow-md hover:shadow-xl transition-all">
+                      <div className="p-2.5 rounded-2xl bg-emerald-50">
+                        <Sparkles className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">가정 연계 팁</p>
+                        <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                          {aiReportMeta?.homeTip || 'AI 생성 후 가정에서 어떻게 대화하면 좋을지 바로 확인할 수 있습니다.'}
+                        </p>
+                        {aiReportMeta?.variationStyle && (
+                          <p className="mt-2 text-[10px] font-black text-primary/60 uppercase tracking-widest">
+                            {aiReportMeta.variationStyle}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
+
+              {aiReportMeta && (
+                <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+                  <div className="rounded-[1.75rem] bg-white shadow-lg ring-1 ring-border/50 p-5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">교육 렌즈</p>
+                    <p className="text-base font-black tracking-tight">{aiReportMeta.pedagogyLens || '분석 중'}</p>
+                    <p className="mt-1 text-xs font-bold text-muted-foreground">{aiReportMeta.secondaryLens ? `보조 렌즈: ${aiReportMeta.secondaryLens}` : '보조 렌즈 없음'}</p>
+                  </div>
+                  <div className="rounded-[1.75rem] bg-white shadow-lg ring-1 ring-border/50 p-5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">오늘 코칭 포인트</p>
+                    <p className="text-sm font-bold leading-relaxed text-foreground/80">{aiReportMeta.coachingFocus || '생성 후 표시됩니다.'}</p>
+                  </div>
+                  <div className="rounded-[1.75rem] bg-white shadow-lg ring-1 ring-border/50 p-5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">가정 연계 팁</p>
+                    <p className="text-sm font-bold leading-relaxed text-foreground/80">{aiReportMeta.homeTip || '생성 후 표시됩니다.'}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col gap-3">
                 <Label className="text-[10px] font-black uppercase text-primary/70 tracking-widest ml-2 flex items-center gap-2">
