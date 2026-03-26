@@ -2197,14 +2197,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <Link href="/dashboard/student-reports" className="block touch-manipulation">
               <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
                 <CardContent className={cn("p-4", !isMobile && "p-5")}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <div className={cn("flex justify-between gap-2", isMobile ? "items-start flex-wrap" : "items-center")}>
+                    <div className="flex min-w-0 items-center gap-2">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
                         <FileText className="h-3.5 w-3.5" />
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-primary">놓치면 아쉬운 것</span>
+                      <span className={cn(
+                        "font-black uppercase tracking-widest text-primary break-keep leading-tight",
+                        isMobile ? "text-[9px]" : "text-[10px]"
+                      )}>
+                        놓치면 아쉬운 것
+                      </span>
                     </div>
-                    <Badge className="h-5 border-none bg-[#FF7A16] px-2 text-[9px] font-black text-white">리포트</Badge>
+                    <Badge
+                      className={cn(
+                        "shrink-0 border-none bg-[#FF7A16] font-black text-white",
+                        isMobile ? "h-5 px-2 text-[8px]" : "h-5 px-2 text-[9px]"
+                      )}
+                    >
+                      리포트
+                    </Badge>
                   </div>
                   <div className="mt-3 min-w-0">
                     <p className="text-sm font-black leading-6 text-slate-900 break-keep line-clamp-2">{latestUnreadReport.dateKey} 코칭 도착</p>
@@ -2468,7 +2480,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <FileText className="h-6 w-6 text-primary" />
                   </div>
                   <div className="grid min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className={cn("flex items-center gap-2 min-w-0", isMobile && "flex-wrap")}>
                       <span className="font-black tracking-tighter text-sm break-keep">선생님 리포트</span>
                       {unreadReportCount > 0 && (
                         <Badge className="bg-[#FF7A16] text-white border-none font-black text-[8px] h-5 px-2 shrink-0">
@@ -2569,7 +2581,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <FileText className="h-8 w-8" />
               </div>
               <div className="grid text-left min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2 flex-wrap">
                   <span className="font-black tracking-tighter text-xl break-keep">선생님 리포트</span>
                   {unreadReportCount > 0 && (
                     <Badge className="bg-[#FF7A16] text-white border-none font-black text-[9px] h-5 px-2 shrink-0">
