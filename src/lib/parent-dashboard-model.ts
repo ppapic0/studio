@@ -18,6 +18,7 @@ export interface ParentNotificationItem {
     | 'unauthorized_exit'
     | 'penalty'
     | 'counseling_done'
+    | 'announcement'
     | 'weekly_report'
     | 'monthly_report';
   title: string;
