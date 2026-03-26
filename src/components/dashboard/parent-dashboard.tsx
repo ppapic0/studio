@@ -15,7 +15,6 @@ import {
   BookOpen,
   ChevronRight,
   ChevronLeft,
-  PieChart as PieChartIcon,
   BarChart3,
   Flame,
   Info,
@@ -101,7 +100,6 @@ import {
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Progress } from '../ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
@@ -1540,6 +1538,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { data: selectedDatePlans, isLoading: isSelectedDatePlansLoading } = useCollection<StudyPlanItem>(selectedDatePlansQuery, {
     enabled: isActive && !!studentId && !!selectedDateKey,
   });
+  const selectedDateAttendanceRef = useMemoFirebase(
+    () =>
+      !firestore || !centerId || !studentId || !selectedDateKey
+        ? null
+        : doc(firestore, 'centers', centerId, 'attendanceRecords', selectedDateKey, 'students', studentId),
+    [firestore, centerId, studentId, selectedDateKey]
+  );
+  const { data: selectedDateAttendance } = useDoc<Record<string, any>>(selectedDateAttendanceRef, {
+    enabled: isActive && !!studentId && !!selectedDateKey,
+  });
 
   const attendanceCurrentQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
@@ -2316,8 +2324,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return insights.slice(0, 4);
   }, [student?.targetDailyMinutes, weeklyTotalStudyMinutes, weeklyPlanTotal, weeklyPlanCompletionRate, subjectsData, penaltyRecovery.effectivePoints]);
 
-  const weeklyFeedback = report?.content?.trim() || aiInsights[0] || '선생님 피드백이 등록되면 이 영역에서 확인할 수 있습니다.';
-
   const attendanceStatus = useMemo(() => {
     if (!attendanceCurrent) return { label: '상태 미확인', color: 'bg-slate-100 text-slate-400', icon: Clock };
 
@@ -2644,6 +2650,23 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     () => (attendance요청 || []).find((request) => request.date === selectedDateKey),
     [attendance요청, selectedDateKey]
   );
+  const selectedDateCheckInAt = useMemo(() => {
+    if (!selectedDateKey) return null;
+    return (
+      toDateSafe(selectedDateAttendance?.checkInAt) ||
+      checkInByDateKey[selectedDateKey] ||
+      (selectedDateKey === todayKey ? toDateSafe(attendanceCurrent?.lastCheckInAt as TimestampLike) : null)
+    );
+  }, [selectedDateAttendance, checkInByDateKey, selectedDateKey, todayKey, attendanceCurrent?.lastCheckInAt]);
+  const selectedDateCheckOutAt = useMemo(() => {
+    if (!selectedDateKey) return null;
+    return toDateSafe(selectedDateAttendance?.checkOutAt) || checkOutByDateKey[selectedDateKey] || null;
+  }, [selectedDateAttendance, checkOutByDateKey, selectedDateKey]);
+  const selectedDateCheckInLabel = formatAttendanceTimeLabel(selectedDateCheckInAt, '기록 없음');
+  const selectedDateCheckOutLabel =
+    selectedDateKey === todayKey && attendanceCurrent?.status === 'studying' && !selectedDateCheckOutAt
+      ? '학습 중'
+      : formatAttendanceTimeLabel(selectedDateCheckOutAt, '기록 없음');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3491,68 +3514,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   })}
                 </div>
               </Card>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
-                  <CardTitle className="text-[10px] font-black tracking-tight mb-4 flex items-center gap-2 text-slate-500 uppercase">
-                    <PieChartIcon className="h-3.5 w-3.5 text-[#FF7A16]" /> 과목별 학습 비중
-                  </CardTitle>
-                  <div className="space-y-4">
-                    {subjectsData.slice(0, 2).map((s) => {
-                      const ratio = Math.min(100, Math.round((s.minutes / (subjectTotalMinutes || 1)) * 100));
-                      return (
-                        <div key={s.subject} className="space-y-1.5">
-                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-700">
-                            <span>{s.subject}</span>
-                            <span className="font-black">{ratio}%</span>
-                          </div>
-                          <Progress value={ratio} className="h-1 bg-slate-100" />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Card className="rounded-[1.5rem] border border-orange-200 bg-orange-50 p-5 flex flex-col justify-center items-center text-center gap-2 cursor-pointer active:scale-95 transition-all">
-                      <BarChart3 className="h-6 w-6 text-[#FF7A16]" />
-                      <div className="grid gap-0.5 text-[#14295F]">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#B85A00]">주간 상세</span>
-                        <span className="text-xs font-black">성과 상세 분석</span>
-                      </div>
-                    </Card>
-                  </DialogTrigger>
-                  <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
-                    <div className="bg-[#14295F] p-10 text-white relative">
-                      <DialogTitle className="text-3xl font-black tracking-tighter text-left text-white">주간 성과 데이터</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold mt-1 text-sm">최근 7일간의 학습 지표 및 피드백입니다.</DialogDescription>
-                    </div>
-                    <div className="p-8 space-y-10 bg-white overflow-y-auto max-h-[60vh] custom-scrollbar">
-                      <div className="space-y-4">
-                        <h4 className="text-xs font-black uppercase text-[#14295F] tracking-[0.2em] ml-1">일별 집중 시간 (분)</h4>
-                        <div className="h-48 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsLineChart data={dailyStudyTrend}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                              <XAxis dataKey="date" fontSize={10} fontWeight="800" axisLine={false} tickLine={false} />
-                              <YAxis fontSize={10} fontWeight="800" axisLine={false} tickLine={false} width={30} />
-                              <Tooltip contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)'}} />
-                              <Line type="monotone" dataKey="minutes" stroke="#FF7A16" strokeWidth={4} dot={{ r: 4, fill: '#fff', stroke: '#FF7A16', strokeWidth: 2 }} />
-                            </RechartsLineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                      <div className="p-6 rounded-[2rem] bg-orange-50/50 border border-orange-100">
-                        <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
-                        <p className="text-base font-bold text-slate-700 leading-relaxed">"{weeklyFeedback}"</p>
-                      </div>
-                    </div>
-                    <DialogFooter className="p-6 bg-white border-t">
-                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F] text-white">확인 완료</Button></DialogClose>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
             </TabsContent>
 
             <TabsContent value="data" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
@@ -4367,7 +4328,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <DialogTitle className="text-xl font-black tracking-tight">
                   {selectedCalendarDate ? format(selectedCalendarDate, 'yyyy.MM.dd (EEE)', { locale: ko }) : '날짜 상세'}
                 </DialogTitle>
-                <DialogDescription className="mt-1 text-xs font-bold text-white/72">해당 날짜의 학습 흐름과 계획 요약입니다.</DialogDescription>
+                <DialogDescription className="mt-1 text-xs font-bold text-white/72">해당 날짜의 학습 흐름, 계획 요약, 등하원 기록입니다.</DialogDescription>
               </div>
             </div>
           </div>
@@ -4390,6 +4351,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <p className="mt-1 text-sm font-black text-[#14295F]">
                   {selectedDateRequest ? (selectedDateRequest.type === 'late' ? '지각 신청' : '결석 신청') : '기록 없음'}
                 </p>
+              </Card>
+              <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">등원 시각</p>
+                <p className="dashboard-number mt-1 text-xl text-[#14295F]">{selectedDateCheckInLabel}</p>
+              </Card>
+              <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">하원 시각</p>
+                <p className="dashboard-number mt-1 text-xl text-[#14295F]">{selectedDateCheckOutLabel}</p>
               </Card>
             </div>
 
