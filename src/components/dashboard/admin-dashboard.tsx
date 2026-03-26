@@ -145,6 +145,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
+  const [isAttendanceFullscreenOpen, setIsAttendanceFullscreenOpen] = useState(false);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
@@ -1457,7 +1458,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <Button
                   type="button"
                   variant={selectedRoomView === 'all' ? 'default' : 'outline'}
-                  onClick={() => setSelectedRoomView('all')}
+                  onClick={() => {
+                    setSelectedRoomView('all');
+                    setIsAttendanceFullscreenOpen(true);
+                  }}
                   className={cn(
                     'h-10 rounded-xl font-black',
                     selectedRoomView === 'all' ? 'bg-primary text-white' : 'border-2'
@@ -1500,6 +1504,52 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 }
               }}
             />
+
+            <Dialog open={isAttendanceFullscreenOpen} onOpenChange={setIsAttendanceFullscreenOpen}>
+              <DialogContent className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden rounded-[2rem] border-none bg-[#f6f8ff] p-0 shadow-[0_24px_80px_rgba(20,41,95,0.28)]">
+                <div className="border-b border-primary/10 bg-white/90 px-5 py-4 backdrop-blur sm:px-6">
+                  <DialogHeader className="gap-2 text-left">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="h-6 border-none bg-primary px-2.5 text-[10px] font-black text-white">
+                        FULL SCREEN
+                      </Badge>
+                      {selectedClass !== 'all' && (
+                        <Badge className="h-6 border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
+                          {selectedClass}
+                        </Badge>
+                      )}
+                    </div>
+                    <DialogTitle className="text-2xl font-black tracking-tight text-primary">
+                      등하원 관제 전체보기
+                    </DialogTitle>
+                    <DialogDescription className="text-xs font-bold text-muted-foreground">
+                      두 호실을 한 화면에서 크게 확인합니다. `Esc`를 누르면 대시보드로 돌아갑니다.
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto py-4">
+                  <CenterAdminAttendanceBoard
+                    roomConfigs={roomConfigs}
+                    selectedRoomView="all"
+                    selectedClass={selectedClass}
+                    isMobile={isMobile}
+                    isLoading={attendanceBoardLoading}
+                    summary={attendanceBoardSummary}
+                    seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
+                    studentsById={studentsById}
+                    studentMembersById={studentMembersById}
+                    getSeatForRoom={getSeatForRoom}
+                    onSeatClick={(seat) => {
+                      setIsAttendanceFullscreenOpen(false);
+                      if (seat.studentId) {
+                        setSelectedFocusStudentId(seat.studentId);
+                      }
+                    }}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
           </section>
 
           <section className="px-1">
