@@ -203,6 +203,19 @@ export interface DailyReport {
     teacherOneLiner: string;
     strengths: string[];
     improvements: string[];
+    pedagogyLens?: '습관 형성' | '자기조절' | '집중 회복' | '성장 가속';
+    secondaryLens?: '습관 형성' | '자기조절' | '집중 회복' | '성장 가속';
+    stateBucket?: string;
+    variationKey?: string;
+    variationStyle?: '차분한 관찰형' | '격려형' | '전략 코칭형' | '균형 피드백형' | '가정 대화형' | '회복 지원형';
+    coachingFocus?: string;
+    homeTip?: string;
+    studyBand?: '저학습' | '기준학습' | '고학습' | '고집중';
+    growthBand?: '급하락' | '하락' | '유지' | '상승' | '급상승';
+    completionBand?: '낮음' | '보통' | '양호' | '높음';
+    routineBand?: '정상' | '지각' | '루틴누락' | '미입실' | '퇴실불안정';
+    volatilityBand?: '안정' | '출렁임' | '불안정';
+    continuityBand?: '회복중' | '유지중' | '연속호조' | '연속저하';
     metrics: {
       growthRate: number;
       deltaMinutesFromAvg: number;
