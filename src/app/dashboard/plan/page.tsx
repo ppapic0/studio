@@ -1453,90 +1453,51 @@ export default function StudyPlanPage() {
               <Badge variant="outline" className={cn("h-7 rounded-full px-3 text-[10px] font-black shadow-sm", missionWrapupChipClass)}>
                 {hasOutPlan && outTime ? `${outTime} 전 마무리` : '마감 시간 미설정'}
               </Badge>
-              <Badge variant="outline" className="h-7 rounded-full border-emerald-200/90 bg-emerald-50/90 px-3 text-[10px] font-black text-emerald-700 shadow-sm">
-                학습 {remainingStudyTasks.length}개 남음
-              </Badge>
-              <Badge variant="outline" className="h-7 rounded-full border-amber-200/90 bg-amber-50/90 px-3 text-[10px] font-black text-amber-700 shadow-sm">
-                개인 {remainingPersonalTasks.length}개 남음
-              </Badge>
             </div>
 
-            <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]")}>
-              <div className="rounded-[1.45rem] border border-white/90 bg-white/84 p-4 shadow-[0_22px_40px_-34px_rgba(20,41,95,0.28)] backdrop-blur-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={cn(
-                      "text-[10px] font-black uppercase tracking-[0.2em]",
-                      estimatedPlanReward > 0 ? "text-amber-600" : "text-slate-400"
-                    )}>
-                      예상 보상
-                    </p>
-                    <p className={cn(
-                      "mt-2 font-black tracking-tight break-keep",
-                      estimatedPlanReward > 0 ? "text-slate-900" : "text-slate-500",
-                      isMobile ? "text-[1.35rem] leading-[1.08]" : "text-[1.7rem] leading-[1.05]"
-                    )}>
-                      {missionRewardLabel}
-                    </p>
-                    <p className="mt-2 max-w-[28rem] text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                      {missionRewardGuide}
-                    </p>
-                  </div>
-                  <div className={cn(
-                    "shrink-0 rounded-[1.2rem] border p-3 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.25)]",
-                    estimatedPlanReward > 0
-                      ? "border-amber-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,249,237,0.96)_100%)] text-amber-600"
-                      : "border-slate-200 bg-white/92 text-slate-300"
-                  )}>
-                    <Sparkles className="h-5 w-5" />
-                  </div>
-                </div>
+            <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+              <div className="rounded-[1.3rem] border border-white/90 bg-white/84 px-4 py-3.5 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.24)] backdrop-blur-sm">
+                <p className={cn(
+                  "text-[10px] font-black uppercase tracking-[0.18em]",
+                  estimatedPlanReward > 0 ? "text-amber-600" : "text-slate-400"
+                )}>
+                  예상 보상
+                </p>
+                <p className={cn(
+                  "mt-2 font-black tracking-tight break-keep",
+                  estimatedPlanReward > 0 ? "text-slate-900" : "text-slate-500",
+                  isMobile ? "text-[1.2rem]" : "text-[1.45rem]"
+                )}>
+                  {missionRewardLabel}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                  {estimatedPlanReward > 0 ? '완료할수록 더 커져요.' : '첫 완료부터 보상이 열려요.'}
+                </p>
               </div>
 
-              <div className="grid gap-3">
-                <div className="rounded-[1.35rem] border border-white/90 bg-white/84 p-4 shadow-[0_20px_34px_-30px_rgba(20,41,95,0.24)] backdrop-blur-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className={cn(
-                        "text-[10px] font-black uppercase tracking-[0.2em]",
-                        hasOutPlan && outTime ? "text-emerald-600" : "text-slate-400"
-                      )}>
-                        마감 리듬
-                      </p>
-                      <p className={cn(
-                        "mt-2 font-black tracking-tight break-keep text-slate-900",
-                        isMobile ? "text-[1.35rem] leading-[1.08]" : "text-[1.6rem] leading-[1.05]"
-                      )}>
-                        {missionWrapupValue}
-                      </p>
-                      <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                        {missionWrapupGuide}
-                      </p>
-                    </div>
-                    <div className={cn(
-                      "shrink-0 rounded-[1.2rem] border p-3 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.25)]",
-                      hasOutPlan && outTime
-                        ? "border-emerald-100 bg-emerald-50/90 text-emerald-600"
-                        : "border-slate-200 bg-white/92 text-slate-300"
-                    )}>
-                      <CalendarCheck className="h-5 w-5" />
-                    </div>
-                  </div>
-                </div>
+              <div className="rounded-[1.3rem] border border-white/90 bg-white/84 px-4 py-3.5 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.24)] backdrop-blur-sm">
+                <p className={cn(
+                  "text-[10px] font-black uppercase tracking-[0.18em]",
+                  hasOutPlan && outTime ? "text-emerald-600" : "text-slate-400"
+                )}>
+                  마감 리듬
+                </p>
+                <p className="mt-2 font-black tracking-tight break-keep text-slate-900 text-[1.2rem] sm:text-[1.45rem]">
+                  {missionWrapupValue}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                  {hasOutPlan && outTime ? '오늘 마감 기준이 정해졌어요.' : '하원 시간만 정하면 충분해요.'}
+                </p>
+              </div>
 
-                <div className="rounded-[1.35rem] border border-primary/12 bg-primary/[0.04] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/55">완료 흐름</p>
-                      <p className="mt-1 text-sm font-black text-slate-900 break-keep">
-                        완료 {completedMissionCount}/{allMissionTasks.length} · {Math.max(0, allMissionTasks.length - completedMissionCount)}개 남음
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-primary/10 bg-white px-3 py-1 text-sm font-black text-primary shadow-sm">
-                      {missionProgressPercent}%
-                    </span>
-                  </div>
-                </div>
+              <div className="rounded-[1.3rem] border border-primary/12 bg-primary/[0.04] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/55">남은 흐름</p>
+                <p className="mt-2 text-sm font-black text-slate-900 break-keep">
+                  학습 {remainingStudyTasks.length}개 · 개인 {remainingPersonalTasks.length}개
+                </p>
+                <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                  완료 {completedMissionCount}/{allMissionTasks.length} · {Math.max(0, allMissionTasks.length - completedMissionCount)}개 남음
+                </p>
               </div>
             </div>
 
@@ -1553,23 +1514,17 @@ export default function StudyPlanPage() {
                   ))}
                 </div>
               ) : (
-                <div className="relative overflow-hidden rounded-[1.4rem] border border-dashed border-primary/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] px-4 py-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.24)]">
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.1),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.08),transparent_24%)]" />
+                <div className="relative overflow-hidden rounded-[1.3rem] border border-dashed border-primary/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] px-4 py-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.24)]">
                   <div className="relative flex items-start gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_16px_28px_-22px_rgba(20,41,95,0.34)]">
                       <PlusCircle className="h-4.5 w-4.5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-black text-slate-900 break-keep">지금 한 개만 적어도 오늘 허브가 바로 움직여요.</p>
-                      <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                        가장 먼저 끝낼 한 가지를 아래에서 추가하면 토큰과 진행 보드가 바로 시작됩니다.
-                      </p>
+                      <p className="text-sm font-black text-slate-900 break-keep">첫 미션 한 개만 적어도 바로 시작돼요.</p>
+                      <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">가장 먼저 끝낼 한 가지부터 추가해 보세요.</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="inline-flex items-center rounded-full border border-primary/12 bg-white/92 px-3 py-1 text-[10px] font-black text-primary shadow-sm">
                           첫 미션 추가
-                        </span>
-                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[10px] font-black text-slate-500">
-                          아래 입력창에서 시작
                         </span>
                       </div>
                     </div>
