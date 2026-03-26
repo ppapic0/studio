@@ -145,6 +145,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
+  const [isAttendanceFullscreenOpen, setIsAttendanceFullscreenOpen] = useState(false);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
@@ -1396,6 +1397,130 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [selectedFocusStudent, focusStudentTrend, selectedFocusStat, selectedFocusProgress]);
 
+  const attendanceDashboardSection = (
+    <section className="space-y-4 px-1">
+      <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
+        <div className="grid gap-1">
+          <div className="flex items-center gap-2 text-primary/65">
+            <ClipboardCheck className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.28em]">Dashboard Priority View</span>
+          </div>
+          <p className="text-xs font-bold text-muted-foreground">
+            등하원 관제는 먼저 보고, 누적 운영 건강도는 바로 아래 그래프로 이어서 확인합니다.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={selectedRoomView === 'all' ? 'default' : 'outline'}
+            onClick={() => {
+              setSelectedRoomView('all');
+              setIsAttendanceFullscreenOpen(true);
+            }}
+            className={cn(
+              'h-10 rounded-xl font-black',
+              selectedRoomView === 'all' ? 'bg-primary text-white' : 'border-2'
+            )}
+          >
+            <LayoutGrid className="mr-2 h-4 w-4" />
+            전체보기
+          </Button>
+          {roomConfigs.map((room) => (
+            <Button
+              key={room.id}
+              type="button"
+              variant={selectedRoomView === room.id ? 'default' : 'outline'}
+              onClick={() => setSelectedRoomView(room.id)}
+              className={cn(
+                'h-10 rounded-xl font-black',
+                selectedRoomView === room.id ? 'bg-primary text-white' : 'border-2'
+              )}
+            >
+              {room.name}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <CenterAdminAttendanceBoard
+        roomConfigs={roomConfigs}
+        selectedRoomView={selectedRoomView}
+        selectedClass={selectedClass}
+        isMobile={isMobile}
+        isLoading={attendanceBoardLoading}
+        summary={attendanceBoardSummary}
+        seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
+        studentsById={studentsById}
+        studentMembersById={studentMembersById}
+        getSeatForRoom={getSeatForRoom}
+        onSeatClick={(seat) => {
+          if (seat.studentId) {
+            setSelectedFocusStudentId(seat.studentId);
+          }
+        }}
+      />
+
+      <Dialog open={isAttendanceFullscreenOpen} onOpenChange={setIsAttendanceFullscreenOpen}>
+        <DialogContent className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden rounded-[2rem] border-none bg-[#f6f8ff] p-0 shadow-[0_24px_80px_rgba(20,41,95,0.28)]">
+          <div className="border-b border-primary/10 bg-white/90 px-5 py-4 backdrop-blur sm:px-6">
+            <DialogHeader className="gap-2 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="h-6 border-none bg-primary px-2.5 text-[10px] font-black text-white">
+                  FULL SCREEN
+                </Badge>
+                {selectedClass !== 'all' && (
+                  <Badge className="h-6 border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
+                    {selectedClass}
+                  </Badge>
+                )}
+              </div>
+              <DialogTitle className="text-2xl font-black tracking-tight text-primary">
+                등하원 관제 전체보기
+              </DialogTitle>
+              <DialogDescription className="text-xs font-bold text-muted-foreground">
+                두 호실을 한 화면에서 크게 확인합니다. `Esc`를 누르면 대시보드로 돌아갑니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto py-4">
+            <CenterAdminAttendanceBoard
+              roomConfigs={roomConfigs}
+              selectedRoomView="all"
+              selectedClass={selectedClass}
+              isMobile={isMobile}
+              isLoading={attendanceBoardLoading}
+              summary={attendanceBoardSummary}
+              seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
+              studentsById={studentsById}
+              studentMembersById={studentMembersById}
+              getSeatForRoom={getSeatForRoom}
+              onSeatClick={(seat) => {
+                setIsAttendanceFullscreenOpen(false);
+                if (seat.studentId) {
+                  setSelectedFocusStudentId(seat.studentId);
+                }
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+
+  const heatmapGraphSection = (
+    <section className="px-1">
+      <CenterAdminHeatmapCharts
+        title="운영 히트맵 그래프"
+        description="등하원 도면 아래에서 운영 KPI, 학부모 반응, 위험, 수납, 효율을 그래프 중심으로 읽고 바로 우선순위를 정할 수 있습니다."
+        rows={adminHeatmapRows}
+        isLoading={adminHeatmapLoading}
+        actionHref="/dashboard/teacher"
+        actionLabel="실시간 교실 이동"
+      />
+    </section>
+  );
+
   if (!isActive) return null;
 
   if (membersLoading || !isMounted) {
@@ -1442,77 +1567,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       {metrics ? (
         <>
-          <section className="space-y-4 px-1">
-            <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
-              <div className="grid gap-1">
-                <div className="flex items-center gap-2 text-primary/65">
-                  <ClipboardCheck className="h-4 w-4" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.28em]">Dashboard Priority View</span>
-                </div>
-                <p className="text-xs font-bold text-muted-foreground">
-                  등하원 관제는 먼저 보고, 누적 운영 건강도는 바로 아래 그래프로 이어서 확인합니다.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={selectedRoomView === 'all' ? 'default' : 'outline'}
-                  onClick={() => setSelectedRoomView('all')}
-                  className={cn(
-                    'h-10 rounded-xl font-black',
-                    selectedRoomView === 'all' ? 'bg-primary text-white' : 'border-2'
-                  )}
-                >
-                  <LayoutGrid className="mr-2 h-4 w-4" />
-                  전체보기
-                </Button>
-                {roomConfigs.map((room) => (
-                  <Button
-                    key={room.id}
-                    type="button"
-                    variant={selectedRoomView === room.id ? 'default' : 'outline'}
-                    onClick={() => setSelectedRoomView(room.id)}
-                    className={cn(
-                      'h-10 rounded-xl font-black',
-                      selectedRoomView === room.id ? 'bg-primary text-white' : 'border-2'
-                    )}
-                  >
-                    {room.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <CenterAdminAttendanceBoard
-              roomConfigs={roomConfigs}
-              selectedRoomView={selectedRoomView}
-              selectedClass={selectedClass}
-              isMobile={isMobile}
-              isLoading={attendanceBoardLoading}
-              summary={attendanceBoardSummary}
-              seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
-              studentsById={studentsById}
-              studentMembersById={studentMembersById}
-              getSeatForRoom={getSeatForRoom}
-              onSeatClick={(seat) => {
-                if (seat.studentId) {
-                  setSelectedFocusStudentId(seat.studentId);
-                }
-              }}
-            />
-          </section>
-
-          <section className="px-1">
-            <CenterAdminHeatmapCharts
-              title="운영 히트맵 그래프"
-              description="등하원 도면 아래에서 운영 KPI, 학부모 반응, 위험, 수납, 효율을 그래프 중심으로 읽고 바로 우선순위를 정할 수 있습니다."
-              rows={adminHeatmapRows}
-              isLoading={adminHeatmapLoading}
-              actionHref="/dashboard/teacher"
-              actionLabel="실시간 교실 이동"
-            />
-          </section>
-
           <section className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <Activity className="h-5 w-5 text-primary" />
@@ -1586,6 +1640,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </Link>
             </div>
           </section>
+
+          {attendanceDashboardSection}
+
+          {heatmapGraphSection}
 
           <section className="space-y-4 px-1">
             <div className="flex items-center gap-2">
