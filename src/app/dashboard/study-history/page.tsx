@@ -853,12 +853,12 @@ export default function StudyHistoryPage() {
               ))}
             </div>
           </div>
-          <div className={cn("grid grid-cols-7 gap-1.5 border-b border-primary/10", isMobile ? "px-2 py-2.5" : "px-4 py-3")}>
+          <div className={cn("grid grid-cols-7 border-b border-primary/10", isMobile ? "gap-1 px-1.5 py-1.5" : "gap-1.5 px-4 py-3")}>
             {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
               <div
                 key={day}
                 className={cn(
-                  isMobile ? "py-2 text-[9px]" : "py-3 text-[11px]",
+                  isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
                   "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
                   i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
                 )}
@@ -867,7 +867,7 @@ export default function StudyHistoryPage() {
               </div>
             ))}
           </div>
-          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1.5 p-2" : "auto-rows-fr gap-3 p-4")}>
+          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 p-1.5" : "auto-rows-fr gap-3 p-4")}>
             {logsLoading ? (
               <div className="col-span-7 h-[400px] flex items-center justify-center">
                 <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
@@ -889,7 +889,7 @@ export default function StudyHistoryPage() {
                   onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
                     "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
-                    isMobile ? "aspect-[0.94] min-h-[4.8rem] p-1.5" : "min-h-[150px] p-3",
+                    isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
                     !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                     isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
                     isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
@@ -898,16 +898,16 @@ export default function StudyHistoryPage() {
                   {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-primary/20" />}
                   <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
                   {isCurrentMonth && (
-                    <div className={cn("pointer-events-none absolute inset-x-3", isMobile ? "bottom-9" : "bottom-[4.1rem]")}>
+                    <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-2 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
                       <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
                     </div>
                   )}
 
-                  <div className={cn("relative z-10 flex justify-between items-start gap-2", isMobile ? "mb-1 md:mb-2" : "mb-2.5")}>
+                  <div className={cn("relative z-10 flex justify-between items-start gap-1.5", isMobile ? "mb-0.5" : "mb-2.5")}>
                     <span
                       className={cn(
                         "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                        isMobile ? "min-w-[1.6rem] px-1.5 py-0.5 text-[10px]" : "min-w-[2rem] px-2 py-1 text-xs",
+                        isMobile ? "min-w-[1.35rem] px-1 py-[0.2rem] text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
                         idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
                         isTodayCalendar && "border-primary/20 text-primary"
                       )}
@@ -915,25 +915,25 @@ export default function StudyHistoryPage() {
                       {format(day, 'd')}
                     </span>
                     {hasStatusCluster ? (
-                      <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]", isMobile ? "px-1.5 py-[0.3rem]" : "px-2 py-1")}>
+                      <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]", isMobile ? "px-1 py-[0.2rem]" : "px-2 py-1")}>
                         {hasPlans && <span className={cn("rounded-full bg-primary", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
-                        {hasDeepFocus && <Zap className={cn("text-amber-500 fill-amber-500", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />}
+                        {hasDeepFocus && <Zap className={cn("text-amber-500 fill-amber-500", isMobile ? "h-2 w-2" : "h-3 w-3")} />}
                       </div>
                     ) : (
-                      <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
+                      <span className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} aria-hidden="true" />
                     )}
                   </div>
 
-                  <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 px-1" : "bottom-3 px-3")}>
+                  <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1 px-0.5" : "bottom-3 px-3")}>
                     <div
                       className={cn(
                         "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
-                        isMobile ? "px-2 py-1.5" : "px-3 py-2.5",
+                        isMobile ? "px-1.5 py-1" : "px-3 py-2.5",
                         getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                       )}
                     >
                       {isMobile ? (
-                        <span className="dashboard-number block tabular-nums text-[0.96rem] leading-none tracking-[-0.05em]">
+                        <span className="dashboard-number block tabular-nums text-[0.78rem] leading-none tracking-[-0.05em]">
                           {timeLabel}
                         </span>
                       ) : (

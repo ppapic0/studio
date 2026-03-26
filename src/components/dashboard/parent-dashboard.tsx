@@ -3390,18 +3390,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
                 <div className={cn(
-                  "grid grid-cols-7 gap-1.5 border-b border-[#14295F]/10",
-                  isMobile ? "px-2 py-2.5" : "px-4 py-3"
+                  "grid grid-cols-7 border-b border-[#14295F]/10",
+                  isMobile ? "gap-1 px-1.5 py-1.5" : "gap-1.5 px-4 py-3"
                 )}>
                   {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                     <div key={day} className={cn(
-                      isMobile ? "py-2 text-[10px] md:py-2.5 md:text-[11px]" : "py-3 text-[11px]",
+                      isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
                       "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
                       i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
                     )}>{day}</div>
                   ))}
                 </div>
-                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1.5 p-2" : "gap-2.5 p-3")}>
+                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1 p-1.5" : "gap-2.5 p-3")}>
                   {logsLoading ? (
                     <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-[#14295F] opacity-20" /></div>
                   ) : calendarData.map((day, idx) => {
@@ -3422,7 +3422,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         onClick={() => setSelectedCalendarDate(day)}
                         className={cn(
                           "group relative overflow-hidden rounded-[1.15rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30",
-                          isMobile ? "aspect-[0.94] min-h-[4.8rem] p-1.5 md:min-h-[7.2rem] md:p-2.5" : "min-h-[150px] p-3",
+                          isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
                           !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                           isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(20,41,95,0.32)] active:translate-y-0",
                           isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]"
@@ -3431,15 +3431,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.3rem] border border-[#FF7A16]/20" />}
                         <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
                         {isCurrentMonth && (
-                          <div className={cn("pointer-events-none absolute inset-x-3", isMobile ? "bottom-9" : "bottom-[4.1rem]")}>
+                          <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-2 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
                             <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
                           </div>
                         )}
-                        <div className={cn("relative z-10 flex justify-between items-start gap-2", isMobile ? "mb-1 md:mb-2" : "mb-2.5")}>
+                        <div className={cn("relative z-10 flex justify-between items-start gap-1.5", isMobile ? "mb-0.5" : "mb-2.5")}>
                           <span
                             className={cn(
                               "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                              isMobile ? "text-[10px] min-w-[1.6rem] px-1.5 py-0.5 md:text-[11px] md:px-2 md:py-0.75" : "text-xs min-w-[2rem] px-2 py-1",
+                              isMobile ? "text-[9px] min-w-[1.35rem] px-1 py-[0.2rem]" : "text-xs min-w-[2rem] px-2 py-1",
                               idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
                               isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
                             )}
@@ -3447,24 +3447,24 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             {format(day, 'd')}
                           </span>
                           {hasStatusCluster ? (
-                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]", isMobile ? "px-1.5 py-[0.3rem]" : "px-2 py-1")}>
+                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]", isMobile ? "px-1 py-[0.2rem]" : "px-2 py-1")}>
                               {hasPlans && <span className={cn("rounded-full bg-[#14295F]", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
-                              {hasDeepFocus && <Zap className={cn("text-orange-500 fill-orange-500", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />}
+                              {hasDeepFocus && <Zap className={cn("text-orange-500 fill-orange-500", isMobile ? "h-2 w-2" : "h-3 w-3")} />}
                             </div>
                           ) : (
-                            <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
+                            <span className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} aria-hidden="true" />
                           )}
                         </div>
-                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 px-1" : "bottom-3 px-3")}>
+                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1 px-0.5" : "bottom-3 px-3")}>
                           <div
                             className={cn(
                               "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
-                              isMobile ? "px-2 py-1.5" : "px-3 py-2.5",
+                              isMobile ? "px-1.5 py-1" : "px-3 py-2.5",
                               getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                             )}
                           >
                             {isMobile ? (
-                              <span className="dashboard-number block tabular-nums text-[0.96rem] leading-none tracking-[-0.05em]">
+                              <span className="dashboard-number block tabular-nums text-[0.78rem] leading-none tracking-[-0.05em]">
                                 {timeLabel}
                               </span>
                             ) : (
