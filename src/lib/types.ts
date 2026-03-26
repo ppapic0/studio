@@ -178,7 +178,12 @@ export interface StudyPlanItem {
   dateKey: string;
   category?: 'schedule' | 'personal' | 'study';
   subject?: string;
+  studyPlanMode?: 'time' | 'volume';
   targetMinutes?: number;
+  targetAmount?: number;
+  actualAmount?: number;
+  amountUnit?: '문제' | '페이지' | '챕터' | '지문' | '세트' | '회독' | '직접입력';
+  amountUnitLabel?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
