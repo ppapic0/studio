@@ -109,6 +109,16 @@ export type ComparisonRow = {
   track: string;
 };
 
+export type MarketingLaunchNotice = {
+  enabled: boolean;
+  eyebrow: string;
+  title: string;
+  description: string;
+  note: string;
+  primaryLabel: string;
+  secondaryLabel: string;
+};
+
 export type MarketingContent = {
   brand: {
     name: string;
@@ -119,6 +129,7 @@ export type MarketingContent = {
     logoMark: string;
     heroBackground: string;
   };
+  launchNotice: MarketingLaunchNotice;
   nav: MarketingNavItem[];
   valueCards: MarketingCard[];
   director: {
@@ -209,6 +220,16 @@ export const marketingContent: MarketingContent = {
     logoFull: '/track-logo-full.png',
     logoMark: '/track-logo-mark.png',
     heroBackground: '',
+  },
+  launchNotice: {
+    enabled: true,
+    eyebrow: 'OPENING NOTICE',
+    title: '트랙은 4월 말 오픈 예정입니다',
+    description:
+      '현재 웹페이지와 앱은 계속 수정 중입니다. 보시는 데 큰 차질이 없도록 순차적으로 반영하고 있으며, 일부 화면과 문구는 계속 변경될 수 있습니다.',
+    note: '정식 오픈 전까지 실제 운영 흐름에 맞춰 계속 다듬고 있습니다.',
+    primaryLabel: '확인했습니다',
+    secondaryLabel: '오늘 하루 보지 않기',
   },
   nav: [
     { label: '운영 방식', href: '/#features' },

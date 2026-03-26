@@ -5,6 +5,7 @@ import { HomeGrowthProofSection } from '@/components/marketing/home-growth-proof
 import { KoreanClassSection } from '@/components/marketing/korean-class-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
+import { MarketingLaunchNoticeModal } from '@/components/marketing/marketing-launch-notice-modal';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { ResultsSection } from '@/components/marketing/results-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
@@ -16,6 +17,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen overflow-x-clip bg-white text-slate-900">
       <MarketingPageTracker pageType="landing" placement="landing_root" />
+      <MarketingLaunchNoticeModal notice={marketingContent.launchNotice} />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
       <ScrollReveal>
