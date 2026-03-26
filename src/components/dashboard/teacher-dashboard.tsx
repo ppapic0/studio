@@ -260,7 +260,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const triggerAttendanceSms = async (
     studentId: string,
-    eventType: 'check_in' | 'check_out'
+    eventType: 'study_start' | 'away_start' | 'study_end'
   ) => {
     if (!functions || !centerId || !canTriggerAttendanceSms) return;
 
@@ -1375,10 +1375,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         type: kakaoType
       });
 
-      if (nextStatus === 'studying') {
-        void triggerAttendanceSms(studentId, 'check_in');
+      if (nextStatus === 'studying' && prevStatus === 'absent') {
+        void triggerAttendanceSms(studentId, 'study_start');
+      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+        void triggerAttendanceSms(studentId, 'away_start');
       } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
-        void triggerAttendanceSms(studentId, 'check_out');
+        void triggerAttendanceSms(studentId, 'study_end');
       }
       
       toast({ title: "학생 상태가 업데이트되었습니다." });
