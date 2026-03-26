@@ -34,6 +34,9 @@ export function KoreanClassSection() {
               센터 이용과 수업은 분리됩니다. 재학생·N수생 모두 등록 가능하며,
               국어 수업은 별도로 추가할 수 있습니다.
             </p>
+            <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.7] text-[#14295F]/78">
+              매달 더프, 사설 모의고사(국어-이감, 시대인재 서바이벌 등 제휴 협의중)도 함께 실시합니다.
+            </p>
           </div>
 
           {/* CTA */}
