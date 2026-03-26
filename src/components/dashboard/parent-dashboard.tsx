@@ -1484,7 +1484,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [linkedStudents, student?.name, studentId, linkedStudentIds.length]
   );
   const shouldLoadStudyAnalytics = isActive && !!centerId && !!studentId && tab !== 'communication' && tab !== 'billing';
-  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && tab === 'home';
+  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && (tab === 'home' || tab === 'communication');
   const shouldLoadReportArchive = isActive && !!studentId && isReportArchiveOpen;
   const shouldLoadParentCommunications = isActive && !!centerId && !!user && tab === 'communication';
   const shouldLoadInvoices = isActive && !!studentId && tab === 'billing';
@@ -3977,6 +3977,75 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="communication" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
+              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
+                <CardTitle className="mb-2 flex items-center gap-2 text-lg font-black tracking-tighter text-[#14295F]">
+                  <Bell className="h-5 w-5 text-[#14295F]" />
+                  공지사항 · 알림
+                </CardTitle>
+                <CardDescription className="mb-6 text-sm font-bold text-slate-500">
+                  센터 공지와 최근 알림을 소통 탭에서도 바로 확인할 수 있어요.
+                </CardDescription>
+
+                {recentNotifications.length === 0 ? (
+                  <div className="rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50/60 py-16 text-center">
+                    <p className="text-sm font-black text-slate-400">확인할 공지사항이 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recentNotifications.map((notification) => {
+                      const isRead = notification.isRead || !!readMap[notification.id];
+
+                      return (
+                        <button
+                          key={notification.id}
+                          type="button"
+                          className={cn(
+                            'relative w-full overflow-hidden rounded-[1.75rem] border p-5 text-left transition-all active:scale-[0.98]',
+                            isRead
+                              ? 'border-slate-100 bg-slate-50/40 shadow-sm'
+                              : 'border-[#ffd4a6] bg-[linear-gradient(135deg,#fff8ef_0%,#f1f6ff_100%)] shadow-[0_20px_40px_-28px_rgba(20,41,95,0.20)] ring-1 ring-[#ffd5ab]/70'
+                          )}
+                          onClick={() => void openNotificationDetail(notification)}
+                        >
+                          {!isRead && (
+                            <>
+                              <div className="pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full bg-[#FF7A16]/18 blur-xl" />
+                              <Sparkles className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-[#FF7A16]" />
+                            </>
+                          )}
+                          <div className="relative z-10 flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                  {notification.createdAtLabel}
+                                </span>
+                                {notification.isImportant && (
+                                  <Badge variant="outline" className="h-5 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
+                                    중요
+                                  </Badge>
+                                )}
+                                {!isRead && (
+                                  <Badge variant="outline" className="h-5 border-none bg-[#14295F] px-2 text-[10px] font-black text-white">
+                                    새 알림
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="truncate text-base font-black tracking-tight text-[#14295F]">
+                                {notification.title}
+                              </p>
+                              <p className="mt-2 line-clamp-2 whitespace-pre-line text-sm font-bold leading-relaxed text-slate-600">
+                                {notification.body}
+                              </p>
+                            </div>
+                            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-300" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+
               <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
                 <CardTitle className="text-lg font-black tracking-tighter mb-6 flex items-center gap-2 text-[#14295F]"><Send className="h-5 w-5 text-[#14295F]" /> 상담 및 지원 요청</CardTitle>
                 <div className="space-y-4">
