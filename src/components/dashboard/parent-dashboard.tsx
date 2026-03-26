@@ -760,12 +760,7 @@ function RhythmTimeChartDialog({
   rhythmScore: number;
 }) {
   const latestRhythm = trend.slice().reverse().find((item) => typeof item.rhythmMinutes === 'number');
-  const previewChartId = useId().replace(/:/g, '');
-  const rhythmPreviewTrend = rhythmScoreTrend.slice(-7);
-  const rhythmPreviewHasScores = rhythmPreviewTrend.some((point) => Number(point.score || 0) > 0);
-  const rhythmPreviewPeakScore = rhythmPreviewHasScores
-    ? Math.max(...rhythmPreviewTrend.map((point) => Number(point.score || 0)))
-    : 0;
+  const rhythmPreviewBars = rhythmScoreTrend.slice(-6);
 
   return (
     <Dialog>
@@ -808,49 +803,24 @@ function RhythmTimeChartDialog({
                 </Badge>
               </div>
 
-              <div className="mt-4 rounded-[1.15rem] border border-[#dfe9fb] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
-                <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                  <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#6d7fa5]">최근 7일 리듬 그래프</span>
-                  <span className="text-[10px] font-black text-[#14295F]">
-                    {rhythmPreviewHasScores ? `최고 ${Math.round(rhythmPreviewPeakScore)}점` : '기록 대기'}
-                  </span>
-                </div>
-                <div className="h-[76px] w-full">
-                  {rhythmPreviewHasScores ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={rhythmPreviewTrend} margin={{ top: 6, right: 6, left: 6, bottom: 4 }}>
-                        <defs>
-                          <linearGradient id={`${previewChartId}-area`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#8BB8FF" stopOpacity={0.32} />
-                            <stop offset="100%" stopColor="#8BB8FF" stopOpacity={0.04} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8eef8" />
-                        <XAxis hide dataKey="date" />
-                        <YAxis hide domain={[0, 100]} />
-                        <Area
-                          type="monotone"
-                          dataKey="score"
-                          stroke="none"
-                          fill={`url(#${previewChartId}-area)`}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="score"
-                          stroke="#2563eb"
-                          strokeWidth={2.6}
-                          dot={{ r: 2.2, fill: '#14295F', stroke: '#ffffff', strokeWidth: 1.2 }}
-                          activeDot={{ r: 3.5, fill: '#FF7A16', stroke: '#14295F', strokeWidth: 1.5 }}
-                          isAnimationActive={false}
-                        />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex h-full items-center justify-center rounded-[0.95rem] border border-dashed border-[#d9e4fb] bg-white/80 text-[11px] font-bold text-slate-400">
-                      최근 리듬 기록 대기
+              <div className="mt-4 flex items-end gap-1.5">
+                {(rhythmPreviewBars.length > 0 ? rhythmPreviewBars : [{ date: '대기', score: 0 }]).map((point, index, array) => {
+                  const safeScore = Math.max(6, Math.round((Number(point.score || 0) / 100) * 44));
+                  const isLatest = index === array.length - 1;
+                  return (
+                    <div key={`${point.date}-${index}`} className="flex-1">
+                      <div
+                        className={cn(
+                          'w-full rounded-full transition-all duration-200',
+                          isLatest
+                            ? 'bg-[linear-gradient(180deg,#14295F_0%,#FF7A16_100%)] shadow-[0_14px_20px_-16px_rgba(20,41,95,0.4)]'
+                            : 'bg-[linear-gradient(180deg,#d8e5ff_0%,#b8c9ef_100%)]'
+                        )}
+                        style={{ height: `${safeScore}px` }}
+                      />
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
 
               <p className="mt-4 text-[11px] font-bold leading-5 text-slate-500">
@@ -1500,7 +1470,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [linkedStudents, student?.name, studentId, linkedStudentIds.length]
   );
   const shouldLoadStudyAnalytics = isActive && !!centerId && !!studentId && tab !== 'communication' && tab !== 'billing';
-  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && (tab === 'home' || tab === 'communication');
+  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && tab === 'home';
   const shouldLoadReportArchive = isActive && !!studentId && isReportArchiveOpen;
   const shouldLoadParentCommunications = isActive && !!centerId && !!user && tab === 'communication';
   const shouldLoadInvoices = isActive && !!studentId && tab === 'billing';
@@ -3012,8 +2982,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 showEntryMotion && 'parent-card-enter parent-entry-delay-3'
               )}
             >
-              <div className="grid h-full grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
-                <div className="min-w-0 space-y-2.5">
+              <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
+                <div className="min-w-0 space-y-2.5 pr-[5.7rem] sm:pr-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#56739f]">오늘 공부</span>
                     {growthCelebrationCandidate ? (
@@ -3037,7 +3007,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </p>
                   </div>
                 </div>
-                <div className="w-full max-w-[7rem] justify-self-end sm:flex sm:min-w-0 sm:max-w-none sm:items-start sm:justify-end sm:w-auto">
+                <div className="absolute right-0 -top-1 w-[4.8rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
                   <ParentMetricSparkline
                     tone="study"
                     points={dailyStudyTrend.map((point) => ({
@@ -3059,8 +3029,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 showEntryMotion && 'parent-card-enter parent-entry-delay-3'
               )}
             >
-              <div className="grid h-full grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
-                <div className="min-w-0 space-y-2.5">
+              <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
+                <div className="min-w-0 space-y-2.5 pr-[5.7rem] sm:pr-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c66a13]">계획 달성</span>
                     <Badge variant="outline" className="h-6 rounded-full border border-[#ffd8ab] bg-white/90 px-2.5 text-[10px] font-black text-[#b45f0d]">
@@ -3078,7 +3048,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </p>
                   </div>
                 </div>
-                <div className="w-full max-w-[7rem] justify-self-end sm:flex sm:min-w-0 sm:max-w-none sm:items-start sm:justify-end sm:w-auto">
+                <div className="absolute right-0 -top-1 w-[4.8rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
                   <ParentMetricSparkline
                     tone="plan"
                     points={dailyPlanTrend.map((point) => ({
@@ -3131,13 +3101,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <div className="rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#5b7d88]">등원</p>
-                      <p className="mt-1 whitespace-nowrap break-keep text-[11px] font-black leading-none tracking-tight text-[#14295F] sm:text-[13px]">
+                      <p className="mt-1 text-[13px] font-black tracking-tight text-[#14295F]">
                         {todayAttendanceTimeSummary.checkInLabel}
                       </p>
                     </div>
                     <div className="rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#5b7d88]">하원</p>
-                      <p className="mt-1 whitespace-nowrap break-keep text-[11px] font-black leading-none tracking-tight text-[#14295F] sm:text-[13px]">
+                      <p className="mt-1 text-[13px] font-black tracking-tight text-[#14295F]">
                         {todayAttendanceTimeSummary.checkOutLabel}
                       </p>
                     </div>
@@ -3394,26 +3364,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
               <div className="flex flex-col gap-3 px-1 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-col">
-                  <h3 className="text-xl font-black tracking-tighter text-primary">기록트랙</h3>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">학습 일관성 맵</p>
+                  <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">학습 일관성 맵</p>
                 </div>
-                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-primary/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbff_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(37,99,235,0.35)] ring-1 ring-white/70">
-                  <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
-                  <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-white/80 bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_30px_-24px_rgba(37,99,235,0.32)]">
-                    <span className="text-sm font-black tracking-tight text-primary">{format(currentCalendarDate, 'yyyy년 M월')}</span>
+                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.15rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f5f8ff_100%)] p-1.5 shadow-[0_18px_36px_-28px_rgba(20,41,95,0.24)] ring-1 ring-white/70">
+                  <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/85" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[0.9rem] bg-white/75 text-[#14295F] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:bg-[#14295F]/5" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-4 w-4" /></Button>
+                  <div className="flex min-w-[86px] items-center justify-center rounded-[0.95rem] border border-white/80 bg-white/92 px-4 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_28px_-24px_rgba(20,41,95,0.24)]">
+                    <span className="text-[11px] font-black text-[#14295F]">{format(currentCalendarDate, 'yyyy년 M월')}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[0.9rem] bg-white/75 text-[#14295F] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:bg-[#14295F]/5" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
               </div>
 
-              <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
-                <CardContent className="relative p-0">
-                <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
-                  <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/50">학습 흐름</span>
+              <Card className="relative overflow-hidden rounded-[2.5rem] border border-[#14295F]/8 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.06),transparent_26%),linear-gradient(180deg,#ffffff_0%,#f7f9ff_100%)] shadow-[0_28px_70px_-52px_rgba(20,41,95,0.28)] ring-1 ring-white/70">
+                <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-[#14295F]/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
+                  <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#14295F]/50">학습 흐름</span>
                   <div className="flex flex-wrap gap-1.5">
                     {PARENT_CALENDAR_LEGEND.map((item) => (
-                      <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)] sm:text-[9px]">
+                      <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(20,41,95,0.14)] sm:text-[9px]">
                         <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
                         {item.label}
                       </span>
@@ -3421,20 +3390,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
                 <div className={cn(
-                  "grid grid-cols-7 border-b border-primary/10",
+                  "grid grid-cols-7 border-b border-[#14295F]/10",
                   isMobile ? "gap-1 px-1.5 py-1.5" : "gap-1.5 px-4 py-3"
                 )}>
                   {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                     <div key={day} className={cn(
                       isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
                       "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
-                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
+                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
                     )}>{day}</div>
                   ))}
                 </div>
-                <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 p-1.5" : "auto-rows-fr gap-3 p-4")}>
+                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1 p-1.5" : "gap-2.5 p-3")}>
                   {logsLoading ? (
-                    <div className="col-span-7 h-[400px] flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>
+                    <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-[#14295F] opacity-20" /></div>
                   ) : calendarData.map((day, idx) => {
                     const dateKey = format(day, 'yyyy-MM-dd');
                     const log = allLogs?.find(l => l.dateKey === dateKey);
@@ -3452,14 +3421,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         key={dateKey}
                         onClick={() => setSelectedCalendarDate(day)}
                         className={cn(
-                          "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                          "group relative overflow-hidden rounded-[1.15rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30",
                           isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
                           !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
-                          isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
-                          isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
+                          isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(20,41,95,0.32)] active:translate-y-0",
+                          isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]"
                         )}
                       >
-                        {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-primary/20" />}
+                        {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.3rem] border border-[#FF7A16]/20" />}
                         <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
                         {isCurrentMonth && (
                           <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-2 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
@@ -3472,25 +3441,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
                               isMobile ? "text-[9px] min-w-[1.35rem] px-1 py-[0.2rem]" : "text-xs min-w-[2rem] px-2 py-1",
                               idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                              isTodayCalendar && "border-primary/20 text-primary"
+                              isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
                             )}
                           >
                             {format(day, 'd')}
                           </span>
                           {hasStatusCluster ? (
-                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]", isMobile ? "px-1 py-[0.2rem]" : "px-2 py-1")}>
-                              {hasPlans && <span className={cn("rounded-full bg-primary", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
-                              {hasDeepFocus && <Zap className={cn("text-amber-500 fill-amber-500", isMobile ? "h-2 w-2" : "h-3 w-3")} />}
+                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]", isMobile ? "px-1 py-[0.2rem]" : "px-2 py-1")}>
+                              {hasPlans && <span className={cn("rounded-full bg-[#14295F]", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
+                              {hasDeepFocus && <Zap className={cn("text-orange-500 fill-orange-500", isMobile ? "h-2 w-2" : "h-3 w-3")} />}
                             </div>
                           ) : (
                             <span className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} aria-hidden="true" />
                           )}
                         </div>
-                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1 px-0.5" : "bottom-3 px-3")}>
+                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1 px-0.5" : "bottom-2 px-2")}>
                           <div
                             className={cn(
-                              "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
-                              isMobile ? "px-1.5 py-1" : "px-3 py-2.5",
+                              "overflow-hidden rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
+                              isMobile ? "px-1.5 py-1" : "px-2.5 py-2",
                               getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                             )}
                           >
@@ -3499,11 +3468,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 {timeLabel}
                               </span>
                             ) : (
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
                                   공부시간
                                 </span>
-                                <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
+                                <span className="dashboard-number ml-auto shrink-0 tabular-nums text-[1rem] leading-none tracking-[-0.05em]">
                                   {timeLabel}
                                 </span>
                               </div>
@@ -3521,7 +3490,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     );
                   })}
                 </div>
-                </CardContent>
               </Card>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
@@ -3961,70 +3929,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="communication" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <Card className="rounded-[2.2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_72%,#fff8f0_100%)] p-5 shadow-sm sm:p-6">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-[#14295F]" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">센터 공지사항 · 알림</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {unreadRecentCount > 0 && (
-                      <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/15 px-2.5 text-[10px] font-black text-[#FF7A16]">
-                        미읽음 {unreadRecentCount}
-                      </Badge>
-                    )}
-                    <Badge variant="outline" className="h-6 rounded-full border border-slate-200 bg-white px-2.5 text-[10px] font-black text-slate-500">
-                      {recentNotifications.length}건
-                    </Badge>
-                  </div>
-                </div>
-                <p className="mb-3 text-[11px] font-bold text-slate-500">센터에서 전달한 최신 공지와 알림을 여기서 바로 확인할 수 있어요.</p>
-
-                {recentNotifications.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
-                    확인할 공지사항이 없습니다.
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {recentNotifications.map((notification) => {
-                      const isRead = notification.isRead || !!readMap[notification.id];
-
-                      return (
-                        <button
-                          type="button"
-                          key={notification.id}
-                          className={cn(
-                            'relative w-full overflow-hidden rounded-[1.45rem] border p-4 text-left transition-all',
-                            isRead
-                              ? 'border-[#dde6f9] bg-white'
-                              : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff7ef_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/70 md:hover:shadow-md'
-                          )}
-                          onClick={() => void openNotificationDetail(notification)}
-                        >
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{notification.createdAtLabel}</span>
-                            <div className="flex items-center gap-2">
-                              {!isRead && <span className="h-2 w-2 rounded-full bg-[#FF7A16]" />}
-                              {notification.isImportant && (
-                                <Badge variant="outline" className="h-5 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
-                                  중요
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <p className="text-sm font-black leading-snug tracking-tight text-[#14295F] sm:text-base">{notification.title}</p>
-                          {notification.body && (
-                            <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-relaxed text-slate-500">
-                              {notification.body}
-                            </p>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card>
-
               <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
                 <CardTitle className="text-lg font-black tracking-tighter mb-6 flex items-center gap-2 text-[#14295F]"><Send className="h-5 w-5 text-[#14295F]" /> 상담 및 지원 요청</CardTitle>
                 <div className="space-y-4">
