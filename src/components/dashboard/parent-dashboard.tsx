@@ -3378,6 +3378,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
+                <CardContent className="relative p-0">
                 <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
                   <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/50">학습 흐름</span>
                   <div className="flex flex-wrap gap-1.5">
@@ -3401,9 +3402,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     )}>{day}</div>
                   ))}
                 </div>
-                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.04),transparent_45%)]", isMobile ? "gap-1 p-1.5" : "gap-3 p-4")}>
+                <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 p-1.5" : "auto-rows-fr gap-3 p-4")}>
                   {logsLoading ? (
-                    <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                    <div className="col-span-7 h-[400px] flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>
                   ) : calendarData.map((day, idx) => {
                     const dateKey = format(day, 'yyyy-MM-dd');
                     const log = allLogs?.find(l => l.dateKey === dateKey);
@@ -3421,7 +3422,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         key={dateKey}
                         onClick={() => setSelectedCalendarDate(day)}
                         className={cn(
-                          "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                          "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                           isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
                           !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                           isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
@@ -3458,7 +3459,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1 px-0.5" : "bottom-3 px-3")}>
                           <div
                             className={cn(
-                              "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
+                              "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
                               isMobile ? "px-1.5 py-1" : "px-3 py-2.5",
                               getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                             )}
@@ -3490,6 +3491,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     );
                   })}
                 </div>
+                </CardContent>
               </Card>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
