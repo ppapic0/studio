@@ -760,7 +760,12 @@ function RhythmTimeChartDialog({
   rhythmScore: number;
 }) {
   const latestRhythm = trend.slice().reverse().find((item) => typeof item.rhythmMinutes === 'number');
-  const rhythmPreviewBars = rhythmScoreTrend.slice(-6);
+  const previewChartId = useId().replace(/:/g, '');
+  const rhythmPreviewTrend = rhythmScoreTrend.slice(-7);
+  const rhythmPreviewHasScores = rhythmPreviewTrend.some((point) => Number(point.score || 0) > 0);
+  const rhythmPreviewPeakScore = rhythmPreviewHasScores
+    ? Math.max(...rhythmPreviewTrend.map((point) => Number(point.score || 0)))
+    : 0;
 
   return (
     <Dialog>
@@ -803,24 +808,49 @@ function RhythmTimeChartDialog({
                 </Badge>
               </div>
 
-              <div className="mt-4 flex items-end gap-1.5">
-                {(rhythmPreviewBars.length > 0 ? rhythmPreviewBars : [{ date: '대기', score: 0 }]).map((point, index, array) => {
-                  const safeScore = Math.max(6, Math.round((Number(point.score || 0) / 100) * 44));
-                  const isLatest = index === array.length - 1;
-                  return (
-                    <div key={`${point.date}-${index}`} className="flex-1">
-                      <div
-                        className={cn(
-                          'w-full rounded-full transition-all duration-200',
-                          isLatest
-                            ? 'bg-[linear-gradient(180deg,#14295F_0%,#FF7A16_100%)] shadow-[0_14px_20px_-16px_rgba(20,41,95,0.4)]'
-                            : 'bg-[linear-gradient(180deg,#d8e5ff_0%,#b8c9ef_100%)]'
-                        )}
-                        style={{ height: `${safeScore}px` }}
-                      />
+              <div className="mt-4 rounded-[1.15rem] border border-[#dfe9fb] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                  <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#6d7fa5]">최근 7일 리듬 그래프</span>
+                  <span className="text-[10px] font-black text-[#14295F]">
+                    {rhythmPreviewHasScores ? `최고 ${Math.round(rhythmPreviewPeakScore)}점` : '기록 대기'}
+                  </span>
+                </div>
+                <div className="h-[76px] w-full">
+                  {rhythmPreviewHasScores ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={rhythmPreviewTrend} margin={{ top: 6, right: 6, left: 6, bottom: 4 }}>
+                        <defs>
+                          <linearGradient id={`${previewChartId}-area`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#8BB8FF" stopOpacity={0.32} />
+                            <stop offset="100%" stopColor="#8BB8FF" stopOpacity={0.04} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8eef8" />
+                        <XAxis hide dataKey="date" />
+                        <YAxis hide domain={[0, 100]} />
+                        <Area
+                          type="monotone"
+                          dataKey="score"
+                          stroke="none"
+                          fill={`url(#${previewChartId}-area)`}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="score"
+                          stroke="#2563eb"
+                          strokeWidth={2.6}
+                          dot={{ r: 2.2, fill: '#14295F', stroke: '#ffffff', strokeWidth: 1.2 }}
+                          activeDot={{ r: 3.5, fill: '#FF7A16', stroke: '#14295F', strokeWidth: 1.5 }}
+                          isAnimationActive={false}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center rounded-[0.95rem] border border-dashed border-[#d9e4fb] bg-white/80 text-[11px] font-bold text-slate-400">
+                      최근 리듬 기록 대기
                     </div>
-                  );
-                })}
+                  )}
+                </div>
               </div>
 
               <p className="mt-4 text-[11px] font-bold leading-5 text-slate-500">
