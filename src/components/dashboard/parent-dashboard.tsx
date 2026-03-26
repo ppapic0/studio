@@ -1827,7 +1827,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     () => sortedInvoices.filter((invoice) => invoice.status !== 'void' && invoice.status !== 'refunded'),
     [sortedInvoices]
   );
-  const latestInvoice = displayInvoices[0];
 
   const billingSummary = useMemo(() => {
     return displayInvoices.reduce(
@@ -1864,6 +1863,35 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       className: 'bg-rose-100 text-rose-700 border-rose-200',
     };
   }, [displayInvoices]);
+  const outstandingInvoices = useMemo(
+    () => displayInvoices.filter((invoice) => invoice.status === 'issued' || invoice.status === 'overdue'),
+    [displayInvoices]
+  );
+  const primaryInvoice = useMemo(
+    () => outstandingInvoices[0] || displayInvoices[0] || null,
+    [displayInvoices, outstandingInvoices]
+  );
+  const secondaryInvoices = useMemo(
+    () => (primaryInvoice ? displayInvoices.filter((invoice) => invoice.id !== primaryInvoice.id) : []),
+    [displayInvoices, primaryInvoice]
+  );
+  const outstandingInvoiceCount = outstandingInvoices.length;
+  const paidInvoiceCount = useMemo(
+    () => displayInvoices.filter((invoice) => invoice.status === 'paid').length,
+    [displayInvoices]
+  );
+  const billingHeroCopy = useMemo(() => {
+    if (displayInvoices.length === 0) {
+      return '현재 발행된 청구서가 없어요. 새로운 수납 요청이 생기면 이곳에서 바로 확인할 수 있습니다.';
+    }
+    if (outstandingInvoiceCount > 0) {
+      return `${outstandingInvoiceCount}건의 확인이 필요한 청구서가 있어요. 가장 중요한 청구서를 먼저 보여드립니다.`;
+    }
+    return '최근 수납 상태가 안정적으로 관리되고 있어요. 완료된 청구 이력도 함께 정리해드렸습니다.';
+  }, [displayInvoices.length, outstandingInvoiceCount]);
+  const primaryInvoiceDueDate = primaryInvoice ? toDateSafe((primaryInvoice as any).cycleEndDate) : null;
+  const primaryInvoiceStatusMeta = primaryInvoice ? getInvoiceStatusMeta(primaryInvoice.status) : null;
+  const primaryInvoiceIsOutstanding = !!primaryInvoice && (primaryInvoice.status === 'issued' || primaryInvoice.status === 'overdue');
 
   const studyPlans = (todayPlans || []).filter((item) => item.category === 'study' || !item.category);
   const totalMinutes = todayLog?.totalMinutes || 0;
@@ -4085,103 +4113,258 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="billing" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <Card className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1">
-                      <h3 className="text-4xl font-black tracking-tight text-[#14295F] leading-none">수납</h3>
-                      <p className="text-[15px] font-bold text-slate-700 leading-snug">
-                        <span className="block">센터수납요청건을 비대면으로</span>
-                        <span className="block">결제할 수 있어요!</span>
-                      </p>
+              <Card className="relative overflow-hidden rounded-[2rem] border border-[#dce6f8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_44%,#eef4ff_100%)] p-5 shadow-[0_26px_60px_-42px_rgba(20,41,95,0.22)] sm:p-6">
+                <div className="pointer-events-none absolute -right-12 top-0 h-32 w-32 rounded-full bg-[#c9dafd]/38 blur-3xl" />
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.55)_0%,rgba(255,255,255,0)_40%)]" />
+                <div className="relative z-10 space-y-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.15rem] border border-[#dfe8fb] bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_24px_-20px_rgba(20,41,95,0.18)]">
+                        <CreditCard className="h-4.5 w-4.5 text-[#14295F]" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Billing Report</p>
+                        <h3 className="mt-1 text-[1.38rem] font-black tracking-tight text-[#14295F] sm:text-[1.6rem]">수납</h3>
+                        <p className="mt-1 text-[12px] font-bold leading-[1.65] text-slate-500 sm:text-[12.5px]">
+                          {billingHeroCopy}
+                        </p>
+                      </div>
                     </div>
-                    <span className="shrink-0 text-[14px] font-black text-[#14295F]">실시간 연동</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="h-8 rounded-full border border-[#d8e5ff] bg-white/92 px-3 text-[10px] font-black text-[#14295F] shadow-sm">
+                        실시간 연동
+                      </Badge>
+                      {mobileBillingStatusMeta && (
+                        <Badge variant="outline" className={cn('h-8 rounded-full border px-3 text-[10px] font-black shadow-sm', mobileBillingStatusMeta.className)}>
+                          {mobileBillingStatusMeta.label}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[12px] font-black text-[#14295F]">청구금액</p>
-                        {mobileBillingStatusMeta && (
-                          <Badge variant="outline" className={cn('h-6 border px-2 text-[11px] font-black', mobileBillingStatusMeta.className)}>
-                            {mobileBillingStatusMeta.label}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="dashboard-number mt-2 text-[1.15rem] leading-none text-[#14295F] whitespace-nowrap">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-[1.45rem] border border-[#dbe6fb] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_34px_-26px_rgba(20,41,95,0.18)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6d7fa5]">청구금액</p>
+                      <p className="dashboard-number mt-2 whitespace-nowrap text-[1.45rem] leading-none text-[#14295F] sm:text-[1.6rem]">
                         {formatWon(billingSummary.billed)}
                       </p>
-                    </div>
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 px-4 py-3.5 shadow-sm sm:text-center">
-                      <p className="text-[12px] font-black text-emerald-700">수납</p>
-                      <p className="dashboard-number mt-2 text-[1.15rem] leading-none text-emerald-700 whitespace-nowrap">
-                        {formatWon(billingSummary.paid)}
+                      <p className="mt-2 text-[11px] font-bold text-slate-500">
+                        {displayInvoices.length > 0 ? `총 ${displayInvoices.length}건 청구 내역` : '발행된 청구서 없음'}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50/40 px-4 py-3.5 shadow-sm sm:text-center">
-                      <p className="text-[12px] font-black text-rose-700">미납</p>
-                      <p className="dashboard-number mt-2 text-[1.15rem] leading-none text-rose-700 whitespace-nowrap">
+
+                    <div className="rounded-[1.45rem] border border-emerald-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.98)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_34px_-26px_rgba(5,150,105,0.18)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">수납 완료</p>
+                      <p className="dashboard-number mt-2 whitespace-nowrap text-[1.45rem] leading-none text-emerald-700 sm:text-[1.6rem]">
+                        {formatWon(billingSummary.paid)}
+                      </p>
+                      <p className="mt-2 text-[11px] font-bold text-emerald-700/80">
+                        {paidInvoiceCount > 0 ? `${paidInvoiceCount}건 수납 완료` : '완료 내역 대기'}
+                      </p>
+                    </div>
+
+                    <div className="rounded-[1.45rem] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,241,244,0.98)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_34px_-26px_rgba(225,29,72,0.16)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-rose-700">미납</p>
+                      <p className="dashboard-number mt-2 whitespace-nowrap text-[1.45rem] leading-none text-rose-700 sm:text-[1.6rem]">
                         {formatWon(billingSummary.overdue)}
+                      </p>
+                      <p className="mt-2 text-[11px] font-bold text-rose-700/80">
+                        {outstandingInvoiceCount > 0 ? `청구 ${outstandingInvoiceCount}건 확인` : '확인 필요 없음'}
                       </p>
                     </div>
                   </div>
                 </div>
               </Card>
 
-              {latestInvoice ? (
-                <div className="space-y-3">
-                  {displayInvoices.map((invoice) => {
-                    const invoiceDueDate = toDateSafe((invoice as any).cycleEndDate);
-                    const statusMeta = getInvoiceStatusMeta(invoice.status);
-
-                    return (
-                      <Card key={invoice.id} className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                          <div className="space-y-2 min-w-0 flex-1">
-                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                              <p className="min-w-0 truncate whitespace-nowrap text-[1.45rem] font-black leading-none tracking-tight text-[#14295F] md:text-[20px]">
-                                {invoice.studentName || student?.name || '학생'}
-                              </p>
-                              <Badge variant="outline" className="h-6 border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-600">
-                                {getInvoiceTrackLabel(invoice.trackCategory)}
+              {primaryInvoice ? (
+                <div className="space-y-4">
+                  <Card className="relative overflow-hidden rounded-[2rem] border border-[#d8e4fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_44%,#eef4ff_100%)] p-5 shadow-[0_28px_60px_-42px_rgba(20,41,95,0.22)] sm:p-6">
+                    <div className="pointer-events-none absolute -right-14 top-0 h-36 w-36 rounded-full bg-[#d5e3ff]/38 blur-3xl" />
+                    <div className="relative z-10 space-y-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="h-6 rounded-full border border-[#d8e5ff] bg-white/92 px-2.5 text-[10px] font-black text-[#14295F]">
+                              {primaryInvoiceIsOutstanding ? '우선 결제' : '최근 청구서'}
+                            </Badge>
+                            <Badge variant="outline" className="h-6 rounded-full border border-slate-200 bg-white/92 px-2.5 text-[10px] font-black text-slate-600">
+                              {getInvoiceTrackLabel(primaryInvoice.trackCategory)}
+                            </Badge>
+                            {primaryInvoiceStatusMeta && (
+                              <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black', primaryInvoiceStatusMeta.className)}>
+                                {primaryInvoiceStatusMeta.label}
                               </Badge>
-                              {statusMeta && (
-                                <Badge variant="outline" className={cn('h-6 border px-2 text-[10px] font-black shrink-0', statusMeta.className)}>
-                                  <span className="md:hidden">{statusMeta.mobileLabel}</span>
-                                  <span className="hidden md:inline">{statusMeta.label}</span>
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-[15px] font-bold text-slate-600">
-                              결제 마감일 {invoiceDueDate ? format(invoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Primary Invoice</p>
+                            <h4 className="min-w-0 truncate text-[1.4rem] font-black tracking-tight text-[#14295F] sm:text-[1.7rem]">
+                              {primaryInvoice.studentName || student?.name || '학생'}
+                            </h4>
+                            <p className="text-[12px] font-bold text-slate-500">
+                              결제 마감일 {primaryInvoiceDueDate ? format(primaryInvoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
                             </p>
                           </div>
-                          <p className="dashboard-number shrink-0 whitespace-nowrap text-[1.9rem] leading-none text-[#14295F] md:text-[2.05rem]">
-                            {formatWon(Number(invoice.finalPrice || 0))}
+                        </div>
+                        <div className="shrink-0 rounded-[1.35rem] border border-[#dce6fb] bg-white/92 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] sm:min-w-[180px] sm:text-right">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6d7fa5]">결제 금액</p>
+                          <p className="dashboard-number mt-2 whitespace-nowrap text-[2rem] leading-none text-[#14295F] sm:text-[2.3rem]">
+                            {formatWon(Number(primaryInvoice.finalPrice || 0))}
                           </p>
                         </div>
+                      </div>
 
-                        {(invoice.status === 'issued' || invoice.status === 'overdue') && (
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                        <div className="rounded-[1.15rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">청구 상태</p>
+                          <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">
+                            {primaryInvoiceStatusMeta?.label || '안내 대기'}
+                          </p>
+                        </div>
+                        <div className="rounded-[1.15rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">결제 마감</p>
+                          <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">
+                            {primaryInvoiceDueDate ? format(primaryInvoiceDueDate, 'MM.dd (EEE)', { locale: ko }) : '-'}
+                          </p>
+                        </div>
+                        <div className="rounded-[1.15rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">결제 방식</p>
+                          <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">비대면 앱 결제</p>
+                        </div>
+                      </div>
+
+                      {primaryInvoiceIsOutstanding ? (
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline" className="h-7 rounded-full border border-[#d8e5ff] bg-white/92 px-3 text-[10px] font-black text-[#14295F]">
+                              안전 결제
+                            </Badge>
+                            <Badge variant="outline" className="h-7 rounded-full border border-[#d8e5ff] bg-white/92 px-3 text-[10px] font-black text-[#14295F]">
+                              비대면 결제
+                            </Badge>
+                          </div>
                           <Link
-                            href={`/payment/checkout/${invoice.id}`}
-                            className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#14295F] text-[15px] font-black text-white shadow-sm transition-colors hover:bg-[#10224f]"
+                            href={`/payment/checkout/${primaryInvoice.id}`}
+                            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[1.15rem] bg-[linear-gradient(180deg,#14295F_0%,#10224f_100%)] px-4 text-[15px] font-black text-white shadow-[0_18px_32px_-22px_rgba(20,41,95,0.45)] transition-transform duration-200 hover:-translate-y-0.5"
                           >
                             <CreditCard className="h-4 w-4" />
                             결제하기
                           </Link>
-                        )}
-                      </Card>
-                    );
-                  })}
+                        </div>
+                      ) : (
+                        <div className="rounded-[1.2rem] border border-emerald-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.95)_100%)] px-4 py-3 text-emerald-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle2 className="mt-0.5 h-4.5 w-4.5 shrink-0" />
+                            <div>
+                              <p className="text-[13px] font-black">최근 청구서는 수납 완료되었습니다.</p>
+                              <p className="mt-1 text-[11px] font-bold text-emerald-700/80">
+                                완료된 청구 내역도 아래에서 계속 확인할 수 있어요.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+
+                  {secondaryInvoices.length > 0 && (
+                    <section className="space-y-3">
+                      <div className="flex items-center justify-between gap-3 px-1">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7385a8]">Invoice History</p>
+                          <h4 className="mt-1 text-[1rem] font-black tracking-tight text-[#14295F]">추가 청구 내역</h4>
+                        </div>
+                        <Badge variant="outline" className="h-7 rounded-full border border-[#d8e5ff] bg-white/92 px-3 text-[10px] font-black text-[#14295F]">
+                          {secondaryInvoices.length}건
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        {secondaryInvoices.map((invoice) => {
+                          const invoiceDueDate = toDateSafe((invoice as any).cycleEndDate);
+                          const statusMeta = getInvoiceStatusMeta(invoice.status);
+                          const isOutstanding = invoice.status === 'issued' || invoice.status === 'overdue';
+
+                          return (
+                            <Card key={invoice.id} className="rounded-[1.6rem] border border-[#dfe7f3] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-4 shadow-[0_18px_36px_-28px_rgba(20,41,95,0.16)]">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 space-y-2">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                    <p className="min-w-0 truncate text-[1rem] font-black tracking-tight text-[#14295F]">
+                                      {invoice.studentName || student?.name || '학생'}
+                                    </p>
+                                    <Badge variant="outline" className="h-6 rounded-full border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-600">
+                                      {getInvoiceTrackLabel(invoice.trackCategory)}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-[12px] font-bold text-slate-500">
+                                    마감일 {invoiceDueDate ? format(invoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '-'}
+                                  </p>
+                                </div>
+                                <p className="dashboard-number shrink-0 whitespace-nowrap text-[1.45rem] leading-none text-[#14295F]">
+                                  {formatWon(Number(invoice.finalPrice || 0))}
+                                </p>
+                              </div>
+
+                              <div className="mt-4 flex flex-wrap items-center gap-2">
+                                {statusMeta && (
+                                  <Badge variant="outline" className={cn('h-6 rounded-full border px-2 text-[10px] font-black', statusMeta.className)}>
+                                    <span className="md:hidden">{statusMeta.mobileLabel}</span>
+                                    <span className="hidden md:inline">{statusMeta.label}</span>
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="h-6 rounded-full border border-[#d8e5ff] bg-white px-2 text-[10px] font-black text-[#14295F]">
+                                  {invoiceDueDate ? format(invoiceDueDate, 'MM.dd', { locale: ko }) : '일정 미정'}
+                                </Badge>
+                              </div>
+
+                              {isOutstanding ? (
+                                <Link
+                                  href={`/payment/checkout/${invoice.id}`}
+                                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[1rem] border border-[#14295F]/10 bg-[#14295F] text-[13px] font-black text-white shadow-[0_14px_24px_-18px_rgba(20,41,95,0.35)] transition-colors hover:bg-[#10224f]"
+                                >
+                                  <CreditCard className="h-4 w-4" />
+                                  이 청구서 결제
+                                </Link>
+                              ) : (
+                                <div className="mt-4 rounded-[1rem] border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-[11px] font-bold text-emerald-700">
+                                  수납 완료된 청구서입니다.
+                                </div>
+                              )}
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
                 </div>
               ) : (
-                <Card className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
-                  <p className="text-[14px] font-bold text-slate-500">현재 발행된 인보이스가 없습니다.</p>
+                <Card className="rounded-[1.85rem] border border-[#dce6f8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-6 text-center shadow-[0_22px_48px_-36px_rgba(20,41,95,0.18)]">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[1.1rem] border border-[#dce6f8] bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+                    <CreditCard className="h-5 w-5 text-[#14295F]" />
+                  </div>
+                  <p className="mt-4 text-[1rem] font-black tracking-tight text-[#14295F]">현재 발행된 청구서가 없습니다.</p>
+                  <p className="mt-1 text-[12px] font-bold leading-6 text-slate-500">
+                    새 수납 요청이 생기면 이곳에서 가장 먼저 안내해드릴게요.
+                  </p>
                 </Card>
               )}
 
-              <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50/50 px-4 py-3">
-                <p className="text-[15px] font-black text-emerald-700">감사합니다! 최선을 다해 관리하겠습니다!</p>
+              <div className="rounded-[1.45rem] border border-emerald-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.95)_100%)] px-4 py-4 shadow-[0_18px_32px_-26px_rgba(5,150,105,0.14)]">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] border border-emerald-200 bg-white/92">
+                    <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Care Note</p>
+                    <p className="mt-1 text-[14px] font-black tracking-tight text-emerald-700">
+                      결제와 수납 내역을 부모님 앱에서 언제든 다시 확인할 수 있어요.
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold text-emerald-700/80">
+                      필요한 청구서는 우선순위에 맞춰 먼저 보여드리고, 완료된 내역도 아래에서 함께 관리합니다.
+                    </p>
+                  </div>
+                </div>
               </div>
             </TabsContent>
 
