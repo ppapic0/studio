@@ -757,6 +757,80 @@ function MiniBestStudySparkline({
   );
 }
 
+function MiniStreakSparkline({
+  data,
+  isMobile,
+  currentStreakDays,
+}: {
+  data: Array<{ date: string; value: number }>;
+  isMobile: boolean;
+  currentStreakDays: number;
+}) {
+  const width = isMobile ? 104 : 124;
+  const height = isMobile ? 62 : 72;
+  const chartHeight = isMobile ? 34 : 40;
+  const paddingX = 5;
+  const paddingY = 5;
+  const gradientId = isMobile ? 'streak-fill-mobile' : 'streak-fill-desktop';
+
+  const normalizedData = data.length > 1
+    ? data
+    : data.length === 1
+      ? [data[0], data[0]]
+      : [
+          { date: 'start', value: 0 },
+          { date: 'end', value: 0 },
+        ];
+
+  const maxValue = Math.max(1, ...normalizedData.map((item) => item.value));
+
+  const getX = (index: number) => {
+    if (normalizedData.length <= 1) return width / 2;
+    return paddingX + (index / (normalizedData.length - 1)) * (width - paddingX * 2);
+  };
+
+  const getY = (value: number) => {
+    const usableHeight = chartHeight - paddingY * 2;
+    return chartHeight - paddingY - (value / maxValue) * usableHeight;
+  };
+
+  const linePath = normalizedData
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${getX(index)} ${getY(point.value)}`)
+    .join(' ');
+  const areaPath = `${linePath} L ${getX(normalizedData.length - 1)} ${chartHeight} L ${getX(0)} ${chartHeight} Z`;
+  const lastPoint = normalizedData[normalizedData.length - 1];
+  const lastPointX = getX(normalizedData.length - 1);
+  const lastPointY = getY(lastPoint.value);
+
+  return (
+    <div className={cn(
+      "pointer-events-none w-full rounded-[1.05rem] border border-rose-100/90 bg-[linear-gradient(180deg,rgba(255,246,248,0.97)_0%,rgba(255,255,255,0.9)_100%)] px-2.5 py-2 shadow-[0_16px_36px_-30px_rgba(244,63,94,0.42)]",
+      isMobile ? "min-h-[4.15rem]" : "min-h-[4.7rem]"
+    )}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[8px] font-black uppercase tracking-[0.24em] text-rose-500/65">7일 흐름</span>
+        <span className="text-[9px] font-black text-rose-600">{currentStreakDays}일</span>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={cn("mt-1 w-full", isMobile ? "h-[2.7rem]" : "h-[3rem]")}
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FB7185" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#FB7185" stopOpacity="0.04" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={linePath} fill="none" stroke="#F43F5E" strokeWidth={isMobile ? 2.35 : 2.55} strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={lastPointX} cy={lastPointY} r={isMobile ? 3.1 : 3.5} fill="#F43F5E" />
+        <circle cx={lastPointX} cy={lastPointY} r={isMobile ? 1.35 : 1.6} fill="#FFF1F2" />
+      </svg>
+    </div>
+  );
+}
+
 function StudySessionHistoryDialog({
   studentId,
   centerId,
@@ -1906,6 +1980,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return progress?.dailyLpStatus?.[dateKey]?.plan ? 1 : 0;
     }).reduce<number>((sum, count) => sum + count, 0);
   }, [today, progress?.dailyLpStatus]);
+  const streakTrend = useMemo(() => {
+    if (!today) return [];
+    let runningStreak = 0;
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = subDays(today, 6 - index);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const studiedMinutes = logMinutesByDateKey.get(dateKey) || 0;
+      runningStreak = studiedMinutes > 0 ? runningStreak + 1 : 0;
+      return {
+        date: format(date, 'M/d'),
+        value: runningStreak,
+      };
+    });
+  }, [today, logMinutesByDateKey]);
   const activeStudentIds = useMemo(() => {
     if (!activeStudentMembers) return null;
     return new Set(
@@ -2093,11 +2181,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">연속 성장</span>
                 <RefreshCw className="h-4 w-4 text-rose-400" />
               </div>
-              <div className="mt-3">
-                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
-                  {currentStreakDays}<span className="ml-1 text-xs font-bold text-slate-400">일</span>
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">최근 5일 목표 달성 {recentFivePlanWins}/5일</p>
+              <div className={cn("mt-3 gap-3", isMobile ? "flex flex-col" : "flex items-end justify-between")}>
+                <div className="min-w-0 flex-1">
+                  <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
+                    {currentStreakDays}<span className="ml-1 text-xs font-bold text-slate-400">일</span>
+                  </p>
+                  <p className="mt-1 break-keep text-[11px] font-semibold text-slate-500">최근 5일 목표 달성 {recentFivePlanWins}/5일</p>
+                </div>
+                <div className={cn("shrink-0", isMobile ? "w-full max-w-[7rem] self-end" : "w-[6.8rem]")}>
+                  <MiniStreakSparkline
+                    data={streakTrend}
+                    isMobile={isMobile}
+                    currentStreakDays={currentStreakDays}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
