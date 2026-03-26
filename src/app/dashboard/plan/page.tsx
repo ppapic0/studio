@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
   Card, 
   CardContent, 
@@ -99,6 +100,12 @@ import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { ROUTINE_TEMPLATE_OPTIONS } from '@/components/dashboard/student-planner/planner-constants';
+import { RoutineComposerCard } from '@/components/dashboard/student-planner/routine-composer-card';
+import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
+import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
+import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
+import { RepeatCopySheet } from '@/components/dashboard/student-planner/repeat-copy-sheet';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -674,6 +681,7 @@ export default function StudyPlanPage() {
   const firestore = useFirestore();
   const { activeMembership, viewMode, currentTier } = useAppContext();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
 
   const isMobile = viewMode === 'mobile';
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -682,6 +690,7 @@ export default function StudyPlanPage() {
   const [newStudyMinutes, setNewStudyMinutes] = useState('60');
   const [newPersonalTask, setNewPersonalTask] = useState('');
   const [newRoutineTitle, setNewRoutineTitle] = useState('');
+  const [selectedRoutineTemplateKey, setSelectedRoutineTemplateKey] = useState('arrival');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
   const [isTaskCopyDialogOpen, setIsTaskCopyDialogOpen] = useState(false);
@@ -695,8 +704,26 @@ export default function StudyPlanPage() {
   const [outTime, setOutTime] = useState('22:00');
 
   useEffect(() => {
-    setSelectedDate(new Date());
-  }, []);
+    const requestedDate = searchParams.get('date');
+    if (!requestedDate) {
+      setSelectedDate(new Date());
+      return;
+    }
+
+    const [year, month, day] = requestedDate.split('-').map(Number);
+    if (!year || !month || !day) {
+      setSelectedDate(new Date());
+      return;
+    }
+
+    const nextDate = new Date(year, month - 1, day);
+    if (Number.isNaN(nextDate.getTime())) {
+      setSelectedDate(new Date());
+      return;
+    }
+
+    setSelectedDate(nextDate);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!selectedDate) return;
@@ -831,6 +858,17 @@ export default function StudyPlanPage() {
     ? `${outTime} 전까지 마무리 목표`
     : '하원 예정 시간을 정하면 마감 리듬이 생겨요';
   const missionProgressPercent = clampPercent(missionCompletionRate);
+  const routineCountLabel = `${scheduleItems.length}개`;
+  const studyCountLabel = `${studyTasks.length}개`;
+  const personalCountLabel = `${personalTasks.length}개`;
+  const completedStudyCount = useMemo(
+    () => studyTasks.filter((task) => task.done).length,
+    [studyTasks]
+  );
+  const completedPersonalCount = useMemo(
+    () => personalTasks.filter((task) => task.done).length,
+    [personalTasks]
+  );
   const doneStudyMissionCount = useMemo(
     () => Math.max(0, studyTasks.length - remainingStudyTasks.length),
     [studyTasks.length, remainingStudyTasks.length]
@@ -937,6 +975,11 @@ export default function StudyPlanPage() {
     missionWrapupLabel,
     deadlineProgress,
   ]);
+
+  const handleRoutineTemplateSelect = (template: (typeof ROUTINE_TEMPLATE_OPTIONS)[number]) => {
+    setSelectedRoutineTemplateKey(template.key);
+    setNewRoutineTitle(template.title);
+  };
 
   const applySameDayRoutinePenalty = async (reason: string) => {
     if (!firestore || !activeMembership || !user || !progressRef || !selectedDateKey) return false;
@@ -1687,6 +1730,372 @@ export default function StudyPlanPage() {
         </CardContent>
       </Card>
 
+      <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile && "rounded-[1.5rem]")}>
+        <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
+        <CardHeader className={cn("border-b bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,249,255,0.94)_100%)]", isMobile ? "p-4" : "p-8")}>
+          <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-start justify-between")}>
+            <div className="min-w-0">
+              <Badge className="border-none bg-primary/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-primary shadow-none">
+                설정 스튜디오
+              </Badge>
+              <CardTitle className={cn("mt-3 font-black tracking-tight text-primary break-keep", isMobile ? "text-xl" : "text-3xl")}>
+                루틴과 공부 계획을 한 곳에서 빠르게 정리해요
+              </CardTitle>
+              <CardDescription className={cn("mt-2 break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
+                생활 루틴부터 학습 계획, 기타 일정까지 여기서 전체 설정을 끝내고 기록트랙에서는 빠르게만 손보세요.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge className="rounded-full border border-primary/10 bg-white px-3 py-1 text-[10px] font-black text-primary shadow-sm">
+                {format(selectedDate, 'yyyy. MM. dd', { locale: ko })}
+              </Badge>
+              <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
+                루틴 {routineCountLabel}
+              </Badge>
+              <Badge className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700 shadow-sm">
+                학습 {studyCountLabel}
+              </Badge>
+              <Badge className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
+                기타 {personalCountLabel}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className={cn("bg-[#fafafa] space-y-5", isMobile ? "p-4" : "p-8")}>
+          <section className={cn("overflow-hidden rounded-[1.85rem] border border-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_100%)] shadow-[0_18px_44px_-34px_rgba(20,41,95,0.22)]", isMobile && "rounded-[1.45rem]")}>
+            <div className={cn("space-y-4", isMobile ? "p-4" : "p-6")}>
+              <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-2xl bg-primary/7 p-2.5 text-primary">
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className={cn("font-black tracking-tight text-primary", isMobile ? "text-base" : "text-xl")}>생활 루틴</h3>
+                      <p className={cn("break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
+                        등원, 하원, 식사, 학원처럼 매일 반복되는 흐름부터 먼저 정리해요.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="rounded-full border border-primary/10 bg-white px-3 py-1 text-[10px] font-black text-primary shadow-sm">
+                    현재 {routineCountLabel}
+                  </Badge>
+                  {isToday ? (
+                    <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
+                      당일 수정 시 벌점 +{SAME_DAY_ROUTINE_PENALTY_POINTS}
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+
+              {isToday ? (
+                <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50/80 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-4 w-4 text-amber-600" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black text-amber-900">당일 루틴 수정 주의</p>
+                      <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-amber-800/80">
+                        오늘 루틴도 수정할 수 있지만 벌점은 하루 최대 1점만 자동 반영됩니다.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {!isPast ? (
+                <RoutineComposerCard
+                  title="생활 루틴 추가"
+                  description="템플릿으로 빠르게 시작하고, 필요한 이름만 바로 고쳐서 저장해요."
+                  value={newRoutineTitle}
+                  onValueChange={(value) => {
+                    setNewRoutineTitle(value);
+                    if (!value.trim()) {
+                      setSelectedRoutineTemplateKey('custom');
+                    }
+                  }}
+                  onSubmit={() => handleAddTask(newRoutineTitle, 'schedule')}
+                  isSubmitting={isSubmitting}
+                  isMobile={isMobile}
+                  selectedTemplateKey={selectedRoutineTemplateKey}
+                  onTemplateSelect={handleRoutineTemplateSelect}
+                  templateOptions={ROUTINE_TEMPLATE_OPTIONS}
+                />
+              ) : null}
+
+              {isLoading ? (
+                <div className="flex justify-center py-14">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary/20" />
+                </div>
+              ) : scheduleItems.length === 0 ? (
+                <div className="rounded-[1.5rem] border border-dashed border-primary/15 bg-white/72 p-6 text-center">
+                  <p className="text-sm font-black text-primary">아직 루틴이 없어요</p>
+                  <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                    등원, 하원, 식사처럼 자주 반복되는 루틴을 먼저 만들어두면 하루 관리가 훨씬 쉬워져요.
+                  </p>
+                  {!isPast ? (
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      {ROUTINE_TEMPLATE_OPTIONS.filter((item) => item.key !== 'custom').slice(0, 6).map((template) => (
+                        <Button
+                          key={template.key}
+                          type="button"
+                          variant="outline"
+                          className="h-8 rounded-full border-primary/15 bg-white px-3 text-[10px] font-black text-primary"
+                          onClick={() => handleRoutineTemplateSelect(template)}
+                        >
+                          {template.label}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {[...scheduleItems]
+                    .sort((a, b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00'))
+                    .map((item) => (
+                      <ScheduleItemCard
+                        key={item.id}
+                        item={{ id: item.id, title: item.title }}
+                        onUpdateRange={handleUpdateScheduleRange}
+                        onDelete={() => handleDeleteTask(item as WithId<StudyPlanItem>)}
+                        isPast={isPast}
+                        isToday={isToday}
+                        isMobile={isMobile}
+                      />
+                    ))}
+                </div>
+              )}
+            </div>
+          </section>
+          <section className={cn("overflow-hidden rounded-[1.85rem] border border-emerald-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(244,253,248,0.96)_100%)] shadow-[0_18px_44px_-34px_rgba(16,185,129,0.18)]", isMobile && "rounded-[1.45rem]")}>
+            <div className={cn("space-y-4", isMobile ? "p-4" : "p-6")}>
+              <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-2xl bg-emerald-500/10 p-2.5 text-emerald-600">
+                      <BookOpen className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-base" : "text-xl")}>학습 계획</h3>
+                      <p className={cn("break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
+                        과목과 시간을 먼저 고르고, 해야 할 공부를 짧게 남겨서 바로 실행해요.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700 shadow-sm">
+                    완료 {completedStudyCount}/{studyTasks.length}
+                  </Badge>
+                  <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
+                    목표 {Math.floor(studyTimeSummary.total / 60)}시간 {studyTimeSummary.total % 60}분
+                  </Badge>
+                </div>
+              </div>
+
+              {!isPast ? (
+                <StudyComposerCard
+                  title="학습 계획 추가"
+                  description="과목과 시간을 먼저 고르면 학생이 무엇부터 해야 하는지 더 빨리 이해할 수 있어요."
+                  subjectOptions={SUBJECTS}
+                  subjectValue={newStudySubject}
+                  onSubjectChange={setNewStudySubject}
+                  minuteValue={newStudyMinutes}
+                  onMinuteChange={setNewStudyMinutes}
+                  taskValue={newStudyTask}
+                  onTaskChange={setNewStudyTask}
+                  onSubmit={() => handleAddTask(newStudyTask, 'study')}
+                  isSubmitting={isSubmitting}
+                  isMobile={isMobile}
+                />
+              ) : null}
+
+              {studyTasks.length === 0 ? (
+                <div className="rounded-[1.5rem] border border-dashed border-emerald-200 bg-white/80 p-6 text-center">
+                  <p className="text-sm font-black text-emerald-700">첫 학습 계획을 추가해보세요</p>
+                  <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                    과목과 시간 프리셋만 먼저 고르면 학생이 바로 시작하기 좋은 계획 카드가 만들어집니다.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {studyTasks.map((task) => {
+                    const subject = SUBJECTS.find((item) => item.id === (task.subject || 'etc'));
+                    return (
+                      <PlanItemCard
+                        key={task.id}
+                        id={task.id}
+                        title={task.title}
+                        checked={task.done}
+                        onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
+                        onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
+                        disabled={isPast}
+                        isMobile={isMobile}
+                        tone="emerald"
+                        badgeLabel={subject?.label || '기타'}
+                        metaLabel={task.targetMinutes ? `${task.targetMinutes}분 목표` : null}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+          <section className={cn("overflow-hidden rounded-[1.85rem] border border-amber-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,251,245,0.96)_100%)] shadow-[0_18px_44px_-34px_rgba(251,146,60,0.18)]", isMobile && "rounded-[1.45rem]")}>
+            <div className={cn("space-y-4", isMobile ? "p-4" : "p-6")}>
+              <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-2xl bg-amber-500/10 p-2.5 text-amber-600">
+                      <CalendarDays className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-base" : "text-xl")}>기타 일정</h3>
+                      <p className={cn("break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
+                        병원, 약속, 시험 준비처럼 공부 외 일정은 보조 카드로 짧게만 관리해요.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <Badge className="rounded-full border border-amber-100 bg-white px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
+                  완료 {completedPersonalCount}/{personalTasks.length}
+                </Badge>
+              </div>
+
+              {!isPast ? (
+                <Card className="overflow-hidden rounded-[1.6rem] border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,251,245,0.96)_100%)] ring-1 ring-amber-100/80 shadow-[0_18px_44px_-34px_rgba(245,158,11,0.18)]">
+                  <CardHeader className={cn(isMobile ? "p-4 pb-3" : "p-6 pb-4")}>
+                    <div className="flex items-center gap-2">
+                      <div className="rounded-2xl bg-amber-500/10 p-2 text-amber-600">
+                        <PlusCircle className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <CardTitle className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-sm" : "text-lg")}>
+                          기타 일정 추가
+                        </CardTitle>
+                        <CardDescription className={cn("break-keep text-slate-500", isMobile ? "mt-0.5 text-[10px] leading-4" : "mt-0.5 text-[11px] leading-5")}>
+                          짧은 제목만 적어도 오늘 일정 보드에 바로 반영돼요.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className={cn(isMobile ? "p-4 pt-0" : "p-6 pt-0")}>
+                    <div className="flex items-center gap-2 rounded-[1.15rem] border border-amber-100 bg-white/92 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <Input
+                        placeholder="예: 병원, 상담, 준비물 챙기기"
+                        value={newPersonalTask}
+                        onChange={(e) => setNewPersonalTask(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
+                        disabled={isSubmitting}
+                        className="h-10 border-none bg-transparent text-sm font-bold shadow-none focus-visible:ring-0"
+                      />
+                      <Button
+                        type="button"
+                        onClick={() => handleAddTask(newPersonalTask, 'personal')}
+                        disabled={isSubmitting || !newPersonalTask.trim()}
+                        className={cn("rounded-xl bg-amber-500 font-black text-white hover:bg-amber-600", isMobile ? "h-10 px-4 text-xs" : "h-10 px-4 text-sm")}
+                      >
+                        추가
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {personalTasks.length === 0 ? (
+                <div className="rounded-[1.5rem] border border-dashed border-amber-200 bg-white/80 p-6 text-center">
+                  <p className="text-sm font-black text-amber-700">보조 일정은 필요할 때만 가볍게 추가해요</p>
+                  <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                    공부 외 일정은 너무 무겁게 적지 말고, 꼭 챙겨야 할 것만 짧게 남겨두면 충분해요.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {personalTasks.map((task) => (
+                    <PlanItemCard
+                      key={task.id}
+                      id={task.id}
+                      title={task.title}
+                      checked={task.done}
+                      onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
+                      onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
+                      disabled={isPast}
+                      isMobile={isMobile}
+                      tone="amber"
+                      badgeLabel="기타"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {!isPast ? (
+            <section className="rounded-[1.65rem] border border-slate-200 bg-white/92 p-4 shadow-[0_20px_42px_-34px_rgba(15,23,42,0.2)]">
+              <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">설정 보조 액션</p>
+                  <p className="mt-1 break-keep text-sm font-bold text-slate-700">
+                    반복 복사는 이 날짜를 기준으로 같은 요일 패턴에 안전하게 복사해요.
+                  </p>
+                </div>
+                <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row")}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsRoutineCopyDialogOpen(true)}
+                    disabled={isSubmitting || !hasCopyableRoutines}
+                    className={cn("rounded-xl border-2 bg-white font-black", isMobile ? "h-10 w-full text-[10px]" : "h-11 px-5 text-xs")}
+                  >
+                    <Copy className="mr-2 h-3.5 w-3.5" /> 루틴 반복 복사
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsTaskCopyDialogOpen(true)}
+                    disabled={isSubmitting || !hasCopyableTasks}
+                    className={cn("rounded-xl border-2 bg-white font-black", isMobile ? "h-10 w-full text-[10px]" : "h-11 px-5 text-xs")}
+                  >
+                    <Copy className="mr-2 h-3.5 w-3.5" /> 학습/기타 반복 복사
+                  </Button>
+                </div>
+              </div>
+            </section>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <RepeatCopySheet
+        open={isTaskCopyDialogOpen}
+        onOpenChange={setIsTaskCopyDialogOpen}
+        title="계획 반복 복사"
+        description="선택한 요일 패턴으로 학습 계획과 기타 일정을 몇 주간 이어붙여요."
+        weeksValue={taskCopyWeeks}
+        onWeeksChange={setTaskCopyWeeks}
+        selectedDays={taskCopyDays}
+        onToggleDay={(day, checked) => toggleCopyDay('task', day, checked)}
+        onConfirm={handleApplyTasksToAllWeekdays}
+        isSubmitting={isSubmitting}
+        isMobile={isMobile}
+        weekdayOptions={WEEKDAY_OPTIONS}
+      />
+
+      <RepeatCopySheet
+        open={isRoutineCopyDialogOpen}
+        onOpenChange={setIsRoutineCopyDialogOpen}
+        title="루틴 반복 복사"
+        description="자주 쓰는 루틴을 같은 요일 라인으로 몇 주간 빠르게 복사해요."
+        weeksValue={routineCopyWeeks}
+        onWeeksChange={setRoutineCopyWeeks}
+        selectedDays={routineCopyDays}
+        onToggleDay={(day, checked) => toggleCopyDay('routine', day, checked)}
+        onConfirm={handleApplyRoutineToAllWeekdays}
+        isSubmitting={isSubmitting}
+        isMobile={isMobile}
+        weekdayOptions={WEEKDAY_OPTIONS}
+      />
+
+      {false && (
       <div className={cn("grid gap-4 sm:gap-6 items-start", isMobile ? "grid-cols-1 px-0" : "md:grid-cols-12")}>
         {/* 학습 계획 카드 */}
         <div className={cn("w-full mx-auto order-1 md:order-2", isMobile ? "md:col-span-12" : "md:col-span-7")}>
@@ -1960,6 +2369,7 @@ export default function StudyPlanPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
       
       <footer className={cn("py-8 text-center opacity-30", isMobile ? "hidden" : "px-4 py-12")}>
         <div className="flex items-center justify-center gap-6 text-[10px] font-black uppercase tracking-[0.4em] text-primary">

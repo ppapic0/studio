@@ -101,6 +101,11 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { StudentTrackSubnav } from '@/components/dashboard/student-track-subnav';
+import { ROUTINE_TEMPLATE_OPTIONS } from '@/components/dashboard/student-planner/planner-constants';
+import { RoutineComposerCard } from '@/components/dashboard/student-planner/routine-composer-card';
+import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
+import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
+import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
 
 type LinkedStudentOption = {
   id: string;
@@ -306,6 +311,7 @@ export default function StudyHistoryPage() {
   const [newStudyMinutes, setNewStudyMinutes] = useState('60');
   const [newPersonalTask, setNewPersonalTask] = useState('');
   const [newRoutineTitle, setNewRoutineTitle] = useState('');
+  const [selectedRoutineTemplateKey, setSelectedRoutineTemplateKey] = useState('arrival');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
   const [linkedStudents, setLinkedStudents] = useState<LinkedStudentOption[]>([]);
@@ -410,6 +416,16 @@ export default function StudyHistoryPage() {
   const scheduleItems = useMemo(() => dailyPlans.filter(p => p.category === 'schedule'), [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans.filter(p => p.category === 'personal'), [dailyPlans]);
   const studyTasks = useMemo(() => dailyPlans.filter(p => p.category === 'study' || !p.category), [dailyPlans]);
+  const completedStudyCount = useMemo(() => studyTasks.filter((task) => task.done).length, [studyTasks]);
+  const completedPersonalCount = useMemo(() => personalTasks.filter((task) => task.done).length, [personalTasks]);
+  const totalQuickPlanCount = scheduleItems.length + studyTasks.length + personalTasks.length;
+  const completedQuickPlanCount = completedStudyCount + completedPersonalCount;
+  const quickPlanCompletionRate = totalQuickPlanCount > 0 ? Math.round((completedQuickPlanCount / totalQuickPlanCount) * 100) : 0;
+
+  const handleRoutineTemplateSelect = (template: (typeof ROUTINE_TEMPLATE_OPTIONS)[number]) => {
+    setSelectedRoutineTemplateKey(template.key);
+    setNewRoutineTitle(template.title);
+  };
 
   const calendarData = useMemo(() => {
     if (!currentDate) return { days: [], monthStart: null };
@@ -424,18 +440,6 @@ export default function StudyHistoryPage() {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-  };
-
-  const formatCompactCalendarTime = (minutes: number, isCurrentMonth: boolean) => {
-    if (!isCurrentMonth || minutes <= 0) return '--';
-    if (minutes < 60) return `${minutes}m`;
-
-    const roundedHalfHour = Math.round((minutes / 60) * 2) / 2;
-    const label = Number.isInteger(roundedHalfHour)
-      ? roundedHalfHour.toFixed(0)
-      : roundedHalfHour.toFixed(1);
-
-    return `${label}h`;
   };
 
   const getHeatmapColor = (minutes: number) => {
@@ -775,12 +779,12 @@ export default function StudyHistoryPage() {
               ))}
             </div>
           </div>
-          <div className={cn("grid grid-cols-7 border-b border-primary/10", isMobile ? "gap-[2px] px-1 py-1.5" : "gap-1.5 px-4 py-3")}>
+          <div className={cn("grid grid-cols-7 gap-1.5 border-b border-primary/10", isMobile ? "px-2 py-2.5" : "px-4 py-3")}>
             {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
               <div
                 key={day}
                 className={cn(
-                    isMobile ? "py-1 text-[8px]" : "py-3 text-[11px]",
+                  isMobile ? "py-2 text-[9px]" : "py-3 text-[11px]",
                   "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
                   i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
                 )}
@@ -789,7 +793,7 @@ export default function StudyHistoryPage() {
               </div>
             ))}
           </div>
-          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-[2px] p-1" : "auto-rows-fr gap-3 p-4")}>
+          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1.5 p-2" : "auto-rows-fr gap-3 p-4")}>
             {logsLoading ? (
               <div className="col-span-7 h-[400px] flex items-center justify-center">
                 <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
@@ -801,9 +805,8 @@ export default function StudyHistoryPage() {
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isTodayCalendar = isSameDay(day, new Date());
               const hasDeepFocus = isCurrentMonth && minutes >= 180;
+              const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
               const timeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
-              const compactTimeLabel = formatCompactCalendarTime(minutes, isCurrentMonth);
-              const compactStatusTone = hasDeepFocus ? 'bg-amber-400' : hasPlans ? 'bg-primary/65' : 'bg-transparent';
 
               return (
                 <button
@@ -812,99 +815,65 @@ export default function StudyHistoryPage() {
                   onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
                     "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
-                    isMobile ? "aspect-square min-h-[3.35rem] p-[0.36rem]" : "min-h-[150px] p-3",
+                    isMobile ? "aspect-[0.94] min-h-[4.8rem] p-1.5" : "min-h-[150px] p-3",
                     !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                     isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
-                    isMobile && "shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_8px_18px_-16px_rgba(15,23,42,0.14)]",
-                    isTodayCalendar && (isMobile ? "z-10 ring-[1.5px] ring-inset ring-primary/28 shadow-[0_10px_18px_-16px_rgba(37,99,235,0.18)]" : "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]")
+                    isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
                   )}
                 >
-                  {isTodayCalendar && <div className={cn("pointer-events-none absolute border border-primary/20", isMobile ? "-inset-px rounded-[1rem]" : "-inset-0.5 rounded-[1.35rem]")} />}
-                  <div className={cn("pointer-events-none absolute top-0 h-px bg-white/90", isMobile ? "inset-x-1.5" : "inset-x-3")} />
-
-                  {isMobile ? (
-                    <div className="relative z-10 flex h-full flex-col justify-between">
-                      <div className="flex items-start justify-between gap-1">
-                        <span
-                          className={cn(
-                            "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                            "min-w-[1.12rem] px-[0.34rem] py-[0.16rem] text-[8px]",
-                            idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white/94 text-slate-700",
-                            isTodayCalendar && "border-primary/20 text-primary"
-                          )}
-                        >
-                          {format(day, 'd')}
-                        </span>
-                        <span
-                          className={cn(
-                            "mt-[0.2rem] h-1.5 w-1.5 rounded-full transition-opacity",
-                            compactStatusTone,
-                            !(hasPlans || hasDeepFocus) && "opacity-0"
-                          )}
-                          aria-hidden="true"
-                        />
-                      </div>
-
-                      <div className="flex flex-1 items-end justify-center pb-[0.02rem]">
-                        <span
-                          className={cn(
-                            "inline-flex max-w-full items-center justify-center rounded-full border bg-white/92 px-1.5 py-[0.22rem] text-center shadow-[0_8px_14px_-12px_rgba(15,23,42,0.18)]",
-                            "dashboard-number tabular-nums text-[0.62rem] leading-none tracking-[-0.04em] min-[360px]:text-[0.68rem]",
-                            getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
-                          )}
-                        >
-                          {compactTimeLabel}
-                        </span>
-                      </div>
+                  {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-primary/20" />}
+                  <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
+                  {isCurrentMonth && (
+                    <div className={cn("pointer-events-none absolute inset-x-3", isMobile ? "bottom-9" : "bottom-[4.1rem]")}>
+                      <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
                     </div>
-                  ) : (
-                    <>
-                      {isCurrentMonth && (
-                        <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-2 bottom-6" : "inset-x-3 bottom-[4.1rem]")}>
-                          <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
+                  )}
+
+                  <div className={cn("relative z-10 flex justify-between items-start gap-2", isMobile ? "mb-1 md:mb-2" : "mb-2.5")}>
+                    <span
+                      className={cn(
+                        "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                        isMobile ? "min-w-[1.6rem] px-1.5 py-0.5 text-[10px]" : "min-w-[2rem] px-2 py-1 text-xs",
+                        idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
+                        isTodayCalendar && "border-primary/20 text-primary"
+                      )}
+                    >
+                      {format(day, 'd')}
+                    </span>
+                    {hasStatusCluster ? (
+                      <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]", isMobile ? "px-1.5 py-[0.3rem]" : "px-2 py-1")}>
+                        {hasPlans && <span className={cn("rounded-full bg-primary", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
+                        {hasDeepFocus && <Zap className={cn("text-amber-500 fill-amber-500", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />}
+                      </div>
+                    ) : (
+                      <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
+                    )}
+                  </div>
+
+                  <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 px-1" : "bottom-3 px-3")}>
+                    <div
+                      className={cn(
+                        "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
+                        isMobile ? "px-2 py-1.5" : "px-3 py-2.5",
+                        getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                      )}
+                    >
+                      {isMobile ? (
+                        <span className="dashboard-number block tabular-nums text-[0.96rem] leading-none tracking-[-0.05em]">
+                          {timeLabel}
+                        </span>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            공부시간
+                          </span>
+                          <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
+                            {timeLabel}
+                          </span>
                         </div>
                       )}
-
-                      <div className={cn("relative z-10 flex justify-between items-start gap-1", isMobile ? "mb-0.5" : "mb-2.5")}>
-                        <span
-                          className={cn(
-                            "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                            isMobile ? "min-w-[1.25rem] px-1 py-[0.22rem] text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
-                            idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                            isTodayCalendar && "border-primary/20 text-primary"
-                          )}
-                        >
-                          {format(day, 'd')}
-                        </span>
-                        {(hasPlans || hasDeepFocus) ? (
-                          <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]", "px-2 py-1")}>
-                            {hasPlans && <span className="h-2 w-2 rounded-full bg-primary" />}
-                            {hasDeepFocus && <Zap className="h-3 w-3 fill-amber-500 text-amber-500" />}
-                          </div>
-                        ) : (
-                          <span className="h-6 w-6" aria-hidden="true" />
-                        )}
-                      </div>
-
-                      <div className="absolute left-0 right-0 bottom-3 px-3">
-                        <div
-                          className={cn(
-                            "rounded-[0.95rem] border bg-white text-center whitespace-nowrap px-3 py-2.5 shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
-                            getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                              공부시간
-                            </span>
-                            <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
-                              {timeLabel}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                    </div>
+                  </div>
 
                   {!isMobile && isCurrentMonth && (
                     <div className="pointer-events-none absolute inset-x-3 bottom-12">
@@ -939,6 +908,251 @@ export default function StudyHistoryPage() {
             </div>
           </div>
           <div className={cn("bg-[#fafafa] overflow-y-auto custom-scrollbar", isMobile ? "max-h-[60vh]" : "max-h-[600px]")}>
+            <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "today-plan"} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 rounded-none h-16 bg-muted/20 p-0 border-b">
+                <TabsTrigger value="ai-report" disabled={!dailyReport || dailyReport.status !== 'sent'} className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
+                  <Sparkles className="h-3.5 w-3.5" /> 인공지능 리포트
+                </TabsTrigger>
+                <TabsTrigger value="today-plan" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
+                  <ClipboardList className="h-3.5 w-3.5" /> 오늘 계획
+                </TabsTrigger>
+              </TabsList>
+              <div className={cn("space-y-6", isMobile ? "p-5" : "p-8")}>
+                <TabsContent value="ai-report" className="mt-0">
+                  {reportLoading ? (
+                    <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                  ) : dailyReport && dailyReport.status === 'sent' ? (
+                    <VisualReportViewer content={dailyReport.content} />
+                  ) : (
+                    <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20 italic">
+                      <FileText className="h-12 w-12" />
+                      <p className="font-black text-sm">이날의 분석 리포트가 없습니다.</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="today-plan" className="mt-0 space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className="rounded-full border border-primary/10 bg-white px-3 py-1 text-[10px] font-black text-primary shadow-sm">
+                      루틴 {scheduleItems.length}개
+                    </Badge>
+                    <Badge className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700 shadow-sm">
+                      학습 {studyTasks.length}개
+                    </Badge>
+                    <Badge className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
+                      기타 {personalTasks.length}개
+                    </Badge>
+                    <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
+                      완료율 {quickPlanCompletionRate}%
+                    </Badge>
+                    {isToday ? (
+                      <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
+                        당일 루틴 수정 시 벌점 주의
+                      </Badge>
+                    ) : null}
+                  </div>
+
+                  {isToday ? (
+                    <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50/80 p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="mt-0.5 h-4 w-4 text-amber-600" />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black text-amber-900">오늘 루틴 수정 안내</p>
+                          <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-amber-800/80">
+                            기록트랙에서는 빠른 수정만 하고, 큰 루틴 편집은 계획트랙에서 마무리하는 흐름이 가장 안전해요.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <section className="space-y-3 rounded-[1.65rem] border border-primary/10 bg-white/92 p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/55">루틴</p>
+                        <h3 className="mt-1 text-sm font-black text-primary">빠른 루틴 확인/수정</h3>
+                      </div>
+                      <Badge className="rounded-full border border-primary/10 bg-primary/5 px-3 py-1 text-[10px] font-black text-primary shadow-none">
+                        {scheduleItems.length}개
+                      </Badge>
+                    </div>
+
+                    {!isActuallyPast && !isParent ? (
+                      <RoutineComposerCard
+                        title="빠른 루틴 추가"
+                        description="템플릿 하나 선택하고 필요한 이름만 수정하면 바로 저장돼요."
+                        value={newRoutineTitle}
+                        onValueChange={(value) => {
+                          setNewRoutineTitle(value);
+                          if (!value.trim()) {
+                            setSelectedRoutineTemplateKey('custom');
+                          }
+                        }}
+                        onSubmit={() => handleAddTask(newRoutineTitle, 'schedule')}
+                        isSubmitting={isSubmitting}
+                        isMobile={isMobile}
+                        compact
+                        selectedTemplateKey={selectedRoutineTemplateKey}
+                        onTemplateSelect={handleRoutineTemplateSelect}
+                        templateOptions={ROUTINE_TEMPLATE_OPTIONS}
+                      />
+                    ) : null}
+
+                    {scheduleItems.length === 0 ? (
+                      <div className="rounded-[1.35rem] border border-dashed border-primary/15 bg-slate-50/70 p-5 text-center">
+                        <p className="text-sm font-black text-primary">등록된 루틴이 없습니다.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {[...scheduleItems]
+                          .sort((a, b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00'))
+                          .map((item) => (
+                            <ScheduleItemCard
+                              key={item.id}
+                              item={{ id: item.id, title: item.title }}
+                              onUpdateRange={handleUpdateScheduleRange}
+                              onDelete={() => handleDeleteTask(item as WithId<StudyPlanItem>)}
+                              isPast={isActuallyPast}
+                              isToday={isToday}
+                              isMobile={isMobile}
+                              disabled={isParent}
+                            />
+                          ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="space-y-3 rounded-[1.65rem] border border-emerald-100 bg-white/92 p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-600/70">학습</p>
+                        <h3 className="mt-1 text-sm font-black text-slate-900">오늘 학습 계획</h3>
+                      </div>
+                      <Badge className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700 shadow-none">
+                        완료 {completedStudyCount}/{studyTasks.length}
+                      </Badge>
+                    </div>
+
+                    {!isActuallyPast && !isParent ? (
+                      <StudyComposerCard
+                        title="빠른 학습 추가"
+                        description="과목, 시간, 제목만 빠르게 적고 큰 수정은 계획트랙에서 이어서 해요."
+                        subjectOptions={SUBJECTS}
+                        subjectValue={newStudySubject}
+                        onSubjectChange={setNewStudySubject}
+                        minuteValue={newStudyMinutes}
+                        onMinuteChange={setNewStudyMinutes}
+                        taskValue={newStudyTask}
+                        onTaskChange={setNewStudyTask}
+                        onSubmit={() => handleAddTask(newStudyTask, 'study')}
+                        isSubmitting={isSubmitting}
+                        isMobile={isMobile}
+                        compact
+                      />
+                    ) : null}
+
+                    {studyTasks.length === 0 ? (
+                      <div className="rounded-[1.35rem] border border-dashed border-emerald-200 bg-emerald-50/40 p-5 text-center">
+                        <p className="text-sm font-black text-emerald-700">등록된 학습 계획이 없습니다.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {studyTasks.map((task) => {
+                          const subject = SUBJECTS.find((item) => item.id === (task.subject || 'etc'));
+                          return (
+                            <PlanItemCard
+                              key={task.id}
+                              id={task.id}
+                              title={task.title}
+                              checked={task.done}
+                              onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
+                              onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
+                              disabled={isActuallyPast || isParent}
+                              isMobile={isMobile}
+                              tone="emerald"
+                              badgeLabel={subject?.label || '기타'}
+                              metaLabel={task.targetMinutes ? `${task.targetMinutes}분 목표` : null}
+                              compact
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="space-y-3 rounded-[1.65rem] border border-amber-100 bg-white/92 p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-600/70">기타</p>
+                        <h3 className="mt-1 text-sm font-black text-slate-900">기타 일정</h3>
+                      </div>
+                      <Badge className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-none">
+                        완료 {completedPersonalCount}/{personalTasks.length}
+                      </Badge>
+                    </div>
+
+                    {!isActuallyPast && !isParent ? (
+                      <div className="flex items-center gap-2 rounded-[1.15rem] border border-amber-100 bg-white/92 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                        <Input
+                          placeholder="예: 병원, 상담, 준비물 챙기기"
+                          value={newPersonalTask}
+                          onChange={(e) => setNewPersonalTask(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
+                          disabled={isSubmitting}
+                          className="h-10 border-none bg-transparent text-sm font-bold shadow-none focus-visible:ring-0"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => handleAddTask(newPersonalTask, 'personal')}
+                          disabled={isSubmitting || !newPersonalTask.trim()}
+                          className={cn("rounded-xl bg-amber-500 font-black text-white hover:bg-amber-600", isMobile ? "h-10 px-3 text-[11px]" : "h-10 px-4 text-xs")}
+                        >
+                          추가
+                        </Button>
+                      </div>
+                    ) : null}
+
+                    {personalTasks.length === 0 ? (
+                      <div className="rounded-[1.35rem] border border-dashed border-amber-200 bg-amber-50/40 p-5 text-center">
+                        <p className="text-sm font-black text-amber-700">등록된 기타 일정이 없습니다.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {personalTasks.map((task) => (
+                          <PlanItemCard
+                            key={task.id}
+                            id={task.id}
+                            title={task.title}
+                            checked={task.done}
+                            onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
+                            onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
+                            disabled={isActuallyPast || isParent}
+                            isMobile={isMobile}
+                            tone="amber"
+                            badgeLabel="기타"
+                            compact
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  {!isParent ? (
+                    <Button asChild className="h-11 w-full rounded-2xl bg-primary font-black text-white shadow-[0_18px_36px_-24px_rgba(20,41,95,0.45)] hover:bg-primary/92">
+                      <Link href={selectedDateKey ? `/dashboard/plan?date=${selectedDateKey}` : '/dashboard/plan'}>
+                        계획트랙에서 전체 편집
+                      </Link>
+                    </Button>
+                  ) : (
+                    <div className="rounded-[1.15rem] border border-slate-200 bg-slate-50/70 px-4 py-3 text-center text-[11px] font-semibold text-slate-500">
+                      학부모 모드에서는 계획 확인만 가능해요.
+                    </div>
+                  )}
+                </TabsContent>
+              </div>
+            </Tabs>
+
+            {false && (
             <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "schedule"} className="w-full">
               <TabsList className="grid w-full grid-cols-4 rounded-none h-16 bg-muted/20 p-0 border-b">
                 <TabsTrigger value="ai-report" disabled={!dailyReport || dailyReport.status !== 'sent'} className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
@@ -959,7 +1173,12 @@ export default function StudyHistoryPage() {
                   {reportLoading ? (
                     <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
                   ) : dailyReport && dailyReport.status === 'sent' ? (
-                    <VisualReportViewer content={dailyReport.content} />
+                    <VisualReportViewer
+                      content={dailyReport.content}
+                      aiMeta={dailyReport.aiMeta}
+                      dateKey={dailyReport.dateKey}
+                      studentName={dailyReport.studentName}
+                    />
                   ) : (
                     <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20 italic">
                       <FileText className="h-12 w-12" />
@@ -1066,6 +1285,7 @@ export default function StudyHistoryPage() {
                 </TabsContent>
               </div>
             </Tabs>
+            )}
           </div>
           <div className="p-8 bg-white border-t shrink-0 flex justify-center">
             <Button variant="ghost" className="w-full h-12 rounded-2xl font-black text-muted-foreground/60 hover:bg-muted/50 transition-all" onClick={() => setSelectedDateForPlan(null)}>분석 창 닫기</Button>

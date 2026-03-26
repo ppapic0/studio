@@ -5,14 +5,16 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 import { useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { StudentNotification } from '@/lib/types';
+import { DailyReport, StudentNotification } from '@/lib/types';
 
 export type ReportItem = {
   id: string;
   dateKey?: string;
   studentId?: string;
+  studentName?: string;
   status?: string;
   content?: string;
+  aiMeta?: DailyReport['aiMeta'] | null;
   viewedAt?: { toDate?: () => Date } | null;
   viewedByUid?: string;
   viewedByName?: string;

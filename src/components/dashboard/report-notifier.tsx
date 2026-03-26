@@ -69,7 +69,12 @@ export function ReportNotifier() {
               <Wand2 className="h-3.5 w-3.5" /> {reportDateKey} 분석 결과
             </Badge>
           </div>
-          <VisualReportViewer content={reportContent} />
+          <VisualReportViewer
+            content={reportContent}
+            aiMeta={notification.aiMeta || null}
+            dateKey={typeof notification.dateKey === 'string' ? notification.dateKey : undefined}
+            studentName={typeof notification.studentName === 'string' ? notification.studentName : undefined}
+          />
         </div>
 
         <DialogFooter className="p-6 bg-white border-t shrink-0">

@@ -203,6 +203,15 @@ export interface DailyReport {
     teacherOneLiner: string;
     strengths: string[];
     improvements: string[];
+    level?: number;
+    levelName?: string;
+    attendanceLabel?: string;
+    totalStudyMinutes?: number;
+    completionRate?: number;
+    history7Days?: Array<{
+      date: string;
+      minutes: number;
+    }>;
     pedagogyLens?: '습관 형성' | '자기조절' | '집중 회복' | '성장 가속';
     secondaryLens?: '습관 형성' | '자기조절' | '집중 회복' | '성장 가속';
     stateBucket?: string;

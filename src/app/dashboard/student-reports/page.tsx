@@ -214,7 +214,12 @@ export default function StudentReportsPage() {
               </div>
 
               <div className="custom-scrollbar flex-1 overflow-y-auto bg-[#fafafa] p-6 sm:p-12">
-                <VisualReportViewer content={selectedReport.content} />
+                <VisualReportViewer
+                  content={selectedReport.content}
+                  aiMeta={selectedReport.aiMeta}
+                  dateKey={selectedReport.dateKey}
+                  studentName={selectedReport.studentName}
+                />
               </div>
 
               <DialogFooter className="shrink-0 justify-center border-t bg-white p-6 sm:p-8">
