@@ -25,6 +25,7 @@ type CenterAdminAttendanceBoardProps = {
   selectedRoomView: 'all' | string;
   selectedClass: string;
   isMobile: boolean;
+  seatDetailLevel?: 'default' | 'nameOnly';
   isLoading: boolean;
   summary: CenterAdminAttendanceBoardSummary;
   seatSignalsBySeatId: Map<string, CenterAdminAttendanceSeatSignal>;
@@ -39,6 +40,7 @@ export function CenterAdminAttendanceBoard({
   selectedRoomView,
   selectedClass,
   isMobile,
+  seatDetailLevel = 'default',
   isLoading,
   summary,
   seatSignalsBySeatId,
@@ -120,6 +122,7 @@ export function CenterAdminAttendanceBoard({
                   student?.name ||
                   member?.displayName ||
                   '학생';
+                const isNameOnly = seatDetailLevel === 'nameOnly';
 
                 return (
                   <button
@@ -158,29 +161,41 @@ export function CenterAdminAttendanceBoard({
                       <div
                         className={cn(
                           'flex h-full w-full flex-col text-center',
-                          compact
-                            ? 'justify-between px-0.5 pb-0.5 pt-3'
-                            : 'items-center justify-center gap-1 px-0.5'
+                          isNameOnly
+                            ? compact
+                              ? 'items-center justify-center px-1 pb-1 pt-3'
+                              : 'items-center justify-center px-1.5'
+                            : compact
+                              ? 'justify-between px-0.5 pb-0.5 pt-3'
+                              : 'items-center justify-center gap-1 px-0.5'
                         )}
                       >
                         <span
                           className={cn(
                             'w-full font-black tracking-tight text-center whitespace-normal break-keep',
-                            compact ? 'min-h-[18px] text-[9px] leading-[1.08]' : 'truncate leading-none text-[10px]'
+                            isNameOnly
+                              ? compact
+                                ? 'text-[10px] leading-[1.15] text-slate-950'
+                                : 'text-[11px] leading-[1.2] text-slate-950'
+                              : compact
+                                ? 'min-h-[18px] text-[9px] leading-[1.08]'
+                                : 'truncate leading-none text-[10px]'
                           )}
                         >
                           {displayName}
                         </span>
-                        <span
-                          className={cn(
-                            'inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 font-black shadow-sm',
-                            compact ? 'text-[5px]' : 'text-[7px]',
-                            resolvedPresentation.chipClass
-                          )}
-                        >
-                          {resolvedPresentation.chipLabel}
-                        </span>
-                        {!compact && (
+                        {!isNameOnly && (
+                          <span
+                            className={cn(
+                              'inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 font-black shadow-sm',
+                              compact ? 'text-[5px]' : 'text-[7px]',
+                              resolvedPresentation.chipClass
+                            )}
+                          >
+                            {resolvedPresentation.chipLabel}
+                          </span>
+                        )}
+                        {!isNameOnly && !compact && (
                           <span
                             className={cn(
                               'font-black opacity-80',
@@ -190,7 +205,7 @@ export function CenterAdminAttendanceBoard({
                             공부 {signal?.todayStudyLabel || '확인중'}
                           </span>
                         )}
-                        {!compact && visibleFlags.length > 0 && (
+                        {!isNameOnly && !compact && visibleFlags.length > 0 && (
                           <div className="flex flex-wrap items-center justify-center gap-1">
                             {visibleFlags.map((flag) => (
                               <span
@@ -206,7 +221,7 @@ export function CenterAdminAttendanceBoard({
                             ))}
                           </div>
                         )}
-                        {compact && (
+                        {!isNameOnly && compact && (
                           <div className="flex min-h-[10px] items-center justify-center gap-1">
                             {visibleFlags.length > 0 ? (
                               visibleFlags.map((flag) => (
