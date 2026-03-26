@@ -119,6 +119,13 @@ export type MarketingLaunchNotice = {
   secondaryLabel: string;
 };
 
+export type CenterEnvironmentPhoto = {
+  title: string;
+  summary: string;
+  image?: string;
+  alt: string;
+};
+
 export type MarketingContent = {
   brand: {
     name: string;
@@ -178,6 +185,13 @@ export type MarketingContent = {
     guides: AppExperienceGuide[];
     captures: AppEvidenceCapture[];
     trustMetrics: AppDataMetric[];
+  };
+  centerEnvironment: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    highlights: string[];
+    photos: CenterEnvironmentPhoto[];
   };
   lpSystem: {
     heading: string;
@@ -555,6 +569,30 @@ export const marketingContent: MarketingContent = {
       { label: '빠른 개입 구조', value: '즉시 점검', detail: '흔들리는 구간을 빠르게 확인하고 바로 조정합니다', tone: 'orange' },
       { label: '학부모 확인', value: '안심 관리', detail: '출결·공부시간·리포트를 한 흐름으로 확인합니다', tone: 'green' },
       { label: '국어 수업 연동', value: '실전 대비', detail: '독서실 관리와 국어 수업이 같은 방향으로 연결됩니다', tone: 'red' },
+    ],
+  },
+  centerEnvironment: {
+    eyebrow: 'STUDY ENVIRONMENT',
+    title: '와이파이 방화벽으로 학습에 불필요한 접속을 제한합니다',
+    description:
+      '센터 내 네트워크는 공부 흐름에 방해가 되는 접속을 줄이고, 학생이 더 안정적으로 집중할 수 있는 환경으로 운영됩니다.',
+    highlights: ['학습 집중 환경', '불필요한 접속 제한', '센터 전체 동일 적용'],
+    photos: [
+      {
+        title: '센터 전경',
+        summary: '입실 순간부터 차분한 분위기와 운영 기준이 느껴지도록 정리한 공간입니다.',
+        alt: '센터 전경 실제 사진 예정 자리',
+      },
+      {
+        title: '학습 공간',
+        summary: '학생이 오래 머물러도 흐름이 끊기지 않도록 몰입 중심으로 설계한 자리입니다.',
+        alt: '학습 공간 실제 사진 예정 자리',
+      },
+      {
+        title: '상담 공간',
+        summary: '학생과 학부모가 편하게 상담 흐름을 이어갈 수 있도록 별도 공간으로 운영합니다.',
+        alt: '상담 공간 실제 사진 예정 자리',
+      },
     ],
   },
   lpSystem: {

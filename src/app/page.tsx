@@ -1,4 +1,5 @@
 import { ConsultSection } from '@/components/marketing/consult-section';
+import { CenterEnvironmentSection } from '@/components/marketing/center-environment-section';
 import { DataAnalyticsPreviewSection } from '@/components/marketing/data-analytics-preview-section';
 import { HeroSection } from '@/components/marketing/hero-section';
 import { HomeGrowthProofSection } from '@/components/marketing/home-growth-proof-section';
@@ -25,6 +26,9 @@ export default function HomePage() {
       </ScrollReveal>
       <ScrollReveal>
         <HomeGrowthProofSection />
+      </ScrollReveal>
+      <ScrollReveal>
+        <CenterEnvironmentSection centerEnvironment={marketingContent.centerEnvironment} />
       </ScrollReveal>
       <ScrollReveal>
         <DataAnalyticsPreviewSection />
