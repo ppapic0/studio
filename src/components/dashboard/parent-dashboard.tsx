@@ -1083,6 +1083,15 @@ function formatMinutes(minutes: number) {
   return `${h}:${m.toString().padStart(2, '0')}`;
 }
 
+function formatCompactCalendarMinutes(minutes: number) {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  if (safeMinutes <= 0) return '--';
+  if (safeMinutes < 60) return `${safeMinutes}m`;
+
+  const roundedHours = Math.round((safeMinutes / 60) * 10) / 10;
+  return `${roundedHours.toFixed(1).replace(/\.0$/, '')}h`;
+}
+
 function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록') {
   if (!value || Number.isNaN(value.getTime())) return emptyLabel;
   return format(value, 'HH:mm');
@@ -3391,17 +3400,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
                 <div className={cn(
                   "grid grid-cols-7 gap-1.5 border-b border-[#14295F]/10",
-                  isMobile ? "px-2 py-2.5" : "px-4 py-3"
+                  isMobile ? "px-1.5 py-2" : "px-4 py-3"
                 )}>
                   {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                     <div key={day} className={cn(
-                      isMobile ? "py-2 text-[10px] md:py-2.5 md:text-[11px]" : "py-3 text-[11px]",
+                      isMobile ? "py-1.5 text-[8px] md:py-2 md:text-[9px]" : "py-3 text-[11px]",
                       "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
                       i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
                     )}>{day}</div>
                   ))}
                 </div>
-                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1.5 p-2" : "gap-2.5 p-3")}>
+                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1 p-1.5" : "gap-2.5 p-3")}>
                   {logsLoading ? (
                     <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-[#14295F] opacity-20" /></div>
                   ) : calendarData.map((day, idx) => {
@@ -3413,7 +3422,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     const hasPlans = (weeklyPlans || []).some((plan) => plan.dateKey === dateKey);
                     const hasDeepFocus = isCurrentMonth && minutes >= 180;
                     const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
-                    const timeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
+                    const fullTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
+                    const compactTimeLabel = isCurrentMonth ? formatCompactCalendarMinutes(minutes) : '--';
+                    const statusLabel = isCurrentMonth && minutes > 0 ? '오늘 학습 기록' : '기록 대기';
 
                     return (
                       <button
@@ -3422,70 +3433,108 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         onClick={() => setSelectedCalendarDate(day)}
                         className={cn(
                           "group relative overflow-hidden rounded-[1.15rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30",
-                          isMobile ? "aspect-[0.94] min-h-[4.8rem] p-1.5 md:min-h-[7.2rem] md:p-2.5" : "min-h-[150px] p-3",
+                          isMobile ? "aspect-square min-h-[4.15rem] p-1 md:min-h-[4.6rem] md:p-1.5" : "min-h-[150px] p-3",
                           !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                           isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(20,41,95,0.32)] active:translate-y-0",
-                          isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]"
+                          isTodayCalendar && (isMobile
+                            ? "z-10 ring-[1.5px] ring-inset ring-[#FF7A16]/28 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.18)]"
+                            : "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]")
                         )}
                       >
-                        {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.3rem] border border-[#FF7A16]/20" />}
+                        {isTodayCalendar && (
+                          <div className={cn(
+                            "pointer-events-none absolute border border-[#FF7A16]/20",
+                            isMobile ? "inset-0 rounded-[1.15rem]" : "-inset-0.5 rounded-[1.3rem]"
+                          )} />
+                        )}
                         <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
-                        {isCurrentMonth && (
-                          <div className={cn("pointer-events-none absolute inset-x-3", isMobile ? "bottom-9" : "bottom-[4.1rem]")}>
+                        {isCurrentMonth && !isMobile && (
+                          <div className="pointer-events-none absolute inset-x-3 bottom-[4.1rem]">
                             <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
                           </div>
                         )}
-                        <div className={cn("relative z-10 flex justify-between items-start gap-2", isMobile ? "mb-1 md:mb-2" : "mb-2.5")}>
-                          <span
-                            className={cn(
-                              "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                              isMobile ? "text-[10px] min-w-[1.6rem] px-1.5 py-0.5 md:text-[11px] md:px-2 md:py-0.75" : "text-xs min-w-[2rem] px-2 py-1",
-                              idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                              isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
-                            )}
-                          >
-                            {format(day, 'd')}
-                          </span>
-                          {hasStatusCluster ? (
-                            <div className={cn("inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]", isMobile ? "px-1.5 py-[0.3rem]" : "px-2 py-1")}>
-                              {hasPlans && <span className={cn("rounded-full bg-[#14295F]", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
-                              {hasDeepFocus && <Zap className={cn("text-orange-500 fill-orange-500", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />}
-                            </div>
-                          ) : (
-                            <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
-                          )}
-                        </div>
-                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 px-1" : "bottom-3 px-3")}>
-                          <div
-                            className={cn(
-                              "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
-                              isMobile ? "px-2 py-1.5" : "px-3 py-2.5",
-                              getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
-                            )}
-                          >
+                        <div className={cn("relative z-10 flex h-full flex-col", isMobile ? "gap-1" : "gap-2")}>
+                          <div className="flex items-start justify-between gap-1.5">
+                            <span
+                              className={cn(
+                                "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                                isMobile ? "min-w-[1.45rem] px-1.5 py-0.5 text-[9px]" : "text-xs min-w-[2rem] px-2 py-1",
+                                idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
+                                isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
+                              )}
+                            >
+                              {format(day, 'd')}
+                            </span>
+
                             {isMobile ? (
-                              <span className="dashboard-number block tabular-nums text-[0.96rem] leading-none tracking-[-0.05em]">
-                                {timeLabel}
-                              </span>
-                            ) : (
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                                  공부시간
+                              hasDeepFocus ? (
+                                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-orange-100 bg-white/95 text-orange-500 shadow-[0_8px_16px_-14px_rgba(20,41,95,0.24)]">
+                                  <Zap className="h-2.5 w-2.5 fill-orange-500" />
                                 </span>
-                                <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
-                                  {timeLabel}
+                              ) : hasPlans ? (
+                                <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-[#14295F] shadow-[0_6px_12px_-10px_rgba(20,41,95,0.45)]" />
+                              ) : (
+                                <span className="h-5 w-5" aria-hidden="true" />
+                              )
+                            ) : hasStatusCluster ? (
+                              <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]">
+                                {hasPlans && <span className="h-2 w-2 rounded-full bg-[#14295F]" />}
+                                {hasDeepFocus && <Zap className="h-3 w-3 fill-orange-500 text-orange-500" />}
+                              </div>
+                            ) : (
+                              <span className="h-6 w-6" aria-hidden="true" />
+                            )}
+                          </div>
+
+                          {isMobile ? (
+                            <div className="mt-auto flex flex-col justify-end gap-1">
+                              {isCurrentMonth && (
+                                <div className={cn(
+                                  "h-1 rounded-full",
+                                  minutes > 0 ? `bg-gradient-to-r ${getCalendarAccentClass(minutes)}` : "bg-slate-200/80"
+                                )} />
+                              )}
+                              <div className="flex items-end justify-between gap-1">
+                                <span className={cn(
+                                  "text-[8px] font-black uppercase tracking-[0.14em]",
+                                  !isCurrentMonth ? "text-slate-300" : "text-slate-400"
+                                )}>
+                                  {hasPlans && isCurrentMonth ? '계획' : ''}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "inline-flex shrink-0 items-center rounded-full border bg-white/95 px-1.5 py-[0.34rem] text-[10px] font-black tabular-nums leading-none shadow-[0_12px_18px_-16px_rgba(20,41,95,0.26)]",
+                                    getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                                  )}
+                                >
+                                  {compactTimeLabel}
                                 </span>
                               </div>
-                            )}
-                          </div>
-                        </div>
-                        {!isMobile && isCurrentMonth && (
-                          <div className="pointer-events-none absolute inset-x-3 bottom-12">
-                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                              {minutes > 0 ? '오늘 학습 기록' : '기록 대기'}
                             </div>
-                          </div>
-                        )}
+                          ) : (
+                            <div className="mt-auto flex flex-col gap-2">
+                              {isCurrentMonth && (
+                                <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
+                              )}
+                              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                {statusLabel}
+                              </div>
+                              <div
+                                className={cn(
+                                  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[0.95rem] border bg-white/96 px-3 py-2.5 shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
+                                  getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                                )}
+                              >
+                                <span className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                  공부시간
+                                </span>
+                                <span className="dashboard-number shrink-0 whitespace-nowrap tabular-nums text-[1.02rem] leading-none tracking-[-0.05em]">
+                                  {fullTimeLabel}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
