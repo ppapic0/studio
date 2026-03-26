@@ -50,9 +50,27 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
         <div className="brand-sheen-panel relative mt-5 overflow-hidden rounded-2xl border border-[#FF7A16]/18 bg-[#FFF6ED] px-6 py-7 sm:px-8 sm:py-8">
           <div className="brand-glow-drift absolute right-8 top-4 h-24 w-24 rounded-full bg-[#FFB878]/18 blur-3xl" />
           <p className="relative text-[10px] font-black uppercase tracking-[0.24em] text-[#FF9848]">Success Story</p>
-          <p className="font-brand relative mt-3 break-keep text-[1.35rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.55rem]">
-            {successStory.summary}
-          </p>
+          <div className="relative mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-[28rem]">
+              <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">{successStory.title}</p>
+              <p className="font-brand mt-2 break-keep text-[1.35rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.55rem]">
+                {successStory.summary}
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[33rem] lg:flex-1">
+              {successStory.timeline.map((item) => (
+                <article
+                  key={item.label}
+                  className="rounded-[1.15rem] border border-white/70 bg-white/84 px-4 py-4 text-center shadow-[0_12px_28px_rgba(20,41,95,0.06)] backdrop-blur"
+                >
+                  <p className="text-[10px] font-black tracking-[0.16em] text-[#FF7A16]">{item.label}</p>
+                  <p className="mt-2 break-keep text-[1.15rem] font-black leading-none text-[#14295F]">{item.value}</p>
+                  <p className="mt-2 text-[11px] font-semibold text-[#52677F]">{item.detail}</p>
+                </article>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>

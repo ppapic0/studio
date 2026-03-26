@@ -131,6 +131,11 @@ export type MarketingContent = {
   successStory: {
     title: string;
     summary: string;
+    timeline: Array<{
+      label: string;
+      value: string;
+      detail: string;
+    }>;
   };
   classSystem: ProgramStep[];
   studyCafe: {
@@ -268,8 +273,13 @@ export const marketingContent: MarketingContent = {
     { label: '성장 사례', value: '백분위 99', detail: '3등급에서 고려대 합격' },
   ],
   successStory: {
-    title: '성장 사례',
-    summary: '트랙에서 이 사례는 시작일 뿐, 더 많은 변화가 이어지고 있습니다.',
+    title: '성적 상승 케이스',
+    summary: '3등급에서 수능 백분위 99까지 올린 케이스',
+    timeline: [
+      { label: '6모', value: '3등급', detail: '백분위 82' },
+      { label: '9모', value: '1등급', detail: '백분위 96' },
+      { label: '수능', value: '백분위 99', detail: '고려대 합격' },
+    ],
   },
   classSystem: [
     {
