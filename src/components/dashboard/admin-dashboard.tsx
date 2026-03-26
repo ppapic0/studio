@@ -116,6 +116,10 @@ const toSafeStudentName = (displayName?: string | null, memberId?: string): stri
   return '이름 미등록';
 };
 
+const normalizePhoneNumber = (value?: string | null): string => {
+  return String(value || '').replace(/\D/g, '').trim();
+};
+
 const calculateRhythmScoreFromMinutes = (minutes: number[]): number => {
   if (!minutes.length) return 0;
   const average = minutes.reduce((sum, value) => sum + value, 0) / minutes.length;
@@ -592,9 +596,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const parentMemberMap = new Map<string, CenterMembership>(
       (parentMembers || []).map((member) => [member.id, member])
     );
+    const memberCanonicalKeyById = new Map<string, string>();
+    const canonicalKeyByPhone = new Map<string, string>();
+
+    (parentMembers || []).forEach((member) => {
+      const normalizedPhone = normalizePhoneNumber(member.phoneNumber);
+      const canonicalKey = normalizedPhone || member.id;
+      memberCanonicalKeyById.set(member.id, canonicalKey);
+      if (normalizedPhone) {
+        canonicalKeyByPhone.set(normalizedPhone, canonicalKey);
+      }
+    });
 
     const buckets = new Map<string, {
+      bucketKey: string;
       parentUid: string;
+      parentUids: Set<string>;
       parentName: string;
       parentPhone: string;
       studentIds: Set<string>;
@@ -608,15 +625,51 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       latestInteractionMs: number;
     }>();
 
-    const ensureBucket = (parentUid: string) => {
-      let bucket = buckets.get(parentUid);
+    const resolveCanonicalParentKey = (params: {
+      parentUid?: string | null;
+      phoneNumber?: string | null;
+    }) => {
+      const normalizedPhone = normalizePhoneNumber(params.phoneNumber);
+      if (params.parentUid && memberCanonicalKeyById.has(params.parentUid)) {
+        return memberCanonicalKeyById.get(params.parentUid)!;
+      }
+      if (normalizedPhone && canonicalKeyByPhone.has(normalizedPhone)) {
+        return canonicalKeyByPhone.get(normalizedPhone)!;
+      }
+      return normalizedPhone || params.parentUid || '';
+    };
+
+    const ensureBucket = ({
+      parentUid,
+      phoneNumber,
+      parentName,
+      linkedStudentIds,
+    }: {
+      parentUid?: string | null;
+      phoneNumber?: string | null;
+      parentName?: string | null;
+      linkedStudentIds?: string[];
+    }) => {
+      const canonicalKey = resolveCanonicalParentKey({ parentUid, phoneNumber });
+      if (!canonicalKey) return null;
+
+      let bucket = buckets.get(canonicalKey);
       if (bucket) return bucket;
-      const parentMember = parentMemberMap.get(parentUid);
+      const parentMember = (parentUid && parentMemberMap.get(parentUid))
+        || (parentUid
+          ? (parentMembers || []).find((member) => member.id === parentUid)
+          : undefined)
+        || (linkedStudentIds && linkedStudentIds.length > 0
+          ? (parentMembers || []).find((member) => (member.linkedStudentIds || []).some((id) => linkedStudentIds.includes(id)))
+          : undefined);
+      const resolvedPhone = normalizePhoneNumber(phoneNumber) || normalizePhoneNumber(parentMember?.phoneNumber);
       bucket = {
-        parentUid,
-        parentName: parentMember?.displayName || '',
-        parentPhone: parentMember?.phoneNumber || '',
-        studentIds: new Set(parentMember?.linkedStudentIds || []),
+        bucketKey: canonicalKey,
+        parentUid: parentUid || parentMember?.id || canonicalKey,
+        parentUids: new Set([parentUid, parentMember?.id].filter((value): value is string => Boolean(value))),
+        parentName: parentMember?.displayName || (parentName || '').trim(),
+        parentPhone: resolvedPhone || '',
+        studentIds: new Set(linkedStudentIds || parentMember?.linkedStudentIds || []),
         visitCount: 0,
         reportReadCount: 0,
         consultationEventCount: 0,
@@ -626,14 +679,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         latestVisitMs: 0,
         latestInteractionMs: 0,
       };
-      buckets.set(parentUid, bucket);
+      buckets.set(canonicalKey, bucket);
       return bucket;
     };
 
     (parentMembers || []).forEach((member) => {
       const linkedIds = member.linkedStudentIds || [];
       if (linkedIds.length > 0 && !linkedIds.some((id) => targetMemberIds.has(id))) return;
-      ensureBucket(member.id);
+      ensureBucket({
+        parentUid: member.id,
+        phoneNumber: member.phoneNumber,
+        parentName: member.displayName,
+        linkedStudentIds: linkedIds,
+      });
     });
 
     (parentActivityEvents || []).forEach((event) => {
@@ -642,7 +700,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       if (!targetMemberIds.has(event.studentId)) return;
       if (!event.parentUid) return;
 
-      const bucket = ensureBucket(event.parentUid);
+      const bucket = ensureBucket({
+        parentUid: event.parentUid,
+        phoneNumber: event.metadata?.parentPhone,
+        parentName: event.metadata?.parentName,
+        linkedStudentIds: [event.studentId],
+      });
+      if (!bucket) return;
+      bucket.parentUids.add(event.parentUid);
       bucket.studentIds.add(event.studentId);
       bucket.latestInteractionMs = Math.max(bucket.latestInteractionMs, createdAtMs);
 
@@ -661,7 +726,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         bucket.parentName = metaName.trim();
       }
       if (!bucket.parentPhone && typeof metaPhone === 'string' && metaPhone.trim()) {
-        bucket.parentPhone = metaPhone.trim();
+        bucket.parentPhone = normalizePhoneNumber(metaPhone);
       }
     });
 
@@ -671,7 +736,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       if (!targetMemberIds.has(item.studentId)) return;
       if (!item.parentUid) return;
 
-      const bucket = ensureBucket(item.parentUid);
+      const bucket = ensureBucket({
+        parentUid: item.parentUid,
+        phoneNumber: item.parentPhone,
+        parentName: item.parentName,
+        linkedStudentIds: [item.studentId],
+      });
+      if (!bucket) return;
+      bucket.parentUids.add(item.parentUid);
       bucket.studentIds.add(item.studentId);
       bucket.latestInteractionMs = Math.max(bucket.latestInteractionMs, createdAtMs);
 
@@ -681,6 +753,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       if (!bucket.parentName && typeof item.parentName === 'string' && item.parentName.trim()) {
         bucket.parentName = item.parentName.trim();
+      }
+      if (!bucket.parentPhone && typeof item.parentPhone === 'string' && item.parentPhone.trim()) {
+        bucket.parentPhone = normalizePhoneNumber(item.parentPhone);
       }
     });
 
@@ -738,7 +813,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const parentName = bucket.parentName || `학부모-${bucket.parentUid.slice(0, 6)}`;
 
       return {
+        bucketKey: bucket.bucketKey,
         parentUid: bucket.parentUid,
+        parentUids: Array.from(bucket.parentUids),
         parentName,
         parentPhone: bucket.parentPhone || '-',
         linkedStudentNames,
@@ -768,11 +845,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (!keyword) return parentTrustRows;
     return parentTrustRows.filter((row) => {
       const studentsText = row.linkedStudentNames.join(' ').toLowerCase();
+      const parentUidText = row.parentUids.join(' ').toLowerCase();
       return (
         row.parentName.toLowerCase().includes(keyword)
         || row.parentPhone.toLowerCase().includes(keyword)
         || studentsText.includes(keyword)
-        || row.parentUid.toLowerCase().includes(keyword)
+        || parentUidText.includes(keyword)
       );
     });
   }, [parentTrustRows, parentTrustSearch]);
@@ -1923,7 +2001,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className="text-xs font-bold text-slate-500">현재 즉시 연락이 필요한 학부모가 없습니다.</p>
                     ) : (
                       parentContactRecommendations.slice(0, 3).map((row) => (
-                        <div key={row.parentUid} className="rounded-xl border border-rose-100 bg-white px-3 py-2">
+                        <div key={row.bucketKey} className="rounded-xl border border-rose-100 bg-white px-3 py-2">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-black text-slate-900 truncate">{row.parentName}</p>
                             <Badge className={cn(
@@ -2549,7 +2627,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             ) : (
               <div className="grid gap-3">
                 {filteredParentTrustRows.map((row) => (
-                  <div key={row.parentUid} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                  <div key={row.bucketKey} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
