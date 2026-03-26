@@ -802,39 +802,47 @@ function RhythmTimeChartDialog({
             </div>
 
             <div className="mt-4 rounded-[1.35rem] border border-[#dfe9fb] bg-white/88 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6d7fa5]">오늘 학습 리듬 점수</p>
-                  <div className="mt-2 flex items-end gap-1.5">
-                    <span className="dashboard-number text-[2.25rem] leading-none tracking-[-0.05em] text-[#14295F]">
-                      {rhythmScore}
-                    </span>
-                    <span className="pb-1 text-[12px] font-black text-[#6d7fa5]">점</span>
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
+                <div className="rounded-[1.15rem] border border-[#dce7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] px-3 py-3 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.18)]">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6d7fa5]">최근 리듬 그래프</p>
+                    <span className="text-[10px] font-black text-[#FF7A16]">14일 추이</span>
+                  </div>
+                  <div className="flex items-end gap-1.5">
+                    {(rhythmPreviewBars.length > 0 ? rhythmPreviewBars : [{ date: '대기', score: 0 }]).map((point, index, array) => {
+                      const safeScore = Math.max(6, Math.round((Number(point.score || 0) / 100) * 44));
+                      const isLatest = index === array.length - 1;
+                      return (
+                        <div key={`${point.date}-${index}`} className="flex-1">
+                          <div
+                            className={cn(
+                              'w-full rounded-full transition-all duration-200',
+                              isLatest
+                                ? 'bg-[linear-gradient(180deg,#14295F_0%,#FF7A16_100%)] shadow-[0_14px_20px_-16px_rgba(20,41,95,0.4)]'
+                                : 'bg-[linear-gradient(180deg,#d8e5ff_0%,#b8c9ef_100%)]'
+                            )}
+                            style={{ height: `${safeScore}px` }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <Badge variant="outline" className="h-7 rounded-full border border-[#d8e5ff] bg-[#eef4ff] px-3 text-[10px] font-black text-[#14295F]">
-                  최근 시작 {latestRhythm?.rhythmMinutes ? toClockLabel(latestRhythm.rhythmMinutes) : '기록 대기'}
-                </Badge>
-              </div>
 
-              <div className="mt-4 flex items-end gap-1.5">
-                {(rhythmPreviewBars.length > 0 ? rhythmPreviewBars : [{ date: '대기', score: 0 }]).map((point, index, array) => {
-                  const safeScore = Math.max(6, Math.round((Number(point.score || 0) / 100) * 44));
-                  const isLatest = index === array.length - 1;
-                  return (
-                    <div key={`${point.date}-${index}`} className="flex-1">
-                      <div
-                        className={cn(
-                          'w-full rounded-full transition-all duration-200',
-                          isLatest
-                            ? 'bg-[linear-gradient(180deg,#14295F_0%,#FF7A16_100%)] shadow-[0_14px_20px_-16px_rgba(20,41,95,0.4)]'
-                            : 'bg-[linear-gradient(180deg,#d8e5ff_0%,#b8c9ef_100%)]'
-                        )}
-                        style={{ height: `${safeScore}px` }}
-                      />
+                <div className="flex flex-col justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6d7fa5]">오늘 학습 리듬 점수</p>
+                    <div className="mt-2 flex items-end gap-1.5">
+                      <span className="dashboard-number text-[2.25rem] leading-none tracking-[-0.05em] text-[#14295F]">
+                        {rhythmScore}
+                      </span>
+                      <span className="pb-1 text-[12px] font-black text-[#6d7fa5]">점</span>
                     </div>
-                  );
-                })}
+                  </div>
+                  <Badge variant="outline" className="h-7 w-fit rounded-full border border-[#d8e5ff] bg-[#eef4ff] px-3 text-[10px] font-black text-[#14295F]">
+                    최근 시작 {latestRhythm?.rhythmMinutes ? toClockLabel(latestRhythm.rhythmMinutes) : '기록 대기'}
+                  </Badge>
+                </div>
               </div>
 
               <p className="mt-4 text-[11px] font-bold leading-5 text-slate-500">
