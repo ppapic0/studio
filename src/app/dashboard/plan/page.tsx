@@ -47,14 +47,12 @@ import {
   CalendarX,
   CalendarDays,
   Sparkles,
-  ListTodo,
   Activity,
   PlusCircle,
   CheckCircle2,
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
-  CircleDot,
   BarChart3,
   BookOpen,
   AlertCircle,
@@ -167,223 +165,6 @@ function timeToClockProgress(time?: string | null) {
   return clampPercent(((hour * 60) + minute) / (24 * 60) * 100);
 }
 
-function MissionRunnerCapsule({
-  progress,
-  completedCount,
-  totalCount,
-  isMobile,
-}: {
-  progress: number;
-  completedCount: number;
-  totalCount: number;
-  isMobile: boolean;
-}) {
-  const checkpoints = [14, 50, 86];
-  const displayProgress = totalCount > 0 ? Math.min(94, Math.max(10, progress)) : 10;
-  const displayLabel = totalCount > 0 ? `${completedCount}/${totalCount}` : '준비';
-  const completedNodes = totalCount > 0
-    ? checkpoints.filter((_, index) => progress >= ((index + 1) / checkpoints.length) * 100 - 6).length
-    : 0;
-
-  return (
-    <div className={cn(
-      "plan-mission-enter relative overflow-hidden rounded-[1.35rem] border border-primary/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.98)_0%,rgba(245,249,255,0.96)_100%)] shadow-[0_22px_50px_-34px_rgba(20,41,95,0.34)] ring-1 ring-white/80",
-      isMobile ? "w-[6.65rem] p-2.5" : "w-[8.15rem] p-3"
-    )}>
-      <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-      <div className="pointer-events-none absolute -right-4 -top-5 h-14 w-14 rounded-full bg-primary/10 blur-2xl" />
-      <p className="text-[8px] font-black uppercase tracking-[0.22em] text-primary/60">Mission Run</p>
-      <div className={cn("relative mt-2", isMobile ? "h-9" : "h-10")}>
-        <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-slate-100/90 ring-1 ring-slate-200/80" />
-        <div
-          className="plan-runner-track absolute left-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,rgba(255,122,22,0.92)_0%,rgba(20,41,95,0.88)_100%)]"
-          style={{ width: `${displayProgress}%` }}
-        />
-        {checkpoints.map((position, index) => (
-          <div
-            key={position}
-            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${position}%` }}
-          >
-            <div className={cn(
-              "h-3.5 w-3.5 rounded-full border border-white shadow-[0_6px_14px_-10px_rgba(20,41,95,0.45)]",
-              index < completedNodes ? "bg-[#10295f]" : "bg-white/88"
-            )} />
-          </div>
-        ))}
-        <div
-          className="plan-runner-token absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: `${displayProgress}%` }}
-        >
-          <div className={cn(
-            "flex items-center justify-center rounded-full border border-white/90 bg-[linear-gradient(135deg,#ff9f47_0%,#ff7a16_42%,#10295f_100%)] text-white shadow-[0_16px_28px_-18px_rgba(20,41,95,0.55)]",
-            isMobile ? "h-6 w-6" : "h-7 w-7"
-          )}>
-            {progress >= 100 ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleDot className="h-3.5 w-3.5 fill-current" />}
-          </div>
-        </div>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-400">
-          {progress >= 100 ? 'Clear' : totalCount > 0 ? 'Run' : 'Idle'}
-        </span>
-        <span className="text-[10px] font-black text-primary">{displayLabel}</span>
-      </div>
-    </div>
-  );
-}
-
-function MissionProgressRail({
-  progress,
-  completedCount,
-  totalCount,
-  isMobile,
-}: {
-  progress: number;
-  completedCount: number;
-  totalCount: number;
-  isMobile: boolean;
-}) {
-  const checkpoints = [12, 50, 88];
-  const displayProgress = totalCount > 0 ? Math.min(96, Math.max(8, progress)) : 8;
-  const progressLabel = totalCount === 0
-    ? '첫 미션을 등록하면 토큰이 바로 출발해요.'
-    : progress >= 100
-      ? '오늘 미션을 모두 클리어했어요.'
-      : `${Math.max(0, totalCount - completedCount)}개 남았어요. 가장 중요한 것부터 밀어주세요.`;
-
-  return (
-    <div className={cn(
-      "plan-mission-enter relative overflow-hidden rounded-[1.5rem] border border-primary/12 bg-white/82 shadow-[0_20px_48px_-34px_rgba(20,41,95,0.34)] ring-1 ring-white/90 backdrop-blur-sm",
-      isMobile ? "mt-4 p-4" : "mt-5 p-5"
-    )}>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.12),transparent_26%)]" />
-      <div className="relative flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/55">오늘 목표 진행률</p>
-          <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">{progressLabel}</p>
-        </div>
-        <span className={cn(
-          "rounded-full border border-primary/12 bg-primary/[0.06] px-3 py-1 font-black text-primary",
-          isMobile ? "text-xs" : "text-sm"
-        )}>
-          {Math.round(progress)}%
-        </span>
-      </div>
-      <div className={cn("relative", isMobile ? "mt-5 h-16" : "mt-6 h-[4.3rem]")}>
-        <div className="absolute inset-x-0 top-1/2 h-[0.48rem] -translate-y-1/2 rounded-full bg-slate-100/95 ring-1 ring-slate-200/90" />
-        <div
-          className="plan-runner-track absolute left-0 top-1/2 h-[0.48rem] -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,rgba(255,122,22,0.95)_0%,rgba(20,41,95,0.92)_100%)] shadow-[0_10px_22px_-16px_rgba(255,122,22,0.45)]"
-          style={{ width: `${displayProgress}%` }}
-        />
-        {checkpoints.map((position, index) => {
-          const isActive = displayProgress >= position - 2;
-          return (
-            <div
-              key={position}
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${position}%` }}
-            >
-              <div className={cn(
-                "relative flex items-center justify-center rounded-full border border-white shadow-[0_10px_24px_-18px_rgba(20,41,95,0.4)]",
-                isActive ? "bg-[#10295f] text-white" : "bg-white/92 text-slate-400",
-                isMobile ? "h-5 w-5" : "h-6 w-6"
-              )}>
-                <span className="text-[9px] font-black">{index + 1}</span>
-                {isActive && <span className="plan-metric-pulse absolute inset-0 rounded-full bg-[#10295f]/20" />}
-              </div>
-            </div>
-          );
-        })}
-        <div
-          className="plan-runner-token absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: `${displayProgress}%` }}
-        >
-          <div className={cn(
-            "relative flex items-center justify-center rounded-full border border-white/90 bg-[linear-gradient(135deg,#ffb15f_0%,#ff7a16_48%,#10295f_100%)] text-white shadow-[0_20px_38px_-22px_rgba(20,41,95,0.6)]",
-            isMobile ? "h-9 w-9" : "h-10 w-10"
-          )}>
-            {progress >= 100 ? <CheckCircle2 className="h-5 w-5" /> : <CircleDot className="h-4 w-4 fill-current" />}
-            <span className="plan-metric-pulse absolute inset-0 rounded-full bg-[#ff7a16]/18" />
-          </div>
-        </div>
-      </div>
-      <div className="relative mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-        <span>Start</span>
-        <span>{progress >= 100 ? 'Finish' : 'Chase'}</span>
-      </div>
-    </div>
-  );
-}
-
-function MissionFocusStackCard({
-  task,
-  index,
-  isMobile,
-}: {
-  task: WithId<StudyPlanItem>;
-  index: number;
-  isMobile: boolean;
-}) {
-  const subjectLabel = task.subject ? SUBJECTS.find((subject) => subject.id === task.subject)?.label : null;
-  const metaChips = [
-    task.category === 'personal' ? '개인 미션' : '학습 미션',
-    subjectLabel,
-    task.category === 'personal' ? null : buildStudyTaskMeta(task),
-  ].filter(Boolean).slice(0, 2) as string[];
-  const isPrimary = index === 0;
-
-  return (
-    <div
-      className={cn(
-        "relative overflow-hidden border backdrop-blur-sm",
-        isPrimary
-          ? "z-30 rounded-[1.4rem] border-primary/12 bg-[linear-gradient(140deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_100%)] shadow-[0_28px_56px_-36px_rgba(20,41,95,0.42)]"
-          : index === 1
-            ? "z-20 -mt-3 ml-2 rounded-[1.25rem] border-slate-200/85 bg-white/92 shadow-[0_18px_34px_-28px_rgba(20,41,95,0.3)]"
-            : "z-10 -mt-3 ml-4 rounded-[1.2rem] border-slate-200/80 bg-slate-50/94 shadow-[0_14px_24px_-24px_rgba(20,41,95,0.18)]",
-        isPrimary ? (isMobile ? "px-4 py-4" : "px-5 py-5") : (isMobile ? "px-3.5 py-3" : "px-4 py-3.5")
-      )}
-    >
-      <div className={cn(
-        "pointer-events-none absolute inset-0",
-        isPrimary ? "bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,122,22,0.12),transparent_26%)]" : ""
-      )} />
-      <div className="relative flex items-start gap-3">
-        <div className={cn(
-          "flex shrink-0 items-center justify-center rounded-2xl font-black shadow-[0_12px_22px_-18px_rgba(20,41,95,0.4)]",
-          isPrimary ? "bg-primary text-white" : "bg-white text-primary ring-1 ring-slate-200/90",
-          isPrimary ? (isMobile ? "h-10 w-10" : "h-11 w-11") : "h-8 w-8"
-        )}>
-          {index + 1}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className={cn(
-            "break-keep font-black text-slate-900",
-            isPrimary
-              ? (isMobile ? "text-base leading-6 line-clamp-1" : "text-lg leading-7 line-clamp-1")
-              : "text-sm leading-5 line-clamp-1"
-          )}>
-            {task.title}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {metaChips.map((chip) => (
-              <span
-                key={chip}
-                className={cn(
-                  "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.08em]",
-                  isPrimary ? "border-primary/10 bg-primary/[0.06] text-primary" : "border-slate-200 bg-white/90 text-slate-500"
-                )}
-              >
-                {chip}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMobile }: any) {
   const [titlePart, timePart] = item.title.split(': ');
@@ -706,11 +487,6 @@ export default function StudyPlanPage() {
     }
     return `목표 ${Math.floor(studyTimeSummary.total / 60)}시간 ${studyTimeSummary.total % 60}분`;
   }, [studyTasks.length, volumeStudyTasks.length, studyTimeSummary.total]);
-  const allMissionTasks = useMemo(() => [...studyTasks, ...personalTasks], [studyTasks, personalTasks]);
-  const completedMissionCount = useMemo(
-    () => allMissionTasks.filter((task) => task.done).length,
-    [allMissionTasks]
-  );
   const remainingStudyTasks = useMemo(
     () => studyTasks.filter((task) => !task.done),
     [studyTasks]
@@ -719,10 +495,6 @@ export default function StudyPlanPage() {
     () => personalTasks.filter((task) => !task.done),
     [personalTasks]
   );
-  const missionCompletionRate = useMemo(() => {
-    if (allMissionTasks.length === 0) return 0;
-    return Math.round((completedMissionCount / allMissionTasks.length) * 100);
-  }, [allMissionTasks.length, completedMissionCount]);
   const planRewardMultiplier = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
     return 1
@@ -731,29 +503,6 @@ export default function StudyPlanPage() {
       + (Math.min(100, raw.achievement || 0) / 100) * 0.05
       + (Math.min(100, raw.resilience || 0) / 100) * 0.05;
   }, [progress?.stats]);
-  const estimatedPlanReward = useMemo(() => {
-    const alreadyEarned = !!progress?.dailyLpStatus?.[selectedDateKey]?.plan;
-    if (alreadyEarned || studyTasks.length < 3) return 0;
-    return Math.round(100 * planRewardMultiplier);
-  }, [progress?.dailyLpStatus, selectedDateKey, studyTasks.length, planRewardMultiplier]);
-  const missionFocusItems = useMemo(() => {
-    const studyFocus = remainingStudyTasks.slice(0, 3);
-    if (studyFocus.length > 0) return studyFocus;
-    return remainingPersonalTasks.slice(0, 3);
-  }, [remainingStudyTasks, remainingPersonalTasks]);
-  const missionBoardTitle = isPast
-    ? '이날 계획 기록'
-    : isToday
-      ? '오늘 꼭 끝낼 3가지'
-      : `${selectedDate ? format(selectedDate, 'M월 d일', { locale: ko }) : '선택한 날'} 미션 보드`;
-  const missionBoardDescription = isPast
-    ? '이날 어떤 계획을 세웠고 얼마나 실행했는지 차분하게 돌아볼 수 있어요.'
-    : remainingStudyTasks.length > 0
-      ? `학습 미션 ${remainingStudyTasks.length}개와 개인 미션 ${remainingPersonalTasks.length}개가 남아 있어요. 가장 중요한 것부터 정리해 보세요.`
-      : allMissionTasks.length > 0
-        ? '오늘 미션을 거의 정리했어요. 남은 시간은 복습이나 내일 준비에 써도 좋아요.'
-        : '아직 등록된 미션이 없어요. 작게라도 한 가지 목표를 적어두면 시작이 더 쉬워져요.';
-  const missionProgressPercent = clampPercent(missionCompletionRate);
   const routineCountLabel = `${scheduleItems.length}개`;
   const studyCountLabel = `${studyTasks.length}개`;
   const personalCountLabel = `${personalTasks.length}개`;
@@ -765,20 +514,6 @@ export default function StudyPlanPage() {
     () => personalTasks.filter((task) => task.done).length,
     [personalTasks]
   );
-  const missionRewardLabel = estimatedPlanReward > 0 ? `+${estimatedPlanReward} LP` : '보상 대기';
-  const missionRewardGuide = estimatedPlanReward > 0
-    ? '학습 미션 3개를 마무리하면 보상 루트가 열려요.'
-    : '오늘 계획 보너스를 이미 받았거나 아직 준비 중이에요.';
-  const missionRewardChipClass = estimatedPlanReward > 0
-    ? 'border-amber-100 bg-amber-50/90 text-amber-700'
-    : 'border-slate-200 bg-slate-50/90 text-slate-500';
-  const missionWrapupValue = hasOutPlan && outTime ? outTime : '미정';
-  const missionWrapupGuide = hasOutPlan && outTime
-    ? `${outTime} 전까지 오늘 흐름을 마무리하는 리듬이에요.`
-    : '하원 예정 시간을 정하면 오늘 마감 리듬이 생겨요.';
-  const missionWrapupChipClass = hasOutPlan && outTime
-    ? 'border-emerald-100 bg-emerald-50/90 text-emerald-700'
-    : 'border-slate-200 bg-slate-50/90 text-slate-500';
   const taskCopyOptions = useMemo(() => (
     copyableTaskItems.map((item) => {
       const subject = SUBJECTS.find((entry) => entry.id === (item.subject || 'etc'));
@@ -1402,139 +1137,6 @@ export default function StudyPlanPage() {
           <ChevronRight className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
         </Button>
       </div>
-
-      <section className="grid gap-3 [&>*]:min-w-0">
-        <Card className={cn(
-          "plan-mission-enter relative overflow-hidden border-none bg-[linear-gradient(145deg,#fffef9_0%,#ffffff_42%,#f4f9ff_100%)] shadow-[0_30px_80px_-46px_rgba(20,41,95,0.42)] ring-1 ring-black/[0.04]",
-          isMobile ? "rounded-[1.65rem]" : "rounded-[2.75rem]"
-        )}>
-          <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.1),transparent_28%)]" />
-          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-          <CardContent className={cn("relative", isMobile ? "p-5" : "p-8")}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-2">
-                <Badge className="border-none bg-primary/10 text-primary font-black text-[10px] tracking-[0.18em] uppercase shadow-sm">
-                  오늘의 미션 허브
-                </Badge>
-                <div className="min-w-0">
-                  <h2 className={cn("font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-[clamp(1.95rem,9vw,2.45rem)] leading-[1.08]" : "text-[2.45rem] leading-[1.04]")}>
-                    {missionBoardTitle}
-                  </h2>
-                  <p className={cn("mt-2 line-clamp-2 font-semibold text-slate-600 break-keep", isMobile ? "text-sm leading-6" : "text-base leading-7 max-w-[38rem]")}>
-                    {missionBoardDescription}
-                  </p>
-                </div>
-              </div>
-              <div className="shrink-0">
-                <MissionRunnerCapsule
-                  progress={missionProgressPercent}
-                  completedCount={completedMissionCount}
-                  totalCount={allMissionTasks.length}
-                  isMobile={isMobile}
-                />
-              </div>
-            </div>
-
-            <MissionProgressRail
-              progress={missionProgressPercent}
-              completedCount={completedMissionCount}
-              totalCount={allMissionTasks.length}
-              isMobile={isMobile}
-            />
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-white/80 px-3 text-[10px] font-black text-primary shadow-sm">
-                완료 {completedMissionCount}/{allMissionTasks.length}
-              </Badge>
-              <Badge variant="outline" className={cn("h-7 rounded-full px-3 text-[10px] font-black shadow-sm", missionRewardChipClass)}>
-                {estimatedPlanReward > 0 ? `예상 ${missionRewardLabel}` : missionRewardLabel}
-              </Badge>
-              <Badge variant="outline" className={cn("h-7 rounded-full px-3 text-[10px] font-black shadow-sm", missionWrapupChipClass)}>
-                {hasOutPlan && outTime ? `${outTime} 전 마무리` : '마감 시간 미설정'}
-              </Badge>
-            </div>
-
-            <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-              <div className="rounded-[1.3rem] border border-white/90 bg-white/84 px-4 py-3.5 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.24)] backdrop-blur-sm">
-                <p className={cn(
-                  "text-[10px] font-black uppercase tracking-[0.18em]",
-                  estimatedPlanReward > 0 ? "text-amber-600" : "text-slate-400"
-                )}>
-                  예상 보상
-                </p>
-                <p className={cn(
-                  "mt-2 font-black tracking-tight break-keep",
-                  estimatedPlanReward > 0 ? "text-slate-900" : "text-slate-500",
-                  isMobile ? "text-[1.2rem]" : "text-[1.45rem]"
-                )}>
-                  {missionRewardLabel}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                  {estimatedPlanReward > 0 ? '완료할수록 더 커져요.' : '첫 완료부터 보상이 열려요.'}
-                </p>
-              </div>
-
-              <div className="rounded-[1.3rem] border border-white/90 bg-white/84 px-4 py-3.5 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.24)] backdrop-blur-sm">
-                <p className={cn(
-                  "text-[10px] font-black uppercase tracking-[0.18em]",
-                  hasOutPlan && outTime ? "text-emerald-600" : "text-slate-400"
-                )}>
-                  마감 리듬
-                </p>
-                <p className="mt-2 font-black tracking-tight break-keep text-slate-900 text-[1.2rem] sm:text-[1.45rem]">
-                  {missionWrapupValue}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                  {hasOutPlan && outTime ? '오늘 마감 기준이 정해졌어요.' : '하원 시간만 정하면 충분해요.'}
-                </p>
-              </div>
-
-              <div className="rounded-[1.3rem] border border-primary/12 bg-primary/[0.04] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/55">남은 흐름</p>
-                <p className="mt-2 text-sm font-black text-slate-900 break-keep">
-                  학습 {remainingStudyTasks.length}개 · 개인 {remainingPersonalTasks.length}개
-                </p>
-                <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                  완료 {completedMissionCount}/{allMissionTasks.length} · {Math.max(0, allMissionTasks.length - completedMissionCount)}개 남음
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              {missionFocusItems.length > 0 ? (
-                <div className="relative pb-1">
-                  {missionFocusItems.slice(0, 3).map((task, index) => (
-                    <MissionFocusStackCard
-                      key={task.id}
-                      task={task}
-                      index={index}
-                      isMobile={isMobile}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="relative overflow-hidden rounded-[1.3rem] border border-dashed border-primary/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] px-4 py-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.24)]">
-                  <div className="relative flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_16px_28px_-22px_rgba(20,41,95,0.34)]">
-                      <PlusCircle className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-black text-slate-900 break-keep">첫 미션 한 개만 적어도 바로 시작돼요.</p>
-                      <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">가장 먼저 끝낼 한 가지부터 추가해 보세요.</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="inline-flex items-center rounded-full border border-primary/12 bg-white/92 px-3 py-1 text-[10px] font-black text-primary shadow-sm">
-                          첫 미션 추가
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
 
       {!isPast && (
         <Card className={cn(
