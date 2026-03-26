@@ -179,7 +179,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
-  const { rows: adminHeatmapRows, isLoading: adminHeatmapLoading } = useCenterAdminHeatmap({
+  const {
+    rows: adminHeatmapRows,
+    interventionSignals: heatmapInterventionSignals,
+    isLoading: adminHeatmapLoading,
+  } = useCenterAdminHeatmap({
     centerId,
     isActive,
     selectedClass,
@@ -1516,6 +1520,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         title="운영 히트맵 그래프"
         description="등하원 도면 아래에서 운영 KPI, 학부모 반응, 위험, 수납, 효율을 그래프 중심으로 읽고 바로 우선순위를 정할 수 있습니다."
         rows={adminHeatmapRows}
+        interventionSignals={heatmapInterventionSignals}
+        scopeLabel={selectedClass === 'all' ? '센터 전체' : selectedClass}
         isLoading={adminHeatmapLoading}
         actionHref="/dashboard/teacher"
         actionLabel="실시간 교실 이동"

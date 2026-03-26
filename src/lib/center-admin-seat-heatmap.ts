@@ -25,6 +25,8 @@ export type CenterAdminSeatDomainScores = Record<CenterAdminSeatDomainKey, numbe
 export interface CenterAdminStudentSeatSignal {
   studentId: string;
   seatId: string;
+  studentName: string;
+  className?: string;
   roomId?: string;
   roomSeatNo?: number;
   attendanceStatus: AttendanceCurrent['status'];
