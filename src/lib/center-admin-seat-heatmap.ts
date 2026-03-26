@@ -25,12 +25,16 @@ export type CenterAdminSeatDomainScores = Record<CenterAdminSeatDomainKey, numbe
 export interface CenterAdminStudentSeatSignal {
   studentId: string;
   seatId: string;
+  studentName: string;
+  className?: string;
   roomId?: string;
   roomSeatNo?: number;
   attendanceStatus: AttendanceCurrent['status'];
   compositeHealth: number;
   domainScores: CenterAdminSeatDomainScores;
   todayMinutes: number;
+  weeklyStudyMinutes: number;
+  weeklyStudyLabel: string;
   effectivePenaltyPoints: number;
   hasUnreadReport: boolean;
   hasCounselingToday: boolean;
@@ -171,6 +175,17 @@ function formatDurationLabel(totalMinutes: number) {
   if (hours <= 0) return `${minutes}분`;
   if (minutes <= 0) return `${hours}시간`;
   return `${hours}시간 ${minutes}분`;
+}
+
+export function formatCenterAdminWeeklyStudyLabel(totalMinutes: number | null | undefined) {
+  if (!Number.isFinite(totalMinutes) || totalMinutes == null || totalMinutes < 0) {
+    return '주간 확인중';
+  }
+
+  const safeMinutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const minutes = safeMinutes % 60;
+  return `주간 ${hours}h ${minutes}m`;
 }
 
 function resolveScoreToneMeta(score: number) {

@@ -116,6 +116,10 @@ const toSafeStudentName = (displayName?: string | null, memberId?: string): stri
   return '이름 미등록';
 };
 
+const normalizePhoneNumber = (value?: string | null): string => {
+  return String(value || '').replace(/\D/g, '').trim();
+};
+
 const calculateRhythmScoreFromMinutes = (minutes: number[]): number => {
   if (!minutes.length) return 0;
   const average = minutes.reduce((sum, value) => sum + value, 0) / minutes.length;
@@ -145,6 +149,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
+  const [isStudyingStudentsDialogOpen, setIsStudyingStudentsDialogOpen] = useState(false);
   const [isAttendanceFullscreenOpen, setIsAttendanceFullscreenOpen] = useState(false);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
@@ -179,7 +184,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
-  const { rows: adminHeatmapRows, isLoading: adminHeatmapLoading } = useCenterAdminHeatmap({
+  const {
+    rows: adminHeatmapRows,
+    interventionSignals: heatmapInterventionSignals,
+    isLoading: adminHeatmapLoading,
+  } = useCenterAdminHeatmap({
     centerId,
     isActive,
     selectedClass,
@@ -194,6 +203,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const roomConfigs = useMemo(
     () => normalizeLayoutRooms(centerData?.layoutSettings),
     [centerData?.layoutSettings]
+  );
+  const roomNameById = useMemo(
+    () =>
+      new Map(
+        roomConfigs.map((room, index) => [room.id, room.name?.trim() || `${index + 1}호실`])
+      ),
+    [roomConfigs]
+  );
+  const roomOrderById = useMemo(
+    () =>
+      new Map(
+        roomConfigs.map((room, index) => [room.id, typeof room.order === 'number' ? room.order : index])
+      ),
+    [roomConfigs]
   );
 
   useEffect(() => {
@@ -573,9 +596,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const parentMemberMap = new Map<string, CenterMembership>(
       (parentMembers || []).map((member) => [member.id, member])
     );
+    const memberCanonicalKeyById = new Map<string, string>();
+    const canonicalKeyByPhone = new Map<string, string>();
+
+    (parentMembers || []).forEach((member) => {
+      const normalizedPhone = normalizePhoneNumber(member.phoneNumber);
+      const canonicalKey = normalizedPhone || member.id;
+      memberCanonicalKeyById.set(member.id, canonicalKey);
+      if (normalizedPhone) {
+        canonicalKeyByPhone.set(normalizedPhone, canonicalKey);
+      }
+    });
 
     const buckets = new Map<string, {
+      bucketKey: string;
       parentUid: string;
+      parentUids: Set<string>;
       parentName: string;
       parentPhone: string;
       studentIds: Set<string>;
@@ -589,15 +625,51 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       latestInteractionMs: number;
     }>();
 
-    const ensureBucket = (parentUid: string) => {
-      let bucket = buckets.get(parentUid);
+    const resolveCanonicalParentKey = (params: {
+      parentUid?: string | null;
+      phoneNumber?: string | null;
+    }) => {
+      const normalizedPhone = normalizePhoneNumber(params.phoneNumber);
+      if (params.parentUid && memberCanonicalKeyById.has(params.parentUid)) {
+        return memberCanonicalKeyById.get(params.parentUid)!;
+      }
+      if (normalizedPhone && canonicalKeyByPhone.has(normalizedPhone)) {
+        return canonicalKeyByPhone.get(normalizedPhone)!;
+      }
+      return normalizedPhone || params.parentUid || '';
+    };
+
+    const ensureBucket = ({
+      parentUid,
+      phoneNumber,
+      parentName,
+      linkedStudentIds,
+    }: {
+      parentUid?: string | null;
+      phoneNumber?: string | null;
+      parentName?: string | null;
+      linkedStudentIds?: string[];
+    }) => {
+      const canonicalKey = resolveCanonicalParentKey({ parentUid, phoneNumber });
+      if (!canonicalKey) return null;
+
+      let bucket = buckets.get(canonicalKey);
       if (bucket) return bucket;
-      const parentMember = parentMemberMap.get(parentUid);
+      const parentMember = (parentUid && parentMemberMap.get(parentUid))
+        || (parentUid
+          ? (parentMembers || []).find((member) => member.id === parentUid)
+          : undefined)
+        || (linkedStudentIds && linkedStudentIds.length > 0
+          ? (parentMembers || []).find((member) => (member.linkedStudentIds || []).some((id) => linkedStudentIds.includes(id)))
+          : undefined);
+      const resolvedPhone = normalizePhoneNumber(phoneNumber) || normalizePhoneNumber(parentMember?.phoneNumber);
       bucket = {
-        parentUid,
-        parentName: parentMember?.displayName || '',
-        parentPhone: parentMember?.phoneNumber || '',
-        studentIds: new Set(parentMember?.linkedStudentIds || []),
+        bucketKey: canonicalKey,
+        parentUid: parentUid || parentMember?.id || canonicalKey,
+        parentUids: new Set([parentUid, parentMember?.id].filter((value): value is string => Boolean(value))),
+        parentName: parentMember?.displayName || (parentName || '').trim(),
+        parentPhone: resolvedPhone || '',
+        studentIds: new Set(linkedStudentIds || parentMember?.linkedStudentIds || []),
         visitCount: 0,
         reportReadCount: 0,
         consultationEventCount: 0,
@@ -607,14 +679,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         latestVisitMs: 0,
         latestInteractionMs: 0,
       };
-      buckets.set(parentUid, bucket);
+      buckets.set(canonicalKey, bucket);
       return bucket;
     };
 
     (parentMembers || []).forEach((member) => {
       const linkedIds = member.linkedStudentIds || [];
       if (linkedIds.length > 0 && !linkedIds.some((id) => targetMemberIds.has(id))) return;
-      ensureBucket(member.id);
+      ensureBucket({
+        parentUid: member.id,
+        phoneNumber: member.phoneNumber,
+        parentName: member.displayName,
+        linkedStudentIds: linkedIds,
+      });
     });
 
     (parentActivityEvents || []).forEach((event) => {
@@ -623,7 +700,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       if (!targetMemberIds.has(event.studentId)) return;
       if (!event.parentUid) return;
 
-      const bucket = ensureBucket(event.parentUid);
+      const bucket = ensureBucket({
+        parentUid: event.parentUid,
+        phoneNumber: event.metadata?.parentPhone,
+        parentName: event.metadata?.parentName,
+        linkedStudentIds: [event.studentId],
+      });
+      if (!bucket) return;
+      bucket.parentUids.add(event.parentUid);
       bucket.studentIds.add(event.studentId);
       bucket.latestInteractionMs = Math.max(bucket.latestInteractionMs, createdAtMs);
 
@@ -642,7 +726,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         bucket.parentName = metaName.trim();
       }
       if (!bucket.parentPhone && typeof metaPhone === 'string' && metaPhone.trim()) {
-        bucket.parentPhone = metaPhone.trim();
+        bucket.parentPhone = normalizePhoneNumber(metaPhone);
       }
     });
 
@@ -652,7 +736,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       if (!targetMemberIds.has(item.studentId)) return;
       if (!item.parentUid) return;
 
-      const bucket = ensureBucket(item.parentUid);
+      const bucket = ensureBucket({
+        parentUid: item.parentUid,
+        phoneNumber: item.parentPhone,
+        parentName: item.parentName,
+        linkedStudentIds: [item.studentId],
+      });
+      if (!bucket) return;
+      bucket.parentUids.add(item.parentUid);
       bucket.studentIds.add(item.studentId);
       bucket.latestInteractionMs = Math.max(bucket.latestInteractionMs, createdAtMs);
 
@@ -662,6 +753,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       if (!bucket.parentName && typeof item.parentName === 'string' && item.parentName.trim()) {
         bucket.parentName = item.parentName.trim();
+      }
+      if (!bucket.parentPhone && typeof item.parentPhone === 'string' && item.parentPhone.trim()) {
+        bucket.parentPhone = normalizePhoneNumber(item.parentPhone);
       }
     });
 
@@ -719,7 +813,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const parentName = bucket.parentName || `학부모-${bucket.parentUid.slice(0, 6)}`;
 
       return {
+        bucketKey: bucket.bucketKey,
         parentUid: bucket.parentUid,
+        parentUids: Array.from(bucket.parentUids),
         parentName,
         parentPhone: bucket.parentPhone || '-',
         linkedStudentNames,
@@ -749,11 +845,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (!keyword) return parentTrustRows;
     return parentTrustRows.filter((row) => {
       const studentsText = row.linkedStudentNames.join(' ').toLowerCase();
+      const parentUidText = row.parentUids.join(' ').toLowerCase();
       return (
         row.parentName.toLowerCase().includes(keyword)
         || row.parentPhone.toLowerCase().includes(keyword)
         || studentsText.includes(keyword)
-        || row.parentUid.toLowerCase().includes(keyword)
+        || parentUidText.includes(keyword)
       );
     });
   }, [parentTrustRows, parentTrustSearch]);
@@ -762,6 +859,29 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () => parentTrustRows.filter((row) => row.priority !== '안정').slice(0, 5),
     [parentTrustRows]
   );
+
+  const currentlyStudyingStudents = useMemo(() => {
+    return Object.values(attendanceSeatSignalsBySeatId || {})
+      .filter((signal) => Boolean(signal && signal.seatStatus === 'studying'))
+      .sort((a, b) => {
+        const roomOrderA = roomOrderById.get(a.roomId || '') ?? Number.MAX_SAFE_INTEGER;
+        const roomOrderB = roomOrderById.get(b.roomId || '') ?? Number.MAX_SAFE_INTEGER;
+        if (roomOrderA !== roomOrderB) return roomOrderA - roomOrderB;
+
+        const seatNoA = a.roomSeatNo ?? Number.MAX_SAFE_INTEGER;
+        const seatNoB = b.roomSeatNo ?? Number.MAX_SAFE_INTEGER;
+        if (seatNoA !== seatNoB) return seatNoA - seatNoB;
+
+        return a.studentName.localeCompare(b.studentName, 'ko');
+      })
+      .map((signal) => ({
+        ...signal,
+        roomLabel:
+          signal.roomId && signal.roomSeatNo
+            ? `${roomNameById.get(signal.roomId) || signal.roomId} ${signal.roomSeatNo}번`
+            : '좌석 확인중',
+      }));
+  }, [attendanceSeatSignalsBySeatId, roomNameById, roomOrderById]);
 
   const handleCreateAnnouncement = async () => {
     if (!firestore || !centerId || !activeMembership) return;
@@ -1516,6 +1636,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         title="운영 히트맵 그래프"
         description="등하원 도면 아래에서 운영 KPI, 학부모 반응, 위험, 수납, 효율을 그래프 중심으로 읽고 바로 우선순위를 정할 수 있습니다."
         rows={adminHeatmapRows}
+        interventionSignals={heatmapInterventionSignals}
+        scopeLabel={selectedClass === 'all' ? '센터 전체' : selectedClass}
         isLoading={adminHeatmapLoading}
         actionHref="/dashboard/teacher"
         actionLabel="실시간 교실 이동"
@@ -1601,25 +1723,35 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03]">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">현재 착석 인원</p>
-                    <h3 className="dashboard-number text-5xl text-primary">{metrics.checkedInCount}<span className="ml-1 text-2xl opacity-40">명</span></h3>
+              <button
+                type="button"
+                onClick={() => setIsStudyingStudentsDialogOpen(true)}
+                className="block w-full text-left"
+              >
+                <Card className="rounded-[2.5rem] border-none bg-white p-10 shadow-xl ring-1 ring-black/[0.03] transition-all group cursor-pointer hover:-translate-y-0.5 hover:shadow-2xl">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">현재 착석 인원</p>
+                      <h3 className="dashboard-number text-5xl text-primary">{metrics.checkedInCount}<span className="ml-1 text-2xl opacity-40">명</span></h3>
+                    </div>
+                    <div className="rounded-[1.5rem] bg-blue-50 p-4 shadow-sm transition-all duration-500 group-hover:bg-blue-600 group-hover:text-white"><Users className="h-8 w-8 text-blue-600 group-hover:text-white" /></div>
                   </div>
-                  <div className="bg-blue-50 p-4 rounded-[1.5rem] group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-sm"><Users className="h-8 w-8 text-blue-600 group-hover:text-white" /></div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-dashed">
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">재원생(대상)</p>
-                    <p className="dashboard-number text-xl">{metrics.totalStudents}명</p>
+                  <div className="mt-8 grid grid-cols-2 gap-4 border-t border-dashed pt-8">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">재원생(대상)</p>
+                      <p className="dashboard-number text-xl">{metrics.totalStudents}명</p>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">실시간 점유율</p>
+                      <p className="dashboard-number text-xl text-blue-600">{metrics.seatOccupancy}%</p>
+                    </div>
                   </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">실시간 점유율</p>
-                    <p className="dashboard-number text-xl text-blue-600">{metrics.seatOccupancy}%</p>
+                  <div className="mt-6 flex items-center justify-between border-t border-dashed pt-4">
+                    <p className="text-[11px] font-bold text-slate-500">누르면 현재 공부중인 학생 목록이 열립니다.</p>
+                    <ChevronRight className="h-4 w-4 text-blue-500 transition-transform duration-300 group-hover:translate-x-1" />
                   </div>
-                </div>
-              </Card>
+                </Card>
+              </button>
 
               <Link
                 href="/dashboard/teacher/students?showRisk=1#risk-analysis"
@@ -1869,7 +2001,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className="text-xs font-bold text-slate-500">현재 즉시 연락이 필요한 학부모가 없습니다.</p>
                     ) : (
                       parentContactRecommendations.slice(0, 3).map((row) => (
-                        <div key={row.parentUid} className="rounded-xl border border-rose-100 bg-white px-3 py-2">
+                        <div key={row.bucketKey} className="rounded-xl border border-rose-100 bg-white px-3 py-2">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-black text-slate-900 truncate">{row.parentName}</p>
                             <Badge className={cn(
@@ -1974,6 +2106,90 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <p className="font-black text-xl tracking-tighter">분석 데이터를 집계하고 있습니다...</p>
         </div>
       )}
+      <Dialog open={isStudyingStudentsDialogOpen} onOpenChange={setIsStudyingStudentsDialogOpen}>
+        <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-2xl">
+          <div className="bg-[linear-gradient(135deg,#14295F_0%,#2754D7_100%)] px-6 py-6 text-white">
+            <DialogHeader className="space-y-2 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white backdrop-blur">
+                  실시간 공부 현황
+                </Badge>
+                <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-primary">
+                  {selectedClass === 'all' ? '센터 전체' : selectedClass}
+                </Badge>
+              </div>
+              <DialogTitle className="text-2xl font-black tracking-tight">
+                현재 공부중인 학생 {currentlyStudyingStudents.length}명
+              </DialogTitle>
+              <DialogDescription className="text-sm font-medium text-white/75">
+                현재 좌석 상태가 공부중으로 잡힌 학생만 모아 보여줍니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="max-h-[65vh] overflow-y-auto bg-slate-50 px-4 py-4 sm:px-5">
+            {attendanceBoardLoading ? (
+              <div className="flex min-h-[240px] items-center justify-center gap-3 text-slate-500">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm font-bold">실시간 공부중 학생을 불러오는 중입니다.</span>
+              </div>
+            ) : currentlyStudyingStudents.length === 0 ? (
+              <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
+                <p className="text-base font-black text-slate-800">현재 공부중인 학생이 없습니다.</p>
+                <p className="mt-2 text-sm font-medium text-slate-500">
+                  잠시 후 다시 확인하거나 실시간 교실 도면에서 상태를 확인해 주세요.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {currentlyStudyingStudents.map((student) => (
+                  <div
+                    key={student.studentId}
+                    className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-base font-black tracking-tight text-slate-900">
+                            {student.studentName}
+                          </p>
+                          {student.className ? (
+                            <Badge className="h-6 rounded-full border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
+                              {student.className}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge className="h-6 rounded-full border-none bg-blue-50 px-2.5 text-[10px] font-black text-blue-700">
+                            {student.roomLabel}
+                          </Badge>
+                          <Badge className="h-6 rounded-full border-none bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-700">
+                            {student.todayStudyLabel}
+                          </Badge>
+                          <Badge className="h-6 rounded-full border-none bg-indigo-50 px-2.5 text-[10px] font-black text-indigo-700">
+                            {student.boardLabel}
+                          </Badge>
+                        </div>
+                      </div>
+                      {student.checkedAtLabel ? (
+                        <p className="shrink-0 text-[11px] font-bold text-slate-500">
+                          입실 {student.checkedAtLabel}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="h-11 rounded-xl px-5 font-black">
+                닫기
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!selectedFocusStudentId} onOpenChange={(open) => !open && setSelectedFocusStudentId(null)}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl max-h-[92vh] flex flex-col">
 
@@ -2411,7 +2627,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             ) : (
               <div className="grid gap-3">
                 {filteredParentTrustRows.map((row) => (
-                  <div key={row.parentUid} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                  <div key={row.bucketKey} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
