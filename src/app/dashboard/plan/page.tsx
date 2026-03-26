@@ -524,6 +524,8 @@ export default function StudyPlanPage() {
   const [routineCopyWeeks, setRoutineCopyWeeks] = useState('4');
   const [taskCopyDays, setTaskCopyDays] = useState<number[]>([]);
   const [routineCopyDays, setRoutineCopyDays] = useState<number[]>([]);
+  const [taskCopyItemIds, setTaskCopyItemIds] = useState<string[]>([]);
+  const [routineCopyItemIds, setRoutineCopyItemIds] = useState<string[]>([]);
 
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
@@ -614,8 +616,10 @@ export default function StudyPlanPage() {
   const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
-  const hasCopyableTasks = useMemo(() => dailyPlans?.some(p => p.category !== 'schedule') ?? false, [dailyPlans]);
-  const hasCopyableRoutines = useMemo(() => dailyPlans?.some(p => p.category === 'schedule') ?? false, [dailyPlans]);
+  const copyableTaskItems = useMemo(() => dailyPlans?.filter(p => p.category !== 'schedule') || [], [dailyPlans]);
+  const copyableRoutineItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
+  const hasCopyableTasks = copyableTaskItems.length > 0;
+  const hasCopyableRoutines = copyableRoutineItems.length > 0;
 
   const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원 예정')), [scheduleItems]);
   const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원 예정')), [scheduleItems]);
@@ -705,6 +709,49 @@ export default function StudyPlanPage() {
   const missionWrapupChipClass = hasOutPlan && outTime
     ? 'border-emerald-100 bg-emerald-50/90 text-emerald-700'
     : 'border-slate-200 bg-slate-50/90 text-slate-500';
+  const taskCopyOptions = useMemo(() => (
+    copyableTaskItems.map((item) => {
+      const subject = SUBJECTS.find((entry) => entry.id === (item.subject || 'etc'));
+      const isStudyItem = item.category === 'study' || !item.category;
+      const minutesLabel = item.targetMinutes ? `${item.targetMinutes}분 목표` : '시간 자유';
+      return {
+        id: item.id,
+        title: item.title,
+        meta: isStudyItem
+          ? `${subject?.label ?? '기타'} · ${minutesLabel}`
+          : '기타 일정',
+        badgeLabel: isStudyItem ? '학습' : '기타',
+        badgeClassName: isStudyItem
+          ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+          : 'border-amber-100 bg-amber-50 text-amber-700',
+      };
+    })
+  ), [copyableTaskItems]);
+  const routineCopyOptions = useMemo(() => (
+    copyableRoutineItems.map((item) => ({
+      id: item.id,
+      title: item.title,
+      meta: '생활 루틴',
+      badgeLabel: '루틴',
+      badgeClassName: 'border-sky-100 bg-sky-50 text-sky-700',
+    }))
+  ), [copyableRoutineItems]);
+
+  useEffect(() => {
+    if (!isTaskCopyDialogOpen) return;
+    setTaskCopyItemIds((prev) => {
+      const validIds = prev.filter((id) => copyableTaskItems.some((item) => item.id === id));
+      return validIds.length > 0 ? validIds : copyableTaskItems.map((item) => item.id);
+    });
+  }, [isTaskCopyDialogOpen, copyableTaskItems]);
+
+  useEffect(() => {
+    if (!isRoutineCopyDialogOpen) return;
+    setRoutineCopyItemIds((prev) => {
+      const validIds = prev.filter((id) => copyableRoutineItems.some((item) => item.id === id));
+      return validIds.length > 0 ? validIds : copyableRoutineItems.map((item) => item.id);
+    });
+  }, [isRoutineCopyDialogOpen, copyableRoutineItems]);
 
   const handleRoutineTemplateSelect = (template: (typeof ROUTINE_TEMPLATE_OPTIONS)[number]) => {
     setSelectedRoutineTemplateKey(template.key);
@@ -1038,20 +1085,29 @@ export default function StudyPlanPage() {
     setRoutineCopyDays(prev => checked ? Array.from(new Set([...prev, day])) : prev.filter(d => d !== day));
   };
 
+  const toggleCopyItem = (target: 'task' | 'routine', id: string, checked: boolean) => {
+    if (target === 'task') {
+      setTaskCopyItemIds((prev) => checked ? Array.from(new Set([...prev, id])) : prev.filter((itemId) => itemId !== id));
+      return;
+    }
+    setRoutineCopyItemIds((prev) => checked ? Array.from(new Set([...prev, id])) : prev.filter((itemId) => itemId !== id));
+  };
+
   const copyPlansWithOptions = async (
     kind: 'task' | 'routine',
-    options: { weeks: number; weekdays: number[] }
+    options: { weeks: number; weekdays: number[]; itemIds: string[] }
   ) => {
     if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return false;
 
-    const sourcePlans = kind === 'task'
+    const sourcePlans = (kind === 'task'
       ? dailyPlans.filter(p => p.category !== 'schedule')
-      : dailyPlans.filter(p => p.category === 'schedule');
+      : dailyPlans.filter(p => p.category === 'schedule'))
+      .filter((plan) => options.itemIds.includes(plan.id));
 
     if (sourcePlans.length === 0) {
       toast({
         variant: 'destructive',
-        title: kind === 'task' ? '복사할 학습/개인 계획이 없습니다.' : '복사할 생활 루틴이 없습니다.',
+        title: kind === 'task' ? '복사할 학습/기타 계획을 선택해 주세요.' : '복사할 생활 루틴을 선택해 주세요.',
       });
       return false;
     }
@@ -1130,6 +1186,7 @@ export default function StudyPlanPage() {
     const copied = await copyPlansWithOptions('task', {
       weeks: Number(taskCopyWeeks),
       weekdays: taskCopyDays,
+      itemIds: taskCopyItemIds,
     });
     if (copied) setIsTaskCopyDialogOpen(false);
   };
@@ -1138,6 +1195,7 @@ export default function StudyPlanPage() {
     const copied = await copyPlansWithOptions('routine', {
       weeks: Number(routineCopyWeeks),
       weekdays: routineCopyDays,
+      itemIds: routineCopyItemIds,
     });
     if (copied) setIsRoutineCopyDialogOpen(false);
   };
@@ -1877,10 +1935,16 @@ export default function StudyPlanPage() {
         onOpenChange={setIsTaskCopyDialogOpen}
         title="계획 반복 복사"
         description="선택한 요일 패턴으로 학습 계획과 기타 일정을 몇 주간 이어붙여요."
+        itemLabel="복사할 계획 선택"
         weeksValue={taskCopyWeeks}
         onWeeksChange={setTaskCopyWeeks}
         selectedDays={taskCopyDays}
         onToggleDay={(day, checked) => toggleCopyDay('task', day, checked)}
+        itemOptions={taskCopyOptions}
+        selectedItemIds={taskCopyItemIds}
+        onToggleItem={(id, checked) => toggleCopyItem('task', id, checked)}
+        onSelectAllItems={() => setTaskCopyItemIds(copyableTaskItems.map((item) => item.id))}
+        onClearItems={() => setTaskCopyItemIds([])}
         onConfirm={handleApplyTasksToAllWeekdays}
         isSubmitting={isSubmitting}
         isMobile={isMobile}
@@ -1892,10 +1956,16 @@ export default function StudyPlanPage() {
         onOpenChange={setIsRoutineCopyDialogOpen}
         title="루틴 반복 복사"
         description="자주 쓰는 루틴을 같은 요일 라인으로 몇 주간 빠르게 복사해요."
+        itemLabel="복사할 루틴 선택"
         weeksValue={routineCopyWeeks}
         onWeeksChange={setRoutineCopyWeeks}
         selectedDays={routineCopyDays}
         onToggleDay={(day, checked) => toggleCopyDay('routine', day, checked)}
+        itemOptions={routineCopyOptions}
+        selectedItemIds={routineCopyItemIds}
+        onToggleItem={(id, checked) => toggleCopyItem('routine', id, checked)}
+        onSelectAllItems={() => setRoutineCopyItemIds(copyableRoutineItems.map((item) => item.id))}
+        onClearItems={() => setRoutineCopyItemIds([])}
         onConfirm={handleApplyRoutineToAllWeekdays}
         isSubmitting={isSubmitting}
         isMobile={isMobile}
