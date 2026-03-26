@@ -1182,7 +1182,7 @@
 
 /* iPhone 15 baseline shell for app mode */
 .dashboard-mobile-shell {
-  --dashboard-mobile-nav-clearance: calc(7.05rem + env(safe-area-inset-bottom, 0px));
+  --dashboard-mobile-nav-clearance: calc(7.85rem + env(safe-area-inset-bottom, 0px));
   width: min(100%, clamp(21.5rem, 92vw, 25.25rem));
   max-width: calc(100vw - 0.75rem);
   height: min(53.25rem, calc(100svh - 0.75rem));
@@ -1287,6 +1287,7 @@
 }
 
 .parent-app-shell {
+  --parent-app-nav-clearance: calc(6.9rem + env(safe-area-inset-bottom, 0px));
   width: min(100%, calc(100vw - 0.5rem));
   max-width: calc(100vw - 0.5rem);
   height: min(54.5rem, calc(100svh - 0.5rem));
@@ -1296,11 +1297,12 @@
 
 .parent-app-shell .parent-app-main {
   min-height: 0;
-  padding: 1rem 0.92rem calc(6.15rem + env(safe-area-inset-bottom, 0px));
+  padding: 1rem 0.92rem var(--parent-app-nav-clearance);
   gap: 0.95rem;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
+  scroll-padding-bottom: var(--parent-app-nav-clearance);
 }
 
 .parent-app-nav-wrap {
@@ -1377,12 +1379,14 @@
 
 @media (max-width: 390px) {
   .dashboard-mobile-shell {
+    --dashboard-mobile-nav-clearance: calc(7.45rem + env(safe-area-inset-bottom, 0px));
     max-width: calc(100vw - 0.4rem);
     border-width: 7px;
     border-radius: 2.25rem;
   }
 
   .parent-app-shell {
+    --parent-app-nav-clearance: calc(6.5rem + env(safe-area-inset-bottom, 0px));
     max-width: calc(100vw - 0.18rem);
     border-width: 6px;
     border-radius: 2rem;
@@ -1394,7 +1398,7 @@
   }
 
   .parent-app-main {
-    padding: 0.82rem 0.68rem calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.82rem 0.68rem var(--parent-app-nav-clearance);
     gap: 0.75rem;
   }
 
@@ -1429,9 +1433,13 @@
 
 @media (max-height: 760px) and (max-width: 480px) {
   .dashboard-mobile-shell {
-    --dashboard-mobile-nav-clearance: calc(6.35rem + env(safe-area-inset-bottom, 0px));
+    --dashboard-mobile-nav-clearance: calc(7rem + env(safe-area-inset-bottom, 0px));
     height: min(100svh - 0.35rem, 49rem);
     margin-top: 0.15rem;
+  }
+
+  .parent-app-shell {
+    --parent-app-nav-clearance: calc(6.15rem + env(safe-area-inset-bottom, 0px));
   }
 
   .dashboard-mobile-main {
@@ -1441,7 +1449,7 @@
 
   .parent-app-main {
     padding-top: 0.84rem;
-    padding-bottom: calc(5.7rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--parent-app-nav-clearance);
   }
 }
 

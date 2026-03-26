@@ -117,8 +117,8 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
         'z-50 transition-all duration-300',
         useBrandNav
           ? isParent
-            ? 'h-[5.1rem] rounded-t-[1.45rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1 pb-[calc(env(safe-area-inset-bottom)+0.2rem)] shadow-[0_-14px_28px_rgba(10,20,52,0.42)] sm:h-[5.25rem]'
-            : 'h-[5.8rem] rounded-t-[1.75rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1 pb-[calc(env(safe-area-inset-bottom)+0.38rem)] shadow-[0_-16px_32px_rgba(10,20,52,0.46)]'
+            ? 'h-[5.9rem] rounded-t-[1.55rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1.5 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] shadow-[0_-14px_28px_rgba(10,20,52,0.42)] sm:h-[6.05rem]'
+            : 'h-[6.35rem] rounded-t-[1.75rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1.5 pb-[calc(env(safe-area-inset-bottom)+0.48rem)] shadow-[0_-16px_32px_rgba(10,20,52,0.46)]'
           : 'h-20 border-t border-black/[0.06] bg-white/95 pb-6 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-2xl',
         isParent || isMobileMode ? 'relative' : 'fixed bottom-0 left-0 right-0 md:hidden',
         playParentEntry && 'parent-nav-enter parent-entry-delay-5',
@@ -129,9 +129,9 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
         className={cn(
           'relative h-full',
           isParent
-            ? 'grid grid-cols-5 gap-0 px-1 pt-0.5'
+            ? 'grid grid-cols-5 gap-0.5 px-1 pt-1.5'
             : useBrandNav
-              ? 'grid gap-1 px-2 pt-1.5'
+              ? 'grid gap-1 px-2.5 pt-2'
               : 'flex items-center justify-around px-2'
         )}
         style={!isParent && useBrandNav ? { gridTemplateColumns: `repeat(${Math.max(currentNav.length, 1)}, minmax(0, 1fr))` } : undefined}
@@ -154,12 +154,16 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
               href={item.href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'relative flex min-w-0 flex-col items-center justify-center rounded-2xl transition-all active:scale-95',
-                isParent ? 'h-full gap-0.5' : 'h-full min-w-[52px] gap-1 group',
+                'relative flex min-w-0 flex-col items-center rounded-2xl transition-all active:scale-95',
+                isParent
+                  ? 'h-full justify-start gap-1 px-0.5 pt-2.5 pb-2.5'
+                  : useBrandNav
+                    ? 'h-full min-w-[52px] justify-start gap-1.5 px-1 pt-2.5 pb-3 group'
+                    : 'h-full justify-center gap-1 group',
                 useBrandNav
                   ? isActive
-                    ? 'text-[#FFD7AE]'
-                    : 'text-white/68'
+                    ? 'text-[#FFE6CB]'
+                    : 'text-white/82'
                   : isActive
                     ? 'text-primary'
                     : 'text-muted-foreground/40'
@@ -168,7 +172,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
               <div
                 className={cn(
                   'rounded-xl transition-all',
-                  isParent ? 'p-[0.28rem] sm:p-[0.38rem]' : 'p-2',
+                  isParent ? 'p-[0.36rem] sm:p-[0.42rem]' : useBrandNav ? 'p-2.5' : 'p-2',
                   isActive
                     ? useBrandNav
                       ? 'bg-[#FF7A16] text-[#14295F] shadow-[0_10px_18px_rgba(255,122,22,0.40)]'
@@ -189,15 +193,15 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
 
               <span
                 className={cn(
-                  'font-black tracking-tight transition-all duration-300 whitespace-nowrap',
-                  isParent ? 'px-0.5 text-center text-[9.8px] leading-[1.02] sm:text-[10.5px]' : 'text-[10px]',
-                  isActive ? 'opacity-100' : 'opacity-45'
+                  'font-black tracking-tight transition-all duration-300 whitespace-nowrap leading-none',
+                  isParent ? 'px-0.5 text-center text-[10.4px] sm:text-[10.9px]' : useBrandNav ? 'text-[10.8px]' : 'text-[10px]',
+                  isActive ? 'opacity-100' : useBrandNav ? 'opacity-80' : 'opacity-45'
                 )}
               >
                 {item.label}
               </span>
 
-              {isActive && useBrandNav && <div className="absolute bottom-[0.35rem] h-1.5 w-1.5 rounded-full bg-[#FF7A16]" />}
+              {isActive && useBrandNav && <div className="absolute bottom-[0.78rem] h-1.5 w-1.5 rounded-full bg-[#FF7A16]" />}
               {isActive && !useBrandNav && (
                 <div
                   className={cn(
@@ -214,7 +218,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
       {isMobileMode && (
         <div
           className={cn(
-            'absolute bottom-1.5 left-1/2 h-1.5 w-32 -translate-x-1/2 rounded-full',
+            'absolute bottom-1 left-1/2 h-1.5 w-32 -translate-x-1/2 rounded-full',
             useBrandNav ? 'bg-white/25' : 'bg-black/10'
           )}
         />
