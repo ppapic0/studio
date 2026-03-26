@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { 
   Card, 
@@ -61,7 +61,6 @@ import {
   XCircle,
   CalendarClock,
   Zap,
-  Trophy,
   Crown,
   Info,
 } from 'lucide-react';
@@ -358,180 +357,6 @@ function MissionFocusStackCard({
         </div>
       </div>
     </div>
-  );
-}
-
-function PlanMetricOrbit({
-  value,
-  strokeColor,
-  trackColor,
-  glowClassName,
-  isMobile,
-  children,
-}: {
-  value: number;
-  strokeColor: string;
-  trackColor: string;
-  glowClassName: string;
-  isMobile: boolean;
-  children: ReactNode;
-}) {
-  const size = isMobile ? 48 : 56;
-  const radius = isMobile ? 18 : 21;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (clampPercent(value) / 100) * circumference;
-
-  return (
-    <div className="relative">
-      <span className={cn("plan-metric-pulse absolute inset-1 rounded-full blur-md", glowClassName)} />
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" className="relative">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={trackColor}
-          strokeWidth={isMobile ? 5 : 6}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth={isMobile ? 5 : 6}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function RewardSparkVisual({ isMobile, active }: { isMobile: boolean; active: boolean }) {
-  return (
-    <div className={cn("relative", isMobile ? "h-12 w-12" : "h-14 w-14")}>
-      <div className={cn(
-        "absolute inset-0 rounded-[1.1rem] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,249,237,0.96)_100%)] shadow-[0_16px_30px_-20px_rgba(251,191,36,0.45)]",
-        active ? "ring-1 ring-amber-100" : "ring-1 ring-slate-100"
-      )} />
-      {active && (
-        <>
-          {[
-            { className: "left-1.5 top-2", delay: '0s' },
-            { className: "right-2 top-1.5", delay: '0.45s' },
-            { className: "right-1.5 bottom-2", delay: '0.95s' },
-          ].map((spark) => (
-            <span
-              key={spark.className}
-              className={cn("plan-reward-spark absolute h-1.5 w-1.5 rounded-full bg-amber-400", spark.className)}
-              style={{ animationDelay: spark.delay }}
-            />
-          ))}
-        </>
-      )}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <Sparkles className={cn("h-5 w-5", active ? "text-amber-500" : "text-slate-300")} />
-      </div>
-    </div>
-  );
-}
-
-function CompetitionLadderVisual({ filledCount, isMobile }: { filledCount: number; isMobile: boolean }) {
-  const heights = isMobile ? ['h-3.5', 'h-5', 'h-[1.625rem]'] : ['h-4', 'h-[1.375rem]', 'h-7'];
-
-  return (
-    <div className="flex items-end gap-1 rounded-[1rem] border border-white/90 bg-white/88 px-2.5 py-2 shadow-[0_14px_28px_-22px_rgba(244,63,94,0.38)]">
-      {heights.map((height, index) => (
-        <span
-          key={height}
-          className={cn(
-            "w-2 rounded-full",
-            height,
-            index < filledCount
-              ? "bg-[linear-gradient(180deg,#fb7185_0%,#ef4444_100%)] shadow-[0_10px_18px_-12px_rgba(244,63,94,0.55)]"
-              : "bg-slate-200"
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
-function PlanMetricCard({
-  title,
-  titleClassName,
-  icon,
-  iconShellClassName,
-  value,
-  description,
-  badge,
-  badgeClassName,
-  glowClassName,
-  visual,
-  isMobile,
-  className,
-}: {
-  title: string;
-  titleClassName: string;
-  icon: ReactNode;
-  iconShellClassName: string;
-  value: ReactNode;
-  description: string;
-  badge: string;
-  badgeClassName: string;
-  glowClassName: string;
-  visual?: ReactNode;
-  isMobile: boolean;
-  className?: string;
-}) {
-  return (
-    <Card className={cn(
-      "plan-mission-enter group relative overflow-hidden border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_100%)] shadow-[0_20px_46px_-36px_rgba(20,41,95,0.38)] ring-1 ring-black/[0.05] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_56px_-32px_rgba(20,41,95,0.42)]",
-      isMobile ? "rounded-[1.45rem]" : "rounded-[1.7rem]",
-      className
-    )}>
-      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-      <div className={cn("pointer-events-none absolute -right-6 top-0 h-24 w-24 rounded-full blur-3xl", glowClassName)} />
-      <CardContent className={cn("relative flex h-full flex-col", isMobile ? "p-4" : "p-5")}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className={cn("text-[10px] font-black uppercase tracking-[0.2em]", titleClassName)}>{title}</p>
-            <div className="mt-3">
-              <p className={cn(
-                "font-black tracking-tight text-slate-900 break-keep",
-                isMobile ? "text-[clamp(1.4rem,6vw,2rem)] leading-[1.02]" : "text-[clamp(1.55rem,2vw,2.25rem)] leading-[1.02]"
-              )}>
-                {value}
-              </p>
-              <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                {description}
-              </p>
-            </div>
-          </div>
-          <div className="shrink-0 flex flex-col items-end gap-2">
-            <div className={cn(
-              "relative flex items-center justify-center rounded-2xl border border-white/90 bg-white/88 shadow-[0_16px_30px_-22px_rgba(20,41,95,0.3)]",
-              isMobile ? "h-10 w-10" : "h-11 w-11",
-              iconShellClassName
-            )}>
-              {icon}
-            </div>
-            {visual}
-          </div>
-        </div>
-        <div className="mt-auto pt-4">
-          <span className={cn("inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black tracking-[0.14em]", badgeClassName)}>
-            {badge}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -854,9 +679,6 @@ export default function StudyPlanPage() {
       : allMissionTasks.length > 0
         ? '오늘 미션을 거의 정리했어요. 남은 시간은 복습이나 내일 준비에 써도 좋아요.'
         : '아직 등록된 미션이 없어요. 작게라도 한 가지 목표를 적어두면 시작이 더 쉬워져요.';
-  const missionWrapupLabel = hasOutPlan && outTime
-    ? `${outTime} 전까지 마무리 목표`
-    : '하원 예정 시간을 정하면 마감 리듬이 생겨요';
   const missionProgressPercent = clampPercent(missionCompletionRate);
   const routineCountLabel = `${scheduleItems.length}개`;
   const studyCountLabel = `${studyTasks.length}개`;
@@ -869,112 +691,20 @@ export default function StudyPlanPage() {
     () => personalTasks.filter((task) => task.done).length,
     [personalTasks]
   );
-  const doneStudyMissionCount = useMemo(
-    () => Math.max(0, studyTasks.length - remainingStudyTasks.length),
-    [studyTasks.length, remainingStudyTasks.length]
-  );
-  const competitionLadderFilled = useMemo(() => {
-    if (studyTasks.length === 0) return 0;
-    if (doneStudyMissionCount === 0) return 0;
-    return Math.min(3, Math.ceil((doneStudyMissionCount / studyTasks.length) * 3));
-  }, [doneStudyMissionCount, studyTasks.length]);
-  const deadlineProgress = useMemo(
-    () => (hasOutPlan && outTime ? Math.max(10, timeToClockProgress(outTime)) : 0),
-    [hasOutPlan, outTime]
-  );
-  const missionMetricCards = useMemo(() => {
-    return [
-      {
-        key: 'pace',
-        title: '진행도',
-        titleClassName: 'text-sky-600',
-        glowClassName: 'bg-sky-100/70',
-        iconShellClassName: 'text-sky-600',
-        icon: <Activity className="h-4 w-4 text-sky-500" />,
-        value: <>{missionProgressPercent}<span className="ml-1 text-xs font-bold text-slate-400">%</span></>,
-        description: '오늘 미션 달성률이 토큰 진행과 함께 바로 반영돼요.',
-        badge: allMissionTasks.length > 0 ? `${completedMissionCount}개 체크` : '첫 미션 대기',
-        badgeClassName: 'border-sky-100 bg-sky-50/90 text-sky-700',
-        visual: (
-          <PlanMetricOrbit
-            value={missionProgressPercent}
-            strokeColor="#0EA5E9"
-            trackColor="rgba(191,219,254,0.72)"
-            glowClassName="bg-sky-200/50"
-            isMobile={isMobile}
-          >
-            <Activity className="h-4 w-4 text-sky-500" />
-          </PlanMetricOrbit>
-        ),
-      },
-      {
-        key: 'reward',
-        title: '예상 보상',
-        titleClassName: estimatedPlanReward > 0 ? 'text-amber-600' : 'text-slate-400',
-        glowClassName: estimatedPlanReward > 0 ? 'bg-amber-100/70' : 'bg-slate-100/70',
-        iconShellClassName: estimatedPlanReward > 0 ? 'text-amber-600' : 'text-slate-400',
-        icon: <Sparkles className={cn("h-4 w-4", estimatedPlanReward > 0 ? "text-amber-500" : "text-slate-300")} />,
-        value: estimatedPlanReward > 0
-          ? <>{`+${estimatedPlanReward}`}<span className="ml-1 text-xs font-bold text-slate-400">LP</span></>
-          : '보상 대기',
-        description: estimatedPlanReward > 0
-          ? '학습 미션 3개 완료 시 보상 루트가 열려요.'
-          : '오늘 계획 보너스를 이미 받았거나 아직 준비 중이에요.',
-        badge: estimatedPlanReward > 0 ? '보상 루트 활성' : '루트 잠금',
-        badgeClassName: estimatedPlanReward > 0 ? 'border-amber-100 bg-amber-50/90 text-amber-700' : 'border-slate-200 bg-slate-50/90 text-slate-500',
-        visual: <RewardSparkVisual isMobile={isMobile} active={estimatedPlanReward > 0} />,
-      },
-      {
-        key: 'race',
-        title: '자기 경쟁',
-        titleClassName: 'text-rose-500',
-        glowClassName: 'bg-rose-100/70',
-        iconShellClassName: 'text-rose-500',
-        icon: <Trophy className="h-4 w-4 text-rose-400" />,
-        value: <>{doneStudyMissionCount} <span className="mx-1 text-sm font-bold text-slate-300">/</span> {studyTasks.length || 0}</>,
-        description: '오늘 학습 미션 레이스에서 내가 어디까지 왔는지 보여줘요.',
-        badge: studyTasks.length > 0 ? `레이스 ${competitionLadderFilled}/3` : '미션 생성 필요',
-        badgeClassName: 'border-rose-100 bg-rose-50/90 text-rose-700',
-        visual: <CompetitionLadderVisual filledCount={competitionLadderFilled} isMobile={isMobile} />,
-      },
-      {
-        key: 'wrapup',
-        title: '마감 리듬',
-        titleClassName: hasOutPlan && outTime ? 'text-emerald-600' : 'text-slate-400',
-        glowClassName: hasOutPlan && outTime ? 'bg-emerald-100/70' : 'bg-slate-100/70',
-        iconShellClassName: hasOutPlan && outTime ? 'text-emerald-600' : 'text-slate-400',
-        icon: <CalendarCheck className={cn("h-4 w-4", hasOutPlan && outTime ? "text-emerald-500" : "text-slate-300")} />,
-        value: hasOutPlan && outTime ? outTime : '미정',
-        description: missionWrapupLabel,
-        badge: hasOutPlan && outTime ? `${outTime} 리듬 저장` : '시간 설정 필요',
-        badgeClassName: hasOutPlan && outTime ? 'border-emerald-100 bg-emerald-50/90 text-emerald-700' : 'border-slate-200 bg-slate-50/90 text-slate-500',
-        visual: (
-          <PlanMetricOrbit
-            value={deadlineProgress}
-            strokeColor={hasOutPlan && outTime ? '#10B981' : '#CBD5E1'}
-            trackColor={hasOutPlan && outTime ? 'rgba(167,243,208,0.72)' : 'rgba(226,232,240,0.82)'}
-            glowClassName={hasOutPlan && outTime ? 'bg-emerald-200/50' : 'bg-slate-200/45'}
-            isMobile={isMobile}
-          >
-            <CalendarCheck className={cn("h-4 w-4", hasOutPlan && outTime ? "text-emerald-500" : "text-slate-300")} />
-          </PlanMetricOrbit>
-        ),
-      },
-    ];
-  }, [
-    missionProgressPercent,
-    allMissionTasks.length,
-    completedMissionCount,
-    estimatedPlanReward,
-    doneStudyMissionCount,
-    studyTasks.length,
-    competitionLadderFilled,
-    isMobile,
-    hasOutPlan,
-    outTime,
-    missionWrapupLabel,
-    deadlineProgress,
-  ]);
+  const missionRewardLabel = estimatedPlanReward > 0 ? `+${estimatedPlanReward} LP` : '보상 대기';
+  const missionRewardGuide = estimatedPlanReward > 0
+    ? '학습 미션 3개를 마무리하면 보상 루트가 열려요.'
+    : '오늘 계획 보너스를 이미 받았거나 아직 준비 중이에요.';
+  const missionRewardChipClass = estimatedPlanReward > 0
+    ? 'border-amber-100 bg-amber-50/90 text-amber-700'
+    : 'border-slate-200 bg-slate-50/90 text-slate-500';
+  const missionWrapupValue = hasOutPlan && outTime ? outTime : '미정';
+  const missionWrapupGuide = hasOutPlan && outTime
+    ? `${outTime} 전까지 오늘 흐름을 마무리하는 리듬이에요.`
+    : '하원 예정 시간을 정하면 오늘 마감 리듬이 생겨요.';
+  const missionWrapupChipClass = hasOutPlan && outTime
+    ? 'border-emerald-100 bg-emerald-50/90 text-emerald-700'
+    : 'border-slate-200 bg-slate-50/90 text-slate-500';
 
   const handleRoutineTemplateSelect = (template: (typeof ROUTINE_TEMPLATE_OPTIONS)[number]) => {
     setSelectedRoutineTemplateKey(template.key);
@@ -1499,10 +1229,10 @@ export default function StudyPlanPage() {
         </Button>
       </div>
 
-      <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2 max-[350px]:grid-cols-1" : "grid-cols-12")}>
+      <section className="grid gap-3 [&>*]:min-w-0">
         <Card className={cn(
           "plan-mission-enter relative overflow-hidden border-none bg-[linear-gradient(145deg,#fffef9_0%,#ffffff_42%,#f4f9ff_100%)] shadow-[0_30px_80px_-46px_rgba(20,41,95,0.42)] ring-1 ring-black/[0.04]",
-          isMobile ? "col-span-2 max-[350px]:col-span-1 rounded-[1.65rem]" : "col-span-7 rounded-[2.75rem]"
+          isMobile ? "rounded-[1.65rem]" : "rounded-[2.75rem]"
         )}>
           <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.1),transparent_28%)]" />
@@ -1543,12 +1273,97 @@ export default function StudyPlanPage() {
               <Badge variant="outline" className="h-7 rounded-full border-primary/15 bg-white/80 px-3 text-[10px] font-black text-primary shadow-sm">
                 완료 {completedMissionCount}/{allMissionTasks.length}
               </Badge>
+              <Badge variant="outline" className={cn("h-7 rounded-full px-3 text-[10px] font-black shadow-sm", missionRewardChipClass)}>
+                {estimatedPlanReward > 0 ? `예상 ${missionRewardLabel}` : missionRewardLabel}
+              </Badge>
+              <Badge variant="outline" className={cn("h-7 rounded-full px-3 text-[10px] font-black shadow-sm", missionWrapupChipClass)}>
+                {hasOutPlan && outTime ? `${outTime} 전 마무리` : '마감 시간 미설정'}
+              </Badge>
               <Badge variant="outline" className="h-7 rounded-full border-emerald-200/90 bg-emerald-50/90 px-3 text-[10px] font-black text-emerald-700 shadow-sm">
                 학습 {remainingStudyTasks.length}개 남음
               </Badge>
               <Badge variant="outline" className="h-7 rounded-full border-amber-200/90 bg-amber-50/90 px-3 text-[10px] font-black text-amber-700 shadow-sm">
                 개인 {remainingPersonalTasks.length}개 남음
               </Badge>
+            </div>
+
+            <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]")}>
+              <div className="rounded-[1.45rem] border border-white/90 bg-white/84 p-4 shadow-[0_22px_40px_-34px_rgba(20,41,95,0.28)] backdrop-blur-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={cn(
+                      "text-[10px] font-black uppercase tracking-[0.2em]",
+                      estimatedPlanReward > 0 ? "text-amber-600" : "text-slate-400"
+                    )}>
+                      예상 보상
+                    </p>
+                    <p className={cn(
+                      "mt-2 font-black tracking-tight break-keep",
+                      estimatedPlanReward > 0 ? "text-slate-900" : "text-slate-500",
+                      isMobile ? "text-[1.35rem] leading-[1.08]" : "text-[1.7rem] leading-[1.05]"
+                    )}>
+                      {missionRewardLabel}
+                    </p>
+                    <p className="mt-2 max-w-[28rem] text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                      {missionRewardGuide}
+                    </p>
+                  </div>
+                  <div className={cn(
+                    "shrink-0 rounded-[1.2rem] border p-3 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.25)]",
+                    estimatedPlanReward > 0
+                      ? "border-amber-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,249,237,0.96)_100%)] text-amber-600"
+                      : "border-slate-200 bg-white/92 text-slate-300"
+                  )}>
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                <div className="rounded-[1.35rem] border border-white/90 bg-white/84 p-4 shadow-[0_20px_34px_-30px_rgba(20,41,95,0.24)] backdrop-blur-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={cn(
+                        "text-[10px] font-black uppercase tracking-[0.2em]",
+                        hasOutPlan && outTime ? "text-emerald-600" : "text-slate-400"
+                      )}>
+                        마감 리듬
+                      </p>
+                      <p className={cn(
+                        "mt-2 font-black tracking-tight break-keep text-slate-900",
+                        isMobile ? "text-[1.35rem] leading-[1.08]" : "text-[1.6rem] leading-[1.05]"
+                      )}>
+                        {missionWrapupValue}
+                      </p>
+                      <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                        {missionWrapupGuide}
+                      </p>
+                    </div>
+                    <div className={cn(
+                      "shrink-0 rounded-[1.2rem] border p-3 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.25)]",
+                      hasOutPlan && outTime
+                        ? "border-emerald-100 bg-emerald-50/90 text-emerald-600"
+                        : "border-slate-200 bg-white/92 text-slate-300"
+                    )}>
+                      <CalendarCheck className="h-5 w-5" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.35rem] border border-primary/12 bg-primary/[0.04] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/55">완료 흐름</p>
+                      <p className="mt-1 text-sm font-black text-slate-900 break-keep">
+                        완료 {completedMissionCount}/{allMissionTasks.length} · {Math.max(0, allMissionTasks.length - completedMissionCount)}개 남음
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-primary/10 bg-white px-3 py-1 text-sm font-black text-primary shadow-sm">
+                      {missionProgressPercent}%
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="mt-5">
@@ -1564,40 +1379,32 @@ export default function StudyPlanPage() {
                   ))}
                 </div>
               ) : (
-                <div className="relative overflow-hidden rounded-[1.4rem] border border-dashed border-primary/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.96)_0%,rgba(247,250,255,0.92)_100%)] px-4 py-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.24)]">
-                  <div className="pointer-events-none absolute left-5 top-5 h-3 w-3 rounded-full bg-primary soft-glow" />
-                  <div className="pointer-events-none absolute left-[1.42rem] top-8 h-10 w-px bg-[linear-gradient(180deg,rgba(20,41,95,0.28),rgba(20,41,95,0.02))]" />
-                  <div className="relative pl-6">
-                    <p className="text-sm font-black text-slate-900 break-keep">첫 미션을 적으면 토큰이 바로 출발해요.</p>
-                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                      작게라도 한 가지 목표를 추가하면 오늘 허브가 움직이기 시작합니다.
-                    </p>
+                <div className="relative overflow-hidden rounded-[1.4rem] border border-dashed border-primary/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] px-4 py-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.24)]">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.1),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.08),transparent_24%)]" />
+                  <div className="relative flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_16px_28px_-22px_rgba(20,41,95,0.34)]">
+                      <PlusCircle className="h-4.5 w-4.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-900 break-keep">지금 한 개만 적어도 오늘 허브가 바로 움직여요.</p>
+                      <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                        가장 먼저 끝낼 한 가지를 아래에서 추가하면 토큰과 진행 보드가 바로 시작됩니다.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center rounded-full border border-primary/12 bg-white/92 px-3 py-1 text-[10px] font-black text-primary shadow-sm">
+                          첫 미션 추가
+                        </span>
+                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[10px] font-black text-slate-500">
+                          아래 입력창에서 시작
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
-
-        <div className={cn("grid gap-3", isMobile ? "col-span-2 max-[350px]:col-span-1 grid-cols-2 max-[350px]:grid-cols-1" : "col-span-5 grid-cols-2")}>
-          {missionMetricCards.map((card, index) => (
-            <PlanMetricCard
-              key={card.key}
-              title={card.title}
-              titleClassName={card.titleClassName}
-              icon={card.icon}
-              iconShellClassName={card.iconShellClassName}
-              value={card.value}
-              description={card.description}
-              badge={card.badge}
-              badgeClassName={card.badgeClassName}
-              glowClassName={card.glowClassName}
-              visual={card.visual}
-              isMobile={isMobile}
-              className={cn(index === 0 && "plan-entry-delay-1", index === 1 && "plan-entry-delay-2", index === 2 && "plan-entry-delay-3", index === 3 && "plan-entry-delay-4")}
-            />
-          ))}
-        </div>
       </section>
 
       {!isPast && (
