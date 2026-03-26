@@ -1470,7 +1470,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [linkedStudents, student?.name, studentId, linkedStudentIds.length]
   );
   const shouldLoadStudyAnalytics = isActive && !!centerId && !!studentId && tab !== 'communication' && tab !== 'billing';
-  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && tab === 'home';
+  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && (tab === 'home' || tab === 'communication');
   const shouldLoadReportArchive = isActive && !!studentId && isReportArchiveOpen;
   const shouldLoadParentCommunications = isActive && !!centerId && !!user && tab === 'communication';
   const shouldLoadInvoices = isActive && !!studentId && tab === 'billing';
@@ -3929,6 +3929,70 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="communication" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
+              <Card className="rounded-[2.2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_72%,#fff8f0_100%)] p-5 shadow-sm sm:p-6">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-[#14295F]" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">센터 공지사항 · 알림</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {unreadRecentCount > 0 && (
+                      <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/15 px-2.5 text-[10px] font-black text-[#FF7A16]">
+                        미읽음 {unreadRecentCount}
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="h-6 rounded-full border border-slate-200 bg-white px-2.5 text-[10px] font-black text-slate-500">
+                      {recentNotifications.length}건
+                    </Badge>
+                  </div>
+                </div>
+                <p className="mb-3 text-[11px] font-bold text-slate-500">센터에서 전달한 최신 공지와 알림을 여기서 바로 확인할 수 있어요.</p>
+
+                {recentNotifications.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
+                    확인할 공지사항이 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {recentNotifications.map((notification) => {
+                      const isRead = notification.isRead || !!readMap[notification.id];
+
+                      return (
+                        <button
+                          type="button"
+                          key={notification.id}
+                          className={cn(
+                            'relative w-full overflow-hidden rounded-[1.45rem] border p-4 text-left transition-all',
+                            isRead
+                              ? 'border-[#dde6f9] bg-white'
+                              : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff7ef_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/70 md:hover:shadow-md'
+                          )}
+                          onClick={() => void openNotificationDetail(notification)}
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{notification.createdAtLabel}</span>
+                            <div className="flex items-center gap-2">
+                              {!isRead && <span className="h-2 w-2 rounded-full bg-[#FF7A16]" />}
+                              {notification.isImportant && (
+                                <Badge variant="outline" className="h-5 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
+                                  중요
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-sm font-black leading-snug tracking-tight text-[#14295F] sm:text-base">{notification.title}</p>
+                          {notification.body && (
+                            <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-relaxed text-slate-500">
+                              {notification.body}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+
               <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
                 <CardTitle className="text-lg font-black tracking-tighter mb-6 flex items-center gap-2 text-[#14295F]"><Send className="h-5 w-5 text-[#14295F]" /> 상담 및 지원 요청</CardTitle>
                 <div className="space-y-4">
