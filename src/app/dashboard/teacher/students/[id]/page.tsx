@@ -34,6 +34,7 @@ import {
   buildStartEndInsight,
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
+import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
 
 const STAT_CONFIG = {
   focus: { label: '집중력', sub: '집중', icon: Target, color: 'text-blue-500', accent: 'bg-blue-50', guide: '몰입 시간을 안정적으로 확보하면 상승합니다.' },
@@ -54,8 +55,6 @@ type DailyStatSnapshot = {
 };
 type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number; personalCount: number };
 type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
-type DetailPresentationMode = 'default' | 'student-analysis';
-
 const STATUS_LABEL: Record<CounselingReservation['status'], string> = {
   requested: '요청',
   confirmed: '확정',
@@ -390,14 +389,9 @@ function StatAnalysisCard({
   );
 }
 
-export default function StudentDetailPage({
-  params,
-  presentationMode = 'default',
-}: {
-  params: Promise<{ id: string }>;
-  presentationMode?: DetailPresentationMode;
-}) {
+export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: studentId } = use(params);
+  const presentationMode = useStudentDetailPresentationMode();
   const { user: currentUser } = useUser();
   const { activeMembership, viewMode } = useAppContext();
   const firestore = useFirestore();
