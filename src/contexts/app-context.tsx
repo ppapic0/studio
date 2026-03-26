@@ -124,6 +124,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       Array.isArray(membership.linkedStudentIds) &&
       membership.linkedStudentIds.some((id) => typeof id === 'string' && id.trim().length > 0);
 
+    const getMembershipPriority = (membership: CenterMembership) => {
+      const normalizedRole = normalizeRole(membership.role);
+      if (normalizedRole === 'centerAdmin') return 0;
+      if (normalizedRole === 'teacher') return 1;
+      if (normalizedRole === 'parent' && hasLinkedStudents(membership)) return 2;
+      if (normalizedRole === 'student') return 3;
+      return 4;
+    };
+
     const pickActiveMembership = (items: CenterMembership[]): CenterMembership | null => {
       if (items.length === 0) return null;
 
@@ -132,14 +141,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return !normalized || normalized === 'active';
       });
       if (activeItems.length === 0) return null;
-      const source = activeItems;
 
-      const parentWithLinkedStudent = source.find(
-        (membership) => normalizeRole(membership.role) === 'parent' && hasLinkedStudents(membership)
+      return (
+        activeItems
+          .slice()
+          .sort((a, b) => {
+            const priorityDiff = getMembershipPriority(a) - getMembershipPriority(b);
+            if (priorityDiff !== 0) return priorityDiff;
+
+            const aJoinedAt = typeof a.joinedAt?.toMillis === 'function' ? a.joinedAt.toMillis() : 0;
+            const bJoinedAt = typeof b.joinedAt?.toMillis === 'function' ? b.joinedAt.toMillis() : 0;
+            return bJoinedAt - aJoinedAt;
+          })[0] || null
       );
-      if (parentWithLinkedStudent) return parentWithLinkedStudent;
-
-      return source[0] || null;
     };
 
     const applyMembershipState = () => {
