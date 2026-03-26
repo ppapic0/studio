@@ -1182,7 +1182,9 @@
 
 /* iPhone 15 baseline shell for app mode */
 .dashboard-mobile-shell {
-  --dashboard-mobile-nav-clearance: calc(7.85rem + env(safe-area-inset-bottom, 0px));
+  --dashboard-mobile-nav-base-clearance: calc(7.85rem + env(safe-area-inset-bottom, 0px));
+  --dashboard-mobile-nav-extra-clearance: 1.15rem;
+  --dashboard-mobile-nav-clearance: calc(var(--dashboard-mobile-nav-base-clearance) + var(--dashboard-mobile-nav-extra-clearance));
   width: min(100%, clamp(21.5rem, 92vw, 25.25rem));
   max-width: calc(100vw - 0.75rem);
   height: min(53.25rem, calc(100svh - 0.75rem));
@@ -1198,6 +1200,13 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
   scroll-padding-bottom: var(--dashboard-mobile-nav-clearance);
+}
+
+.dashboard-mobile-shell .dashboard-mobile-main::after {
+  content: '';
+  display: block;
+  min-height: 0.85rem;
+  flex-shrink: 0;
 }
 
 .dashboard-mobile-nav-wrap {
@@ -1287,7 +1296,9 @@
 }
 
 .parent-app-shell {
-  --parent-app-nav-clearance: calc(6.9rem + env(safe-area-inset-bottom, 0px));
+  --parent-app-nav-base-clearance: calc(6.9rem + env(safe-area-inset-bottom, 0px));
+  --parent-app-nav-extra-clearance: 1rem;
+  --parent-app-nav-clearance: calc(var(--parent-app-nav-base-clearance) + var(--parent-app-nav-extra-clearance));
   width: min(100%, calc(100vw - 0.5rem));
   max-width: calc(100vw - 0.5rem);
   height: min(54.5rem, calc(100svh - 0.5rem));
@@ -1303,6 +1314,13 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
   scroll-padding-bottom: var(--parent-app-nav-clearance);
+}
+
+.parent-app-shell .parent-app-main::after {
+  content: '';
+  display: block;
+  min-height: 0.8rem;
+  flex-shrink: 0;
 }
 
 .parent-app-nav-wrap {
@@ -1379,14 +1397,16 @@
 
 @media (max-width: 390px) {
   .dashboard-mobile-shell {
-    --dashboard-mobile-nav-clearance: calc(7.45rem + env(safe-area-inset-bottom, 0px));
+    --dashboard-mobile-nav-base-clearance: calc(7.45rem + env(safe-area-inset-bottom, 0px));
+    --dashboard-mobile-nav-extra-clearance: 1rem;
     max-width: calc(100vw - 0.4rem);
     border-width: 7px;
     border-radius: 2.25rem;
   }
 
   .parent-app-shell {
-    --parent-app-nav-clearance: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+    --parent-app-nav-base-clearance: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+    --parent-app-nav-extra-clearance: 0.9rem;
     max-width: calc(100vw - 0.18rem);
     border-width: 6px;
     border-radius: 2rem;
@@ -1433,13 +1453,15 @@
 
 @media (max-height: 760px) and (max-width: 480px) {
   .dashboard-mobile-shell {
-    --dashboard-mobile-nav-clearance: calc(7rem + env(safe-area-inset-bottom, 0px));
+    --dashboard-mobile-nav-base-clearance: calc(7rem + env(safe-area-inset-bottom, 0px));
+    --dashboard-mobile-nav-extra-clearance: 0.95rem;
     height: min(100svh - 0.35rem, 49rem);
     margin-top: 0.15rem;
   }
 
   .parent-app-shell {
-    --parent-app-nav-clearance: calc(6.15rem + env(safe-area-inset-bottom, 0px));
+    --parent-app-nav-base-clearance: calc(6.15rem + env(safe-area-inset-bottom, 0px));
+    --parent-app-nav-extra-clearance: 0.8rem;
   }
 
   .dashboard-mobile-main {
