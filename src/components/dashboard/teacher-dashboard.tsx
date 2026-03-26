@@ -2664,7 +2664,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
-                          <TabsContent value="reports" className="mt-0 h-full overflow-y-auto custom-scrollbar p-6 pb-28 sm:p-8 sm:pb-32 space-y-6">
+                          <TabsContent value="reports" className="mt-0 h-full min-h-0 overflow-y-auto custom-scrollbar p-6 pb-36 sm:p-8 sm:pb-40 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <FileText className="h-4 w-4 text-amber-600" />
                               <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest">최근 발송된 리포트 (5건)</h4>
@@ -2690,6 +2690,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   </button>
                                 ))
                               )}
+                            </div>
+                            <div className="border-t border-dashed pt-2">
+                              <Button
+                                variant="secondary"
+                                className="h-14 w-full rounded-2xl border border-primary/5 bg-primary/5 font-black text-primary transition-all hover:bg-primary/10 sm:h-16"
+                                asChild
+                              >
+                                <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}>
+                                  <User className="h-5 w-5 opacity-40" />
+                                  학생 정밀 리포트 & 과거 상세 분석
+                                  <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
+                                </Link>
+                              </Button>
                             </div>
                           </TabsContent>
                         </div>
@@ -2743,7 +2756,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   </DialogDescription>
                                 </DialogHeader>
                               </div>
-                              <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white space-y-3">
+                              <div className="flex-1 overflow-y-auto p-6 pb-10 sm:p-8 sm:pb-12 bg-white space-y-3">
                                 <div className="flex items-center justify-between">
                                   <Badge className="border-none bg-amber-50 text-amber-700 font-black">{selectedReportPreview.dateKey}</Badge>
                                   {selectedReportPreview.viewedAt && <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">열람 완료</Badge>}
@@ -2763,12 +2776,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           )}
                         </DialogContent>
                       </Dialog>
-
-                      <div className="p-6 sm:p-8 pt-0 border-t border-dashed mt-4">
-                        <Button variant="secondary" className="w-full h-14 sm:h-16 rounded-2xl font-black gap-4 text-primary bg-primary/5 hover:bg-primary/10 transition-all border border-primary/5" asChild>
-                          <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}><User className="h-5 w-5 opacity-40" />학생 정밀 리포트 & 과거 상세 분석<ChevronRight className="ml-auto h-5 w-5 opacity-20" /></Link>
-                        </Button>
-                      </div>
                     </div>
                   </>
                 );
