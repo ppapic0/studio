@@ -982,6 +982,11 @@ function formatMinutes(minutes: number) {
   return `${h}:${m.toString().padStart(2, '0')}`;
 }
 
+function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록') {
+  if (!value || Number.isNaN(value.getTime())) return emptyLabel;
+  return format(value, 'HH:mm');
+}
+
 const PARENT_CALENDAR_LEGEND = [
   { label: '기록 없음', swatch: 'from-white via-slate-50 to-slate-100 ring-slate-200/90' },
   { label: '짧은 몰입', swatch: 'from-white via-emerald-100 to-emerald-200 ring-emerald-300/90' },
@@ -1137,6 +1142,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const [checkInByDateKey, setCheckInByDateKey] = useState<Record<string, Date | null>>({});
+  const [checkOutByDateKey, setCheckOutByDateKey] = useState<Record<string, Date | null>>({});
   const [studyStartByDateKey, setStudyStartByDateKey] = useState<Record<string, Date | null>>({});
   const [studyEndByDateKey, setStudyEndByDateKey] = useState<Record<string, Date | null>>({});
   const [awayMinutesByDateKey, setAwayMinutesByDateKey] = useState<Record<string, number>>({});
@@ -1304,6 +1310,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     setSelectedChildReport(null);
     setSelectedCalendarDate(null);
     setCheckInByDateKey({});
+    setCheckOutByDateKey({});
     setStudyStartByDateKey({});
     setStudyEndByDateKey({});
     setAwayMinutesByDateKey({});
@@ -1447,6 +1454,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (!isActive || !firestore || !centerId || !studentId || !today) {
       setCheckInByDateKey({});
+      setCheckOutByDateKey({});
       return;
     }
 
@@ -1462,20 +1470,32 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           targetDateKeys.map(async (dateKey) => {
             const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
             const snap = await getDoc(recordRef);
-            if (!snap.exists()) return [dateKey, null] as const;
+            if (!snap.exists()) {
+              return [dateKey, { checkInAt: null, checkOutAt: null }] as const;
+            }
             const payload = snap.data() as Record<string, unknown>;
             const checkInAt = toDateSafe((payload?.checkInAt as TimestampLike) || (payload?.updatedAt as TimestampLike));
-            return [dateKey, checkInAt] as const;
+            const checkOutAt = toDateSafe(payload?.checkOutAt as TimestampLike);
+            return [dateKey, { checkInAt, checkOutAt }] as const;
           })
         );
 
         if (!cancelled) {
-          const next = Object.fromEntries(pairs) as Record<string, Date | null>;
-          setCheckInByDateKey(next);
+          const nextCheckIn = Object.fromEntries(
+            pairs.map(([dateKey, value]) => [dateKey, value.checkInAt])
+          ) as Record<string, Date | null>;
+          const nextCheckOut = Object.fromEntries(
+            pairs.map(([dateKey, value]) => [dateKey, value.checkOutAt])
+          ) as Record<string, Date | null>;
+          setCheckInByDateKey(nextCheckIn);
+          setCheckOutByDateKey(nextCheckOut);
         }
       } catch (error) {
         console.warn('[parent-dashboard] failed to load check-in trend', error);
-        if (!cancelled) setCheckInByDateKey({});
+        if (!cancelled) {
+          setCheckInByDateKey({});
+          setCheckOutByDateKey({});
+        }
       }
     };
 
@@ -2373,6 +2393,49 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [sortedNotifications]
   );
 
+  const todayCheckInAt = useMemo(() => {
+    const recordCheckInAt = todayKey ? checkInByDateKey[todayKey] || null : null;
+    if (recordCheckInAt) return recordCheckInAt;
+
+    const liveCheckInAt = toDateSafe(attendanceCurrent?.lastCheckInAt as TimestampLike);
+    if (liveCheckInAt && today && isSameDay(liveCheckInAt, today)) {
+      return liveCheckInAt;
+    }
+
+    return null;
+  }, [attendanceCurrent?.lastCheckInAt, checkInByDateKey, today, todayKey]);
+
+  const todayCheckOutAt = useMemo(() => {
+    const recordCheckOutAt = todayKey ? checkOutByDateKey[todayKey] || null : null;
+    if (recordCheckOutAt) return recordCheckOutAt;
+
+    if (!latestCheckOutNotification?.createdAtMs || !today) return null;
+    const notificationCheckOutAt = new Date(latestCheckOutNotification.createdAtMs);
+    if (Number.isNaN(notificationCheckOutAt.getTime()) || !isSameDay(notificationCheckOutAt, today)) {
+      return null;
+    }
+
+    return notificationCheckOutAt;
+  }, [checkOutByDateKey, latestCheckOutNotification?.createdAtMs, today, todayKey]);
+
+  const todayAttendanceTimeSummary = useMemo(() => {
+    const isCurrentlyInside = ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '');
+
+    return {
+      dateLabel: today ? format(today, 'MM/dd (EEE)', { locale: ko }) : '오늘',
+      checkInLabel: formatAttendanceTimeLabel(todayCheckInAt, '미기록'),
+      checkOutLabel: isCurrentlyInside
+        ? todayCheckOutAt
+          ? formatAttendanceTimeLabel(todayCheckOutAt)
+          : '학습 중'
+        : todayCheckOutAt
+          ? formatAttendanceTimeLabel(todayCheckOutAt)
+          : todayCheckInAt
+            ? '기록 대기'
+            : '미기록',
+    };
+  }, [attendanceCurrent?.status, today, todayCheckInAt, todayCheckOutAt]);
+
   const recentLifeAttendanceSummary = useMemo(() => {
     const isAwayNow = attendanceCurrent?.status === 'away' || attendanceCurrent?.status === 'break';
     const hasAwayRecord = isAwayNow || !!latestAwayNotification;
@@ -2924,10 +2987,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   </div>
                 </div>
-                <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_16px_-16px_rgba(27,114,141,0.22)]">
-                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#477281]">최근 기록</p>
-                  <p className="mt-1 text-[12px] font-black text-[#14295F]">{recentLifeAttendanceSummary.recentStudyDate}</p>
-                  <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">앱에서 실시간으로 확인 중</p>
+                <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2.5 shadow-[0_10px_16px_-16px_rgba(27,114,141,0.22)]">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#477281]">오늘 출결 기록</p>
+                    <p className="text-[10px] font-black text-[#245565]">{todayAttendanceTimeSummary.dateLabel}</p>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#5b7d88]">등원</p>
+                      <p className="mt-1 text-[13px] font-black tracking-tight text-[#14295F]">
+                        {todayAttendanceTimeSummary.checkInLabel}
+                      </p>
+                    </div>
+                    <div className="rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#5b7d88]">하원</p>
+                      <p className="mt-1 text-[13px] font-black tracking-tight text-[#14295F]">
+                        {todayAttendanceTimeSummary.checkOutLabel}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">앱에서 실시간 출결 시각 기준</p>
                 </div>
               </div>
             </ParentMetricCardShell>
