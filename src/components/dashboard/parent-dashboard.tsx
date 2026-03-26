@@ -3033,7 +3033,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               )}
             >
               <div className="flex h-full flex-col gap-3">
-                <div className="grid grid-cols-[minmax(0,1fr)_4.8rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
+                <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
                   <div className="min-w-0 space-y-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#56739f]">오늘 공부</span>
@@ -3083,7 +3083,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               )}
             >
               <div className="flex h-full flex-col gap-3">
-                <div className="grid grid-cols-[minmax(0,1fr)_4.8rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
+                <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
                   <div className="min-w-0 space-y-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c66a13]">계획 달성</span>
