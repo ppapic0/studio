@@ -23,7 +23,7 @@ import {
   setDoc,
   limit,
 } from 'firebase/firestore';
-import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry, DailyReport } from '@/lib/types';
+import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry, DailyReport, StudySession } from '@/lib/types';
 import { 
   format, 
   startOfMonth, 
@@ -315,6 +315,7 @@ export default function StudyHistoryPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
   const [linkedStudents, setLinkedStudents] = useState<LinkedStudentOption[]>([]);
+  const [calendarSessionsByDateKey, setCalendarSessionsByDateKey] = useState<Record<string, Partial<StudySession>[]>>({});
 
   useEffect(() => { setCurrentDate(new Date()); }, []);
 
@@ -455,6 +456,123 @@ export default function StudyHistoryPage() {
     return `${roundedHours.toFixed(1).replace(/\.0$/, '')}h`;
   };
 
+  const toCalendarSessionDate = (value: { toDate?: () => Date } | Date | string | null | undefined) => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (typeof value === 'object' && typeof value.toDate === 'function') {
+      const parsed = value.toDate();
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+  };
+
+  const buildDaySessionSparkline = (sessions: Partial<StudySession>[]) => {
+    const buckets = Array.from({ length: 6 }, () => 0);
+    const bucketRanges = [
+      [6, 9],
+      [9, 12],
+      [12, 15],
+      [15, 18],
+      [18, 21],
+      [21, 24],
+    ] as const;
+
+    sessions.forEach((session) => {
+      const startAt = toCalendarSessionDate(session.startTime as { toDate?: () => Date } | Date | string | null | undefined);
+      if (!startAt) return;
+
+      const durationMinutes = Math.max(0, Math.round(session.durationMinutes || 0));
+      const fallbackEndAt = new Date(startAt.getTime() + Math.max(durationMinutes, 10) * 60000);
+      const rawEndAt = toCalendarSessionDate(session.endTime as { toDate?: () => Date } | Date | string | null | undefined) || fallbackEndAt;
+      const endAt = rawEndAt.getTime() >= startAt.getTime() ? rawEndAt : fallbackEndAt;
+
+      bucketRanges.forEach(([startHour, endHour], index) => {
+        const bucketStart = new Date(startAt);
+        bucketStart.setHours(startHour, 0, 0, 0);
+        const bucketEnd = new Date(startAt);
+        bucketEnd.setHours(endHour, 0, 0, 0);
+        const overlapStart = Math.max(startAt.getTime(), bucketStart.getTime());
+        const overlapEnd = Math.min(endAt.getTime(), bucketEnd.getTime());
+        if (overlapEnd > overlapStart) {
+          buckets[index] += Math.round((overlapEnd - overlapStart) / 60000);
+        }
+      });
+    });
+
+    return buckets;
+  };
+
+  const getSessionSparklinePath = (bucketMinutes: number[]) => {
+    const max = Math.max(1, ...bucketMinutes);
+    return bucketMinutes
+      .map((value, index) => {
+        const x = 6 + index * 16.8;
+        const y = 24 - (value / max) * 16;
+        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      })
+      .join(' ');
+  };
+
+  const visibleCalendarDateKeys = useMemo(
+    () => calendarData.days.map((day) => format(day, 'yyyy-MM-dd')),
+    [calendarData.days]
+  );
+  const visibleCalendarDateKeysSignature = visibleCalendarDateKeys.join('|');
+
+  useEffect(() => {
+    if (!firestore || !activeMembership?.id || !targetUid || visibleCalendarDateKeys.length === 0) {
+      setCalendarSessionsByDateKey({});
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadCalendarSessions = async () => {
+      try {
+        const results = await Promise.all(
+          visibleCalendarDateKeys.map(async (dateKey) => {
+            try {
+              const sessionsRef = collection(firestore, 'centers', activeMembership.id, 'studyLogs', targetUid, 'days', dateKey, 'sessions');
+              const sessionsSnap = await getDocs(query(sessionsRef, orderBy('startTime', 'asc')));
+              return [
+                dateKey,
+                sessionsSnap.docs.map((snapshot) => snapshot.data() as Partial<StudySession>),
+              ] as const;
+            } catch {
+              return [dateKey, []] as const;
+            }
+          })
+        );
+
+        if (!cancelled) {
+          setCalendarSessionsByDateKey(Object.fromEntries(results));
+        }
+      } catch {
+        if (!cancelled) {
+          setCalendarSessionsByDateKey({});
+        }
+      }
+    };
+
+    void loadCalendarSessions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [firestore, activeMembership?.id, targetUid, visibleCalendarDateKeysSignature]);
+
+  const calendarSessionSparklineByDateKey = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(calendarSessionsByDateKey).map(([dateKey, sessions]) => [dateKey, buildDaySessionSparkline(sessions)])
+      ) as Record<string, number[]>,
+    [calendarSessionsByDateKey]
+  );
+
   const getHeatmapColor = (minutes: number) => {
     if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
     if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,246,0.98)_60%,rgba(225,248,238,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.18)]';
@@ -462,15 +580,6 @@ export default function StudyHistoryPage() {
     if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(223,250,246,0.98)_52%,rgba(210,243,246,0.98)_100%)] ring-1 ring-inset ring-teal-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(14,165,233,0.22)]';
     if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,244,255,0.98)_50%,rgba(213,231,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
     return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(220,236,255,0.98)_46%,rgba(205,221,255,0.98)_100%)] ring-1 ring-inset ring-blue-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.24)]';
-  };
-
-  const getCalendarAccentClass = (minutes: number) => {
-    if (minutes === 0) return 'from-slate-200 via-slate-300 to-slate-200';
-    if (minutes < 60) return 'from-emerald-300 via-emerald-400 to-teal-400';
-    if (minutes < 180) return 'from-emerald-400 via-teal-400 to-cyan-400';
-    if (minutes < 300) return 'from-teal-400 via-cyan-400 to-sky-400';
-    if (minutes < 480) return 'from-sky-400 via-blue-400 to-indigo-400';
-    return 'from-sky-500 via-blue-500 to-indigo-600';
   };
 
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
@@ -814,6 +923,8 @@ export default function StudyHistoryPage() {
             ) : calendarData.days.map((day, idx) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const minutes = logs?.find(l => l.dateKey === dateKey)?.totalMinutes || 0;
+              const sessionSparkline = calendarSessionSparklineByDateKey[dateKey] || [];
+              const hasSessionSparkline = sessionSparkline.some((value) => value > 0);
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isTodayCalendar = isSameDay(day, new Date());
@@ -830,7 +941,7 @@ export default function StudyHistoryPage() {
                   onClick={() => setSelectedDateForPlan(day)}
                   className={cn(
                     "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
-                    isMobile ? "aspect-square min-h-[4.15rem] p-1" : "min-h-[150px] p-3",
+                    isMobile ? "aspect-square min-h-[3.95rem] p-1" : "min-h-[156px] p-3",
                     !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                     isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
                     isTodayCalendar && (isMobile
@@ -845,18 +956,12 @@ export default function StudyHistoryPage() {
                     )} />
                   )}
                   <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
-                  {isCurrentMonth && !isMobile && (
-                    <div className={cn("pointer-events-none absolute inset-x-3", isMobile ? "bottom-9" : "bottom-[4.1rem]")}>
-                      <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
-                    </div>
-                  )}
-
                   <div className={cn("relative z-10 flex h-full flex-col", isMobile ? "gap-1" : "gap-2")}>
-                    <div className="flex items-start justify-between gap-1.5">
+                    <div className="flex items-start justify-between gap-1">
                       <span
                         className={cn(
                           "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                          isMobile ? "min-w-[1.45rem] px-1.5 py-0.5 text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
+                          isMobile ? "min-w-[1.4rem] px-1.5 py-0.5 text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
                           idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
                           isTodayCalendar && "border-primary/20 text-primary"
                         )}
@@ -866,13 +971,13 @@ export default function StudyHistoryPage() {
 
                       {isMobile ? (
                         hasDeepFocus ? (
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-100 bg-white/95 text-amber-500 shadow-[0_8px_16px_-14px_rgba(15,23,42,0.24)]">
+                          <span className="hidden min-[375px]:inline-flex h-4.5 w-4.5 items-center justify-center rounded-full border border-amber-100 bg-white/95 text-amber-500 shadow-[0_8px_16px_-14px_rgba(15,23,42,0.24)]">
                             <Zap className="h-2.5 w-2.5 fill-amber-500" />
                           </span>
                         ) : hasPlans ? (
-                          <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-primary shadow-[0_6px_12px_-10px_rgba(37,99,235,0.45)]" />
+                          <span className="mt-1 hidden min-[375px]:inline-flex h-2 w-2 rounded-full bg-primary shadow-[0_6px_12px_-10px_rgba(37,99,235,0.45)]" />
                         ) : (
-                          <span className="h-5 w-5" aria-hidden="true" />
+                          <span className="hidden min-[375px]:inline-flex h-4 w-4" aria-hidden="true" />
                         )
                       ) : hasStatusCluster ? (
                         <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]">
@@ -885,37 +990,56 @@ export default function StudyHistoryPage() {
                     </div>
 
                     {isMobile ? (
-                      <div className="mt-auto flex flex-col justify-end gap-1">
-                        {isCurrentMonth && (
-                          <div className={cn(
-                            "h-1 rounded-full",
-                            minutes > 0 ? `bg-gradient-to-r ${getCalendarAccentClass(minutes)}` : "bg-slate-200/80"
-                          )} />
-                        )}
-                        <div className="flex items-end justify-between gap-1">
-                          <span className={cn(
-                            "text-[8px] font-black uppercase tracking-[0.14em]",
-                            !isCurrentMonth ? "text-slate-300" : "text-slate-400"
-                          )}>
-                            {hasPlans && isCurrentMonth ? '계획' : ''}
-                          </span>
-                          <span
-                            className={cn(
-                              "inline-flex shrink-0 items-center rounded-full border bg-white/95 px-1.5 py-[0.34rem] text-[10px] font-black tabular-nums leading-none shadow-[0_12px_18px_-16px_rgba(15,23,42,0.26)]",
-                              getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
-                            )}
-                          >
-                            {compactTimeLabel}
-                          </span>
-                        </div>
+                      <div className="mt-auto flex items-end justify-between gap-1">
+                        <span className="hidden min-[375px]:inline-flex items-center gap-1">
+                          {hasPlans && isCurrentMonth && <span className="h-1.5 w-1.5 rounded-full bg-primary/85" />}
+                          {hasDeepFocus && isCurrentMonth && <Zap className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />}
+                        </span>
+                        <span className="hidden min-[375px]:inline-flex" aria-hidden="true" />
+                        <span
+                          className={cn(
+                            "inline-flex shrink-0 items-center rounded-full border bg-white/95 px-1.5 py-[0.34rem] text-[10px] font-black tabular-nums leading-none shadow-[0_12px_18px_-16px_rgba(15,23,42,0.26)]",
+                            getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                          )}
+                        >
+                          {compactTimeLabel}
+                        </span>
                       </div>
                     ) : (
-                      <div className="mt-auto flex flex-col gap-2">
-                        {isCurrentMonth && (
-                          <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
-                        )}
-                        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                          {statusLabel}
+                      <div className="mt-auto flex flex-col gap-2.5">
+                        <div className="rounded-[1rem] border border-white/80 bg-white/88 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_14px_24px_-24px_rgba(15,23,42,0.2)]">
+                          <svg viewBox="0 0 110 28" className="h-7 w-full" aria-hidden="true">
+                            <path
+                              d="M6 22H104"
+                              stroke={hasSessionSparkline ? 'rgba(148,163,184,0.22)' : 'rgba(148,163,184,0.3)'}
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d={hasSessionSparkline ? getSessionSparklinePath(sessionSparkline) : 'M 6 22 L 104 22'}
+                              stroke={hasSessionSparkline ? '#22C55E' : 'rgba(148,163,184,0.55)'}
+                              strokeWidth="2.75"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill="none"
+                            />
+                          </svg>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={cn(
+                              "truncate text-[10px] font-black uppercase tracking-[0.16em]",
+                              hasSessionSparkline ? "text-emerald-600/85" : "text-slate-400"
+                            )}
+                          >
+                            {statusLabel}
+                          </span>
+                          {hasStatusCluster && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.18)]">
+                              {hasPlans && <span className="h-2 w-2 rounded-full bg-primary" />}
+                              {hasDeepFocus && <Zap className="h-3 w-3 fill-amber-500 text-amber-500" />}
+                            </span>
+                          )}
                         </div>
                         <div
                           className={cn(
