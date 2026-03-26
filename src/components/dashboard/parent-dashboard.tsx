@@ -3149,13 +3149,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <div className="rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#5b7d88]">등원</p>
-                      <p className="mt-1 text-[13px] font-black tracking-tight text-[#14295F]">
+                      <p className="mt-1 truncate whitespace-nowrap text-[12px] font-black tracking-tight text-[#14295F] sm:text-[13px]">
                         {todayAttendanceTimeSummary.checkInLabel}
                       </p>
                     </div>
                     <div className="rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#5b7d88]">하원</p>
-                      <p className="mt-1 text-[13px] font-black tracking-tight text-[#14295F]">
+                      <p className="mt-1 truncate whitespace-nowrap text-[12px] font-black tracking-tight text-[#14295F] sm:text-[13px]">
                         {todayAttendanceTimeSummary.checkOutLabel}
                       </p>
                     </div>
