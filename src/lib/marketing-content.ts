@@ -551,10 +551,10 @@ export const marketingContent: MarketingContent = {
       },
     ],
     trustMetrics: [
-      { label: '실시간 확인 항목', value: '5개', detail: '출결·상태·그래프·리포트·알림', tone: 'navy' },
-      { label: '권한별 화면', value: '3개', detail: '학생·학부모·운영자 분리', tone: 'orange' },
-      { label: '주요 합격 사례', value: '6건', detail: '2026 주요 대학 및 성장 사례', tone: 'green' },
-      { label: '공개 증빙 자산', value: '4개', detail: '성적표 3장 + 피드백 1장', tone: 'red' },
+      { label: '학생이 얻는 변화', value: '공부 습관', detail: '매일 같은 흐름으로 공부가 이어집니다', tone: 'navy' },
+      { label: '빠른 개입 구조', value: '즉시 점검', detail: '흔들리는 구간을 빠르게 확인하고 바로 조정합니다', tone: 'orange' },
+      { label: '학부모 확인', value: '안심 관리', detail: '출결·공부시간·리포트를 한 흐름으로 확인합니다', tone: 'green' },
+      { label: '국어 수업 연동', value: '실전 대비', detail: '독서실 관리와 국어 수업이 같은 방향으로 연결됩니다', tone: 'red' },
     ],
   },
   lpSystem: {
