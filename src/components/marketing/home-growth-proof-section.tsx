@@ -36,7 +36,7 @@ const interventionHighlights = [
     label: '개입',
     title: '루틴과 개입을 바로 연결합니다',
     description: '시작 시간 고정, 주간 계획 조정, 과제 밀도 재배치를 같은 흐름 안에서 반복 개입합니다.',
-    emphasis: '주간 학습시간 21h → 56H',
+    emphasis: '주간 학습시간 21h → 34h',
   },
   {
     icon: Sparkles,
@@ -55,7 +55,7 @@ const caseMetrics = [
   },
   {
     label: '주간 학습시간',
-    value: '21h → 56H',
+    value: '21h → 34h',
     detail: '루틴 고정 이후 상승',
   },
   {
