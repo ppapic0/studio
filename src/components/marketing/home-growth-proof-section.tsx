@@ -24,20 +24,20 @@ const proofImages = [
   {
     label: '실제 성적표',
     title: '6월 모의평가',
-    caption: '국어 백분위 82',
-    image: '/marketing/proof/june-mock-redacted.jpg',
+    caption: '국어 3등급 · 백분위 82',
+    image: '/marketing/proof/june-score-sheet-proof-v3.jpg',
   },
   {
     label: '실제 성적표',
     title: '9월 모의평가',
-    caption: '국어 백분위 96',
-    image: '/marketing/proof/september-mock-redacted.jpg',
+    caption: '국어 1등급 · 백분위 96',
+    image: '/marketing/proof/september-score-sheet-proof-v3.jpg',
   },
   {
     label: '실제 성적표',
     title: '수능 본시험',
     caption: '국어 백분위 99',
-    image: '/marketing/proof/csat-score-redacted.jpg',
+    image: '/marketing/proof/csat-score-sheet-proof-v3.jpg',
   },
 ];
 
@@ -116,7 +116,7 @@ export function HomeGrowthProofSection() {
                       alt={item.title}
                       fill
                       sizes="(max-width: 1024px) 100vw, 33vw"
-                      className="object-cover object-center"
+                      className="object-contain object-center bg-white"
                     />
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0d1732]/88 to-transparent" />
                     <div className="absolute bottom-3 left-4 right-4">

@@ -100,7 +100,7 @@ const modeContent: Record<
       {
         title: '실제 결과 증빙',
         description: '운영 구조가 결과로 이어진 실제 성적표 일부를 마스킹해 공개합니다.',
-        image: '/marketing/proof/september-mock-redacted.jpg',
+        image: '/marketing/proof/september-score-sheet-proof-v3.jpg',
       },
     ],
     stages: [
@@ -153,12 +153,24 @@ function ProofCard({
   badge?: string;
 }) {
   const showImage = image && !image.includes('/marketing/app-evidence/');
+  const isDocumentProof = image.includes('/marketing/proof/');
 
   return (
     <article className="overflow-hidden rounded-[1.5rem] border border-[#14295F]/10 bg-white shadow-sm">
       {showImage ? (
-        <div className="relative aspect-[1.22/1] border-b border-[#14295F]/8 bg-[#0D1732]">
-          <Image src={image} alt={title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
+        <div
+          className={cn(
+            'relative aspect-[1.22/1] border-b border-[#14295F]/8',
+            isDocumentProof ? 'bg-white' : 'bg-[#0D1732]',
+          )}
+        >
+          <Image
+            src={image}
+            alt={title}
+            fill
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            className={cn(isDocumentProof ? 'object-contain' : 'object-cover')}
+          />
         </div>
       ) : (
         <div className="border-b border-[#14295F]/8 bg-[linear-gradient(145deg,#F8FBFF_0%,#EEF3FF_100%)] px-5 py-5">
