@@ -1591,8 +1591,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   status: seat.status,
                   isEditMode,
                 });
-                const secondaryFlags = (seatSignal?.secondaryFlags || []).slice(0, compact ? 1 : 2);
                 const isAisle = seat.type === 'aisle';
+                const nameTextClass =
+                  occupantId && overlayPresentation.isDark ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]' : 'text-slate-950';
 
                 return (
                   <div
@@ -1620,7 +1621,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         {roomSeatNo}
                       </span>
                     )}
-                    {seat.seatZone && !isAisle && (
+                    {seat.seatZone && !isAisle && isEditMode && (
                       <Badge
                         variant="outline"
                         className={cn(
@@ -1635,40 +1636,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     {isAisle ? (
                       isEditMode && <MapIcon className={cn(compact ? 'h-2.5 w-2.5' : 'h-3 w-3', 'opacity-40')} />
                     ) : occupantId ? (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-0.5">
+                      <div
+                        className={cn(
+                          'flex h-full w-full flex-col items-center justify-center text-center',
+                          compact ? 'px-1 pt-2' : 'px-1.5'
+                        )}
+                      >
                         <span
                           className={cn(
-                            'w-full truncate text-center font-black leading-none tracking-tighter',
-                            compact ? 'text-[8px]' : 'text-[10px]'
+                            'w-full font-black tracking-tight whitespace-normal break-keep text-center',
+                            nameTextClass,
+                            compact
+                              ? 'text-[10px] leading-[1.12] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
+                              : 'text-[12px] leading-[1.18] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
                           )}
                         >
                           {occupantName}
                         </span>
-                        <span
-                          className={cn(
-                            'inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 font-black tracking-tight shadow-sm',
-                            compact ? 'text-[5px]' : 'text-[7px]',
-                            overlayPresentation.chipClass
-                          )}
-                        >
-                          {overlayPresentation.chipLabel}
-                        </span>
-                        {secondaryFlags.length > 0 && (
-                          <div className="flex flex-wrap items-center justify-center gap-1">
-                            {secondaryFlags.map((flag) => (
-                              <span
-                                key={`${seat.id}_${flag}`}
-                                className={cn(
-                                  'inline-flex max-w-full items-center rounded-full px-1 py-0.5 font-black tracking-tight shadow-sm',
-                                  compact ? 'text-[4px]' : 'text-[5px]',
-                                  overlayPresentation.flagClass
-                                )}
-                              >
-                                {flag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center">
@@ -2664,7 +2648,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
-                          <TabsContent value="reports" className="mt-0 h-full overflow-y-auto custom-scrollbar p-6 pb-28 sm:p-8 sm:pb-32 space-y-6">
+                          <TabsContent value="reports" className="mt-0 h-full min-h-0 overflow-y-auto custom-scrollbar p-6 pb-36 sm:p-8 sm:pb-40 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <FileText className="h-4 w-4 text-amber-600" />
                               <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest">최근 발송된 리포트 (5건)</h4>
@@ -2690,6 +2674,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   </button>
                                 ))
                               )}
+                            </div>
+                            <div className="border-t border-dashed pt-2">
+                              <Button
+                                variant="secondary"
+                                className="h-14 w-full rounded-2xl border border-primary/5 bg-primary/5 font-black text-primary transition-all hover:bg-primary/10 sm:h-16"
+                                asChild
+                              >
+                                <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}>
+                                  <User className="h-5 w-5 opacity-40" />
+                                  학생 정밀 리포트 & 과거 상세 분석
+                                  <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
+                                </Link>
+                              </Button>
                             </div>
                           </TabsContent>
                         </div>
@@ -2743,7 +2740,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   </DialogDescription>
                                 </DialogHeader>
                               </div>
-                              <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white space-y-3">
+                              <div className="flex-1 overflow-y-auto p-6 pb-10 sm:p-8 sm:pb-12 bg-white space-y-3">
                                 <div className="flex items-center justify-between">
                                   <Badge className="border-none bg-amber-50 text-amber-700 font-black">{selectedReportPreview.dateKey}</Badge>
                                   {selectedReportPreview.viewedAt && <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">열람 완료</Badge>}
@@ -2763,12 +2760,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           )}
                         </DialogContent>
                       </Dialog>
-
-                      <div className="p-6 sm:p-8 pt-0 border-t border-dashed mt-4">
-                        <Button variant="secondary" className="w-full h-14 sm:h-16 rounded-2xl font-black gap-4 text-primary bg-primary/5 hover:bg-primary/10 transition-all border border-primary/5" asChild>
-                          <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}><User className="h-5 w-5 opacity-40" />학생 정밀 리포트 & 과거 상세 분석<ChevronRight className="ml-auto h-5 w-5 opacity-20" /></Link>
-                        </Button>
-                      </div>
                     </div>
                   </>
                 );
