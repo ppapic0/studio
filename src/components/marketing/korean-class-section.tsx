@@ -15,38 +15,64 @@ export function KoreanClassSection() {
         />
       </div>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="brand-sheen-panel relative flex flex-col items-center gap-5 rounded-[1.4rem] border border-[rgba(20,41,95,0.1)] bg-white px-7 py-7 text-center shadow-[0_16px_34px_rgba(20,41,95,0.07)] sm:flex-row sm:gap-8 sm:px-10 sm:text-left">
-          <div className="brand-glow-drift absolute -right-8 top-4 h-24 w-24 rounded-full bg-[#FFB878]/14 blur-3xl" />
-          {/* Icon */}
-          <div className="brand-glow-drift mx-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#14295F]/7 sm:mx-0">
-            <BookOpen className="h-5 w-5 text-[#14295F]/70" />
+        <div className="space-y-4">
+          <div className="brand-sheen-panel relative overflow-hidden rounded-[1.5rem] border border-[rgba(255,122,22,0.16)] bg-[linear-gradient(135deg,rgba(255,255,255,0.94)_0%,rgba(255,244,236,0.98)_100%)] px-6 py-5 shadow-[0_18px_42px_rgba(20,41,95,0.08)] sm:px-8">
+            <div className="brand-glow-drift absolute -right-8 -top-6 h-24 w-24 rounded-full bg-[#FFB878]/20 blur-3xl" />
+            <div className="brand-glow-drift absolute left-[-3%] bottom-[-18%] h-28 w-28 rounded-full bg-[#FFD7B5]/20 blur-3xl" />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">
+                  실전 모의고사 운영
+                </p>
+                <h3 className="break-keep text-[1.02rem] font-black leading-[1.45] text-[#14295F] sm:text-[1.12rem]">
+                  매달 더프와 사설 모의고사를 함께 운영해
+                  <br className="hidden sm:block" />실전 감각과 국어 대응력을 꾸준히 점검합니다
+                </h3>
+                <p className="break-keep text-[13px] font-semibold leading-[1.7] text-slate-500">
+                  더프, 사설 모의고사와 함께 국어는 이감, 시대인재 서바이벌 등도
+                  제휴 협의 중인 흐름으로 준비하고 있습니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 sm:max-w-[270px] sm:justify-end">
+                {['매달 더프 실시', '사설 모의고사 운영', '국어 실전 대비 점검'].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-[rgba(255,122,22,0.18)] bg-white/90 px-3 py-1.5 text-[11px] font-black text-[#C25A00] shadow-[0_8px_18px_rgba(255,122,22,0.08)]"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Text */}
-          <div className="flex-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">
-              국어 수업 연결
-            </p>
-            <h3 className="mt-1 break-keep text-[1.05rem] font-black text-[#14295F]">
-              수능 국어 수업은 필요할 때 선택합니다
-            </h3>
-            <p className="mt-1.5 break-keep text-[13px] font-semibold text-slate-500">
-              센터 이용과 수업은 분리됩니다. 재학생·N수생 모두 등록 가능하며,
-              국어 수업은 별도로 추가할 수 있습니다.
-            </p>
-            <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.7] text-[#14295F]/78">
-              매달 더프, 사설 모의고사(국어-이감, 시대인재 서바이벌 등 제휴 협의중)도 함께 실시합니다.
-            </p>
-          </div>
+          <div className="brand-sheen-panel relative flex flex-col items-center gap-5 rounded-[1.4rem] border border-[rgba(20,41,95,0.1)] bg-white px-7 py-7 text-center shadow-[0_16px_34px_rgba(20,41,95,0.07)] sm:flex-row sm:gap-8 sm:px-10 sm:text-left">
+            <div className="brand-glow-drift absolute -right-8 top-4 h-24 w-24 rounded-full bg-[#FFB878]/14 blur-3xl" />
+            <div className="brand-glow-drift mx-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#14295F]/7 sm:mx-0">
+              <BookOpen className="h-5 w-5 text-[#14295F]/70" />
+            </div>
 
-          {/* CTA */}
-          <a
-            href="#consult"
-            className="brand-cta-float shrink-0 inline-flex items-center gap-2 whitespace-nowrap rounded-[0.8rem] bg-[#14295F] px-6 py-3 text-[13px] font-black text-white transition-all hover:bg-[#14295F]/90"
-          >
-            수업 문의하기
-            <ArrowRight className="brand-cta-arrow h-3.5 w-3.5" />
-          </a>
+            <div className="flex-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FF7A16]">
+                국어 수업 연결
+              </p>
+              <h3 className="mt-1 break-keep text-[1.05rem] font-black text-[#14295F]">
+                수능 국어 수업은 필요할 때 선택합니다
+              </h3>
+              <p className="mt-1.5 break-keep text-[13px] font-semibold text-slate-500">
+                센터 이용과 수업은 분리됩니다. 재학생·N수생 모두 등록 가능하며,
+                국어 수업은 별도로 추가할 수 있습니다.
+              </p>
+            </div>
+
+            <a
+              href="#consult"
+              className="brand-cta-float shrink-0 inline-flex items-center gap-2 whitespace-nowrap rounded-[0.8rem] bg-[#14295F] px-6 py-3 text-[13px] font-black text-white transition-all hover:bg-[#14295F]/90"
+            >
+              수업 문의하기
+              <ArrowRight className="brand-cta-arrow h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
       </div>
     </section>
