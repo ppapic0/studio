@@ -3564,7 +3564,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             <span
                               className={cn(
                                 "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                                isMobile ? "min-w-[1.4rem] px-1.5 py-0.5 text-[9px]" : "text-xs min-w-[2rem] px-2 py-1",
+                                isMobile ? "min-w-[1.3rem] px-1.5 py-0.5 text-[8px]" : "text-xs min-w-[2rem] px-2 py-1",
                                 idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
                                 isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
                               )}
@@ -3573,14 +3573,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             </span>
 
                             {isMobile ? (
-                              hasDeepFocus ? (
-                                <span className="hidden min-[375px]:inline-flex h-4.5 w-4.5 items-center justify-center rounded-full border border-orange-100 bg-white/95 text-orange-500 shadow-[0_8px_16px_-14px_rgba(20,41,95,0.24)]">
-                                  <Zap className="h-2.5 w-2.5 fill-orange-500" />
-                                </span>
-                              ) : hasPlans ? (
-                                <span className="mt-1 hidden min-[375px]:inline-flex h-2 w-2 rounded-full bg-[#14295F] shadow-[0_6px_12px_-10px_rgba(20,41,95,0.45)]" />
+                              hasDeepFocus || hasPlans ? (
+                                <span
+                                  className={cn(
+                                    "mt-1 hidden min-[375px]:inline-flex rounded-full",
+                                    hasDeepFocus ? "h-1.5 w-1.5 bg-orange-400" : "h-1.5 w-1.5 bg-[#14295F]/85"
+                                  )}
+                                />
                               ) : (
-                                <span className="hidden min-[375px]:inline-flex h-4 w-4" aria-hidden="true" />
+                                <span className="hidden min-[375px]:inline-flex h-1.5 w-1.5 opacity-0" aria-hidden="true" />
                               )
                             ) : hasStatusCluster ? (
                               <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]">
@@ -3594,15 +3595,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
                           {isMobile ? (
                             <div className="mt-auto flex items-end justify-between gap-1">
-                              <span className="hidden min-[375px]:inline-flex items-center gap-1">
-                                {hasPlans && isCurrentMonth && <span className="h-1.5 w-1.5 rounded-full bg-[#14295F]/85" />}
-                                {hasDeepFocus && isCurrentMonth && <Zap className="h-2.5 w-2.5 fill-orange-500 text-orange-500" />}
+                              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-400/85">
+                                {isCurrentMonth ? '' : ''}
                               </span>
-                              <span className="hidden min-[375px]:inline-flex" aria-hidden="true" />
                               <span
                                 className={cn(
-                                  "inline-flex shrink-0 items-center rounded-full border bg-white/95 px-1.5 py-[0.34rem] text-[10px] font-black tabular-nums leading-none shadow-[0_12px_18px_-16px_rgba(20,41,95,0.26)]",
-                                  getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                                  "shrink-0 whitespace-nowrap text-[10px] font-black tabular-nums leading-none tracking-[-0.04em]",
+                                  !isCurrentMonth ? "text-slate-300" : minutes > 0 ? "text-slate-800" : "text-slate-400"
                                 )}
                               >
                                 {compactTimeLabel}
