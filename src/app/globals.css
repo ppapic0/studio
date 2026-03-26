@@ -518,35 +518,77 @@
     animation: fade-up-pop 0.5s cubic-bezier(0.2, 0.9, 0.2, 1);
   }
 
-  .track-runner-shell {
+  .track-motion-shell {
     position: relative;
     overflow: hidden;
+    background:
+      radial-gradient(circle at top right, rgba(255, 216, 132, 0.24), transparent 26%),
+      linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%);
   }
 
-  .track-runner {
+  .track-motion-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.08), transparent 38%),
+      linear-gradient(0deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+    pointer-events: none;
+  }
+
+  .track-motion-vehicle {
     transform-origin: center;
-    animation: track-runner-bob 1.8s ease-in-out infinite;
+    animation: track-motion-float 2.2s ease-in-out infinite;
   }
 
-  .track-runner-arm-front,
-  .track-runner-leg-back {
-    transform-origin: 50% 12%;
-    animation: track-runner-swing 0.9s ease-in-out infinite;
+  .track-motion-vehicle--walk {
+    animation-duration: 2.8s;
   }
 
-  .track-runner-arm-back,
-  .track-runner-leg-front {
-    transform-origin: 50% 12%;
-    animation: track-runner-swing 0.9s ease-in-out infinite reverse;
+  .track-motion-vehicle--run {
+    animation-duration: 1.4s;
   }
 
-  .track-runner-path {
+  .track-motion-vehicle--bike {
+    animation-duration: 2s;
+  }
+
+  .track-motion-vehicle--car {
+    animation-name: track-motion-drive;
+    animation-duration: 2.6s;
+  }
+
+  .track-motion-vehicle--plane {
+    animation-name: track-motion-fly;
+    animation-duration: 3.2s;
+  }
+
+  .track-motion-limb-a,
+  .track-motion-limb-b {
+    transform-origin: center;
+    animation: track-motion-swing 1s ease-in-out infinite;
+  }
+
+  .track-motion-limb-b {
+    animation-direction: reverse;
+  }
+
+  .track-motion-wheel {
+    transform-origin: center;
+    animation: track-motion-wheel-spin 1s linear infinite;
+  }
+
+  .track-motion-path {
     stroke-dasharray: 10 10;
-    animation: track-runner-path 1.3s linear infinite;
+    animation: track-motion-path 1.3s linear infinite;
   }
 
-  .track-runner-spark {
-    animation: track-runner-spark 1.5s ease-in-out infinite;
+  .track-motion-trail {
+    animation: track-motion-trail 1.4s ease-in-out infinite;
+  }
+
+  .track-motion-spark {
+    animation: track-motion-spark 1.5s ease-in-out infinite;
   }
 
   @keyframes analysis-sheen {
@@ -1527,17 +1569,40 @@
   }
 }
 
-@keyframes track-runner-bob {
+@keyframes track-motion-float {
   0%,
   100% {
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
   50% {
-    transform: translateY(-3px);
+    transform: translate3d(0, -3px, 0);
   }
 }
 
-@keyframes track-runner-swing {
+@keyframes track-motion-drive {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  35% {
+    transform: translate3d(2px, -1px, 0);
+  }
+  70% {
+    transform: translate3d(-1px, 0, 0);
+  }
+}
+
+@keyframes track-motion-fly {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-2deg);
+  }
+  50% {
+    transform: translate3d(4px, -4px, 0) rotate(1deg);
+  }
+}
+
+@keyframes track-motion-swing {
   0%,
   100% {
     transform: rotate(18deg);
@@ -1547,7 +1612,16 @@
   }
 }
 
-@keyframes track-runner-path {
+@keyframes track-motion-wheel-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes track-motion-path {
   0% {
     stroke-dashoffset: 0;
   }
@@ -1556,7 +1630,19 @@
   }
 }
 
-@keyframes track-runner-spark {
+@keyframes track-motion-trail {
+  0%,
+  100% {
+    opacity: 0.24;
+    transform: translate3d(0, 0, 0) scaleX(0.92);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translate3d(-6px, 0, 0) scaleX(1.06);
+  }
+}
+
+@keyframes track-motion-spark {
   0%,
   100% {
     opacity: 0.3;
@@ -2492,13 +2578,13 @@
   .student-route-enter,
   .student-shell-glow,
   .student-hero-enter,
-  .track-runner,
-  .track-runner-arm-front,
-  .track-runner-arm-back,
-  .track-runner-leg-front,
-  .track-runner-leg-back,
-  .track-runner-path,
-  .track-runner-spark,
+  .track-motion-vehicle,
+  .track-motion-limb-a,
+  .track-motion-limb-b,
+  .track-motion-wheel,
+  .track-motion-path,
+  .track-motion-trail,
+  .track-motion-spark,
   .dashboard-premium-overlay[data-state="open"],
   .dashboard-premium-overlay[data-state="closed"],
   .dashboard-premium-dialog[data-state="open"],
