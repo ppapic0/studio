@@ -1592,11 +1592,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   isEditMode,
                 });
                 const isAisle = seat.type === 'aisle';
-                const weeklyStudyLabel = seatSignal?.weeklyStudyLabel || '주간 확인중';
                 const nameTextClass =
-                  occupantId && overlayPresentation.isDark ? 'text-white' : 'text-slate-950';
-                const weeklyTextClass =
-                  occupantId && overlayPresentation.isDark ? 'text-white/88' : 'text-slate-600';
+                  occupantId && overlayPresentation.isDark ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]' : 'text-slate-950';
 
                 return (
                   <div
@@ -1641,13 +1638,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     ) : occupantId ? (
                       <div
                         className={cn(
-                          'flex h-full w-full flex-col items-center justify-center px-1 text-center',
-                          compact ? 'gap-0.5 pt-2' : 'gap-1.5 px-1.5'
+                          'flex h-full w-full flex-col items-center justify-center text-center',
+                          compact ? 'px-1 pt-2' : 'px-1.5'
                         )}
                       >
                         <span
                           className={cn(
-                            'w-full font-black tracking-tight whitespace-normal break-keep',
+                            'w-full font-black tracking-tight whitespace-normal break-keep text-center',
                             nameTextClass,
                             compact
                               ? 'text-[10px] leading-[1.12] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
@@ -1656,17 +1653,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         >
                           {occupantName}
                         </span>
-                        {!isEditMode && (
-                          <span
-                            className={cn(
-                              'w-full font-black tracking-tight',
-                              weeklyTextClass,
-                              compact ? 'text-[6px] leading-none' : 'text-[8px] leading-none'
-                            )}
-                          >
-                            {weeklyStudyLabel}
-                          </span>
-                        )}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center">
