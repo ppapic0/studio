@@ -3455,11 +3455,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             <span className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} aria-hidden="true" />
                           )}
                         </div>
-                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1 px-0.5" : "bottom-3 px-3")}>
+                        <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1 px-0.5" : "bottom-2 px-2")}>
                           <div
                             className={cn(
-                              "rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
-                              isMobile ? "px-1.5 py-1" : "px-3 py-2.5",
+                              "overflow-hidden rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
+                              isMobile ? "px-1.5 py-1" : "px-2.5 py-2",
                               getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                             )}
                           >
@@ -3468,11 +3468,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 {timeLabel}
                               </span>
                             ) : (
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
                                   공부시간
                                 </span>
-                                <span className="dashboard-number tabular-nums text-[1.08rem] leading-none tracking-[-0.05em]">
+                                <span className="dashboard-number ml-auto shrink-0 tabular-nums text-[1rem] leading-none tracking-[-0.05em]">
                                   {timeLabel}
                                 </span>
                               </div>
