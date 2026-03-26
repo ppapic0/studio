@@ -65,7 +65,7 @@ export default function KioskPage() {
 
   const triggerAttendanceSms = async (
     studentId: string,
-    eventType: 'check_in' | 'check_out'
+    eventType: 'study_start' | 'away_start' | 'study_end'
   ) => {
     if (!functions || !centerId || !canTriggerAttendanceSms) return;
 
@@ -336,10 +336,12 @@ export default function KioskPage() {
         type: kakaoType
       });
 
-      if (nextStatus === 'studying') {
-        void triggerAttendanceSms(student.id, 'check_in');
+      if (nextStatus === 'studying' && prevStatus === 'absent') {
+        void triggerAttendanceSms(student.id, 'study_start');
+      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+        void triggerAttendanceSms(student.id, 'away_start');
       } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
-        void triggerAttendanceSms(student.id, 'check_out');
+        void triggerAttendanceSms(student.id, 'study_end');
       }
 
       const statusLabels: Record<AttendanceCurrent['status'], string> = {

@@ -20,7 +20,13 @@ type InviteDoc = {
   expiresAt?: admin.firestore.Timestamp;
 };
 
-type AttendanceSmsEventType = "check_in" | "check_out" | "late_alert";
+type AttendanceSmsEventType =
+  | "study_start"
+  | "away_start"
+  | "study_end"
+  | "late_alert"
+  | "check_in"
+  | "check_out";
 type SmsProviderType = "none" | "aligo" | "custom";
 
 type NotificationSettingsDoc = {
@@ -32,7 +38,12 @@ type NotificationSettingsDoc = {
   smsEndpointUrl?: string;
   smsTemplateCheckIn?: string;
   smsTemplateCheckOut?: string;
+  smsTemplateStudyStart?: string;
+  smsTemplateAwayStart?: string;
+  smsTemplateStudyEnd?: string;
   smsTemplateLateAlert?: string;
+  smsApiKeyConfigured?: boolean;
+  smsApiKeyLastUpdatedAt?: admin.firestore.Timestamp;
   lateAlertEnabled?: boolean;
   lateAlertGraceMinutes?: number;
   defaultArrivalTime?: string;
@@ -44,9 +55,12 @@ type SmsRecipient = {
   phoneNumber: string;
 };
 
-const DEFAULT_SMS_TEMPLATES: Record<AttendanceSmsEventType, string> = {
-  check_in: "{studentName}학생이 {time}에 등원했습니다.",
-  check_out: "{studentName}학생이 {time}에 하원했습니다.",
+const SMS_BYTE_LIMIT = 90;
+
+const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "study_end" | "late_alert", string> = {
+  study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
+  away_start: "[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.",
+  study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
   late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
 };
 
@@ -383,6 +397,79 @@ function applyTemplate(template: string, values: Record<string, string>): string
   }, template);
 }
 
+function normalizeSmsEventType(eventType: AttendanceSmsEventType): "study_start" | "away_start" | "study_end" | "late_alert" {
+  if (eventType === "check_in") return "study_start";
+  if (eventType === "check_out") return "study_end";
+  return eventType;
+}
+
+function calculateSmsBytes(message: string): number {
+  return Array.from(message || "").reduce((sum, char) => {
+    const code = char.charCodeAt(0);
+    return sum + (code <= 0x007f ? 1 : 2);
+  }, 0);
+}
+
+function trimSmsToByteLimit(message: string, limit = SMS_BYTE_LIMIT): string {
+  let result = "";
+  for (const char of Array.from(message || "")) {
+    const candidate = result + char;
+    if (calculateSmsBytes(candidate) > limit) break;
+    result = candidate;
+  }
+  return result.trim();
+}
+
+function sanitizeSmsTemplate(template: string): string {
+  return String(template || "")
+    .replace(/[^\u0020-\u007E\u00A0-\u00FF\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function loadCenterName(
+  db: admin.firestore.Firestore,
+  centerId: string
+): Promise<string> {
+  try {
+    const centerSnap = await db.doc(`centers/${centerId}`).get();
+    const name = centerSnap.data()?.name;
+    return typeof name === "string" && name.trim().length > 0 ? name.trim() : "센터";
+  } catch {
+    return "센터";
+  }
+}
+
+function resolveTemplateByEvent(
+  settings: NotificationSettingsDoc,
+  eventType: "study_start" | "away_start" | "study_end" | "late_alert"
+): string {
+  if (eventType === "study_start") {
+    return settings.smsTemplateStudyStart || settings.smsTemplateCheckIn || DEFAULT_SMS_TEMPLATES.study_start;
+  }
+  if (eventType === "study_end") {
+    return settings.smsTemplateStudyEnd || settings.smsTemplateCheckOut || DEFAULT_SMS_TEMPLATES.study_end;
+  }
+  if (eventType === "away_start") {
+    return settings.smsTemplateAwayStart || DEFAULT_SMS_TEMPLATES.away_start;
+  }
+  return settings.smsTemplateLateAlert || DEFAULT_SMS_TEMPLATES.late_alert;
+}
+
+function buildSmsDedupeKey(params: {
+  centerId: string;
+  studentId: string;
+  eventType: "study_start" | "away_start" | "study_end" | "late_alert";
+  eventAt: Date;
+}): string {
+  const dateKey = toDateKey(params.eventAt);
+  const minuteKey = `${String(params.eventAt.getHours()).padStart(2, "0")}${String(params.eventAt.getMinutes()).padStart(2, "0")}`;
+  if (params.eventType === "study_start" || params.eventType === "study_end" || params.eventType === "late_alert") {
+    return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}`;
+  }
+  return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}_${minuteKey}`;
+}
+
 async function loadNotificationSettings(
   db: admin.firestore.Firestore,
   centerId: string
@@ -390,6 +477,20 @@ async function loadNotificationSettings(
   const settingsSnap = await db.doc(`centers/${centerId}/settings/notifications`).get();
   if (!settingsSnap.exists) return {};
   return (settingsSnap.data() || {}) as NotificationSettingsDoc;
+}
+
+function validateSmsTemplateLength(template: string, fieldLabel: string) {
+  const sanitized = sanitizeSmsTemplate(template);
+  if (!sanitized) return "";
+  const bytes = calculateSmsBytes(sanitized);
+  if (bytes > SMS_BYTE_LIMIT) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `${fieldLabel} exceeds ${SMS_BYTE_LIMIT} bytes.`,
+      { userMessage: `${fieldLabel} 문구가 90byte를 넘었습니다.` }
+    );
+  }
+  return sanitized;
 }
 
 async function collectParentRecipients(
@@ -447,33 +548,52 @@ async function queueParentSmsNotification(
     centerId,
     studentId,
     studentName,
-    eventType,
+    eventType: rawEventType,
     eventAt,
     expectedTime,
   } = params;
+  const eventType = normalizeSmsEventType(rawEventType);
   const settings = params.settings || await loadNotificationSettings(db, centerId);
   const recipients = await collectParentRecipients(db, centerId, studentId);
   if (recipients.length === 0) {
     return { queuedCount: 0, recipientCount: 0, message: "" };
   }
-
-  const template = (() => {
-    if (eventType === "check_in") return settings.smsTemplateCheckIn || DEFAULT_SMS_TEMPLATES.check_in;
-    if (eventType === "check_out") return settings.smsTemplateCheckOut || DEFAULT_SMS_TEMPLATES.check_out;
-    return settings.smsTemplateLateAlert || DEFAULT_SMS_TEMPLATES.late_alert;
-  })();
+  const centerName = await loadCenterName(db, centerId);
+  const template = resolveTemplateByEvent(settings, eventType);
 
   const eventTimeLabel = toTimeLabel(eventAt);
   const expectedTimeLabel = expectedTime || settings.defaultArrivalTime || "정해진 시간";
-  const message = applyTemplate(template, {
+  const message = trimSmsToByteLimit(applyTemplate(template, {
     studentName,
     time: eventTimeLabel,
     expectedTime: expectedTimeLabel,
+    centerName,
+  }));
+  const messageBytes = calculateSmsBytes(message);
+  const dedupeKey = buildSmsDedupeKey({
+    centerId,
+    studentId,
+    eventType,
+    eventAt,
   });
+  const dedupeRef = db.doc(`centers/${centerId}/smsDedupes/${dedupeKey}`);
+  const dedupeSnap = await dedupeRef.get();
+  if (dedupeSnap.exists) {
+    return { queuedCount: 0, recipientCount: recipients.length, message };
+  }
 
   const provider = settings.smsProvider || "none";
   const ts = admin.firestore.Timestamp.now();
   const batch = db.batch();
+  batch.set(dedupeRef, {
+    centerId,
+    studentId,
+    eventType,
+    dedupeKey,
+    createdAt: ts,
+    renderedMessage: message,
+    messageBytes,
+  }, { merge: true });
 
   recipients.forEach((recipient) => {
     const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
@@ -487,12 +607,17 @@ async function queueParentSmsNotification(
       sender: settings.smsSender || null,
       endpointUrl: settings.smsEndpointUrl || null,
       message,
+      renderedMessage: message,
+      messageBytes,
+      dedupeKey,
       eventType,
       status: settings.smsEnabled === false || provider === "none" ? "pending_provider" : "queued",
+      providerStatus: settings.smsEnabled === false || provider === "none" ? "pending_provider" : "queued",
       createdAt: ts,
       updatedAt: ts,
       metadata: {
         studentName,
+        centerName,
         expectedTime: expectedTime || null,
       },
     });
@@ -503,14 +628,16 @@ async function queueParentSmsNotification(
       studentId,
       parentUid: recipient.parentUid,
       type: eventType,
-      title: eventType === "check_in"
-        ? "등원 알림"
-        : eventType === "check_out"
-          ? "하원 알림"
-          : "지각 알림",
+      title: eventType === "study_start"
+        ? "공부 시작 알림"
+        : eventType === "study_end"
+          ? "공부 종료 알림"
+          : eventType === "away_start"
+            ? "외출 알림"
+            : "지각 알림",
       body: message,
       isRead: false,
-      isImportant: eventType !== "check_in",
+      isImportant: eventType !== "study_start",
       createdAt: ts,
       updatedAt: ts,
     });
@@ -524,6 +651,9 @@ async function queueParentSmsNotification(
     provider,
     recipientCount: recipients.length,
     message,
+    renderedMessage: message,
+    messageBytes,
+    dedupeKey,
     createdAt: ts,
     updatedAt: ts,
   });
@@ -2483,6 +2613,74 @@ export const confirmInvoicePayment = functions.region(region).https.onCall(async
   };
 });
 
+export const saveNotificationSettingsSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = String(data?.centerId || "").trim();
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId is required.");
+  }
+
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
+  if (!isAdminRole(callerRole)) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 저장할 수 있습니다.");
+  }
+
+  const payload = {
+    smsEnabled: data?.smsEnabled !== false,
+    smsProvider: (["none", "aligo", "custom"].includes(String(data?.smsProvider || "")) ? String(data?.smsProvider) : "none") as SmsProviderType,
+    smsSender: asTrimmedString(data?.smsSender),
+    smsUserId: asTrimmedString(data?.smsUserId),
+    smsEndpointUrl: asTrimmedString(data?.smsEndpointUrl),
+    smsTemplateStudyStart: validateSmsTemplateLength(
+      String(data?.smsTemplateStudyStart || ""),
+      "공부 시작 템플릿"
+    ) || DEFAULT_SMS_TEMPLATES.study_start,
+    smsTemplateAwayStart: validateSmsTemplateLength(
+      String(data?.smsTemplateAwayStart || ""),
+      "외출 템플릿"
+    ) || DEFAULT_SMS_TEMPLATES.away_start,
+    smsTemplateStudyEnd: validateSmsTemplateLength(
+      String(data?.smsTemplateStudyEnd || ""),
+      "공부 종료 템플릿"
+    ) || DEFAULT_SMS_TEMPLATES.study_end,
+    smsTemplateLateAlert: validateSmsTemplateLength(
+      String(data?.smsTemplateLateAlert || ""),
+      "지각 템플릿"
+    ) || DEFAULT_SMS_TEMPLATES.late_alert,
+    lateAlertEnabled: data?.lateAlertEnabled !== false,
+    lateAlertGraceMinutes: Number.isFinite(Number(data?.lateAlertGraceMinutes))
+      ? Math.max(0, Number(data?.lateAlertGraceMinutes))
+      : 20,
+    defaultArrivalTime: asTrimmedString(data?.defaultArrivalTime, "17:00"),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedBy: context.auth.uid,
+  } as Record<string, unknown>;
+
+  const rawApiKey = asTrimmedString(data?.smsApiKey);
+  if (rawApiKey) {
+    payload.smsApiKey = rawApiKey;
+    payload.smsApiKeyConfigured = true;
+    payload.smsApiKeyLastUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+  } else if (data?.clearSmsApiKey === true) {
+    payload.smsApiKey = admin.firestore.FieldValue.delete();
+    payload.smsApiKeyConfigured = false;
+    payload.smsApiKeyLastUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  await db.doc(`centers/${centerId}/settings/notifications`).set(payload, { merge: true });
+
+  return {
+    ok: true,
+    smsApiKeyConfigured: rawApiKey.length > 0 ? true : data?.clearSmsApiKey === true ? false : undefined,
+  };
+});
+
 export const notifyAttendanceSms = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
 
@@ -2500,7 +2698,7 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
     });
   }
 
-  if (!(["check_in", "check_out", "late_alert"] as AttendanceSmsEventType[]).includes(eventType)) {
+  if (!(["study_start", "away_start", "study_end", "late_alert", "check_in", "check_out"] as AttendanceSmsEventType[]).includes(eventType)) {
     throw new functions.https.HttpsError("invalid-argument", "Invalid event type.", {
       userMessage: "알림 타입이 올바르지 않습니다.",
     });

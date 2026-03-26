@@ -368,7 +368,12 @@ export interface NotificationSettings {
   smsEndpointUrl?: string;
   smsTemplateCheckIn?: string;
   smsTemplateCheckOut?: string;
+  smsTemplateStudyStart?: string;
+  smsTemplateAwayStart?: string;
+  smsTemplateStudyEnd?: string;
   smsTemplateLateAlert?: string;
+  smsApiKeyConfigured?: boolean;
+  smsApiKeyLastUpdatedAt?: Timestamp;
   lateAlertEnabled?: boolean;
   lateAlertGraceMinutes?: number;
   defaultArrivalTime?: string;
