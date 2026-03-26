@@ -518,77 +518,93 @@
     animation: fade-up-pop 0.5s cubic-bezier(0.2, 0.9, 0.2, 1);
   }
 
-  .track-motion-shell {
+  .track-pace-shell {
     position: relative;
     overflow: hidden;
-    background:
-      radial-gradient(circle at top right, rgba(255, 216, 132, 0.24), transparent 26%),
-      linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%);
   }
 
-  .track-motion-shell::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(135deg, rgba(255,255,255,0.08), transparent 38%),
-      linear-gradient(0deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
-    pointer-events: none;
-  }
-
-  .track-motion-vehicle {
+  .track-pace-vehicle {
     transform-origin: center;
-    animation: track-motion-float 2.2s ease-in-out infinite;
   }
 
-  .track-motion-vehicle--walk {
-    animation-duration: 2.8s;
+  .track-pace-lane {
+    opacity: 0.72;
   }
 
-  .track-motion-vehicle--run {
-    animation-duration: 1.4s;
+  .track-pace-dash {
+    stroke-dasharray: 14 12;
+    animation: track-pace-lane-flow 2s linear infinite;
   }
 
-  .track-motion-vehicle--bike {
-    animation-duration: 2s;
+  .track-pace-spark,
+  .track-pace-node-glow {
+    animation: track-pace-glow 1.8s ease-in-out infinite;
   }
 
-  .track-motion-vehicle--car {
-    animation-name: track-motion-drive;
-    animation-duration: 2.6s;
+  .track-pace-vehicle--walk,
+  .track-pace-vehicle--run,
+  .track-pace-vehicle--bike,
+  .track-pace-vehicle--car,
+  .track-pace-vehicle--plane {
+    animation: track-pace-hover 1.8s ease-in-out infinite;
   }
 
-  .track-motion-vehicle--plane {
-    animation-name: track-motion-fly;
-    animation-duration: 3.2s;
+  .track-pace-vehicle--walk .track-pace-limb-a,
+  .track-pace-vehicle--walk .track-pace-limb-d {
+    transform-origin: 18px 26px;
+    animation: track-pace-walk 1.2s ease-in-out infinite;
   }
 
-  .track-motion-limb-a,
-  .track-motion-limb-b {
+  .track-pace-vehicle--walk .track-pace-limb-b,
+  .track-pace-vehicle--walk .track-pace-limb-c {
+    transform-origin: 18px 28px;
+    animation: track-pace-walk 1.2s ease-in-out infinite reverse;
+  }
+
+  .track-pace-vehicle--run {
+    animation-duration: 0.88s;
+  }
+
+  .track-pace-vehicle--run .track-pace-limb-a,
+  .track-pace-vehicle--run .track-pace-limb-d {
+    transform-origin: 18px 28px;
+    animation: track-pace-run 0.68s ease-in-out infinite;
+  }
+
+  .track-pace-vehicle--run .track-pace-limb-b,
+  .track-pace-vehicle--run .track-pace-limb-c {
+    transform-origin: 16px 32px;
+    animation: track-pace-run 0.68s ease-in-out infinite reverse;
+  }
+
+  .track-pace-wheel {
     transform-origin: center;
-    animation: track-motion-swing 1s ease-in-out infinite;
+    animation: track-pace-wheel-spin 0.95s linear infinite;
   }
 
-  .track-motion-limb-b {
-    animation-direction: reverse;
+  .track-pace-vehicle--bike {
+    animation-duration: 1.3s;
   }
 
-  .track-motion-wheel {
-    transform-origin: center;
-    animation: track-motion-wheel-spin 1s linear infinite;
+  .track-pace-vehicle--car {
+    animation-duration: 1.5s;
   }
 
-  .track-motion-path {
-    stroke-dasharray: 10 10;
-    animation: track-motion-path 1.3s linear infinite;
+  .track-pace-streak {
+    animation: track-pace-streak 1.05s ease-out infinite;
   }
 
-  .track-motion-trail {
-    animation: track-motion-trail 1.4s ease-in-out infinite;
+  .track-pace-streak.delay-1,
+  .track-pace-contrail.delay-1 {
+    animation-delay: 0.25s;
   }
 
-  .track-motion-spark {
-    animation: track-motion-spark 1.5s ease-in-out infinite;
+  .track-pace-vehicle--plane {
+    animation: track-pace-plane 2.2s ease-in-out infinite;
+  }
+
+  .track-pace-contrail {
+    animation: track-pace-contrail 1.8s ease-in-out infinite;
   }
 
   @keyframes analysis-sheen {
@@ -1569,88 +1585,103 @@
   }
 }
 
-@keyframes track-motion-float {
+@keyframes track-pace-hover {
   0%,
   100% {
-    transform: translate3d(0, 0, 0);
+    transform: translateY(0);
   }
   50% {
-    transform: translate3d(0, -3px, 0);
+    transform: translateY(-2.5px);
   }
 }
 
-@keyframes track-motion-drive {
+@keyframes track-pace-walk {
   0%,
   100% {
-    transform: translate3d(0, 0, 0);
-  }
-  35% {
-    transform: translate3d(2px, -1px, 0);
-  }
-  70% {
-    transform: translate3d(-1px, 0, 0);
-  }
-}
-
-@keyframes track-motion-fly {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(-2deg);
+    transform: rotate(12deg);
   }
   50% {
-    transform: translate3d(4px, -4px, 0) rotate(1deg);
+    transform: rotate(-12deg);
   }
 }
 
-@keyframes track-motion-swing {
-  0%,
-  100% {
-    transform: rotate(18deg);
+@keyframes track-pace-run {
+  0% {
+    transform: rotate(24deg);
   }
   50% {
-    transform: rotate(-18deg);
+    transform: rotate(-24deg);
+  }
+  100% {
+    transform: rotate(24deg);
   }
 }
 
-@keyframes track-motion-wheel-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes track-motion-path {
+@keyframes track-pace-lane-flow {
   0% {
     stroke-dashoffset: 0;
   }
   100% {
-    stroke-dashoffset: -40;
+    stroke-dashoffset: -52;
   }
 }
 
-@keyframes track-motion-trail {
+@keyframes track-pace-glow {
   0%,
   100% {
-    opacity: 0.24;
-    transform: translate3d(0, 0, 0) scaleX(0.92);
+    opacity: 0.42;
+    transform: translate3d(0, 0, 0) scale(0.96);
   }
   50% {
-    opacity: 0.85;
-    transform: translate3d(-6px, 0, 0) scaleX(1.06);
+    opacity: 1;
+    transform: translate3d(0, -1px, 0) scale(1.08);
   }
 }
 
-@keyframes track-motion-spark {
+@keyframes track-pace-wheel-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes track-pace-streak {
+  0% {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+  30% {
+    opacity: 0.52;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+@keyframes track-pace-plane {
   0%,
   100% {
-    opacity: 0.3;
-    transform: translate3d(0, 0, 0) scale(0.92);
+    transform: translate3d(0, 1px, 0) rotate(-3deg);
   }
   50% {
-    opacity: 0.95;
-    transform: translate3d(-3px, -4px, 0) scale(1.08);
+    transform: translate3d(0, -4px, 0) rotate(2deg);
+  }
+}
+
+@keyframes track-pace-contrail {
+  0% {
+    opacity: 0.12;
+    transform: translateX(2px);
+  }
+  50% {
+    opacity: 0.46;
+  }
+  100% {
+    opacity: 0.12;
+    transform: translateX(-6px);
   }
 }
 
@@ -1732,73 +1763,6 @@
   42% {
     opacity: 0.82;
     transform: translate3d(0, -4px, 0) scale(1.16);
-  }
-}
-
-@keyframes hero-headline-burst-in {
-  0% {
-    opacity: 0;
-    filter: blur(18px);
-    transform:
-      translate3d(var(--hero-from-x, 0px), var(--hero-from-y, 22px), 0)
-      scale(var(--hero-from-scale, 0.9))
-      rotate(var(--hero-from-rotate, 0deg));
-  }
-  42% {
-    opacity: 1;
-  }
-  68% {
-    filter: blur(0);
-    transform:
-      translate3d(calc(var(--hero-from-x, 0px) * -0.14), calc(var(--hero-from-y, 22px) * -0.14), 0)
-      scale(1.03)
-      rotate(calc(var(--hero-from-rotate, 0deg) * -0.18));
-  }
-  100% {
-    opacity: 1;
-    filter: blur(0);
-    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-  }
-}
-
-@keyframes hero-headline-flare {
-  0% {
-    opacity: 0;
-    transform: scale(0.68);
-  }
-  34% {
-    opacity: 0.84;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.34);
-  }
-}
-
-@keyframes hero-headline-aura {
-  0% {
-    opacity: 0;
-    transform: scale(0.82);
-  }
-  38% {
-    opacity: 0.42;
-  }
-  100% {
-    opacity: 0.16;
-    transform: scale(1);
-  }
-}
-
-@keyframes hero-copy-enter {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 18px, 0);
-    filter: blur(8px);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-    filter: blur(0);
   }
 }
 
@@ -2215,68 +2179,6 @@
   will-change: transform, opacity;
 }
 
-.hero-headline-shell {
-  isolation: isolate;
-}
-
-.hero-headline-aura {
-  opacity: 0;
-  animation: hero-headline-aura 1.05s cubic-bezier(0.2, 0.88, 0.24, 1) 0.12s forwards;
-  will-change: transform, opacity;
-}
-
-.hero-headline-token {
-  display: inline-block;
-  opacity: 0;
-  filter: blur(18px);
-  text-shadow: 0 0 24px rgba(255, 255, 255, 0.08);
-  animation: hero-headline-burst-in 0.98s cubic-bezier(0.16, 0.92, 0.24, 1) forwards;
-  animation-delay: calc(var(--hero-line-delay, 0s) + var(--hero-token-delay, 0s));
-  will-change: transform, opacity, filter;
-}
-
-.hero-headline-token-highlight {
-  position: relative;
-  text-shadow:
-    0 0 18px rgba(255, 122, 22, 0.16),
-    0 0 34px rgba(255, 166, 92, 0.12);
-}
-
-.hero-headline-token-highlight::after {
-  content: "";
-  position: absolute;
-  inset: -0.16em -0.12em;
-  z-index: -1;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(255,122,22,0.42) 0%, rgba(255,184,122,0.14) 34%, transparent 72%);
-  opacity: 0;
-  filter: blur(18px);
-  animation: hero-headline-flare 0.82s ease-out forwards;
-  animation-delay: calc(var(--hero-line-delay, 0s) + var(--hero-token-delay, 0s) + 0.08s);
-  pointer-events: none;
-}
-
-.hero-copy-enter,
-.hero-cta-enter,
-.hero-meta-enter {
-  opacity: 0;
-  filter: blur(8px);
-  animation: hero-copy-enter 0.62s cubic-bezier(0.2, 0.88, 0.24, 1) forwards;
-  will-change: transform, opacity, filter;
-}
-
-.hero-copy-enter {
-  animation-delay: 0.42s;
-}
-
-.hero-cta-enter {
-  animation-delay: var(--hero-cta-delay, 0.52s);
-}
-
-.hero-meta-enter {
-  animation-delay: var(--hero-meta-delay, 0.62s);
-}
-
 .brand-glow-drift {
   animation: brand-glow-drift 9.6s ease-in-out infinite;
   will-change: transform, opacity;
@@ -2680,12 +2582,6 @@
   .hero-firework,
   .hero-firework-core,
   .hero-particle-twinkle,
-  .hero-headline-aura,
-  .hero-headline-token,
-  .hero-headline-token-highlight::after,
-  .hero-copy-enter,
-  .hero-cta-enter,
-  .hero-meta-enter,
   .brand-glow-drift,
   .brand-pulse-dot,
   .brand-cta-float,
@@ -2713,13 +2609,17 @@
   .student-route-enter,
   .student-shell-glow,
   .student-hero-enter,
-  .track-motion-vehicle,
-  .track-motion-limb-a,
-  .track-motion-limb-b,
-  .track-motion-wheel,
-  .track-motion-path,
-  .track-motion-trail,
-  .track-motion-spark,
+  .track-pace-dash,
+  .track-pace-spark,
+  .track-pace-node-glow,
+  .track-pace-vehicle,
+  .track-pace-limb-a,
+  .track-pace-limb-b,
+  .track-pace-limb-c,
+  .track-pace-limb-d,
+  .track-pace-wheel,
+  .track-pace-streak,
+  .track-pace-contrail,
   .dashboard-premium-overlay[data-state="open"],
   .dashboard-premium-overlay[data-state="closed"],
   .dashboard-premium-dialog[data-state="open"],
@@ -2747,16 +2647,6 @@
   .brand-chart-draw {
     animation: none !important;
     stroke-dashoffset: 0 !important;
-  }
-
-  .hero-headline-aura,
-  .hero-headline-token,
-  .hero-copy-enter,
-  .hero-cta-enter,
-  .hero-meta-enter {
-    opacity: 1 !important;
-    filter: none !important;
-    transform: none !important;
   }
 
   .brand-bar-rise,

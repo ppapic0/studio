@@ -260,189 +260,163 @@ function shouldShowDailyCheckInToast(centerId: string, userId: string, dateKey: 
   }
 }
 
-type TrackTravelMode = 'walk' | 'run' | 'bike' | 'car' | 'plane';
-
-function getTrackTravelState(totalMinutes: number): {
-  mode: TrackTravelMode;
-  badge: string;
-  title: string;
-  hint: string;
-  rangeLabel: string;
-} {
-  if (totalMinutes < 60) {
+function getTrackPaceMeta(totalMinutes: number) {
+  if (totalMinutes >= 240) {
     return {
-      mode: 'walk',
-      badge: '워밍업 트랙',
-      title: '걷는 페이스로 리듬을 만들고 있어요',
-      hint: '0~1시간 구간',
-      rangeLabel: 'WALK',
-    };
+      mode: 'plane',
+      eyebrow: '플라이트 페이스',
+      title: '비행기처럼 높은 고도로 올라가고 있어요',
+      badge: 'FLY',
+      window: '4시간+ 구간',
+    } as const;
   }
-
-  if (totalMinutes < 120) {
-    return {
-      mode: 'run',
-      badge: '질주 페이스',
-      title: '뛰는 템포로 공부가 붙고 있어요',
-      hint: '1~2시간 구간',
-      rangeLabel: 'RUN',
-    };
-  }
-
-  if (totalMinutes < 180) {
-    return {
-      mode: 'bike',
-      badge: '라이딩 모드',
-      title: '자전거처럼 안정적으로 속도를 올리고 있어요',
-      hint: '2~3시간 구간',
-      rangeLabel: 'BIKE',
-    };
-  }
-
-  if (totalMinutes < 240) {
+  if (totalMinutes >= 180) {
     return {
       mode: 'car',
-      badge: '드라이브 모드',
-      title: '자동차처럼 몰입 구간을 밀고 가고 있어요',
-      hint: '3~4시간 구간',
-      rangeLabel: 'DRIVE',
-    };
+      eyebrow: '드라이브 페이스',
+      title: '자동차처럼 안정된 속도로 밀고 있어요',
+      badge: 'DRIVE',
+      window: '3~4시간 구간',
+    } as const;
   }
-
+  if (totalMinutes >= 120) {
+    return {
+      mode: 'bike',
+      eyebrow: '라이드 페이스',
+      title: '자전거처럼 리듬을 타며 전진하고 있어요',
+      badge: 'RIDE',
+      window: '2~3시간 구간',
+    } as const;
+  }
+  if (totalMinutes >= 60) {
+    return {
+      mode: 'run',
+      eyebrow: '러닝 페이스',
+      title: '뛰는 흐름으로 공부가 붙고 있어요',
+      badge: 'RUN',
+      window: '1~2시간 구간',
+    } as const;
+  }
   return {
-    mode: 'plane',
-    badge: '순항 모드',
-    title: '비행기처럼 높게 치고 올라가고 있어요',
-    hint: '4시간 이상 구간',
-    rangeLabel: 'FLY',
-  };
+    mode: 'walk',
+    eyebrow: '워밍업 트랙',
+    title: '걷는 페이스로 리듬을 만들고 있어요',
+    badge: 'WALK',
+    window: '0~1시간 구간',
+  } as const;
 }
 
 function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean; totalMinutes: number }) {
-  const travelState = getTrackTravelState(totalMinutes);
-  const vehicleTransform =
-    travelState.mode === 'walk'
-      ? 'translate(26 34)'
-      : travelState.mode === 'run'
-        ? 'translate(42 28)'
-        : travelState.mode === 'bike'
-          ? 'translate(34 24)'
-          : travelState.mode === 'car'
-            ? 'translate(34 24)'
-            : 'translate(28 18)';
+  const pace = getTrackPaceMeta(totalMinutes);
+
+  const vehicle = (() => {
+    switch (pace.mode) {
+      case 'walk':
+        return (
+          <g className="track-pace-vehicle track-pace-vehicle--walk" transform="translate(64 40)">
+            <circle cx="18" cy="10" r="7.5" fill="#FFE0BC" />
+            <path d="M18 20L18 40" stroke="#FFF9F3" strokeWidth="5.5" strokeLinecap="round" />
+            <path className="track-pace-limb-a" d="M18 26L31 34" stroke="#FFE0BC" strokeWidth="5" strokeLinecap="round" />
+            <path className="track-pace-limb-b" d="M18 28L7 36" stroke="#FFE0BC" strokeWidth="5" strokeLinecap="round" />
+            <path className="track-pace-limb-c" d="M18 40L29 54" stroke="#FFBF77" strokeWidth="5.5" strokeLinecap="round" />
+            <path className="track-pace-limb-d" d="M18 40L8 53" stroke="#FFBF77" strokeWidth="5.5" strokeLinecap="round" />
+          </g>
+        );
+      case 'run':
+        return (
+          <g className="track-pace-vehicle track-pace-vehicle--run" transform="translate(62 36)">
+            <circle cx="18" cy="10" r="7.5" fill="#FFE0BC" />
+            <path d="M16 20L24 34L16 46" stroke="#FFF9F3" strokeWidth="5.8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M24 34L37 28" stroke="#FFF9F3" strokeWidth="5.4" strokeLinecap="round" />
+            <path className="track-pace-limb-a" d="M24 34L36 41" stroke="#FFE0BC" strokeWidth="4.8" strokeLinecap="round" />
+            <path className="track-pace-limb-b" d="M18 28L6 34" stroke="#FFE0BC" strokeWidth="4.8" strokeLinecap="round" />
+            <path className="track-pace-limb-c" d="M16 46L31 58" stroke="#FFBF77" strokeWidth="5.4" strokeLinecap="round" />
+            <path className="track-pace-limb-d" d="M16 46L5 59" stroke="#FFBF77" strokeWidth="5.4" strokeLinecap="round" />
+          </g>
+        );
+      case 'bike':
+        return (
+          <g className="track-pace-vehicle track-pace-vehicle--bike" transform="translate(56 44)">
+            <circle className="track-pace-wheel" cx="16" cy="26" r="10.5" stroke="#DDEBFF" strokeWidth="4.2" fill="rgba(255,255,255,0.12)" />
+            <circle className="track-pace-wheel" cx="50" cy="26" r="10.5" stroke="#DDEBFF" strokeWidth="4.2" fill="rgba(255,255,255,0.12)" />
+            <path d="M16 26L29 12L40 26L29 26L22 18" stroke="#FFF9F3" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M40 26L50 26L56 12" stroke="#FFF9F3" strokeWidth="4.5" strokeLinecap="round" />
+            <circle cx="33" cy="6" r="6.5" fill="#FFE0BC" />
+            <path d="M32 12L39 20L29 27" stroke="#FFE0BC" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+        );
+      case 'car':
+        return (
+          <g className="track-pace-vehicle track-pace-vehicle--car" transform="translate(54 46)">
+            <path className="track-pace-streak" d="M-8 26H12" stroke="rgba(255,255,255,0.3)" strokeWidth="3.5" strokeLinecap="round" />
+            <path className="track-pace-streak delay-1" d="M-14 20H2" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M14 10H42L54 20V34H8V20L14 10Z" fill="#FFF9F3" />
+            <path d="M18 14H39L47 22H14L18 14Z" fill="#BFD3FF" />
+            <circle cx="18" cy="35" r="6.5" fill="#233B74" />
+            <circle cx="44" cy="35" r="6.5" fill="#233B74" />
+            <circle cx="18" cy="35" r="3" fill="#ECF3FF" />
+            <circle cx="44" cy="35" r="3" fill="#ECF3FF" />
+          </g>
+        );
+      case 'plane':
+        return (
+          <g className="track-pace-vehicle track-pace-vehicle--plane" transform="translate(54 24)">
+            <path className="track-pace-contrail" d="M0 38C18 40 32 38 46 30" stroke="rgba(255,255,255,0.32)" strokeWidth="3.5" strokeLinecap="round" />
+            <path className="track-pace-contrail delay-1" d="M8 46C24 48 38 46 52 38" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M16 38L46 26L68 16L78 20L58 31L78 34L74 42L54 37L40 48L30 46L40 35L16 38Z" fill="#FFF9F3" />
+            <path d="M49 24L57 14L66 16L60 26" fill="#FFD26C" />
+          </g>
+        );
+      default:
+        return null;
+    }
+  })();
 
   return (
     <div
       aria-hidden="true"
       className={cn(
-        "track-motion-shell rounded-[1.5rem] border border-white/15 bg-white/12 backdrop-blur-md",
+        "track-pace-shell rounded-[1.5rem] border border-white/15 bg-white/12 backdrop-blur-md",
         isMobile ? "w-full p-3" : "min-w-[210px] p-4"
       )}
+      data-pace={pace.mode}
     >
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/65">{travelState.badge}</p>
-          <p className={cn("font-black tracking-tight text-white", isMobile ? "text-sm" : "text-base")}>{travelState.title}</p>
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/65">{pace.eyebrow}</p>
+          <p className={cn("font-black tracking-tight text-white break-keep", isMobile ? "text-sm leading-5" : "text-base leading-6")}>{pace.title}</p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className="track-motion-spark mt-1 h-2.5 w-2.5 rounded-full bg-[#FFD26C] shadow-[0_0_0_6px_rgba(255,210,108,0.18)]" />
-          <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[8px] font-black uppercase tracking-[0.22em] text-white/75">
-            {travelState.rangeLabel}
-          </span>
-        </div>
+        <div className="track-pace-spark mt-1 h-2.5 w-2.5 rounded-full bg-[#FFD26C] shadow-[0_0_0_6px_rgba(255,210,108,0.18)]" />
       </div>
       <svg
-        viewBox="0 0 180 112"
+        viewBox="0 0 220 120"
         className={cn("w-full", isMobile ? "h-[74px]" : "h-[90px]")}
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient id="trackMotionLane" x1="16" y1="92" x2="164" y2="40" gradientUnits="userSpaceOnUse">
-            <stop stopColor="rgba(255,255,255,0.28)" />
-            <stop offset="1" stopColor="rgba(255,255,255,0.12)" />
-          </linearGradient>
-          <linearGradient id="trackMotionMark" x1="0" y1="0" x2="1" y2="0">
-            <stop stopColor="#FFD26C" />
-            <stop offset="1" stopColor="#FFF2D3" />
+          <linearGradient id="trackPaceGlow" x1="22" y1="82" x2="198" y2="54" gradientUnits="userSpaceOnUse">
+            <stop stopColor="rgba(255,255,255,0.2)" />
+            <stop offset="0.48" stopColor="rgba(255,255,255,0.8)" />
+            <stop offset="1" stopColor="rgba(255,210,108,0.9)" />
           </linearGradient>
         </defs>
-
-        <path d="M18 90C30 78 46 70 70 69H132C148 69 160 58 163 44" stroke="rgba(255,255,255,0.15)" strokeWidth="18" strokeLinecap="round" />
-        <path d="M18 90C30 78 46 70 70 69H132C148 69 160 58 163 44" stroke="url(#trackMotionLane)" strokeWidth="14" strokeLinecap="round" />
-        <path className="track-motion-path" d="M18 90C30 78 46 70 70 69H132C148 69 160 58 163 44" stroke="rgba(255,255,255,0.42)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="8 8" />
-        <path d="M104 64H132" stroke="rgba(255,255,255,0.18)" strokeWidth="4" strokeLinecap="round" />
-        <path d="M82 64H96" stroke="rgba(255,255,255,0.18)" strokeWidth="4" strokeLinecap="round" />
-        <path d="M28 84L40 74" stroke="rgba(255,255,255,0.18)" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="20" cy="90" r="4.5" fill="#FFF3DE" />
-        <circle cx="162" cy="44" r="5.5" fill="url(#trackMotionMark)" />
-
-        <g className={cn("track-motion-vehicle", `track-motion-vehicle--${travelState.mode}`)} transform={vehicleTransform}>
-          {travelState.mode === 'walk' && (
-            <>
-              <circle cx="22" cy="10" r="7.5" fill="#FFD7AE" />
-              <path d="M22 18L24 34L33 47" stroke="#FFF8F0" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M24 25L13 33" stroke="#FFD7AE" strokeWidth="5" strokeLinecap="round" />
-              <path className="track-motion-limb-a" d="M26 26L38 22" stroke="#FFD7AE" strokeWidth="5" strokeLinecap="round" />
-              <path className="track-motion-limb-b" d="M24 34L14 48" stroke="#FFB870" strokeWidth="5.5" strokeLinecap="round" />
-              <path className="track-motion-limb-a" d="M26 34L37 48" stroke="#FFB870" strokeWidth="5.5" strokeLinecap="round" />
-              <path d="M8 48H42" stroke="rgba(255,255,255,0.16)" strokeWidth="2.5" strokeLinecap="round" />
-            </>
-          )}
-
-          {travelState.mode === 'run' && (
-            <>
-              <circle cx="20" cy="12" r="9" fill="#FFD7AE" />
-              <path d="M20 22L28 40L18 54L36 72" stroke="#F8FAFF" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M28 40L44 34" stroke="#F8FAFF" strokeWidth="7" strokeLinecap="round" />
-              <path className="track-motion-limb-a" d="M26 34L44 38" stroke="#FFD7AE" strokeWidth="6" strokeLinecap="round" />
-              <path className="track-motion-limb-b" d="M24 30L8 38" stroke="#FFD7AE" strokeWidth="6" strokeLinecap="round" />
-              <path className="track-motion-limb-a" d="M18 54L38 72" stroke="#FFB870" strokeWidth="7" strokeLinecap="round" />
-              <path className="track-motion-limb-b" d="M18 54L4 72" stroke="#FFB870" strokeWidth="7" strokeLinecap="round" />
-            </>
-          )}
-
-          {travelState.mode === 'bike' && (
-            <>
-              <circle className="track-motion-wheel" cx="16" cy="56" r="11" stroke="#EAF3FF" strokeWidth="5" />
-              <circle className="track-motion-wheel" cx="54" cy="56" r="11" stroke="#EAF3FF" strokeWidth="5" />
-              <path d="M16 56L30 38L41 56H16Z" stroke="#FFF8F0" strokeWidth="4.5" strokeLinejoin="round" />
-              <path d="M30 38L52 34L54 56" stroke="#FFF8F0" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M30 38L26 28" stroke="#FFF8F0" strokeWidth="4.5" strokeLinecap="round" />
-              <circle cx="28" cy="18" r="7" fill="#FFD7AE" />
-              <path d="M28 25L36 35L45 39" stroke="#FFD7AE" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M34 33L20 43" stroke="#FFD7AE" strokeWidth="5.5" strokeLinecap="round" />
-              <path d="M35 34L38 53" stroke="#FFB870" strokeWidth="5.5" strokeLinecap="round" />
-              <path d="M28 34L21 53" stroke="#FFB870" strokeWidth="5.5" strokeLinecap="round" />
-            </>
-          )}
-
-          {travelState.mode === 'car' && (
-            <>
-              <path d="M10 42H48L58 54V67H6V54L10 42Z" fill="#FFF8F0" />
-              <path d="M18 34H42L48 42H12L18 34Z" fill="#FFD7AE" />
-              <rect x="18" y="44" width="26" height="10" rx="4" fill="#A5D4FF" />
-              <circle className="track-motion-wheel" cx="18" cy="67" r="7" fill="#16325C" />
-              <circle className="track-motion-wheel" cx="46" cy="67" r="7" fill="#16325C" />
-              <circle cx="18" cy="67" r="3" fill="#EAF3FF" />
-              <circle cx="46" cy="67" r="3" fill="#EAF3FF" />
-              <path className="track-motion-trail" d="M68 44H82" stroke="rgba(255,255,255,0.35)" strokeWidth="4" strokeLinecap="round" />
-              <path className="track-motion-trail" d="M72 56H90" stroke="rgba(255,255,255,0.25)" strokeWidth="3" strokeLinecap="round" />
-            </>
-          )}
-
-          {travelState.mode === 'plane' && (
-            <>
-              <path d="M8 52L60 34L66 40L36 55L66 58L72 64L38 64L22 78L16 76L24 64L8 62V52Z" fill="#FFF8F0" />
-              <path d="M44 46L53 28L60 30L54 48" fill="#FFD7AE" />
-              <path d="M44 60L57 76L49 76L39 64" fill="#FFD7AE" />
-              <path className="track-motion-trail" d="M78 48H96" stroke="rgba(255,255,255,0.35)" strokeWidth="4" strokeLinecap="round" />
-              <path className="track-motion-trail" d="M84 60H108" stroke="rgba(255,255,255,0.22)" strokeWidth="3" strokeLinecap="round" />
-            </>
-          )}
-        </g>
+        <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="rgba(255,255,255,0.16)" strokeWidth="12" strokeLinecap="round" />
+        <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="rgba(255,255,255,0.28)" strokeWidth="2.6" strokeLinecap="round" className="track-pace-lane" />
+        <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="url(#trackPaceGlow)" strokeWidth="3.4" strokeLinecap="round" className="track-pace-dash" />
+        <circle cx="18" cy="88" r="5" fill="#FFF5EA" opacity="0.72" />
+        <circle cx="78" cy="77" r="3.5" fill="#FFF5EA" opacity="0.45" />
+        <circle cx="136" cy="52" r="3.5" fill="#FFF5EA" opacity="0.45" />
+        <circle cx="198" cy="63" r="5.5" fill="#FFD26C" />
+        <circle cx="198" cy="63" r="11" fill="#FFD26C" opacity="0.18" className="track-pace-node-glow" />
+        {vehicle}
       </svg>
-      <p className="mt-2 text-[10px] font-bold text-white/60">{travelState.hint}</p>
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/72">{pace.window}</span>
+        <span className="rounded-full border border-white/22 bg-white/12 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white/88">
+          {pace.badge}
+        </span>
+      </div>
     </div>
   );
 }
@@ -2337,26 +2311,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <Link href="/dashboard/student-reports" className="block touch-manipulation">
               <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
                 <CardContent className={cn("p-4", !isMobile && "p-5")}>
-                  <div className={cn("flex justify-between gap-2", isMobile ? "items-start flex-wrap" : "items-center")}>
-                    <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
                         <FileText className="h-3.5 w-3.5" />
                       </div>
-                      <span className={cn(
-                        "font-black uppercase tracking-widest text-primary break-keep leading-tight",
-                        isMobile ? "text-[9px]" : "text-[10px]"
-                      )}>
-                        놓치면 아쉬운 것
-                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary">놓치면 아쉬운 것</span>
                     </div>
-                    <Badge
-                      className={cn(
-                        "shrink-0 border-none bg-[#FF7A16] font-black text-white",
-                        isMobile ? "h-5 px-2 text-[8px]" : "h-5 px-2 text-[9px]"
-                      )}
-                    >
-                      리포트
-                    </Badge>
+                    <Badge className="h-5 border-none bg-[#FF7A16] px-2 text-[9px] font-black text-white">리포트</Badge>
                   </div>
                   <div className="mt-3 min-w-0">
                     <p className="text-sm font-black leading-6 text-slate-900 break-keep line-clamp-2">{latestUnreadReport.dateKey} 코칭 도착</p>
@@ -2620,7 +2582,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <FileText className="h-6 w-6 text-primary" />
                   </div>
                   <div className="grid min-w-0">
-                    <div className={cn("flex items-center gap-2 min-w-0", isMobile && "flex-wrap")}>
+                    <div className="flex items-center gap-2">
                       <span className="font-black tracking-tighter text-sm break-keep">선생님 리포트</span>
                       {unreadReportCount > 0 && (
                         <Badge className="bg-[#FF7A16] text-white border-none font-black text-[8px] h-5 px-2 shrink-0">
@@ -2721,7 +2683,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <FileText className="h-8 w-8" />
               </div>
               <div className="grid text-left min-w-0">
-                <div className="flex min-w-0 items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <span className="font-black tracking-tighter text-xl break-keep">선생님 리포트</span>
                   {unreadReportCount > 0 && (
                     <Badge className="bg-[#FF7A16] text-white border-none font-black text-[9px] h-5 px-2 shrink-0">
