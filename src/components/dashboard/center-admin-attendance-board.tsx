@@ -116,7 +116,6 @@ export function CenterAdminAttendanceBoard({
                 };
                 const isAisle = seat.type === 'aisle';
                 const isFilteredOut = selectedClass !== 'all' && member?.className !== selectedClass;
-                const visibleFlags = (signal?.flags || []).slice(0, compact || isMobile ? 1 : 2);
                 const displayName =
                   signal?.studentName ||
                   student?.name ||
@@ -162,97 +161,33 @@ export function CenterAdminAttendanceBoard({
                       <div
                         className={cn(
                           'flex h-full w-full flex-col text-center',
-                          isNameOnly
-                            ? compact
-                              ? 'items-center justify-center px-1 pb-1 pt-3'
-                              : 'items-center justify-center px-1.5 py-1'
-                            : compact
-                              ? 'justify-between px-0.5 pb-0.5 pt-3'
-                              : 'items-center justify-center gap-1 px-0.5'
+                          compact
+                            ? 'items-center justify-center px-1 pb-1 pt-3'
+                            : isNameOnly
+                              ? 'items-center justify-center px-1.5 py-1'
+                              : 'items-center justify-center gap-1 px-1.5 py-1'
                         )}
                       >
                         <span
                           className={cn(
                             'w-full text-center font-black tracking-tight whitespace-normal break-keep',
-                            isNameOnly
-                              ? compact
-                                ? 'line-clamp-2 text-[10px] leading-[1.15] text-slate-950'
-                                : 'line-clamp-2 text-[11px] leading-[1.2] text-slate-950'
-                              : compact
-                                ? 'min-h-[18px] text-[9px] leading-[1.08]'
-                                : 'truncate leading-none text-[10px]'
+                            compact
+                              ? 'line-clamp-2 text-[10px] leading-[1.12] text-slate-950'
+                              : isNameOnly
+                                ? 'line-clamp-2 text-[11px] leading-[1.2] text-slate-950'
+                                : 'line-clamp-2 text-[11px] leading-[1.15] text-slate-950'
                           )}
                         >
                           {displayName}
                         </span>
-                        {isNameOnly && (
-                          <span
-                            className={cn(
-                              'inline-flex items-center justify-center rounded-full border border-black/5 bg-white/78 px-1.5 py-0.5 font-black tracking-tight text-slate-700 shadow-sm',
-                              compact ? 'mt-1 text-[7px] leading-none' : 'mt-1.5 text-[8px] leading-none'
-                            )}
-                          >
-                            공부 {studyTimeLabel}
-                          </span>
-                        )}
-                        {!isNameOnly && (
-                          <span
-                            className={cn(
-                              'inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 font-black shadow-sm',
-                              compact ? 'text-[5px]' : 'text-[7px]',
-                              resolvedPresentation.chipClass
-                            )}
-                          >
-                            {resolvedPresentation.chipLabel}
-                          </span>
-                        )}
-                        {!isNameOnly && !compact && (
-                          <span
-                            className={cn(
-                              'font-black opacity-80',
-                              compact ? 'text-[5px]' : 'text-[7px]'
-                            )}
-                          >
-                            공부 {signal?.todayStudyLabel || '확인중'}
-                          </span>
-                        )}
-                        {!isNameOnly && !compact && visibleFlags.length > 0 && (
-                          <div className="flex flex-wrap items-center justify-center gap-1">
-                            {visibleFlags.map((flag) => (
-                              <span
-                                key={`${seat.id}_${flag}`}
-                                className={cn(
-                                  'inline-flex items-center rounded-full px-1 py-0.5 font-black shadow-sm',
-                                  compact ? 'text-[4px]' : 'text-[5px]',
-                                  resolvedPresentation.flagClass
-                                )}
-                              >
-                                {flag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {!isNameOnly && compact && (
-                          <div className="flex min-h-[10px] items-center justify-center gap-1">
-                            {visibleFlags.length > 0 ? (
-                              visibleFlags.map((flag) => (
-                                <span
-                                  key={`${seat.id}_${flag}`}
-                                  className={cn(
-                                    'inline-flex items-center rounded-full px-1 py-0.5 font-black text-[4px] shadow-sm',
-                                    resolvedPresentation.flagClass
-                                  )}
-                                >
-                                  {flag}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-[5px] font-black opacity-80">
-                                {signal?.todayStudyLabel || '확인중'}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        <span
+                          className={cn(
+                            'inline-flex items-center justify-center rounded-full border border-black/5 bg-white/80 font-black tracking-tight text-slate-700 shadow-sm',
+                            compact ? 'mt-1 px-1.5 py-0.5 text-[7px] leading-none' : 'mt-1.5 px-2 py-0.5 text-[8px] leading-none'
+                          )}
+                        >
+                          공부 {studyTimeLabel}
+                        </span>
                       </div>
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
@@ -294,7 +229,7 @@ export function CenterAdminAttendanceBoard({
                 )}
               </div>
               <p className="text-xs font-bold text-muted-foreground">
-                루틴 기반 출석 여부, 최근 7일 출결 주의, 외출 중 복귀 여부를 좌석 기준으로 바로 확인합니다.
+                좌석 색으로 출석 현황을 보고, 좌석 안에서는 학생 이름과 현재 공부시간을 바로 확인합니다.
               </p>
             </div>
             <Button asChild variant="outline" className="h-10 rounded-xl border-2 font-black">
