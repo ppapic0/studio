@@ -227,6 +227,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [roomDrafts, setRoomDrafts] = useState<Record<string, { rows: number; cols: number }>>({});
   const [seatOverlayMode, setSeatOverlayMode] = useState<CenterAdminSeatOverlayMode>('composite');
   const [selectedSeatInsightKey, setSelectedSeatInsightKey] = useState<CenterAdminSeatDomainKey | null>(null);
+  const [activeStudentModalTab, setActiveStudentModalTab] = useState<'status' | 'history' | 'penalty' | 'reports'>('status');
 
   useEffect(() => {
     setMounted(true);
@@ -234,6 +235,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setActiveStudentModalTab('status');
+  }, [selectedSeat?.id, isManaging]);
 
   const centerId = activeMembership?.id;
   const {
@@ -2271,10 +2276,42 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   mode: 'composite',
                   status: selectedSeat.status,
                 });
+                const activeStudentTabCopy =
+                  activeStudentModalTab === 'history'
+                    ? {
+                        label: '학습 히스토리',
+                        accent: 'text-emerald-100',
+                        border: 'border-emerald-200/25',
+                        bg: 'bg-emerald-400/10',
+                        description: '최근 학습 변화와 일별 시간을 이 화면에서 바로 확인합니다.',
+                      }
+                    : activeStudentModalTab === 'penalty'
+                      ? {
+                          label: '벌점 관리',
+                          accent: 'text-rose-100',
+                          border: 'border-rose-200/25',
+                          bg: 'bg-rose-400/10',
+                          description: '벌점 현황과 기록, 조치 입력을 메인 영역에서 바로 관리합니다.',
+                        }
+                      : activeStudentModalTab === 'reports'
+                        ? {
+                            label: '리포트 내역',
+                            accent: 'text-amber-100',
+                            border: 'border-amber-200/25',
+                            bg: 'bg-amber-400/10',
+                            description: '발송된 리포트 목록과 상세를 아래 스크롤 없이 먼저 보이게 정리합니다.',
+                          }
+                        : null;
 
                 return (
                   <>
-                    <div className={cn("relative shrink-0 p-6 text-white sm:p-7 lg:p-8", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
+                    <div
+                      className={cn(
+                        "relative shrink-0 text-white",
+                        activeStudentModalTab === 'status' ? "p-6 sm:p-7 lg:p-8" : "p-5 sm:p-6",
+                        selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary"
+                      )}
+                    >
                       <div className="absolute top-0 right-0 p-6 opacity-10 rotate-12 sm:p-8"><Sparkles className="h-20 w-20 sm:h-24 sm:w-24 lg:h-28 lg:w-28" /></div>
                       <DialogHeader className="relative z-10">
                         <DialogTitle className="text-2xl font-black tracking-tighter sm:text-3xl lg:text-[2rem]">{studentsById.get(selectedSeat.studentId || '')?.name || '학생'}</DialogTitle>
@@ -2284,139 +2321,176 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           {selectedSeat.seatZone && <Badge className="bg-white text-primary border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.seatZone}</Badge>}
                         </div>
                         {selectedSeat.studentId && (
-                          <div className="mt-4 grid gap-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60">실시간 세션</p>
-                                <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.session}</p>
-                              </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 누적</p>
-                                <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.total}</p>
-                              </div>
-                            </div>
-
-                            {selectedAttendanceSignal && (
-                              <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4">
-                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 판정</p>
-                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.boardLabel}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">루틴 예정</p>
-                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.routineExpectedArrivalTime || '미설정'}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 공부</p>
-                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.todayStudyLabel}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">최근 7일</p>
-                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.attendanceRiskLabel}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">복귀/퇴실</p>
-                                    <p className="mt-2 text-sm font-black text-white">
-                                      {selectedAttendanceSignal.isReturned
-                                        ? '복귀'
-                                        : selectedAttendanceSignal.isCheckedOut
-                                          ? '퇴실'
-                                          : selectedAttendanceSignal.seatStatus === 'away' || selectedAttendanceSignal.seatStatus === 'break'
-                                            ? '외출 중'
-                                            : '-'}
-                                    </p>
-                                  </div>
+                          activeStudentModalTab === 'status' ? (
+                            <div className="mt-4 grid gap-3">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-white/60">실시간 세션</p>
+                                  <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.session}</p>
                                 </div>
-                                <p className="mt-3 text-xs font-bold leading-relaxed text-white/90">
-                                  {selectedAttendanceSignal.note}
-                                </p>
+                                <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 누적</p>
+                                  <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.total}</p>
+                                </div>
                               </div>
-                            )}
 
-                            {selectedSeatSignal && (
-                              <>
+                              {selectedAttendanceSignal && (
                                 <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <Badge className={cn("border-none font-black", selectedSeatPresentation.chipClass)}>
-                                      {selectedSeatSignal.primaryChip}
-                                    </Badge>
-                                    {selectedSeatSignal.secondaryFlags.map((flag) => (
-                                      <Badge key={`${selectedSeat.id}_${flag}`} className={cn("border-none font-black", selectedSeatPresentation.flagClass)}>
-                                        {flag}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                  <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
-                                    {selectedSeatSignal.topReason}
-                                  </p>
-                                </div>
-
-                                <div className="space-y-3">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-[11px] font-bold text-white/70">
-                                      점수를 누르면 왜 이 점수가 나왔는지와 바로 할 대응을 AI 기준으로 짧게 보여줍니다.
-                                    </p>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/50">
-                                      점수 선택
-                                    </p>
-                                  </div>
-
                                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                                    {selectedSeatDomainSummary.map((domain) => {
-                                      const isActive = domain.key === selectedSeatInsightKey;
-                                      return (
-                                        <button
-                                          key={domain.key}
-                                          type="button"
-                                          onClick={() => setSelectedSeatInsightKey(domain.key)}
-                                          className={cn(
-                                            "rounded-2xl border px-3 py-3 text-center transition-all",
-                                            isActive
-                                              ? "border-white bg-white/20 shadow-lg shadow-black/10"
-                                              : "border-white/10 bg-white/10 hover:bg-white/15"
-                                          )}
-                                        >
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-white/60">{domain.label}</p>
-                                          <Badge className={cn("mt-2 border-none font-black", domain.badgeClass)}>
-                                            {domain.score}
-                                          </Badge>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {selectedSeatDomainInsight && (
-                                    <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/20 p-4">
-                                      <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-white/60">AI 분석</p>
-                                          <p className="mt-1 text-sm font-black text-white">
-                                            {selectedSeatDomainInsight.label} {selectedSeatDomainInsight.score}점
-                                          </p>
-                                        </div>
-                                        <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
-                                          {selectedSeatDomainInsight.score}
-                                        </Badge>
-                                      </div>
-                                      <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
-                                        {selectedSeatDomainInsight.analysis}
-                                      </p>
-                                      <p className="mt-2 text-xs font-bold leading-relaxed text-white/75">
-                                        대응: {selectedSeatDomainInsight.action}
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 판정</p>
+                                      <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.boardLabel}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-white/60">루틴 예정</p>
+                                      <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.routineExpectedArrivalTime || '미설정'}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 공부</p>
+                                      <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.todayStudyLabel}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-white/60">최근 7일</p>
+                                      <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.attendanceRiskLabel}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-white/60">복귀/퇴실</p>
+                                      <p className="mt-2 text-sm font-black text-white">
+                                        {selectedAttendanceSignal.isReturned
+                                          ? '복귀'
+                                          : selectedAttendanceSignal.isCheckedOut
+                                            ? '퇴실'
+                                            : selectedAttendanceSignal.seatStatus === 'away' || selectedAttendanceSignal.seatStatus === 'break'
+                                              ? '외출 중'
+                                              : '-'}
                                       </p>
                                     </div>
-                                  )}
+                                  </div>
+                                  <p className="mt-3 text-xs font-bold leading-relaxed text-white/90">
+                                    {selectedAttendanceSignal.note}
+                                  </p>
                                 </div>
-                              </>
-                            )}
-                          </div>
+                              )}
+
+                              {selectedSeatSignal && (
+                                <>
+                                  <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Badge className={cn("border-none font-black", selectedSeatPresentation.chipClass)}>
+                                        {selectedSeatSignal.primaryChip}
+                                      </Badge>
+                                      {selectedSeatSignal.secondaryFlags.map((flag) => (
+                                        <Badge key={`${selectedSeat.id}_${flag}`} className={cn("border-none font-black", selectedSeatPresentation.flagClass)}>
+                                          {flag}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                    <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
+                                      {selectedSeatSignal.topReason}
+                                    </p>
+                                  </div>
+
+                                  <div className="space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <p className="text-[11px] font-bold text-white/70">
+                                        점수를 누르면 왜 이 점수가 나왔는지와 바로 할 대응을 AI 기준으로 짧게 보여줍니다.
+                                      </p>
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-white/50">
+                                        점수 선택
+                                      </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                      {selectedSeatDomainSummary.map((domain) => {
+                                        const isActive = domain.key === selectedSeatInsightKey;
+                                        return (
+                                          <button
+                                            key={domain.key}
+                                            type="button"
+                                            onClick={() => setSelectedSeatInsightKey(domain.key)}
+                                            className={cn(
+                                              "rounded-2xl border px-3 py-3 text-center transition-all",
+                                              isActive
+                                                ? "border-white bg-white/20 shadow-lg shadow-black/10"
+                                                : "border-white/10 bg-white/10 hover:bg-white/15"
+                                            )}
+                                          >
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-white/60">{domain.label}</p>
+                                            <Badge className={cn("mt-2 border-none font-black", domain.badgeClass)}>
+                                              {domain.score}
+                                            </Badge>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+
+                                    {selectedSeatDomainInsight && (
+                                      <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/20 p-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                          <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-white/60">AI 분석</p>
+                                            <p className="mt-1 text-sm font-black text-white">
+                                              {selectedSeatDomainInsight.label} {selectedSeatDomainInsight.score}점
+                                            </p>
+                                          </div>
+                                          <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
+                                            {selectedSeatDomainInsight.score}
+                                          </Badge>
+                                        </div>
+                                        <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
+                                          {selectedSeatDomainInsight.analysis}
+                                        </p>
+                                        <p className="mt-2 text-xs font-bold leading-relaxed text-white/75">
+                                          대응: {selectedSeatDomainInsight.action}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <div className={cn("mt-4 rounded-[1.75rem] border p-4", activeStudentTabCopy?.border, activeStudentTabCopy?.bg)}>
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-white/60">
+                                    {activeStudentTabCopy?.label}
+                                  </p>
+                                  <p className="text-sm font-bold leading-relaxed text-white/90">
+                                    {activeStudentTabCopy?.description}
+                                  </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-center">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-white/55">상태</p>
+                                    <p className="mt-1 text-xs font-black text-white">{formatAttendanceStatus(selectedSeat.status)}</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-center">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-white/55">오늘 공부</p>
+                                    <p className="mt-1 text-xs font-black text-white">{timeInfo?.total}</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-center">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-white/55">최근 7일</p>
+                                    <p className="mt-1 text-xs font-black text-white">{selectedAttendanceSignal?.attendanceRiskLabel || '-'}</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-center">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-white/55">좌석</p>
+                                    <p className="mt-1 text-xs font-black text-white">{selectedSeatLabel}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )
                         )}
                       </DialogHeader>
                     </div>
                     
                     <div className="flex min-h-0 flex-1 flex-col bg-[#fafafa]">
-                      <Tabs defaultValue="status" className="flex h-full min-h-0 w-full flex-col">
+                      <Tabs
+                        value={activeStudentModalTab}
+                        onValueChange={(value) => setActiveStudentModalTab(value as 'status' | 'history' | 'penalty' | 'reports')}
+                        className="flex h-full min-h-0 w-full flex-col"
+                      >
                         <TabsList className="h-14 w-full shrink-0 rounded-none border-b bg-muted/20 p-0">
                           <TabsTrigger value="status" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-primary transition-all">실시간 상태</TabsTrigger>
                           <TabsTrigger value="history" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-emerald-500 transition-all">학습 히스토리</TabsTrigger>
