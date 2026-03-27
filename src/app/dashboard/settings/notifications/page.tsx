@@ -130,6 +130,7 @@ type StudentDoc = {
   name?: string;
   className?: string;
   grade?: string;
+  phoneNumber?: string;
   parentUids?: string[];
 };
 
@@ -163,6 +164,8 @@ type RecipientPreferenceRow = {
   phoneNumber: string;
   enabled: boolean;
   eventToggles: Record<ParentSmsEventType, boolean>;
+  isFallbackRecipient?: boolean;
+  isPhoneMissing?: boolean;
 };
 
 const DEFAULT_FORM: Required<Pick<NotificationSettings,
@@ -267,6 +270,10 @@ function formatDateLabel(value?: { toDate?: () => Date }) {
   const date = value?.toDate?.();
   if (!date) return '-';
   return `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatShortDateLabel(date: Date) {
+  return `${date.getMonth() + 1}.${date.getDate()}`;
 }
 
 function maskPhone(value?: string) {
@@ -484,6 +491,53 @@ export default function NotificationSettingsPage() {
     };
   }, [smsDeliveryLogsRaw, smsQueueRaw]);
 
+  const deliveryTrend = useMemo(() => {
+    const today = new Date();
+    const dates = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (6 - index));
+      return date;
+    });
+
+    const countsByDate = new Map<string, { total: number; sent: number; failed: number }>(
+      dates.map((date) => [toDateInputValue(date), { total: 0, sent: 0, failed: 0 }])
+    );
+
+    (smsDeliveryLogsRaw || []).forEach((row) => {
+      const dateKey = row.dateKey || toDateKeyFromValue(row.createdAt);
+      if (!dateKey || !countsByDate.has(dateKey)) return;
+      const bucket = countsByDate.get(dateKey)!;
+      if (row.status === 'suppressed_opt_out') return;
+      bucket.total += 1;
+      if (row.status === 'sent') {
+        bucket.sent += 1;
+      } else if (row.status === 'failed') {
+        bucket.failed += 1;
+      }
+    });
+
+    const data = dates.map((date) => {
+      const dateKey = toDateInputValue(date);
+      const bucket = countsByDate.get(dateKey) || { total: 0, sent: 0, failed: 0 };
+      return {
+        dateKey,
+        label: formatShortDateLabel(date),
+        ...bucket,
+      };
+    });
+
+    const maxTotal = Math.max(1, ...data.map((item) => item.total));
+    const totalSent = data.reduce((sum, item) => sum + item.sent, 0);
+    const totalFailed = data.reduce((sum, item) => sum + item.failed, 0);
+
+    return {
+      data,
+      maxTotal,
+      totalSent,
+      totalFailed,
+    };
+  }, [smsDeliveryLogsRaw]);
+
   const recipientRows = useMemo(() => {
     const keyword = recipientSearchTerm.trim().toLowerCase();
     return (studentsRaw || [])
@@ -507,26 +561,28 @@ export default function NotificationSettingsPage() {
             phoneNumber: pref?.phoneNumber || member?.phoneNumber || '',
             enabled: pref?.enabled !== false,
             eventToggles: mergeEventToggles(pref?.eventToggles),
+            isFallbackRecipient: false,
+            isPhoneMissing: !(pref?.phoneNumber || member?.phoneNumber),
           } satisfies RecipientPreferenceRow;
-        }).filter((row) => row.phoneNumber);
+        });
 
         const fallbackPref = preferencesByKey.get(`${student.id}_${STUDENT_SMS_FALLBACK_UID}`);
         const fallbackMember = membersById.get(student.id);
-        const fallbackPhone = fallbackPref?.phoneNumber || fallbackMember?.phoneNumber || '';
-        const resolvedRows = parentRows.length > 0
+        const fallbackPhone = fallbackPref?.phoneNumber || fallbackMember?.phoneNumber || student.phoneNumber || '';
+        const resolvedRows = parentRows.some((row) => row.phoneNumber)
           ? parentRows
-          : fallbackPhone
-            ? [{
-                studentId: student.id,
-                studentName: student.name || '학생',
-                className: student.className || student.grade || '-',
-                parentUid: STUDENT_SMS_FALLBACK_UID,
-                parentName: fallbackPref?.parentName || '학생 본인',
-                phoneNumber: fallbackPhone,
-                enabled: fallbackPref?.enabled !== false,
-                eventToggles: mergeEventToggles(fallbackPref?.eventToggles),
-              } satisfies RecipientPreferenceRow]
-            : [];
+          : [{
+              studentId: student.id,
+              studentName: student.name || '학생',
+              className: student.className || student.grade || '-',
+              parentUid: STUDENT_SMS_FALLBACK_UID,
+              parentName: fallbackPref?.parentName || '학생 본인',
+              phoneNumber: fallbackPhone,
+              enabled: fallbackPref?.enabled !== false,
+              eventToggles: mergeEventToggles(fallbackPref?.eventToggles),
+              isFallbackRecipient: true,
+              isPhoneMissing: !fallbackPhone,
+            } satisfies RecipientPreferenceRow];
 
         return {
           studentId: student.id,
@@ -535,7 +591,6 @@ export default function NotificationSettingsPage() {
           parentRows: resolvedRows,
         };
       })
-      .filter((student) => student.parentRows.length > 0)
       .filter((student) => {
         if (!keyword) return true;
         const haystack = [
@@ -801,11 +856,37 @@ export default function NotificationSettingsPage() {
               </div>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">연동 키 상태</p>
-              <div className="mt-3">
-                <Badge className={cn('border-none font-black', settingsDoc?.smsApiKeyConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
-                  {settingsDoc?.smsApiKeyConfigured ? '등록됨' : '미등록'}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">일별 문자 발송 추이</p>
+                  <p className="mt-1 text-sm font-black text-slate-900">최근 7일 {deliveryTrend.totalSent + deliveryTrend.totalFailed}건</p>
+                </div>
+                <Badge className="border-none bg-slate-100 text-slate-700 font-black">
+                  성공 {deliveryTrend.totalSent} · 실패 {deliveryTrend.totalFailed}
                 </Badge>
+              </div>
+              <div className="mt-4 grid grid-cols-7 gap-2">
+                {deliveryTrend.data.map((item) => {
+                  const height = Math.max(8, Math.round((item.total / deliveryTrend.maxTotal) * 64));
+                  const toneClass =
+                    item.failed > 0
+                      ? 'bg-amber-400'
+                      : item.sent > 0
+                        ? 'bg-emerald-500'
+                        : 'bg-slate-200';
+                  return (
+                    <div key={item.dateKey} className="flex flex-col items-center gap-2">
+                      <div className="flex h-16 w-full items-end justify-center rounded-lg bg-slate-50 px-1 py-1">
+                        <div
+                          className={cn('w-full rounded-md transition-all', toneClass)}
+                          style={{ height: `${height}px` }}
+                          title={`${item.label} · 총 ${item.total}건 · 성공 ${item.sent}건 · 실패 ${item.failed}건`}
+                        />
+                      </div>
+                      <p className="text-[10px] font-black text-slate-500">{item.label}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -954,7 +1035,10 @@ export default function NotificationSettingsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-base font-black text-slate-900">{student.studentName}</p>
-                      <p className="text-xs font-bold text-slate-500">{student.className} · 연결 수신자 {student.parentRows.length}명</p>
+                      <p className="text-xs font-bold text-slate-500">
+                        {student.className} · 연결 수신자 {student.parentRows.length}명
+                        {student.parentRows.every((row) => row.isFallbackRecipient) ? ' · 학생번호 대체수신' : ''}
+                      </p>
                     </div>
                     <Badge className="border-none bg-slate-100 text-slate-700 font-black">수신 제어</Badge>
                   </div>
@@ -966,19 +1050,27 @@ export default function NotificationSettingsPage() {
                       <div key={actionKey} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-black text-slate-900">{row.parentName}</p>
-                            <p className="text-xs font-bold text-slate-500">{maskPhone(row.phoneNumber)}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-black text-slate-900">{row.parentName}</p>
+                              {row.isFallbackRecipient ? (
+                                <Badge className="border-none bg-sky-100 text-sky-700 font-black">대체 수신</Badge>
+                              ) : null}
+                              {row.isPhoneMissing ? (
+                                <Badge className="border-none bg-amber-100 text-amber-700 font-black">번호 미등록</Badge>
+                              ) : null}
+                            </div>
+                            <p className="text-xs font-bold text-slate-500">{row.phoneNumber ? maskPhone(row.phoneNumber) : '학생 번호를 먼저 등록해 주세요.'}</p>
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="text-xs font-bold text-slate-500">전체 수신</span>
-                            <Switch checked={row.enabled} disabled={preferenceActionKey === actionKey} onCheckedChange={(checked) => void handleUpdateRecipientPreference(row, checked, row.eventToggles)} />
+                            <Switch checked={row.enabled} disabled={preferenceActionKey === actionKey || row.isPhoneMissing} onCheckedChange={(checked) => void handleUpdateRecipientPreference(row, checked, row.eventToggles)} />
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {RECIPIENT_EVENT_OPTIONS.map((eventItem) => {
                             const enabled = row.eventToggles[eventItem.value] !== false;
                             return (
-                              <Button key={eventItem.value} type="button" variant="outline" className={cn('h-8 rounded-full px-3 text-xs font-black', enabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500')} disabled={preferenceActionKey === actionKey} onClick={() => void handleUpdateRecipientPreference(row, row.enabled, { ...row.eventToggles, [eventItem.value]: !enabled })}>
+                              <Button key={eventItem.value} type="button" variant="outline" className={cn('h-8 rounded-full px-3 text-xs font-black', enabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500')} disabled={preferenceActionKey === actionKey || row.isPhoneMissing} onClick={() => void handleUpdateRecipientPreference(row, row.enabled, { ...row.eventToggles, [eventItem.value]: !enabled })}>
                                 {preferenceActionKey === actionKey ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
                                 {eventItem.label}
                               </Button>
