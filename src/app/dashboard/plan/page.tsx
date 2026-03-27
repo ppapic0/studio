@@ -53,7 +53,6 @@ import {
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
-  BarChart3,
   BookOpen,
   AlertCircle,
   XCircle,
@@ -1255,47 +1254,6 @@ export default function StudyPlanPage() {
           </CardContent>
         </Card>
       )}
-
-      <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03] group hover:shadow-2xl transition-all duration-500", isMobile ? "rounded-[1.5rem]" : "")}>
-        <div className={cn("h-1.5 w-full bg-gradient-to-r opacity-30", currentTier.gradient)} />
-        <CardHeader className={cn(isMobile ? "p-4 pb-1" : "p-8 pb-4")}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="bg-primary/5 p-1.5 rounded-lg"><BarChart3 className={cn("text-primary", isMobile ? "h-4 w-4" : "h-5 w-5")} /></div>
-              <CardTitle className={cn("font-black uppercase tracking-widest text-primary/60", isMobile ? "text-[8px]" : "text-sm")}>학습 균형 매트릭스</CardTitle>
-            </div>
-            {isToday && <Badge variant="outline" className="text-[8px] font-black border-dashed">오늘 계획 잠금</Badge>}
-          </div>
-        </CardHeader>
-        <CardContent className={cn(isMobile ? "p-4 pt-1" : "p-8 pt-2")}>
-          <div className={cn("flex flex-col", isMobile ? "gap-4" : "gap-8")}>
-            <div className="flex items-baseline gap-2">
-              <span className={cn("font-black tracking-tighter drop-shadow-sm text-primary", isMobile ? "text-3xl" : "text-6xl")}>
-                {Math.floor(studyTimeSummary.total / 60)}<span className={cn("opacity-40 ml-0.5", isMobile ? "text-xs" : "text-xl")}>시간</span> {studyTimeSummary.total % 60}<span className={cn("opacity-40 ml-0.5", isMobile ? "text-xs" : "text-xl")}>분</span>
-              </span>
-              <span className={cn("font-bold text-muted-foreground uppercase tracking-widest opacity-60", isMobile ? "text-[7px]" : "text-[10px]")}>목표 학습량</span>
-            </div>
-            
-            <div className="flex flex-wrap gap-2 sm:gap-3">
-              {SUBJECTS.map(subj => {
-                const plannedTime = studyTimeSummary.breakdown[subj.id] || 0;
-                if (plannedTime === 0) return null;
-                return (
-                  <div key={subj.id} className={cn("flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all shadow-sm", subj.light, subj.text, "border-transparent")}>
-                    <div className={cn("w-1.5 h-1.5 rounded-full shadow-sm", subj.color)} />
-                    <span className={cn("font-black tracking-tight", isMobile ? "text-[9px]" : "text-[11px]")}>{subj.label} {Math.floor(plannedTime / 60)}시간 {plannedTime % 60}분</span>
-                  </div>
-                );
-              })}
-              {studyTimeSummary.total === 0 && (
-                <div className={cn("py-3 px-4 rounded-xl bg-muted/20 border-2 border-dashed border-muted-foreground/10 flex items-center gap-2 text-muted-foreground/40 italic font-bold w-full", isMobile ? "text-[9px]" : "text-[11px]")}>
-                  <Info className="h-3.5 w-3.5" /> 학습 계획을 추가하여 시간 배분을 분석하세요.
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile && "rounded-[1.5rem]")}>
         <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
