@@ -9,8 +9,8 @@ type MockExamProgramSectionProps = {
 
 const programIcons: Record<string, LucideIcon> = {
   '더프': Target,
-  '더프리미엄': Gauge,
-  '이감 · 한수': BookOpenText,
+  '이감': BookOpenText,
+  '한수': Gauge,
   '시대인재 서바이벌 프로': Crosshair,
 };
 
