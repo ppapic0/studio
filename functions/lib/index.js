@@ -422,7 +422,7 @@ function validateSmsTemplateLength(template, fieldLabel) {
     return sanitized;
 }
 async function collectParentRecipients(db, centerId, studentId) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
     if (!studentSnap.exists)
         return [];
@@ -433,18 +433,23 @@ async function collectParentRecipients(db, centerId, studentId) {
     const recipients = [];
     const usedPhones = new Set();
     for (const parentUid of parentUids) {
-        const [userSnap, memberSnap] = await Promise.all([
+        const [userSnap, memberSnap, userCenterSnap] = await Promise.all([
             db.doc(`users/${parentUid}`).get(),
             db.doc(`centers/${centerId}/members/${parentUid}`).get(),
+            db.doc(`userCenters/${parentUid}/centers/${centerId}`).get(),
         ]);
         const userData = userSnap.exists ? userSnap.data() : null;
         const memberData = memberSnap.exists ? memberSnap.data() : null;
-        const phoneNumber = resolveFirstValidPhoneNumber(userData === null || userData === void 0 ? void 0 : userData.phoneNumber, memberData === null || memberData === void 0 ? void 0 : memberData.phoneNumber);
+        const userCenterData = userCenterSnap.exists ? userCenterSnap.data() : null;
+        const phoneNumber = resolveFirstValidPhoneNumber(userData === null || userData === void 0 ? void 0 : userData.phoneNumber, memberData === null || memberData === void 0 ? void 0 : memberData.phoneNumber, userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.phoneNumber);
         if (!phoneNumber || usedPhones.has(phoneNumber))
             continue;
         recipients.push({
             parentUid,
-            parentName: (memberData === null || memberData === void 0 ? void 0 : memberData.displayName) || (userData === null || userData === void 0 ? void 0 : userData.displayName) || null,
+            parentName: (memberData === null || memberData === void 0 ? void 0 : memberData.displayName) ||
+                (userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.displayName) ||
+                (userData === null || userData === void 0 ? void 0 : userData.displayName) ||
+                null,
             phoneNumber,
         });
         usedPhones.add(phoneNumber);
@@ -452,11 +457,12 @@ async function collectParentRecipients(db, centerId, studentId) {
     if (recipients.length > 0) {
         return recipients;
     }
-    const [studentUserSnap, studentMemberSnap] = await Promise.all([
+    const [studentUserSnap, studentMemberSnap, studentUserCenterSnap] = await Promise.all([
         db.doc(`users/${studentId}`).get(),
         db.doc(`centers/${centerId}/members/${studentId}`).get(),
+        db.doc(`userCenters/${studentId}/centers/${centerId}`).get(),
     ]);
-    const fallbackPhoneNumber = resolveFirstValidPhoneNumber((_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.phoneNumber, (_c = studentUserSnap.data()) === null || _c === void 0 ? void 0 : _c.phoneNumber, (_d = studentMemberSnap.data()) === null || _d === void 0 ? void 0 : _d.phoneNumber);
+    const fallbackPhoneNumber = resolveFirstValidPhoneNumber((_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.phoneNumber, (_c = studentUserSnap.data()) === null || _c === void 0 ? void 0 : _c.phoneNumber, (_d = studentMemberSnap.data()) === null || _d === void 0 ? void 0 : _d.phoneNumber, (_e = studentUserCenterSnap.data()) === null || _e === void 0 ? void 0 : _e.phoneNumber);
     if (fallbackPhoneNumber) {
         recipients.push({
             parentUid: STUDENT_SMS_FALLBACK_UID,

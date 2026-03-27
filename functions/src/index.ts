@@ -689,22 +689,29 @@ async function collectParentRecipients(
   const usedPhones = new Set<string>();
 
   for (const parentUid of parentUids) {
-    const [userSnap, memberSnap] = await Promise.all([
+    const [userSnap, memberSnap, userCenterSnap] = await Promise.all([
       db.doc(`users/${parentUid}`).get(),
       db.doc(`centers/${centerId}/members/${parentUid}`).get(),
+      db.doc(`userCenters/${parentUid}/centers/${centerId}`).get(),
     ]);
 
     const userData = userSnap.exists ? userSnap.data() : null;
     const memberData = memberSnap.exists ? memberSnap.data() : null;
+    const userCenterData = userCenterSnap.exists ? userCenterSnap.data() : null;
     const phoneNumber = resolveFirstValidPhoneNumber(
       userData?.phoneNumber,
-      memberData?.phoneNumber
+      memberData?.phoneNumber,
+      userCenterData?.phoneNumber
     );
     if (!phoneNumber || usedPhones.has(phoneNumber)) continue;
 
     recipients.push({
       parentUid,
-      parentName: (memberData?.displayName as string | null) || (userData?.displayName as string | null) || null,
+      parentName:
+        (memberData?.displayName as string | null) ||
+        (userCenterData?.displayName as string | null) ||
+        (userData?.displayName as string | null) ||
+        null,
       phoneNumber,
     });
     usedPhones.add(phoneNumber);
@@ -714,14 +721,16 @@ async function collectParentRecipients(
     return recipients;
   }
 
-  const [studentUserSnap, studentMemberSnap] = await Promise.all([
+  const [studentUserSnap, studentMemberSnap, studentUserCenterSnap] = await Promise.all([
     db.doc(`users/${studentId}`).get(),
     db.doc(`centers/${centerId}/members/${studentId}`).get(),
+    db.doc(`userCenters/${studentId}/centers/${centerId}`).get(),
   ]);
   const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
     studentSnap.data()?.phoneNumber,
     studentUserSnap.data()?.phoneNumber,
-    studentMemberSnap.data()?.phoneNumber
+    studentMemberSnap.data()?.phoneNumber,
+    studentUserCenterSnap.data()?.phoneNumber
   );
 
   if (fallbackPhoneNumber) {
