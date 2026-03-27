@@ -56,7 +56,7 @@ type ParentSmsEventType =
   | 'late_alert'
   | 'weekly_report';
 
-type SmsConsoleEventType = ParentSmsEventType | 'risk_alert';
+type SmsConsoleEventType = ParentSmsEventType | 'risk_alert' | 'manual_note';
 
 type SmsEventTemplateKey =
   | 'smsTemplateStudyStart'
@@ -177,6 +177,20 @@ type RecipientPreferenceRow = {
   isPhoneMissing?: boolean;
 };
 
+type StudentDialogLogDetailRow = {
+  id: string;
+  type: 'log' | 'queue';
+  parentName: string;
+  phoneNumber: string;
+  message: string;
+  statusLabel: string;
+  statusTone: string;
+  timeLabel: string;
+  errorMessage: string;
+  queueId: string | null;
+  queueStatus: string | null;
+};
+
 type TodayBoardEventType = 'study_start' | 'away_start' | 'away_end' | 'study_end';
 
 type StudentSmsBoardEventSummary = {
@@ -237,6 +251,7 @@ const SMS_EVENTS: Array<{ value: SmsConsoleEventType; label: string }> = [
   { value: 'study_end', label: '공부종료' },
   { value: 'late_alert', label: '지각' },
   { value: 'weekly_report', label: '주간리포트' },
+  { value: 'manual_note', label: '수동 문자' },
   { value: 'risk_alert', label: '리스크 알림' },
 ];
 
@@ -325,6 +340,14 @@ function maskPhone(value?: string) {
 function normalizePhoneNumber(value?: string) {
   const digits = String(value || '').replace(/\D/g, '');
   if ((digits.length === 10 || digits.length === 11) && digits.startsWith('01')) return digits;
+  return '';
+}
+
+function resolveFirstValidPhoneNumber(...values: Array<string | undefined>) {
+  for (const value of values) {
+    const normalized = normalizePhoneNumber(value);
+    if (normalized) return normalized;
+  }
   return '';
 }
 
@@ -442,6 +465,9 @@ export default function NotificationSettingsPage() {
   const [isStudentDialogOpen, setIsStudentDialogOpen] = useState(false);
   const [queueActionKey, setQueueActionKey] = useState<string | null>(null);
   const [preferenceActionKey, setPreferenceActionKey] = useState<string | null>(null);
+  const [recipientPhoneDrafts, setRecipientPhoneDrafts] = useState<Record<string, string>>({});
+  const [manualSmsMessage, setManualSmsMessage] = useState('');
+  const [manualSmsActionKey, setManualSmsActionKey] = useState<string | null>(null);
 
   const settingsRef = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -649,7 +675,10 @@ export default function NotificationSettingsPage() {
         const parentRows = (student.parentUids || []).map((parentUid) => {
           const member = membersById.get(parentUid);
           const pref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, parentUid));
-          const phoneNumber = normalizePhoneNumber(pref?.phoneNumber || member?.phoneNumber || '');
+          const phoneNumber = resolveFirstValidPhoneNumber(
+            pref?.phoneNumber,
+            member?.phoneNumber
+          );
           return {
             studentId: student.id,
             studentName,
@@ -665,8 +694,10 @@ export default function NotificationSettingsPage() {
         const parentRowsWithPhone = parentRows.filter((row) => !row.isPhoneMissing);
         const fallbackPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, STUDENT_SMS_FALLBACK_UID));
         const studentMember = membersById.get(student.id);
-        const fallbackPhoneNumber = normalizePhoneNumber(
-          fallbackPref?.phoneNumber || student.phoneNumber || studentMember?.phoneNumber || ''
+        const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
+          fallbackPref?.phoneNumber,
+          student.phoneNumber,
+          studentMember?.phoneNumber
         );
         const fallbackRow = {
           studentId: student.id,
@@ -852,6 +883,20 @@ export default function NotificationSettingsPage() {
     () => todayBoardRows.find((row) => row.studentId === selectedBoardStudentId) || null,
     [selectedBoardStudentId, todayBoardRows]
   );
+
+  useEffect(() => {
+    if (!selectedBoardStudent) return;
+    setRecipientPhoneDrafts((prev) => {
+      const next = { ...prev };
+      selectedBoardStudent.recipients.forEach((row) => {
+        const key = `${row.studentId}:${row.parentUid}`;
+        if (!(key in next)) {
+          next[key] = row.phoneNumber || '';
+        }
+      });
+      return next;
+    });
+  }, [selectedBoardStudent]);
 
   const filteredRecipientRows = useMemo(() => {
     const keyword = recipientSearchTerm.trim().toLowerCase();
@@ -1043,7 +1088,8 @@ export default function NotificationSettingsPage() {
   const handleUpdateRecipientPreference = async (
     row: RecipientPreferenceRow,
     nextEnabled: boolean,
-    nextEventToggles: Record<ParentSmsEventType, boolean>
+    nextEventToggles: Record<ParentSmsEventType, boolean>,
+    phoneNumberOverride?: string
   ) => {
     if (!functions || !centerId) return;
     const actionKey = `${row.studentId}:${row.parentUid}`;
@@ -1056,6 +1102,7 @@ export default function NotificationSettingsPage() {
         parentUid: row.parentUid,
         enabled: nextEnabled,
         eventToggles: nextEventToggles,
+        phoneNumberOverride: phoneNumberOverride || undefined,
       });
       toast({
         title: '수신 설정 저장 완료',
@@ -1069,6 +1116,87 @@ export default function NotificationSettingsPage() {
       });
     } finally {
       setPreferenceActionKey(null);
+    }
+  };
+
+  const handleSaveRecipientPhone = async (row: RecipientPreferenceRow) => {
+    const actionKey = `${row.studentId}:${row.parentUid}`;
+    const nextPhone = normalizePhoneNumber(recipientPhoneDrafts[actionKey] || '');
+    if (!nextPhone) {
+      toast({
+        variant: 'destructive',
+        title: '번호 확인',
+        description: '휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
+      });
+      return;
+    }
+    await handleUpdateRecipientPreference(row, row.enabled, row.eventToggles, nextPhone);
+  };
+
+  const handleResendStudentEvent = async (studentId: string, eventType: TodayBoardEventType) => {
+    if (!functions || !centerId) return;
+    const actionKey = `resend-${studentId}-${eventType}`;
+    setManualSmsActionKey(actionKey);
+    try {
+      const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
+      await notifyAttendanceSms({ centerId, studentId, eventType });
+      toast({
+        title: '문자 재발송 요청 완료',
+        description: `${getEventLabel(eventType)} 문자를 다시 발송 대기열에 넣었습니다.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '재발송 실패',
+        description: error?.message || '문자 재발송 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setManualSmsActionKey(null);
+    }
+  };
+
+  const handleSendManualSms = async () => {
+    if (!functions || !centerId || !selectedBoardStudent) return;
+    const message = manualSmsMessage.replace(/\s+/g, ' ').trim();
+    if (!message) {
+      toast({
+        variant: 'destructive',
+        title: '문자 내용 확인',
+        description: '보낼 문자 내용을 입력해 주세요.',
+      });
+      return;
+    }
+    if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
+      toast({
+        variant: 'destructive',
+        title: '문자 길이 초과',
+        description: '수동 문자 내용이 90byte를 넘었습니다.',
+      });
+      return;
+    }
+
+    const actionKey = `manual-${selectedBoardStudent.studentId}`;
+    setManualSmsActionKey(actionKey);
+    try {
+      const sendManualStudentSms = httpsCallable(functions, 'sendManualStudentSms');
+      await sendManualStudentSms({
+        centerId,
+        studentId: selectedBoardStudent.studentId,
+        message,
+      });
+      setManualSmsMessage('');
+      toast({
+        title: '수동 문자 발송 요청 완료',
+        description: `${selectedBoardStudent.studentName} 학생의 현재 수신 대상에게 문자를 보냈습니다.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '수동 문자 발송 실패',
+        description: error?.message || '직접 문자 발송 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setManualSmsActionKey(null);
     }
   };
 
@@ -1375,6 +1503,26 @@ export default function NotificationSettingsPage() {
                                 {row.isPhoneMissing ? <Badge className="border-none bg-slate-200 text-slate-700 font-black">번호 미등록</Badge> : null}
                               </div>
                               <p className="mt-1 text-xs font-bold text-slate-500">{row.phoneNumber ? maskPhone(row.phoneNumber) : '번호 미등록'}</p>
+                              {(row.isFallbackRecipient || row.isPhoneMissing) ? (
+                                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                  <Input
+                                    value={recipientPhoneDrafts[actionKey] ?? row.phoneNumber}
+                                    onChange={(e) => setRecipientPhoneDrafts((prev) => ({ ...prev, [actionKey]: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
+                                    placeholder="학생 번호 입력"
+                                    className="h-9 rounded-xl border-2 text-sm font-bold"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-9 rounded-xl px-3 text-xs font-black"
+                                    disabled={preferenceActionKey === actionKey}
+                                    onClick={() => void handleSaveRecipientPhone(row)}
+                                  >
+                                    {preferenceActionKey === actionKey ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                                    번호 저장
+                                  </Button>
+                                </div>
+                              ) : null}
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="text-xs font-bold text-slate-500">전체 수신</span>
@@ -1414,9 +1562,36 @@ export default function NotificationSettingsPage() {
                     <h3 className="text-sm font-black text-slate-900">오늘 발송 로그</h3>
                     <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 오늘 보낸 내용을 보여줍니다.</p>
                   </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900">직접 문자 보내기</h4>
+                        <p className="mt-1 text-xs font-bold text-slate-500">현재 수신 허용된 번호로 원하는 문자를 바로 발송합니다.</p>
+                      </div>
+                      <Badge className={cn('border-none font-black', getByteTone(calculateSmsBytes(manualSmsMessage.replace(/\s+/g, ' ').trim())))}>{calculateSmsBytes(manualSmsMessage.replace(/\s+/g, ' ').trim())}byte</Badge>
+                    </div>
+                    <Textarea
+                      value={manualSmsMessage}
+                      onChange={(e) => setManualSmsMessage(e.target.value)}
+                      placeholder="예: 오늘은 자습 시작이 늦어져 19시부터 학습을 시작했습니다. 귀가 전 다시 안내드리겠습니다."
+                      className="mt-3 min-h-[104px] rounded-2xl border-2 font-bold leading-6"
+                    />
+                    <div className="mt-3 flex flex-wrap justify-between gap-2">
+                      <p className="text-xs font-bold text-slate-500">90byte 이하로 전송됩니다.</p>
+                      <Button
+                        type="button"
+                        className="h-10 rounded-xl font-black"
+                        disabled={manualSmsActionKey === `manual-${selectedBoardStudent.studentId}`}
+                        onClick={() => void handleSendManualSms()}
+                      >
+                        {manualSmsActionKey === `manual-${selectedBoardStudent.studentId}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                        직접 문자 보내기
+                      </Button>
+                    </div>
+                  </div>
                   {TODAY_BOARD_EVENTS.map((event) => {
                     const summary = selectedBoardStudent.events[event.value];
-                    const detailRows = [
+                    const detailRows: StudentDialogLogDetailRow[] = [
                       ...summary.logRows.map((row) => ({
                         id: `log-${row.id}`,
                         type: 'log' as const,
@@ -1458,7 +1633,19 @@ export default function NotificationSettingsPage() {
                             <p className="text-base font-black text-slate-900">{event.label}</p>
                             <Badge className={cn('border-none font-black', getTodayBoardCellTone(summary.status))}>{summary.status === 'sent' ? summary.timeLabel : summary.badgeLabel}</Badge>
                           </div>
-                          <p className="text-xs font-bold text-slate-500">오늘 {detailRows.length}건</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-slate-500">오늘 {detailRows.length}건</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-8 rounded-lg px-3 text-xs font-black"
+                              disabled={manualSmsActionKey === `resend-${selectedBoardStudent.studentId}-${event.value}`}
+                              onClick={() => void handleResendStudentEvent(selectedBoardStudent.studentId, event.value)}
+                            >
+                              {manualSmsActionKey === `resend-${selectedBoardStudent.studentId}-${event.value}` ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="mr-1 h-3.5 w-3.5" />}
+                              다시 보내기
+                            </Button>
+                          </div>
                         </div>
                         <div className="mt-3 grid gap-3">
                           {detailRows.length === 0 ? (
