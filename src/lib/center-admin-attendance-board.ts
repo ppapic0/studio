@@ -67,7 +67,7 @@ const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, Attendanc
   present: {
     surfaceClass: 'border-sky-200 bg-sky-50 text-sky-900',
     chipClass: 'bg-sky-600 text-white',
-    chipLabel: '정상 입실',
+    chipLabel: '공부중',
     flagClass: 'bg-white/90 text-sky-700',
     isDark: false,
   },
@@ -102,7 +102,7 @@ const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, Attendanc
   returned: {
     surfaceClass: 'border-cyan-200 bg-cyan-50 text-cyan-900',
     chipClass: 'bg-cyan-600 text-white',
-    chipLabel: '복귀/재입실',
+    chipLabel: '복귀 후 공부',
     flagClass: 'bg-white/90 text-cyan-700',
     isDark: false,
   },
@@ -137,12 +137,12 @@ const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, Attendanc
 };
 
 const BOARD_STATUS_LABELS: Record<CenterAdminAttendanceBoardStatus, string> = {
-  present: '정상 입실',
+  present: '공부중',
   late: '지각 입실',
   routine_missing: '루틴 누락',
   present_missing_routine: '입실·루틴누락',
   away: '외출/휴식',
-  returned: '복귀/재입실',
+  returned: '복귀 후 공부',
   checked_out: '퇴실',
   absent: '미입실',
   excused_absent: '예정 결석',
@@ -191,13 +191,14 @@ export function resolveAttendanceBoardStatus(params: {
 }) {
   const { seatStatus, displayStatus, hasAttendanceEvidence, isReturned } = params;
 
-  if (displayStatus === 'excused_absent') return 'excused_absent';
   if (seatStatus === 'away' || seatStatus === 'break') return 'away';
   if (seatStatus === 'studying' && isReturned) return 'returned';
+  if (seatStatus === 'studying') return 'present';
+  if (displayStatus === 'excused_absent') return 'excused_absent';
   if (displayStatus === 'confirmed_late') return 'late';
   if (displayStatus === 'confirmed_present_missing_routine') return 'present_missing_routine';
   if (displayStatus === 'missing_routine') return 'routine_missing';
-  if (seatStatus === 'studying' || displayStatus === 'confirmed_present') return 'present';
+  if (displayStatus === 'confirmed_present') return 'present';
   if (seatStatus === 'absent' && hasAttendanceEvidence) return 'checked_out';
   if (displayStatus === 'confirmed_absent') return 'absent';
   return 'planned';
@@ -215,6 +216,7 @@ export function buildAttendanceBoardFlags(params: {
   const { displayStatus, attendanceRiskLevel, isLongAway } = params;
   return [
     attendanceRiskLevel === 'risk' ? '출석위험' : attendanceRiskLevel === 'warning' ? '출석주의' : null,
+    displayStatus === 'confirmed_late' ? '지각' : null,
     displayStatus === 'missing_routine' || displayStatus === 'confirmed_present_missing_routine' ? '루틴누락' : null,
     isLongAway ? '장기외출' : null,
     displayStatus === 'excused_absent' ? '예정결석' : null,
@@ -223,13 +225,26 @@ export function buildAttendanceBoardFlags(params: {
 
 export function buildAttendanceBoardNote(params: {
   boardStatus: CenterAdminAttendanceBoardStatus;
+  displayStatus: DisplayAttendanceStatus;
   expectedArrivalTime?: string | null;
   currentAwayMinutes?: number;
   attendanceRiskLabel: '정상' | '출석주의' | '출석위험';
 }) {
-  const { boardStatus, expectedArrivalTime, currentAwayMinutes = 0, attendanceRiskLabel } = params;
+  const { boardStatus, displayStatus, expectedArrivalTime, currentAwayMinutes = 0, attendanceRiskLabel } = params;
 
   switch (boardStatus) {
+    case 'present':
+      if (displayStatus === 'confirmed_late') {
+        return expectedArrivalTime
+          ? `현재 공부중이며 오늘은 루틴 예정 ${expectedArrivalTime}보다 늦게 입실했습니다.`
+          : '현재 공부중이며 오늘은 지각 입실로 기록돼 있습니다.';
+      }
+      if (displayStatus === 'missing_routine' || displayStatus === 'confirmed_present_missing_routine') {
+        return '현재 공부중이지만 오늘 루틴 기록이 비어 있어 먼저 점검이 필요합니다.';
+      }
+      return attendanceRiskLabel === '정상'
+        ? '현재 실제 좌석 상태는 공부중으로 확인됩니다.'
+        : `현재는 공부중이지만 최근 7일 기준 ${attendanceRiskLabel} 학생입니다.`;
     case 'late':
       return expectedArrivalTime
         ? `루틴 예정 ${expectedArrivalTime} 대비 늦게 입실한 상태입니다.`
@@ -243,7 +258,7 @@ export function buildAttendanceBoardNote(params: {
         ? `외출/휴식이 ${currentAwayMinutes}분 이어져 복귀 확인이 필요합니다.`
         : '현재 외출 또는 휴식 중입니다.';
     case 'returned':
-      return '오늘 누적 공부 기록이 있어 재입실 또는 복귀 상태로 판단됩니다.';
+      return '현재 공부에 복귀한 상태이며, 오늘 누적 공부 기록이 함께 확인됩니다.';
     case 'checked_out':
       return '오늘 출석 증거는 있으나 현재는 퇴실 상태입니다.';
     case 'absent':
@@ -268,9 +283,14 @@ export function getAttendanceBoardPresentation(signal: CenterAdminAttendanceSeat
 export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSignal[]): CenterAdminAttendanceBoardSummary {
   return signals.reduce<CenterAdminAttendanceBoardSummary>(
     (acc, signal) => {
-      if (signal.boardStatus === 'present') acc.normalPresentCount += 1;
-      if (signal.boardStatus === 'late' || signal.boardStatus === 'absent') acc.lateOrAbsentCount += 1;
-      if (signal.boardStatus === 'routine_missing' || signal.boardStatus === 'present_missing_routine') acc.routineMissingCount += 1;
+      if (signal.seatStatus === 'studying') acc.normalPresentCount += 1;
+      if (signal.attendanceDisplayStatus === 'confirmed_late' || signal.boardStatus === 'absent') acc.lateOrAbsentCount += 1;
+      if (
+        signal.attendanceDisplayStatus === 'missing_routine' ||
+        signal.attendanceDisplayStatus === 'confirmed_present_missing_routine'
+      ) {
+        acc.routineMissingCount += 1;
+      }
       if (signal.boardStatus === 'away') acc.awayCount += 1;
       if (signal.boardStatus === 'returned') acc.returnedCount += 1;
       if (signal.boardStatus === 'checked_out') acc.checkedOutCount += 1;

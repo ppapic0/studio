@@ -354,6 +354,7 @@ export function useCenterAdminAttendanceBoard({
           flags,
           note: buildAttendanceBoardNote({
             boardStatus,
+            displayStatus: derived.status,
             expectedArrivalTime: routineInfo?.expectedArrivalTime,
             currentAwayMinutes,
             attendanceRiskLabel,
