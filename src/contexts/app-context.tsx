@@ -224,6 +224,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    void fetchFallbackOnce();
+
     const unsubscribeUserCenters = onSnapshot(
       userCentersRef,
       (snapshot) => {
@@ -240,12 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } as CenterMembership;
         });
 
-        // Only fetch from collectionGroup fallback if the primary source has no data
-        if (userCenterMemberships.length === 0) {
-          fetchFallbackOnce();
-        } else {
-          applyMembershipState();
-        }
+        applyMembershipState();
       },
       (error) => {
         console.error('Membership sync error:', error);
