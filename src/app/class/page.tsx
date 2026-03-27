@@ -123,6 +123,12 @@ const contactItems = [
   { label: 'HOURS', value: marketingContent.consult.hoursLine },
 ];
 
+const mobileContactLayoutClass: Record<string, string> = {
+  CONTACT: '',
+  LOCATION: 'col-span-2',
+  HOURS: '',
+};
+
 /* ─────────────────────────────────────────────────
    Page
 ───────────────────────────────────────────────── */
@@ -130,7 +136,7 @@ const contactItems = [
 export default async function ClassPage() {
   const waitlistCount = await getWaitlistCount();
   return (
-    <main className="min-h-screen bg-white text-slate-900">
+    <main className="min-h-screen bg-white pb-24 text-slate-900 sm:pb-0">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
 
       {/* ══════════════════════════════════════════
@@ -459,7 +465,7 @@ export default async function ClassPage() {
                   <img
                     src={koreanMaterialPreviewImagePath}
                     alt="수업자료 PDF 1페이지 미리보기"
-                    className="h-[360px] w-full object-contain"
+                    className="h-[250px] w-full object-contain sm:h-[360px]"
                   />
                 </a>
               </div>
@@ -575,29 +581,31 @@ export default async function ClassPage() {
                     </p>
                   </article>
                 )}
-                {contactItems.map((item) => (
-                  <article
-                    key={item.label}
-                    className="rounded-2xl border p-5"
-                    style={{
-                      borderColor: 'rgba(255,255,255,0.10)',
-                      background: 'rgba(255,255,255,0.06)',
-                    }}
-                  >
-                    <p className="text-[10.5px] font-black tracking-[0.18em] text-[#FFB273]">
-                      {item.label}
-                    </p>
-                    <p className="mt-2 break-keep text-[1.05rem] font-black leading-relaxed text-white">
-                      {item.value}
-                    </p>
-                  </article>
-                ))}
+                <div className="grid grid-cols-2 gap-3">
+                  {contactItems.map((item) => (
+                    <article
+                      key={item.label}
+                      className={`rounded-[1.25rem] border p-4 sm:rounded-2xl sm:p-5 ${mobileContactLayoutClass[item.label] ?? ''}`}
+                      style={{
+                        borderColor: 'rgba(255,255,255,0.10)',
+                        background: 'rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      <p className="text-[10px] font-black tracking-[0.17em] text-[#FFB273] sm:text-[10.5px]">
+                        {item.label}
+                      </p>
+                      <p className="mt-2 break-keep text-[0.94rem] font-black leading-[1.65] text-white sm:text-[1.05rem] sm:leading-relaxed">
+                        {item.value}
+                      </p>
+                    </article>
+                  ))}
+                </div>
 
-                <div className="flex flex-wrap gap-3 pt-1">
-                  <a href="#class-consult" className="premium-cta premium-cta-primary h-12 px-6 text-sm">
+                <div className="grid gap-2.5 pt-1 sm:flex sm:flex-wrap">
+                  <a href="#class-consult" className="premium-cta premium-cta-primary h-12 w-full px-6 text-sm sm:w-auto">
                     상담 폼 작성하기
                   </a>
-                  <a href="/" className="premium-cta premium-cta-ghost h-12 px-6 text-sm">
+                  <a href="/" className="premium-cta premium-cta-ghost h-12 w-full px-6 text-sm sm:w-auto">
                     메인으로 돌아가기
                   </a>
                 </div>

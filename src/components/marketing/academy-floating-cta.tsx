@@ -32,25 +32,27 @@ export function AcademyFloatingCTA() {
 
       {/* Mobile: fixed bottom bar */}
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 sm:hidden transition-all duration-300 ${
+        className={`fixed inset-x-4 bottom-4 z-50 sm:hidden transition-all duration-300 ${
           visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
         }`}
         style={{
           background: 'rgba(10,20,50,0.97)',
-          borderTop: '1px solid rgba(255,255,255,0.10)',
+          border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: '1.35rem',
           backdropFilter: 'blur(12px)',
+          boxShadow: '0 16px 36px -18px rgba(3, 10, 26, 0.78)',
         }}
       >
-        <div className="flex gap-2.5 px-4 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
+        <div className="flex gap-2.5 px-3 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
           <a
             href="#class-consult"
-            className="premium-cta premium-cta-primary h-11 flex-1 text-[13.5px]"
+            className="premium-cta premium-cta-primary h-11 flex-1 text-[13px]"
           >
             수업 상담 신청
           </a>
           <a
             href="#class-consult"
-            className="premium-cta premium-cta-ghost h-11 flex-1 text-[13.5px]"
+            className="premium-cta premium-cta-ghost h-11 flex-1 text-[13px]"
           >
             문의 남기기
           </a>
