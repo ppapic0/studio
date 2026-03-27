@@ -98,6 +98,7 @@ type SmsDispatchResult =
     };
 
 const SMS_BYTE_LIMIT = 90;
+const STUDENT_SMS_FALLBACK_UID = "__student__";
 
 const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "study_end" | "late_alert", string> = {
   study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
@@ -660,11 +661,11 @@ async function collectParentRecipients(
   const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
   if (!studentSnap.exists) return [];
 
-  const parentUidsRaw = studentSnap.data()?.parentUids;
+  const studentData = studentSnap.data() || {};
+  const parentUidsRaw = studentData?.parentUids;
   const parentUids = Array.isArray(parentUidsRaw)
     ? parentUidsRaw.filter((uid): uid is string => typeof uid === "string" && uid.trim().length > 0)
     : [];
-  if (parentUids.length === 0) return [];
 
   const recipients: SmsRecipient[] = [];
   const usedPhones = new Set<string>();
@@ -686,6 +687,27 @@ async function collectParentRecipients(
       phoneNumber,
     });
     usedPhones.add(phoneNumber);
+  }
+
+  if (recipients.length === 0) {
+    const [studentUserSnap, studentMemberSnap] = await Promise.all([
+      db.doc(`users/${studentId}`).get(),
+      db.doc(`centers/${centerId}/members/${studentId}`).get(),
+    ]);
+
+    const fallbackPhone = normalizePhoneNumber(
+      studentData?.phoneNumber ||
+      (studentUserSnap.exists ? studentUserSnap.data()?.phoneNumber : null) ||
+      (studentMemberSnap.exists ? studentMemberSnap.data()?.phoneNumber : null)
+    );
+
+    if (fallbackPhone && !usedPhones.has(fallbackPhone)) {
+      recipients.push({
+        parentUid: STUDENT_SMS_FALLBACK_UID,
+        parentName: "학생 본인",
+        phoneNumber: fallbackPhone,
+      });
+    }
   }
 
   return recipients;
@@ -3408,21 +3430,33 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
   }
 
+  const isStudentFallbackRecipient = parentUid === STUDENT_SMS_FALLBACK_UID;
   const parentUids = normalizeStringArray(studentSnap.data()?.parentUids);
-  if (!parentUids.includes(parentUid)) {
-    throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
+  if (!isStudentFallbackRecipient && !parentUids.includes(parentUid)) {
+    throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 수신자가 아닙니다.");
   }
 
+  const recipientUid = isStudentFallbackRecipient ? studentId : parentUid;
   const [userSnap, memberSnap] = await Promise.all([
-    db.doc(`users/${parentUid}`).get(),
-    db.doc(`centers/${centerId}/members/${parentUid}`).get(),
+    db.doc(`users/${recipientUid}`).get(),
+    db.doc(`centers/${centerId}/members/${recipientUid}`).get(),
   ]);
 
   const studentName = asTrimmedString(studentSnap.data()?.name, "학생");
-  const parentName = asTrimmedString(memberSnap.data()?.displayName || userSnap.data()?.displayName || "학부모");
-  const phoneNumber = normalizePhoneNumber(userSnap.data()?.phoneNumber || memberSnap.data()?.phoneNumber);
+  const parentName = isStudentFallbackRecipient
+    ? "학생 본인"
+    : asTrimmedString(memberSnap.data()?.displayName || userSnap.data()?.displayName || "학부모");
+  const phoneNumber = normalizePhoneNumber(
+    studentSnap.data()?.phoneNumber ||
+    userSnap.data()?.phoneNumber ||
+    memberSnap.data()?.phoneNumber
+  );
   const enabled = data?.enabled !== false;
   const eventToggles = normalizeSmsEventToggles(data?.eventToggles);
+
+  if (!phoneNumber) {
+    throw new functions.https.HttpsError("failed-precondition", "수신 번호를 찾을 수 없습니다.");
+  }
 
   await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
     studentId,

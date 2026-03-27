@@ -39,6 +39,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const SMS_BYTE_LIMIT = 90;
+const STUDENT_SMS_FALLBACK_UID = '__student__';
 
 type ParentSmsEventType =
   | 'study_start'
@@ -491,7 +492,7 @@ export default function NotificationSettingsPage() {
         if (membership?.role === 'student' && membership?.status && membership.status !== 'active') {
           return false;
         }
-        return Array.isArray(student.parentUids) && student.parentUids.length > 0;
+        return true;
       })
       .map((student) => {
         const parentRows = (student.parentUids || []).map((parentUid) => {
@@ -507,14 +508,34 @@ export default function NotificationSettingsPage() {
             enabled: pref?.enabled !== false,
             eventToggles: mergeEventToggles(pref?.eventToggles),
           } satisfies RecipientPreferenceRow;
-        });
+        }).filter((row) => row.phoneNumber);
+
+        const fallbackPref = preferencesByKey.get(`${student.id}_${STUDENT_SMS_FALLBACK_UID}`);
+        const fallbackMember = membersById.get(student.id);
+        const fallbackPhone = fallbackPref?.phoneNumber || fallbackMember?.phoneNumber || '';
+        const resolvedRows = parentRows.length > 0
+          ? parentRows
+          : fallbackPhone
+            ? [{
+                studentId: student.id,
+                studentName: student.name || '학생',
+                className: student.className || student.grade || '-',
+                parentUid: STUDENT_SMS_FALLBACK_UID,
+                parentName: fallbackPref?.parentName || '학생 본인',
+                phoneNumber: fallbackPhone,
+                enabled: fallbackPref?.enabled !== false,
+                eventToggles: mergeEventToggles(fallbackPref?.eventToggles),
+              } satisfies RecipientPreferenceRow]
+            : [];
+
         return {
           studentId: student.id,
           studentName: student.name || '학생',
           className: student.className || student.grade || '-',
-          parentRows,
+          parentRows: resolvedRows,
         };
       })
+      .filter((student) => student.parentRows.length > 0)
       .filter((student) => {
         if (!keyword) return true;
         const haystack = [
@@ -717,13 +738,13 @@ export default function NotificationSettingsPage() {
       });
       toast({
         title: '수신 설정 저장 완료',
-        description: `${row.studentName} 학생의 ${row.parentName} 학부모 수신 설정을 업데이트했습니다.`,
+        description: `${row.studentName} 학생의 ${row.parentName} 수신 설정을 업데이트했습니다.`,
       });
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: '수신 설정 저장 실패',
-        description: error?.message || '학부모 수신 제어 저장 중 오류가 발생했습니다.',
+        description: error?.message || '수신 제어 저장 중 오류가 발생했습니다.',
       });
     } finally {
       setPreferenceActionKey(null);
@@ -883,7 +904,7 @@ export default function NotificationSettingsPage() {
                       <Badge className="border-none bg-slate-100 text-slate-700 font-black">{getEventLabel(row.eventType)}</Badge>
                       <Badge className={cn('border-none font-black', getStatusTone(row.status, row.providerStatus, row.nextAttemptAt, row.attemptCount))}>{getQueueStatusLabel(row.status, row.providerStatus, row.nextAttemptAt, row.attemptCount)}</Badge>
                     </div>
-                    <p className="mt-1 text-[11px] font-bold text-slate-500">{row.parentName || '학부모'} · {maskPhone(row.phoneNumber || row.to)}</p>
+                    <p className="mt-1 text-[11px] font-bold text-slate-500">{row.parentName || '수신자'} · {maskPhone(row.phoneNumber || row.to)}</p>
                   </div>
                   <p className="text-[11px] font-bold text-slate-500">{formatDateLabel(row.createdAt)}</p>
                 </div>
@@ -916,24 +937,24 @@ export default function NotificationSettingsPage() {
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <CardTitle className="text-xl font-black tracking-tight">수신 관리</CardTitle>
-          <CardDescription className="font-bold text-sm">학생별로 연결된 학부모 번호를 보고 전체 수신과 이벤트별 수신을 개별로 끌 수 있습니다.</CardDescription>
+          <CardDescription className="font-bold text-sm">학생별로 보호자 번호를 우선 사용하고, 보호자 번호가 없으면 학생 번호를 대체 수신자로 제어할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input value={recipientSearchTerm} onChange={(e) => setRecipientSearchTerm(e.target.value)} placeholder="학생명, 반, 학부모명, 번호 검색" className="h-11 rounded-xl border-2 pl-10 font-bold" />
+            <Input value={recipientSearchTerm} onChange={(e) => setRecipientSearchTerm(e.target.value)} placeholder="학생명, 반, 수신자명, 번호 검색" className="h-11 rounded-xl border-2 pl-10 font-bold" />
           </div>
 
           <div className="grid gap-3">
             {recipientRows.length === 0 ? (
-              <div className="rounded-xl border border-dashed py-10 text-center text-sm font-bold text-muted-foreground">표시할 학부모 수신 대상이 없습니다.</div>
+              <div className="rounded-xl border border-dashed py-10 text-center text-sm font-bold text-muted-foreground">표시할 문자 수신 대상이 없습니다.</div>
             ) : recipientRows.map((student) => (
               <details key={student.studentId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <summary className="cursor-pointer list-none">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-base font-black text-slate-900">{student.studentName}</p>
-                      <p className="text-xs font-bold text-slate-500">{student.className} · 연결 보호자 {student.parentRows.length}명</p>
+                      <p className="text-xs font-bold text-slate-500">{student.className} · 연결 수신자 {student.parentRows.length}명</p>
                     </div>
                     <Badge className="border-none bg-slate-100 text-slate-700 font-black">수신 제어</Badge>
                   </div>
