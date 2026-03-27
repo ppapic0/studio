@@ -714,10 +714,11 @@ async function sendSmsViaAligo(params) {
     try {
         const formData = new FormData();
         formData.append("key", params.apiKey);
-        formData.append("userid", params.userId);
+        formData.append("user_id", params.userId);
         formData.append("sender", params.sender);
         formData.append("receiver", params.receiver);
         formData.append("msg", params.message);
+        formData.append("msg_type", "SMS");
         formData.append("testmode_yn", "N");
         const response = await fetch("https://apis.aligo.in/send/", {
             method: "POST",
