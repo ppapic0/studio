@@ -370,6 +370,7 @@ export interface NotificationSettings {
   smsTemplateCheckOut?: string;
   smsTemplateStudyStart?: string;
   smsTemplateAwayStart?: string;
+  smsTemplateAwayEnd?: string;
   smsTemplateStudyEnd?: string;
   smsTemplateLateAlert?: string;
   smsApiKeyConfigured?: boolean;

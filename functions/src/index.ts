@@ -23,6 +23,7 @@ type InviteDoc = {
 type AttendanceSmsEventType =
   | "study_start"
   | "away_start"
+  | "away_end"
   | "study_end"
   | "late_alert"
   | "check_in"
@@ -30,6 +31,7 @@ type AttendanceSmsEventType =
 type ParentSmsEventType =
   | "study_start"
   | "away_start"
+  | "away_end"
   | "study_end"
   | "late_alert"
   | "weekly_report";
@@ -55,6 +57,7 @@ type NotificationSettingsDoc = {
   smsTemplateCheckOut?: string;
   smsTemplateStudyStart?: string;
   smsTemplateAwayStart?: string;
+  smsTemplateAwayEnd?: string;
   smsTemplateStudyEnd?: string;
   smsTemplateLateAlert?: string;
   smsApiKeyConfigured?: boolean;
@@ -100,9 +103,10 @@ type SmsDispatchResult =
 const SMS_BYTE_LIMIT = 90;
 const STUDENT_SMS_FALLBACK_UID = "__student__";
 
-const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "study_end" | "late_alert", string> = {
+const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
   study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
   away_start: "[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.",
+  away_end: "[{centerName}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.",
   study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
   late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
 };
@@ -440,7 +444,7 @@ function applyTemplate(template: string, values: Record<string, string>): string
   }, template);
 }
 
-function normalizeSmsEventType(eventType: AttendanceSmsEventType): "study_start" | "away_start" | "study_end" | "late_alert" {
+function normalizeSmsEventType(eventType: AttendanceSmsEventType): "study_start" | "away_start" | "away_end" | "study_end" | "late_alert" {
   if (eventType === "check_in") return "study_start";
   if (eventType === "check_out") return "study_end";
   return eventType;
@@ -450,6 +454,7 @@ function getDefaultSmsEventToggles(): Record<ParentSmsEventType, boolean> {
   return {
     study_start: true,
     away_start: true,
+    away_end: true,
     study_end: true,
     late_alert: true,
     weekly_report: true,
@@ -463,6 +468,7 @@ function normalizeSmsEventToggles(value: unknown): Record<ParentSmsEventType, bo
   return {
     study_start: source.study_start !== false,
     away_start: source.away_start !== false,
+    away_end: source.away_end !== false,
     study_end: source.study_end !== false,
     late_alert: source.late_alert !== false,
     weekly_report: source.weekly_report !== false,
@@ -534,10 +540,13 @@ async function loadCenterName(
 
 function resolveTemplateByEvent(
   settings: NotificationSettingsDoc,
-  eventType: "study_start" | "away_start" | "study_end" | "late_alert"
+  eventType: "study_start" | "away_start" | "away_end" | "study_end" | "late_alert"
 ): string {
   if (eventType === "study_start") {
     return settings.smsTemplateStudyStart || settings.smsTemplateCheckIn || DEFAULT_SMS_TEMPLATES.study_start;
+  }
+  if (eventType === "away_end") {
+    return settings.smsTemplateAwayEnd || DEFAULT_SMS_TEMPLATES.away_end;
   }
   if (eventType === "study_end") {
     return settings.smsTemplateStudyEnd || settings.smsTemplateCheckOut || DEFAULT_SMS_TEMPLATES.study_end;
@@ -551,7 +560,7 @@ function resolveTemplateByEvent(
 function buildSmsDedupeKey(params: {
   centerId: string;
   studentId: string;
-  eventType: "study_start" | "away_start" | "study_end" | "late_alert";
+  eventType: "study_start" | "away_start" | "away_end" | "study_end" | "late_alert";
   eventAt: Date;
 }): string {
   const dateKey = toDateKey(params.eventAt);
@@ -661,8 +670,7 @@ async function collectParentRecipients(
   const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
   if (!studentSnap.exists) return [];
 
-  const studentData = studentSnap.data() || {};
-  const parentUidsRaw = studentData?.parentUids;
+  const parentUidsRaw = studentSnap.data()?.parentUids;
   const parentUids = Array.isArray(parentUidsRaw)
     ? parentUidsRaw.filter((uid): uid is string => typeof uid === "string" && uid.trim().length > 0)
     : [];
@@ -689,25 +697,26 @@ async function collectParentRecipients(
     usedPhones.add(phoneNumber);
   }
 
-  if (recipients.length === 0) {
-    const [studentUserSnap, studentMemberSnap] = await Promise.all([
-      db.doc(`users/${studentId}`).get(),
-      db.doc(`centers/${centerId}/members/${studentId}`).get(),
-    ]);
+  if (recipients.length > 0) {
+    return recipients;
+  }
 
-    const fallbackPhone = normalizePhoneNumber(
-      studentData?.phoneNumber ||
-      (studentUserSnap.exists ? studentUserSnap.data()?.phoneNumber : null) ||
-      (studentMemberSnap.exists ? studentMemberSnap.data()?.phoneNumber : null)
-    );
+  const [studentUserSnap, studentMemberSnap] = await Promise.all([
+    db.doc(`users/${studentId}`).get(),
+    db.doc(`centers/${centerId}/members/${studentId}`).get(),
+  ]);
+  const fallbackPhoneNumber = normalizePhoneNumber(
+    studentSnap.data()?.phoneNumber ||
+      studentUserSnap.data()?.phoneNumber ||
+      studentMemberSnap.data()?.phoneNumber
+  );
 
-    if (fallbackPhone && !usedPhones.has(fallbackPhone)) {
-      recipients.push({
-        parentUid: STUDENT_SMS_FALLBACK_UID,
-        parentName: "학생 본인",
-        phoneNumber: fallbackPhone,
-      });
-    }
+  if (fallbackPhoneNumber) {
+    recipients.push({
+      parentUid: STUDENT_SMS_FALLBACK_UID,
+      parentName: "학생 본인",
+      phoneNumber: fallbackPhoneNumber,
+    });
   }
 
   return recipients;
@@ -909,6 +918,8 @@ async function queueParentSmsNotification(
       type: eventType,
       title: eventType === "study_start"
         ? "공부 시작 알림"
+        : eventType === "away_end"
+          ? "복귀 알림"
         : eventType === "study_end"
           ? "공부 종료 알림"
           : eventType === "away_start"
@@ -1060,11 +1071,10 @@ async function sendSmsViaAligo(params: {
   try {
     const formData = new FormData();
     formData.append("key", params.apiKey);
-    formData.append("user_id", params.userId);
+    formData.append("userid", params.userId);
     formData.append("sender", params.sender);
     formData.append("receiver", params.receiver);
     formData.append("msg", params.message);
-    formData.append("msg_type", "SMS");
     formData.append("testmode_yn", "N");
 
     const response = await fetch("https://apis.aligo.in/send/", {
@@ -3275,6 +3285,10 @@ export const saveNotificationSettingsSecure = functions.region(region).https.onC
       String(data?.smsTemplateAwayStart || ""),
       "외출 템플릿"
     ) || DEFAULT_SMS_TEMPLATES.away_start,
+    smsTemplateAwayEnd: validateSmsTemplateLength(
+      String(data?.smsTemplateAwayEnd || ""),
+      "복귀 템플릿"
+    ) || DEFAULT_SMS_TEMPLATES.away_end,
     smsTemplateStudyEnd: validateSmsTemplateLength(
       String(data?.smsTemplateStudyEnd || ""),
       "공부 종료 템플릿"
@@ -3431,16 +3445,15 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
   }
 
-  const isStudentFallbackRecipient = parentUid === STUDENT_SMS_FALLBACK_UID;
   const parentUids = normalizeStringArray(studentSnap.data()?.parentUids);
+  const isStudentFallbackRecipient = parentUid === STUDENT_SMS_FALLBACK_UID;
   if (!isStudentFallbackRecipient && !parentUids.includes(parentUid)) {
-    throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 수신자가 아닙니다.");
+    throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
   }
 
-  const recipientUid = isStudentFallbackRecipient ? studentId : parentUid;
   const [userSnap, memberSnap] = await Promise.all([
-    db.doc(`users/${recipientUid}`).get(),
-    db.doc(`centers/${centerId}/members/${recipientUid}`).get(),
+    db.doc(`users/${isStudentFallbackRecipient ? studentId : parentUid}`).get(),
+    db.doc(`centers/${centerId}/members/${isStudentFallbackRecipient ? studentId : parentUid}`).get(),
   ]);
 
   const studentName = asTrimmedString(studentSnap.data()?.name, "학생");
@@ -3448,16 +3461,12 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     ? "학생 본인"
     : asTrimmedString(memberSnap.data()?.displayName || userSnap.data()?.displayName || "학부모");
   const phoneNumber = normalizePhoneNumber(
-    studentSnap.data()?.phoneNumber ||
-    userSnap.data()?.phoneNumber ||
-    memberSnap.data()?.phoneNumber
+    isStudentFallbackRecipient
+      ? studentSnap.data()?.phoneNumber || userSnap.data()?.phoneNumber || memberSnap.data()?.phoneNumber
+      : userSnap.data()?.phoneNumber || memberSnap.data()?.phoneNumber
   );
   const enabled = data?.enabled !== false;
   const eventToggles = normalizeSmsEventToggles(data?.eventToggles);
-
-  if (!phoneNumber) {
-    throw new functions.https.HttpsError("failed-precondition", "수신 번호를 찾을 수 없습니다.");
-  }
 
   await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
     studentId,
@@ -3562,7 +3571,7 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
     });
   }
 
-  if (!(["study_start", "away_start", "study_end", "late_alert", "check_in", "check_out"] as AttendanceSmsEventType[]).includes(eventType)) {
+  if (!(["study_start", "away_start", "away_end", "study_end", "late_alert", "check_in", "check_out"] as AttendanceSmsEventType[]).includes(eventType)) {
     throw new functions.https.HttpsError("invalid-argument", "Invalid event type.", {
       userMessage: "알림 타입이 올바르지 않습니다.",
     });

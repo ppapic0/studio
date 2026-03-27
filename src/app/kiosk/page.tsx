@@ -65,7 +65,7 @@ export default function KioskPage() {
 
   const triggerAttendanceSms = async (
     studentId: string,
-    eventType: 'study_start' | 'away_start' | 'study_end'
+    eventType: 'study_start' | 'away_start' | 'away_end' | 'study_end'
   ) => {
     if (!functions || !centerId || !canTriggerAttendanceSms) return;
 
@@ -338,6 +338,8 @@ export default function KioskPage() {
 
       if (nextStatus === 'studying' && prevStatus === 'absent') {
         void triggerAttendanceSms(student.id, 'study_start');
+      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+        void triggerAttendanceSms(student.id, 'away_end');
       } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
         void triggerAttendanceSms(student.id, 'away_start');
       } else if (nextStatus === 'absent' && prevStatus !== 'absent') {

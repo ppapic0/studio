@@ -189,14 +189,6 @@ const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: st
   { value: 'status', label: '상태' },
 ];
 
-const SELECTED_SEAT_INSIGHT_CARD_TONE: Record<CenterAdminSeatDomainKey, string> = {
-  operational: 'border-rose-200/20 bg-rose-300/10',
-  parent: 'border-cyan-200/20 bg-cyan-300/10',
-  risk: 'border-amber-200/20 bg-amber-300/10',
-  billing: 'border-emerald-200/20 bg-emerald-300/10',
-  efficiency: 'border-sky-200/20 bg-sky-300/10',
-};
-
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -268,7 +260,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const triggerAttendanceSms = async (
     studentId: string,
-    eventType: 'study_start' | 'away_start' | 'study_end'
+    eventType: 'study_start' | 'away_start' | 'away_end' | 'study_end'
   ) => {
     if (!functions || !centerId || !canTriggerAttendanceSms) return;
 
@@ -1385,6 +1377,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       if (nextStatus === 'studying' && prevStatus === 'absent') {
         void triggerAttendanceSms(studentId, 'study_start');
+      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+        void triggerAttendanceSms(studentId, 'away_end');
       } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
         void triggerAttendanceSms(studentId, 'away_start');
       } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
@@ -2342,10 +2336,26 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                             {selectedSeatSignal && (
                               <>
+                                <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge className={cn("border-none font-black", selectedSeatPresentation.chipClass)}>
+                                      {selectedSeatSignal.primaryChip}
+                                    </Badge>
+                                    {selectedSeatSignal.secondaryFlags.map((flag) => (
+                                      <Badge key={`${selectedSeat.id}_${flag}`} className={cn("border-none font-black", selectedSeatPresentation.flagClass)}>
+                                        {flag}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                  <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
+                                    {selectedSeatSignal.topReason}
+                                  </p>
+                                </div>
+
                                 <div className="space-y-3">
                                   <div className="flex flex-wrap items-center justify-between gap-2">
                                     <p className="text-[11px] font-bold text-white/70">
-                                      점수를 누르면 위 요약이 바로 바뀌고, 선택한 도메인 기준 개입 포인트를 먼저 보여줍니다.
+                                      점수를 누르면 왜 이 점수가 나왔는지와 바로 할 대응을 AI 기준으로 짧게 보여줍니다.
                                     </p>
                                     <p className="text-[10px] font-black uppercase tracking-widest text-white/50">
                                       점수 선택
@@ -2376,57 +2386,27 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                     })}
                                   </div>
 
-                                  <div
-                                    className={cn(
-                                      "rounded-[1.75rem] border p-4",
-                                      selectedSeatDomainInsight
-                                        ? SELECTED_SEAT_INSIGHT_CARD_TONE[selectedSeatDomainInsight.key]
-                                        : "border-white/10 bg-white/10"
-                                    )}
-                                  >
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                      <div className="min-w-0 flex-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-white/60">
-                                          {selectedSeatDomainInsight ? '선택 도메인 요약' : '학생 요약'}
-                                        </p>
-                                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                                          <p className="text-sm font-black text-white">
-                                            {selectedSeatDomainInsight
-                                              ? `${selectedSeatDomainInsight.label} ${selectedSeatDomainInsight.score}점`
-                                              : selectedSeatSignal.primaryChip}
+                                  {selectedSeatDomainInsight && (
+                                    <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/20 p-4">
+                                      <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-white/60">AI 분석</p>
+                                          <p className="mt-1 text-sm font-black text-white">
+                                            {selectedSeatDomainInsight.label} {selectedSeatDomainInsight.score}점
                                           </p>
-                                          <Badge
-                                            className={cn(
-                                              "border-none font-black",
-                                              selectedSeatDomainInsight
-                                                ? selectedSeatDomainInsight.badgeClass
-                                                : selectedSeatPresentation.chipClass
-                                            )}
-                                          >
-                                            {selectedSeatDomainInsight
-                                              ? selectedSeatDomainInsight.score
-                                              : '종합'}
-                                          </Badge>
-                                          {selectedSeatSignal.secondaryFlags.map((flag) => (
-                                            <Badge
-                                              key={`${selectedSeat.id}_${flag}`}
-                                              className={cn("border-none font-black", selectedSeatPresentation.flagClass)}
-                                            >
-                                              {flag}
-                                            </Badge>
-                                          ))}
                                         </div>
+                                        <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
+                                          {selectedSeatDomainInsight.score}
+                                        </Badge>
                                       </div>
-                                    </div>
-                                    <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
-                                      {selectedSeatDomainInsight?.analysis || selectedSeatSignal.topReason}
-                                    </p>
-                                    {selectedSeatDomainInsight?.action && (
+                                      <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
+                                        {selectedSeatDomainInsight.analysis}
+                                      </p>
                                       <p className="mt-2 text-xs font-bold leading-relaxed text-white/75">
                                         대응: {selectedSeatDomainInsight.action}
                                       </p>
-                                    )}
-                                  </div>
+                                    </div>
+                                  )}
                                 </div>
                               </>
                             )}
