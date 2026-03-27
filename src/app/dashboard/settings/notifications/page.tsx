@@ -449,16 +449,6 @@ export default function NotificationSettingsPage() {
     [preferencesRaw]
   );
 
-  const providerReady = useMemo(() => {
-    if (!form.smsEnabled) return false;
-    if (form.smsProvider === 'none') return false;
-    if (!form.smsSender.trim()) return false;
-    if (form.smsProvider === 'aligo') {
-      return Boolean(settingsDoc?.smsApiKeyConfigured && form.smsUserId.trim());
-    }
-    return Boolean(settingsDoc?.smsApiKeyConfigured && form.smsEndpointUrl.trim());
-  }, [form, settingsDoc]);
-
   const queueRows = useMemo(() => {
     const keyword = queueSearchTerm.trim().toLowerCase();
     return (smsQueueRaw || []).filter((row) => {
@@ -832,66 +822,51 @@ export default function NotificationSettingsPage() {
             <PlugZap className="h-5 w-5" /> 연동 설정
           </CardTitle>
           <CardDescription className="font-bold text-sm">
-            키는 마스킹 상태만 노출하고, 현재 제공사 준비 상태와 오늘 발송 가능 여부를 같이 보여줍니다.
+            위에는 최근 문자 흐름만 빠르게 보고, 아래에서 발송 방식과 키를 바로 관리합니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 p-6">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:col-span-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">현재 제공사</p>
-              <div className="mt-2 flex items-center gap-2">
-                <Badge className="border-none bg-slate-100 text-slate-700 font-black">
-                  {form.smsProvider === 'none' ? '연결 안함' : form.smsProvider === 'aligo' ? '알리고' : '사용자 엔드포인트'}
-                </Badge>
-                <Badge className={cn('border-none font-black', providerReady ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
-                  {providerReady ? '발송 가능' : '설정 보완 필요'}
-                </Badge>
+          <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">일별 문자 발송 추이</p>
+                <p className="mt-1 text-lg font-black text-slate-900">최근 7일 {deliveryTrend.totalSent + deliveryTrend.totalFailed}건</p>
               </div>
+              <p className="text-xs font-black text-slate-500">성공 {deliveryTrend.totalSent} · 실패 {deliveryTrend.totalFailed}</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">문자 전송</p>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-sm font-bold">센터 공통 스위치</span>
-                <Switch checked={form.smsEnabled} onCheckedChange={(checked) => updateField('smsEnabled', checked)} />
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">일별 문자 발송 추이</p>
-                  <p className="mt-1 text-sm font-black text-slate-900">최근 7일 {deliveryTrend.totalSent + deliveryTrend.totalFailed}건</p>
-                </div>
-                <Badge className="border-none bg-slate-100 text-slate-700 font-black">
-                  성공 {deliveryTrend.totalSent} · 실패 {deliveryTrend.totalFailed}
-                </Badge>
-              </div>
-              <div className="mt-4 grid grid-cols-7 gap-2">
-                {deliveryTrend.data.map((item) => {
-                  const height = Math.max(8, Math.round((item.total / deliveryTrend.maxTotal) * 64));
-                  const toneClass =
-                    item.failed > 0
-                      ? 'bg-amber-400'
-                      : item.sent > 0
-                        ? 'bg-emerald-500'
-                        : 'bg-slate-200';
-                  return (
-                    <div key={item.dateKey} className="flex flex-col items-center gap-2">
-                      <div className="flex h-16 w-full items-end justify-center rounded-lg bg-slate-50 px-1 py-1">
-                        <div
-                          className={cn('w-full rounded-md transition-all', toneClass)}
-                          style={{ height: `${height}px` }}
-                          title={`${item.label} · 총 ${item.total}건 · 성공 ${item.sent}건 · 실패 ${item.failed}건`}
-                        />
-                      </div>
-                      <p className="text-[10px] font-black text-slate-500">{item.label}</p>
+            <div className="mt-5 grid grid-cols-7 gap-3">
+              {deliveryTrend.data.map((item) => {
+                const height = Math.max(10, Math.round((item.total / deliveryTrend.maxTotal) * 92));
+                const toneClass =
+                  item.failed > 0
+                    ? 'bg-amber-400'
+                    : item.sent > 0
+                      ? 'bg-emerald-500'
+                      : 'bg-slate-200';
+                return (
+                  <div key={item.dateKey} className="flex flex-col items-center gap-2">
+                    <div className="flex h-24 w-full items-end justify-center rounded-xl bg-slate-50 px-1.5 py-1.5">
+                      <div
+                        className={cn('w-full rounded-lg transition-all', toneClass)}
+                        style={{ height: `${height}px` }}
+                        title={`${item.label} · 총 ${item.total}건 · 성공 ${item.sent}건 · 실패 ${item.failed}건`}
+                      />
                     </div>
-                  );
-                })}
-              </div>
+                    <p className="text-[10px] font-black text-slate-500">{item.label}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 sm:col-span-2">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">문자 전송</p>
+                <p className="mt-1 text-sm font-black text-slate-900">센터 공통 스위치</p>
+              </div>
+              <Switch checked={form.smsEnabled} onCheckedChange={(checked) => updateField('smsEnabled', checked)} />
+            </div>
             <div className="space-y-2">
               <Label className="text-[11px] font-black uppercase text-muted-foreground">연동 방식</Label>
               <Select value={form.smsProvider} onValueChange={(value) => updateField('smsProvider', value as 'none' | 'aligo' | 'custom')}>
