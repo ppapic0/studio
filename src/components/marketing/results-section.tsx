@@ -26,17 +26,17 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
           <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-[#14295F]/46">
             주요 합격 실적
           </p>
-          <StaggerChildren stagger={80} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StaggerChildren stagger={80} className="grid grid-cols-5 gap-1.5 sm:gap-3">
             {universities.map((u) => (
               <article
                 key={u.label}
-                className="brand-sheen-panel relative overflow-hidden rounded-2xl border border-[#14295F]/10 bg-white px-3.5 py-4 text-center shadow-[0_10px_26px_rgba(20,41,95,0.06)] sm:px-4 sm:py-5"
+                className="brand-sheen-panel relative min-w-0 overflow-hidden rounded-[1rem] border border-[#14295F]/10 bg-white px-2.5 py-3 text-center shadow-[0_10px_26px_rgba(20,41,95,0.06)] sm:rounded-2xl sm:px-4 sm:py-5"
               >
                 <div className="brand-glow-drift absolute -right-6 top-0 h-16 w-16 rounded-full bg-[#FFB878]/10 blur-2xl" />
                 <div className="relative">
-                  <p className="brand-number-pop font-brand text-[1.9rem] font-black leading-none text-[#14295F] sm:text-[2.2rem]">{u.value}</p>
-                  <p className="mt-2 break-keep text-[12px] font-semibold text-[#47607B]">{u.label}</p>
-                  <p className="mt-1 text-[10px] font-semibold text-[#14295F]/42">{u.detail}</p>
+                  <p className="brand-number-pop font-brand text-[1.35rem] font-black leading-none text-[#14295F] sm:text-[2.2rem]">{u.value}</p>
+                  <p className="mt-1.5 break-keep text-[9px] font-semibold leading-[1.3] text-[#47607B] sm:mt-2 sm:text-[12px]">{u.label}</p>
+                  <p className="mt-1 hidden text-[10px] font-semibold text-[#14295F]/42 sm:block">{u.detail}</p>
                 </div>
               </article>
             ))}
@@ -49,7 +49,7 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
           <div className="relative mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-full sm:max-w-[28rem]">
               <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">{successStory.title}</p>
-              <p className="font-brand mt-2 break-keep text-[1.2rem] font-black leading-[1.28] text-[#14295F] sm:text-[1.55rem]">
+              <p className="font-brand mt-2 break-keep text-[1.18rem] font-black leading-[1.22] text-[#14295F] sm:text-[1.55rem]">
                 {successStory.summary}
               </p>
             </div>
@@ -58,11 +58,11 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
               {successStory.timeline.map((item) => (
                 <article
                   key={item.label}
-                  className="rounded-[1.15rem] border border-white/70 bg-white/84 px-3 py-3 text-center shadow-[0_12px_28px_rgba(20,41,95,0.06)] backdrop-blur sm:px-4 sm:py-4"
+                  className="rounded-[0.95rem] border border-white/70 bg-white/84 px-2.5 py-3 text-center shadow-[0_12px_28px_rgba(20,41,95,0.06)] backdrop-blur sm:rounded-[1.15rem] sm:px-4 sm:py-4"
                 >
-                  <p className="text-[10px] font-black tracking-[0.16em] text-[#FF7A16]">{item.label}</p>
-                  <p className="mt-2 break-keep text-[1rem] font-black leading-none text-[#14295F] sm:text-[1.15rem]">{item.value}</p>
-                  <p className="mt-2 text-[11px] font-semibold text-[#52677F]">{item.detail}</p>
+                  <p className="text-[9px] font-black tracking-[0.12em] text-[#FF7A16] sm:text-[10px]">{item.label}</p>
+                  <p className="mt-1.5 break-keep text-[0.95rem] font-black leading-none text-[#14295F] sm:mt-2 sm:text-[1.15rem]">{item.value}</p>
+                  <p className="mt-1.5 text-[9px] font-semibold leading-[1.35] text-[#52677F] sm:mt-2 sm:text-[11px]">{item.detail}</p>
                 </article>
               ))}
             </div>

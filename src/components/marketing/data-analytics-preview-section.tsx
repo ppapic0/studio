@@ -154,7 +154,7 @@ function ChartLegend({ label, tone }: { label: string; tone: LegendTone }) {
   };
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black ${toneClassMap[tone]}`}>
+    <span className={`inline-flex rounded-full px-2 py-1 text-[8.5px] font-black ${toneClassMap[tone]} sm:px-3 sm:text-[10px]`}>
       {label}
     </span>
   );
@@ -170,7 +170,7 @@ function DataBadge({ label, tone = 'navy' }: { label: string; tone?: LegendTone 
   };
 
   return (
-    <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black ${toneClassMap[tone]}`}>
+    <span className={`inline-flex rounded-full border px-2 py-1 text-[8.5px] font-black ${toneClassMap[tone]} sm:px-3 sm:text-[10px]`}>
       {label}
     </span>
   );
@@ -197,13 +197,13 @@ function MetricCard({
 
   return (
     <article
-      className={`brand-sheen-panel relative overflow-hidden rounded-[1.2rem] border px-4 py-4 shadow-[0_10px_20px_rgba(20,41,95,0.04)] ${toneClassMap[tone]}`}
+      className={`brand-sheen-panel relative min-w-0 overflow-hidden rounded-[1rem] border px-2.5 py-3 shadow-[0_10px_20px_rgba(20,41,95,0.04)] sm:rounded-[1.2rem] sm:px-4 sm:py-4 ${toneClassMap[tone]}`}
     >
       <div className="brand-glow-drift absolute -right-8 top-0 h-20 w-20 rounded-full bg-[#FFB878]/14 blur-2xl" />
       <div className="relative">
-        <p className="text-[11px] font-black text-[#4D627A]">{label}</p>
-        <p className="brand-number-pop dashboard-number mt-2 text-[1.7rem] text-[#14295F]">{value}</p>
-        <p className="mt-1.5 text-[11px] font-bold text-[#5A6E85]">{detail}</p>
+        <p className="text-[8.5px] font-black leading-[1.3] text-[#4D627A] sm:text-[11px]">{label}</p>
+        <p className="brand-number-pop dashboard-number mt-1.5 break-keep text-[1rem] text-[#14295F] sm:mt-2 sm:text-[1.7rem]">{value}</p>
+        <p className="mt-1 text-[8.5px] font-bold leading-[1.35] text-[#5A6E85] sm:mt-1.5 sm:text-[11px]">{detail}</p>
       </div>
     </article>
   );
@@ -230,7 +230,7 @@ function ChartPanel({
 }) {
   return (
     <article
-      className={`brand-panel-scan relative overflow-hidden rounded-[1.45rem] border border-[#14295F]/10 bg-white p-4 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:rounded-[1.55rem] sm:p-6 ${className}`}
+      className={`brand-panel-scan relative min-w-0 overflow-hidden rounded-[1.1rem] border border-[#14295F]/10 bg-white p-3 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:rounded-[1.55rem] sm:p-6 ${className}`}
     >
       <div className="brand-glow-drift absolute -left-8 top-5 h-24 w-24 rounded-full bg-[#FF7A16]/8 blur-3xl" />
       <div
@@ -241,20 +241,20 @@ function ChartPanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Icon className="h-4 w-4 shrink-0 text-[#14295F]" />
-              <h3 className="break-keep text-[1rem] font-black text-[#14295F] sm:text-[1.15rem]">{title}</h3>
+              <Icon className="h-3.5 w-3.5 shrink-0 text-[#14295F] sm:h-4 sm:w-4" />
+              <h3 className="break-keep text-[0.86rem] font-black leading-[1.28] text-[#14295F] sm:text-[1.15rem]">{title}</h3>
             </div>
-            <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.68] text-[#50657D] sm:text-[13.5px]">{description}</p>
+            <p className="mt-1.5 break-keep text-[11px] font-semibold leading-[1.6] text-[#50657D] sm:mt-2 sm:text-[13.5px] sm:leading-[1.68]">{description}</p>
           </div>
           {badge}
         </div>
 
-        {legend ? <div className="mt-4 flex flex-wrap gap-2">{legend}</div> : null}
+        {legend ? <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">{legend}</div> : null}
 
-        <div className="mt-4">{children}</div>
+        <div className="mt-3 sm:mt-4">{children}</div>
 
-        <div className="mt-4 rounded-[1rem] border border-[#14295F]/10 bg-[#F8FBFF] px-3.5 py-3 sm:px-4">
-          <p className="break-keep text-[12px] font-semibold leading-[1.62] text-[#425A75] sm:text-[12.5px]">{footer}</p>
+        <div className="mt-3 rounded-[0.9rem] border border-[#14295F]/10 bg-[#F8FBFF] px-2.5 py-2.5 sm:mt-4 sm:rounded-[1rem] sm:px-4 sm:py-3">
+          <p className="break-keep text-[10px] font-semibold leading-[1.55] text-[#425A75] sm:text-[12.5px] sm:leading-[1.62]">{footer}</p>
         </div>
       </div>
     </article>
@@ -704,7 +704,7 @@ export function DataAnalyticsPreviewSection() {
           </p>
         </div>
 
-        <StaggerChildren stagger={90} className="mt-6 grid gap-3 sm:grid-cols-3 sm:gap-3">
+        <StaggerChildren stagger={90} className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
           {heroMetrics.map((metric) => (
             <MetricCard
               key={metric.label}
@@ -739,7 +739,7 @@ export function DataAnalyticsPreviewSection() {
           </ChartPanel>
         </div>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-2">
           <ChartPanel
             icon={BarChart3}
             title="주간 학습시간 성장률"

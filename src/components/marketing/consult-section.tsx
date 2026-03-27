@@ -58,23 +58,23 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
         >
           <SectionHeading eyebrow="Consulting" title={consult.heading} description={consult.description} light />
 
-          <StaggerChildren className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6" stagger={85}>
+          <StaggerChildren className="mt-6 grid grid-cols-5 gap-2 sm:gap-3" stagger={85}>
             {trustMetrics.map((metric) => (
               <article
                 key={`${metric.label}-${metric.value}`}
-                className="brand-sheen-panel rounded-2xl border px-3.5 py-4 sm:px-4"
+                className="brand-sheen-panel min-w-0 rounded-[1rem] border px-2 py-2.5 sm:rounded-2xl sm:px-4 sm:py-4"
                 style={{
                   borderColor: 'rgba(255,255,255,0.12)',
                   background: 'rgba(255,255,255,0.06)',
                 }}
               >
-                <p className="text-[10px] font-black tracking-[0.16em] text-white">{metric.label}</p>
-                <p className="brand-number-pop mt-2 text-[1.15rem] font-black text-white">{metric.value}</p>
-                <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white">{metric.detail}</p>
+                <p className="text-[7px] font-black tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.16em]">{metric.label}</p>
+                <p className="brand-number-pop mt-1.5 break-keep text-[0.92rem] font-black leading-none text-white sm:mt-2 sm:text-[1.15rem]">{metric.value}</p>
+                <p className="mt-1 hidden break-keep text-[11px] font-semibold leading-[1.55] text-white sm:block">{metric.detail}</p>
               </article>
             ))}
             <article
-              className="brand-beacon brand-sheen-panel relative col-span-2 rounded-2xl border px-3.5 py-4 sm:px-4 lg:col-span-1 xl:col-span-1"
+              className="brand-beacon brand-sheen-panel relative min-w-0 rounded-[1rem] border px-2 py-2.5 sm:rounded-2xl sm:px-4 sm:py-4"
               style={{
                 borderColor: 'rgba(255,122,22,0.30)',
                 background: 'rgba(255,122,22,0.10)',
@@ -84,9 +84,9 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                 className="brand-glow-drift absolute -right-6 top-0 h-20 w-20 rounded-full bg-[#FFB878]/20 blur-3xl"
                 style={{ animationDelay: '-1.7s' }}
               />
-              <p className="text-[10px] font-black tracking-[0.16em] text-[#FFB273]">현재 대기 인원</p>
-              <p className="brand-number-pop mt-2 text-[1.15rem] font-black text-white">{waitlistCount}명</p>
-              <p className="mt-1 break-keep text-[11px] font-semibold leading-[1.55] text-white">
+              <p className="text-[7px] font-black tracking-[0.08em] text-[#FFB273] sm:text-[10px] sm:tracking-[0.16em]">현재 대기 인원</p>
+              <p className="brand-number-pop mt-1.5 break-keep text-[0.92rem] font-black leading-none text-white sm:mt-2 sm:text-[1.15rem]">{waitlistCount}명</p>
+              <p className="mt-1 hidden break-keep text-[11px] font-semibold leading-[1.55] text-white sm:block">
                 상담 요청 후 순차적으로 안내 중입니다.
               </p>
             </article>
