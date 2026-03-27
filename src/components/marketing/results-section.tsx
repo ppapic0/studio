@@ -7,6 +7,14 @@ type ResultsSectionProps = {
   successStory: MarketingContent['successStory'];
 };
 
+const mobileUniversityLabelMap: Record<string, string> = {
+  고려대학교: '고려대',
+  서강대학교: '서강대',
+  성균관대학교: '성균관대',
+  홍익대학교: '홍익대',
+  아주대학교: '아주대',
+};
+
 export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) {
   const universities = outcomes.filter((o) => o.label !== '성장 사례');
 
@@ -35,7 +43,10 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
                 <div className="brand-glow-drift absolute -right-6 top-0 h-16 w-16 rounded-full bg-[#FFB878]/10 blur-2xl" />
                 <div className="relative">
                   <p className="brand-number-pop font-brand text-[1.35rem] font-black leading-none text-[#14295F] sm:text-[2.2rem]">{u.value}</p>
-                  <p className="mt-1.5 break-keep text-[9px] font-semibold leading-[1.3] text-[#47607B] sm:mt-2 sm:text-[12px]">{u.label}</p>
+                  <p className="mt-1.5 break-keep text-[8.5px] font-semibold leading-[1.32] text-[#47607B] sm:mt-2 sm:text-[12px]">
+                    <span className="sm:hidden">{mobileUniversityLabelMap[u.label] ?? u.label}</span>
+                    <span className="hidden sm:inline">{u.label}</span>
+                  </p>
                   <p className="mt-1 hidden text-[10px] font-semibold text-[#14295F]/42 sm:block">{u.detail}</p>
                 </div>
               </article>

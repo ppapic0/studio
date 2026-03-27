@@ -46,10 +46,10 @@ function ScreenshotFrame({ screen }: { screen: ShowcaseScreen }) {
       />
       <div className="brand-glow-drift absolute left-1/2 top-10 h-28 w-28 -translate-x-1/2 rounded-full bg-[#FFB878]/14 blur-3xl" />
 
-      <div className="relative flex min-h-[12.5rem] items-center justify-center sm:min-h-[24rem]">
-        <div className="brand-glow-drift absolute inset-y-4 left-1/2 w-[8rem] -translate-x-1/2 rounded-[2rem] bg-[#14295F]/8 blur-3xl sm:inset-y-8 sm:w-[18rem] sm:rounded-[3rem]" />
+      <div className="relative flex min-h-[11.5rem] items-center justify-center sm:min-h-[24rem]">
+        <div className="brand-glow-drift absolute inset-y-4 left-1/2 w-[7rem] -translate-x-1/2 rounded-[2rem] bg-[#14295F]/8 blur-3xl sm:inset-y-8 sm:w-[18rem] sm:rounded-[3rem]" />
         <div
-          className={`relative aspect-[10/20] w-full max-w-[7.8rem] overflow-hidden rounded-[1.5rem] border shadow-[0_24px_48px_rgba(20,41,95,0.14)] sm:max-w-[17rem] sm:rounded-[2.6rem] ${style.device} ${
+          className={`relative aspect-[10/20] w-full max-w-[6.35rem] overflow-hidden rounded-[1.3rem] border shadow-[0_24px_48px_rgba(20,41,95,0.14)] sm:max-w-[17rem] sm:rounded-[2.6rem] ${style.device} ${
             screen.image ? '' : 'brand-sheen-panel'
           }`}
         >
@@ -66,7 +66,7 @@ function ScreenshotFrame({ screen }: { screen: ShowcaseScreen }) {
               <span className="rounded-full border border-[#14295F]/10 bg-[#F7FAFF] px-2 py-1 text-[8px] font-black tracking-[0.1em] text-[#14295F]/56 sm:px-3 sm:text-[10px] sm:tracking-[0.14em]">
                 실제 스크린샷 예정
               </span>
-              <p className="mt-3 break-keep text-[0.74rem] font-black leading-[1.38] text-[#14295F] sm:mt-4 sm:text-[1.05rem] sm:leading-[1.42]">
+              <p className="mt-3 break-keep text-[0.8rem] font-black leading-[1.38] text-[#14295F] sm:mt-4 sm:text-[1.05rem] sm:leading-[1.42]">
                 완성된 화면이
                 <br />
                 이 자리에 반영됩니다.
@@ -85,7 +85,8 @@ function ScreenshotFrame({ screen }: { screen: ShowcaseScreen }) {
 function ShowcaseRow({ screen, reverse = false }: { screen: ShowcaseScreen; reverse?: boolean }) {
   const style = screenStyleMap[screen.mode as keyof typeof screenStyleMap] ?? screenStyleMap['학생 모드'];
   const Icon = style.icon;
-  const textColumnClass = reverse ? 'col-start-2 lg:col-start-2' : 'col-start-1 lg:col-start-1';
+  const headingColumnClass = reverse ? 'col-start-2 lg:col-start-2' : 'col-start-1 lg:col-start-1';
+  const bodyColumnClass = reverse ? 'col-span-2 lg:col-span-1 lg:col-start-2' : 'col-span-2 lg:col-span-1 lg:col-start-1';
   const imageColumnClass = reverse
     ? 'col-start-1 row-span-2 row-start-1 lg:col-start-1 lg:row-span-2 lg:row-start-1'
     : 'col-start-2 row-span-2 row-start-1 lg:col-start-2 lg:row-span-2 lg:row-start-1';
@@ -95,16 +96,16 @@ function ShowcaseRow({ screen, reverse = false }: { screen: ShowcaseScreen; reve
       className={`brand-sheen-panel relative overflow-hidden rounded-[1.2rem] border p-3 shadow-[0_18px_40px_rgba(20,41,95,0.08)] sm:rounded-[2rem] sm:p-6 lg:p-8 ${style.card}`}
     >
       <div className="brand-glow-drift absolute -right-10 top-6 h-28 w-28 rounded-full bg-[#FFB878]/12 blur-3xl" />
-      <div className="grid grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] gap-3 sm:gap-6 lg:grid-cols-[minmax(0,0.84fr)_minmax(0,1.16fr)] lg:gap-x-10">
-        <div className={textColumnClass}>
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2.5 sm:gap-6 lg:grid-cols-[minmax(0,0.84fr)_minmax(0,1.16fr)] lg:gap-x-10">
+        <div className={headingColumnClass}>
           <div className="flex items-center gap-2 sm:gap-3">
             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11 sm:rounded-2xl ${style.iconWrap}`}>
               <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <p className={`text-[9px] font-black tracking-[0.1em] ${style.label} sm:text-[12px] sm:tracking-[0.14em]`}>{screen.mode}</p>
+            <p className={`text-[9px] font-black tracking-[0.08em] ${style.label} sm:text-[12px] sm:tracking-[0.14em]`}>{screen.mode}</p>
           </div>
 
-          <h3 className="mt-3 break-keep text-[0.96rem] font-black leading-[1.2] text-[#14295F] sm:mt-4 sm:text-[clamp(1.2rem,6.5vw,2rem)]">
+          <h3 className="mt-3 break-keep text-[0.88rem] font-black leading-[1.28] text-[#14295F] sm:mt-4 sm:text-[clamp(1.2rem,6.5vw,2rem)]">
             {screen.title}
           </h3>
         </div>
@@ -113,8 +114,8 @@ function ShowcaseRow({ screen, reverse = false }: { screen: ShowcaseScreen; reve
           <ScreenshotFrame screen={screen} />
         </div>
 
-        <div className={textColumnClass}>
-          <p className="break-keep text-[11px] font-semibold leading-[1.65] text-[#425a75] sm:text-[15px] sm:leading-[1.82]">
+        <div className={bodyColumnClass}>
+          <p className="break-keep text-[11.5px] font-semibold leading-[1.66] text-[#425a75] sm:text-[15px] sm:leading-[1.82]">
             {screen.summary}
           </p>
 
@@ -122,7 +123,7 @@ function ShowcaseRow({ screen, reverse = false }: { screen: ShowcaseScreen; reve
             {screen.highlights.map((item, index) => (
               <span
                 key={`${screen.mode}-${item}`}
-                className={`brand-chip-rise rounded-full border px-2 py-1 text-[8.5px] font-black ${style.chip} sm:px-3 sm:py-1.5 sm:text-[11px]`}
+                className={`brand-chip-rise whitespace-nowrap rounded-full border px-2 py-1 text-[9px] font-black leading-none ${style.chip} sm:px-3 sm:py-1.5 sm:text-[11px]`}
                 style={{ animationDelay: `${0.08 + index * 0.08}s` }}
               >
                 {item}

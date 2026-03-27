@@ -12,6 +12,13 @@ type ConsultSectionProps = {
   trustMetrics: MarketingContent['appSystem']['trustMetrics'];
 };
 
+const mobileTrustMetricMap: Record<string, { label: string; value: string }> = {
+  '학생이 얻는 변화': { label: '변화', value: '습관' },
+  '빠른 개입 구조': { label: '개입', value: '즉시' },
+  '학부모 확인': { label: '확인', value: '안심' },
+  '국어 수업 연동': { label: '국어', value: '실전' },
+};
+
 async function getWaitlistCount(): Promise<number> {
   noStore();
   try {
@@ -68,8 +75,14 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                   background: 'rgba(255,255,255,0.06)',
                 }}
               >
-                <p className="text-[7px] font-black tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.16em]">{metric.label}</p>
-                <p className="brand-number-pop mt-1.5 break-keep text-[0.92rem] font-black leading-none text-white sm:mt-2 sm:text-[1.15rem]">{metric.value}</p>
+                <p className="break-keep text-[8px] font-black tracking-[0.06em] text-white sm:text-[10px] sm:tracking-[0.16em]">
+                  <span className="sm:hidden">{mobileTrustMetricMap[metric.label]?.label ?? metric.label}</span>
+                  <span className="hidden sm:inline">{metric.label}</span>
+                </p>
+                <p className="brand-number-pop mt-1.5 break-keep text-[0.98rem] font-black leading-none text-white sm:mt-2 sm:text-[1.15rem]">
+                  <span className="sm:hidden">{mobileTrustMetricMap[metric.label]?.value ?? metric.value}</span>
+                  <span className="hidden sm:inline">{metric.value}</span>
+                </p>
                 <p className="mt-1 hidden break-keep text-[11px] font-semibold leading-[1.55] text-white sm:block">{metric.detail}</p>
               </article>
             ))}
@@ -84,7 +97,10 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                 className="brand-glow-drift absolute -right-6 top-0 h-20 w-20 rounded-full bg-[#FFB878]/20 blur-3xl"
                 style={{ animationDelay: '-1.7s' }}
               />
-              <p className="text-[7px] font-black tracking-[0.08em] text-[#FFB273] sm:text-[10px] sm:tracking-[0.16em]">현재 대기 인원</p>
+              <p className="break-keep text-[8px] font-black tracking-[0.06em] text-[#FFB273] sm:text-[10px] sm:tracking-[0.16em]">
+                <span className="sm:hidden">대기</span>
+                <span className="hidden sm:inline">현재 대기 인원</span>
+              </p>
               <p className="brand-number-pop mt-1.5 break-keep text-[0.92rem] font-black leading-none text-white sm:mt-2 sm:text-[1.15rem]">{waitlistCount}명</p>
               <p className="mt-1 hidden break-keep text-[11px] font-semibold leading-[1.55] text-white sm:block">
                 상담 요청 후 순차적으로 안내 중입니다.

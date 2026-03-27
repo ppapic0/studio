@@ -5,18 +5,21 @@ import { BarChart3, Clock3, Search, Sparkles } from 'lucide-react';
 const caseTimeline = [
   {
     phase: '6월 모의평가',
+    mobilePhase: '6모',
     score: '3등급',
     percentile: '백분위 82',
     tone: 'border-[#14295F]/10 bg-white text-[#14295F]',
   },
   {
     phase: '9월 모의평가',
+    mobilePhase: '9모',
     score: '1등급',
     percentile: '백분위 96',
     tone: 'border-[#FF7A16]/18 bg-[#FFF6EF] text-[#14295F]',
   },
   {
     phase: '수능 본시험',
+    mobilePhase: '수능',
     score: '상승 완료',
     percentile: '백분위 99',
     tone: 'border-[#14295F] bg-[#14295F] text-white',
@@ -30,6 +33,7 @@ const interventionHighlights = [
     title: '문제 상태를 먼저 진단합니다',
     description: '국어 약점 유형과 공부시간 하락 구간을 먼저 확인하고, 루틴이 무너지는 지점을 찾습니다.',
     emphasis: '6월 3등급 · 백분위 82',
+    mobileEmphasis: '3등급 · 82',
   },
   {
     icon: Clock3,
@@ -37,6 +41,7 @@ const interventionHighlights = [
     title: '루틴과 개입을 바로 연결합니다',
     description: '시작 시간 고정, 주간 계획 조정, 과제 밀도 재배치를 같은 흐름 안에서 반복 개입합니다.',
     emphasis: '주간 학습시간 21h → 34h',
+    mobileEmphasis: '21h → 34h',
   },
   {
     icon: Sparkles,
@@ -44,22 +49,26 @@ const interventionHighlights = [
     title: '변화도 다시 숫자로 확인합니다',
     description: '상승한 성적만 보는 것이 아니라, 학습 안정성과 루틴 회복이 함께 유지되는지 전후를 비교합니다.',
     emphasis: '9월 백분위 96 → 수능 99',
+    mobileEmphasis: '96 → 99',
   },
 ] as const;
 
 const caseMetrics = [
   {
     label: '백분위 변화',
+    mobileLabel: '백분위',
     value: '82 → 96 → 99',
     detail: '6월 · 9월 · 수능',
   },
   {
     label: '주간 학습시간',
+    mobileLabel: '학습시간',
     value: '21h → 34h',
     detail: '루틴 고정 이후 상승',
   },
   {
     label: '개입 기록',
+    mobileLabel: '개입기록',
     value: '14회',
     detail: '점검 · 피드백 누적',
   },
@@ -68,17 +77,23 @@ const caseMetrics = [
 const scoreSheetProofs = [
   {
     label: '6월 모의평가',
+    mobileLabel: '6모',
     caption: '국어 3등급 · 백분위 82',
+    mobileCaption: '3등급 · 82',
     image: '/marketing/proof/june-score-sheet-proof-v6.jpg',
   },
   {
     label: '9월 모의평가',
+    mobileLabel: '9모',
     caption: '국어 1등급 · 백분위 96',
+    mobileCaption: '1등급 · 96',
     image: '/marketing/proof/september-score-sheet-proof-v6.jpg',
   },
   {
     label: '수능',
+    mobileLabel: '수능',
     caption: '국어 백분위 99',
+    mobileCaption: '백분위 99',
     image: '/marketing/proof/csat-score-sheet-proof-v6.jpg',
   },
 ] as const;
@@ -159,7 +174,10 @@ export function HomeGrowthProofSection() {
                       className={`brand-sheen-panel relative min-w-0 overflow-hidden rounded-[0.95rem] border px-2.5 py-3 shadow-[0_10px_22px_rgba(20,41,95,0.04)] sm:rounded-[1.2rem] sm:px-4 sm:py-4 ${item.tone}`}
                     >
                       <div className="relative">
-                        <p className="text-[8.5px] font-black tracking-[0.12em] opacity-70 sm:text-[10px]">{item.phase}</p>
+                        <p className="text-[9px] font-black tracking-[0.08em] opacity-70 sm:text-[10px]">
+                          <span className="sm:hidden">{item.mobilePhase}</span>
+                          <span className="hidden sm:inline">{item.phase}</span>
+                        </p>
                         <p className="brand-number-pop mt-1.5 break-keep text-[0.92rem] font-black leading-none sm:mt-2 sm:text-[1.1rem]">{item.score}</p>
                         <p className="mt-1.5 text-[9px] font-semibold leading-[1.35] opacity-85 sm:mt-2 sm:text-[13px]">{item.percentile}</p>
                       </div>
@@ -197,7 +215,8 @@ export function HomeGrowthProofSection() {
                             className="brand-chip-rise mt-3 rounded-[0.8rem] bg-white px-2.5 py-1.5 text-[9px] font-black leading-[1.35] text-[#14295F] shadow-[inset_0_0_0_1px_rgba(20,41,95,0.06)] sm:mt-4 sm:rounded-[0.95rem] sm:px-3 sm:py-2 sm:text-[12px]"
                             style={{ animationDelay: `${0.12 + index * 0.08}s` }}
                           >
-                            {item.emphasis}
+                            <span className="sm:hidden">{item.mobileEmphasis}</span>
+                            <span className="hidden sm:inline">{item.emphasis}</span>
                           </p>
                         </article>
                       );
@@ -212,7 +231,10 @@ export function HomeGrowthProofSection() {
                       className="brand-sheen-panel relative min-w-0 overflow-hidden rounded-[0.95rem] border border-[#14295F]/10 bg-[#14295F] px-2.5 py-3 text-white sm:rounded-[1.2rem] sm:px-4 sm:py-4"
                     >
                       <div className="brand-glow-drift absolute -right-8 top-0 h-16 w-16 rounded-full bg-white/12 blur-2xl" />
-                      <p className="text-[8.5px] font-black tracking-[0.12em] text-white/58 sm:text-[10px]">{item.label}</p>
+                      <p className="text-[8.5px] font-black tracking-[0.08em] text-white/58 sm:text-[10px]">
+                        <span className="sm:hidden">{item.mobileLabel}</span>
+                        <span className="hidden sm:inline">{item.label}</span>
+                      </p>
                       <p className="brand-number-pop mt-1.5 break-keep text-[0.92rem] font-black leading-[1.2] sm:mt-2 sm:text-[1.2rem]">{item.value}</p>
                       <p className="mt-1 text-[8.5px] font-semibold leading-[1.35] text-white/68 sm:mt-1.5 sm:text-[11px]">{item.detail}</p>
                     </article>
@@ -250,7 +272,10 @@ export function HomeGrowthProofSection() {
                 className="brand-sheen-panel min-w-0 overflow-hidden rounded-[1rem] border border-[#14295F]/10 bg-white shadow-[0_12px_26px_rgba(20,41,95,0.06)] sm:rounded-[1.3rem]"
               >
                 <div className="px-2.5 pb-3 pt-3 sm:px-4 sm:pb-4 sm:pt-4">
-                  <p className="text-[8.5px] font-black tracking-[0.12em] text-[#FF7A16] sm:text-[10px]">{item.label}</p>
+                  <p className="text-[8.5px] font-black tracking-[0.08em] text-[#FF7A16] sm:text-[10px]">
+                    <span className="sm:hidden">{item.mobileLabel}</span>
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </p>
                   <div className="mt-2 rounded-[0.85rem] border border-[#14295F]/8 bg-[#F8FBFF] p-1.5 sm:mt-3 sm:rounded-[1.1rem] sm:p-3">
                     <div className="relative aspect-[3/4] overflow-hidden rounded-[0.95rem] bg-white">
                       <Image
@@ -262,7 +287,10 @@ export function HomeGrowthProofSection() {
                       />
                     </div>
                   </div>
-                  <p className="mt-2 break-keep text-[9px] font-black leading-[1.4] text-[#14295F] sm:mt-3 sm:text-[13px]">{item.caption}</p>
+                  <p className="mt-2 break-keep text-[9px] font-black leading-[1.4] text-[#14295F] sm:mt-3 sm:text-[13px]">
+                    <span className="sm:hidden">{item.mobileCaption}</span>
+                    <span className="hidden sm:inline">{item.caption}</span>
+                  </p>
                 </div>
               </article>
             ))}

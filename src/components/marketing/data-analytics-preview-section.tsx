@@ -154,7 +154,7 @@ function ChartLegend({ label, tone }: { label: string; tone: LegendTone }) {
   };
 
   return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-[8.5px] font-black ${toneClassMap[tone]} sm:px-3 sm:text-[10px]`}>
+    <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-black leading-none ${toneClassMap[tone]} sm:px-3 sm:text-[10px]`}>
       {label}
     </span>
   );
@@ -170,7 +170,7 @@ function DataBadge({ label, tone = 'navy' }: { label: string; tone?: LegendTone 
   };
 
   return (
-    <span className={`inline-flex rounded-full border px-2 py-1 text-[8.5px] font-black ${toneClassMap[tone]} sm:px-3 sm:text-[10px]`}>
+    <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-1 text-[9px] font-black leading-none ${toneClassMap[tone]} sm:px-3 sm:text-[10px]`}>
       {label}
     </span>
   );
@@ -201,9 +201,9 @@ function MetricCard({
     >
       <div className="brand-glow-drift absolute -right-8 top-0 h-20 w-20 rounded-full bg-[#FFB878]/14 blur-2xl" />
       <div className="relative">
-        <p className="text-[8.5px] font-black leading-[1.3] text-[#4D627A] sm:text-[11px]">{label}</p>
-        <p className="brand-number-pop dashboard-number mt-1.5 break-keep text-[1rem] text-[#14295F] sm:mt-2 sm:text-[1.7rem]">{value}</p>
-        <p className="mt-1 text-[8.5px] font-bold leading-[1.35] text-[#5A6E85] sm:mt-1.5 sm:text-[11px]">{detail}</p>
+        <p className="break-keep text-[9px] font-black leading-[1.28] text-[#4D627A] sm:text-[11px]">{label}</p>
+        <p className="brand-number-pop dashboard-number mt-1.5 break-keep text-[1.06rem] text-[#14295F] sm:mt-2 sm:text-[1.7rem]">{value}</p>
+        <p className="mt-1 hidden text-[8.5px] font-bold leading-[1.35] text-[#5A6E85] sm:mt-1.5 sm:block sm:text-[11px]">{detail}</p>
       </div>
     </article>
   );
