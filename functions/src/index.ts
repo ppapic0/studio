@@ -6,6 +6,8 @@ if (admin.apps.length === 0) {
 }
 
 const region = "asia-northeast3";
+const smsVpcConnector = "sms-egress-connector";
+const smsVpcEgressSettings = "ALL_TRAFFIC" as const;
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
 const adminRoles = new Set(["centerAdmin", "owner"]);
 type AllowedRole = (typeof allowedRoles)[number];
@@ -3770,6 +3772,10 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
 
 export const scheduledSmsQueueDispatcher = functions
   .region(region)
+  .runWith({
+    vpcConnector: smsVpcConnector,
+    vpcConnectorEgressSettings: smsVpcEgressSettings,
+  })
   .pubsub.schedule("every 1 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {

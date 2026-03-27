@@ -7,6 +7,8 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 const region = "asia-northeast3";
+const smsVpcConnector = "sms-egress-connector";
+const smsVpcEgressSettings = "ALL_TRAFFIC";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"];
 const adminRoles = new Set(["centerAdmin", "owner"]);
 const SMS_BYTE_LIMIT = 90;
@@ -2995,6 +2997,10 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
 });
 exports.scheduledSmsQueueDispatcher = functions
     .region(region)
+    .runWith({
+    vpcConnector: smsVpcConnector,
+    vpcConnectorEgressSettings: smsVpcEgressSettings,
+})
     .pubsub.schedule("every 1 minutes")
     .timeZone("Asia/Seoul")
     .onRun(async () => {
