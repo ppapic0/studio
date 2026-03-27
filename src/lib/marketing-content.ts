@@ -615,8 +615,8 @@ export const marketingContent: MarketingContent = {
     highlights: ['매달 더프 실시', '이감 점검', '한수 점검', '서바이벌 프로 실시'],
     programs: [
       {
-        title: '더프',
-        summary: '더프 실전 모의로 현재 위치를 확인하고, 더프리미엄 기준까지 함께 반영해 시간 운영과 기본 대응력을 점검합니다.',
+        title: '더프리미엄 모의고사',
+        summary: '더프리미엄 실전 모의고사로 현재 위치를 확인하고, 성적표까지 함께 반영해 시간 운영과 기본 대응력을 점검합니다.',
       },
       {
         title: '이감',
