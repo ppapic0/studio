@@ -415,7 +415,7 @@ function getQueueStatusLabel(status?: string, providerStatus?: string, nextAttem
   if (status === 'failed') return '실패';
   if (status === 'pending_provider') return '설정 대기';
   if (status === 'cancelled') return '취소됨';
-  if (status === 'sent') return '발송완료';
+  if (status === 'sent') return '전송 접수';
   if (status === 'queued' && providerStatus === 'retry_scheduled' && nextAttemptAt?.toDate && (attemptCount || 0) > 0) {
     return '재시도 예정';
   }
@@ -429,14 +429,14 @@ function getStatusTone(status?: string, providerStatus?: string, nextAttemptAt?:
   if (label === '취소됨') return 'bg-slate-200 text-slate-700';
   if (label === '처리중') return 'bg-violet-100 text-violet-700';
   if (label === '재시도 예정') return 'bg-orange-100 text-orange-700';
-  if (label === '발송완료') return 'bg-emerald-100 text-emerald-700';
+  if (label === '전송 접수') return 'bg-emerald-100 text-emerald-700';
   return 'bg-blue-100 text-blue-700';
 }
 
 function getDeliveryStatusLabel(status?: string) {
   if (status === 'suppressed_opt_out') return '수신거부';
   if (status === 'failed') return '실패';
-  return '발송완료';
+  return '전송 접수';
 }
 
 export default function NotificationSettingsPage() {
@@ -1251,11 +1251,11 @@ export default function NotificationSettingsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">최근 7일 문자 전송 현황</p>
-                <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">센터 문자 흐름을 선그래프로 빠르게 확인합니다.</h3>
-                <p className="mt-2 text-sm font-bold text-slate-500">발송완료와 실패·보류 흐름을 함께 보고, 오늘 대기 건수까지 같이 확인합니다.</p>
+                <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">센터 문자 전송 흐름을 선그래프로 빠르게 확인합니다.</h3>
+                <p className="mt-2 text-sm font-bold text-slate-500">전송 접수와 실패·보류 흐름을 함께 보고, 실제 수신은 통신사·단말 정책에 따라 달라질 수 있습니다.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">발송완료 {smsTrendSummary.totalSent}건</Badge>
+                <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">전송 접수 {smsTrendSummary.totalSent}건</Badge>
                 <Badge className="border-none bg-rose-100 text-rose-700 font-black">실패·보류 {smsTrendSummary.totalIssue}건</Badge>
                 <Badge className="border-none bg-blue-100 text-blue-700 font-black">오늘 대기 {smsTrendSummary.pendingTodayCount}건</Badge>
               </div>
@@ -1286,14 +1286,14 @@ export default function NotificationSettingsPage() {
                   <div key={item.key} className="rounded-xl bg-white px-2 py-2 text-center shadow-sm ring-1 ring-slate-100">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</p>
                     <div className="mt-2 flex items-center justify-center gap-2 text-xs font-black">
-                      <span className="text-emerald-600">완료 {item.sent}</span>
+                      <span className="text-emerald-600">접수 {item.sent}</span>
                       <span className="text-orange-600">이슈 {item.issue}</span>
                     </div>
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-slate-600">
-                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />발송완료</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />전송 접수</span>
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />실패·보류</span>
               </div>
             </div>
@@ -1406,12 +1406,12 @@ export default function NotificationSettingsPage() {
         <CardHeader className="border-b bg-muted/10">
           <CardTitle className="text-xl font-black tracking-tight">발송 현황</CardTitle>
           <CardDescription className="font-bold text-sm">
-            학생별로 오늘 등원·외출·복귀·하원 문자 시각만 먼저 보고, 상세는 팝업에서 확인합니다.
+            학생별로 오늘 등원·외출·복귀·하원 문자 접수 시각만 먼저 보고, 상세는 팝업에서 확인합니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 p-6">
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 발송완료 학생</p><p className="mt-2 text-3xl font-black text-emerald-800">{todayBoardSummary.sentStudents}</p></div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 접수 학생</p><p className="mt-2 text-3xl font-black text-emerald-800">{todayBoardSummary.sentStudents}</p></div>
             <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-rose-700">실패 학생</p><p className="mt-2 text-3xl font-black text-rose-800">{todayBoardSummary.failedStudents}</p></div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">번호 미등록</p><p className="mt-2 text-3xl font-black text-slate-700">{todayBoardSummary.missingPhoneStudents}</p></div>
             <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-orange-700">재확인 필요</p><p className="mt-2 text-3xl font-black text-orange-800">{todayBoardSummary.retryStudents}</p></div>
@@ -1423,7 +1423,7 @@ export default function NotificationSettingsPage() {
               <Input value={studentBoardSearchTerm} onChange={(e) => setStudentBoardSearchTerm(e.target.value)} placeholder="학생명, 반 검색" className="h-11 rounded-xl border-2 pl-10 font-bold" />
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm font-bold text-slate-600">
-              실패 · 번호없음 · 미발송 학생이 위로 올라옵니다.
+              실패 · 번호없음 · 미접수 학생이 위로 올라오고, 공부시작·외출·복귀·하원은 실시간 교실/키오스크 전환 시 자동으로 큐에 들어갑니다.
             </div>
           </div>
 
@@ -1454,7 +1454,7 @@ export default function NotificationSettingsPage() {
                         </Badge>
                       </div>
                       <p className="mt-1 text-xs font-bold text-slate-500">
-                        수신 대상 {student.recipients.filter((row) => !row.isPhoneMissing).length}명 · 오늘 발송 {student.todaySentCount}건
+                        수신 대상 {student.recipients.filter((row) => !row.isPhoneMissing).length}명 · 오늘 접수 {student.todaySentCount}건
                       </p>
                     </div>
                     {TODAY_BOARD_EVENTS.map((event) => {
@@ -1484,12 +1484,12 @@ export default function NotificationSettingsPage() {
                     {selectedBoardStudent.studentName}
                   </DialogTitle>
                   <DialogDescription className="text-sm font-bold text-white/80">
-                    {selectedBoardStudent.className} · 오늘 문자 발송 흐름과 수신 번호를 함께 확인합니다.
+                    {selectedBoardStudent.className} · 오늘 문자 접수 흐름과 수신 번호를 함께 확인합니다.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Badge className="border-none bg-white/20 text-white font-black">수신 대상 {selectedBoardStudent.recipients.filter((row) => !row.isPhoneMissing).length}명</Badge>
-                  <Badge className="border-none bg-white/20 text-white font-black">오늘 발송 {selectedBoardStudent.todaySentCount}건</Badge>
+                  <Badge className="border-none bg-white/20 text-white font-black">오늘 접수 {selectedBoardStudent.todaySentCount}건</Badge>
                   <Badge className={cn('border-none font-black', selectedBoardStudent.hasMissingPhone ? 'bg-white text-slate-700' : 'bg-emerald-100 text-emerald-700')}>
                     {selectedBoardStudent.recipientLabel}
                   </Badge>
@@ -1500,7 +1500,7 @@ export default function NotificationSettingsPage() {
                 <section className="space-y-3">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">수신 번호</h3>
-                    <p className="mt-1 text-xs font-bold text-slate-500">보호자 번호가 없으면 학생 본인 번호로 fallback 됩니다.</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">보호자 번호가 없으면 학생 본인 번호로 fallback 되고, 아래 시각은 문자 게이트웨이 접수 기준입니다.</p>
                   </div>
                   <div className="grid gap-3">
                     {selectedBoardStudent.recipients.map((row) => {
@@ -1571,7 +1571,7 @@ export default function NotificationSettingsPage() {
 
                 <section className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">오늘 발송 로그</h3>
+                    <h3 className="text-sm font-black text-slate-900">오늘 접수 로그</h3>
                     <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 오늘 보낸 내용을 보여줍니다.</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
@@ -1868,7 +1868,7 @@ export default function NotificationSettingsPage() {
                 <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue placeholder="상태 필터" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체 상태</SelectItem>
-                  <SelectItem value="sent">발송완료</SelectItem>
+                  <SelectItem value="sent">전송 접수</SelectItem>
                   <SelectItem value="failed">실패</SelectItem>
                   <SelectItem value="suppressed_opt_out">수신거부</SelectItem>
                 </SelectContent>
