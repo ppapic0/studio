@@ -126,6 +126,11 @@ export type CenterEnvironmentPhoto = {
   alt: string;
 };
 
+export type MockExamProgramCard = {
+  title: string;
+  summary: string;
+};
+
 export type MarketingContent = {
   brand: {
     name: string;
@@ -192,6 +197,13 @@ export type MarketingContent = {
     description: string;
     highlights: string[];
     photos: CenterEnvironmentPhoto[];
+  };
+  mockExamProgram: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    highlights: string[];
+    programs: MockExamProgramCard[];
   };
   lpSystem: {
     heading: string;
@@ -592,6 +604,31 @@ export const marketingContent: MarketingContent = {
         title: '상담 공간',
         summary: '학생과 학부모가 편하게 상담 흐름을 이어갈 수 있도록 별도 공간으로 운영합니다.',
         alt: '상담 공간 실제 사진 예정 자리',
+      },
+    ],
+  },
+  mockExamProgram: {
+    eyebrow: 'REAL MOCK EXAM PROGRAM',
+    title: '대치동까지 가지 않아도, 트랙에서 실전 모의고사 체계를 바로 경험합니다',
+    description:
+      '매달 더프와 더프리미엄을 포함한 실전 모의 운영에 더해, 국어는 이감 · 한수 · 시대인재 서바이벌 프로 모의고사까지 연결해 점검합니다. 멀리 이동하지 않아도 실전 감각과 대응력을 같은 흐름 안에서 꾸준히 관리합니다.',
+    highlights: ['매달 더프 실시', '더프리미엄 운영', '이감 · 한수 점검', '서바이벌 프로 실시'],
+    programs: [
+      {
+        title: '더프',
+        summary: '월간 실전 모의로 현재 위치와 기본 대응력을 꾸준히 확인합니다.',
+      },
+      {
+        title: '더프리미엄',
+        summary: '조금 더 높은 긴장감의 실전 환경에서 시간 운영과 집중 흐름을 점검합니다.',
+      },
+      {
+        title: '이감 · 한수',
+        summary: '국어 실전 감각이 흔들리지 않도록 주요 사설 모의 흐름을 꾸준히 연결합니다.',
+      },
+      {
+        title: '시대인재 서바이벌 프로',
+        summary: '상위권 실전 난도까지 대비해 시험장에서 흔들리지 않는 대응력을 만듭니다.',
       },
     ],
   },

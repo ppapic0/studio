@@ -7,6 +7,7 @@ import { KoreanClassSection } from '@/components/marketing/korean-class-section'
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingLaunchNoticeModal } from '@/components/marketing/marketing-launch-notice-modal';
+import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { ResultsSection } from '@/components/marketing/results-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
@@ -26,6 +27,9 @@ export default function HomePage() {
       </ScrollReveal>
       <ScrollReveal>
         <HomeGrowthProofSection />
+      </ScrollReveal>
+      <ScrollReveal>
+        <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
       </ScrollReveal>
       <ScrollReveal>
         <CenterEnvironmentSection centerEnvironment={marketingContent.centerEnvironment} />
