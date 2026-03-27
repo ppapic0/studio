@@ -65,6 +65,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 import { format } from 'date-fns';
+import Link from 'next/link';
 
 function resolveCallableErrorMessage(error: any, fallback: string): string {
   const detailMessage =
@@ -431,6 +432,11 @@ export default function StudentAccountManagementPage() {
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <Button asChild variant="outline" size="icon" className="h-11 w-11 rounded-xl border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all">
+                        <Link href={`/dashboard/teacher/students/${member.id}`}>
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
                       <Button variant="outline" size="icon" onClick={() => handleOpenEditModal(member)} className="h-11 w-11 rounded-xl border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all"><Edit2 className="h-4 w-4" /></Button>
 
                       <AlertDialog>
