@@ -1083,6 +1083,13 @@ function formatMinutes(minutes: number) {
   return `${h}:${m.toString().padStart(2, '0')}`;
 }
 
+function formatCompactCalendarMinutes(minutes: number) {
+  if (minutes <= 0) return '--';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round((minutes / 60) * 10) / 10;
+  return Number.isInteger(hours) ? `${hours.toFixed(0)}h` : `${hours.toFixed(1)}h`;
+}
+
 function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록') {
   if (!value || Number.isNaN(value.getTime())) return emptyLabel;
   return format(value, 'HH:mm');
@@ -3413,7 +3420,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     const hasPlans = (weeklyPlans || []).some((plan) => plan.dateKey === dateKey);
                     const hasDeepFocus = isCurrentMonth && minutes >= 180;
                     const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
-                    const timeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
+                    const timeLabel = isCurrentMonth
+                      ? (isMobile ? formatCompactCalendarMinutes(minutes) : formatMinutes(minutes))
+                      : '--';
 
                     return (
                       <button
@@ -3461,13 +3470,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         <div className={cn("absolute left-0 right-0", isMobile ? "inset-y-0 flex items-center justify-center px-1.5" : "bottom-2 px-2")}>
                           <div
                             className={cn(
-                              "overflow-hidden rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
-                              isMobile ? "min-w-[2.25rem] px-1.5 py-1" : "px-2.5 py-2",
+                              "overflow-hidden text-center whitespace-nowrap",
+                              isMobile
+                                ? "min-w-0 rounded-none border-none bg-transparent px-0 py-0 shadow-none"
+                                : "rounded-[0.95rem] border bg-white px-2.5 py-2 shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
                               getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                             )}
                           >
                             {isMobile ? (
-                              <span className="dashboard-number block tabular-nums text-[0.78rem] leading-none tracking-[-0.05em]">
+                              <span className="dashboard-number block tabular-nums text-[0.68rem] leading-none tracking-[-0.08em]">
                                 {timeLabel}
                               </span>
                             ) : (
