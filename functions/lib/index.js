@@ -472,6 +472,27 @@ async function collectParentRecipients(db, centerId, studentId) {
     }
     return recipients;
 }
+function normalizeExplicitSmsRecipients(rawRecipients) {
+    if (!Array.isArray(rawRecipients))
+        return [];
+    const normalized = [];
+    const usedPhones = new Set();
+    for (const raw of rawRecipients) {
+        const row = raw;
+        const phoneNumber = resolveFirstValidPhoneNumber(row === null || row === void 0 ? void 0 : row.phoneNumber);
+        if (!phoneNumber || usedPhones.has(phoneNumber))
+            continue;
+        const parentUid = asTrimmedString(row === null || row === void 0 ? void 0 : row.parentUid, STUDENT_SMS_FALLBACK_UID);
+        const parentName = asTrimmedString(row === null || row === void 0 ? void 0 : row.parentName, parentUid === STUDENT_SMS_FALLBACK_UID ? "학생 본인" : "학부모");
+        normalized.push({
+            parentUid,
+            parentName,
+            phoneNumber,
+        });
+        usedPhones.add(phoneNumber);
+    }
+    return normalized;
+}
 async function splitRecipientsBySmsPreference(db, centerId, studentId, studentName, eventType, recipients) {
     if (recipients.length === 0) {
         return { allowedRecipients: [], suppressedRecipients: [] };
@@ -644,7 +665,9 @@ async function queueParentSmsNotification(db, params) {
 async function queueManualStudentSms(db, params) {
     const { centerId, studentId, studentName } = params;
     const settings = params.settings || await loadNotificationSettings(db, centerId);
-    const recipients = await collectParentRecipients(db, centerId, studentId);
+    const recipients = params.recipientOverrides && params.recipientOverrides.length > 0
+        ? params.recipientOverrides
+        : await collectParentRecipients(db, centerId, studentId);
     const message = trimSmsToByteLimit(asTrimmedString(params.message));
     if (!message) {
         return { queuedCount: 0, recipientCount: 0, message: "" };
@@ -3156,12 +3179,14 @@ exports.sendManualStudentSms = functions.region(region).https.onCall(async (data
     const studentNameRaw = (_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.name;
     const studentName = typeof studentNameRaw === "string" && studentNameRaw.trim() ? studentNameRaw.trim() : "학생";
     const settings = await loadNotificationSettings(db, centerId);
+    const recipientOverrides = normalizeExplicitSmsRecipients(data === null || data === void 0 ? void 0 : data.recipientOverrides);
     const queueResult = await queueManualStudentSms(db, {
         centerId,
         studentId,
         studentName,
         message: rawMessage,
         settings,
+        recipientOverrides,
     });
     if (queueResult.recipientCount === 0) {
         throw new functions.https.HttpsError("failed-precondition", "No recipients available.", {

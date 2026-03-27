@@ -1179,10 +1179,22 @@ export default function NotificationSettingsPage() {
     setManualSmsActionKey(actionKey);
     try {
       const sendManualStudentSms = httpsCallable(functions, 'sendManualStudentSms');
+      const recipientOverrides = selectedBoardStudent.recipients
+        .filter((row) => row.enabled)
+        .map((row) => {
+          const key = `${row.studentId}:${row.parentUid}`;
+          return {
+            parentUid: row.parentUid,
+            parentName: row.parentName,
+            phoneNumber: normalizePhoneNumber(recipientPhoneDrafts[key] ?? row.phoneNumber),
+          };
+        })
+        .filter((row) => !!row.phoneNumber);
       await sendManualStudentSms({
         centerId,
         studentId: selectedBoardStudent.studentId,
         message,
+        recipientOverrides,
       });
       setManualSmsMessage('');
       toast({

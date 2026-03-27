@@ -744,6 +744,31 @@ async function collectParentRecipients(
   return recipients;
 }
 
+function normalizeExplicitSmsRecipients(rawRecipients: unknown): SmsRecipient[] {
+  if (!Array.isArray(rawRecipients)) return [];
+
+  const normalized: SmsRecipient[] = [];
+  const usedPhones = new Set<string>();
+
+  for (const raw of rawRecipients) {
+    const row = raw as Record<string, unknown>;
+    const phoneNumber = resolveFirstValidPhoneNumber(row?.phoneNumber);
+    if (!phoneNumber || usedPhones.has(phoneNumber)) continue;
+
+    const parentUid = asTrimmedString(row?.parentUid, STUDENT_SMS_FALLBACK_UID);
+    const parentName = asTrimmedString(row?.parentName, parentUid === STUDENT_SMS_FALLBACK_UID ? "학생 본인" : "학부모");
+
+    normalized.push({
+      parentUid,
+      parentName,
+      phoneNumber,
+    });
+    usedPhones.add(phoneNumber);
+  }
+
+  return normalized;
+}
+
 async function splitRecipientsBySmsPreference(
   db: admin.firestore.Firestore,
   centerId: string,
@@ -989,11 +1014,15 @@ async function queueManualStudentSms(
     studentName: string;
     message: string;
     settings?: NotificationSettingsDoc;
+    recipientOverrides?: SmsRecipient[];
   }
 ): Promise<{ queuedCount: number; recipientCount: number; message: string }> {
   const { centerId, studentId, studentName } = params;
   const settings = params.settings || await loadNotificationSettings(db, centerId);
-  const recipients = await collectParentRecipients(db, centerId, studentId);
+  const recipients =
+    params.recipientOverrides && params.recipientOverrides.length > 0
+      ? params.recipientOverrides
+      : await collectParentRecipients(db, centerId, studentId);
   const message = trimSmsToByteLimit(asTrimmedString(params.message));
   if (!message) {
     return { queuedCount: 0, recipientCount: 0, message: "" };
@@ -3957,12 +3986,14 @@ export const sendManualStudentSms = functions.region(region).https.onCall(async 
   const studentNameRaw = studentSnap.data()?.name;
   const studentName = typeof studentNameRaw === "string" && studentNameRaw.trim() ? studentNameRaw.trim() : "학생";
   const settings = await loadNotificationSettings(db, centerId);
+  const recipientOverrides = normalizeExplicitSmsRecipients(data?.recipientOverrides);
   const queueResult = await queueManualStudentSms(db, {
     centerId,
     studentId,
     studentName,
     message: rawMessage,
     settings,
+    recipientOverrides,
   });
 
   if (queueResult.recipientCount === 0) {
