@@ -428,6 +428,7 @@ export default function NotificationSettingsPage() {
 
   const [form, setForm] = useState(DEFAULT_FORM);
   const [smsApiKeyInput, setSmsApiKeyInput] = useState('');
+  const [showApiKeyEditor, setShowApiKeyEditor] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [studentBoardSearchTerm, setStudentBoardSearchTerm] = useState('');
   const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
@@ -504,6 +505,20 @@ export default function NotificationSettingsPage() {
     }));
   }, [settingsDoc]);
 
+  const isSmsApiKeyConfigured = useMemo(() => {
+    return Boolean(
+      settingsDoc?.smsApiKeyConfigured
+      || settingsDoc?.smsApiKey
+      || settingsDoc?.smsApiKeyLastUpdatedAt
+    );
+  }, [settingsDoc]);
+
+  useEffect(() => {
+    if (isSmsApiKeyConfigured) {
+      setShowApiKeyEditor(false);
+    }
+  }, [isSmsApiKeyConfigured]);
+
   const sampleValues = useMemo(() => ({
     studentName: '김재윤',
     time: '18:40',
@@ -537,10 +552,10 @@ export default function NotificationSettingsPage() {
     if (form.smsProvider === 'none') return false;
     if (!form.smsSender.trim()) return false;
     if (form.smsProvider === 'aligo') {
-      return Boolean(settingsDoc?.smsApiKeyConfigured && form.smsUserId.trim());
+      return Boolean(isSmsApiKeyConfigured && form.smsUserId.trim());
     }
-    return Boolean(settingsDoc?.smsApiKeyConfigured && form.smsEndpointUrl.trim());
-  }, [form, settingsDoc]);
+    return Boolean(isSmsApiKeyConfigured && form.smsEndpointUrl.trim());
+  }, [form, isSmsApiKeyConfigured]);
 
   const smsTrendSummary = useMemo(() => {
     const range = Array.from({ length: 7 }, (_, index) => {
@@ -944,6 +959,7 @@ export default function NotificationSettingsPage() {
       const saveNotificationSettings = httpsCallable(functions, 'saveNotificationSettingsSecure');
       await saveNotificationSettings({ centerId, ...form, smsApiKey: smsApiKeyInput.trim() });
       setSmsApiKeyInput('');
+      setShowApiKeyEditor(false);
       toast({
         title: '문자 설정 저장 완료',
         description: '템플릿과 발송 설정이 업데이트되었습니다.',
@@ -966,6 +982,7 @@ export default function NotificationSettingsPage() {
       const saveNotificationSettings = httpsCallable(functions, 'saveNotificationSettingsSecure');
       await saveNotificationSettings({ centerId, clearSmsApiKey: true });
       setSmsApiKeyInput('');
+      setShowApiKeyEditor(false);
       toast({
         title: '연동 키 제거 완료',
         description: '저장된 문자 연동 키를 해제했습니다.',
@@ -1158,8 +1175,8 @@ export default function NotificationSettingsPage() {
               <Badge className={cn('border-none font-black', providerReady ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
                 {providerReady ? '발송 가능' : '설정 보완 필요'}
               </Badge>
-              <Badge className={cn('border-none font-black', settingsDoc?.smsApiKeyConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
-                {settingsDoc?.smsApiKeyConfigured ? '연동 키 등록됨' : '연동 키 미등록'}
+              <Badge className={cn('border-none font-black', isSmsApiKeyConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                {isSmsApiKeyConfigured ? '연동 키 등록됨' : '연동 키 미등록'}
               </Badge>
             </div>
           </div>
@@ -1186,20 +1203,57 @@ export default function NotificationSettingsPage() {
               <Label className="text-[11px] font-black uppercase text-muted-foreground">연동 사용자 아이디</Label>
               <Input value={form.smsUserId} onChange={(e) => updateField('smsUserId', e.target.value)} placeholder="발신 계정 아이디" className="h-11 rounded-xl border-2 font-bold" />
             </div>
-            <div className="space-y-2">
-              <Label className="text-[11px] font-black uppercase text-muted-foreground">연동 주소</Label>
-              <Input value={form.smsEndpointUrl} onChange={(e) => updateField('smsEndpointUrl', e.target.value)} placeholder="https://your-sms-gateway.example/send" className="h-11 rounded-xl border-2 font-bold" />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label className="text-[11px] font-black uppercase text-muted-foreground">연동 키</Label>
-              <div className="flex gap-2">
-                <Input value={smsApiKeyInput} onChange={(e) => setSmsApiKeyInput(e.target.value)} placeholder={settingsDoc?.smsApiKeyConfigured ? '새 키를 입력하면 교체됩니다.' : '연동 키 입력'} className="h-11 rounded-xl border-2 font-bold" />
-                {settingsDoc?.smsApiKeyConfigured ? (
-                  <Button type="button" variant="outline" className="h-11 rounded-xl font-black text-rose-600" onClick={() => void handleClearApiKey()}>
-                    키 해제
-                  </Button>
-                ) : null}
+            {form.smsProvider === 'custom' ? (
+              <div className="space-y-2">
+                <Label className="text-[11px] font-black uppercase text-muted-foreground">연동 주소</Label>
+                <Input value={form.smsEndpointUrl} onChange={(e) => updateField('smsEndpointUrl', e.target.value)} placeholder="https://your-sms-gateway.example/send" className="h-11 rounded-xl border-2 font-bold" />
               </div>
+            ) : form.smsProvider === 'aligo' ? (
+              <div className="space-y-2">
+                <Label className="text-[11px] font-black uppercase text-muted-foreground">알리고 발송 경로</Label>
+                <div className="flex h-11 items-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-600">
+                  알리고는 시스템 발송 API를 사용해 별도 주소 입력이 필요 없습니다.
+                </div>
+              </div>
+            ) : null}
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="text-[11px] font-black uppercase text-muted-foreground">
+                {isSmsApiKeyConfigured && !showApiKeyEditor ? '연동 상태' : '연동 키'}
+              </Label>
+              {isSmsApiKeyConfigured && !showApiKeyEditor ? (
+                <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-emerald-800">저장된 연동 키로 발송 중입니다.</p>
+                    <p className="mt-1 text-xs font-bold text-emerald-700/90">
+                      {form.smsProvider === 'aligo'
+                        ? '알리고는 저장된 키와 사용자 아이디로 바로 발송합니다.'
+                        : '저장된 연동 키로 사용자 엔드포인트를 호출합니다.'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" className="h-11 rounded-xl font-black" onClick={() => setShowApiKeyEditor(true)}>
+                      키 다시 등록
+                    </Button>
+                    <Button type="button" variant="outline" className="h-11 rounded-xl font-black text-rose-600" onClick={() => void handleClearApiKey()}>
+                      키 해제
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input value={smsApiKeyInput} onChange={(e) => setSmsApiKeyInput(e.target.value)} placeholder={isSmsApiKeyConfigured ? '새 키를 입력하면 교체됩니다.' : '연동 키 입력'} className="h-11 rounded-xl border-2 font-bold" />
+                  {isSmsApiKeyConfigured ? (
+                    <>
+                      <Button type="button" variant="outline" className="h-11 rounded-xl font-black" onClick={() => { setSmsApiKeyInput(''); setShowApiKeyEditor(false); }}>
+                        입력 닫기
+                      </Button>
+                      <Button type="button" variant="outline" className="h-11 rounded-xl font-black text-rose-600" onClick={() => void handleClearApiKey()}>
+                        키 해제
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
       </CardContent>
