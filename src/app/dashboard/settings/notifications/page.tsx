@@ -1242,6 +1242,10 @@ export default function NotificationSettingsPage() {
               ) : (
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input value={smsApiKeyInput} onChange={(e) => setSmsApiKeyInput(e.target.value)} placeholder={isSmsApiKeyConfigured ? '새 키를 입력하면 교체됩니다.' : '연동 키 입력'} className="h-11 rounded-xl border-2 font-bold" />
+                  <Button type="button" className="h-11 rounded-xl font-black" onClick={() => void handleSave()} disabled={isSaving || isLoading}>
+                    {(isSaving || isLoading) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    연동 저장
+                  </Button>
                   {isSmsApiKeyConfigured ? (
                     <>
                       <Button type="button" variant="outline" className="h-11 rounded-xl font-black" onClick={() => { setSmsApiKeyInput(''); setShowApiKeyEditor(false); }}>
