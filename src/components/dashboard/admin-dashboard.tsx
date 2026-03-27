@@ -521,6 +521,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     });
 
     return (teacherMembers || [])
+      .filter((teacher): teacher is CenterMembership => Boolean(teacher))
       .map((teacher) => {
         const reports = [...(reportByTeacher.get(teacher.id) || [])].sort(
           (a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0)
@@ -533,7 +534,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           ...teacher,
           teacherName: teacher.displayName || `선생님-${teacher.id.slice(0, 6)}`,
           reports,
-          sentReports: reports.filter((report) => report.status === 'sent'),
+          sentReports: reports.filter((report) => report?.status === 'sent'),
           logs,
         };
       })
@@ -1052,8 +1053,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (avgGrowthRate <= -0.1) focusActions.push('초반 60분 단일 과목 고정 운영으로 첫 이탈 시간을 늘려보세요.');
     if (focusActions.length === 0) focusActions.push('현재 리듬을 유지하면서 오답 복습 루틴 점검만 추가하세요.');
 
-    const filteredReports = dailyReports?.filter(r => targetMemberIds.has(r.studentId)) || [];
-    const sentReports = filteredReports.filter(r => r.status === 'sent');
+    const filteredReports = (dailyReports || []).filter(
+      (report): report is DailyReport => Boolean(report) && targetMemberIds.has(report.studentId)
+    );
+    const sentReports = filteredReports.filter((report) => report?.status === 'sent');
 
     const thirtyDaysAgoMs = now - (30 * 24 * 60 * 60 * 1000);
     const recentParentEvents = (parentActivityEvents || []).filter((event) => {

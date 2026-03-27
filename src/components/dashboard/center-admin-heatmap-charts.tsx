@@ -137,18 +137,6 @@ export function CenterAdminHeatmapCharts({
   className,
 }: CenterAdminHeatmapChartsProps) {
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-
-  if (isLoading) {
-    return (
-      <Card className={cn('overflow-hidden rounded-[2.5rem] border-none bg-white shadow-xl', className)}>
-        <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8">
-          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-25" />
-          <p className="text-sm font-black uppercase tracking-[0.24em] text-muted-foreground">운영 그래프 동기화 중</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   const summaryChartData = rows.map((row) => ({
     id: row.id,
     label: row.label,
@@ -174,6 +162,17 @@ export function CenterAdminHeatmapCharts({
       })
       .slice(0, 5);
   }, [interventionSignals, selectedDomainKey]);
+
+  if (isLoading) {
+    return (
+      <Card className={cn('overflow-hidden rounded-[2.5rem] border-none bg-white shadow-xl', className)}>
+        <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8">
+          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-25" />
+          <p className="text-sm font-black uppercase tracking-[0.24em] text-muted-foreground">운영 그래프 동기화 중</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>

@@ -218,9 +218,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           })
           .filter((membership): membership is CenterMembership => !!membership);
         applyMembershipState();
-      } catch (error) {
-        console.warn('Membership fallback fetch warning:', error);
-        setMembershipsLoading(false);
+      } catch (error: any) {
+        memberFallbackMemberships = [];
+        if (error?.code !== 'permission-denied') {
+          console.warn('Membership fallback fetch warning:', error);
+        }
+        applyMembershipState();
       }
     };
 

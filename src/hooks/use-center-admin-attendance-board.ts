@@ -86,6 +86,7 @@ export function useCenterAdminAttendanceBoard({
     () =>
       (studentMembers || []).filter(
         (member) =>
+          Boolean(member) &&
           member.role === 'student' &&
           member.status === 'active' &&
           (selectedClass === 'all' || member.className === selectedClass)

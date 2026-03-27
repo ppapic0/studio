@@ -77,6 +77,10 @@ function toMillis(value: unknown) {
   return 0;
 }
 
+function isDefined<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
+
 function riskScoreFromDaily(stat?: DailyStudentStat | null, progress?: GrowthProgress | null) {
   let riskScore = 0;
   if (stat) {
@@ -111,6 +115,7 @@ function scoreAttendanceStatus(status?: AttendanceCurrent['status']) {
 
 function scoreReportRegularity(studentReports: DailyReport[], nowMs: number) {
   const latestReport = [...studentReports]
+    .filter((report): report is DailyReport => isDefined(report))
     .filter((report) => report.status === 'sent')
     .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt))[0];
 
@@ -126,6 +131,7 @@ function scoreReportRegularity(studentReports: DailyReport[], nowMs: number) {
 
 function scoreCommentDensity(studentReports: DailyReport[]) {
   const latestReport = [...studentReports]
+    .filter((report): report is DailyReport => isDefined(report))
     .filter((report) => report.status === 'sent')
     .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt))[0];
 
@@ -419,7 +425,7 @@ export function useCenterAdminHeatmap({
   const summary = useMemo(() => {
     const totalStudents = filteredMembers.length;
     const todayStats = (statsByDate[todayKey] || []).filter((item) => targetMemberIds.has(item.studentId));
-    const todayReports = (reportsByDate.get(todayKey) || []).filter((report) => report.status === 'sent');
+    const todayReports = (reportsByDate.get(todayKey) || []).filter((report) => report?.status === 'sent');
     const checkedInCount = (attendanceList || []).filter(
       (seat) => seat.studentId && targetMemberIds.has(seat.studentId) && seat.status === 'studying'
     ).length;
@@ -553,7 +559,7 @@ export function useCenterAdminHeatmap({
       const endIndex = historyKeys.indexOf(dateKey);
       const windowKeys = endIndex >= 6 ? historyKeys.slice(endIndex - 6, endIndex + 1) : historyKeys.slice(0, endIndex + 1);
       const windowStats = windowKeys.flatMap((key) => (statsByDate[key] || []).filter((row) => targetMemberIds.has(row.studentId)));
-      const windowReports = windowKeys.flatMap((key) => (reportsByDate.get(key) || []).filter((row) => row.status === 'sent'));
+      const windowReports = windowKeys.flatMap((key) => (reportsByDate.get(key) || []).filter((row) => row?.status === 'sent'));
       const windowKpis = windowKeys.map((key) => kpiByDate.get(key)).filter(Boolean) as KpiDaily[];
       const isTodayPoint = dateKey === todayKey;
 
@@ -857,7 +863,7 @@ export function useCenterAdminHeatmap({
         const seat = attendanceByStudentId.get(member.id);
         const stat = todayStatsByStudentId.get(member.id);
         const progress = progressById.get(member.id);
-        const studentReports = (reportsByStudentId.get(member.id) || []).filter((report) => report.status === 'sent');
+        const studentReports = (reportsByStudentId.get(member.id) || []).filter((report) => report?.status === 'sent');
         const latestInvoice = currentMonthInvoiceByStudentId.get(member.id);
         const invoiceStatus: Invoice['status'] | 'none' = latestInvoice?.status ?? 'none';
         const parentEvents = parentEvents30dByStudentId.get(member.id) || [];
@@ -929,7 +935,7 @@ export function useCenterAdminHeatmap({
           hasCounselingToday,
           invoiceStatus,
           currentAwayMinutes,
-          status: seat.status,
+          status: seat?.status || 'absent',
         });
         const baseSignal = {
           studentId: member.id,
