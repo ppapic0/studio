@@ -318,7 +318,8 @@ export default function StudentAccountManagementPage() {
         throw new Error(result.data?.message || "처리 실패");
       }
     } catch (e: any) {
-      toast({ variant: "destructive", title: "삭제 실패", description: "데이터가 너무 많아 백그라운드에서 작업이 계속 진행 중일 수 있습니다." });
+      const message = resolveCallableErrorMessage(e, "학생 계정 삭제 중 오류가 발생했습니다.");
+      toast({ variant: "destructive", title: "삭제 실패", description: message });
     } finally {
       setIsDeleting(null);
     }

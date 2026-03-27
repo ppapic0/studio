@@ -1946,62 +1946,88 @@ export const deleteStudentAccount = functions.region(region).runWith({
   const { studentId, centerId } = data;
   if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
 
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  if (!callerMemberSnap.exists || !isAdminRole(callerMemberSnap.data()?.role)) {
+  const callerMembership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+  if (!isAdminRole(callerMembership.role)) {
     throw new functions.https.HttpsError("permission-denied", "센터 관리자만 삭제 가능합니다.");
   }
 
   const targetMemberRef = db.doc(`centers/${centerId}/members/${studentId}`);
+  const targetStudentRef = db.doc(`centers/${centerId}/students/${studentId}`);
+  const targetUserCenterRef = db.doc(`userCenters/${studentId}/centers/${centerId}`);
   const targetMemberSnap = await targetMemberRef.get();
-  if (!targetMemberSnap.exists || targetMemberSnap.data()?.role !== "student") {
+  const [targetStudentSnap, targetUserCenterSnap] = await Promise.all([
+    targetStudentRef.get(),
+    targetUserCenterRef.get(),
+  ]);
+  const targetRole =
+    (typeof targetMemberSnap.data()?.role === "string" ? targetMemberSnap.data()?.role : "") ||
+    (typeof targetUserCenterSnap.data()?.role === "string" ? targetUserCenterSnap.data()?.role : "") ||
+    (targetStudentSnap.exists ? "student" : "");
+  if ((!targetMemberSnap.exists && !targetStudentSnap.exists && !targetUserCenterSnap.exists) || targetRole !== "student") {
     throw new functions.https.HttpsError("failed-precondition", "해당 센터의 학생 계정만 삭제할 수 있습니다.");
   }
 
   try {
-    const errors: string[] = [];
+    const timestamp = admin.firestore.Timestamp.now();
+    const requiredErrors: string[] = [];
+    const warningErrors: string[] = [];
+    const parentUids = normalizeStringArray(targetStudentSnap.data()?.parentUids);
 
-    const paths = [
-      `users/${studentId}`,
-      `userCenters/${studentId}`,
-      `centers/${centerId}/members/${studentId}`,
-      `centers/${centerId}/students/${studentId}`,
-      `centers/${centerId}/growthProgress/${studentId}`,
-      `centers/${centerId}/plans/${studentId}`,
-      `centers/${centerId}/studyLogs/${studentId}`,
-    ];
+    const pushError = (bucket: string[], label: string, error: any) => {
+      bucket.push(`${label}: ${error?.message || "delete failed"}`);
+    };
 
-    const filterCols = [
-      `centers/${centerId}/counselingReservations`,
-      `centers/${centerId}/counselingLogs`,
-      `centers/${centerId}/attendanceRequests`,
-      `centers/${centerId}/dailyReports`,
-    ];
+    const deleteTree = async (
+      ref: admin.firestore.DocumentReference,
+      label: string,
+      bucket: string[]
+    ) => {
+      try {
+        await db.recursiveDelete(ref);
+      } catch (error: any) {
+        pushError(bucket, label, error);
+      }
+    };
+
+    const deleteByStudentIdQuery = async (
+      collectionPath: string,
+      label: string,
+      bucket: string[]
+    ) => {
+      try {
+        const snap = await db.collection(collectionPath).where("studentId", "==", studentId).get();
+        await Promise.all(snap.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
+      } catch (error: any) {
+        pushError(bucket, label, error);
+      }
+    };
 
     await Promise.all([
-      ...paths.map(async (path) => {
-        try {
-          await db.recursiveDelete(db.doc(path));
-        } catch (e: any) {
-          errors.push(`${path}: ${e?.message || "delete failed"}`);
-        }
-      }),
-      ...filterCols.map(async (colPath) => {
-        try {
-          const q = await db.collection(colPath).where("studentId", "==", studentId).get();
-          await Promise.all(q.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
-        } catch (e: any) {
-          errors.push(`${colPath}: ${e?.message || "query delete failed"}`);
-        }
-      }),
+      deleteTree(db.doc(`users/${studentId}`), "users", requiredErrors),
+      deleteTree(db.doc(`userCenters/${studentId}`), "userCenters", requiredErrors),
+      deleteTree(targetMemberRef, "member", requiredErrors),
+      deleteTree(targetStudentRef, "student", requiredErrors),
+      deleteTree(db.doc(`centers/${centerId}/growthProgress/${studentId}`), "growthProgress", warningErrors),
+      deleteTree(db.doc(`centers/${centerId}/plans/${studentId}`), "plans", warningErrors),
+      deleteTree(db.doc(`centers/${centerId}/studyLogs/${studentId}`), "studyLogs", warningErrors),
+      deleteByStudentIdQuery(`centers/${centerId}/counselingReservations`, "counselingReservations", warningErrors),
+      deleteByStudentIdQuery(`centers/${centerId}/counselingLogs`, "counselingLogs", warningErrors),
+      deleteByStudentIdQuery(`centers/${centerId}/attendanceRequests`, "attendanceRequests", warningErrors),
+      deleteByStudentIdQuery(`centers/${centerId}/dailyReports`, "dailyReports", warningErrors),
+      deleteByStudentIdQuery(`centers/${centerId}/attendanceEvents`, "attendanceEvents", warningErrors),
+      deleteByStudentIdQuery(`centers/${centerId}/smsQueue`, "smsQueue", warningErrors),
+      deleteByStudentIdQuery(`centers/${centerId}/smsDeliveryLogs`, "smsDeliveryLogs", warningErrors),
+      deleteByStudentIdQuery(`centers/${centerId}/invoices`, "invoices", warningErrors),
       (async () => {
         try {
           const statsSnap = await db.collectionGroup("students").where("studentId", "==", studentId).get();
           const statDocs = statsSnap.docs.filter((docSnap) =>
-            docSnap.ref.path.startsWith(`centers/${centerId}/dailyStudentStats/`)
+            docSnap.ref.path.startsWith(`centers/${centerId}/dailyStudentStats/`) ||
+            docSnap.ref.path.startsWith(`centers/${centerId}/attendanceDailyStats/`)
           );
           await Promise.all(statDocs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
-        } catch (e: any) {
-          errors.push(`dailyStudentStats: ${e?.message || "stats cleanup failed"}`);
+        } catch (error: any) {
+          pushError(warningErrors, "dailyStats", error);
         }
       })(),
       (async () => {
@@ -2011,13 +2037,12 @@ export const deleteStudentAccount = functions.region(region).runWith({
             leaderboardsSnap.docs.map(async (boardDoc) => {
               const directEntryRef = boardDoc.ref.collection("entries").doc(studentId);
               await db.recursiveDelete(directEntryRef);
-
               const byStudentQuery = await boardDoc.ref.collection("entries").where("studentId", "==", studentId).get();
               await Promise.all(byStudentQuery.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
             })
           );
-        } catch (e: any) {
-          errors.push(`leaderboards: ${e?.message || "leaderboard cleanup failed"}`);
+        } catch (error: any) {
+          pushError(warningErrors, "leaderboards", error);
         }
       })(),
       (async () => {
@@ -2028,22 +2053,63 @@ export const deleteStudentAccount = functions.region(region).runWith({
               seatDoc.ref.set(
                 {
                   studentId: null,
+                  roomId: admin.firestore.FieldValue.delete(),
+                  roomSeatNo: admin.firestore.FieldValue.delete(),
+                  seatId: admin.firestore.FieldValue.delete(),
                   status: "absent",
-                  updatedAt: admin.firestore.Timestamp.now(),
+                  updatedAt: timestamp,
                   lastCheckInAt: admin.firestore.FieldValue.delete(),
                 },
                 { merge: true }
               )
             )
           );
-        } catch (e: any) {
-          errors.push(`attendanceCurrent: ${e?.message || "seat cleanup failed"}`);
+        } catch (error: any) {
+          pushError(warningErrors, "attendanceCurrent", error);
+        }
+      })(),
+      (async () => {
+        try {
+          if (parentUids.length === 0) return;
+          const batch = db.batch();
+          for (const parentUid of parentUids) {
+            batch.set(
+              db.doc(`centers/${centerId}/members/${parentUid}`),
+              {
+                linkedStudentIds: admin.firestore.FieldValue.arrayRemove(studentId),
+                updatedAt: timestamp,
+              },
+              { merge: true }
+            );
+            batch.set(
+              db.doc(`userCenters/${parentUid}/centers/${centerId}`),
+              {
+                linkedStudentIds: admin.firestore.FieldValue.arrayRemove(studentId),
+                updatedAt: timestamp,
+              },
+              { merge: true }
+            );
+          }
+          await batch.commit();
+        } catch (error: any) {
+          pushError(warningErrors, "parentLinks", error);
+        }
+      })(),
+      (async () => {
+        try {
+          const recipientPrefSnap = await db
+            .collection(`centers/${centerId}/smsRecipientPreferences`)
+            .where("studentId", "==", studentId)
+            .get();
+          await Promise.all(recipientPrefSnap.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
+        } catch (error: any) {
+          pushError(warningErrors, "smsRecipientPreferences", error);
         }
       })(),
     ]);
 
-    if (errors.length > 0) {
-      throw new Error(`학생 데이터 일부 삭제 실패 (${errors.length}건)`);
+    if (requiredErrors.length > 0) {
+      throw new Error(`핵심 학생 데이터 삭제 실패 (${requiredErrors.join(" | ")})`);
     }
 
     try {
@@ -2054,9 +2120,15 @@ export const deleteStudentAccount = functions.region(region).runWith({
       }
     }
 
-    return { ok: true, message: "정리가 완료되었습니다." };
+    return {
+      ok: true,
+      message: warningErrors.length > 0 ? "학생 계정은 삭제되었고, 일부 보조 기록은 후속 정리되었습니다." : "정리가 완료되었습니다.",
+      warnings: warningErrors,
+    };
   } catch (error: any) {
-    throw new functions.https.HttpsError("internal", error.message);
+    throw new functions.https.HttpsError("internal", error?.message || "학생 계정 삭제 중 오류가 발생했습니다.", {
+      userMessage: error?.message || "학생 계정 삭제 중 오류가 발생했습니다.",
+    });
   }
 });
 

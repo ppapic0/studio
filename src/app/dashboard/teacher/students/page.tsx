@@ -72,6 +72,41 @@ import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 import { isTeacherOrAdminRole } from '@/lib/dashboard-access';
 
+function resolveCallableErrorMessage(error: any, fallback: string): string {
+  const detailMessage =
+    typeof error?.details === 'string'
+      ? error.details
+      : typeof error?.details?.userMessage === 'string'
+        ? error.details.userMessage
+        : typeof error?.details?.message === 'string'
+          ? error.details.message
+          : '';
+
+  const rawMessage = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
+  const cleanedRaw = rawMessage
+    .replace(/^\d+\s+FAILED_PRECONDITION:\s*/i, '')
+    .replace(/^\d+\s+INVALID_ARGUMENT:\s*/i, '')
+    .replace(/^\d+\s+ALREADY_EXISTS:\s*/i, '')
+    .replace(/^\d+\s+PERMISSION_DENIED:\s*/i, '')
+    .replace(/^\d+\s+INTERNAL:\s*/i, '')
+    .trim();
+
+  const code = String(error?.code || '').toLowerCase();
+  const isInternal = code.includes('internal') || /\b(functions\/internal|internal)\b/i.test(cleanedRaw);
+
+  if (detailMessage) return detailMessage;
+  if (!isInternal && cleanedRaw) return cleanedRaw;
+
+  if (code.includes('permission-denied')) {
+    return '삭제 권한이 없습니다. 센터관리자 계정인지 확인해 주세요.';
+  }
+  if (code.includes('failed-precondition')) {
+    return '삭제할 학생 계정을 찾지 못했습니다. 학생 등록 상태를 다시 확인해 주세요.';
+  }
+
+  return fallback;
+}
+
 const RiskIntelligencePanel = dynamic(
   () => import('@/components/dashboard/risk-intelligence').then((mod) => mod.RiskIntelligence),
   {
@@ -234,11 +269,9 @@ export default function StudentListPage() {
       }
     } catch (e: any) {
       console.error("[Delete Student Error]", e);
-      let errorMsg = "계정 삭제 중 오류가 발생했습니다.";
+      let errorMsg = resolveCallableErrorMessage(e, "계정 삭제 중 오류가 발생했습니다.");
       if (e.code === 'deadline-exceeded') {
         errorMsg = "서버 처리 시간이 너무 오래 걸립니다. 하지만 삭제 작업은 백그라운드에서 계속 진행될 수 있습니다. 잠시 후 확인해 보세요.";
-      } else if (e.message) {
-        errorMsg = e.message;
       }
       toast({ 
         variant: "destructive", 

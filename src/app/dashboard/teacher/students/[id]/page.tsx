@@ -1332,7 +1332,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: '삭제 실패' });
+      const message = resolveCallableErrorMessage(error, '학생 계정 삭제 중 오류가 발생했습니다.');
+      toast({ variant: 'destructive', title: '삭제 실패', description: message });
     } finally {
       setIsUpdating(false);
     }
