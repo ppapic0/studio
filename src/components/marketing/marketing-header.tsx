@@ -9,6 +9,8 @@ type MarketingHeaderProps = {
 };
 
 export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
+  const mobileBrandLines = ['트랙 스터디센터', '트랙 국어학원'];
+
   return (
     <header
       className="sticky top-0 z-50"
@@ -29,9 +31,15 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
             className="h-6 w-auto shrink-0 object-contain sm:h-9"
           />
           <div className="grid min-w-0 gap-0.5">
-            <span className="truncate text-[0.78rem] font-bold leading-[1.18] text-white sm:text-[1.02rem] lg:text-[1.05rem]">
-              <span className="sm:hidden">트랙 스터디센터</span>
-              <span className="hidden sm:inline">{brand.name}</span>
+            <div className="grid min-w-0 gap-0.5 sm:hidden">
+              {mobileBrandLines.map((line) => (
+                <span key={line} className="truncate text-[0.75rem] font-bold leading-[1.1] text-white">
+                  {line}
+                </span>
+              ))}
+            </div>
+            <span className="hidden truncate text-[0.78rem] font-bold leading-[1.18] text-white sm:block sm:text-[1.02rem] lg:text-[1.05rem]">
+              {brand.name}
             </span>
             <span className="hidden text-[9.5px] font-black tracking-[0.18em] text-white/50 md:block">
               MANAGED STUDY CENTER

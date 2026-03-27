@@ -39,6 +39,11 @@ async function getWaitlistCount(): Promise<number> {
 
 export async function ConsultSection({ consult, trustMetrics }: ConsultSectionProps) {
   const waitlistCount = await getWaitlistCount();
+  const infoCards = [
+    { label: 'CONTACT', value: consult.contactLine, mobileSpanClass: '' },
+    { label: 'LOCATION', value: consult.locationLine, mobileSpanClass: 'col-span-2' },
+    { label: 'HOURS', value: consult.hoursLine, mobileSpanClass: '' },
+  ];
 
   return (
     <section
@@ -138,25 +143,25 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                 </article>
               )}
 
-              {[
-                { label: 'CONTACT', value: consult.contactLine },
-                { label: 'LOCATION', value: consult.locationLine },
-                { label: 'HOURS', value: consult.hoursLine },
-              ].map((item) => (
-                <article
-                  key={item.label}
-                  className="brand-sheen-panel rounded-2xl border p-5"
-                  style={{
-                    borderColor: 'rgba(255,255,255,0.10)',
-                    background: 'rgba(255,255,255,0.06)',
-                  }}
-                >
-                  <p className="text-[10.5px] font-black tracking-[0.18em] text-[#FFB273]">{item.label}</p>
-                  <p className="mt-2 break-keep text-[1.05rem] font-black leading-relaxed text-white">
-                    {item.value}
-                  </p>
-                </article>
-              ))}
+              <div className="grid grid-cols-2 gap-3">
+                {infoCards.map((item) => (
+                  <article
+                    key={item.label}
+                    className={`brand-sheen-panel rounded-[1.25rem] border p-4 sm:rounded-2xl sm:p-5 ${item.mobileSpanClass}`}
+                    style={{
+                      borderColor: 'rgba(255,255,255,0.10)',
+                      background: 'rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <p className="text-[10px] font-black tracking-[0.17em] text-[#FFB273] sm:text-[10.5px]">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 break-keep text-[0.94rem] font-black leading-[1.65] text-white sm:text-[1.05rem] sm:leading-relaxed">
+                      {item.value}
+                    </p>
+                  </article>
+                ))}
+              </div>
 
               <div className="grid gap-2.5 pt-1 sm:flex sm:flex-wrap">
                 <a
