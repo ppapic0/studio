@@ -476,6 +476,13 @@ export default function StudyHistoryPage() {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
+  const formatCompactCalendarMinutes = (minutes: number) => {
+    if (minutes <= 0) return '--';
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.round((minutes / 60) * 10) / 10;
+    return Number.isInteger(hours) ? `${hours.toFixed(0)}h` : `${hours.toFixed(1)}h`;
+  };
+
   const getHeatmapColor = (minutes: number) => {
     if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
     if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,246,0.98)_60%,rgba(225,248,238,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.18)]';
@@ -880,7 +887,9 @@ export default function StudyHistoryPage() {
               const isTodayCalendar = isSameDay(day, new Date());
               const hasDeepFocus = isCurrentMonth && minutes >= 180;
               const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
-              const timeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
+              const timeLabel = isCurrentMonth
+                ? (isMobile ? formatCompactCalendarMinutes(minutes) : formatMinutes(minutes))
+                : '--';
 
               return (
                 <button
@@ -930,13 +939,15 @@ export default function StudyHistoryPage() {
                   <div className={cn("absolute left-0 right-0", isMobile ? "inset-y-0 flex items-center justify-center px-1.5" : "bottom-2 px-2")}>
                     <div
                       className={cn(
-                        "overflow-hidden rounded-[0.95rem] border bg-white text-center whitespace-nowrap shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
-                        isMobile ? "min-w-[2.25rem] px-1.5 py-1" : "px-2.5 py-2",
+                        "overflow-hidden text-center whitespace-nowrap",
+                        isMobile
+                          ? "min-w-0 rounded-none border-none bg-transparent px-0 py-0 shadow-none"
+                          : "rounded-[0.95rem] border bg-white px-2.5 py-2 shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
                         getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                       )}
                     >
                       {isMobile ? (
-                        <span className="dashboard-number block tabular-nums text-[0.78rem] leading-none tracking-[-0.05em]">
+                        <span className="dashboard-number block tabular-nums text-[0.68rem] leading-none tracking-[-0.08em]">
                           {timeLabel}
                         </span>
                       ) : (
