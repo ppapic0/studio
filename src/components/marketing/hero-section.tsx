@@ -39,6 +39,11 @@ function getHeroTokens(line: string, lineIndex: number): HeroToken[] {
 
 export function HeroSection({ brand }: HeroSectionProps) {
   const heroTitleLines = brand.heroTitle.split('\n');
+  const mobileHeroLines = [
+    '공부는 방향이 중요합니다.',
+    '성장의 길, 트랙에서',
+    '시작됩니다.',
+  ];
   const heroFireworks = [
     {
       className: 'right-[8%] top-[6%] h-48 w-48 sm:h-60 sm:w-60 lg:h-[21rem] lg:w-[21rem]',
@@ -277,7 +282,40 @@ export function HeroSection({ brand }: HeroSectionProps) {
             <span className="eyebrow-badge-light">TRACK STUDY CENTER</span>
 
             <div className="space-y-5 sm:space-y-6">
-              <div className="hero-headline-shell relative mx-auto inline-flex w-full max-w-[22.5rem] justify-center sm:max-w-full">
+              <div className="hero-headline-shell relative mx-auto inline-flex w-full max-w-[22.5rem] justify-center sm:hidden">
+                <div className="hero-headline-aura absolute inset-x-[10%] top-[10%] h-[64%] rounded-full bg-[radial-gradient(circle,rgba(255,122,22,0.26)_0%,rgba(255,184,122,0.14)_30%,transparent_74%)] blur-3xl" />
+                <div className="hero-headline-flare absolute left-1/2 top-[18%] h-20 w-20 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,201,154,0.55)_0%,rgba(255,122,22,0.18)_40%,transparent_72%)] blur-2xl sm:h-28 sm:w-28" />
+                <h1 className="font-aggro-display relative text-[clamp(2.05rem,12vw,5.35rem)] font-black tracking-[-0.04em] text-white">
+                  <span className="flex flex-col items-center gap-[0.12em] leading-[0.94]">
+                    {mobileHeroLines.map((line, lineIndex) => (
+                      <span key={`mobile-${line}`} className="hero-headline-line flex justify-center">
+                        <span
+                          className="hero-headline-token inline-flex items-center justify-center break-keep text-center"
+                          style={
+                            {
+                              ['--hero-token-delay' as string]: `${0.02 + lineIndex * 0.1}s`,
+                              ['--hero-from-x' as string]: lineIndex === 0 ? '-34px' : lineIndex === 1 ? '12px' : '30px',
+                              ['--hero-from-y' as string]: lineIndex === 0 ? '-16px' : lineIndex === 1 ? '20px' : '34px',
+                              ['--hero-from-rotate' as string]: lineIndex === 0 ? '-5deg' : lineIndex === 1 ? '6deg' : '-4deg',
+                              ['--hero-from-scale' as string]: lineIndex === 1 ? '0.92' : '0.9',
+                            } as CSSProperties
+                          }
+                        >
+                          {lineIndex === 1 ? (
+                            <>
+                              성장의 길,&nbsp;<span className="hero-headline-token-highlight inline-block text-[#FF7A16]">트랙</span>에서
+                            </>
+                          ) : (
+                            line
+                          )}
+                        </span>
+                      </span>
+                    ))}
+                  </span>
+                </h1>
+              </div>
+
+              <div className="hero-headline-shell relative mx-auto hidden w-full justify-center sm:inline-flex sm:max-w-full">
                 <div className="hero-headline-aura absolute inset-x-[10%] top-[10%] h-[64%] rounded-full bg-[radial-gradient(circle,rgba(255,122,22,0.26)_0%,rgba(255,184,122,0.14)_30%,transparent_74%)] blur-3xl" />
                 <div className="hero-headline-flare absolute left-1/2 top-[18%] h-20 w-20 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,201,154,0.55)_0%,rgba(255,122,22,0.18)_40%,transparent_72%)] blur-2xl sm:h-28 sm:w-28" />
                 <h1 className="font-aggro-display relative text-[clamp(2.1rem,11.8vw,5.35rem)] font-black tracking-[-0.04em] text-white">

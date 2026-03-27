@@ -69,26 +69,27 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
           </div>
         </article>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {centerEnvironment.photos.map((photo, index) => (
             <article
               key={photo.title}
-              className="marketing-card brand-sheen-panel overflow-hidden p-4 sm:p-5"
+              className="marketing-card brand-sheen-panel overflow-hidden p-3 sm:p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">CENTER 0{index + 1}</p>
-                  <h3 className="mt-2 break-keep text-[1.02rem] font-black leading-[1.35] text-[#14295F] sm:text-[1.1rem]">
+                  <p className="text-[8.5px] font-black tracking-[0.16em] text-[#FF7A16] sm:text-[10px]">CENTER 0{index + 1}</p>
+                  <h3 className="mt-1.5 break-keep text-[0.9rem] font-black leading-[1.28] text-[#14295F] sm:mt-2 sm:text-[1.1rem]">
                     {photo.title}
                   </h3>
                 </div>
-                <span className="rounded-full border border-[#14295F]/10 bg-[#F7FAFF] px-3 py-1 text-[10px] font-black text-[#425A75]">
-                  실제 사진 예정
+                <span className="rounded-full border border-[#14295F]/10 bg-[#F7FAFF] px-2.5 py-1 text-[8.5px] font-black text-[#425A75] sm:px-3 sm:text-[10px]">
+                  <span className="sm:hidden">사진 예정</span>
+                  <span className="hidden sm:inline">실제 사진 예정</span>
                 </span>
               </div>
 
-              <div className="mt-4 rounded-[1.25rem] border border-[#14295F]/10 bg-[linear-gradient(160deg,#F7FAFF_0%,#FFFFFF_100%)] p-3">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-[1rem] border border-dashed border-[#14295F]/14 bg-white">
+              <div className="mt-3 rounded-[1rem] border border-[#14295F]/10 bg-[linear-gradient(160deg,#F7FAFF_0%,#FFFFFF_100%)] p-2 sm:mt-4 sm:rounded-[1.25rem] sm:p-3">
+                <div className="relative aspect-[5/4] overflow-hidden rounded-[0.85rem] border border-dashed border-[#14295F]/14 bg-white sm:aspect-[4/3] sm:rounded-[1rem]">
                   {photo.image ? (
                     <Image
                       src={photo.image}
@@ -98,21 +99,25 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
                       className="object-cover"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.10),transparent_34%),linear-gradient(160deg,#F9FBFF_0%,#FFFFFF_100%)] px-6 text-center">
-                      <div className="h-14 w-14 rounded-[1.25rem] border border-[#FF7A16]/14 bg-white shadow-[0_14px_28px_rgba(20,41,95,0.06)]" />
-                      <p className="mt-4 text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">CENTER PHOTO</p>
-                      <p className="mt-2 break-keep text-[0.92rem] font-black leading-[1.35] text-[#14295F] sm:text-[0.98rem]">
-                        실제 센터 사진 예정
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.10),transparent_34%),linear-gradient(160deg,#F9FBFF_0%,#FFFFFF_100%)] px-3 text-center sm:px-6">
+                      <div className="h-8 w-8 rounded-[0.9rem] border border-[#FF7A16]/14 bg-white shadow-[0_14px_28px_rgba(20,41,95,0.06)] sm:h-14 sm:w-14 sm:rounded-[1.25rem]" />
+                      <p className="mt-2.5 text-[8.5px] font-black tracking-[0.14em] text-[#FF7A16] sm:mt-4 sm:text-[11px]">CENTER PHOTO</p>
+                      <p className="mt-1.5 break-keep text-[0.78rem] font-black leading-[1.28] text-[#14295F] sm:mt-2 sm:text-[0.98rem]">
+                        <span className="sm:hidden">센터 사진 예정</span>
+                        <span className="hidden sm:inline">실제 센터 사진 예정</span>
                       </p>
-                      <p className="mt-2 break-keep text-[12px] font-semibold leading-[1.7] text-[#5B7087]">
-                        준비되면 이 자리에 바로 반영됩니다.
+                      <p className="mt-1.5 break-keep text-[10px] font-semibold leading-[1.45] text-[#5B7087] sm:mt-2 sm:text-[12px] sm:leading-[1.7]">
+                        <span className="sm:hidden">준비 후 반영</span>
+                        <span className="hidden sm:inline">준비되면 이 자리에 바로 반영됩니다.</span>
                       </p>
                     </div>
                   )}
                 </div>
               </div>
 
-              <p className="mt-4 break-keep text-[12.8px] font-semibold leading-[1.72] text-[#52667D]">{photo.summary}</p>
+              <p className="mt-3 break-keep text-[11px] font-semibold leading-[1.62] text-[#52667D] sm:mt-4 sm:text-[12.8px] sm:leading-[1.72]">
+                {photo.summary}
+              </p>
             </article>
           ))}
         </div>

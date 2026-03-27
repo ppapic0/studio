@@ -16,7 +16,7 @@ import { marketingContent } from '@/lib/marketing-content';
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen overflow-x-clip bg-white text-slate-900">
+    <main className="min-h-screen overflow-x-clip bg-white pb-24 text-slate-900 sm:pb-0">
       <MarketingPageTracker pageType="landing" placement="landing_root" />
       <MarketingLaunchNoticeModal notice={marketingContent.launchNotice} />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />

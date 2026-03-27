@@ -30,6 +30,7 @@ const interventionHighlights = [
   {
     icon: Search,
     label: '진단',
+    mobileTitle: '문제 진단',
     title: '문제 상태를 먼저 진단합니다',
     description: '국어 약점 유형과 공부시간 하락 구간을 먼저 확인하고, 루틴이 무너지는 지점을 찾습니다.',
     emphasis: '6월 3등급 · 백분위 82',
@@ -38,6 +39,7 @@ const interventionHighlights = [
   {
     icon: Clock3,
     label: '개입',
+    mobileTitle: '루틴 개입',
     title: '루틴과 개입을 바로 연결합니다',
     description: '시작 시간 고정, 주간 계획 조정, 과제 밀도 재배치를 같은 흐름 안에서 반복 개입합니다.',
     emphasis: '주간 학습시간 21h → 34h',
@@ -46,6 +48,7 @@ const interventionHighlights = [
   {
     icon: Sparkles,
     label: '변화 확인',
+    mobileTitle: '변화 확인',
     title: '변화도 다시 숫자로 확인합니다',
     description: '상승한 성적만 보는 것이 아니라, 학습 안정성과 루틴 회복이 함께 유지되는지 전후를 비교합니다.',
     emphasis: '9월 백분위 96 → 수능 99',
@@ -106,7 +109,7 @@ export function HomeGrowthProofSection() {
       style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
           <article className="marketing-card p-4 sm:p-8">
             <span className="inline-flex items-center rounded-full bg-[#14295F]/7 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-[#14295F] uppercase">
               Growth Proof
@@ -178,8 +181,8 @@ export function HomeGrowthProofSection() {
                           <span className="sm:hidden">{item.mobilePhase}</span>
                           <span className="hidden sm:inline">{item.phase}</span>
                         </p>
-                        <p className="brand-number-pop mt-1.5 break-keep text-[0.92rem] font-black leading-none sm:mt-2 sm:text-[1.1rem]">{item.score}</p>
-                        <p className="mt-1.5 text-[9px] font-semibold leading-[1.35] opacity-85 sm:mt-2 sm:text-[13px]">{item.percentile}</p>
+                        <p className="brand-number-pop mt-1.5 whitespace-nowrap break-keep text-[0.92rem] font-black leading-none sm:mt-2 sm:text-[1.1rem]">{item.score}</p>
+                        <p className="mt-1.5 whitespace-nowrap text-[9px] font-semibold leading-[1.35] opacity-85 sm:mt-2 sm:text-[13px]">{item.percentile}</p>
                       </div>
                     </article>
                   ))}
@@ -207,7 +210,10 @@ export function HomeGrowthProofSection() {
                               <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </div>
                           </div>
-                          <p className="mt-2 break-keep text-[0.82rem] font-black leading-[1.36] text-[#14295F] sm:mt-3 sm:text-[1rem] sm:leading-[1.42]">{item.title}</p>
+                          <p className="mt-2 break-keep text-[0.82rem] font-black leading-[1.36] text-[#14295F] sm:mt-3 sm:text-[1rem] sm:leading-[1.42]">
+                            <span className="sm:hidden">{item.mobileTitle}</span>
+                            <span className="hidden sm:inline">{item.title}</span>
+                          </p>
                           <p className="mt-2 hidden break-keep text-[13px] font-semibold leading-[1.72] text-[#425a75] sm:block">
                             {item.description}
                           </p>
@@ -235,7 +241,7 @@ export function HomeGrowthProofSection() {
                         <span className="sm:hidden">{item.mobileLabel}</span>
                         <span className="hidden sm:inline">{item.label}</span>
                       </p>
-                      <p className="brand-number-pop mt-1.5 break-keep text-[0.92rem] font-black leading-[1.2] sm:mt-2 sm:text-[1.2rem]">{item.value}</p>
+                      <p className="brand-number-pop mt-1.5 whitespace-nowrap break-keep text-[0.92rem] font-black leading-[1.2] sm:mt-2 sm:text-[1.2rem]">{item.value}</p>
                       <p className="mt-1 text-[8.5px] font-semibold leading-[1.35] text-white/68 sm:mt-1.5 sm:text-[11px]">{item.detail}</p>
                     </article>
                   ))}
