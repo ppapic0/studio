@@ -19,20 +19,20 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
         boxShadow: '0 1px 0 0 rgba(255,255,255,0.05) inset, 0 8px 24px -4px rgba(0,0,0,0.28)',
       }}
     >
-      <div className="mx-auto flex h-[4.25rem] w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="inline-flex min-w-0 flex-1 items-center gap-2.5 transition-opacity hover:opacity-85">
+      <div className="mx-auto flex h-[3.9rem] w-full max-w-7xl items-center justify-between gap-2 px-3.5 sm:h-[4.25rem] sm:gap-3 sm:px-6 lg:px-8">
+        <Link href="/" className="inline-flex min-w-0 flex-1 items-center gap-2 transition-opacity hover:opacity-85 sm:gap-2.5">
           <Image
             src="/track-logo-mark-white.png"
             alt={`${brand.name} 로고`}
             width={54}
             height={36}
-            className="h-8 w-auto shrink-0 object-contain sm:h-9"
+            className="h-7 w-auto shrink-0 object-contain sm:h-9"
           />
           <div className="grid min-w-0 gap-0.5">
-            <span className="truncate text-[0.94rem] font-bold text-white sm:text-[1.02rem] lg:text-[1.05rem]">
+            <span className="truncate text-[0.8rem] font-bold leading-[1.18] text-white sm:text-[1.02rem] lg:text-[1.05rem]">
               {brand.name}
             </span>
-            <span className="hidden text-[9.5px] font-black tracking-[0.18em] text-white/50 sm:block">
+            <span className="hidden text-[9.5px] font-black tracking-[0.18em] text-white/50 md:block">
               MANAGED STUDY CENTER
             </span>
           </div>
@@ -53,14 +53,14 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <a
             href="/go/login?placement=header"
-            className="premium-cta premium-cta-ghost h-8 whitespace-nowrap px-3 text-[11px] font-extrabold tracking-[-0.01em] sm:h-9 sm:px-4 sm:text-xs"
+            className="premium-cta premium-cta-ghost h-8 min-w-[4.25rem] whitespace-nowrap px-2.5 text-[10.5px] font-extrabold tracking-[-0.01em] sm:h-9 sm:min-w-0 sm:px-4 sm:text-xs"
           >
             <span className="sm:hidden">로그인</span>
             <span className="hidden sm:inline">웹앱 로그인</span>
           </a>
           <a
             href="/go/experience?placement=header"
-            className="premium-cta premium-cta-primary h-8 whitespace-nowrap px-3 text-[11px] font-extrabold tracking-[-0.01em] [text-shadow:0_1px_1px_rgba(0,0,0,0.28)] sm:h-10 sm:px-5 sm:text-[13.5px]"
+            className="premium-cta premium-cta-primary h-8 min-w-[4.25rem] whitespace-nowrap px-2.5 text-[10.5px] font-extrabold tracking-[-0.01em] [text-shadow:0_1px_1px_rgba(0,0,0,0.28)] sm:h-10 sm:min-w-0 sm:px-5 sm:text-[13.5px]"
           >
             <span className="sm:hidden">체험</span>
             <span className="hidden sm:inline">웹앱 체험</span>
@@ -70,12 +70,12 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
 
       {/* Mobile nav */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} className="lg:hidden">
-        <nav className="mx-auto flex h-10 w-full max-w-7xl items-center gap-5 overflow-x-auto px-4 sm:px-6">
+        <nav className="mx-auto flex h-9 w-full max-w-7xl items-center gap-4 overflow-x-auto px-3.5 sm:h-10 sm:gap-5 sm:px-6">
           {nav.map((item) => (
             <a
               key={item.href}
               href={item.href}
-              className="whitespace-nowrap text-[11px] font-bold text-white/55 transition-colors hover:text-white/90"
+              className="whitespace-nowrap text-[10.5px] font-bold text-white/55 transition-colors hover:text-white/90 sm:text-[11px]"
             >
               {item.label}
             </a>

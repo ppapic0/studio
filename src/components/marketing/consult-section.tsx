@@ -36,7 +36,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
   return (
     <section
       id="consult"
-      className="on-dark relative scroll-mt-28 overflow-hidden py-10 sm:py-14"
+      className="on-dark relative scroll-mt-28 overflow-hidden py-9 sm:py-14"
       style={{ background: 'linear-gradient(160deg, #0c1a40 0%, #14295f 55%, #0d1e4a 100%)' }}
     >
       <div className="pointer-events-none absolute inset-0">
@@ -48,7 +48,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
       </div>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div
-          className="brand-sheen-panel relative overflow-hidden rounded-[2rem] border p-7 sm:p-10"
+          className="brand-sheen-panel relative overflow-hidden rounded-[1.7rem] border p-5 sm:rounded-[2rem] sm:p-10"
           style={{
             borderColor: 'rgba(255,255,255,0.10)',
             background: 'rgba(255,255,255,0.05)',
@@ -58,11 +58,11 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
         >
           <SectionHeading eyebrow="Consulting" title={consult.heading} description={consult.description} light />
 
-          <StaggerChildren className="mt-6 grid gap-3 md:grid-cols-5" stagger={85}>
+          <StaggerChildren className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6" stagger={85}>
             {trustMetrics.map((metric) => (
               <article
                 key={`${metric.label}-${metric.value}`}
-                className="brand-sheen-panel rounded-2xl border px-4 py-4"
+                className="brand-sheen-panel rounded-2xl border px-3.5 py-4 sm:px-4"
                 style={{
                   borderColor: 'rgba(255,255,255,0.12)',
                   background: 'rgba(255,255,255,0.06)',
@@ -74,7 +74,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
               </article>
             ))}
             <article
-              className="brand-beacon brand-sheen-panel relative rounded-2xl border px-4 py-4"
+              className="brand-beacon brand-sheen-panel relative col-span-2 rounded-2xl border px-3.5 py-4 sm:px-4 lg:col-span-1 xl:col-span-1"
               style={{
                 borderColor: 'rgba(255,122,22,0.30)',
                 background: 'rgba(255,122,22,0.10)',
@@ -92,7 +92,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
             </article>
           </StaggerChildren>
 
-          <div className="mt-7 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="mt-7 grid gap-5 lg:grid-cols-[0.95fr_1.05fr] lg:gap-6">
             <ConsultForm waitlistCount={waitlistCount} />
 
             <div className="space-y-4">
@@ -142,22 +142,22 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                 </article>
               ))}
 
-              <div className="flex flex-wrap gap-3 pt-1">
+              <div className="grid gap-2.5 pt-1 sm:flex sm:flex-wrap">
                 <a
                   href="#consult-form"
-                  className="premium-cta premium-cta-primary brand-cta-float h-12 px-6 text-sm"
+                  className="premium-cta premium-cta-primary brand-cta-float h-12 w-full px-6 text-sm sm:w-auto"
                 >
                   상담 폼 작성하기
                 </a>
                 <a
                   href="/go/login?placement=consult_section"
-                  className="premium-cta premium-cta-ghost brand-cta-float h-12 px-6 text-sm"
+                  className="premium-cta premium-cta-ghost brand-cta-float h-12 w-full px-6 text-sm sm:w-auto"
                 >
                   웹앱 로그인
                 </a>
                 <a
                   href="/go/experience?placement=consult_section"
-                  className="premium-cta premium-cta-ghost brand-cta-float h-12 px-6 text-sm"
+                  className="premium-cta premium-cta-ghost brand-cta-float h-12 w-full px-6 text-sm sm:w-auto"
                 >
                   웹앱 체험하기
                 </a>

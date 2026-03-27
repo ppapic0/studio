@@ -15,7 +15,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
         borderTop: '1px solid rgba(255,255,255,0.07)',
       }}
     >
-      <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
             <div className="inline-flex items-center gap-3">
@@ -31,21 +31,21 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
             <p className="mt-4 max-w-md break-keep text-sm font-semibold leading-[1.82] text-white/55">
               {footer.line}
             </p>
-            <div className="mt-6 flex flex-wrap gap-2.5">
-              <a href="#consult" className="premium-cta premium-cta-primary h-10 px-4 text-xs">
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+              <a href="#consult" className="premium-cta premium-cta-primary h-10 px-4 text-xs sm:w-auto">
                 상담 문의
               </a>
-              <a href="/go/login?placement=footer" className="premium-cta premium-cta-ghost h-10 px-4 text-xs">
+              <a href="/go/login?placement=footer" className="premium-cta premium-cta-ghost h-10 px-4 text-xs sm:w-auto">
                 웹앱 로그인
               </a>
-              <a href="/go/experience?placement=footer" className="premium-cta premium-cta-ghost h-10 px-4 text-xs">
+              <a href="/go/experience?placement=footer" className="premium-cta premium-cta-ghost h-10 px-4 text-xs sm:w-auto">
                 웹앱 체험
               </a>
             </div>
           </div>
 
           <div
-            className="rounded-2xl border p-5 space-y-3"
+            className="space-y-3 rounded-2xl border p-4 sm:p-5"
             style={{
               borderColor: 'rgba(255,255,255,0.09)',
               background: 'rgba(255,255,255,0.04)',
@@ -57,10 +57,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
           </div>
         </div>
 
-        <div
-          className="mt-10 pt-6 text-[12px] font-semibold text-white"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
-        >
+        <div className="mt-8 pt-6 text-[12px] font-semibold text-white" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           © {new Date().getFullYear()} {brand.name}. All rights reserved.
         </div>
       </div>

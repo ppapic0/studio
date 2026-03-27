@@ -4,7 +4,7 @@ export function KoreanClassSection() {
   return (
     <section
       id="korean-class"
-      className="relative scroll-mt-20 overflow-hidden py-10 sm:py-12"
+      className="relative scroll-mt-20 overflow-hidden py-9 sm:py-12"
       style={{ background: 'linear-gradient(180deg, #f2f6ff 0%, #edf1fb 100%)' }}
     >
       <div className="pointer-events-none absolute inset-0">
@@ -16,7 +16,7 @@ export function KoreanClassSection() {
       </div>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="space-y-5">
-          <div className="brand-sheen-panel relative overflow-hidden rounded-[1.85rem] border border-[rgba(255,122,22,0.18)] bg-[linear-gradient(135deg,rgba(255,255,255,0.97)_0%,rgba(255,244,236,0.99)_100%)] px-7 py-7 shadow-[0_22px_52px_rgba(20,41,95,0.10)] sm:px-10 sm:py-9 lg:px-12 lg:py-10">
+          <div className="brand-sheen-panel relative overflow-hidden rounded-[1.55rem] border border-[rgba(255,122,22,0.18)] bg-[linear-gradient(135deg,rgba(255,255,255,0.97)_0%,rgba(255,244,236,0.99)_100%)] px-5 py-5 shadow-[0_22px_52px_rgba(20,41,95,0.10)] sm:rounded-[1.85rem] sm:px-10 sm:py-9 lg:px-12 lg:py-10">
             <div className="brand-glow-drift absolute -right-10 -top-8 h-32 w-32 rounded-full bg-[#FFB878]/24 blur-3xl" />
             <div className="brand-glow-drift absolute left-[-3%] bottom-[-20%] h-32 w-32 rounded-full bg-[#FFD7B5]/22 blur-3xl" />
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -24,11 +24,11 @@ export function KoreanClassSection() {
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#FF7A16]">
                   실전 모의고사 운영
                 </p>
-                <h3 className="break-keep text-[1.22rem] font-black leading-[1.38] text-[#14295F] sm:text-[1.45rem] lg:text-[1.62rem]">
+                <h3 className="break-keep text-[1.08rem] font-black leading-[1.42] text-[#14295F] sm:text-[1.45rem] lg:text-[1.62rem]">
                   매달 더프와 사설 모의고사를 함께 운영해
                   <br className="hidden sm:block" />실전 감각과 국어 대응력을 꾸준히 점검합니다
                 </h3>
-                <p className="break-keep text-[14px] font-semibold leading-[1.78] text-slate-500 sm:text-[15px]">
+                <p className="break-keep text-[13.5px] font-semibold leading-[1.74] text-slate-500 sm:text-[15px]">
                   더프, 사설 모의고사와 함께 국어는 이감, 시대인재 서바이벌 등도
                   제휴 협의 중인 흐름으로 준비하고 있습니다.
                 </p>
@@ -46,9 +46,9 @@ export function KoreanClassSection() {
             </div>
           </div>
 
-          <div className="brand-sheen-panel relative flex flex-col items-center gap-5 rounded-[1.4rem] border border-[rgba(20,41,95,0.1)] bg-white px-7 py-7 text-center shadow-[0_16px_34px_rgba(20,41,95,0.07)] sm:flex-row sm:gap-8 sm:px-10 sm:text-left">
+          <div className="brand-sheen-panel relative flex flex-col items-start gap-5 rounded-[1.4rem] border border-[rgba(20,41,95,0.1)] bg-white px-5 py-5 text-left shadow-[0_16px_34px_rgba(20,41,95,0.07)] sm:flex-row sm:gap-8 sm:px-10">
             <div className="brand-glow-drift absolute -right-8 top-4 h-24 w-24 rounded-full bg-[#FFB878]/14 blur-3xl" />
-            <div className="brand-glow-drift mx-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#14295F]/7 sm:mx-0">
+            <div className="brand-glow-drift flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#14295F]/7">
               <BookOpen className="h-5 w-5 text-[#14295F]/70" />
             </div>
 
@@ -67,7 +67,7 @@ export function KoreanClassSection() {
 
             <a
               href="#consult"
-              className="brand-cta-float shrink-0 inline-flex items-center gap-2 whitespace-nowrap rounded-[0.8rem] bg-[#14295F] px-6 py-3 text-[13px] font-black text-white transition-all hover:bg-[#14295F]/90"
+              className="brand-cta-float inline-flex w-full items-center justify-center gap-2 rounded-[0.8rem] bg-[#14295F] px-6 py-3 text-[13px] font-black text-white transition-all hover:bg-[#14295F]/90 sm:w-auto sm:shrink-0 sm:whitespace-nowrap"
             >
               수업 문의하기
               <ArrowRight className="brand-cta-arrow h-3.5 w-3.5" />

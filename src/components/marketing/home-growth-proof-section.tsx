@@ -87,16 +87,16 @@ export function HomeGrowthProofSection() {
   return (
     <section
       id="growth-proof"
-      className="scroll-mt-24 py-16 sm:py-20"
+      className="scroll-mt-24 py-12 sm:py-20"
       style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
-          <article className="marketing-card p-6 sm:p-8">
+          <article className="marketing-card p-5 sm:p-8">
             <span className="inline-flex items-center rounded-full bg-[#14295F]/7 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-[#14295F] uppercase">
               Growth Proof
             </span>
-            <h2 className="mt-4 break-keep text-[clamp(1.45rem,3.1vw,2.15rem)] font-black leading-[1.22] text-[#14295F]">
+            <h2 className="mt-4 break-keep text-[clamp(1.35rem,7vw,2.15rem)] font-black leading-[1.22] text-[#14295F]">
               관리와 코칭을 함께 설계했을때,
               <br />
               성적은 데이터로 올라옵니다
@@ -117,7 +117,7 @@ export function HomeGrowthProofSection() {
               ))}
             </div>
 
-            <div className="mt-7 rounded-[1.4rem] border border-[#14295F]/10 bg-[#14295F] p-5 text-white shadow-[0_18px_34px_rgba(20,41,95,0.16)]">
+            <div className="mt-7 rounded-[1.4rem] border border-[#14295F]/10 bg-[#14295F] p-4 text-white shadow-[0_18px_34px_rgba(20,41,95,0.16)] sm:p-5">
               <p className="text-[10px] font-black tracking-[0.18em] text-white/62">CASE SNAPSHOT</p>
               <p className="brand-number-pop mt-2 break-keep text-[1.35rem] font-black leading-[1.3]">
                 6월 3등급에서 시작해
@@ -130,7 +130,7 @@ export function HomeGrowthProofSection() {
             </div>
 
             <div className="mt-7">
-              <Link href="/class" className="premium-cta premium-cta-primary h-11 px-6 text-sm">
+              <Link href="/class" className="premium-cta premium-cta-primary h-11 w-full px-6 text-sm sm:w-auto">
                 국어 수업 자세히 보기
               </Link>
             </div>
@@ -138,7 +138,7 @@ export function HomeGrowthProofSection() {
 
           <div className="space-y-4">
             <article className="brand-sheen-panel overflow-hidden rounded-[1.6rem] border border-[#14295F]/12 bg-white shadow-[0_18px_40px_rgba(20,41,95,0.10)]">
-              <div className="border-b border-[#14295F]/8 bg-[linear-gradient(135deg,#F8FBFF_0%,#FFF4EB_100%)] px-5 py-5 sm:px-6">
+              <div className="border-b border-[#14295F]/8 bg-[linear-gradient(135deg,#F8FBFF_0%,#FFF4EB_100%)] px-4 py-4 sm:px-6 sm:py-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black tracking-[0.18em] text-[#14295F]/45">대표 익명 사례 01</p>
@@ -168,7 +168,7 @@ export function HomeGrowthProofSection() {
                 </div>
               </div>
 
-              <div className="px-5 py-5 sm:px-6 sm:py-6">
+              <div className="px-4 py-4 sm:px-6 sm:py-6">
                 <div className="relative">
                   <div className="brand-flow-line pointer-events-none absolute left-[16%] right-[16%] top-9 hidden h-[2px] rounded-full bg-[linear-gradient(90deg,rgba(255,122,22,0.08),rgba(255,122,22,0.68),rgba(20,41,95,0.08))] lg:block" />
                   <div className="grid gap-3 lg:grid-cols-3">
@@ -225,7 +225,7 @@ export function HomeGrowthProofSection() {
         </div>
 
         <article className="brand-sheen-panel mt-6 overflow-hidden rounded-[1.6rem] border border-[#14295F]/12 bg-white shadow-[0_18px_40px_rgba(20,41,95,0.10)]">
-          <div className="border-b border-[#14295F]/8 bg-[linear-gradient(135deg,#FFF8F1_0%,#F8FBFF_100%)] px-5 py-5 sm:px-6">
+          <div className="border-b border-[#14295F]/8 bg-[linear-gradient(135deg,#FFF8F1_0%,#F8FBFF_100%)] px-4 py-4 sm:px-6 sm:py-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-2xl">
                 <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">ACTUAL SCORE SHEETS</p>
@@ -243,7 +243,7 @@ export function HomeGrowthProofSection() {
             </div>
           </div>
 
-          <div className="grid gap-4 p-5 sm:p-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 p-4 sm:p-6 md:grid-cols-2 lg:grid-cols-3">
             {scoreSheetProofs.map((item) => (
               <article
                 key={item.image}

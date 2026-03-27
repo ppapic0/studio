@@ -56,7 +56,7 @@ function formatKoreaTime(isoString: string) {
 
 function ReceiptCard({ receipt, onReset }: { receipt: ReceiptInfo; onReset: () => void }) {
   return (
-    <div id="consult-form" className="marketing-card p-5">
+    <div id="consult-form" className="marketing-card p-4 sm:p-5">
       <div className="flex items-center gap-2">
         <CheckCircle2 className="h-5 w-5 text-emerald-500" />
         <p className="text-xs font-black tracking-[0.14em] text-emerald-600">접수 완료</p>
@@ -83,9 +83,9 @@ function ReceiptCard({ receipt, onReset }: { receipt: ReceiptInfo; onReset: () =
             { label: "연락처", value: receipt.consultPhone },
             { label: "접수 일시", value: formatKoreaTime(receipt.createdAt) },
           ].map(({ label, value }) => (
-            <div key={label} className="flex justify-between gap-4 text-sm">
+            <div key={label} className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <span className="font-bold text-[#14295F]/50">{label}</span>
-              <span className="text-right font-black text-[#14295F]">{value}</span>
+              <span className="font-black text-[#14295F] sm:text-right">{value}</span>
             </div>
           ))}
         </div>
@@ -187,7 +187,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
   }
 
   return (
-    <form id="consult-form" onSubmit={onSubmit} className="marketing-card p-5">
+    <form id="consult-form" onSubmit={onSubmit} className="marketing-card p-4 sm:p-5">
       <p className="text-xs font-black tracking-[0.14em] text-[#FF7A16]">CONSULT FORM</p>
       <h3 className="mt-2 text-xl font-black text-[#14295F]">입학 상담 요청</h3>
 
@@ -220,7 +220,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
       {/* 관리형 스터디센터: 상담 vs 입학 대기 */}
       {form.serviceType === "study_center" && (
         <>
-        <div className="mt-3 flex gap-3">
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row">
           {(
             [
               { value: "consult", label: "상담 신청" },
@@ -283,7 +283,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor="school" className="mb-1.5 block text-sm font-black text-[#14295F]">
               학교
@@ -366,7 +366,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
       <button
         type="submit"
         disabled={isDisabled}
-        className="premium-cta premium-cta-primary mt-5 h-11 w-full gap-2 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+        className="premium-cta premium-cta-primary mt-5 h-12 w-full gap-2 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? (
           <>

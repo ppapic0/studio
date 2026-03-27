@@ -19,7 +19,11 @@ type HeroToken = {
 
 function getHeroTokens(line: string, lineIndex: number): HeroToken[] {
   const motionByLine: HeroToken[][] = [
-    [{ text: line, x: '-58px', y: '-22px', rotate: '-8deg', scale: '0.88', delay: '0s' }],
+    [
+      { text: '공부는', x: '-52px', y: '-18px', rotate: '-7deg', scale: '0.9', delay: '0s' },
+      { text: '방향이', x: '14px', y: '-24px', rotate: '6deg', scale: '0.92', delay: '0.05s' },
+      { text: '중요합니다.', x: '48px', y: '18px', rotate: '-8deg', scale: '0.9', delay: '0.1s' },
+    ],
     line.includes('트랙')
       ? [
           { text: '성장의 길, ', x: '-34px', y: '30px', rotate: '8deg', scale: '0.92', delay: '0s' },
@@ -53,7 +57,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
       opacity: 0.28,
     },
     {
-      className: 'left-[8%] bottom-[14%] h-20 w-20 sm:h-28 sm:w-28 lg:h-32 lg:w-32',
+      className: 'hidden sm:block left-[8%] bottom-[14%] h-20 w-20 sm:h-28 sm:w-28 lg:h-32 lg:w-32',
       ringColor: 'rgba(112,162,255,0.2)',
       coreColor: 'rgba(255,160,84,0.16)',
       delay: '3.1s',
@@ -61,7 +65,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
       opacity: 0.18,
     },
     {
-      className: 'right-[18%] bottom-[18%] h-24 w-24 sm:h-36 sm:w-36 lg:h-40 lg:w-40',
+      className: 'hidden sm:block right-[18%] bottom-[18%] h-24 w-24 sm:h-36 sm:w-36 lg:h-40 lg:w-40',
       ringColor: 'rgba(255,168,88,0.22)',
       coreColor: 'rgba(255,228,188,0.14)',
       delay: '4.2s',
@@ -267,21 +271,21 @@ export function HeroSection({ brand }: HeroSectionProps) {
         />
       </div>
 
-      <div className="relative mx-auto flex w-full max-w-7xl justify-center px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
-        <div className="max-w-[58rem] space-y-8 text-center sm:space-y-10">
+      <div className="relative mx-auto flex w-full max-w-7xl justify-center px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+        <div className="max-w-[23rem] space-y-7 text-center sm:max-w-[58rem] sm:space-y-10">
           <div className="space-y-5 sm:space-y-6">
             <span className="eyebrow-badge-light">TRACK STUDY CENTER</span>
 
             <div className="space-y-5 sm:space-y-6">
-              <div className="hero-headline-shell relative mx-auto inline-flex max-w-full justify-center">
+              <div className="hero-headline-shell relative mx-auto inline-flex w-full max-w-[22.5rem] justify-center sm:max-w-full">
                 <div className="hero-headline-aura absolute inset-x-[10%] top-[10%] h-[64%] rounded-full bg-[radial-gradient(circle,rgba(255,122,22,0.26)_0%,rgba(255,184,122,0.14)_30%,transparent_74%)] blur-3xl" />
                 <div className="hero-headline-flare absolute left-1/2 top-[18%] h-20 w-20 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,201,154,0.55)_0%,rgba(255,122,22,0.18)_40%,transparent_72%)] blur-2xl sm:h-28 sm:w-28" />
-                <h1 className="font-aggro-display relative text-[clamp(2.25rem,10.4vw,5.35rem)] font-black tracking-[-0.04em] text-white">
-                  <span className="flex flex-col items-center gap-[0.085em] sm:gap-[0.07em]">
+                <h1 className="font-aggro-display relative text-[clamp(2.1rem,11.8vw,5.35rem)] font-black tracking-[-0.04em] text-white">
+                  <span className="flex flex-col items-center gap-[0.11em] sm:gap-[0.07em]">
                     {heroTitleLines.map((line, lineIndex) => (
                       <span
                         key={`${line}-${lineIndex}`}
-                        className="hero-headline-line flex max-w-full flex-wrap items-end justify-center gap-x-[0.04em] gap-y-[0.02em] break-keep leading-[0.92] sm:flex-nowrap"
+                        className="hero-headline-line flex max-w-full flex-wrap items-end justify-center gap-x-[0.045em] gap-y-[0.03em] break-keep leading-[0.94] sm:flex-nowrap sm:leading-[0.92]"
                         style={{ ['--hero-line-delay' as string]: `${0.06 + lineIndex * 0.1}s` }}
                       >
                         {getHeroTokens(line, lineIndex).map((token, tokenIndex) => (
@@ -306,14 +310,14 @@ export function HeroSection({ brand }: HeroSectionProps) {
                   </span>
                 </h1>
               </div>
-              <p className="hero-copy-enter mx-auto max-w-[40rem] break-keep px-2 text-[14.5px] font-semibold leading-[1.82] text-white/[0.82] sm:text-[16.5px]">
+              <p className="hero-copy-enter mx-auto max-w-[21rem] break-keep px-1 text-[14px] font-semibold leading-[1.8] text-white/[0.82] sm:max-w-[40rem] sm:px-2 sm:text-[16.5px]">
                 {brand.heroDescription}
               </p>
             </div>
           </div>
 
           <div
-            className="hero-cta-enter flex flex-col gap-3 px-1 sm:flex-row sm:flex-wrap sm:justify-center"
+            className="hero-cta-enter flex flex-col gap-2.5 px-1 sm:flex-row sm:flex-wrap sm:justify-center"
             style={{ ['--hero-cta-delay' as string]: '0.48s' }}
           >
             <a
@@ -331,7 +335,7 @@ export function HeroSection({ brand }: HeroSectionProps) {
           </div>
 
           <p
-            className="hero-meta-enter mx-auto max-w-[32rem] break-keep text-[12px] font-semibold leading-[1.7] text-white/[0.58] sm:text-[12.5px]"
+            className="hero-meta-enter mx-auto max-w-[18rem] break-keep text-[11.5px] font-semibold leading-[1.68] text-white/[0.58] sm:max-w-[32rem] sm:text-[12.5px]"
             style={{ ['--hero-meta-delay' as string]: '0.58s' }}
           >
             관리형 스터디센터 · 국어학원 · 학부모 앱 연동

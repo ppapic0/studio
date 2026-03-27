@@ -11,15 +11,11 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
   const universities = outcomes.filter((o) => o.label !== '성장 사례');
 
   return (
-    <section
-      id="results"
-      className="scroll-mt-20 py-12 sm:py-16"
-      style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%)' }}
-    >
+    <section id="results" className="scroll-mt-20 py-10 sm:py-16" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%)' }}>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge">2026 RESULT</span>
-          <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.75rem,3.5vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
+          <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.58rem,8vw,2.5rem)] font-black leading-[1.08] text-[#14295F]">
             2026학년도 수능,
             <br />
             트랙의 운영 구조가 만들어 낸 결과입니다.
@@ -34,11 +30,11 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
             {universities.map((u) => (
               <article
                 key={u.label}
-                className="brand-sheen-panel relative overflow-hidden rounded-2xl border border-[#14295F]/10 bg-white px-4 py-5 text-center shadow-[0_10px_26px_rgba(20,41,95,0.06)]"
+                className="brand-sheen-panel relative overflow-hidden rounded-2xl border border-[#14295F]/10 bg-white px-3.5 py-4 text-center shadow-[0_10px_26px_rgba(20,41,95,0.06)] sm:px-4 sm:py-5"
               >
                 <div className="brand-glow-drift absolute -right-6 top-0 h-16 w-16 rounded-full bg-[#FFB878]/10 blur-2xl" />
                 <div className="relative">
-                  <p className="brand-number-pop font-brand text-[2.2rem] font-black leading-none text-[#14295F]">{u.value}</p>
+                  <p className="brand-number-pop font-brand text-[1.9rem] font-black leading-none text-[#14295F] sm:text-[2.2rem]">{u.value}</p>
                   <p className="mt-2 break-keep text-[12px] font-semibold text-[#47607B]">{u.label}</p>
                   <p className="mt-1 text-[10px] font-semibold text-[#14295F]/42">{u.detail}</p>
                 </div>
@@ -47,25 +43,25 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
           </StaggerChildren>
         </div>
 
-        <div className="brand-sheen-panel relative mt-5 overflow-hidden rounded-2xl border border-[#FF7A16]/18 bg-[#FFF6ED] px-6 py-7 sm:px-8 sm:py-8">
+        <div className="brand-sheen-panel relative mt-5 overflow-hidden rounded-2xl border border-[#FF7A16]/18 bg-[#FFF6ED] px-4 py-5 sm:px-8 sm:py-8">
           <div className="brand-glow-drift absolute right-8 top-4 h-24 w-24 rounded-full bg-[#FFB878]/18 blur-3xl" />
           <p className="relative text-[10px] font-black uppercase tracking-[0.24em] text-[#FF9848]">Success Story</p>
           <div className="relative mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-[28rem]">
+            <div className="max-w-full sm:max-w-[28rem]">
               <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">{successStory.title}</p>
-              <p className="font-brand mt-2 break-keep text-[1.35rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.55rem]">
+              <p className="font-brand mt-2 break-keep text-[1.2rem] font-black leading-[1.28] text-[#14295F] sm:text-[1.55rem]">
                 {successStory.summary}
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[33rem] lg:flex-1">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:min-w-[33rem] lg:flex-1">
               {successStory.timeline.map((item) => (
                 <article
                   key={item.label}
-                  className="rounded-[1.15rem] border border-white/70 bg-white/84 px-4 py-4 text-center shadow-[0_12px_28px_rgba(20,41,95,0.06)] backdrop-blur"
+                  className="rounded-[1.15rem] border border-white/70 bg-white/84 px-3 py-3 text-center shadow-[0_12px_28px_rgba(20,41,95,0.06)] backdrop-blur sm:px-4 sm:py-4"
                 >
                   <p className="text-[10px] font-black tracking-[0.16em] text-[#FF7A16]">{item.label}</p>
-                  <p className="mt-2 break-keep text-[1.15rem] font-black leading-none text-[#14295F]">{item.value}</p>
+                  <p className="mt-2 break-keep text-[1rem] font-black leading-none text-[#14295F] sm:text-[1.15rem]">{item.value}</p>
                   <p className="mt-2 text-[11px] font-semibold text-[#52677F]">{item.detail}</p>
                 </article>
               ))}

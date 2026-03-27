@@ -68,6 +68,17 @@ const LARGE_CHART: ChartConfig = {
   max: 100,
 };
 
+const MOBILE_LARGE_CHART: ChartConfig = {
+  width: 360,
+  height: 220,
+  padLeft: 16,
+  padRight: 14,
+  padTop: 18,
+  padBottom: 30,
+  min: 0,
+  max: 100,
+};
+
 const MINI_CHART: ChartConfig = {
   width: 520,
   height: 220,
@@ -75,6 +86,17 @@ const MINI_CHART: ChartConfig = {
   padRight: 22,
   padTop: 22,
   padBottom: 34,
+  min: 0,
+  max: 100,
+};
+
+const MOBILE_MINI_CHART: ChartConfig = {
+  width: 320,
+  height: 184,
+  padLeft: 18,
+  padRight: 14,
+  padTop: 16,
+  padBottom: 28,
   min: 0,
   max: 100,
 };
@@ -116,6 +138,10 @@ function formatHourLabel(value: number) {
   const wholeHour = Math.floor(value);
   const minutes = Math.round((value - wholeHour) * 60);
   return `${String(wholeHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function getVisibleLabelIndexes(isMobile: boolean) {
+  return isMobile ? [0, 2, 4, 6] : chartLabels.map((_, index) => index);
 }
 
 function ChartLegend({ label, tone }: { label: string; tone: LegendTone }) {
@@ -204,7 +230,7 @@ function ChartPanel({
 }) {
   return (
     <article
-      className={`brand-panel-scan relative overflow-hidden rounded-[1.55rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:p-6 ${className}`}
+      className={`brand-panel-scan relative overflow-hidden rounded-[1.45rem] border border-[#14295F]/10 bg-white p-4 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:rounded-[1.55rem] sm:p-6 ${className}`}
     >
       <div className="brand-glow-drift absolute -left-8 top-5 h-24 w-24 rounded-full bg-[#FF7A16]/8 blur-3xl" />
       <div
@@ -216,9 +242,9 @@ function ChartPanel({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Icon className="h-4 w-4 shrink-0 text-[#14295F]" />
-              <h3 className="break-keep text-[1.05rem] font-black text-[#14295F] sm:text-[1.15rem]">{title}</h3>
+              <h3 className="break-keep text-[1rem] font-black text-[#14295F] sm:text-[1.15rem]">{title}</h3>
             </div>
-            <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.7] text-[#50657D]">{description}</p>
+            <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.68] text-[#50657D] sm:text-[13.5px]">{description}</p>
           </div>
           {badge}
         </div>
@@ -227,33 +253,39 @@ function ChartPanel({
 
         <div className="mt-4">{children}</div>
 
-        <div className="mt-4 rounded-[1rem] border border-[#14295F]/10 bg-[#F8FBFF] px-4 py-3">
-          <p className="break-keep text-[12.5px] font-semibold leading-[1.65] text-[#425A75]">{footer}</p>
+        <div className="mt-4 rounded-[1rem] border border-[#14295F]/10 bg-[#F8FBFF] px-3.5 py-3 sm:px-4">
+          <p className="break-keep text-[12px] font-semibold leading-[1.62] text-[#425A75] sm:text-[12.5px]">{footer}</p>
         </div>
       </div>
     </article>
   );
 }
 
-function OverviewTrendChart() {
-  const studyConfig = { ...LARGE_CHART, min: 4.5, max: 12 };
-  const rateConfig = { ...LARGE_CHART, min: 55, max: 95 };
+function OverviewTrendChart({ mobile = false }: { mobile?: boolean }) {
+  const baseConfig = mobile ? MOBILE_LARGE_CHART : LARGE_CHART;
+  const studyConfig = { ...baseConfig, min: 4.5, max: 12 };
+  const rateConfig = { ...baseConfig, min: 55, max: 95 };
   const studyPoints = getSeriesPoints(overviewStudyHours, studyConfig);
   const goalPoints = getSeriesPoints(overviewGoalRates, rateConfig);
-  const baseline = getPlotBottom(LARGE_CHART);
+  const baseline = getPlotBottom(baseConfig);
+  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
 
   return (
-    <svg viewBox={`0 0 ${LARGE_CHART.width} ${LARGE_CHART.height}`} className="h-[245px] w-full sm:h-[270px]" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${baseConfig.width} ${baseConfig.height}`}
+      className={mobile ? 'h-[184px] w-full' : 'h-[245px] w-full sm:h-[270px]'}
+      aria-hidden="true"
+    >
       {[0, 1, 2, 3].map((index) => {
         const y =
-          LARGE_CHART.padTop +
-          index * ((getPlotBottom(LARGE_CHART) - LARGE_CHART.padTop) / 3);
+          baseConfig.padTop +
+          index * ((getPlotBottom(baseConfig) - baseConfig.padTop) / 3);
         return (
           <line
             key={index}
-            x1={LARGE_CHART.padLeft}
+            x1={baseConfig.padLeft}
             y1={y}
-            x2={getPlotRight(LARGE_CHART)}
+            x2={getPlotRight(baseConfig)}
             y2={y}
             stroke="rgba(20,41,95,0.10)"
             strokeDasharray="4 8"
@@ -307,40 +339,46 @@ function OverviewTrendChart() {
         />
       ))}
 
-      {chartLabels.map((label, index) => (
+      {visibleLabelIndexes.map((index) => (
         <text
-          key={label}
+          key={chartLabels[index] ?? index}
           x={studyPoints[index]?.x ?? LARGE_CHART.padLeft}
-          y={LARGE_CHART.height - 12}
+          y={baseConfig.height - (mobile ? 10 : 12)}
           textAnchor="middle"
-          fontSize="12"
+          fontSize={mobile ? '10' : '12'}
           fontWeight="700"
           fill="#51667D"
         >
-          {label}
+          {chartLabels[index]}
         </text>
       ))}
     </svg>
   );
 }
 
-function WeeklyGrowthChart() {
-  const barConfig = { ...MINI_CHART, min: 0, max: 8.5 };
-  const lineConfig = { ...MINI_CHART, min: 0, max: 50 };
+function WeeklyGrowthChart({ mobile = false }: { mobile?: boolean }) {
+  const baseConfig = mobile ? MOBILE_MINI_CHART : MINI_CHART;
+  const barConfig = { ...baseConfig, min: 0, max: 8.5 };
+  const lineConfig = { ...baseConfig, min: 0, max: 50 };
   const barPoints = getSeriesPoints(growthHours, barConfig);
   const linePoints = getSeriesPoints(growthRates, lineConfig);
-  const baseline = getPlotBottom(MINI_CHART);
+  const baseline = getPlotBottom(baseConfig);
+  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
 
   return (
-    <svg viewBox={`0 0 ${MINI_CHART.width} ${MINI_CHART.height}`} className="h-[200px] w-full" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${baseConfig.width} ${baseConfig.height}`}
+      className={mobile ? 'h-[172px] w-full' : 'h-[200px] w-full'}
+      aria-hidden="true"
+    >
       {[0, 1, 2, 3].map((index) => {
-        const y = MINI_CHART.padTop + index * ((baseline - MINI_CHART.padTop) / 3);
+        const y = baseConfig.padTop + index * ((baseline - baseConfig.padTop) / 3);
         return (
           <line
             key={index}
-            x1={MINI_CHART.padLeft}
+            x1={baseConfig.padLeft}
             y1={y}
-            x2={getPlotRight(MINI_CHART)}
+            x2={getPlotRight(baseConfig)}
             y2={y}
             stroke="rgba(20,41,95,0.09)"
             strokeDasharray="4 8"
@@ -388,38 +426,44 @@ function WeeklyGrowthChart() {
         />
       ))}
 
-      {chartLabels.map((label, index) => (
+      {visibleLabelIndexes.map((index) => (
         <text
-          key={label}
+          key={chartLabels[index] ?? index}
           x={barPoints[index]?.x ?? MINI_CHART.padLeft}
-          y={MINI_CHART.height - 10}
+          y={baseConfig.height - 10}
           textAnchor="middle"
-          fontSize="11"
+          fontSize={mobile ? '10' : '11'}
           fontWeight="700"
           fill="#5B7087"
         >
-          {label}
+          {chartLabels[index]}
         </text>
       ))}
     </svg>
   );
 }
 
-function RhythmChart() {
-  const rhythmConfig = { ...MINI_CHART, min: 68, max: 96 };
+function RhythmChart({ mobile = false }: { mobile?: boolean }) {
+  const baseConfig = mobile ? MOBILE_MINI_CHART : MINI_CHART;
+  const rhythmConfig = { ...baseConfig, min: 68, max: 96 };
   const rhythmPoints = getSeriesPoints(rhythmScores, rhythmConfig);
-  const baseline = getPlotBottom(MINI_CHART);
+  const baseline = getPlotBottom(baseConfig);
+  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
 
   return (
-    <svg viewBox={`0 0 ${MINI_CHART.width} ${MINI_CHART.height}`} className="h-[200px] w-full" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${baseConfig.width} ${baseConfig.height}`}
+      className={mobile ? 'h-[172px] w-full' : 'h-[200px] w-full'}
+      aria-hidden="true"
+    >
       {[0, 1, 2, 3].map((index) => {
-        const y = MINI_CHART.padTop + index * ((baseline - MINI_CHART.padTop) / 3);
+        const y = baseConfig.padTop + index * ((baseline - baseConfig.padTop) / 3);
         return (
           <line
             key={index}
-            x1={MINI_CHART.padLeft}
+            x1={baseConfig.padLeft}
             y1={y}
-            x2={getPlotRight(MINI_CHART)}
+            x2={getPlotRight(baseConfig)}
             y2={y}
             stroke="rgba(20,41,95,0.08)"
             strokeDasharray="4 8"
@@ -451,32 +495,38 @@ function RhythmChart() {
         />
       ))}
 
-      {chartLabels.map((label, index) => (
+      {visibleLabelIndexes.map((index) => (
         <text
-          key={label}
+          key={chartLabels[index] ?? index}
           x={rhythmPoints[index]?.x ?? MINI_CHART.padLeft}
-          y={MINI_CHART.height - 10}
+          y={baseConfig.height - 10}
           textAnchor="middle"
-          fontSize="11"
+          fontSize={mobile ? '10' : '11'}
           fontWeight="700"
           fill="#5B7087"
         >
-          {label}
+          {chartLabels[index]}
         </text>
       ))}
     </svg>
   );
 }
 
-function StudyWindowChart() {
-  const timeConfig = { ...MINI_CHART, padLeft: 52, min: 8, max: 24 };
+function StudyWindowChart({ mobile = false }: { mobile?: boolean }) {
+  const baseConfig = mobile ? MOBILE_MINI_CHART : MINI_CHART;
+  const timeConfig = { ...baseConfig, padLeft: mobile ? 36 : 52, min: 8, max: 24 };
   const startPoints = getSeriesPoints(studyStartTimes, timeConfig);
   const endPoints = getSeriesPoints(studyEndTimes, timeConfig);
   const baseline = getPlotBottom(timeConfig);
-  const yTicks = [8, 12, 16, 20, 24];
+  const yTicks = mobile ? [8, 12, 16, 20, 24] : [8, 12, 16, 20, 24];
+  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
 
   return (
-    <svg viewBox={`0 0 ${timeConfig.width} ${timeConfig.height}`} className="h-[200px] w-full" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${timeConfig.width} ${timeConfig.height}`}
+      className={mobile ? 'h-[176px] w-full' : 'h-[200px] w-full'}
+      aria-hidden="true"
+    >
       {yTicks.map((tick) => {
         const [{ y }] = getSeriesPoints([tick], { ...timeConfig, padRight: timeConfig.width - timeConfig.padLeft });
         return (
@@ -489,7 +539,7 @@ function StudyWindowChart() {
               stroke="rgba(20,41,95,0.08)"
               strokeDasharray="4 8"
             />
-            <text x="8" y={y + 4} fontSize="11" fontWeight="700" fill="#5B7087">
+            <text x={mobile ? '4' : '8'} y={y + 4} fontSize={mobile ? '9.5' : '11'} fontWeight="700" fill="#5B7087">
               {formatHourLabel(tick)}
             </text>
           </g>
@@ -540,30 +590,36 @@ function StudyWindowChart() {
         />
       ))}
 
-      {chartLabels.map((label, index) => (
+      {visibleLabelIndexes.map((index) => (
         <text
-          key={label}
+          key={chartLabels[index] ?? index}
           x={startPoints[index]?.x ?? timeConfig.padLeft}
           y={timeConfig.height - 10}
           textAnchor="middle"
-          fontSize="11"
+          fontSize={mobile ? '10' : '11'}
           fontWeight="700"
           fill="#5B7087"
         >
-          {label}
+          {chartLabels[index]}
         </text>
       ))}
     </svg>
   );
 }
 
-function BreakTimeChart() {
-  const breakConfig = { ...MINI_CHART, min: 0, max: 3 };
+function BreakTimeChart({ mobile = false }: { mobile?: boolean }) {
+  const baseConfig = mobile ? MOBILE_MINI_CHART : MINI_CHART;
+  const breakConfig = { ...baseConfig, min: 0, max: 3 };
   const breakPoints = getSeriesPoints(breakMinutes, breakConfig);
   const baseline = getPlotBottom(breakConfig);
+  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
 
   return (
-    <svg viewBox={`0 0 ${breakConfig.width} ${breakConfig.height}`} className="h-[200px] w-full" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${breakConfig.width} ${breakConfig.height}`}
+      className={mobile ? 'h-[172px] w-full' : 'h-[200px] w-full'}
+      aria-hidden="true"
+    >
       {[0, 1, 2, 3].map((index) => {
         const y = breakConfig.padTop + index * ((baseline - breakConfig.padTop) / 3);
         return (
@@ -603,17 +659,17 @@ function BreakTimeChart() {
         />
       ))}
 
-      {chartLabels.map((label, index) => (
+      {visibleLabelIndexes.map((index) => (
         <text
-          key={label}
+          key={chartLabels[index] ?? index}
           x={breakPoints[index]?.x ?? breakConfig.padLeft}
           y={breakConfig.height - 10}
           textAnchor="middle"
-          fontSize="11"
+          fontSize={mobile ? '10' : '11'}
           fontWeight="700"
           fill="#5B7087"
         >
-          {label}
+          {chartLabels[index]}
         </text>
       ))}
     </svg>
@@ -622,7 +678,7 @@ function BreakTimeChart() {
 
 export function DataAnalyticsPreviewSection() {
   return (
-    <section id="data-approach" className="relative scroll-mt-28 overflow-hidden bg-[#F7F9FD] py-16 sm:py-20">
+    <section id="data-approach" className="relative scroll-mt-28 overflow-hidden bg-[#F7F9FD] py-12 sm:py-20">
       <div className="pointer-events-none absolute inset-0">
         <div className="brand-glow-drift absolute left-[-8%] top-[14%] h-44 w-44 rounded-full bg-[#7AA7FF]/10 blur-[90px]" />
         <div
@@ -637,18 +693,18 @@ export function DataAnalyticsPreviewSection() {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="relative mx-auto max-w-3xl text-center">
           <span className="eyebrow-badge">DATA DRIVEN</span>
-          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(2rem,4.7vw,3rem)] font-black leading-[1.06] text-[#14295F]">
+          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.58rem,8vw,3rem)] font-black leading-[1.08] text-[#14295F]">
             실제 앱처럼 누적되는 그래프를
             <br />
             홈에서도 먼저 보여드립니다
           </h2>
-          <p className="mt-4 break-keep text-[15px] font-bold leading-[1.8] text-[#2F4662] sm:text-[15.5px]">
+          <p className="mt-4 break-keep text-[14px] font-bold leading-[1.74] text-[#2F4662] sm:text-[15.5px]">
             공부시간, 목표 달성률, 성장률, 리듬, 시작·종료 시간, 중간 이탈시간까지 한 화면에서 읽을 수 있도록
             실제 운영 구조를 홈페이지용으로 다시 정리했습니다.
           </p>
         </div>
 
-        <StaggerChildren stagger={90} className="mt-7 grid gap-3 md:grid-cols-3">
+        <StaggerChildren stagger={90} className="mt-6 grid gap-3 sm:grid-cols-3 sm:gap-3">
           {heroMetrics.map((metric) => (
             <MetricCard
               key={metric.label}
@@ -674,7 +730,12 @@ export function DataAnalyticsPreviewSection() {
             }
             footer="후반부로 갈수록 공부시간과 목표 달성률이 함께 안정화되는 모습이 보이도록 설계했습니다."
           >
-            <OverviewTrendChart />
+            <div className="sm:hidden">
+              <OverviewTrendChart mobile />
+            </div>
+            <div className="hidden sm:block">
+              <OverviewTrendChart />
+            </div>
           </ChartPanel>
         </div>
 
@@ -692,7 +753,12 @@ export function DataAnalyticsPreviewSection() {
             }
             footer="학습시간이 늘어나는 구간에서 성장률도 같이 받쳐주는 흐름으로 보이게 구성했습니다."
           >
-            <WeeklyGrowthChart />
+            <div className="sm:hidden">
+              <WeeklyGrowthChart mobile />
+            </div>
+            <div className="hidden sm:block">
+              <WeeklyGrowthChart />
+            </div>
           </ChartPanel>
 
           <ChartPanel
@@ -702,7 +768,12 @@ export function DataAnalyticsPreviewSection() {
             badge={<DataBadge label="최근 평균 89점" tone="green" />}
             footer="중간에 작은 흔들림이 있어도 다시 회복되는 패턴이 보여 학습 태도가 안정적으로 보입니다."
           >
-            <RhythmChart />
+            <div className="sm:hidden">
+              <RhythmChart mobile />
+            </div>
+            <div className="hidden sm:block">
+              <RhythmChart />
+            </div>
           </ChartPanel>
 
           <ChartPanel
@@ -718,7 +789,12 @@ export function DataAnalyticsPreviewSection() {
             }
             footer="시작 시각 편차가 줄고 종료 시각도 크게 흔들리지 않아 루틴이 단단해진 인상을 줍니다."
           >
-            <StudyWindowChart />
+            <div className="sm:hidden">
+              <StudyWindowChart mobile />
+            </div>
+            <div className="hidden sm:block">
+              <StudyWindowChart />
+            </div>
           </ChartPanel>
 
           <ChartPanel
@@ -728,28 +804,33 @@ export function DataAnalyticsPreviewSection() {
             badge={<DataBadge label="낮음 유지" tone="rose" />}
             footer="초반 1회 이탈 이후에는 짧고 안정적인 수준으로 유지돼 관리가 잘 되고 있는 흐름으로 보입니다."
           >
-            <BreakTimeChart />
+            <div className="sm:hidden">
+              <BreakTimeChart mobile />
+            </div>
+            <div className="hidden sm:block">
+              <BreakTimeChart />
+            </div>
           </ChartPanel>
         </div>
 
-        <article className="mt-6 rounded-[1.45rem] border border-[#14295F]/10 bg-white px-5 py-5 shadow-[0_10px_24px_rgba(20,41,95,0.05)] sm:px-6">
+        <article className="mt-6 rounded-[1.45rem] border border-[#14295F]/10 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(20,41,95,0.05)] sm:px-6 sm:py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-[12px] font-bold text-[#FF7A16]">NEXT VIEW</p>
               <p className="mt-1.5 break-keep text-[1.05rem] font-black leading-[1.42] text-[#14295F]">
                 같은 데이터도 학생, 학부모, 운영자는 서로 다르게 읽습니다.
               </p>
-              <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.7] text-[#52667D]">
+              <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.68] text-[#52667D] sm:text-[14px]">
                 아래 역할별 화면에서 누가 어떤 그래프를 먼저 보는지 이어서 확인할 수 있게 연결합니다.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link href="#app" className="premium-cta premium-cta-primary h-11 gap-1.5 px-5 text-sm">
+            <div className="grid gap-2.5 sm:flex sm:flex-wrap sm:gap-3">
+              <Link href="#app" className="premium-cta premium-cta-primary h-11 w-full gap-1.5 px-5 text-sm sm:w-auto">
                 역할별 화면 이어보기
                 <ArrowRight className="brand-cta-arrow h-3.5 w-3.5" />
               </Link>
-              <Link href="/experience" className="premium-cta premium-cta-muted h-11 px-5 text-sm">
+              <Link href="/experience" className="premium-cta premium-cta-muted h-11 w-full px-5 text-sm sm:w-auto">
                 전체 체험 보기
               </Link>
             </div>
