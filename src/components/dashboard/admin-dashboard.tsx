@@ -862,7 +862,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const currentlyStudyingStudents = useMemo(() => {
-    return Object.values(attendanceSeatSignalsBySeatId || {})
+    return Array.from(attendanceSeatSignalsBySeatId?.values() || [])
       .filter((signal) => Boolean(signal && signal.seatStatus === 'studying'))
       .sort((a, b) => {
         const roomOrderA = roomOrderById.get(a.roomId || '') ?? Number.MAX_SAFE_INTEGER;
