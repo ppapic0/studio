@@ -27,7 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { httpsCallable } from 'firebase/functions';
-import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { type StudentProfile, type User as UserType } from '@/lib/types';
 
@@ -293,52 +293,18 @@ export default function DashboardPage() {
   }
 
   const persistSelfPhoneDirectly = async (normalizedPhone: string) => {
-    if (!user || !activeMembership || !firestore) {
+    if (!user || !firestore) {
       throw new Error('저장 준비가 아직 끝나지 않았습니다. 잠시 후 다시 시도해 주세요.');
     }
 
-    const batch = writeBatch(firestore);
-    const timestamp = serverTimestamp();
-
-    batch.set(
+    await setDoc(
       doc(firestore, 'users', user.uid),
       {
         phoneNumber: normalizedPhone,
-        updatedAt: timestamp,
+        updatedAt: serverTimestamp(),
       },
       { merge: true }
     );
-
-    batch.set(
-      doc(firestore, 'centers', activeMembership.id, 'members', user.uid),
-      {
-        phoneNumber: normalizedPhone,
-        updatedAt: timestamp,
-      },
-      { merge: true }
-    );
-
-    batch.set(
-      doc(firestore, 'userCenters', user.uid, 'centers', activeMembership.id),
-      {
-        phoneNumber: normalizedPhone,
-        updatedAt: timestamp,
-      },
-      { merge: true }
-    );
-
-    if (activeMembership.role === 'student') {
-      batch.set(
-        doc(firestore, 'centers', activeMembership.id, 'students', user.uid),
-        {
-          phoneNumber: normalizedPhone,
-          updatedAt: timestamp,
-        },
-        { merge: true }
-      );
-    }
-
-    await batch.commit();
   };
 
   const handleSavePhoneCapture = async () => {
@@ -362,71 +328,19 @@ export default function DashboardPage() {
 
     setIsPhoneCaptureSaving(true);
     try {
-      let savedBy: 'function' | 'direct' = 'function';
-
-      if (activeMembership.role === 'student' && functions) {
-        const updateFn = httpsCallable(functions, 'updateStudentAccount');
-        await updateFn({
-          studentId: user.uid,
-          centerId: activeMembership.id,
-          phoneNumber: normalizedPhone,
-        });
-      } else if (activeMembership.role === 'parent' && functions) {
-        const updateFn = httpsCallable(functions, 'updateParentProfile');
-        await updateFn({
-          centerId: activeMembership.id,
-          phoneNumber: normalizedPhone,
-        });
-      } else if (activeMembership.role === 'student' || activeMembership.role === 'parent') {
-        savedBy = 'direct';
-        await persistSelfPhoneDirectly(normalizedPhone);
-      } else {
+      if (activeMembership.role !== 'student' && activeMembership.role !== 'parent') {
         throw new Error('학생 또는 학부모 계정에서만 전화번호를 저장할 수 있습니다.');
       }
+
+      await persistSelfPhoneDirectly(normalizedPhone);
 
       setSavedPhoneFallback(normalizedPhone);
       setIsPhoneCaptureOpen(false);
       toast({
         title: '전화번호 저장 완료',
-        description: savedBy === 'direct'
-          ? '본인 전화번호가 바로 저장되었습니다.'
-          : '로그인 계정의 본인 전화번호가 저장되었습니다.',
+        description: '본인 전화번호가 바로 저장되었습니다.',
       });
     } catch (error: any) {
-      const code = String(error?.code || '').toLowerCase();
-      const shouldFallbackToDirect =
-        Boolean(functions)
-        && (activeMembership.role === 'student' || activeMembership.role === 'parent')
-        && (
-          code.includes('unavailable')
-          || code.includes('deadline-exceeded')
-          || code.includes('internal')
-          || /network|fetch|function|timeout/i.test(String(error?.message || ''))
-        );
-
-      if (shouldFallbackToDirect) {
-        try {
-          await persistSelfPhoneDirectly(normalizedPhone);
-          setSavedPhoneFallback(normalizedPhone);
-          setIsPhoneCaptureOpen(false);
-          toast({
-            title: '전화번호 저장 완료',
-            description: '함수 연결이 늦어 직접 저장으로 처리했습니다.',
-          });
-          return;
-        } catch (fallbackError: any) {
-          toast({
-            variant: 'destructive',
-            title: '저장 실패',
-            description: resolveCallableErrorMessage(
-              fallbackError,
-              '전화번호 저장 중 오류가 발생했습니다.'
-            ),
-          });
-          return;
-        }
-      }
-
       toast({
         variant: 'destructive',
         title: '저장 실패',
