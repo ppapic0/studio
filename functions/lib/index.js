@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateParentProfile = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
@@ -1604,7 +1604,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     var _a, _b;
     const db = admin.firestore();
     const auth = admin.auth();
-    const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode, className, memberStatus, seasonLp, stats, todayStudyMinutes, dateKey, } = data;
+    const { studentId, centerId, password, displayName, schoolName, grade, phoneNumber, parentLinkCode, className, memberStatus, seasonLp, stats, todayStudyMinutes, dateKey, } = data;
     if (!context.auth)
         throw new functions.https.HttpsError("unauthenticated", "인증 필요");
     if (!studentId || !centerId)
@@ -1661,6 +1661,8 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
     const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
     const trimmedGrade = typeof grade === "string" ? grade.trim() : "";
+    const phoneNumberProvided = phoneNumber !== undefined;
+    const normalizedPhoneNumber = phoneNumber === null ? "" : normalizePhoneNumber(phoneNumber);
     const hasClassName = className !== undefined;
     const normalizedClassName = hasClassName
         ? (typeof className === "string" && className.trim() ? className.trim() : null)
@@ -1682,6 +1684,11 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     if (memberStatusProvided && !normalizedMemberStatus) {
         throw new functions.https.HttpsError("invalid-argument", "Invalid member status.", {
             userMessage: "상태 값이 올바르지 않습니다. 재원/휴원/퇴원 중에서 선택해 주세요.",
+        });
+    }
+    if (phoneNumberProvided && !normalizedPhoneNumber) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid phone number.", {
+            userMessage: "휴대폰 번호를 01012345678 형식으로 입력해 주세요.",
         });
     }
     if (parentLinkCodeProvided) {
@@ -1780,10 +1787,10 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             dateKey !== undefined;
         if (hasForbiddenUpdate) {
             throw new functions.https.HttpsError("permission-denied", "학생 계정은 일부 항목만 수정할 수 있습니다.", {
-                userMessage: "학생은 학교/학년/학부모 연동 코드만 수정할 수 있습니다.",
+                userMessage: "학생은 학교/학년/본인 전화번호/학부모 연동 코드만 수정할 수 있습니다.",
             });
         }
-        const hasSelfEditableFieldInPayload = typeof schoolName === "string" || typeof grade === "string" || parentLinkCodeProvided;
+        const hasSelfEditableFieldInPayload = typeof schoolName === "string" || typeof grade === "string" || parentLinkCodeProvided || phoneNumberProvided;
         if (!hasSelfEditableFieldInPayload) {
             throw new functions.https.HttpsError("invalid-argument", "No editable field provided.", {
                 userMessage: "수정할 항목을 입력해 주세요.",
@@ -1814,7 +1821,9 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             userUpdate.displayName = trimmedDisplayName;
         if (trimmedSchoolName)
             userUpdate.schoolName = trimmedSchoolName;
-        const hasUserWrite = trimmedDisplayName.length > 0 || trimmedSchoolName.length > 0;
+        if (phoneNumberProvided)
+            userUpdate.phoneNumber = normalizedPhoneNumber;
+        const hasUserWrite = trimmedDisplayName.length > 0 || trimmedSchoolName.length > 0 || phoneNumberProvided;
         if (hasUserWrite) {
             batch.set(userRef, userUpdate, { merge: true });
         }
@@ -1825,6 +1834,8 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             studentUpdate.schoolName = trimmedSchoolName;
         if (trimmedGrade)
             studentUpdate.grade = trimmedGrade;
+        if (phoneNumberProvided)
+            studentUpdate.phoneNumber = normalizedPhoneNumber;
         if (parentLinkCodeProvided)
             studentUpdate.parentLinkCode = normalizedParentLinkCode || null;
         if (canEditOtherStudent && hasClassName)
@@ -1836,9 +1847,12 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             memberUpdate.displayName = trimmedDisplayName;
         if (hasClassName)
             memberUpdate.className = normalizedClassName;
+        if (phoneNumberProvided)
+            memberUpdate.phoneNumber = normalizedPhoneNumber;
         if (isAdminCaller && memberStatusProvided)
             memberUpdate.status = normalizedMemberStatus;
-        if (canEditOtherStudent) {
+        const shouldWriteMember = canEditOtherStudent || phoneNumberProvided;
+        if (shouldWriteMember) {
             batch.set(memberRef, memberUpdate, { merge: true });
         }
         const userCenterRef = db.doc("userCenters/" + studentId + "/centers/" + centerId);
@@ -1846,12 +1860,20 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             className: normalizedClassName,
             updatedAt: timestamp,
         };
+        if (phoneNumberProvided)
+            userCenterUpdate.phoneNumber = normalizedPhoneNumber;
         if (isAdminCaller && memberStatusProvided)
             userCenterUpdate.status = normalizedMemberStatus;
+        const shouldWriteUserCenter = (canEditOtherStudent && hasClassName) ||
+            (isAdminCaller && memberStatusProvided) ||
+            phoneNumberProvided;
         if (canEditOtherStudent && hasClassName) {
             batch.set(userCenterRef, userCenterUpdate, { merge: true });
         }
         else if (isAdminCaller && memberStatusProvided) {
+            batch.set(userCenterRef, userCenterUpdate, { merge: true });
+        }
+        else if (phoneNumberProvided) {
             batch.set(userCenterRef, userCenterUpdate, { merge: true });
         }
         if (isAdminCaller) {
@@ -1913,10 +1935,10 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             if (hasUserWrite) {
                 coreWrites.push(userRef.set(userUpdate, { merge: true }));
             }
-            if (canEditOtherStudent) {
+            if (shouldWriteMember) {
                 coreWrites.push(memberRef.set(memberUpdate, { merge: true }));
             }
-            if (canEditOtherStudent && (hasClassName || (isAdminCaller && memberStatusProvided))) {
+            if (shouldWriteUserCenter) {
                 coreWrites.push(userCenterRef.set(userCenterUpdate, { merge: true }));
             }
             const coreResults = await Promise.allSettled(coreWrites);
@@ -1952,6 +1974,53 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             userMessage: (e === null || e === void 0 ? void 0 : e.message) || "Unknown internal error",
         });
     }
+});
+exports.updateParentProfile = functions.region(region).https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+    }
+    const callerUid = context.auth.uid;
+    const centerId = typeof (data === null || data === void 0 ? void 0 : data.centerId) === "string" ? data.centerId.trim() : "";
+    const schoolName = typeof (data === null || data === void 0 ? void 0 : data.schoolName) === "string" ? data.schoolName.trim() : "";
+    const normalizedPhoneNumber = normalizePhoneNumber(data === null || data === void 0 ? void 0 : data.phoneNumber);
+    if (!centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+            userMessage: "센터 정보가 누락되었습니다. 다시 로그인 후 시도해 주세요.",
+        });
+    }
+    if (!normalizedPhoneNumber) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid phone number.", {
+            userMessage: "휴대폰 번호를 01012345678 형식으로 입력해 주세요.",
+        });
+    }
+    const callerMembership = await resolveCenterMembershipRole(db, centerId, callerUid);
+    if (callerMembership.role !== "parent" || !isActiveMembershipStatus(callerMembership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Only active parent members can update profile.", {
+            userMessage: "학부모 계정만 본인 전화번호를 수정할 수 있습니다.",
+        });
+    }
+    const timestamp = admin.firestore.Timestamp.now();
+    const batch = db.batch();
+    const userRef = db.doc(`users/${callerUid}`);
+    const memberRef = db.doc(`centers/${centerId}/members/${callerUid}`);
+    const userCenterRef = db.doc(`userCenters/${callerUid}/centers/${centerId}`);
+    const userUpdate = {
+        phoneNumber: normalizedPhoneNumber,
+        updatedAt: timestamp,
+    };
+    if (schoolName) {
+        userUpdate.schoolName = schoolName;
+    }
+    const membershipUpdate = {
+        phoneNumber: normalizedPhoneNumber,
+        updatedAt: timestamp,
+    };
+    batch.set(userRef, userUpdate, { merge: true });
+    batch.set(memberRef, membershipUpdate, { merge: true });
+    batch.set(userCenterRef, membershipUpdate, { merge: true });
+    await batch.commit();
+    return { ok: true };
 });
 exports.registerStudent = functions.region(region).https.onCall(async (data, context) => {
     var _a;
@@ -2060,7 +2129,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
     const studentLinkCodeInput = (_b = (_a = data === null || data === void 0 ? void 0 : data.studentLinkCode) !== null && _a !== void 0 ? _a : data === null || data === void 0 ? void 0 : data.parentLinkCode) !== null && _b !== void 0 ? _b : "";
     const studentLinkCode = String(studentLinkCodeInput).trim();
     const displayNameInput = String((data === null || data === void 0 ? void 0 : data.displayName) || "").trim();
-    const parentPhoneNumber = normalizePhoneNumber((data === null || data === void 0 ? void 0 : data.parentPhoneNumber) || (data === null || data === void 0 ? void 0 : data.phoneNumber) || "");
+    const signupPhoneNumber = normalizePhoneNumber((data === null || data === void 0 ? void 0 : data.parentPhoneNumber) || (data === null || data === void 0 ? void 0 : data.phoneNumber) || "");
     if (!allowedRoles.includes(role)) {
         throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.");
     }
@@ -2280,7 +2349,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 ...extractLinkedIds(existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.linkedStudentIds),
             ]));
             let linkedStudentIds = [];
-            let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber((existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.phoneNumber) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.phoneNumber) || "");
+            let effectiveUserPhone = signupPhoneNumber || normalizePhoneNumber((existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.phoneNumber) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.phoneNumber) || "");
             const resolvedStatus = "active";
             if (role === "student") {
                 if (!schoolName) {
@@ -2293,6 +2362,11 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         userMessage: "학생 가입에는 6자리 부모 연동 코드가 필요합니다.",
                     });
                 }
+                if (!effectiveUserPhone) {
+                    throw new functions.https.HttpsError("invalid-argument", "Student phone number is required.", {
+                        userMessage: "학생 가입 시 본인 휴대폰 번호를 입력해주세요.",
+                    });
+                }
             }
             if (role === "parent") {
                 if (!linkedStudentRef || !linkedStudentData || !linkedStudentId) {
@@ -2300,7 +2374,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         userMessage: "연동할 학생 정보를 찾지 못했습니다. 다시 시도해주세요.",
                     });
                 }
-                if (!effectiveParentPhone) {
+                if (!effectiveUserPhone) {
                     throw new functions.https.HttpsError("invalid-argument", "Parent phone number is required.", {
                         userMessage: "학부모 가입/연동 시 휴대폰 번호를 입력해주세요.",
                     });
@@ -2325,8 +2399,8 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 updatedAt: ts,
                 createdAt: ts,
             };
-            if (role === "parent" && effectiveParentPhone) {
-                userDocData.phoneNumber = effectiveParentPhone;
+            if ((role === "student" || role === "parent") && effectiveUserPhone) {
+                userDocData.phoneNumber = effectiveUserPhone;
             }
             t.set(db.doc(`users/${uid}`), userDocData, { merge: true });
             const memberData = {
@@ -2338,8 +2412,8 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 displayName: resolvedDisplayName,
                 className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.className) || null,
             };
-            if (role === "parent" && effectiveParentPhone) {
-                memberData.phoneNumber = effectiveParentPhone;
+            if ((role === "student" || role === "parent") && effectiveUserPhone) {
+                memberData.phoneNumber = effectiveUserPhone;
             }
             if (linkedStudentIds.length > 0) {
                 memberData.linkedStudentIds = linkedStudentIds;
@@ -2353,8 +2427,8 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 displayName: resolvedDisplayName,
                 className: targetClassName || (existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.className) || (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.className) || null,
             };
-            if (role === "parent" && effectiveParentPhone) {
-                userCenterData.phoneNumber = effectiveParentPhone;
+            if ((role === "student" || role === "parent") && effectiveUserPhone) {
+                userCenterData.phoneNumber = effectiveUserPhone;
             }
             if (linkedStudentIds.length > 0) {
                 userCenterData.linkedStudentIds = linkedStudentIds;
@@ -2367,6 +2441,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                     name: resolvedDisplayName,
                     schoolName,
                     grade,
+                    phoneNumber: effectiveUserPhone,
                     className: targetClassName,
                     seatNo: 0,
                     targetDailyMinutes: 360,

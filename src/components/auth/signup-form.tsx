@@ -44,7 +44,7 @@ const formSchema = z
     inviteCode: z.string().trim().optional(),
     parentLinkCode: z.string().trim().optional(),
     studentLinkCode: z.string().trim().optional(),
-    parentPhoneNumber: z.string().trim().optional(),
+    phoneNumber: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.confirmPassword) {
@@ -87,7 +87,7 @@ export function SignupForm() {
       inviteCode: '',
       parentLinkCode: '',
       studentLinkCode: '',
-      parentPhoneNumber: '',
+      phoneNumber: '',
     },
   });
 
@@ -186,6 +186,12 @@ export function SignupForm() {
         form.setError('parentLinkCode', { message: '학생 코드(6자리 숫자)를 입력해 주세요.' });
         return;
       }
+      const normalizedPhone = normalizePhone(values.phoneNumber || '');
+      if (!isValidKoreanMobilePhone(normalizedPhone)) {
+        form.setError('phoneNumber', { message: '본인 휴대폰 번호를 01012345678 형식으로 입력해 주세요.' });
+        return;
+      }
+      values.phoneNumber = normalizedPhone;
     }
 
     if (values.role === 'parent') {
@@ -194,12 +200,12 @@ export function SignupForm() {
         return;
       }
 
-      const normalizedPhone = normalizePhone(values.parentPhoneNumber || '');
+      const normalizedPhone = normalizePhone(values.phoneNumber || '');
       if (!isValidKoreanMobilePhone(normalizedPhone)) {
-        form.setError('parentPhoneNumber', { message: '휴대폰 번호를 01012345678 형식으로 입력해 주세요.' });
+        form.setError('phoneNumber', { message: '본인 휴대폰 번호를 01012345678 형식으로 입력해 주세요.' });
         return;
       }
-      values.parentPhoneNumber = normalizedPhone;
+      values.phoneNumber = normalizedPhone;
     }
 
     if ((values.role === 'teacher' || values.role === 'centerAdmin') && (!values.displayName || values.displayName.length < 2)) {
@@ -238,7 +244,7 @@ export function SignupForm() {
         grade: '고등학생',
         parentLinkCode: values.parentLinkCode || null,
         studentLinkCode: values.studentLinkCode || null,
-        parentPhoneNumber: values.parentPhoneNumber || null,
+        phoneNumber: values.phoneNumber || null,
       });
 
       setLoadingStatus('회원가입 완료');
@@ -274,7 +280,7 @@ export function SignupForm() {
         form.setError('parentLinkCode', { message: signupErrorMessage });
       }
       if (/phone|전화|휴대폰/.test(msgLower)) {
-        form.setError('parentPhoneNumber', { message: signupErrorMessage });
+        form.setError('phoneNumber', { message: signupErrorMessage });
       }
       if (/school|학교/.test(msgLower)) {
         form.setError('schoolName', { message: signupErrorMessage });
@@ -394,6 +400,29 @@ export function SignupForm() {
 
             <FormField
               control={form.control}
+              name="phoneNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold">본인 전화번호</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="01012345678"
+                      maxLength={11}
+                      {...field}
+                      className="h-12 rounded-xl border-2 font-black tracking-tight"
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <FormDescription className="text-[10px] font-bold">
+                    학생 본인 알림과 센터 연락을 위해 사용됩니다.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="parentLinkCode"
               render={({ field }) => (
                 <FormItem>
@@ -449,10 +478,10 @@ export function SignupForm() {
         {selectedRole === 'parent' && (
           <FormField
             control={form.control}
-            name="parentPhoneNumber"
+            name="phoneNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="font-bold">학부모 전화번호</FormLabel>
+                <FormLabel className="font-bold">본인 전화번호</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="01012345678"
@@ -463,7 +492,7 @@ export function SignupForm() {
                   />
                 </FormControl>
                 <FormDescription className="text-[10px] font-bold">
-                  등원/하원/지각 문자 수신 번호입니다.
+                  학부모 본인 수신 번호로 문자와 연락이 전달됩니다.
                 </FormDescription>
                 <FormMessage />
               </FormItem>

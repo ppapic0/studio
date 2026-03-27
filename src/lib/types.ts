@@ -97,6 +97,7 @@ export interface StudentProfile {
   name: string;
   grade: string;
   schoolName: string;
+  phoneNumber?: string;
   className?: string;
   seatNo: number;
   seatId?: string;

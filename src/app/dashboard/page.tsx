@@ -28,7 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
-import { type StudentProfile } from '@/lib/types';
+import { type StudentProfile, type User as UserType } from '@/lib/types';
 
 type ExamCountdownSetting = {
   id: string;
@@ -131,11 +131,22 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const [isInviteSubmitting, setIsInviteSubmitting] = useState(false);
   const [isParentLinkSubmitting, setIsParentLinkSubmitting] = useState(false);
+  const [isPhoneCaptureOpen, setIsPhoneCaptureOpen] = useState(false);
+  const [phoneCaptureValue, setPhoneCaptureValue] = useState('');
+  const [isPhoneCaptureSaving, setIsPhoneCaptureSaving] = useState(false);
+  const [savedPhoneFallback, setSavedPhoneFallback] = useState('');
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [isExamSaving, setIsExamSaving] = useState(false);
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const isStudentRole = activeMembership?.role === 'student';
+  const isParentRole = activeMembership?.role === 'parent';
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+  const { data: userProfile } = useDoc<UserType>(userProfileRef, { enabled: Boolean(user) });
 
   const studentProfileRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
@@ -189,6 +200,30 @@ export default function DashboardPage() {
     defaultValues: { studentLinkCode: '', parentPhoneNumber: '' },
   });
 
+  const resolvedSelfPhone = useMemo(() => {
+    if (!activeMembership) return '';
+    if (activeMembership.role === 'student') {
+      return normalizePhone(studentProfile?.phoneNumber || userProfile?.phoneNumber || activeMembership.phoneNumber || '');
+    }
+    if (activeMembership.role === 'parent') {
+      return normalizePhone(userProfile?.phoneNumber || activeMembership.phoneNumber || '');
+    }
+    return '';
+  }, [activeMembership, studentProfile?.phoneNumber, userProfile?.phoneNumber]);
+
+  const effectiveSelfPhone = savedPhoneFallback || resolvedSelfPhone;
+
+  useEffect(() => {
+    if (!activeMembership || !user) return;
+    if (activeMembership.role !== 'student' && activeMembership.role !== 'parent') return;
+    if (effectiveSelfPhone) {
+      setIsPhoneCaptureOpen(false);
+      return;
+    }
+    setPhoneCaptureValue('');
+    setIsPhoneCaptureOpen(true);
+  }, [activeMembership, user, effectiveSelfPhone]);
+
   async function onInviteSubmit(values: z.infer<typeof inviteFormSchema>) {
     if (!user || !functions) return;
 
@@ -217,9 +252,9 @@ export default function DashboardPage() {
     if (!user || !functions) return;
 
     const normalizedPhone = normalizePhone(values.parentPhoneNumber || '');
-    if (normalizedPhone && !isValidKoreanMobilePhone(normalizedPhone)) {
+    if (!isValidKoreanMobilePhone(normalizedPhone)) {
       parentLinkForm.setError('parentPhoneNumber', {
-        message: '휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
+        message: '본인 휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
       });
       return;
     }
@@ -230,7 +265,7 @@ export default function DashboardPage() {
       const result: any = await completeSignupFn({
         role: 'parent',
         studentLinkCode: values.studentLinkCode.trim(),
-        parentPhoneNumber: normalizedPhone || null,
+        parentPhoneNumber: normalizedPhone,
       });
 
       if (result.data?.ok) {
@@ -255,6 +290,54 @@ export default function DashboardPage() {
       setIsParentLinkSubmitting(false);
     }
   }
+
+  const handleSavePhoneCapture = async () => {
+    if (!user || !functions || !activeMembership) return;
+    const normalizedPhone = normalizePhone(phoneCaptureValue);
+    if (!isValidKoreanMobilePhone(normalizedPhone)) {
+      toast({
+        variant: 'destructive',
+        title: '전화번호 확인',
+        description: '휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
+      });
+      return;
+    }
+
+    setIsPhoneCaptureSaving(true);
+    try {
+      if (activeMembership.role === 'student') {
+        const updateFn = httpsCallable(functions, 'updateStudentAccount');
+        await updateFn({
+          studentId: user.uid,
+          centerId: activeMembership.id,
+          phoneNumber: normalizedPhone,
+        });
+      } else if (activeMembership.role === 'parent') {
+        const updateFn = httpsCallable(functions, 'updateParentProfile');
+        await updateFn({
+          centerId: activeMembership.id,
+          phoneNumber: normalizedPhone,
+        });
+      } else {
+        return;
+      }
+
+      setSavedPhoneFallback(normalizedPhone);
+      setIsPhoneCaptureOpen(false);
+      toast({
+        title: '전화번호 저장 완료',
+        description: '로그인 계정의 본인 전화번호가 저장되었습니다.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '저장 실패',
+        description: resolveCallableErrorMessage(error, '전화번호 저장 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setIsPhoneCaptureSaving(false);
+    }
+  };
 
   const handleAddExamDraft = () => {
     setExamDrafts((prev) => {
@@ -342,27 +425,58 @@ export default function DashboardPage() {
 
     if (userRole === 'parent') {
       return (
-        <div className="flex flex-col gap-3">
-          <ParentDashboard isActive={true} />
-        </div>
+        <>
+          <div className="flex flex-col gap-3">
+            <ParentDashboard isActive={true} />
+          </div>
+          <Dialog open={isPhoneCaptureOpen} onOpenChange={(open) => { if (effectiveSelfPhone) setIsPhoneCaptureOpen(open); }}>
+            <DialogContent className="rounded-[2.5rem] border-none p-0 shadow-2xl sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+              <div className="bg-primary px-6 py-6 text-white">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black tracking-tight">본인 전화번호 확인</DialogTitle>
+                  <DialogDescription className="text-white/75 font-bold">학부모 계정은 본인 수신 번호가 필요합니다. 지금 바로 등록해 주세요.</DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="space-y-4 p-6">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-black uppercase text-muted-foreground">학부모 본인 전화번호</Label>
+                  <Input
+                    value={phoneCaptureValue}
+                    onChange={(e) => setPhoneCaptureValue(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="01012345678"
+                    className="h-12 rounded-xl border-2 font-black tracking-tight"
+                    maxLength={11}
+                  />
+                </div>
+              </div>
+              <DialogFooter className="border-t bg-muted/10 p-6">
+                <Button onClick={handleSavePhoneCapture} disabled={isPhoneCaptureSaving} className="h-12 w-full rounded-2xl font-black">
+                  {isPhoneCaptureSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
+                  전화번호 저장
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       );
     }
 
     return (
-      <div className={cn('flex flex-col', isMobile ? 'gap-1' : 'gap-2')}>
-        <div className={cn('mb-2 flex flex-wrap items-center gap-2 px-1', isMobile ? 'mt-0' : 'mb-4')}>
-          <h1 className={cn('font-black tracking-tighter', isMobile ? 'text-xl' : 'text-4xl')}>
-            {`${user?.displayName}\uB2D8, \uBC18\uAC00\uC6CC\uC694!`}
-          </h1>
-          <Badge
-            variant="secondary"
-            className={cn(
-              'shrink-0 whitespace-nowrap rounded-full border-none bg-primary font-black uppercase text-white',
-              isMobile ? 'h-5 px-2 text-[9px]' : 'h-7 px-3 text-[11px]',
-            )}
-          >
-            {'\uD559\uC0DD'}
-          </Badge>
+      <>
+        <div className={cn('flex flex-col', isMobile ? 'gap-1' : 'gap-2')}>
+          <div className={cn('mb-2 flex flex-wrap items-center gap-2 px-1', isMobile ? 'mt-0' : 'mb-4')}>
+            <h1 className={cn('font-black tracking-tighter', isMobile ? 'text-xl' : 'text-4xl')}>
+              {`${user?.displayName}\uB2D8, \uBC18\uAC00\uC6CC\uC694!`}
+            </h1>
+            <Badge
+              variant="secondary"
+              className={cn(
+                'shrink-0 whitespace-nowrap rounded-full border-none bg-primary font-black uppercase text-white',
+                isMobile ? 'h-5 px-2 text-[9px]' : 'h-7 px-3 text-[11px]',
+              )}
+            >
+              {'\uD559\uC0DD'}
+            </Badge>
 
           {userRole === 'student' && (
             <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
@@ -444,10 +558,39 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>
-          <StudentDashboard isActive={true} />
+          <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>
+            <StudentDashboard isActive={true} />
+          </div>
         </div>
-      </div>
+        <Dialog open={isPhoneCaptureOpen} onOpenChange={(open) => { if (effectiveSelfPhone) setIsPhoneCaptureOpen(open); }}>
+          <DialogContent className="rounded-[2.5rem] border-none p-0 shadow-2xl sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+            <div className="bg-primary px-6 py-6 text-white">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black tracking-tight">본인 전화번호 등록</DialogTitle>
+                <DialogDescription className="text-white/75 font-bold">학생 계정은 본인 번호가 필요합니다. 누락된 번호를 지금 바로 추가해 주세요.</DialogDescription>
+              </DialogHeader>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="space-y-2">
+                <Label className="text-[11px] font-black uppercase text-muted-foreground">학생 본인 전화번호</Label>
+                <Input
+                  value={phoneCaptureValue}
+                  onChange={(e) => setPhoneCaptureValue(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                  placeholder="01012345678"
+                  className="h-12 rounded-xl border-2 font-black tracking-tight"
+                  maxLength={11}
+                />
+              </div>
+            </div>
+            <DialogFooter className="border-t bg-muted/10 p-6">
+              <Button onClick={handleSavePhoneCapture} disabled={isPhoneCaptureSaving} className="h-12 w-full rounded-2xl font-black">
+                {isPhoneCaptureSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
+                전화번호 저장
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 
@@ -563,7 +706,7 @@ export default function DashboardPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-black uppercase tracking-widest text-primary/70">
-                        학부모 전화번호 (선택)
+                        학부모 본인 전화번호
                       </FormLabel>
                       <FormControl>
                         <div className="relative">
@@ -577,7 +720,7 @@ export default function DashboardPage() {
                         </div>
                       </FormControl>
                       <p className="text-[10px] font-bold text-muted-foreground">
-                        최초 연동 계정이면 필수이며, 기존 연동 계정은 비워도 됩니다.
+                        학생 연동과 문자 수신을 위해 필수 입력입니다.
                       </p>
                       <FormMessage />
                     </FormItem>

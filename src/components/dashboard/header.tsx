@@ -15,6 +15,7 @@ import {
   School,
   Loader2,
   Sparkles,
+  Phone,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -108,6 +109,14 @@ function normalizeParentLinkCode(value: unknown): string {
   return '';
 }
 
+function normalizePhone(raw: string): string {
+  return raw.replace(/\D/g, '');
+}
+
+function isValidKoreanMobilePhone(raw: string): boolean {
+  return /^01\d{8,9}$/.test(raw);
+}
+
 type DashboardHeaderProps = {
   playStudentEntry?: boolean;
 };
@@ -134,6 +143,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
   const [schoolName, setSchoolName] = useState('');
   const [grade, setGrade] = useState('');
   const [parentLinkCode, setParentLinkCode] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   const userRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -175,6 +185,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
       setSchoolName(studentProfile.schoolName || '');
       setGrade(studentProfile.grade || '');
       setParentLinkCode(normalizeParentLinkCode(studentProfile.parentLinkCode));
+      setPhoneNumber(normalizePhone(studentProfile.phoneNumber || userProfile?.phoneNumber || activeMembership?.phoneNumber || ''));
       setIsSettingsFormInitialized(true);
       return;
     }
@@ -183,9 +194,10 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
       setSchoolName(userProfile.schoolName || '');
       setGrade('');
       setParentLinkCode('');
+      setPhoneNumber(normalizePhone(userProfile.phoneNumber || activeMembership?.phoneNumber || ''));
       setIsSettingsFormInitialized(true);
     }
-  }, [isSettingsOpen, isSettingsFormInitialized, studentProfile, userProfile]);
+  }, [isSettingsOpen, isSettingsFormInitialized, studentProfile, userProfile, activeMembership?.phoneNumber]);
 
   useEffect(() => {
     if (!isParentMode || typeof window === 'undefined') return;
@@ -213,6 +225,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
     const normalizedSchoolName = schoolName.trim();
     const normalizedGrade = grade.trim();
     const normalizedParentLinkCode = normalizeParentLinkCode(parentLinkCode);
+    const normalizedPhoneNumber = normalizePhone(phoneNumber);
     const currentParentLinkCode = normalizeParentLinkCode(studentProfile?.parentLinkCode);
 
     if (activeMembership.role === 'student' && normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
@@ -220,6 +233,15 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
         variant: 'destructive',
         title: '\uC785\uB825 \uD655\uC778',
         description: '\uD559\uBD80\uBAA8 \uC5F0\uB3D9 \uCF54\uB4DC\uB294 6\uC790\uB9AC \uC22B\uC790\uB85C \uC785\uB825\uD574 \uC8FC\uC138\uC694.',
+      });
+      return;
+    }
+
+    if ((activeMembership.role === 'student' || activeMembership.role === 'parent') && !isValidKoreanMobilePhone(normalizedPhoneNumber)) {
+      toast({
+        variant: 'destructive',
+        title: '\uC785\uB825 \uD655\uC778',
+        description: '\uBCF8\uC778 \uD734\uB300\uD3F0 \uBC88\uD638\uB97C 01012345678 \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD574 \uC8FC\uC138\uC694.',
       });
       return;
     }
@@ -237,11 +259,22 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
           centerId: activeMembership.id,
           schoolName: normalizedSchoolName,
           grade: normalizedGrade,
+          phoneNumber: normalizedPhoneNumber,
         };
         if (normalizedParentLinkCode !== currentParentLinkCode) {
           payload.parentLinkCode = normalizedParentLinkCode || null;
         }
         await updateFn(payload);
+      } else if (activeMembership.role === 'parent') {
+        if (!functions) {
+          throw new Error('함수 연결이 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.');
+        }
+        const updateFn = httpsCallable(functions, 'updateParentProfile');
+        await updateFn({
+          centerId: activeMembership.id,
+          schoolName: normalizedSchoolName,
+          phoneNumber: normalizedPhoneNumber,
+        });
       } else {
         const batch = writeBatch(firestore);
         batch.set(
@@ -408,6 +441,22 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
                 />
               </div>
             </div>
+
+            {(activeMembership?.role === 'student' || activeMembership?.role === 'parent') && (
+              <div className="grid gap-2">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">본인 전화번호</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/30" />
+                  <Input
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    className="h-12 rounded-xl border-2 pl-10 font-black tracking-tight"
+                    placeholder="01012345678"
+                    maxLength={11}
+                  />
+                </div>
+              </div>
+            )}
 
             {activeMembership?.role === 'student' && (
               <>
