@@ -123,6 +123,7 @@ export function CenterAdminAttendanceBoard({
                   '학생';
                 const isNameOnly = seatDetailLevel === 'nameOnly';
                 const studyTimeLabel = signal?.todayStudyLabel || '0h 0m';
+                const compactStudyTimeLabel = studyTimeLabel.replace(/\s+/g, '');
 
                 return (
                   <button
@@ -172,21 +173,21 @@ export function CenterAdminAttendanceBoard({
                           className={cn(
                             'w-full text-center font-black tracking-tight whitespace-normal break-keep',
                             compact
-                              ? 'line-clamp-2 text-[10px] leading-[1.12] text-slate-950'
+                              ? 'min-h-[22px] line-clamp-2 text-[10px] leading-[1.12] text-slate-950'
                               : isNameOnly
-                                ? 'line-clamp-2 text-[11px] leading-[1.2] text-slate-950'
-                                : 'line-clamp-2 text-[11px] leading-[1.15] text-slate-950'
+                                ? 'min-h-[28px] line-clamp-2 text-[11px] leading-[1.2] text-slate-950'
+                                : 'min-h-[28px] line-clamp-2 text-[11px] leading-[1.15] text-slate-950'
                           )}
                         >
                           {displayName}
                         </span>
                         <span
                           className={cn(
-                            'inline-flex items-center justify-center rounded-full border border-black/5 bg-white/80 font-black tracking-tight text-slate-700 shadow-sm',
+                            'inline-flex max-w-full items-center justify-center rounded-full border border-black/5 bg-white/80 font-black tracking-tight whitespace-nowrap text-slate-700 shadow-sm',
                             compact ? 'mt-1 px-1.5 py-0.5 text-[7px] leading-none' : 'mt-1.5 px-2 py-0.5 text-[8px] leading-none'
                           )}
                         >
-                          공부 {studyTimeLabel}
+                          {compactStudyTimeLabel}
                         </span>
                       </div>
                     ) : (
