@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Target } from 'lucide-react';
+import { History, Loader2, RotateCcw, Target } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import {
+  type RecentStudyOption,
   STUDY_AMOUNT_UNIT_OPTIONS,
   STUDY_MINUTE_PRESETS,
   STUDY_PLAN_MODE_OPTIONS,
@@ -53,6 +54,12 @@ type StudyComposerCardProps = {
   onSubmit: () => void;
   isSubmitting: boolean;
   isMobile: boolean;
+  isRecentLoading?: boolean;
+  recentOptions?: RecentStudyOption[];
+  onPrefillRecent?: (value: RecentStudyOption) => void;
+  onOpenRecentSheet?: () => void;
+  activeRecentTitle?: string | null;
+  onResetRecentPrefill?: () => void;
   compact?: boolean;
   disabled?: boolean;
   submitLabel?: string;
@@ -81,11 +88,18 @@ export function StudyComposerCard({
   onSubmit,
   isSubmitting,
   isMobile,
+  isRecentLoading = false,
+  recentOptions = [],
+  onPrefillRecent,
+  onOpenRecentSheet,
+  activeRecentTitle = null,
+  onResetRecentPrefill,
   compact = false,
   disabled = false,
   submitLabel = '계획 추가',
 }: StudyComposerCardProps) {
   const isVolumeMode = studyModeValue === 'volume';
+  const visibleRecentOptions = recentOptions.slice(0, isMobile ? 3 : 5);
 
   return (
     <Card className={cn(
@@ -108,6 +122,87 @@ export function StudyComposerCard({
         </div>
       </CardHeader>
       <CardContent className={cn(compact ? "space-y-3 p-4 pt-0" : isMobile ? "space-y-3 p-5 pt-0" : "space-y-4 p-6 pt-0")}>
+        {recentOptions.length > 0 || isRecentLoading ? (
+          <div className="rounded-[1.3rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] p-3 shadow-[0_18px_40px_-36px_rgba(20,41,95,0.24)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-2xl bg-primary/7 p-2 text-primary">
+                    <History className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black tracking-tight text-slate-900">최근 불러오기</p>
+                    <p className="mt-0.5 break-keep text-[10px] font-semibold leading-4 text-slate-500">
+                      전에 쓰던 계획을 불러와서 말만 조금 바꿔도 돼요.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {onOpenRecentSheet ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={disabled || isSubmitting || isRecentLoading}
+                  onClick={onOpenRecentSheet}
+                  className="h-8 rounded-full px-3 text-[10px] font-black text-primary"
+                >
+                  {isRecentLoading ? '불러오는 중' : '더 보기'}
+                </Button>
+              ) : null}
+            </div>
+            <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
+              {isRecentLoading ? (
+                <div className="flex h-[6.5rem] min-w-full items-center justify-center rounded-[1.15rem] border border-dashed border-slate-200 bg-white/80">
+                  <span className="text-[11px] font-semibold text-slate-400">최근 계획을 불러오는 중이에요.</span>
+                </div>
+              ) : null}
+              {visibleRecentOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  disabled={disabled || isSubmitting}
+                  onClick={() => onPrefillRecent?.(option)}
+                  className="min-w-[11rem] shrink-0 rounded-[1.15rem] border border-slate-200 bg-white/94 p-3 text-left shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50/45"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">
+                      {option.subjectLabel}
+                    </span>
+                    <span className="text-[9px] font-black text-slate-400">{option.studyModeLabel}</span>
+                  </div>
+                  <p className="mt-2 line-clamp-1 break-keep text-[11px] font-black tracking-tight text-slate-900">
+                    {option.title}
+                  </p>
+                  <p className="mt-1 line-clamp-2 break-keep text-[10px] font-semibold leading-4 text-slate-500">
+                    {option.metaLabel}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {activeRecentTitle ? (
+          <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-emerald-100 bg-emerald-50/75 p-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">불러온 계획 수정 중</p>
+              <p className="mt-1 line-clamp-1 break-keep text-xs font-black text-emerald-950">{activeRecentTitle}</p>
+            </div>
+            {onResetRecentPrefill ? (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={disabled || isSubmitting}
+                onClick={onResetRecentPrefill}
+                className="h-8 shrink-0 rounded-full px-3 text-[10px] font-black text-emerald-700"
+              >
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                초기화
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-2">
           {STUDY_PLAN_MODE_OPTIONS.map((option) => {
             const isActive = option.value === studyModeValue;

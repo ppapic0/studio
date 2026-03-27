@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { 
   Card, 
@@ -98,6 +98,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import {
   ROUTINE_TEMPLATE_OPTIONS,
+  type RecentStudyOption,
   type StudyAmountUnit,
   type StudyPlanMode,
 } from '@/components/dashboard/student-planner/planner-constants';
@@ -105,6 +106,7 @@ import { RoutineComposerCard } from '@/components/dashboard/student-planner/rout
 import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
 import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
 import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
+import { RecentStudySheet } from '@/components/dashboard/student-planner/recent-study-sheet';
 import { RepeatCopySheet } from '@/components/dashboard/student-planner/repeat-copy-sheet';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
@@ -150,6 +152,16 @@ function buildStudyTaskMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetM
     return `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel} · ${progressRate}%`;
   }
   return task.targetMinutes ? `${task.targetMinutes}분 목표` : '시간 자유';
+}
+
+function normalizeStudyTitle(title: string) {
+  return title.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function getPlanTimestampMs(task: Pick<StudyPlanItem, 'updatedAt' | 'createdAt'>) {
+  const updatedAtMs = task.updatedAt?.toDate?.().getTime?.() ?? 0;
+  const createdAtMs = task.createdAt?.toDate?.().getTime?.() ?? 0;
+  return Math.max(updatedAtMs, createdAtMs);
 }
 
 function clampPercent(value: number) {
@@ -330,12 +342,16 @@ export default function StudyPlanPage() {
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
   const [isTaskCopyDialogOpen, setIsTaskCopyDialogOpen] = useState(false);
   const [isRoutineCopyDialogOpen, setIsRoutineCopyDialogOpen] = useState(false);
+  const [isRecentStudySheetOpen, setIsRecentStudySheetOpen] = useState(false);
   const [taskCopyWeeks, setTaskCopyWeeks] = useState('4');
   const [routineCopyWeeks, setRoutineCopyWeeks] = useState('4');
   const [taskCopyDays, setTaskCopyDays] = useState<number[]>([]);
   const [routineCopyDays, setRoutineCopyDays] = useState<number[]>([]);
   const [taskCopyItemIds, setTaskCopyItemIds] = useState<string[]>([]);
   const [routineCopyItemIds, setRoutineCopyItemIds] = useState<string[]>([]);
+  const [recentStudyOptions, setRecentStudyOptions] = useState<RecentStudyOption[]>([]);
+  const [isRecentStudyLoading, setIsRecentStudyLoading] = useState(false);
+  const [activeRecentStudyKey, setActiveRecentStudyKey] = useState<string | null>(null);
 
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
@@ -401,6 +417,56 @@ export default function StudyPlanPage() {
     setSelectedDate(addDays(selectedDate, direction * 7));
   };
 
+  const recentStudyWeekKeys = useMemo(() => {
+    if (!selectedDate) return [];
+    return Array.from(
+      new Set(
+        [0, 7, 14].map((offset) =>
+          format(addDays(selectedDate, -offset), "yyyy-'W'II")
+        )
+      )
+    );
+  }, [selectedDate]);
+
+  const buildRecentStudyOption = useCallback(
+    (task: WithId<StudyPlanItem>, sourceWeekKey: string): RecentStudyOption => {
+      const subjectValue = task.subject || 'etc';
+      const subject = SUBJECTS.find((item) => item.id === subjectValue);
+      const studyModeValue = resolveStudyPlanMode(task);
+      const amountUnitValue = (task.amountUnit || '문제') as StudyAmountUnit;
+      const customAmountUnitValue = task.amountUnit === '직접입력' ? task.amountUnitLabel?.trim() || '' : '';
+      const updatedAtMs = getPlanTimestampMs(task);
+      const usedDate = updatedAtMs ? format(new Date(updatedAtMs), 'M/d') : task.dateKey.slice(5).replace('-', '/');
+
+      return {
+        key: [
+          subjectValue,
+          studyModeValue,
+          studyModeValue === 'volume'
+            ? `${Math.max(0, task.targetAmount || 0)}:${resolveAmountUnitLabel(task)}`
+            : `${Math.max(0, task.targetMinutes || 0)}`,
+          normalizeStudyTitle(task.title),
+        ].join('::'),
+        sourceId: task.id,
+        sourceDateKey: task.dateKey,
+        sourceWeekKey,
+        title: task.title,
+        subjectValue,
+        subjectLabel: subject?.label || '기타',
+        studyModeValue,
+        studyModeLabel: studyModeValue === 'volume' ? '분량형' : '시간형',
+        minuteValue: String(task.targetMinutes || ''),
+        amountValue: String(task.targetAmount || ''),
+        amountUnitValue,
+        customAmountUnitValue,
+        enableVolumeMinutes: studyModeValue === 'volume' && Number(task.targetMinutes || 0) > 0,
+        metaLabel: buildStudyTaskMeta(task),
+        updatedLabel: `${usedDate} 사용`,
+      };
+    },
+    []
+  );
+
   const planItemsQuery = useMemoFirebase(() => {
     if (!firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return null;
     return query(
@@ -425,6 +491,67 @@ export default function StudyPlanPage() {
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
   }, [firestore, activeMembership, user]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isStudent });
+
+  const fetchRecentStudyOptions = useCallback(async () => {
+    if (!firestore || !user || !activeMembership || !isStudent || recentStudyWeekKeys.length === 0) {
+      setRecentStudyOptions([]);
+      return;
+    }
+
+    setIsRecentStudyLoading(true);
+
+    try {
+      const snapshots = await Promise.all(
+        recentStudyWeekKeys.map((targetWeekKey) =>
+          getDocs(
+            collection(
+              firestore,
+              'centers',
+              activeMembership.id,
+              'plans',
+              user.uid,
+              'weeks',
+              targetWeekKey,
+              'items'
+            )
+          ).then((snapshot) => ({ targetWeekKey, snapshot }))
+        )
+      );
+
+      const recentItems = snapshots
+        .flatMap(({ targetWeekKey, snapshot }) =>
+          snapshot.docs.map((snap) => ({
+            ...((snap.data() || {}) as StudyPlanItem),
+            id: snap.id,
+            targetWeekKey,
+          }))
+        )
+        .filter((item) => item.category === 'study' || !item.category)
+        .filter((item) => item.title?.trim());
+
+      recentItems.sort((left, right) => getPlanTimestampMs(right) - getPlanTimestampMs(left));
+
+      const uniqueItems = new Map<string, RecentStudyOption>();
+
+      for (const item of recentItems) {
+        const option = buildRecentStudyOption(item as WithId<StudyPlanItem>, item.targetWeekKey);
+        if (!uniqueItems.has(option.key)) {
+          uniqueItems.set(option.key, option);
+        }
+      }
+
+      setRecentStudyOptions(Array.from(uniqueItems.values()));
+    } catch (error) {
+      console.error('최근 학습 계획을 불러오지 못했습니다.', error);
+      setRecentStudyOptions([]);
+    } finally {
+      setIsRecentStudyLoading(false);
+    }
+  }, [activeMembership, buildRecentStudyOption, firestore, isStudent, recentStudyWeekKeys, user]);
+
+  useEffect(() => {
+    void fetchRecentStudyOptions();
+  }, [fetchRecentStudyOptions]);
 
   const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
@@ -540,6 +667,21 @@ export default function StudyPlanPage() {
       badgeClassName: 'border-sky-100 bg-sky-50 text-sky-700',
     }))
   ), [copyableRoutineItems]);
+  const visibleRecentStudyOptions = useMemo(
+    () => recentStudyOptions.slice(0, isMobile ? 3 : 5),
+    [isMobile, recentStudyOptions]
+  );
+  const activeRecentStudyOption = useMemo(
+    () => recentStudyOptions.find((item) => item.key === activeRecentStudyKey) || null,
+    [activeRecentStudyKey, recentStudyOptions]
+  );
+
+  useEffect(() => {
+    if (!activeRecentStudyKey) return;
+    if (!recentStudyOptions.some((item) => item.key === activeRecentStudyKey)) {
+      setActiveRecentStudyKey(null);
+    }
+  }, [activeRecentStudyKey, recentStudyOptions]);
 
   useEffect(() => {
     if (!isTaskCopyDialogOpen) return;
@@ -560,6 +702,30 @@ export default function StudyPlanPage() {
   const handleRoutineTemplateSelect = (template: (typeof ROUTINE_TEMPLATE_OPTIONS)[number]) => {
     setSelectedRoutineTemplateKey(template.key);
     setNewRoutineTitle(template.title);
+  };
+
+  const resetStudyComposerPrefill = () => {
+    setActiveRecentStudyKey(null);
+    setNewStudyTask('');
+    setNewStudyMinutes('60');
+    setNewStudyTargetAmount('');
+    setNewStudyAmountUnit('문제');
+    setNewStudyCustomAmountUnit('');
+    setEnableVolumeStudyMinutes(false);
+    setNewStudyMode('volume');
+  };
+
+  const handlePrefillRecentStudy = (item: RecentStudyOption) => {
+    setNewStudySubject(item.subjectValue);
+    setNewStudyMode(item.studyModeValue);
+    setNewStudyMinutes(item.minuteValue || '60');
+    setNewStudyTargetAmount(item.amountValue);
+    setNewStudyAmountUnit(item.amountUnitValue);
+    setNewStudyCustomAmountUnit(item.customAmountUnitValue);
+    setEnableVolumeStudyMinutes(item.enableVolumeMinutes);
+    setNewStudyTask(item.title);
+    setActiveRecentStudyKey(item.key);
+    setIsRecentStudySheetOpen(false);
   };
 
   const applySameDayRoutinePenalty = async (reason: string) => {
@@ -623,8 +789,17 @@ export default function StudyPlanPage() {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
-  const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule') => {
-    if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent || !weekKey || !selectedDateKey) return;
+  const handleAddTask = async (
+    title: string,
+    category: 'study' | 'personal' | 'schedule',
+    options?: {
+      studyPrefill?: RecentStudyOption;
+      preserveStudyComposer?: boolean;
+    }
+  ) => {
+    if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent || !weekKey || !selectedDateKey) {
+      return false;
+    }
 
     setIsSubmitting(true);
     const itemsCollectionRef = collection(
@@ -637,8 +812,9 @@ export default function StudyPlanPage() {
       weekKey,
       'items'
     );
-    
+
     try {
+      const recentStudy = options?.studyPrefill;
       const data: any = {
         title: title.trim(),
         done: false,
@@ -655,19 +831,28 @@ export default function StudyPlanPage() {
       if (category === 'schedule' && !title.includes('등원하지 않습니다')) {
         data.title = `${title.trim()}: 09:00 ~ 10:00`;
       } else if (category === 'study') {
-        data.subject = newStudySubject;
-        data.studyPlanMode = newStudyMode;
-        if (newStudyMode === 'time') {
-          data.targetMinutes = Number(newStudyMinutes) || 0;
+        const studyMode = recentStudy?.studyModeValue || newStudyMode;
+        const studyMinutes = recentStudy?.minuteValue ?? newStudyMinutes;
+        const studyAmount = recentStudy?.amountValue ?? newStudyTargetAmount;
+        const studyAmountUnit = recentStudy?.amountUnitValue || newStudyAmountUnit;
+        const customUnitLabel = (recentStudy?.customAmountUnitValue ?? newStudyCustomAmountUnit).trim();
+        const subjectValue = recentStudy?.subjectValue || newStudySubject;
+        const shouldKeepMinutes = recentStudy ? recentStudy.enableVolumeMinutes : enableVolumeStudyMinutes;
+
+        data.subject = subjectValue;
+        data.studyPlanMode = studyMode;
+
+        if (studyMode === 'time') {
+          data.targetMinutes = Number(studyMinutes) || 0;
         } else {
-          data.targetAmount = Number(newStudyTargetAmount) || 0;
+          data.targetAmount = Number(studyAmount) || 0;
           data.actualAmount = 0;
-          data.amountUnit = newStudyAmountUnit;
-          if (newStudyAmountUnit === '직접입력') {
-            data.amountUnitLabel = newStudyCustomAmountUnit.trim() || '단위';
+          data.amountUnit = studyAmountUnit;
+          if (studyAmountUnit === '직접입력') {
+            data.amountUnitLabel = customUnitLabel || '단위';
           }
-          if (enableVolumeStudyMinutes && Number(newStudyMinutes) > 0) {
-            data.targetMinutes = Number(newStudyMinutes) || 0;
+          if (shouldKeepMinutes && Number(studyMinutes) > 0) {
+            data.targetMinutes = Number(studyMinutes) || 0;
           }
         }
       }
@@ -681,27 +866,49 @@ export default function StudyPlanPage() {
           description: '당일 출석 루틴은 작성/수정 가능하지만 벌점이 자동 반영됩니다.',
         });
       }
-      
+
       if (category === 'study') {
-        setNewStudyTask('');
-        setNewStudyTargetAmount('');
-        setNewStudyAmountUnit('문제');
-        setNewStudyCustomAmountUnit('');
-        setEnableVolumeStudyMinutes(false);
+        if (!options?.preserveStudyComposer) {
+          setNewStudyTask('');
+          setNewStudyTargetAmount('');
+          setNewStudyAmountUnit('문제');
+          setNewStudyCustomAmountUnit('');
+          setEnableVolumeStudyMinutes(false);
+          setActiveRecentStudyKey(null);
+        }
+        await fetchRecentStudyOptions();
       } else if (category === 'personal') {
         setNewPersonalTask('');
       } else {
         setNewRoutineTitle('');
         setIsRoutineModalOpen(false);
       }
+
+      return true;
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: '할 일 추가 실패',
         description: typeof error?.message === 'string' ? error.message : '할 일을 저장하지 못했습니다.',
       });
+      return false;
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleQuickAddRecentStudy = async (item: RecentStudyOption) => {
+    const added = await handleAddTask(item.title, 'study', {
+      studyPrefill: item,
+      preserveStudyComposer: true,
+    });
+
+    if (added) {
+      setIsRecentStudySheetOpen(false);
+      toast({
+        title: '최근 계획을 그대로 추가했어요.',
+        description: '제목과 목표는 유지하고, 완료 상태는 새로 시작하도록 초기화했어요.',
+      });
     }
   };
 
@@ -1405,7 +1612,7 @@ export default function StudyPlanPage() {
                     <div>
                       <h3 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-base" : "text-xl")}>학습 계획</h3>
                       <p className={cn("break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
-                        과목과 시간을 먼저 고르고, 해야 할 공부를 짧게 남겨서 바로 실행해요.
+                        전에 쓰던 계획을 불러와서 조금만 바꾸거나, 새 목표를 바로 짧게 적어둘 수 있어요.
                       </p>
                     </div>
                   </div>
@@ -1423,7 +1630,7 @@ export default function StudyPlanPage() {
               {!isPast ? (
                 <StudyComposerCard
                   title="학습 계획 추가"
-                  description="시간을 먼저 못 정해도 괜찮아요. 시간형과 분량형 중 편한 방식으로 바로 적어보세요."
+                  description="최근 계획을 먼저 불러오거나, 시간형과 분량형 중 편한 방식으로 바로 적어보세요."
                   subjectOptions={SUBJECTS}
                   subjectValue={newStudySubject}
                   onSubjectChange={setNewStudySubject}
@@ -1444,6 +1651,12 @@ export default function StudyPlanPage() {
                   onSubmit={() => handleAddTask(newStudyTask, 'study')}
                   isSubmitting={isSubmitting}
                   isMobile={isMobile}
+                  isRecentLoading={isRecentStudyLoading}
+                  recentOptions={visibleRecentStudyOptions}
+                  onPrefillRecent={handlePrefillRecentStudy}
+                  onOpenRecentSheet={() => setIsRecentStudySheetOpen(true)}
+                  activeRecentTitle={activeRecentStudyOption?.title || null}
+                  onResetRecentPrefill={resetStudyComposerPrefill}
                 />
               ) : null}
 
@@ -1607,6 +1820,16 @@ export default function StudyPlanPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      <RecentStudySheet
+        open={isRecentStudySheetOpen}
+        onOpenChange={setIsRecentStudySheetOpen}
+        items={recentStudyOptions}
+        onPrefill={handlePrefillRecentStudy}
+        onQuickAdd={handleQuickAddRecentStudy}
+        isSubmitting={isSubmitting}
+        isMobile={isMobile}
+      />
 
       <RepeatCopySheet
         open={isTaskCopyDialogOpen}

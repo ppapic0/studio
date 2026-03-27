@@ -9,6 +9,24 @@ export type RoutineTemplateOption = {
 
 export type StudyPlanMode = 'time' | 'volume';
 export type StudyAmountUnit = '문제' | '페이지' | '챕터' | '지문' | '세트' | '회독' | '직접입력';
+export type RecentStudyOption = {
+  key: string;
+  sourceId: string;
+  sourceDateKey: string;
+  sourceWeekKey: string;
+  title: string;
+  subjectValue: string;
+  subjectLabel: string;
+  studyModeValue: StudyPlanMode;
+  studyModeLabel: string;
+  minuteValue: string;
+  amountValue: string;
+  amountUnitValue: StudyAmountUnit;
+  customAmountUnitValue: string;
+  enableVolumeMinutes: boolean;
+  metaLabel: string;
+  updatedLabel: string;
+};
 
 export const ROUTINE_TEMPLATE_OPTIONS: RoutineTemplateOption[] = [
   { key: 'arrival', label: '등원', title: '등원 예정', icon: 'arrival' },
