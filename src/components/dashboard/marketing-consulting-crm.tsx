@@ -982,6 +982,11 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', STATUS_META[request.status || 'new'].className)}>
                               {STATUS_META[request.status || 'new'].label}
                             </Badge>
+                            {request.school && (
+                              <Badge variant="outline" className="max-w-[180px] truncate text-[10px] font-black text-slate-700">
+                                {request.school}
+                              </Badge>
+                            )}
                             {request.grade && (
                               <Badge variant="outline" className="text-[10px] font-black text-slate-700">
                                 {request.grade}
@@ -1313,6 +1318,11 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', STATUS_META[lead.status || 'new'].className)}>
                               {STATUS_META[lead.status || 'new'].label}
                             </Badge>
+                            {lead.school && (
+                              <Badge variant="outline" className="max-w-[180px] truncate text-[10px] font-black text-slate-700">
+                                {lead.school}
+                              </Badge>
+                            )}
                             {lead.grade && (
                               <Badge variant="outline" className="text-[10px] font-black text-slate-700">
                                 {lead.grade}
@@ -1608,6 +1618,11 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', WAITLIST_STATUS_META[entry.status || 'waiting'].className)}>
                               {WAITLIST_STATUS_META[entry.status || 'waiting'].label}
                             </Badge>
+                            {entry.school && (
+                              <Badge variant="outline" className="max-w-[180px] truncate text-[10px] font-black text-slate-700">
+                                {entry.school}
+                              </Badge>
+                            )}
                             <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[entry.serviceType].color)}>
                               {SERVICE_TYPE_META[entry.serviceType].label}
                             </Badge>
