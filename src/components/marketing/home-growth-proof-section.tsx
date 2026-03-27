@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import { BarChart3, Clock3, Search, Sparkles } from 'lucide-react';
 
 const caseTimeline = [
@@ -109,52 +108,7 @@ export function HomeGrowthProofSection() {
       style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
-          <article className="marketing-card p-4 sm:p-8">
-            <span className="inline-flex items-center rounded-full bg-[#14295F]/7 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-[#14295F] uppercase">
-              Growth Proof
-            </span>
-            <h2 className="mt-3 break-keep text-[1.12rem] font-black leading-[1.22] text-[#14295F] sm:mt-4 sm:text-[clamp(1.35rem,7vw,2.15rem)]">
-              관리와 코칭을 함께 설계했을때,
-              <br />
-              성적은 데이터로 올라옵니다
-            </h2>
-            <p className="mt-3 break-keep text-[12px] font-semibold leading-[1.72] text-[#425a75] sm:mt-4 sm:text-[14px] sm:leading-[1.82]">
-              한 학생의 변화 과정을 익명 사례로 정리했습니다. 트랙은 결과만 보여주지 않고, 어떤 문제를 먼저 찾았고
-              어떤 개입이 성적 상승으로 이어졌는지 같은 흐름 안에서 설명합니다.
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-1.5 sm:mt-6 sm:gap-2">
-              {['익명 대표 사례', '국어 약점 진단', '루틴 고정 개입', '전후 데이터 확인'].map((chip) => (
-                <span
-                  key={chip}
-                  className="rounded-full border border-[#14295F]/10 bg-[#F7FAFF] px-2.5 py-1 text-[9.5px] font-black text-[#14295F]/78 sm:px-3 sm:py-1.5 sm:text-[12px]"
-                >
-                  {chip}
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-5 rounded-[1.1rem] border border-[#14295F]/10 bg-[#14295F] p-4 text-white shadow-[0_18px_34px_rgba(20,41,95,0.16)] sm:mt-7 sm:rounded-[1.4rem] sm:p-5">
-              <p className="text-[10px] font-black tracking-[0.18em] text-white/62">CASE SNAPSHOT</p>
-              <p className="brand-number-pop mt-2 break-keep text-[1.02rem] font-black leading-[1.28] sm:text-[1.35rem]">
-                6월 3등급에서 시작해
-                <br />
-                수능 백분위 99까지 올라간 사례
-              </p>
-              <p className="mt-2.5 break-keep text-[11px] font-semibold leading-[1.6] text-white/78 sm:mt-3 sm:text-[13px] sm:leading-[1.72]">
-                결과만이 아니라, 개입 전후의 루틴 변화와 공부시간 회복까지 함께 본 대표 사례입니다.
-              </p>
-            </div>
-
-            <div className="mt-5 sm:mt-7">
-              <Link href="/class" className="premium-cta premium-cta-primary h-11 w-full px-6 text-sm sm:w-auto">
-                국어 수업 자세히 보기
-              </Link>
-            </div>
-          </article>
-
-          <div className="space-y-4">
+        <div className="space-y-4">
             <article className="brand-sheen-panel overflow-hidden rounded-[1.6rem] border border-[#14295F]/12 bg-white shadow-[0_18px_40px_rgba(20,41,95,0.10)]">
               <div className="border-b border-[#14295F]/8 bg-[linear-gradient(135deg,#F8FBFF_0%,#FFF4EB_100%)] px-3.5 py-4 sm:px-6 sm:py-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -248,8 +202,6 @@ export function HomeGrowthProofSection() {
                 </div>
               </div>
             </article>
-
-          </div>
         </div>
 
         <article className="brand-sheen-panel mt-6 overflow-hidden rounded-[1.6rem] border border-[#14295F]/12 bg-white shadow-[0_18px_40px_rgba(20,41,95,0.10)]">
