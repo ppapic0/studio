@@ -334,6 +334,22 @@ function formatTimeLabel(value?: { toDate?: () => Date }) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function formatShortDateLabel(date: Date) {
+  return `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function buildLinePath(points: Array<{ x: number; y: number }>) {
+  if (points.length === 0) return '';
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+}
+
+function buildAreaPath(points: Array<{ x: number; y: number }>, baselineY: number) {
+  if (points.length === 0) return '';
+  const first = points[0];
+  const last = points[points.length - 1];
+  return `M ${first.x} ${baselineY} ${buildLinePath(points)} L ${last.x} ${baselineY} Z`;
+}
+
 function getEventLabel(eventType?: string) {
   if (eventType === 'check_in') return '공부시작';
   if (eventType === 'check_out') return '공부종료';
@@ -525,6 +541,83 @@ export default function NotificationSettingsPage() {
     }
     return Boolean(settingsDoc?.smsApiKeyConfigured && form.smsEndpointUrl.trim());
   }, [form, settingsDoc]);
+
+  const smsTrendSummary = useMemo(() => {
+    const range = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (6 - index));
+      return {
+        key: toDateInputValue(date),
+        label: formatShortDateLabel(date),
+        sent: 0,
+        issue: 0,
+      };
+    });
+    const dayMap = new Map(range.map((item) => [item.key, item] as const));
+    (smsDeliveryLogsRaw || []).forEach((row) => {
+      const key =
+        row.dateKey ||
+        toDateKeyFromValue(row.sentAt) ||
+        toDateKeyFromValue(row.failedAt) ||
+        toDateKeyFromValue(row.createdAt);
+      if (!key) return;
+      const bucket = dayMap.get(key);
+      if (!bucket) return;
+      if (row.status === 'sent') {
+        bucket.sent += 1;
+      } else {
+        bucket.issue += 1;
+      }
+    });
+    const todayKey = range[range.length - 1]?.key;
+    const pendingTodayCount = (smsQueueRaw || []).filter((row) => {
+      const key = toDateKeyFromValue(row.createdAt) || toDateKeyFromValue(row.updatedAt) || toDateKeyFromValue(row.nextAttemptAt);
+      return key === todayKey && ['queued', 'processing', 'pending_provider'].includes(String(row.status || ''));
+    }).length;
+    return {
+      range,
+      maxCount: Math.max(1, ...range.map((item) => Math.max(item.sent, item.issue))),
+      totalSent: range.reduce((sum, item) => sum + item.sent, 0),
+      totalIssue: range.reduce((sum, item) => sum + item.issue, 0),
+      pendingTodayCount,
+    };
+  }, [smsDeliveryLogsRaw, smsQueueRaw]);
+
+  const smsTrendChart = useMemo(() => {
+    const width = 640;
+    const height = 220;
+    const paddingX = 24;
+    const paddingTop = 24;
+    const paddingBottom = 36;
+    const chartWidth = width - paddingX * 2;
+    const chartHeight = height - paddingTop - paddingBottom;
+    const baselineY = paddingTop + chartHeight;
+    const maxCount = smsTrendSummary.maxCount;
+    const stepX = smsTrendSummary.range.length > 1 ? chartWidth / (smsTrendSummary.range.length - 1) : chartWidth;
+    const toPoint = (value: number, index: number) => ({
+      x: paddingX + stepX * index,
+      y: paddingTop + chartHeight - (value / maxCount) * chartHeight,
+    });
+    const sentPoints = smsTrendSummary.range.map((item, index) => toPoint(item.sent, index));
+    const issuePoints = smsTrendSummary.range.map((item, index) => toPoint(item.issue, index));
+    const yTicks = Array.from({ length: 4 }, (_, index) => Math.round((maxCount / 3) * (3 - index)));
+    return {
+      width,
+      height,
+      baselineY,
+      sentPoints,
+      issuePoints,
+      sentPath: buildLinePath(sentPoints),
+      sentAreaPath: buildAreaPath(sentPoints, baselineY),
+      issuePath: buildLinePath(issuePoints),
+      yTicks,
+      chartWidth,
+      paddingX,
+      paddingTop,
+      chartHeight,
+    };
+  }, [smsTrendSummary]);
 
   const recipientRows = useMemo(() => {
     return (studentsRaw || [])
@@ -993,36 +1086,81 @@ export default function NotificationSettingsPage() {
             <PlugZap className="h-5 w-5" /> 연동 설정
           </CardTitle>
           <CardDescription className="font-bold text-sm">
-            키는 마스킹 상태만 노출하고, 현재 제공사 준비 상태와 오늘 발송 가능 여부를 같이 보여줍니다.
+            상단에서는 최근 7일 문자 전송 흐름을 보고, 아래에서 연동과 발송 규칙을 바로 관리합니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 p-6">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:col-span-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">현재 제공사</p>
-              <div className="mt-2 flex items-center gap-2">
-                <Badge className="border-none bg-slate-100 text-slate-700 font-black">
-                  {form.smsProvider === 'none' ? '연결 안함' : form.smsProvider === 'aligo' ? '알리고' : '사용자 엔드포인트'}
-                </Badge>
-                <Badge className={cn('border-none font-black', providerReady ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
-                  {providerReady ? '발송 가능' : '설정 보완 필요'}
-                </Badge>
+          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">최근 7일 문자 전송 현황</p>
+                <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">센터 문자 흐름을 선그래프로 빠르게 확인합니다.</h3>
+                <p className="mt-2 text-sm font-bold text-slate-500">발송완료와 실패·보류 흐름을 함께 보고, 오늘 대기 건수까지 같이 확인합니다.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">발송완료 {smsTrendSummary.totalSent}건</Badge>
+                <Badge className="border-none bg-rose-100 text-rose-700 font-black">실패·보류 {smsTrendSummary.totalIssue}건</Badge>
+                <Badge className="border-none bg-blue-100 text-blue-700 font-black">오늘 대기 {smsTrendSummary.pendingTodayCount}건</Badge>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">문자 전송</p>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-sm font-bold">센터 공통 스위치</span>
+            <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-slate-100 bg-slate-50/80 p-4">
+              <svg viewBox={`0 0 ${smsTrendChart.width} ${smsTrendChart.height}`} className="h-56 w-full">
+                {smsTrendChart.yTicks.map((tick, index) => {
+                  const y = smsTrendChart.paddingTop + (smsTrendChart.chartHeight / Math.max(1, smsTrendChart.yTicks.length - 1)) * index;
+                  return (
+                    <g key={`tick-${tick}-${index}`}>
+                      <line x1={smsTrendChart.paddingX} y1={y} x2={smsTrendChart.width - smsTrendChart.paddingX} y2={y} stroke="rgba(148, 163, 184, 0.16)" strokeDasharray="4 6" />
+                      <text x={4} y={y + 4} fontSize="11" fontWeight="800" fill="#64748b">{tick}</text>
+                    </g>
+                  );
+                })}
+                <path d={smsTrendChart.sentAreaPath} fill="rgba(16, 185, 129, 0.10)" />
+                <path d={smsTrendChart.sentPath} fill="none" stroke="#10b981" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d={smsTrendChart.issuePath} fill="none" stroke="#f97316" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="10 8" />
+                {smsTrendChart.sentPoints.map((point, index) => (
+                  <circle key={`sent-${index}`} cx={point.x} cy={point.y} r="5" fill="#10b981" stroke="#ffffff" strokeWidth="3" />
+                ))}
+                {smsTrendChart.issuePoints.map((point, index) => (
+                  <circle key={`issue-${index}`} cx={point.x} cy={point.y} r="4.5" fill="#f97316" stroke="#ffffff" strokeWidth="2.5" />
+                ))}
+              </svg>
+              <div className="mt-2 grid grid-cols-7 gap-2">
+                {smsTrendSummary.range.map((item) => (
+                  <div key={item.key} className="rounded-xl bg-white px-2 py-2 text-center shadow-sm ring-1 ring-slate-100">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</p>
+                    <div className="mt-2 flex items-center justify-center gap-2 text-xs font-black">
+                      <span className="text-emerald-600">완료 {item.sent}</span>
+                      <span className="text-orange-600">이슈 {item.issue}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-slate-600">
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />발송완료</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />실패·보류</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+            <div className="min-w-[150px]">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">센터 문자 전송</p>
+              <p className="mt-1 text-sm font-black text-slate-900">공통 스위치와 제공사 상태를 여기서 함께 확인합니다.</p>
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2 shadow-sm ring-1 ring-slate-200">
+                <span className="text-sm font-black text-slate-700">문자 전송</span>
                 <Switch checked={form.smsEnabled} onCheckedChange={(checked) => updateField('smsEnabled', checked)} />
               </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">연동 키 상태</p>
-              <div className="mt-3">
-                <Badge className={cn('border-none font-black', settingsDoc?.smsApiKeyConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
-                  {settingsDoc?.smsApiKeyConfigured ? '등록됨' : '미등록'}
-                </Badge>
-              </div>
+              <Badge className="border-none bg-slate-100 text-slate-700 font-black">
+                {form.smsProvider === 'none' ? '연결 안함' : form.smsProvider === 'aligo' ? '알리고' : '사용자 엔드포인트'}
+              </Badge>
+              <Badge className={cn('border-none font-black', providerReady ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                {providerReady ? '발송 가능' : '설정 보완 필요'}
+              </Badge>
+              <Badge className={cn('border-none font-black', settingsDoc?.smsApiKeyConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                {settingsDoc?.smsApiKeyConfigured ? '연동 키 등록됨' : '연동 키 미등록'}
+              </Badge>
             </div>
           </div>
 
