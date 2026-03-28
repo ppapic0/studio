@@ -313,13 +313,36 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
     switch (pace.mode) {
       case 'walk':
         return (
-          <g className="track-pace-vehicle track-pace-vehicle--walk" transform="translate(64 40)">
-            <circle cx="18" cy="10" r="7.5" fill="#FFE0BC" />
-            <path d="M18 20L18 40" stroke="#FFF9F3" strokeWidth="5.5" strokeLinecap="round" />
-            <path className="track-pace-limb-a" d="M18 26L31 34" stroke="#FFE0BC" strokeWidth="5" strokeLinecap="round" />
-            <path className="track-pace-limb-b" d="M18 28L7 36" stroke="#FFE0BC" strokeWidth="5" strokeLinecap="round" />
-            <path className="track-pace-limb-c" d="M18 40L29 54" stroke="#FFBF77" strokeWidth="5.5" strokeLinecap="round" />
-            <path className="track-pace-limb-d" d="M18 40L8 53" stroke="#FFBF77" strokeWidth="5.5" strokeLinecap="round" />
+          <g className="track-pace-vehicle track-pace-vehicle--walk" transform="translate(56 34)">
+            <ellipse className="track-pace-walker-shadow" cx="30" cy="61" rx="15" ry="4.2" fill="rgba(255,236,211,0.16)" />
+            <circle className="track-pace-walker-head" cx="28" cy="11" r="6.8" fill="#FFE0BC" />
+            <path
+              className="track-pace-walker-torso"
+              d="M25 20L31 29L29 42"
+              stroke="#FFF9F3"
+              strokeWidth="5.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path d="M28 18L24 24" stroke="#FFF2E2" strokeWidth="4.1" strokeLinecap="round" />
+            <path className="track-pace-limb-a" d="M29 27L40 32" stroke="#FFE4C7" strokeWidth="4.7" strokeLinecap="round" />
+            <path className="track-pace-limb-b" d="M28 28L17 35" stroke="#FFDAB0" strokeWidth="4.7" strokeLinecap="round" />
+            <path
+              className="track-pace-limb-c"
+              d="M29 42L40 53L49 52"
+              stroke="#FFBF77"
+              strokeWidth="5.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              className="track-pace-limb-d"
+              d="M29 42L21 54L14 50"
+              stroke="#FFCF8C"
+              strokeWidth="5.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </g>
         );
       case 'run':
