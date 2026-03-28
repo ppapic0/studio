@@ -628,7 +628,7 @@ export const marketingContent: MarketingContent = {
       },
       {
         title: '시대인재 서바이벌 프로',
-        summary: '흔들리지 않은 난이도 대응력',
+        summary: '상위권 실전 난이도까지 대비해 시험장에서 흔들리지 않는 난이도 대응력을 만듭니다.',
       },
     ],
   },
