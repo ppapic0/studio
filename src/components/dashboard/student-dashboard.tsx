@@ -347,14 +347,49 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
         );
       case 'run':
         return (
-          <g className="track-pace-vehicle track-pace-vehicle--run" transform="translate(62 36)">
-            <circle cx="18" cy="10" r="7.5" fill="#FFE0BC" />
-            <path d="M16 20L24 34L16 46" stroke="#FFF9F3" strokeWidth="5.8" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M24 34L37 28" stroke="#FFF9F3" strokeWidth="5.4" strokeLinecap="round" />
-            <path className="track-pace-limb-a" d="M24 34L36 41" stroke="#FFE0BC" strokeWidth="4.8" strokeLinecap="round" />
-            <path className="track-pace-limb-b" d="M18 28L6 34" stroke="#FFE0BC" strokeWidth="4.8" strokeLinecap="round" />
-            <path className="track-pace-limb-c" d="M16 46L31 58" stroke="#FFBF77" strokeWidth="5.4" strokeLinecap="round" />
-            <path className="track-pace-limb-d" d="M16 46L5 59" stroke="#FFBF77" strokeWidth="5.4" strokeLinecap="round" />
+          <g className="track-pace-vehicle track-pace-vehicle--run" transform="translate(58 39)">
+            <ellipse className="track-pace-runner-shadow" cx="23" cy="59" rx="15.5" ry="4.4" fill="rgba(255,236,211,0.18)" />
+            <circle className="track-pace-runner-head" cx="18" cy="10" r="6.9" fill="#FFE0BC" />
+            <path
+              className="track-pace-runner-torso"
+              d="M15 19L26 30L21 41"
+              stroke="#FFF9F3"
+              strokeWidth="5.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path d="M23 27L31 22" stroke="#FFF4E8" strokeWidth="4.6" strokeLinecap="round" />
+            <path
+              className="track-pace-runner-arm-front"
+              d="M25 29L38 23L45 29"
+              stroke="#FFE2C0"
+              strokeWidth="4.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              className="track-pace-runner-arm-back"
+              d="M20 25L8 31"
+              stroke="#FFD9AF"
+              strokeWidth="4.7"
+              strokeLinecap="round"
+            />
+            <path
+              className="track-pace-runner-leg-front"
+              d="M21 41L35 50L45 47"
+              stroke="#FFBF77"
+              strokeWidth="5.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              className="track-pace-runner-leg-back"
+              d="M21 41L13 54L5 50"
+              stroke="#FFCF8C"
+              strokeWidth="5.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </g>
         );
       case 'bike':
