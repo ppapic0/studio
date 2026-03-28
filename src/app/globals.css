@@ -541,7 +541,6 @@
     animation: track-pace-glow 1.8s ease-in-out infinite;
   }
 
-  .track-pace-vehicle--walk,
   .track-pace-vehicle--run,
   .track-pace-vehicle--bike,
   .track-pace-vehicle--car,
@@ -549,16 +548,46 @@
     animation: track-pace-hover 1.8s ease-in-out infinite;
   }
 
+  .track-pace-vehicle--walk {
+    animation: track-pace-walk-body 1.18s cubic-bezier(0.52, 0.08, 0.42, 0.96) infinite;
+  }
+
   .track-pace-vehicle--walk .track-pace-limb-a,
   .track-pace-vehicle--walk .track-pace-limb-d {
-    transform-origin: 18px 26px;
-    animation: track-pace-walk 1.2s ease-in-out infinite;
+    animation: track-pace-walk-limb-primary 1.18s ease-in-out infinite;
   }
 
   .track-pace-vehicle--walk .track-pace-limb-b,
   .track-pace-vehicle--walk .track-pace-limb-c {
-    transform-origin: 18px 28px;
-    animation: track-pace-walk 1.2s ease-in-out infinite reverse;
+    animation: track-pace-walk-limb-secondary 1.18s ease-in-out infinite;
+  }
+
+  .track-pace-vehicle--walk .track-pace-limb-a {
+    transform-origin: 29px 27px;
+  }
+
+  .track-pace-vehicle--walk .track-pace-limb-b {
+    transform-origin: 28px 28px;
+  }
+
+  .track-pace-vehicle--walk .track-pace-limb-c,
+  .track-pace-vehicle--walk .track-pace-limb-d {
+    transform-origin: 29px 42px;
+  }
+
+  .track-pace-vehicle--walk .track-pace-walker-head {
+    transform-origin: 28px 11px;
+    animation: track-pace-walk-head 1.18s ease-in-out infinite;
+  }
+
+  .track-pace-vehicle--walk .track-pace-walker-torso {
+    transform-origin: 29px 30px;
+    animation: track-pace-walk-torso 1.18s ease-in-out infinite;
+  }
+
+  .track-pace-vehicle--walk .track-pace-walker-shadow {
+    transform-origin: center;
+    animation: track-pace-walk-shadow 1.18s ease-in-out infinite;
   }
 
   .track-pace-vehicle--run {
@@ -1595,13 +1624,71 @@
   }
 }
 
-@keyframes track-pace-walk {
+@keyframes track-pace-walk-body {
   0%,
   100% {
-    transform: rotate(12deg);
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(0.6px, 0.8px, 0);
+  }
+  50% {
+    transform: translate3d(1.1px, -0.9px, 0);
+  }
+  75% {
+    transform: translate3d(0.3px, 0.6px, 0);
+  }
+}
+
+@keyframes track-pace-walk-limb-primary {
+  0%,
+  100% {
+    transform: rotate(17deg);
   }
   50% {
     transform: rotate(-12deg);
+  }
+}
+
+@keyframes track-pace-walk-limb-secondary {
+  0%,
+  100% {
+    transform: rotate(-15deg);
+  }
+  50% {
+    transform: rotate(15deg);
+  }
+}
+
+@keyframes track-pace-walk-head {
+  0%,
+  100% {
+    transform: translateY(0.2px);
+  }
+  50% {
+    transform: translateY(-1.2px);
+  }
+}
+
+@keyframes track-pace-walk-torso {
+  0%,
+  100% {
+    transform: rotate(1.5deg);
+  }
+  50% {
+    transform: rotate(-2.2deg);
+  }
+}
+
+@keyframes track-pace-walk-shadow {
+  0%,
+  100% {
+    transform: scaleX(1) scaleY(1);
+    opacity: 0.34;
+  }
+  50% {
+    transform: scaleX(0.94) scaleY(0.92);
+    opacity: 0.22;
   }
 }
 
@@ -2630,6 +2717,9 @@
   .track-pace-limb-b,
   .track-pace-limb-c,
   .track-pace-limb-d,
+  .track-pace-walker-head,
+  .track-pace-walker-torso,
+  .track-pace-walker-shadow,
   .track-pace-wheel,
   .track-pace-streak,
   .track-pace-contrail,
