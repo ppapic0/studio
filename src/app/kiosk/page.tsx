@@ -261,6 +261,13 @@ export default function KioskPage() {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id);
       const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const wasAway = prevStatus === 'away' || prevStatus === 'break';
+      const wasStudying = prevStatus === 'studying';
+      const wasActive = wasStudying || wasAway;
+      const isStudyStart = nextStatus === 'studying' && !wasActive;
+      const isAwayReturn = wasAway && nextStatus === 'studying';
+      const isAwayStart = (nextStatus === 'away' || nextStatus === 'break') && wasStudying;
+      const isStudyEnd = nextStatus === 'absent' && wasActive;
       let stopSessionId: string | null = null;
 
       // 퇴실(absent) 처리 시 공부 시간 저장 로직
@@ -352,13 +359,13 @@ export default function KioskPage() {
         type: kakaoType
       });
 
-      if (nextStatus === 'studying' && prevStatus === 'absent') {
+      if (isStudyStart) {
         void triggerAttendanceSms(student.id, 'study_start');
-      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+      } else if (isAwayReturn) {
         void triggerAttendanceSms(student.id, 'away_end');
-      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+      } else if (isAwayStart) {
         void triggerAttendanceSms(student.id, 'away_start');
-      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+      } else if (isStudyEnd) {
         void triggerAttendanceSms(student.id, 'study_end');
       }
 

@@ -298,7 +298,7 @@ export default function AttendancePage() {
             ? combineDateWithTime(selectedDate, routine.expectedArrivalTime)
             : null;
         const fallbackCheckedAt =
-          status === 'confirmed_present'
+          status === 'confirmed_present' || status === 'confirmed_present_missing_routine'
             ? expectedArrivalAtFromRoutine || selectedDate
             : status === 'confirmed_late'
               ? expectedArrivalAtFromRoutine
@@ -306,7 +306,7 @@ export default function AttendancePage() {
                 : selectedDate
               : null;
         const normalizedCheckedAt =
-          status === 'confirmed_present' || status === 'confirmed_late'
+          status === 'confirmed_present' || status === 'confirmed_late' || status === 'confirmed_present_missing_routine'
             ? checkedAt || fallbackCheckedAt
             : null;
 
@@ -364,7 +364,11 @@ export default function AttendancePage() {
 
         await batch.commit();
         if (isTodaySelected) {
-          if (status === 'confirmed_present' || status === 'confirmed_late') {
+          if (
+            status === 'confirmed_present' ||
+            status === 'confirmed_late' ||
+            status === 'confirmed_present_missing_routine'
+          ) {
             void triggerAttendanceSms(studentId, 'study_start');
           } else if (
             (status === 'confirmed_absent' || status === 'excused_absent') &&

@@ -1218,6 +1218,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const prevStatus = selectedSeat.status;
       const nowDate = new Date();
       const todayDateKey = format(nowDate, 'yyyy-MM-dd');
+      const wasAway = prevStatus === 'away' || prevStatus === 'break';
+      const wasStudying = prevStatus === 'studying';
+      const wasActive = wasStudying || wasAway;
+      const isStudyStart = nextStatus === 'studying' && !wasActive;
+      const isAwayReturn = wasAway && nextStatus === 'studying';
+      const isAwayStart = (nextStatus === 'away' || nextStatus === 'break') && wasStudying;
+      const isStudyEnd = nextStatus === 'absent' && wasActive;
 
       // 퇴실 처리 시 공부 시간 강제 저장 로직
       if (prevStatus === 'studying' && nextStatus !== 'studying' && selectedSeat.lastCheckInAt) {
@@ -1288,7 +1295,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         statusAfter: nextStatus,
       });
 
-      if (prevStatus === 'absent' && nextStatus === 'studying') {
+      if (isStudyStart) {
         appendAttendanceEventToBatch(batch, firestore, centerId, {
           studentId,
           dateKey: todayDateKey,
@@ -1304,7 +1311,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           checkInAt: nowDate,
           source: 'teacher_dashboard',
         });
-      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+      } else if (isAwayReturn) {
         appendAttendanceEventToBatch(batch, firestore, centerId, {
           studentId,
           dateKey: todayDateKey,
@@ -1319,7 +1326,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           attendanceStatus: nextStatus,
           source: 'teacher_dashboard',
         });
-      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+      } else if (isAwayStart) {
         appendAttendanceEventToBatch(batch, firestore, centerId, {
           studentId,
           dateKey: todayDateKey,
@@ -1334,7 +1341,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           attendanceStatus: nextStatus,
           source: 'teacher_dashboard',
         });
-      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+      } else if (isStudyEnd) {
         appendAttendanceEventToBatch(batch, firestore, centerId, {
           studentId,
           dateKey: todayDateKey,
@@ -1383,13 +1390,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         type: kakaoType
       });
 
-      if (nextStatus === 'studying' && prevStatus === 'absent') {
+      if (isStudyStart) {
         void triggerAttendanceSms(studentId, 'study_start');
-      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+      } else if (isAwayReturn) {
         void triggerAttendanceSms(studentId, 'away_end');
-      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+      } else if (isAwayStart) {
         void triggerAttendanceSms(studentId, 'away_start');
-      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+      } else if (isStudyEnd) {
         void triggerAttendanceSms(studentId, 'study_end');
       }
       
