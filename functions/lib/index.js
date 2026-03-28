@@ -337,7 +337,7 @@ async function loadCenterName(db, centerId) {
         const centerSnap = await db.doc(`centers/${centerId}`).get();
         const name = (_a = centerSnap.data()) === null || _a === void 0 ? void 0 : _a.name;
         const normalizedName = typeof name === "string" ? name.trim() : "";
-        if (normalizedName === "트랙센터") {
+        if (normalizedName === "트랙센터" || normalizedName === "공부트랙 동백센터") {
             return "트랙 관리형 스터디센터";
         }
         return normalizedName.length > 0 ? normalizedName : "트랙 관리형 스터디센터";

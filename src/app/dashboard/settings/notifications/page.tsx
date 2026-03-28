@@ -461,7 +461,7 @@ function getQueueStatusLabel(status?: string, providerStatus?: string, nextAttem
   if (status === 'failed') return '실패';
   if (status === 'pending_provider') return '설정 대기';
   if (status === 'cancelled') return '취소됨';
-  if (status === 'sent') return '전송 접수';
+  if (status === 'sent') return '알리고 접수';
   if (status === 'queued' && providerStatus === 'retry_scheduled' && nextAttemptAt?.toDate && (attemptCount || 0) > 0) {
     return '재시도 예정';
   }
@@ -475,14 +475,14 @@ function getStatusTone(status?: string, providerStatus?: string, nextAttemptAt?:
   if (label === '취소됨') return 'bg-slate-200 text-slate-700';
   if (label === '처리중') return 'bg-violet-100 text-violet-700';
   if (label === '재시도 예정') return 'bg-orange-100 text-orange-700';
-  if (label === '전송 접수') return 'bg-emerald-100 text-emerald-700';
+  if (label === '알리고 접수') return 'bg-emerald-100 text-emerald-700';
   return 'bg-blue-100 text-blue-700';
 }
 
 function getDeliveryStatusLabel(status?: string) {
   if (status === 'suppressed_opt_out') return '수신거부';
   if (status === 'failed') return '실패';
-  return '전송 접수';
+  return '알리고 접수';
 }
 
 export default function NotificationSettingsPage() {
@@ -1371,10 +1371,10 @@ export default function NotificationSettingsPage() {
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">최근 7일 문자 전송 현황</p>
                 <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">센터 문자 전송 흐름을 선그래프로 빠르게 확인합니다.</h3>
-                <p className="mt-2 text-sm font-bold text-slate-500">전송 접수와 실패·보류 흐름을 함께 보고, 접수 기준 문자비용도 일자별로 바로 확인합니다.</p>
+                <p className="mt-2 text-sm font-bold text-slate-500">알리고 접수와 실패·보류 흐름을 함께 보고, 접수 기준 문자비용도 일자별로 바로 확인합니다.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">전송 접수 {smsTrendSummary.totalSent}건</Badge>
+                <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">알리고 접수 {smsTrendSummary.totalSent}건</Badge>
                 <Badge className="border-none bg-rose-100 text-rose-700 font-black">실패·보류 {smsTrendSummary.totalIssue}건</Badge>
                 <Badge className="border-none bg-violet-100 text-violet-700 font-black">7일 비용 {formatSmsCost(smsTrendSummary.totalCost)}</Badge>
                 <Badge className="border-none bg-blue-100 text-blue-700 font-black">오늘 대기 {smsTrendSummary.pendingTodayCount}건</Badge>
@@ -1414,7 +1414,7 @@ export default function NotificationSettingsPage() {
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-slate-600">
-                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />전송 접수</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />알리고 접수</span>
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />실패·보류</span>
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" />문자비용(접수 기준)</span>
               </div>
@@ -1699,7 +1699,7 @@ export default function NotificationSettingsPage() {
                 <section className="space-y-4">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">오늘 접수 로그</h3>
-                    <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 오늘 보낸 내용을 보여줍니다.</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 오늘 알리고에 접수된 내용과 출결 기록을 함께 보여줍니다.</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1772,8 +1772,8 @@ export default function NotificationSettingsPage() {
                             phoneNumber: primaryRecipient?.phoneNumber || '',
                             message:
                               summary.status === 'attendance_only'
-                                ? `오늘 ${event.label} 기록은 ${summary.timeLabel}에 확인됐지만, 문자 전송 접수 기록이 없습니다. 필요하면 다시 보내기로 즉시 접수해 주세요.`
-                                : `오늘 ${event.label} 기록은 확인됐지만 현재 수신 가능한 번호가 없어 문자 전송 접수가 되지 않았습니다. 번호를 등록한 뒤 다시 보내기 해주세요.`,
+                                ? `오늘 ${event.label} 기록은 ${summary.timeLabel}에 확인됐지만, 문자 알리고 접수 기록이 없습니다. 필요하면 다시 보내기로 즉시 접수해 주세요.`
+                                : `오늘 ${event.label} 기록은 확인됐지만 현재 수신 가능한 번호가 없어 문자 알리고 접수가 되지 않았습니다. 번호를 등록한 뒤 다시 보내기 해주세요.`,
                             statusLabel: summary.badgeLabel,
                             statusTone: getTodayBoardCellTone(summary.status),
                             timeLabel: summary.timeLabel,
@@ -1826,6 +1826,9 @@ export default function NotificationSettingsPage() {
                                 <p className="text-[11px] font-bold text-slate-500">{row.timeLabel}</p>
                               </div>
                               <p className="mt-3 rounded-lg bg-white px-3 py-3 text-sm font-bold leading-6 text-slate-800">{row.message}</p>
+                              {row.statusLabel === '알리고 접수' ? (
+                                <p className="mt-2 text-[11px] font-bold text-slate-500">알리고 접수 기준입니다. 실제 수신은 통신사와 단말 정책에 따라 달라질 수 있습니다.</p>
+                              ) : null}
                               {row.errorMessage ? <p className="mt-2 text-xs font-bold text-rose-600">{row.errorMessage}</p> : null}
                               {row.type === 'queue' && row.queueId ? (
                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -2019,7 +2022,7 @@ export default function NotificationSettingsPage() {
                 <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue placeholder="상태 필터" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체 상태</SelectItem>
-                  <SelectItem value="sent">전송 접수</SelectItem>
+                  <SelectItem value="sent">알리고 접수</SelectItem>
                   <SelectItem value="failed">실패</SelectItem>
                   <SelectItem value="suppressed_opt_out">수신거부</SelectItem>
                 </SelectContent>
