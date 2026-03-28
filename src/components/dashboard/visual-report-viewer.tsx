@@ -104,7 +104,25 @@ function buildContentSummarySnippet(content: string) {
     .filter(Boolean)
     .filter((line) => !['오늘 관찰', '교육학적 해석', '내일 코칭', '가정 연계 팁'].includes(line));
 
-  return cleaned[0] || '오늘의 학습 흐름을 짧게 정리했습니다.';
+  const flattened = cleaned
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!flattened) return '오늘의 학습 흐름을 짧게 정리했습니다.';
+
+  const sentenceCandidates = flattened
+    .split(/(?<=[.!?])\s+|(?<=다\.)\s+|(?<=요\.)\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const deduped = sentenceCandidates.filter((item, index, array) => {
+    if (index === 0) return true;
+    return item.replace(/\s+/g, '') !== array[index - 1]?.replace(/\s+/g, '');
+  });
+
+  const joined = deduped.slice(0, 2).join(' ').trim() || deduped[0] || flattened;
+  return joined.length > 72 ? `${joined.slice(0, 71).trimEnd()}…` : joined;
 }
 
 function buildOverallSummary({
@@ -516,7 +534,7 @@ export function VisualReportViewer({
                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white/65">{dateKey}</span>
               )}
             </div>
-            <p className="mt-4 text-xl font-black tracking-tight sm:text-2xl">{overallSummary.headline}</p>
+            <p className="mt-4 text-xl font-black tracking-tight leading-snug break-keep sm:text-2xl">{overallSummary.headline}</p>
             <p className="mt-2 text-sm font-bold leading-relaxed text-white/80">{overallSummary.subline}</p>
           </CardContent>
         </Card>

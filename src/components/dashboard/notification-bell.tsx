@@ -168,7 +168,7 @@ export function NotificationBell() {
     const reportItems: NotificationFeedItem[] = reports.map((report) => ({
       id: `report-${report.id}`,
       kind: 'report',
-      title: `${report.dateKey || '최근'} 분석 리포트`,
+      title: `${report.dateKey || '최근'} 학습 리포트`,
       description:
         report.updatedAt && typeof report.updatedAt.toDate === 'function'
           ? `${format(report.updatedAt.toDate(), 'HH:mm')} 업데이트`

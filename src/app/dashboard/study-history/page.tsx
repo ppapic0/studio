@@ -999,7 +999,7 @@ export default function StudyHistoryPage() {
             <Tabs defaultValue={dailyReport && dailyReport.status === 'sent' ? "ai-report" : "today-plan"} className="w-full">
               <TabsList className="grid w-full grid-cols-2 rounded-none h-16 bg-muted/20 p-0 border-b">
                 <TabsTrigger value="ai-report" disabled={!dailyReport || dailyReport.status !== 'sent'} className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
-                  <Sparkles className="h-3.5 w-3.5" /> 인공지능 리포트
+                  <Sparkles className="h-3.5 w-3.5" /> 학습 리포트
                 </TabsTrigger>
                 <TabsTrigger value="today-plan" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
                   <ClipboardList className="h-3.5 w-3.5" /> 오늘 계획
@@ -1010,11 +1010,16 @@ export default function StudyHistoryPage() {
                   {reportLoading ? (
                     <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
                   ) : dailyReport && dailyReport.status === 'sent' ? (
-                    <VisualReportViewer content={dailyReport.content} />
+                    <VisualReportViewer
+                      content={dailyReport.content}
+                      aiMeta={dailyReport.aiMeta}
+                      dateKey={dailyReport.dateKey}
+                      studentName={dailyReport.studentName}
+                    />
                   ) : (
                     <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20 italic">
                       <FileText className="h-12 w-12" />
-                      <p className="font-black text-sm">이날의 분석 리포트가 없습니다.</p>
+                      <p className="font-black text-sm">이날의 학습 리포트가 없습니다.</p>
                     </div>
                   )}
                 </TabsContent>
@@ -1262,7 +1267,7 @@ export default function StudyHistoryPage() {
             <Tabs defaultValue={dailyReport?.status === 'sent' ? "ai-report" : "schedule"} className="w-full">
               <TabsList className="grid w-full grid-cols-4 rounded-none h-16 bg-muted/20 p-0 border-b">
                 <TabsTrigger value="ai-report" disabled={dailyReport?.status !== 'sent'} className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-amber-500 font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
-                  <Sparkles className="h-3.5 w-3.5" /> 인공지능 리포트
+                  <Sparkles className="h-3.5 w-3.5" /> 학습 리포트
                 </TabsTrigger>
                 <TabsTrigger value="schedule" className="data-[state=active]:bg-white rounded-none border-b-4 border-transparent data-[state=active]:border-primary font-black text-[10px] uppercase tracking-widest flex flex-col gap-1 py-2">
                   <Clock className="h-3.5 w-3.5" /> 루틴
@@ -1288,7 +1293,7 @@ export default function StudyHistoryPage() {
                   ) : (
                     <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20 italic">
                       <FileText className="h-12 w-12" />
-                      <p className="font-black text-sm">이날의 분석 리포트가 없습니다.</p>
+                      <p className="font-black text-sm">이날의 학습 리포트가 없습니다.</p>
                     </div>
                   )}
                 </TabsContent>
