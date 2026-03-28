@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { httpsCallable } from 'firebase/functions';
 import {
   addDoc,
   collection,
@@ -29,7 +30,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -161,6 +162,15 @@ interface WaitlistModal {
   memo: string;
 }
 
+type MarketingSmsTargetSource = 'lead' | 'waitlist';
+
+interface MarketingSmsDialogState {
+  open: boolean;
+  source: MarketingSmsTargetSource;
+  targetIds: string[];
+  message: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<LeadStatus, { label: string; className: string }> = {
@@ -216,6 +226,13 @@ const INITIAL_WAITLIST_MODAL = (): WaitlistModal => ({
   memo: '',
 });
 
+const INITIAL_SMS_DIALOG = (): MarketingSmsDialogState => ({
+  open: false,
+  source: 'waitlist',
+  targetIds: [],
+  message: '',
+});
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toDateMs(value: any): number {
@@ -260,6 +277,7 @@ export function MarketingConsultingCRM({
   isMobile?: boolean;
 }) {
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { user } = useUser();
   const { toast } = useToast();
 
@@ -278,6 +296,9 @@ export function MarketingConsultingCRM({
   const [waitlistServiceFilter, setWaitlistServiceFilter] = useState<'all' | ServiceType>('all');
   const [waitlistStatusFilter, setWaitlistStatusFilter] = useState<'all' | WaitlistStatus>('all');
   const [waitlistSearch, setWaitlistSearch] = useState('');
+  const [selectedWaitlistIds, setSelectedWaitlistIds] = useState<string[]>([]);
+  const [smsDialog, setSmsDialog] = useState<MarketingSmsDialogState>(INITIAL_SMS_DIALOG);
+  const [isSendingMarketingSms, setIsSendingMarketingSms] = useState(false);
 
   // ── Firestore queries ─────────────────────────────────────────────────────
 
@@ -437,6 +458,26 @@ export function MarketingConsultingCRM({
     });
   }, [waitlist, waitlistServiceFilter, waitlistStatusFilter, waitlistSearch]);
 
+  const selectedWaitingEntries = useMemo(
+    () =>
+      filteredWaitlist.filter(
+        (entry) => entry.status === 'waiting' && !!(entry.parentPhone?.trim() || entry.studentPhone?.trim())
+      ),
+    [filteredWaitlist]
+  );
+
+  const selectedWaitlistCount = useMemo(
+    () => selectedWaitlistIds.filter((id) => filteredWaitlist.some((entry) => entry.id === id)).length,
+    [filteredWaitlist, selectedWaitlistIds]
+  );
+
+  const smsDialogTargets = useMemo(() => {
+    if (smsDialog.source === 'lead') {
+      return leads.filter((lead) => smsDialog.targetIds.includes(lead.id));
+    }
+    return waitlist.filter((entry) => smsDialog.targetIds.includes(entry.id));
+  }, [leads, smsDialog.source, smsDialog.targetIds, waitlist]);
+
   const summary = useMemo(() => {
     const total = leads.length;
     const enrolled = leads.filter((l) => l.status === 'enrolled').length;
@@ -487,6 +528,101 @@ export function MarketingConsultingCRM({
   const resetForm = () => {
     setForm(INITIAL_FORM());
     setEditingId(null);
+  };
+
+  const toggleWaitlistSelection = (entryId: string) => {
+    setSelectedWaitlistIds((prev) =>
+      prev.includes(entryId) ? prev.filter((id) => id !== entryId) : [...prev, entryId]
+    );
+  };
+
+  const selectAllWaitingEntries = () => {
+    setSelectedWaitlistIds(selectedWaitingEntries.map((entry) => entry.id));
+  };
+
+  const clearWaitlistSelection = () => {
+    setSelectedWaitlistIds([]);
+  };
+
+  const openLeadSmsDialog = (leadId: string) => {
+    setSmsDialog({
+      open: true,
+      source: 'lead',
+      targetIds: [leadId],
+      message: '',
+    });
+  };
+
+  const openWaitlistSmsDialog = () => {
+    const targetIds = selectedWaitlistIds.filter((id) => filteredWaitlist.some((entry) => entry.id === id));
+    if (targetIds.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: '선택 필요',
+        description: '문자를 보낼 입학 대기 학생을 먼저 선택해 주세요.',
+      });
+      return;
+    }
+    setSmsDialog({
+      open: true,
+      source: 'waitlist',
+      targetIds,
+      message: '',
+    });
+  };
+
+  const handleSendMarketingSms = async () => {
+    if (!centerId || !functions) return;
+    const message = smsDialog.message.trim();
+    if (!message) {
+      toast({ variant: 'destructive', title: '입력 필요', description: '보낼 문자 내용을 입력해 주세요.' });
+      return;
+    }
+    if (smsDialog.targetIds.length === 0) {
+      toast({ variant: 'destructive', title: '선택 필요', description: '문자를 받을 대상을 먼저 선택해 주세요.' });
+      return;
+    }
+
+    setIsSendingMarketingSms(true);
+    try {
+      const sendMarketingLeadSms = httpsCallable(functions, 'sendMarketingLeadSms');
+      const result = await sendMarketingLeadSms({
+        centerId,
+        message,
+        targets: smsDialog.targetIds.map((targetId) => ({
+          targetType: smsDialog.source === 'lead' ? 'consulting_lead' : 'waitlist',
+          targetId,
+        })),
+      });
+
+      const data = (result.data || {}) as {
+        queuedCount?: number;
+        recipientCount?: number;
+        skippedCount?: number;
+        missingCount?: number;
+      };
+
+      toast({
+        title: '문자 접수 완료',
+        description: `접수 ${data.queuedCount ?? 0}건 · 수신 대상 ${data.recipientCount ?? 0}명` +
+          ((data.missingCount ?? 0) > 0 ? ` · 번호 없음 ${data.missingCount}건` : '') +
+          ((data.skippedCount ?? 0) > 0 ? ` · 중복 제외 ${data.skippedCount}건` : ''),
+      });
+
+      setSmsDialog(INITIAL_SMS_DIALOG());
+      if (smsDialog.source === 'waitlist') {
+        setSelectedWaitlistIds([]);
+      }
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: '문자 발송 실패',
+        description: error?.message || '리드 문자 발송 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsSendingMarketingSms(false);
+    }
   };
 
   const handleEdit = (lead: ConsultingLead) => {
@@ -987,9 +1123,9 @@ export function MarketingConsultingCRM({
                                 {request.school}
                               </Badge>
                             )}
-                            {request.grade && (
+                          {request.grade && (
                               <Badge variant="outline" className="text-[10px] font-black text-slate-700">
-                                {request.grade}
+                                학년 {request.grade}
                               </Badge>
                             )}
                             {request.serviceType && (
@@ -1325,7 +1461,7 @@ export function MarketingConsultingCRM({
                             )}
                             {lead.grade && (
                               <Badge variant="outline" className="text-[10px] font-black text-slate-700">
-                                {lead.grade}
+                                학년 {lead.grade}
                               </Badge>
                             )}
                             {lead.serviceType && leadServiceLabel && (
@@ -1377,6 +1513,15 @@ export function MarketingConsultingCRM({
                               ))}
                             </SelectContent>
                           </Select>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-lg border-sky-200 px-3 text-xs font-black text-sky-700 hover:bg-sky-50"
+                            onClick={() => openLeadSmsDialog(lead.id)}
+                          >
+                            <Megaphone className="mr-1 h-3.5 w-3.5" />
+                            문자 보내기
+                          </Button>
                           <Button
                             type="button"
                             variant="outline"
@@ -1583,6 +1728,46 @@ export function MarketingConsultingCRM({
             </div>
 
             {/* ── 대기 목록 ── */}
+            <div className={cn('flex gap-2 rounded-xl border border-orange-100 bg-orange-50/60 p-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
+              <div className="space-y-1">
+                <p className="text-sm font-black text-slate-900">입학 대기 일괄 문자</p>
+                <p className="text-xs font-semibold text-slate-600">
+                  현재 필터 기준 대기중 학생을 선택해서 같은 안내 문자를 한 번에 보낼 수 있습니다.
+                </p>
+              </div>
+              <div className={cn('flex gap-2', isMobile ? 'flex-wrap' : 'items-center')}>
+                <Badge className="border-none bg-white text-orange-700 shadow-sm">
+                  선택 {selectedWaitlistCount}명
+                </Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 rounded-lg border-orange-200 px-3 text-xs font-black text-orange-700 hover:bg-orange-100"
+                  onClick={selectAllWaitingEntries}
+                  disabled={selectedWaitingEntries.length === 0}
+                >
+                  대기중 전체 선택
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 rounded-lg px-3 text-xs font-black"
+                  onClick={clearWaitlistSelection}
+                  disabled={selectedWaitlistIds.length === 0}
+                >
+                  선택 해제
+                </Button>
+                <Button
+                  type="button"
+                  className="h-9 rounded-lg px-3 text-xs font-black"
+                  onClick={openWaitlistSmsDialog}
+                  disabled={selectedWaitlistCount === 0}
+                >
+                  <Megaphone className="mr-1 h-3.5 w-3.5" />
+                  선택 문자 보내기
+                </Button>
+              </div>
+            </div>
             <div className="space-y-2">
               {waitlistLoading ? (
                 <div className="flex h-28 items-center justify-center rounded-xl border border-dashed">
@@ -1609,6 +1794,14 @@ export function MarketingConsultingCRM({
                       <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-start justify-between')}>
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
+                            <label className="mr-1 inline-flex items-center">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400"
+                                checked={selectedWaitlistIds.includes(entry.id)}
+                                onChange={() => toggleWaitlistSelection(entry.id)}
+                              />
+                            </label>
                             <p className="text-base font-black text-slate-800">{entry.studentName}</p>
                             {typeof entry.queueNumber === 'number' && (
                               <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
@@ -1621,6 +1814,11 @@ export function MarketingConsultingCRM({
                             {entry.school && (
                               <Badge variant="outline" className="max-w-[180px] truncate text-[10px] font-black text-slate-700">
                                 {entry.school}
+                              </Badge>
+                            )}
+                            {entry.grade && (
+                              <Badge variant="outline" className="text-[10px] font-black text-slate-700">
+                                학년 {entry.grade}
                               </Badge>
                             )}
                             <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[entry.serviceType].color)}>
@@ -1645,7 +1843,7 @@ export function MarketingConsultingCRM({
                             </span>
                             {entry.studentPhone && <span>학생: {entry.studentPhone}</span>}
                             {entry.school && <span>학교: {entry.school}</span>}
-                            {entry.grade && <span>{entry.grade}</span>}
+                            {entry.grade && <span>학년: {entry.grade}</span>}
                             <span>대기 등록일: {entry.waitlistDate || '-'}</span>
                           </div>
                           {entry.memo && <p className="text-xs font-medium text-slate-500">{entry.memo}</p>}
@@ -1837,6 +2035,89 @@ export function MarketingConsultingCRM({
             >
               {isSavingWaitlist && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               대기 등록 완료
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={smsDialog.open}
+        onOpenChange={(open) => !open && !isSendingMarketingSms && setSmsDialog(INITIAL_SMS_DIALOG())}
+      >
+        <DialogContent className="max-w-xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-black">
+              <Megaphone className="h-5 w-5 text-primary" />
+              {smsDialog.source === 'lead' ? '상담 리드 문자 보내기' : '입학 대기 일괄 문자'}
+            </DialogTitle>
+            <DialogDescription className="font-semibold">
+              {smsDialog.source === 'lead'
+                ? '선택한 홍보/상담 리드에게 바로 문자를 보냅니다.'
+                : '선택한 입학 대기 학생들에게 같은 안내 문자를 한 번에 보냅니다.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+              <p className="text-xs font-black uppercase tracking-wider text-slate-500">대상 미리보기</p>
+              <div className="mt-2 space-y-2">
+                {smsDialogTargets.map((target) => {
+                  const parentPhone = 'parentPhone' in target ? target.parentPhone : '';
+                  const studentPhone = 'studentPhone' in target ? target.studentPhone : '';
+                  const school = 'school' in target ? target.school : '';
+                  const grade = 'grade' in target ? target.grade : '';
+                  return (
+                    <div key={target.id} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 shadow-sm">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-slate-900">
+                          {'studentName' in target ? target.studentName : ''}
+                        </p>
+                        <p className="truncate text-[11px] font-semibold text-slate-500">
+                          {school || '학교 미입력'}
+                          {grade ? ` · 학년 ${grade}` : ''}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 text-[10px] font-black text-slate-700">
+                        {parentPhone?.trim() || studentPhone?.trim() || '번호 없음'}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-black">문자 내용</Label>
+              <Textarea
+                value={smsDialog.message}
+                onChange={(e) => setSmsDialog((prev) => ({ ...prev, message: e.target.value }))}
+                placeholder="입학 대기 안내, 상담 재안내, 공지 문구를 입력하세요."
+                className="min-h-[140px] rounded-lg"
+              />
+              <p className="text-[11px] font-semibold text-slate-500">
+                같은 문자가 선택한 대상에게 발송됩니다. 번호가 없으면 자동으로 제외됩니다.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-lg font-black"
+              onClick={() => setSmsDialog(INITIAL_SMS_DIALOG())}
+              disabled={isSendingMarketingSms}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              className="rounded-lg font-black"
+              onClick={handleSendMarketingSms}
+              disabled={isSendingMarketingSms}
+            >
+              {isSendingMarketingSms && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              문자 보내기
             </Button>
           </DialogFooter>
         </DialogContent>

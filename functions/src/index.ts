@@ -104,6 +104,7 @@ type SmsDispatchResult =
 
 const SMS_BYTE_LIMIT = 90;
 const STUDENT_SMS_FALLBACK_UID = "__student__";
+type MarketingSmsTargetType = "consulting_lead" | "waitlist";
 
 const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
   study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
@@ -1120,6 +1121,140 @@ async function queueManualStudentSms(
   );
 
   return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
+}
+
+async function queueMarketingManualSms(
+  db: admin.firestore.Firestore,
+  params: {
+    centerId: string;
+    message: string;
+    settings?: NotificationSettingsDoc;
+    targets: Array<{
+      targetType: MarketingSmsTargetType;
+      targetId: string;
+    }>;
+  }
+): Promise<{
+  queuedCount: number;
+  recipientCount: number;
+  targetCount: number;
+  skippedCount: number;
+  missingCount: number;
+  message: string;
+}> {
+  const { centerId } = params;
+  const settings = params.settings || await loadNotificationSettings(db, centerId);
+  const message = trimSmsToByteLimit(asTrimmedString(params.message));
+  if (!message) {
+    return { queuedCount: 0, recipientCount: 0, targetCount: 0, skippedCount: 0, missingCount: 0, message: "" };
+  }
+
+  const targets = params.targets
+    .map((row) => ({
+      targetType: row.targetType,
+      targetId: asTrimmedString(row.targetId),
+    }))
+    .filter((row) => row.targetId);
+
+  if (targets.length === 0) {
+    return { queuedCount: 0, recipientCount: 0, targetCount: 0, skippedCount: 0, missingCount: 0, message };
+  }
+
+  const initialStatus = buildSmsQueueInitialStatus(settings);
+  const provider = settings.smsProvider || "none";
+  const ts = admin.firestore.Timestamp.now();
+  const batch = db.batch();
+  const usedPhones = new Set<string>();
+  let queuedCount = 0;
+  let skippedCount = 0;
+  let missingCount = 0;
+
+  for (const target of targets) {
+    const refPath =
+      target.targetType === "consulting_lead"
+        ? `centers/${centerId}/consultingLeads/${target.targetId}`
+        : `centers/${centerId}/admissionWaitlist/${target.targetId}`;
+
+    const targetSnap = await db.doc(refPath).get();
+    if (!targetSnap.exists) {
+      missingCount += 1;
+      continue;
+    }
+
+    const targetData = targetSnap.data() || {};
+    const phoneNumber = resolveFirstValidPhoneNumber(targetData.parentPhone, targetData.studentPhone);
+    if (!phoneNumber) {
+      missingCount += 1;
+      continue;
+    }
+    if (usedPhones.has(phoneNumber)) {
+      skippedCount += 1;
+      continue;
+    }
+    usedPhones.add(phoneNumber);
+
+    const studentName = asTrimmedString(targetData.studentName, "문의 학생");
+    const parentName = asTrimmedString(
+      targetData.parentName,
+      target.targetType === "consulting_lead" ? "상담 리드" : "입학 대기"
+    );
+
+    const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
+    batch.set(queueRef, {
+      centerId,
+      studentId: null,
+      studentName,
+      parentUid: `marketing_${target.targetType}:${target.targetId}`,
+      parentName,
+      phoneNumber,
+      to: phoneNumber,
+      provider,
+      sender: settings.smsSender || null,
+      endpointUrl: settings.smsEndpointUrl || null,
+      message,
+      renderedMessage: message,
+      messageBytes: calculateSmsBytes(message),
+      dedupeKey: null,
+      eventType: "manual_note",
+      dateKey: toDateKey(ts.toDate()),
+      status: initialStatus.status,
+      providerStatus: initialStatus.providerStatus,
+      attemptCount: 0,
+      manualRetryCount: 0,
+      nextAttemptAt: initialStatus.status === "queued" ? ts : null,
+      sentAt: null,
+      failedAt: null,
+      lastErrorCode: null,
+      lastErrorMessage: null,
+      createdAt: ts,
+      updatedAt: ts,
+      metadata: {
+        studentName,
+        targetType: target.targetType,
+        targetId: target.targetId,
+        school: asTrimmedString(targetData.school),
+        grade: asTrimmedString(targetData.grade),
+        serviceType: asTrimmedString(targetData.serviceType),
+        requestType: asTrimmedString(targetData.requestType),
+        source: "marketing_crm",
+      },
+    });
+
+    queuedCount += 1;
+  }
+
+  if (queuedCount > 0) {
+    await batch.commit();
+  }
+
+  return {
+    queuedCount,
+    recipientCount: usedPhones.size,
+    targetCount: targets.length,
+    skippedCount,
+    missingCount,
+    message,
+  };
 }
 
 async function runLateArrivalCheckForCenter(
@@ -4006,6 +4141,85 @@ export const sendManualStudentSms = functions.region(region).https.onCall(async 
     ok: true,
     queuedCount: queueResult.queuedCount,
     recipientCount: queueResult.recipientCount,
+    provider: settings.smsProvider || "none",
+    message: queueResult.message,
+  };
+});
+
+export const sendMarketingLeadSms = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  const rawMessage = String(data?.message || "").replace(/\s+/g, " ").trim();
+  const rawTargets = Array.isArray(data?.targets) ? data.targets : [];
+
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+      userMessage: "센터 정보가 누락되었습니다.",
+    });
+  }
+  if (!rawMessage) {
+    throw new functions.https.HttpsError("invalid-argument", "message is required.", {
+      userMessage: "보낼 문자 내용을 입력해 주세요.",
+    });
+  }
+  if (calculateSmsBytes(rawMessage) > SMS_BYTE_LIMIT) {
+    throw new functions.https.HttpsError("invalid-argument", "message exceeds byte limit.", {
+      userMessage: "문자 내용이 90byte를 넘었습니다.",
+    });
+  }
+  if (rawTargets.length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", "targets are required.", {
+      userMessage: "문자 대상을 선택해 주세요.",
+    });
+  }
+
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
+  if (!isAdminRole(callerRole)) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 리드 문자를 보낼 수 있습니다.");
+  }
+
+  const targets = rawTargets
+    .map((row: any) => {
+      const targetType = asTrimmedString((row as any)?.targetType) as MarketingSmsTargetType;
+      const targetId = asTrimmedString((row as any)?.targetId);
+      return {
+        targetType,
+        targetId,
+      };
+    })
+    .filter(
+      (row: { targetType: MarketingSmsTargetType; targetId: string }) =>
+        row.targetId &&
+        (row.targetType === "consulting_lead" || row.targetType === "waitlist")
+    );
+
+  const settings = await loadNotificationSettings(db, centerId);
+  const queueResult = await queueMarketingManualSms(db, {
+    centerId,
+    message: rawMessage,
+    settings,
+    targets,
+  });
+
+  if (queueResult.queuedCount === 0) {
+    throw new functions.https.HttpsError("failed-precondition", "No recipients available.", {
+      userMessage: "발송 가능한 연락처가 없습니다. 학부모 또는 학생 번호를 먼저 확인해 주세요.",
+    });
+  }
+
+  return {
+    ok: true,
+    queuedCount: queueResult.queuedCount,
+    recipientCount: queueResult.recipientCount,
+    targetCount: queueResult.targetCount,
+    skippedCount: queueResult.skippedCount,
+    missingCount: queueResult.missingCount,
     provider: settings.smsProvider || "none",
     message: queueResult.message,
   };
