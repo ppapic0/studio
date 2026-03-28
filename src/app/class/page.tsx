@@ -126,7 +126,7 @@ const contactItems = [
 const mobileContactLayoutClass: Record<string, string> = {
   CONTACT: '',
   LOCATION: 'col-span-2',
-  HOURS: '',
+  HOURS: 'col-span-2',
 };
 
 /* ─────────────────────────────────────────────────
@@ -135,6 +135,7 @@ const mobileContactLayoutClass: Record<string, string> = {
 
 export default async function ClassPage() {
   const waitlistCount = await getWaitlistCount();
+  const hourLines = marketingContent.consult.hoursLine.split(' · ').map((item) => item.trim());
   return (
     <main className="min-h-screen bg-white pb-24 text-slate-900 sm:pb-0">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
@@ -594,9 +595,22 @@ export default async function ClassPage() {
                       <p className="text-[10px] font-black tracking-[0.17em] text-[#FFB273] sm:text-[10.5px]">
                         {item.label}
                       </p>
-                      <p className="mt-2 break-keep text-[0.94rem] font-black leading-[1.65] text-white sm:text-[1.05rem] sm:leading-relaxed">
-                        {item.value}
-                      </p>
+                      {item.label === 'HOURS' ? (
+                        <div className="mt-2 space-y-1.5 sm:space-y-2">
+                          {hourLines.map((line) => (
+                            <p
+                              key={line}
+                              className="whitespace-nowrap text-[11px] font-black leading-[1.35] tracking-[-0.03em] text-white sm:text-[1.05rem] sm:leading-relaxed sm:tracking-normal"
+                            >
+                              {line}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 break-keep text-[0.94rem] font-black leading-[1.65] text-white sm:text-[1.05rem] sm:leading-relaxed">
+                          {item.value}
+                        </p>
+                      )}
                     </article>
                   ))}
                 </div>

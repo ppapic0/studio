@@ -39,10 +39,11 @@ async function getWaitlistCount(): Promise<number> {
 
 export async function ConsultSection({ consult, trustMetrics }: ConsultSectionProps) {
   const waitlistCount = await getWaitlistCount();
+  const hourLines = consult.hoursLine.split(' · ').map((item) => item.trim());
   const infoCards = [
     { label: 'CONTACT', value: consult.contactLine, mobileSpanClass: '' },
     { label: 'LOCATION', value: consult.locationLine, mobileSpanClass: 'col-span-2' },
-    { label: 'HOURS', value: consult.hoursLine, mobileSpanClass: '' },
+    { label: 'HOURS', value: consult.hoursLine, mobileSpanClass: 'col-span-2' },
   ];
 
   return (
@@ -156,9 +157,22 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                     <p className="text-[10px] font-black tracking-[0.17em] text-[#FFB273] sm:text-[10.5px]">
                       {item.label}
                     </p>
-                    <p className="mt-2 break-keep text-[0.94rem] font-black leading-[1.65] text-white sm:text-[1.05rem] sm:leading-relaxed">
-                      {item.value}
-                    </p>
+                    {item.label === 'HOURS' ? (
+                      <div className="mt-2 space-y-1.5 sm:space-y-2">
+                        {hourLines.map((line) => (
+                          <p
+                            key={line}
+                            className="whitespace-nowrap text-[11px] font-black leading-[1.35] tracking-[-0.03em] text-white sm:text-[1.05rem] sm:leading-relaxed sm:tracking-normal"
+                          >
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 break-keep text-[0.94rem] font-black leading-[1.65] text-white sm:text-[1.05rem] sm:leading-relaxed">
+                        {item.value}
+                      </p>
+                    )}
                   </article>
                 ))}
               </div>
