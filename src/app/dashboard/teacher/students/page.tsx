@@ -18,14 +18,10 @@ import {
   GraduationCap, 
   ChevronRight, 
   Loader2, 
-  Armchair, 
-  Building2, 
   UserCheck,
   UserMinus,
   PauseCircle,
   Users,
-  Activity,
-  UserCog,
   Trash2,
   AlertTriangle
 } from 'lucide-react';
@@ -128,6 +124,8 @@ export default function StudentListPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusTab, setStatusTab] = useState<string>('active');
+  const [classFilter, setClassFilter] = useState<string>('all');
+  const [liveStatusFilter, setLiveStatusFilter] = useState<string>('all');
   
   const isMobile = viewMode === 'mobile';
 
@@ -187,6 +185,17 @@ export default function StudentListPage() {
   
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isTeacherOrAdmin });
 
+  const availableClasses = useMemo(() => {
+    const classes = Array.from(
+      new Set(
+        (studentMembers || [])
+          .map((member) => member.className?.trim())
+          .filter((value): value is string => Boolean(value))
+      )
+    );
+    return classes.sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [studentMembers]);
+
   // 데이터 통합, 필터링 및 정렬
   const filteredStudents = useMemo(() => {
     if (!studentMembers) return [];
@@ -198,8 +207,19 @@ export default function StudentListPage() {
         // 상태 필터링
         if (member.status !== statusTab) return false;
 
-        // 검색어 필터링
         const profile = studentsProfiles?.find(p => p.id === member.id);
+        const attendance = attendanceList?.find((item) => item.studentId === member.id);
+        const currentLiveStatus =
+          attendance?.status === 'studying'
+            ? 'studying'
+            : attendance?.status === 'away' || attendance?.status === 'break'
+              ? 'away'
+              : 'absent';
+
+        if (classFilter !== 'all' && (member.className || '') !== classFilter) return false;
+        if (liveStatusFilter !== 'all' && currentLiveStatus !== liveStatusFilter) return false;
+
+        // 검색어 필터링
         const seatLabel = formatSeatLabel(profile);
         const seatIdentity = resolveSeatIdentity(profile || {});
         return (
@@ -211,7 +231,7 @@ export default function StudentListPage() {
         );
       })
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-  }, [studentMembers, studentsProfiles, searchTerm, statusTab]);
+  }, [studentMembers, studentsProfiles, attendanceList, searchTerm, statusTab, classFilter, liveStatusFilter]);
 
   const counts = useMemo(() => {
     if (!studentMembers) return { active: 0, onHold: 0, withdrawn: 0 };
@@ -221,6 +241,27 @@ export default function StudentListPage() {
       withdrawn: studentMembers.filter(m => m.status === 'withdrawn').length,
     };
   }, [studentMembers]);
+
+  const operationalSummary = useMemo(() => {
+    const activeIds = new Set((studentMembers || []).filter((member) => member.status === 'active').map((member) => member.id));
+    const activeAttendance = (attendanceList || []).filter((item) => item.studentId && activeIds.has(item.studentId));
+    const studyingCount = activeAttendance.filter((item) => item.status === 'studying').length;
+    const awayCount = activeAttendance.filter((item) => item.status === 'away' || item.status === 'break').length;
+    const absentCount = Math.max(0, activeIds.size - studyingCount - awayCount);
+    const assignedSeatCount = (studentsProfiles || []).filter((profile) => {
+      const identity = resolveSeatIdentity(profile || {});
+      return identity.roomSeatNo > 0 || identity.seatNo > 0;
+    }).length;
+
+    return {
+      activeStudents: counts.active,
+      studyingCount,
+      awayCount,
+      absentCount,
+      assignedSeatCount,
+      riskOpenCount: showRiskPanel ? 1 : 0,
+    };
+  }, [attendanceList, counts.active, showRiskPanel, studentMembers, studentsProfiles]);
 
   const handleAddStudent = async () => {
     if (!centerId || !functions) return;
@@ -310,9 +351,11 @@ export default function StudentListPage() {
         <div className="flex flex-col gap-1">
           <h1 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-2xl" : "text-4xl")}>
             <GraduationCap className={cn("text-primary", isMobile ? "h-6 w-6" : "h-10 w-10")} />
-            학생 관리 센터
+            학생 운영 인덱스
           </h1>
-          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest whitespace-nowrap", isMobile ? "text-[9px]" : "text-xs")}>학생 명단 및 관리</p>
+          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest whitespace-nowrap", isMobile ? "text-[9px]" : "text-xs")}>
+            학생 360 진입 전, 상태와 반별 운영 신호를 먼저 좁혀봅니다.
+          </p>
         </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
@@ -367,6 +410,65 @@ export default function StudentListPage() {
         </Card>
       )}
 
+      <section className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'md:grid-cols-3 xl:grid-cols-6')}>
+        {[
+          { label: '재원생', value: `${operationalSummary.activeStudents}명`, sub: '현재 관리 대상', tone: 'text-[#14295F] bg-[#eef4ff]' },
+          { label: '공부중', value: `${operationalSummary.studyingCount}명`, sub: '실시간 좌석 기준', tone: 'text-emerald-700 bg-emerald-50' },
+          { label: '외출', value: `${operationalSummary.awayCount}명`, sub: '복귀 확인 필요', tone: 'text-amber-700 bg-amber-50' },
+          { label: '미입실', value: `${operationalSummary.absentCount}명`, sub: '도착 전 / 퇴실 포함', tone: 'text-rose-700 bg-rose-50' },
+          { label: '좌석배정', value: `${operationalSummary.assignedSeatCount}명`, sub: '도면 연동 가능', tone: 'text-sky-700 bg-sky-50' },
+          { label: '리스크', value: canViewRiskPanel ? (showRiskPanel ? '열림' : '대기') : '-', sub: '센터관리자 분석 패널', tone: 'text-violet-700 bg-violet-50' },
+        ].map((item) => (
+          <Card key={item.label} className="rounded-[1.75rem] border-none bg-white shadow-md ring-1 ring-black/[0.03]">
+            <CardContent className="p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">{item.label}</p>
+              <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{item.value}</p>
+              <div className={cn('mt-3 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black', item.tone)}>
+                {item.sub}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <Card className="rounded-[2rem] border-none bg-white shadow-md ring-1 ring-black/[0.03]">
+        <CardContent className={cn("grid gap-3", isMobile ? "p-4" : "p-5 md:grid-cols-[minmax(0,1.15fr)_220px_220px] md:items-center")}>
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+            <Input
+              placeholder="이름, 학교 또는 좌석 번호로 검색..."
+              className="h-14 rounded-2xl border-2 pl-12 bg-white text-base shadow-sm transition-all focus-visible:ring-primary/10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select value={classFilter} onValueChange={setClassFilter}>
+            <SelectTrigger className="h-14 rounded-2xl border-2 font-black">
+              <SelectValue placeholder="반 전체" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl">
+              <SelectItem value="all" className="font-black">반 전체</SelectItem>
+              {availableClasses.map((className) => (
+                <SelectItem key={className} value={className} className="font-black">
+                  {className}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={liveStatusFilter} onValueChange={setLiveStatusFilter}>
+            <SelectTrigger className="h-14 rounded-2xl border-2 font-black">
+              <SelectValue placeholder="실시간 상태 전체" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl">
+              <SelectItem value="all" className="font-black">실시간 상태 전체</SelectItem>
+              <SelectItem value="studying" className="font-black">공부중</SelectItem>
+              <SelectItem value="away" className="font-black">외출/휴식</SelectItem>
+              <SelectItem value="absent" className="font-black">미입실/퇴실</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="active" className="w-full" onValueChange={setStatusTab}>
         <TabsList className={cn("grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border border-border/50 shadow-inner", isMobile ? "h-14 mb-4" : "h-16 mb-8 max-w-2xl")}>
           <TabsTrigger value="active" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all"><UserCheck className="h-4 w-4" /><span className="hidden sm:inline">재원생</span><Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-emerald-50 text-emerald-600">{counts.active}</Badge></TabsTrigger>
@@ -374,41 +476,69 @@ export default function StudentListPage() {
           <TabsTrigger value="withdrawn" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all"><UserMinus className="h-4 w-4" /><span className="hidden sm:inline">퇴원생</span><Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-slate-100 text-slate-600">{counts.withdrawn}</Badge></TabsTrigger>
         </TabsList>
 
-        <div className={cn("relative group mb-6", isMobile ? "px-1" : "")}>
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-          <Input placeholder="이름, 학교 또는 좌석 번호로 검색..." className={cn("rounded-2xl border-2 pl-12 focus-visible:ring-primary/10 shadow-sm transition-all bg-white", isMobile ? "h-14 text-base" : "h-16 text-lg")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        </div>
-
         {membersLoading ? (<div className="flex flex-col items-center justify-center py-40"><Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" /></div>) : filteredStudents.length === 0 ? (
           <div className="text-center py-32 bg-white/50 rounded-[3rem] border-2 border-dashed"><Users className="h-16 w-16 mx-auto text-muted-foreground/10 mb-4" /><p className="font-black text-muted-foreground/40 uppercase">데이터가 없습니다.</p></div>
         ) : (
-          <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-2 lg:grid-cols-3")}>
+          <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "xl:grid-cols-2")}>
             {filteredStudents.map((member) => {
               const profile = studentsProfiles?.find(p => p.id === member.id);
               const attendance = attendanceList?.find(a => a.studentId === member.id);
+              const seatLabel = formatSeatLabel(profile);
+              const attendanceLabel = attendance?.status === 'studying'
+                ? '공부중'
+                : attendance?.status === 'away' || attendance?.status === 'break'
+                  ? '외출'
+                  : attendance?.status === 'absent'
+                    ? '미입실'
+                    : '확인중';
               return (
                 <Card key={member.id} className={cn("rounded-[2rem] border-none shadow-lg hover:shadow-2xl transition-all group overflow-hidden bg-white ring-1 ring-border/50", member.status === 'withdrawn' && "bg-muted/5")}>
                   <div className={cn("h-1.5 w-full", attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted")} />
                   <CardContent className={isMobile ? "p-5" : "p-6"}>
                     <Link href={`/dashboard/teacher/students/${member.id}`} className="block">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-4 min-w-0">
                           <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50"><AvatarFallback className="bg-primary/5 text-primary font-black text-xl">{member.displayName?.charAt(0) || 'S'}</AvatarFallback></Avatar>
-                          <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-2"><h3 className="text-lg font-black truncate tracking-tighter">{member.displayName}</h3>{member.status === 'active' && getStatusBadge(attendance?.status)}</div>
-                            <div className="flex flex-col text-[10px] font-bold text-muted-foreground leading-tight"><span className="truncate">{profile?.schoolName || '학교 정보 없음'}</span><span className="opacity-60">{profile?.grade || '학년 정보 없음'}</span></div>
+                          <div className="flex flex-col min-w-0 gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-lg font-black truncate tracking-tighter">{member.displayName}</h3>
+                              {member.className ? (
+                                <Badge className="h-5 rounded-full border-none bg-slate-100 px-2 text-[10px] font-black text-slate-700">{member.className}</Badge>
+                              ) : null}
+                              {member.status === 'active' && getStatusBadge(attendance?.status)}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge className="h-6 rounded-full border-none bg-[#eef4ff] px-2.5 text-[10px] font-black text-[#244b90]">
+                                {profile?.schoolName || '학교 정보 없음'}
+                              </Badge>
+                              <Badge className="h-6 rounded-full border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
+                                {profile?.grade || '학년 정보 없음'}
+                              </Badge>
+                              <Badge className="h-6 rounded-full border-none bg-white ring-1 ring-slate-200 px-2.5 text-[10px] font-black text-slate-600">
+                                {seatLabel}
+                              </Badge>
+                            </div>
+                            <div className="grid gap-2 text-[11px] font-bold text-slate-500 sm:grid-cols-3">
+                              <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">현재 상태</p>
+                                <p className="mt-1 text-sm font-black text-[#14295F]">{attendanceLabel}</p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">계정 상태</p>
+                                <p className="mt-1 text-sm font-black text-[#14295F]">
+                                  {member.status === 'active' ? '재원중' : member.status === 'onHold' ? '휴원' : '퇴원'}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">운영 이동</p>
+                                <p className="mt-1 text-sm font-black text-[#14295F]">학생 360 열기</p>
+                              </div>
+                            </div>
                           </div>
                         </div>
                         <ChevronRight className="h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
                       </div>
                     </Link>
-                    
-                    <div className="mt-5 flex items-center justify-between rounded-2xl border border-border/50 bg-muted/20 p-3.5">
-                      <div className="flex items-center gap-2">
-                        <div className="rounded-lg bg-white p-1.5 shadow-sm"><Armchair className="h-3.5 w-3.5 text-primary/60" /></div>
-                        <span className="text-xs font-black text-primary/80">{formatSeatLabel(profile)}</span>
-                      </div>
-                    </div>
 
                     {statusTab === 'withdrawn' && (
                       <div className="mt-4 pt-4 border-t border-dashed border-rose-100">

@@ -6,6 +6,8 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ComposedChart,
+  Bar,
   Legend,
   Line,
   LineChart,
@@ -29,8 +31,7 @@ import {
   type InvoiceTrackCategory,
   type MonthlyTrackBucket,
 } from '@/lib/invoice-analytics';
-import type { CenterMembership, Invoice } from '@/lib/types';
-import { calculateSmsCost, formatSmsCost } from '@/lib/sms-cost';
+import type { CenterMembership, CounselingLog, Invoice } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
@@ -76,14 +77,6 @@ function getStatusLabel(status: Invoice['status']) {
   return status;
 }
 
-type SmsDeliveryLogRow = {
-  id: string;
-  dateKey?: string;
-  status?: string;
-  createdAt?: { toDate?: () => Date };
-  sentAt?: { toDate?: () => Date };
-};
-
 function emptyBucket(month: string): MonthlyTrackBucket {
   return {
     month,
@@ -116,6 +109,45 @@ function emptyBucket(month: string): MonthlyTrackBucket {
   };
 }
 
+type SmsDeliveryLogLite = {
+  id: string;
+  studentId?: string;
+  status?: string;
+  createdAt?: any;
+  sentAt?: any;
+};
+
+type ConsultingLeadLite = {
+  id: string;
+  status?: 'new' | 'contacted' | 'consulted' | 'enrolled' | 'closed';
+  createdAt?: any;
+};
+
+const SMS_UNIT_COST = 8.7;
+
+function toTimestampMs(value: any): number {
+  if (value && typeof value.toDate === 'function') {
+    const date = value.toDate();
+    if (date instanceof Date && !Number.isNaN(date.getTime())) return date.getTime();
+  }
+  return 0;
+}
+
+function toMonthKey(value: any): string {
+  if (value && typeof value.toDate === 'function') {
+    const date = value.toDate();
+    if (date instanceof Date && !Number.isNaN(date.getTime())) {
+      return format(date, 'yyyy-MM');
+    }
+  }
+  return '';
+}
+
+function isAcceptedSmsStatus(status?: string) {
+  const normalized = String(status || '').toLowerCase();
+  return !['failed', 'cancelled', 'suppressed_opt_out', 'pending_provider'].includes(normalized);
+}
+
 export function RevenueAnalysis() {
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
@@ -136,22 +168,23 @@ export function RevenueAnalysis() {
   }, [firestore, centerId]);
   const { data: invoices, isLoading: invoicesLoading } = useCollection<Invoice>(invoicesQuery);
 
-  const selectedMonthStart = useMemo(() => startOfMonth(new Date(`${selectedMonth}-01T00:00:00`)), [selectedMonth]);
-  const selectedMonthEnd = useMemo(() => endOfMonth(selectedMonthStart), [selectedMonthStart]);
-  const selectedMonthStartKey = format(selectedMonthStart, 'yyyy-MM-dd');
-  const selectedMonthEndKey = format(selectedMonthEnd, 'yyyy-MM-dd');
-
   const smsLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'smsDeliveryLogs'),
-      where('dateKey', '>=', selectedMonthStartKey),
-      where('dateKey', '<=', selectedMonthEndKey),
-      orderBy('dateKey', 'asc'),
-      limit(10000)
-    );
-  }, [firestore, centerId, selectedMonthEndKey, selectedMonthStartKey]);
-  const { data: smsDeliveryLogs } = useCollection<SmsDeliveryLogRow>(smsLogsQuery);
+    return query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), limit(1500));
+  }, [firestore, centerId]);
+  const { data: smsDeliveryLogs } = useCollection<SmsDeliveryLogLite>(smsLogsQuery);
+
+  const counselingLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'counselingLogs'), orderBy('createdAt', 'desc'), limit(1000));
+  }, [firestore, centerId]);
+  const { data: counselingLogs } = useCollection<CounselingLog>(counselingLogsQuery);
+
+  const consultingLeadsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'consultingLeads'), limit(1000));
+  }, [firestore, centerId]);
+  const { data: consultingLeads } = useCollection<ConsultingLeadLite>(consultingLeadsQuery);
 
   const monthlyBuckets = useMemo(() => buildMonthlyTrackBuckets(invoices || []), [invoices]);
 
@@ -166,43 +199,11 @@ export function RevenueAnalysis() {
     [monthlyBuckets, selectedMonth]
   );
 
-  const selectedTimeline = useMemo(
-    () => (invoices || []).filter((invoice) => getInvoiceMonth(invoice) === selectedMonth).slice(0, 30),
+  const selectedMonthInvoices = useMemo(
+    () => (invoices || []).filter((invoice) => getInvoiceMonth(invoice) === selectedMonth),
     [invoices, selectedMonth]
   );
-
-  const smsDailyCostRows = useMemo(() => {
-    const baseRows = eachDayOfInterval({ start: selectedMonthStart, end: selectedMonthEnd }).map((date) => ({
-      key: format(date, 'yyyy-MM-dd'),
-      label: format(date, 'M.d'),
-      sentCount: 0,
-      smsCost: 0,
-    }));
-    const rowMap = new Map(baseRows.map((row) => [row.key, row] as const));
-    (smsDeliveryLogs || []).forEach((row) => {
-      const key =
-        row.dateKey ||
-        (row.sentAt?.toDate ? format(row.sentAt.toDate(), 'yyyy-MM-dd') : '') ||
-        (row.createdAt?.toDate ? format(row.createdAt.toDate(), 'yyyy-MM-dd') : '');
-      if (!key || row.status !== 'sent') return;
-      const bucket = rowMap.get(key);
-      if (!bucket) return;
-      bucket.sentCount += 1;
-    });
-    return baseRows.map((row) => ({
-      ...row,
-      smsCost: calculateSmsCost(row.sentCount),
-    }));
-  }, [selectedMonthEnd, selectedMonthStart, smsDeliveryLogs]);
-
-  const selectedMonthSmsCount = useMemo(
-    () => smsDailyCostRows.reduce((sum, row) => sum + row.sentCount, 0),
-    [smsDailyCostRows]
-  );
-  const selectedMonthSmsCost = useMemo(
-    () => smsDailyCostRows.reduce((sum, row) => sum + row.smsCost, 0),
-    [smsDailyCostRows]
-  );
+  const selectedTimeline = useMemo(() => selectedMonthInvoices.slice(0, 30), [selectedMonthInvoices]);
 
   const chartData = useMemo(
     () =>
@@ -224,8 +225,62 @@ export function RevenueAnalysis() {
   const arrearsRate = summary.billed > 0 ? (summary.arrears / summary.billed) * 100 : 0;
 
   const activeStudentCount = (activeStudents || []).length;
-  const smsCostPerStudent = activeStudentCount > 0 ? selectedMonthSmsCost / activeStudentCount : 0;
-  const netCollectedAfterSms = summary.collected - selectedMonthSmsCost;
+  const selectedMonthSmsLogs = useMemo(
+    () => (smsDeliveryLogs || []).filter((log) => toMonthKey(log.sentAt || log.createdAt) === selectedMonth),
+    [smsDeliveryLogs, selectedMonth]
+  );
+  const selectedMonthCounselings = useMemo(
+    () => (counselingLogs || []).filter((log) => toMonthKey(log.createdAt) === selectedMonth),
+    [counselingLogs, selectedMonth]
+  );
+  const selectedMonthLeads = useMemo(
+    () => (consultingLeads || []).filter((lead) => toMonthKey(lead.createdAt) === selectedMonth),
+    [consultingLeads, selectedMonth]
+  );
+  const acceptedSmsCount = selectedMonthSmsLogs.filter((log) => isAcceptedSmsStatus(log.status)).length;
+  const monthlySmsCost = Math.round(acceptedSmsCount * SMS_UNIT_COST);
+  const smsCostPerStudent = activeStudentCount > 0 ? Math.round((monthlySmsCost / activeStudentCount) * 10) / 10 : 0;
+  const consultedLeadCount = selectedMonthLeads.filter((lead) => lead.status === 'consulted' || lead.status === 'enrolled').length;
+  const enrolledLeadCount = selectedMonthLeads.filter((lead) => lead.status === 'enrolled').length;
+  const leadConsultConversionRate = selectedMonthLeads.length > 0 ? (consultedLeadCount / selectedMonthLeads.length) * 100 : 0;
+  const leadEnrollConversionRate = selectedMonthLeads.length > 0 ? (enrolledLeadCount / selectedMonthLeads.length) * 100 : 0;
+  const overdueInvoiceCount = selectedMonthInvoices.filter((invoice) => invoice.status === 'overdue').length;
+  const actionRequiredInvoiceCount = selectedMonthInvoices.filter((invoice) => invoice.status === 'issued' || invoice.status === 'overdue').length;
+  const operatingCostChartData = useMemo(() => {
+    const monthStart = startOfMonth(new Date(`${selectedMonth}-01T00:00:00`));
+    const monthEnd = endOfMonth(monthStart);
+    const dayLabels = eachDayOfInterval({ start: monthStart, end: monthEnd }).map((date) => format(date, 'M.d'));
+    const smsMap = new Map<string, number>();
+    const counselingMap = new Map<string, number>();
+    const leadsMap = new Map<string, number>();
+
+    selectedMonthSmsLogs.forEach((log) => {
+      const raw = (log.sentAt || log.createdAt) as any;
+      if (!raw || typeof raw.toDate !== 'function') return;
+      const label = format(raw.toDate(), 'M.d');
+      if (isAcceptedSmsStatus(log.status)) {
+        smsMap.set(label, (smsMap.get(label) || 0) + Math.round(SMS_UNIT_COST * 10) / 10);
+      }
+    });
+    selectedMonthCounselings.forEach((log) => {
+      if (!log.createdAt) return;
+      const label = format(log.createdAt.toDate(), 'M.d');
+      counselingMap.set(label, (counselingMap.get(label) || 0) + 1);
+    });
+    selectedMonthLeads.forEach((lead) => {
+      const raw = lead.createdAt as any;
+      if (!raw || typeof raw.toDate !== 'function') return;
+      const label = format(raw.toDate(), 'M.d');
+      leadsMap.set(label, (leadsMap.get(label) || 0) + 1);
+    });
+
+    return dayLabels.map((label) => ({
+      day: label,
+      smsCost: Number((smsMap.get(label) || 0).toFixed(1)),
+      counselingCount: counselingMap.get(label) || 0,
+      leadCount: leadsMap.get(label) || 0,
+    }));
+  }, [selectedMonth, selectedMonthCounselings, selectedMonthLeads, selectedMonthSmsLogs]);
 
   const byTrackCards: Array<{ key: InvoiceTrackCategory; title: string }> = [
     { key: 'studyRoom', title: '독서실' },
@@ -285,7 +340,7 @@ export function RevenueAnalysis() {
         </CardHeader>
       </Card>
 
-      <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-5')}>
+      <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
         <Card className="rounded-2xl border-none bg-primary shadow-md">
           <CardContent className="p-5">
             <p className="text-[11px] font-bold text-[#14295F]">당월 청구금액</p>
@@ -311,11 +366,35 @@ export function RevenueAnalysis() {
             <p className="mt-1 text-[11px] font-bold text-muted-foreground">활성 학생 {activeStudentCount}명</p>
           </CardContent>
         </Card>
+      </section>
+
+      <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
         <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
           <CardContent className="p-5">
-            <p className="text-[11px] font-bold text-muted-foreground">당월 문자비용</p>
-            <p className="dashboard-number mt-2 text-2xl text-violet-600">{formatSmsCost(selectedMonthSmsCost)}</p>
-            <p className="mt-1 text-[11px] font-bold text-muted-foreground">전송 접수 {selectedMonthSmsCount}건</p>
+            <p className="text-[11px] font-bold text-muted-foreground">당월 문자 비용</p>
+            <p className="dashboard-number mt-2 text-2xl text-sky-600">{formatWon(monthlySmsCost)}</p>
+            <p className="mt-1 text-[11px] font-bold text-muted-foreground">알리고 접수 {acceptedSmsCount}건 기준</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+          <CardContent className="p-5">
+            <p className="text-[11px] font-bold text-muted-foreground">학생 1인당 문자비</p>
+            <p className="dashboard-number mt-2 text-2xl text-[#2554d4]">₩{smsCostPerStudent.toLocaleString()}</p>
+            <p className="mt-1 text-[11px] font-bold text-muted-foreground">활성 학생 {activeStudentCount}명 기준</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+          <CardContent className="p-5">
+            <p className="text-[11px] font-bold text-muted-foreground">리드 상담 전환율</p>
+            <p className="dashboard-number mt-2 text-2xl text-amber-600">{leadConsultConversionRate.toFixed(1)}%</p>
+            <p className="mt-1 text-[11px] font-bold text-muted-foreground">등록 전환 {leadEnrollConversionRate.toFixed(1)}%</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+          <CardContent className="p-5">
+            <p className="text-[11px] font-bold text-muted-foreground">미수금 운영 신호</p>
+            <p className="dashboard-number mt-2 text-2xl text-rose-600">{actionRequiredInvoiceCount}건</p>
+            <p className="mt-1 text-[11px] font-bold text-muted-foreground">연체 {overdueInvoiceCount}건 · 상담 {selectedMonthCounselings.length}건</p>
           </CardContent>
         </Card>
       </section>
@@ -408,65 +487,32 @@ export function RevenueAnalysis() {
         </Card>
       </section>
 
-      <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-12')}>
-        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50 md:col-span-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-black">
-              <Wallet className="h-5 w-5 text-violet-600" />
-              {selectedMonth} 일자별 문자비용
-            </CardTitle>
-            <CardDescription>전송 접수 기준으로 하루에 얼마나 비용이 나갔는지 바로 확인합니다.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[260px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={smsDailyCostRows}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" fontSize={11} interval={Math.max(0, Math.floor(smsDailyCostRows.length / 8))} />
-                  <YAxis fontSize={11} tickFormatter={(value) => formatSmsCost(toNumber(value))} />
-                  <Tooltip
-                    formatter={(value: number, name: string) =>
-                      name === '문자비용'
-                        ? formatSmsCost(toNumber(value))
-                        : `${Math.round(toNumber(value)).toLocaleString()}건`
-                    }
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="smsCost" name="문자비용" stroke="#7c3aed" strokeWidth={3} dot={false} />
-                  <Line type="monotone" dataKey="sentCount" name="전송 접수" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="8 6" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50 md:col-span-4">
-          <CardHeader>
-            <CardTitle className="text-lg font-black">문자 비용 분석</CardTitle>
-            <CardDescription>CFO/COO 관점에서 문자 운영비를 별도 추적합니다.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between rounded-xl bg-violet-50 px-4 py-3">
-              <span className="text-sm font-black text-violet-900">당월 문자비용</span>
-              <span className="text-base font-black text-violet-700">{formatSmsCost(selectedMonthSmsCost)}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-4 py-3">
-              <span className="text-sm font-black text-emerald-900">문자 반영 순수납</span>
-              <span className="text-base font-black text-emerald-700">{formatWon(netCollectedAfterSms)}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
-              <span className="text-sm font-black text-slate-800">학생 1인당 문자비</span>
-              <span className="text-base font-black text-slate-700">{formatSmsCost(smsCostPerStudent)}</span>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-xs font-black text-slate-500">운영 메모</p>
-              <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-                문자 단가는 건당 8.7원 기준이며, 실제 비용은 전송 접수 건수 기준으로 집계했습니다.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg font-black">
+            <Wallet className="h-5 w-5 text-primary" />
+            운영 비용 연결 분석
+          </CardTitle>
+          <CardDescription>문자 비용, 상담 터치, 신규 리드 흐름을 같은 날짜축으로 묶어 봅니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={operatingCostChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" fontSize={11} />
+                <YAxis yAxisId="cost" fontSize={11} tickFormatter={(value) => `₩${Math.round(toNumber(value))}`} />
+                <YAxis yAxisId="count" orientation="right" fontSize={11} allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Area yAxisId="cost" type="monotone" dataKey="smsCost" name="문자비용" stroke="#0ea5e9" fill="#bae6fd" strokeWidth={2} />
+                <Bar yAxisId="count" dataKey="counselingCount" name="상담 건수" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                <Line yAxisId="count" type="monotone" dataKey="leadCount" name="신규 리드" stroke="#10b981" strokeWidth={2.5} dot={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
         <CardHeader>

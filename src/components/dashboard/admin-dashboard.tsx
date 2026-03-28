@@ -862,7 +862,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const currentlyStudyingStudents = useMemo(() => {
-    return Array.from(attendanceSeatSignalsBySeatId?.values() || [])
+    return Object.values(attendanceSeatSignalsBySeatId || {})
       .filter((signal) => Boolean(signal && signal.seatStatus === 'studying'))
       .sort((a, b) => {
         const roomOrderA = roomOrderById.get(a.roomId || '') ?? Number.MAX_SAFE_INTEGER;
@@ -1520,6 +1520,406 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [selectedFocusStudent, focusStudentTrend, selectedFocusStat, selectedFocusProgress]);
 
+  const urgentInterventionStudents = useMemo(() => {
+    return [...(heatmapInterventionSignals || [])]
+      .sort((a, b) => {
+        if (a.compositeHealth !== b.compositeHealth) return a.compositeHealth - b.compositeHealth;
+        if ((b.effectivePenaltyPoints || 0) !== (a.effectivePenaltyPoints || 0)) {
+          return (b.effectivePenaltyPoints || 0) - (a.effectivePenaltyPoints || 0);
+        }
+        if ((b.currentAwayMinutes || 0) !== (a.currentAwayMinutes || 0)) {
+          return (b.currentAwayMinutes || 0) - (a.currentAwayMinutes || 0);
+        }
+        return (b.todayMinutes || 0) - (a.todayMinutes || 0);
+      })
+      .slice(0, 6);
+  }, [heatmapInterventionSignals]);
+
+  const quickActionLinks = useMemo(
+    () => [
+      {
+        href: '/dashboard/teacher',
+        label: '실시간 교실',
+        description: '도면과 좌석 상태를 바로 열어 조치합니다.',
+        icon: LayoutGrid,
+      },
+      {
+        href: '/dashboard/teacher/students',
+        label: '학생 360',
+        description: '학생별 KPI와 원본 로그를 바로 봅니다.',
+        icon: Users,
+      },
+      {
+        href: '/dashboard/attendance',
+        label: '출결 KPI',
+        description: '미처리 요청과 반복 지각 학생을 봅니다.',
+        icon: ClipboardCheck,
+      },
+      {
+        href: '/dashboard/settings/notifications',
+        label: '문자 콘솔',
+        description: '오늘 문자 접수와 비용 흐름을 확인합니다.',
+        icon: MessageSquare,
+      },
+      {
+        href: '/dashboard/leads',
+        label: '리드 / 상담',
+        description: '입학 대기와 상담 후속 관리를 이어갑니다.',
+        icon: Megaphone,
+      },
+      {
+        href: '/dashboard/revenue',
+        label: '수익 분석',
+        description: '수납 경고와 운영 비용 흐름을 봅니다.',
+        icon: TrendingUp,
+      },
+    ],
+    []
+  );
+
+  const centerHealthAxes = useMemo(() => {
+    return adminHeatmapRows.slice(0, 5).map((row) => {
+      const firstScore = row.trend[0]?.score ?? row.summaryScore;
+      const lastScore = row.trend[row.trend.length - 1]?.score ?? row.summaryScore;
+      const delta = Math.round(lastScore - firstScore);
+      const trendLabel = delta > 0 ? '상승' : delta < 0 ? '하락' : '유지';
+      const tone =
+        row.summaryScore >= 85
+          ? {
+              badge: 'bg-emerald-100 text-emerald-700',
+              card: 'border-emerald-100 bg-[linear-gradient(180deg,#f6fffb_0%,#ffffff_100%)]',
+              dot: 'bg-emerald-500',
+            }
+          : row.summaryScore >= 70
+            ? {
+                badge: 'bg-sky-100 text-sky-700',
+                card: 'border-sky-100 bg-[linear-gradient(180deg,#f5fbff_0%,#ffffff_100%)]',
+                dot: 'bg-sky-500',
+              }
+            : row.summaryScore >= 50
+              ? {
+                  badge: 'bg-amber-100 text-amber-700',
+                  card: 'border-amber-100 bg-[linear-gradient(180deg,#fffaf2_0%,#ffffff_100%)]',
+                  dot: 'bg-amber-500',
+                }
+              : {
+                  badge: 'bg-rose-100 text-rose-700',
+                  card: 'border-rose-100 bg-[linear-gradient(180deg,#fff6f7_0%,#ffffff_100%)]',
+                  dot: 'bg-rose-500',
+                };
+      return {
+        ...row,
+        delta,
+        trendLabel,
+        tone,
+      };
+    });
+  }, [adminHeatmapRows]);
+
+  const todayActionQueue = useMemo(
+    () =>
+      [
+        {
+          key: 'attendance',
+          title: `미입실·지각 ${attendanceBoardSummary.lateOrAbsentCount}명`,
+          detail: '오늘 출결 KPI에서 미입실, 지각 반복 학생을 먼저 확인하세요.',
+          actionLabel: '출결 KPI',
+          href: '/dashboard/attendance',
+          icon: ClipboardCheck,
+          toneClass: 'bg-rose-100 text-rose-700',
+        },
+        {
+          key: 'away',
+          title: `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
+          detail: '실시간 교실 도면에서 장기 외출 학생의 복귀 여부를 바로 점검하세요.',
+          actionLabel: '실시간 교실',
+          href: '/dashboard/teacher',
+          icon: LayoutGrid,
+          toneClass: 'bg-amber-100 text-amber-700',
+        },
+        {
+          key: 'guardian',
+          title: `즉시 연락 추천 보호자 ${parentContactRecommendations.length}명`,
+          detail: '리포트 미열람, 상담 공백, 앱 방문 저조 보호자를 우선 연락 대상으로 묶었습니다.',
+          actionLabel: '보호자 보기',
+          actionType: 'dialog' as const,
+          icon: HeartHandshake,
+          toneClass: 'bg-violet-100 text-violet-700',
+        },
+        {
+          key: 'lead',
+          title: `상담·리드 ${metrics.consultationRequestCount30d}건`,
+          detail: '입학 대기와 최근 상담 요청을 같은 흐름에서 확인할 수 있습니다.',
+          actionLabel: '리드 워크벤치',
+          href: '/dashboard/leads',
+          icon: Megaphone,
+          toneClass: 'bg-blue-100 text-blue-700',
+        },
+        {
+          key: 'cost',
+          title: `문자·수납 비용 흐름`,
+          detail: '비용 분석에서 문자 비용과 수납/전환 효율을 함께 점검하세요.',
+          actionLabel: '비용 분석',
+          href: '/dashboard/revenue',
+          icon: TrendingUp,
+          toneClass: 'bg-emerald-100 text-emerald-700',
+        },
+      ].filter((item) => {
+        if (item.key === 'away') return attendanceBoardSummary.longAwayCount > 0;
+        if (item.key === 'guardian') return parentContactRecommendations.length > 0;
+        return true;
+      }),
+    [attendanceBoardSummary, metrics, parentContactRecommendations]
+  );
+
+  const todayOperationHeaderSection = metrics ? (
+    <section className="space-y-4 px-1">
+      <div className="flex items-center gap-2">
+        <Activity className="h-5 w-5 text-primary" />
+        <h2 className="text-xl font-black tracking-tighter">오늘 운영 헤더</h2>
+        <Badge className="bg-[#14295F] text-white border-none font-black text-[10px] rounded-full px-2.5">
+          실시간 허브
+        </Badge>
+      </div>
+      <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3')}>
+        <Card className="rounded-[2rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#2754D7_100%)] p-6 text-white shadow-[0_18px_40px_rgba(20,41,95,0.18)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/60">오늘 착석 운영</p>
+              <p className="text-3xl font-black tracking-tight">{metrics.checkedInCount}명</p>
+              <p className="text-xs font-bold text-white/80">
+                착석률 {metrics.seatOccupancy}% · 전체 {metrics.totalStudents}명 기준
+              </p>
+            </div>
+            <div className="rounded-[1.25rem] bg-white/12 p-3">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="rounded-xl bg-white/10 px-3 py-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">미입실·지각</p>
+              <p className="mt-1 text-lg font-black">{attendanceBoardSummary.lateOrAbsentCount}명</p>
+            </div>
+            <div className="rounded-xl bg-white/10 px-3 py-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">외출·복귀</p>
+              <p className="mt-1 text-lg font-black">{attendanceBoardSummary.awayCount + attendanceBoardSummary.returnedCount}건</p>
+            </div>
+            <div className="rounded-xl bg-white/10 px-3 py-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">상담·리드</p>
+              <p className="mt-1 text-lg font-black">{metrics.consultationRequestCount30d}건</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="rounded-[2rem] border-none bg-white p-6 shadow-lg ring-1 ring-black/[0.03]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">오늘 조치 큐</p>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">지금 바로 처리할 일</h3>
+            </div>
+            <AlertTriangle className="h-6 w-6 text-rose-500" />
+          </div>
+          <div className="mt-4 grid gap-2">
+            {todayActionQueue.map((item) => (
+              <div key={item.key} className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('inline-flex h-7 w-7 items-center justify-center rounded-full', item.toneClass)}>
+                        <item.icon className="h-4 w-4" />
+                      </span>
+                      <p className="text-sm font-black text-[#14295F]">{item.title}</p>
+                    </div>
+                    <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
+                  </div>
+                  {item.actionType === 'dialog' ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 rounded-lg px-3 text-[11px] font-black"
+                      onClick={() => setIsParentTrustDialogOpen(true)}
+                    >
+                      {item.actionLabel}
+                    </Button>
+                  ) : (
+                    <Button asChild type="button" size="sm" variant="outline" className="h-8 rounded-lg px-3 text-[11px] font-black">
+                      <Link href={item.href!}>{item.actionLabel}</Link>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="rounded-[2rem] border-none bg-white p-6 shadow-lg ring-1 ring-black/[0.03]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">빠른 실행 존</p>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">자주 여는 작업</h3>
+            </div>
+            <ChevronRight className="h-6 w-6 text-primary" />
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {quickActionLinks.slice(0, 4).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3 transition-all hover:border-primary/25 hover:bg-white hover:shadow-sm"
+              >
+                <div className="flex items-center gap-2">
+                  <item.icon className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-black text-[#14295F]">{item.label}</p>
+                </div>
+                <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">{item.description}</p>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      </div>
+      {centerHealthAxes.length > 0 ? (
+        <Card className="rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-black/[0.03]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">센터 건강도 5축</p>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">이번 운영 흐름을 한 번에 봅니다</h3>
+            </div>
+            <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] rounded-full px-2.5">
+              7일 흐름 포함
+            </Badge>
+          </div>
+          <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-5')}>
+            {centerHealthAxes.map((axis) => (
+              <div key={axis.id} className={cn('rounded-[1.4rem] border p-4 shadow-sm', axis.tone.card)}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-black tracking-tight text-[#14295F]">{axis.label}</p>
+                  <span className={cn('rounded-full px-2 py-1 text-[10px] font-black', axis.tone.badge)}>
+                    {axis.summaryLabel}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-3xl font-black tracking-tight text-[#14295F]">{axis.summaryScore}</p>
+                    <p className="mt-1 text-[11px] font-bold text-slate-500">
+                      최근 추이 {axis.trendLabel} {axis.delta === 0 ? '0' : `${axis.delta > 0 ? '+' : ''}${axis.delta}`}
+                    </p>
+                  </div>
+                  <div className={cn('h-4 w-4 rounded-full shadow-[0_0_0_6px_rgba(255,255,255,0.85)]', axis.tone.dot)} />
+                </div>
+                <p className="mt-3 line-clamp-3 text-[11px] font-semibold leading-5 text-slate-500">{axis.description}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+    </section>
+  ) : null;
+
+  const interventionZoneSection = metrics ? (
+    <section className="space-y-4 px-1">
+      <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1.45fr_0.95fr]')}>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <LayoutGrid className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-black tracking-tighter">실시간 운영 존</h2>
+            <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">
+              도면 + 바로조치
+            </Badge>
+          </div>
+          {attendanceDashboardSection}
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-rose-500" />
+            <h2 className="text-xl font-black tracking-tighter">학생 개입 존</h2>
+            <Badge className="bg-rose-100 text-rose-700 border-none font-black text-[10px] rounded-full px-2.5">
+              우선순위
+            </Badge>
+          </div>
+          <Card className="rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-black/[0.03]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">즉시 개입 학생</p>
+                <p className="mt-1 text-sm font-bold text-slate-500">
+                  히트맵과 출결 신호를 같이 보고 바로 학생 360으로 이동합니다.
+                </p>
+              </div>
+              <Link href="/dashboard/teacher/students" className="text-xs font-black text-primary">
+                전체 학생 보기
+              </Link>
+            </div>
+            <div className="mt-4 space-y-2.5">
+              {urgentInterventionStudents.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8 text-center text-xs font-bold text-slate-500">
+                  현재 즉시 개입이 필요한 학생 신호가 없습니다.
+                </div>
+              ) : (
+                urgentInterventionStudents.map((signal, index) => {
+                  const roomLabel = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '미배정';
+                  return (
+                    <button
+                      key={`${signal.studentId}-${signal.seatId}`}
+                      type="button"
+                      onClick={() => setSelectedFocusStudentId(signal.studentId)}
+                      className="grid w-full grid-cols-[28px_1fr_auto] items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3 text-left transition-all hover:border-primary/20 hover:bg-white hover:shadow-sm"
+                    >
+                      <span className="text-xs font-black text-slate-400">{index + 1}</span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-black text-[#14295F]">{signal.studentName}</p>
+                          {signal.className ? (
+                            <Badge className="h-5 rounded-full border-none bg-slate-100 px-2 text-[10px] font-black text-slate-700">
+                              {signal.className}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 truncate text-[11px] font-bold text-slate-500">
+                          {roomLabel} · {signal.attendanceStatus} · {signal.topReason}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-rose-600">{signal.compositeHealth}점</p>
+                        <p className="text-[10px] font-bold text-slate-400">{signal.weeklyStudyLabel}</p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </Card>
+
+          <Card className="rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-black/[0.03]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">빠른 드릴다운</p>
+                <p className="mt-1 text-sm font-bold text-slate-500">도메인별 워크벤치로 바로 이동합니다.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2">
+              {quickActionLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3 transition-all hover:border-primary/20 hover:bg-white hover:shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <item.icon className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-black text-[#14295F]">{item.label}</p>
+                      <p className="text-[11px] font-bold text-slate-500">{item.description}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                </Link>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+    </section>
+  ) : null;
+
   const attendanceDashboardSection = (
     <section className="space-y-4 px-1">
       <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
@@ -1661,7 +2061,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className={cn("flex flex-col gap-8 w-full max-w-[1400px] mx-auto", isMobile ? "px-1" : "px-4 py-6")}>
-      <header className={cn("flex justify-between items-end", isMobile ? "flex-col items-start gap-6" : "")}>
+      <header className={cn("sticky top-3 z-20 flex justify-between items-end rounded-[2rem] border border-white/70 bg-white/80 px-4 py-4 shadow-xl backdrop-blur-xl", isMobile ? "flex-col items-start gap-6" : "")}>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-primary/60">
             <Sparkles className="h-4 w-4" />
@@ -1694,10 +2094,23 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       {metrics ? (
         <>
+          {todayOperationHeaderSection}
+
+          {interventionZoneSection}
+
+          <section className="space-y-4 px-1">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-black tracking-tighter">운영 분석 존</h2>
+              <Badge className="bg-emerald-600 text-white border-none font-black text-[10px] rounded-full px-2.5">그래프 중심</Badge>
+            </div>
+            {heatmapGraphSection}
+          </section>
+
           <section className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <Activity className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-black tracking-tighter">집중 학생 랭킹</h2>
+              <h2 className="text-xl font-black tracking-tighter">학생 개입 랭킹</h2>
               <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">실시간 추적</Badge>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
@@ -1778,14 +2191,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             </div>
           </section>
 
-          {attendanceDashboardSection}
-
-          {heatmapGraphSection}
-
           <section className="space-y-4 px-1">
             <div className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-black tracking-tighter">{'\uC8FC\uAC04 \uD559\uC2B5\uC2DC\uAC04 \uB7AD\uD0B9'}</h2>
+              <h2 className="text-xl font-black tracking-tighter">집중 / 반응 랭킹 존</h2>
               <Badge className="bg-[#14295F] text-white border-none font-black text-[10px] rounded-full px-2.5">Top / Bottom 10</Badge>
             </div>
           
@@ -1851,73 +2260,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </Card>
             </div>
           </section>
-          <section className="space-y-4 px-1">
+          <section className="pb-10 px-1 space-y-4">
             <div className="flex items-center gap-2">
-              <Megaphone className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-black tracking-tighter">학부모 공지사항 관리</h2>
+              <HeartHandshake className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-black tracking-tighter">학부모 반응 / 신뢰 존</h2>
             </div>
-
-            <Card className="rounded-[2rem] border-none bg-white p-6 shadow-lg ring-1 ring-black/[0.03]">
-              <div className="grid gap-3">
-                <Input
-                  value={noticeTitle}
-                  onChange={(event) => setNoticeTitle(event.target.value)}
-                  placeholder="공지 제목"
-                  className="h-11 rounded-xl border-slate-200 font-bold"
-                />
-                <Select value={noticeAudience} onValueChange={(value) => setNoticeAudience(value as 'parent' | 'student' | 'all')}>
-                  <SelectTrigger className="h-11 rounded-xl border-slate-200 font-bold">
-                    <SelectValue placeholder="공지 대상 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="parent">학부모 공지</SelectItem>
-                    <SelectItem value="student">학생 공지</SelectItem>
-                    <SelectItem value="all">학생 + 학부모 공지</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Textarea
-                  value={noticeBody}
-                  onChange={(event) => setNoticeBody(event.target.value)}
-                  placeholder="학부모에게 전달할 공지 내용을 입력하세요."
-                  className="min-h-[110px] rounded-xl border-slate-200 font-bold"
-                />
-                <Button
-                  type="button"
-                  className="h-11 rounded-xl bg-[#14295F] text-white font-black"
-                  onClick={handleCreateAnnouncement}
-                  disabled={isNoticeSubmitting}
-                >
-                  {isNoticeSubmitting ? '등록 중...' : '공지사항 등록'}
-                </Button>
-              </div>
-
-              <div className="mt-5 space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 등록 공지</p>
-                {(centerAnnouncements || []).length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-xs font-bold text-slate-400">
-                    등록된 공지사항이 없습니다.
-                  </div>
-                ) : (
-                  (centerAnnouncements || []).slice(0, 5).map((item: any) => {
-                    const createdAt = item.createdAt?.toDate?.();
-                    return (
-                      <div key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
-                        <p className="text-sm font-black text-[#14295F]">{item.title || '제목 없음'}</p>
-                        <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600">{item.body || '내용 없음'}</p>
-                        <p className="mt-1 text-[10px] font-black text-slate-500">
-                          대상: {item.audience === 'student' ? '학생' : item.audience === 'all' ? '전체' : '학부모'}
-                        </p>
-                        <p className="mt-1 text-[10px] font-black text-slate-400">
-                          {createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '방금 전 등록'}
-                        </p>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </Card>
-          </section>
-          <section className="pb-10 px-1">
             <Card
               className="rounded-[3rem] border-none shadow-2xl bg-white p-10 overflow-hidden relative group ring-1 ring-black/[0.03] cursor-pointer"
               role="button"
@@ -2031,76 +2378,151 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           </section>
 
           <section className="pb-10 px-1 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <UserCog className="h-5 w-5 text-primary" />
-                <h2 className="text-xl font-black tracking-tighter">선생님 계정 관리</h2>
-              </div>
-              <Badge className="bg-slate-900 text-white border-none font-black text-[10px] px-3 py-1">
-                {teacherRows.length}명
-              </Badge>
+            <div className="flex items-center gap-2">
+              <UserCog className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-black tracking-tighter">운영 지원 존</h2>
             </div>
-
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white ring-1 ring-black/[0.03]">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-black tracking-tight">선생님 활동 요약</CardTitle>
-                <CardDescription className="font-bold text-xs">
-                  상담일지 작성 건수와 발송 리포트를 함께 확인하고 계정을 관리할 수 있습니다.
-                </CardDescription>
-                <div className="pt-2">
-                  <Input
-                    value={teacherSearch}
-                    onChange={(event) => setTeacherSearch(event.target.value)}
-                    placeholder="선생님 이름/전화번호/사용자번호 검색"
-                    className="h-11 rounded-xl border-2 font-bold"
-                  />
+            <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1fr_1.08fr]')}>
+              <section className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Megaphone className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-black tracking-tight">학부모 공지사항 관리</h3>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {filteredTeacherRows.length === 0 ? (
-                  <div className="rounded-xl border border-dashed py-10 text-center text-sm font-bold text-muted-foreground">
-                    조회된 선생님 계정이 없습니다.
+
+                <Card className="rounded-[2rem] border-none bg-white p-6 shadow-lg ring-1 ring-black/[0.03]">
+                  <div className="grid gap-3">
+                    <Input
+                      value={noticeTitle}
+                      onChange={(event) => setNoticeTitle(event.target.value)}
+                      placeholder="공지 제목"
+                      className="h-11 rounded-xl border-slate-200 font-bold"
+                    />
+                    <Select value={noticeAudience} onValueChange={(value) => setNoticeAudience(value as 'parent' | 'student' | 'all')}>
+                      <SelectTrigger className="h-11 rounded-xl border-slate-200 font-bold">
+                        <SelectValue placeholder="공지 대상 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="parent">학부모 공지</SelectItem>
+                        <SelectItem value="student">학생 공지</SelectItem>
+                        <SelectItem value="all">학생 + 학부모 공지</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Textarea
+                      value={noticeBody}
+                      onChange={(event) => setNoticeBody(event.target.value)}
+                      placeholder="학부모에게 전달할 공지 내용을 입력하세요."
+                      className="min-h-[110px] rounded-xl border-slate-200 font-bold"
+                    />
+                    <Button
+                      type="button"
+                      className="h-11 rounded-xl bg-[#14295F] text-white font-black"
+                      onClick={handleCreateAnnouncement}
+                      disabled={isNoticeSubmitting}
+                    >
+                      {isNoticeSubmitting ? '등록 중...' : '공지사항 등록'}
+                    </Button>
                   </div>
-                ) : (
-                  filteredTeacherRows.map((teacher) => (
-                    <div key={teacher.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-900 truncate">{teacher.teacherName}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-500">
-                            <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" /> {teacher.phoneNumber || '전화번호 미등록'}</span>
-                            <span>·</span>
-                            <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" /> 상담일지 {teacher.logs.length}건</span>
-                            <span>·</span>
-                            <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" /> 발송 리포트 {teacher.sentReports.length}건</span>
+
+                  <div className="mt-5 space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">최근 등록 공지</p>
+                    {(centerAnnouncements || []).length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-xs font-bold text-slate-400">
+                        등록된 공지사항이 없습니다.
+                      </div>
+                    ) : (
+                      (centerAnnouncements || []).slice(0, 5).map((item: any) => {
+                        const createdAt = item.createdAt?.toDate?.();
+                        return (
+                          <div key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
+                            <p className="text-sm font-black text-[#14295F]">{item.title || '제목 없음'}</p>
+                            <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600">{item.body || '내용 없음'}</p>
+                            <p className="mt-1 text-[10px] font-black text-slate-500">
+                              대상: {item.audience === 'student' ? '학생' : item.audience === 'all' ? '전체' : '학부모'}
+                            </p>
+                            <p className="mt-1 text-[10px] font-black text-slate-400">
+                              {createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '방금 전 등록'}
+                            </p>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </Card>
+              </section>
+
+              <section className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <UserCog className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-black tracking-tight">선생님 계정 관리</h3>
+                  </div>
+                  <Badge className="bg-slate-900 text-white border-none font-black text-[10px] px-3 py-1">
+                    {teacherRows.length}명
+                  </Badge>
+                </div>
+
+                <Card className="rounded-[2rem] border-none shadow-lg bg-white ring-1 ring-black/[0.03]">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-black tracking-tight">선생님 활동 요약</CardTitle>
+                    <CardDescription className="font-bold text-xs">
+                      상담일지 작성 건수와 발송 리포트를 함께 확인하고 계정을 관리할 수 있습니다.
+                    </CardDescription>
+                    <div className="pt-2">
+                      <Input
+                        value={teacherSearch}
+                        onChange={(event) => setTeacherSearch(event.target.value)}
+                        placeholder="선생님 이름/전화번호/사용자번호 검색"
+                        className="h-11 rounded-xl border-2 font-bold"
+                      />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {filteredTeacherRows.length === 0 ? (
+                      <div className="rounded-xl border border-dashed py-10 text-center text-sm font-bold text-muted-foreground">
+                        조회된 선생님 계정이 없습니다.
+                      </div>
+                    ) : (
+                      filteredTeacherRows.map((teacher) => (
+                        <div key={teacher.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-black text-slate-900 truncate">{teacher.teacherName}</p>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                                <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" /> {teacher.phoneNumber || '전화번호 미등록'}</span>
+                                <span>·</span>
+                                <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" /> 상담일지 {teacher.logs.length}건</span>
+                                <span>·</span>
+                                <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" /> 발송 리포트 {teacher.sentReports.length}건</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 rounded-xl font-black text-xs"
+                                onClick={() => setSelectedTeacherId(teacher.id)}
+                              >
+                                상세 보기
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-9 rounded-xl font-black text-xs gap-1.5"
+                                onClick={() => void handleDeleteTeacher({ id: teacher.id, teacherName: teacher.teacherName })}
+                                disabled={deletingTeacherId === teacher.id}
+                              >
+                                {deletingTeacherId === teacher.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
+                                삭제
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-9 rounded-xl font-black text-xs"
-                            onClick={() => setSelectedTeacherId(teacher.id)}
-                          >
-                            상세 보기
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="h-9 rounded-xl font-black text-xs gap-1.5"
-                            onClick={() => void handleDeleteTeacher({ id: teacher.id, teacherName: teacher.teacherName })}
-                            disabled={deletingTeacherId === teacher.id}
-                          >
-                            {deletingTeacherId === teacher.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
-                            삭제
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </section>
+            </div>
           </section>
         </>
       ) : (

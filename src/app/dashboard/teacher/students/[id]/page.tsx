@@ -35,7 +35,6 @@ import {
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
 import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
-import { Student360OverviewDashboard } from '@/components/dashboard/student-360-overview-dashboard';
 
 const STAT_CONFIG = {
   focus: { label: '집중력', sub: '집중', icon: Target, color: 'text-blue-500', accent: 'bg-blue-50', guide: '몰입 시간을 안정적으로 확보하면 상승합니다.' },
@@ -54,109 +53,21 @@ type DailyStatSnapshot = {
   endHour?: number;
   awayMinutes?: number;
 };
-type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number; personalCount: number };
-type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
-type Student360Tab = 'overview' | 'learning' | 'attendance' | 'guardian' | 'reports' | 'risk' | 'billing' | 'raw';
-type Student360Domain = 'learning' | 'attendance' | 'risk' | 'guardian' | 'reports' | 'sms' | 'billing';
-type Student360DomainCard = {
-  key: Student360Domain;
-  title: string;
-  value: string;
-  subValue: string;
-  icon: any;
-  colorClass: string;
-  tab: Student360Tab;
-  progress: number;
-  detailTitle: string;
-  detailBody: string;
-  action: string;
-};
-type AttendanceHistoryRecord = {
-  id: string;
-  dateKey: string;
-  status?: string;
-  displayState?: string;
-  expectedArrivalTime?: string | null;
-  lateMinutes?: number;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
-  checkedInAt?: Timestamp;
-  checkedOutAt?: Timestamp;
-  reason?: string;
-};
-type AttendanceDailyStatRecord = {
-  id: string;
-  dateKey: string;
-  attendanceStatus?: string;
-  checkInAt?: Timestamp;
-  checkOutAt?: Timestamp;
-  lateMinutes?: number;
-  awayMinutes?: number;
-  awayCount?: number;
-  hasCheckOutRecord?: boolean;
-  requestType?: AttendanceRequest['type'];
-  requestStatus?: AttendanceRequest['status'];
-  expectedArrivalTime?: string | null;
-  updatedAt?: Timestamp;
-};
-type AttendanceEventRecord = {
+type SmsDeliveryLogLite = {
   id: string;
   studentId?: string;
-  dateKey?: string;
   eventType?: string;
-  occurredAt?: Timestamp;
-  createdAt?: Timestamp;
-  statusBefore?: string;
-  statusAfter?: string;
-};
-type ParentCommunicationRecord = {
-  id: string;
-  studentId?: string;
-  parentUid?: string;
-  parentName?: string;
-  senderRole?: 'parent' | 'student';
-  senderUid?: string;
-  senderName?: string;
-  type?: string;
-  title?: string;
-  message?: string;
   status?: string;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
-};
-type SmsRecipientPreferenceDoc = {
-  id: string;
-  studentId: string;
-  studentName?: string;
-  parentUid: string;
-  parentName?: string;
-  phoneNumber?: string;
-  enabled?: boolean;
-  eventToggles?: Partial<Record<'study_start' | 'away_start' | 'away_end' | 'study_end' | 'late_alert' | 'weekly_report', boolean>>;
-  updatedAt?: Timestamp;
-};
-type SmsDeliveryLogRow = {
-  id: string;
-  queueId?: string;
-  studentId?: string;
-  studentName?: string;
-  parentUid?: string;
-  parentName?: string;
-  phoneNumber?: string;
-  eventType?: string;
-  renderedMessage?: string;
-  messageBytes?: number;
-  provider?: string;
-  attemptNo?: number;
-  status?: 'sent' | 'failed' | 'suppressed_opt_out' | string;
-  dateKey?: string;
   createdAt?: Timestamp;
   sentAt?: Timestamp;
   failedAt?: Timestamp;
-  errorCode?: string;
-  errorMessage?: string;
-  suppressedReason?: string;
+  renderedMessage?: string;
+  phoneNumber?: string;
+  parentName?: string;
+  parentUid?: string;
 };
+type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number; personalCount: number };
+type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
 const STATUS_LABEL: Record<CounselingReservation['status'], string> = {
   requested: '요청',
   confirmed: '확정',
@@ -253,154 +164,6 @@ function toTime(value?: Timestamp): number {
   } catch {
     return 0;
   }
-}
-
-function toDateSafe(value?: unknown): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate?: () => Date }).toDate === 'function') {
-    try {
-      return (value as { toDate: () => Date }).toDate();
-    } catch {
-      return null;
-    }
-  }
-  const parsed = new Date(value as string);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
-function formatDateTimeLabel(value?: unknown, fallback = '-'): string {
-  const date = toDateSafe(value);
-  return date ? format(date, 'M월 d일 HH:mm', { locale: ko }) : fallback;
-}
-
-function formatDateLabel(value?: unknown, fallback = '-'): string {
-  const date = toDateSafe(value);
-  return date ? format(date, 'M월 d일', { locale: ko }) : fallback;
-}
-
-function statusToLabel(status?: string | null) {
-  switch (status) {
-    case 'studying':
-      return '공부중';
-    case 'away':
-      return '외출';
-    case 'break':
-      return '휴식';
-    case 'absent':
-      return '미입실/퇴실';
-    default:
-      return '확인중';
-  }
-}
-
-function attendanceRecordLabel(status?: string | null) {
-  const normalized = String(status || '').toLowerCase();
-  if (!normalized) return '기록 없음';
-  if (normalized.includes('late')) return '지각';
-  if (normalized.includes('excused')) return '사유결석';
-  if (normalized.includes('absent')) return '결석';
-  if (normalized.includes('missing_routine')) return '루틴 누락';
-  if (normalized.includes('present')) return '출석';
-  if (normalized.includes('study')) return '공부중';
-  if (normalized.includes('away')) return '외출';
-  return status || '기록 없음';
-}
-
-function attendanceTone(status?: string | null) {
-  const normalized = String(status || '').toLowerCase();
-  if (!normalized) {
-    return {
-      label: '기록없음',
-      chipClass: 'border-slate-200 bg-slate-100 text-slate-500',
-      stripClass: 'bg-slate-100 border-slate-200/80',
-    };
-  }
-  if (normalized.includes('late')) {
-    return {
-      label: '지각',
-      chipClass: 'border-amber-200 bg-amber-50 text-amber-700',
-      stripClass: 'bg-amber-100 border-amber-200/80',
-    };
-  }
-  if (normalized.includes('excused')) {
-    return {
-      label: '사유결석',
-      chipClass: 'border-slate-200 bg-slate-100 text-slate-600',
-      stripClass: 'bg-slate-200 border-slate-300/80',
-    };
-  }
-  if (normalized.includes('absent')) {
-    return {
-      label: '결석',
-      chipClass: 'border-rose-200 bg-rose-50 text-rose-700',
-      stripClass: 'bg-rose-200 border-rose-300/80',
-    };
-  }
-  if (normalized.includes('missing_routine')) {
-    return {
-      label: '루틴누락',
-      chipClass: 'border-orange-200 bg-orange-50 text-orange-700',
-      stripClass: 'bg-orange-200 border-orange-300/80',
-    };
-  }
-  if (normalized.includes('away') || normalized.includes('break')) {
-    return {
-      label: '외출',
-      chipClass: 'border-yellow-200 bg-yellow-50 text-yellow-700',
-      stripClass: 'bg-yellow-200 border-yellow-300/80',
-    };
-  }
-  if (normalized.includes('present') || normalized.includes('study')) {
-    return {
-      label: '출석',
-      chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      stripClass: 'bg-emerald-200 border-emerald-300/80',
-    };
-  }
-  return {
-    label: attendanceRecordLabel(status),
-    chipClass: 'border-blue-200 bg-blue-50 text-blue-700',
-    stripClass: 'bg-blue-100 border-blue-200/80',
-  };
-}
-
-function buildDateCountMap<T>(
-  rows: T[],
-  getDateValue: (row: T) => unknown,
-  getValue: (row: T) => number = () => 1
-) {
-  const map: Record<string, number> = {};
-  rows.forEach((row) => {
-    const date = toDateSafe(getDateValue(row));
-    if (!date) return;
-    const dateKey = format(date, 'yyyy-MM-dd');
-    map[dateKey] = (map[dateKey] || 0) + Math.max(0, getValue(row));
-  });
-  return map;
-}
-
-function invoiceStatusLabel(status?: Invoice['status']) {
-  switch (status) {
-    case 'paid':
-      return '수납완료';
-    case 'issued':
-      return '청구됨';
-    case 'overdue':
-      return '미수금';
-    case 'refunded':
-      return '환불';
-    case 'void':
-      return '무효';
-    default:
-      return '수납 확인중';
-  }
-}
-
-function byteValueLabel(value: number, suffix: string) {
-  if (!Number.isFinite(value)) return `0${suffix}`;
-  return `${Math.max(0, Math.round(value))}${suffix}`;
 }
 function normalizeParentLinkCode(value: unknown): string {
   if (typeof value === 'string') {
@@ -638,7 +401,6 @@ function StatAnalysisCard({
     </Card>
   );
 }
-
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: studentId } = use(params);
   const presentationMode = useStudentDetailPresentationMode();
@@ -656,16 +418,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const todayKey = format(today, 'yyyy-MM-dd');
   const periodKey = format(today, 'yyyy-MM');
 
-  const isStudentSelfView = activeMembership?.role === 'student';
   const isAdmin = activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
-  const canViewBilling = isAdmin && !isStudentSelfView;
+  const isStudentSelfView = activeMembership?.role === 'student';
   const canEditStudentInfo = !isStudentSelfView && (isAdmin || activeMembership?.role === 'teacher');
   const canEditGrowthData = !isStudentSelfView && isAdmin;
   const canWriteCounseling = !isStudentSelfView && canEditStudentInfo;
   const backHref = isStudentSelfView ? '/dashboard/analysis' : '/dashboard/teacher/students';
 
-  const [activeTab, setActiveTab] = useState<Student360Tab>('overview');
-  const [selectedDomain, setSelectedDomain] = useState<Student360Domain>('learning');
+  const [activeTab, setActiveTab] = useState<'overview' | 'counseling' | 'plans'>('overview');
   const [focusedChartView, setFocusedChartView] = useState<ChartRangeKey>('weekly');
 
   const [isMasteryModalOpen, setIsMasteryModalOpen] = useState(false);
@@ -714,15 +474,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [statsLoading, setStatsLoading] = useState(false);
   const [planItems, setPlanItems] = useState<WithId<StudyPlanItem>[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
-  const [attendanceHistoryRows, setAttendanceHistoryRows] = useState<AttendanceHistoryRecord[]>([]);
-  const [attendanceDailyStatRows, setAttendanceDailyStatRows] = useState<AttendanceDailyStatRecord[]>([]);
-  const [attendanceWindowLoading, setAttendanceWindowLoading] = useState(false);
-
-  useEffect(() => {
-    if (isStudentSelfView && !['learning', 'guardian'].includes(activeTab)) {
-      setActiveTab('learning');
-    }
-  }, [activeTab, isStudentSelfView]);
 
   const studentRef = useMemoFirebase(() => (!firestore || !centerId ? null : doc(firestore, 'centers', centerId, 'students', studentId)), [firestore, centerId, studentId]);
   const { data: student, isLoading: studentLoading } = useDoc<StudentProfile>(studentRef);
@@ -758,32 +509,41 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const reservationsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'counselingReservations'), orderBy('scheduledAt', 'desc'), limit(200))), [firestore, centerId]);
   const { data: reservationsRaw, isLoading: reservationLoading } = useCollection<CounselingReservation>(reservationsQuery, { enabled: !!centerId });
 
-  const dailyReportsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'dailyReports'), where('studentId', '==', studentId), limit(120))), [firestore, centerId, studentId]);
+  const dailyReportsQuery = useMemoFirebase(
+    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'dailyReports'), where('studentId', '==', studentId), limit(120))),
+    [firestore, centerId, studentId]
+  );
   const { data: dailyReportsRaw } = useCollection<DailyReport>(dailyReportsQuery, { enabled: !!centerId });
 
-  const attendanceRequestsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'attendanceRequests'), where('studentId', '==', studentId), limit(120))), [firestore, centerId, studentId]);
-  const { data: attendanceRequestsRaw } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: !!centerId });
+  const parentActivityQuery = useMemoFirebase(
+    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'parentActivityEvents'), where('studentId', '==', studentId), limit(240))),
+    [firestore, centerId, studentId]
+  );
+  const { data: parentActivityRaw } = useCollection<ParentActivityEvent>(parentActivityQuery, { enabled: !!centerId });
 
-  const attendanceEventsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'attendanceEvents'), where('studentId', '==', studentId), limit(200))), [firestore, centerId, studentId]);
-  const { data: attendanceEventsRaw } = useCollection<AttendanceEventRecord>(attendanceEventsQuery, { enabled: !!centerId });
+  const smsDeliveryLogsQuery = useMemoFirebase(
+    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), where('studentId', '==', studentId), limit(240))),
+    [firestore, centerId, studentId]
+  );
+  const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogLite>(smsDeliveryLogsQuery, { enabled: !!centerId });
 
-  const penaltyLogsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(120))), [firestore, centerId, studentId]);
+  const penaltyLogsQuery = useMemoFirebase(
+    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(120))),
+    [firestore, centerId, studentId]
+  );
   const { data: penaltyLogsRaw } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: !!centerId });
 
-  const parentActivityEventsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'parentActivityEvents'), where('studentId', '==', studentId), limit(200))), [firestore, centerId, studentId]);
-  const { data: parentActivityEventsRaw } = useCollection<ParentActivityEvent>(parentActivityEventsQuery, { enabled: !!centerId });
+  const attendanceRequestsQuery = useMemoFirebase(
+    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'attendanceRequests'), where('studentId', '==', studentId), limit(120))),
+    [firestore, centerId, studentId]
+  );
+  const { data: attendanceRequestsRaw } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: !!centerId });
 
-  const parentCommunicationsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'parentCommunications'), where('studentId', '==', studentId), limit(200))), [firestore, centerId, studentId]);
-  const { data: parentCommunicationsRaw } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, { enabled: !!centerId });
-
-  const smsDeliveryLogsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), where('studentId', '==', studentId), limit(200))), [firestore, centerId, studentId]);
-  const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(smsDeliveryLogsQuery, { enabled: !!centerId });
-
-  const smsRecipientPreferencesQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'smsRecipientPreferences'), where('studentId', '==', studentId), limit(50))), [firestore, centerId, studentId]);
-  const { data: smsRecipientPreferencesRaw } = useCollection<SmsRecipientPreferenceDoc>(smsRecipientPreferencesQuery, { enabled: !!centerId });
-
-  const invoicesQuery = useMemoFirebase(() => (!firestore || !centerId || !canViewBilling ? null : query(collection(firestore, 'centers', centerId, 'invoices'), where('studentId', '==', studentId), limit(50))), [firestore, centerId, studentId, canViewBilling]);
-  const { data: invoicesRaw } = useCollection<Invoice>(invoicesQuery, { enabled: !!centerId && canViewBilling });
+  const invoicesQuery = useMemoFirebase(
+    () => (!firestore || !centerId || !isAdmin ? null : query(collection(firestore, 'centers', centerId, 'invoices'), where('studentId', '==', studentId), limit(120))),
+    [firestore, centerId, studentId, isAdmin]
+  );
+  const { data: invoicesRaw } = useCollection<Invoice>(invoicesQuery, { enabled: !!centerId && isAdmin });
 
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
@@ -994,67 +754,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     };
   }, [firestore, centerId, studentId, todayKey]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchAttendanceWindow = async () => {
-      if (!firestore || !centerId || !studentId) {
-        setAttendanceHistoryRows([]);
-        setAttendanceDailyStatRows([]);
-        setAttendanceWindowLoading(false);
-        return;
-      }
-
-      setAttendanceWindowLoading(true);
-      try {
-        const dateKeys = Array.from({ length: 30 }, (_, index) => format(subDays(today, index), 'yyyy-MM-dd'));
-        const snapshots = await Promise.all(
-          dateKeys.map(async (dateKey) => {
-            const [historySnap, statSnap] = await Promise.all([
-              getDoc(doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId)),
-              getDoc(doc(firestore, 'centers', centerId, 'attendanceDailyStats', dateKey, 'students', studentId)),
-            ]);
-
-            return {
-              dateKey,
-              history: historySnap.exists() ? ({ id: historySnap.id, dateKey, ...(historySnap.data() as Omit<AttendanceHistoryRecord, 'id' | 'dateKey'>) }) : null,
-              dailyStat: statSnap.exists() ? ({ id: statSnap.id, dateKey, ...(statSnap.data() as Omit<AttendanceDailyStatRecord, 'id' | 'dateKey'>) }) : null,
-            };
-          })
-        );
-
-        if (cancelled) return;
-
-        setAttendanceHistoryRows(
-          snapshots
-            .map((row) => row.history)
-            .filter((row): row is AttendanceHistoryRecord => Boolean(row))
-            .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
-        );
-        setAttendanceDailyStatRows(
-          snapshots
-            .map((row) => row.dailyStat)
-            .filter((row): row is AttendanceDailyStatRecord => Boolean(row))
-            .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
-        );
-      } catch (error) {
-        console.error('[Student360] Failed to load attendance window:', error);
-        if (!cancelled) {
-          setAttendanceHistoryRows([]);
-          setAttendanceDailyStatRows([]);
-        }
-      } finally {
-        if (!cancelled) setAttendanceWindowLoading(false);
-      }
-    };
-
-    fetchAttendanceWindow();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [firestore, centerId, studentId, todayKey]);
-
   const studentCounselingLogs = useMemo(() => {
     return (counselingLogsRaw || []).filter((log) => log.studentId === studentId).sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
   }, [counselingLogsRaw, studentId]);
@@ -1068,60 +767,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const studentReservations = useMemo(() => {
     return (reservationsRaw || []).filter((reservation) => reservation.studentId === studentId).sort((a, b) => toTime(b.scheduledAt) - toTime(a.scheduledAt));
   }, [reservationsRaw, studentId]);
-  const studentDailyReports = useMemo(() => {
-    return (dailyReportsRaw || [])
-      .slice()
-      .sort((a, b) => {
-        const left = a.dateKey || '';
-        const right = b.dateKey || '';
-        if (left !== right) return right.localeCompare(left);
-        return toTime((b as unknown as { updatedAt?: Timestamp; createdAt?: Timestamp }).updatedAt || (b as unknown as { createdAt?: Timestamp }).createdAt) - toTime((a as unknown as { updatedAt?: Timestamp; createdAt?: Timestamp }).updatedAt || (a as unknown as { createdAt?: Timestamp }).createdAt);
-      });
-  }, [dailyReportsRaw]);
-  const studentAttendanceRequests = useMemo(() => {
-    return (attendanceRequestsRaw || []).slice().sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
-  }, [attendanceRequestsRaw]);
-  const studentAttendanceEvents = useMemo(() => {
-    return (attendanceEventsRaw || [])
-      .slice()
-      .sort((a, b) => {
-        const left = toDateSafe(b.occurredAt || b.createdAt)?.getTime() || 0;
-        const right = toDateSafe(a.occurredAt || a.createdAt)?.getTime() || 0;
-        return left - right;
-      });
-  }, [attendanceEventsRaw]);
-  const studentPenaltyLogs = useMemo(() => {
-    return (penaltyLogsRaw || []).slice().sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
-  }, [penaltyLogsRaw]);
-  const studentParentActivityEvents = useMemo(() => {
-    return (parentActivityEventsRaw || []).slice().sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
-  }, [parentActivityEventsRaw]);
-  const studentParentCommunications = useMemo(() => {
-    return (parentCommunicationsRaw || [])
-      .slice()
-      .sort((a, b) => {
-        const left = toDateSafe(b.updatedAt || b.createdAt)?.getTime() || 0;
-        const right = toDateSafe(a.updatedAt || a.createdAt)?.getTime() || 0;
-        return left - right;
-      });
-  }, [parentCommunicationsRaw]);
-  const studentSmsDeliveryLogs = useMemo(() => {
-    return (smsDeliveryLogsRaw || [])
-      .slice()
-      .sort((a, b) => {
-        const left = toDateSafe(b.sentAt || b.failedAt || b.createdAt)?.getTime() || 0;
-        const right = toDateSafe(a.sentAt || a.failedAt || a.createdAt)?.getTime() || 0;
-        return left - right;
-      });
-  }, [smsDeliveryLogsRaw]);
-  const studentSmsRecipientPreferences = useMemo(() => {
-    return (smsRecipientPreferencesRaw || [])
-      .slice()
-      .sort((a, b) => (a.parentName || a.studentName || '').localeCompare(b.parentName || b.studentName || ''));
-  }, [smsRecipientPreferencesRaw]);
-  const studentInvoices = useMemo(() => {
-    return (invoicesRaw || []).slice().sort((a, b) => toTime(b.paidAt || b.updatedAt || b.issuedAt) - toTime(a.paidAt || a.updatedAt || a.issuedAt));
-  }, [invoicesRaw]);
   const reservationQuestionById = useMemo(() => {
     const map = new Map<string, string>();
     studentReservations.forEach((reservation) => {
@@ -1541,495 +1186,172 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return result;
   }, [focusedChartView, avgStudyMinutes, avgCompletionRate, rhythmScore]);
 
-  const attendanceRate30d = useMemo(() => {
-    const sourceRows = attendanceDailyStatRows.length ? attendanceDailyStatRows : attendanceHistoryRows;
-    const eligibleRows = sourceRows.filter((row) => Boolean(
-      (row as AttendanceDailyStatRecord).attendanceStatus ||
-      (row as AttendanceHistoryRecord).status ||
-      (row as AttendanceHistoryRecord).displayState ||
-      row.expectedArrivalTime
-    ));
-    if (!eligibleRows.length) return 0;
-    const presentCount = eligibleRows.filter((row) => {
-      const status = ((row as AttendanceDailyStatRecord).attendanceStatus || (row as AttendanceHistoryRecord).displayState || (row as AttendanceHistoryRecord).status || '').toLowerCase();
-      return status.includes('present') || status.includes('study') || status.includes('late');
-    }).length;
-    return Math.round((presentCount / eligibleRows.length) * 100);
-  }, [attendanceDailyStatRows, attendanceHistoryRows]);
-
-  const attendanceLateCount30d = useMemo(() => {
-    return attendanceDailyStatRows.filter((row) => {
-      const status = String(row.attendanceStatus || '').toLowerCase();
-      return (row.lateMinutes || 0) > 0 || status.includes('late');
-    }).length;
-  }, [attendanceDailyStatRows]);
-
-  const attendanceAwayCount30d = useMemo(() => {
-    return attendanceDailyStatRows.reduce((sum, row) => sum + Math.max(0, Math.round(row.awayCount || 0)), 0);
-  }, [attendanceDailyStatRows]);
-
-  const avgAwayMinutes30d = useMemo(() => {
-    const values = attendanceDailyStatRows.map((row) => Number(row.awayMinutes || 0)).filter((value) => value > 0);
-    if (!values.length) return 0;
-    return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
-  }, [attendanceDailyStatRows]);
-
-  const checkOutStability30d = useMemo(() => {
-    const relevantRows = attendanceDailyStatRows.filter((row) => row.checkInAt || row.attendanceStatus);
-    if (!relevantRows.length) return 0;
-    const checkedOutRows = relevantRows.filter((row) => row.hasCheckOutRecord || row.checkOutAt);
-    return Math.round((checkedOutRows.length / relevantRows.length) * 100);
-  }, [attendanceDailyStatRows]);
-
-  const routineMissingCount30d = useMemo(() => {
-    return attendanceHistoryRows.filter((row) => {
-      const status = String(row.displayState || row.status || '').toLowerCase();
-      return status.includes('missing_routine');
-    }).length;
-  }, [attendanceHistoryRows]);
-
-  const latestCounselingAt = studentCounselingLogs[0]?.createdAt;
-  const latestReservationAt = studentReservations[0]?.scheduledAt;
-  const latestReport = studentDailyReports[0];
-  const latestPenaltyLog = studentPenaltyLogs[0];
-  const latestInvoice = studentInvoices[0];
-  const latestSmsLog = studentSmsDeliveryLogs[0];
-  const todayStudyMinutes = focusKpi.todayMinutes;
-  const guardianVisitCount30d = useMemo(() => studentParentActivityEvents.filter((item) => item.eventType === 'app_visit').length, [studentParentActivityEvents]);
-  const reportReadCount30d = useMemo(() => studentParentActivityEvents.filter((item) => item.eventType === 'report_read').length, [studentParentActivityEvents]);
-  const guardianConsultingResponses30d = useMemo(
-    () => studentParentCommunications.filter((item) => (item.senderRole || '').toLowerCase() === 'parent').length,
-    [studentParentCommunications]
+  const days30AgoMs = subDays(today, 30).getTime();
+  const studentDailyReports = useMemo(
+    () => [...(dailyReportsRaw || [])].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt)),
+    [dailyReportsRaw]
   );
-  const enabledSmsRecipients = useMemo(
-    () => studentSmsRecipientPreferences.filter((item) => item.enabled !== false && Boolean(item.phoneNumber)).length,
-    [studentSmsRecipientPreferences]
-  );
-  const latestInvoicePaymentDate = latestInvoice?.paidAt || latestInvoice?.updatedAt || latestInvoice?.issuedAt;
-  const parentLinkCount = useMemo(() => {
-    const linked = new Set([...(student?.parentUids || []), ...studentSmsRecipientPreferences.map((item) => item.parentUid).filter(Boolean)]);
-    linked.delete('__student__');
-    return linked.size;
-  }, [student?.parentUids, studentSmsRecipientPreferences]);
-  const guardianLinkLabel = parentLinkCount > 0 ? `${parentLinkCount}명 연결` : student?.phoneNumber ? '학생 번호 fallback' : '보호자/학생 번호 미등록';
-  const currentStatusLabel = statusToLabel(attendanceCurrent?.status);
-  const reportStatusLabel = latestReport ? `${latestReport.status === 'sent' ? '발송' : '초안'} · ${latestReport.dateKey}` : '리포트 없음';
-  const smsStatusLabel = enabledSmsRecipients > 0 ? `${enabledSmsRecipients}개 수신 가능` : '문자 수신처 없음';
-  const invoiceStatusSummary = canViewBilling ? invoiceStatusLabel(latestInvoice?.status) : '선생님 계정 숨김';
-  const studentRiskScore = useMemo(() => {
-    const penaltyFactor = Math.min(100, Math.max(0, (progress?.penaltyPoints || 0) * 8));
-    const completionFactor = 100 - Math.max(0, Math.min(100, avgCompletionRate));
-    const attendanceFactor = 100 - Math.max(0, Math.min(100, attendanceRate30d));
-    const rhythmFactor = 100 - Math.max(0, Math.min(100, rhythmScore));
-    return Math.round((penaltyFactor + completionFactor + attendanceFactor + rhythmFactor) / 4);
-  }, [progress?.penaltyPoints, avgCompletionRate, attendanceRate30d, rhythmScore]);
-
-  const domainCards = useMemo<Student360DomainCard[]>(() => {
-    const rows: Student360DomainCard[] = [
-      {
-        key: 'learning' as const,
-        title: '학습',
-        value: minutesToLabel(todayStudyMinutes),
-        subValue: `7일 평균 ${minutesToLabel(focusKpi.recent7AvgMinutes)}`,
-        icon: Clock3,
-        colorClass: 'text-blue-500',
-        tab: 'learning' as Student360Tab,
-        progress: Math.max(12, Math.min(100, Math.round((focusKpi.recent7AvgMinutes / 240) * 100))),
-        detailTitle: '학습 KPI 요약',
-        detailBody: `오늘 ${minutesToLabel(todayStudyMinutes)}, 최근 7일 평균 ${minutesToLabel(focusKpi.recent7AvgMinutes)}, 계획 완수율 ${avgCompletionRate}%입니다.`,
-        action: '학습 탭에서 최근 30일 그래프와 계획/루틴 이행 흐름을 바로 확인하세요.',
-      },
-      {
-        key: 'attendance' as const,
-        title: '출결',
-        value: `${attendanceRate30d}%`,
-        subValue: `지각 ${attendanceLateCount30d}회 · 외출 ${attendanceAwayCount30d}회`,
-        icon: CalendarCheck2,
-        colorClass: 'text-emerald-500',
-        tab: 'attendance' as Student360Tab,
-        progress: attendanceRate30d,
-        detailTitle: '출결 KPI 요약',
-        detailBody: `최근 30일 출석률 ${attendanceRate30d}%, 평균 외출 ${minutesToLabel(avgAwayMinutes30d)}, 하원 기록 안정도 ${checkOutStability30d}%입니다.`,
-        action: '출결 탭에서 최근 30일 출결 스트립과 외출/하원 로그, 신청 이력을 함께 보세요.',
-      },
-      {
-        key: 'risk' as const,
-        title: '리스크',
-        value: `${studentRiskScore}점`,
-        subValue: `벌점 ${progress?.penaltyPoints || 0}점 · 루틴누락 ${routineMissingCount30d}회`,
-        icon: AlertTriangle,
-        colorClass: 'text-rose-500',
-        tab: 'risk' as Student360Tab,
-        progress: 100 - studentRiskScore,
-        detailTitle: '생활/리스크 요약',
-        detailBody: `벌점 ${progress?.penaltyPoints || 0}점, 루틴 누락 ${routineMissingCount30d}회, 회복력 ${progress?.stats?.resilience || 0}점 기준으로 리스크를 봅니다.`,
-        action: '리스크/벌점 탭에서 penaltyLogs와 성장/회복 지표를 함께 확인하세요.',
-      },
-      {
-        key: 'guardian' as const,
-        title: '학부모',
-        value: `${guardianVisitCount30d}회`,
-        subValue: `리포트 열람 ${reportReadCount30d}회 · 상담반응 ${guardianConsultingResponses30d}회`,
-        icon: MessageSquare,
-        colorClass: 'text-violet-500',
-        tab: 'guardian' as Student360Tab,
-        progress: Math.min(100, guardianVisitCount30d * 12 + reportReadCount30d * 10),
-        detailTitle: '학부모/상담 요약',
-        detailBody: `앱 방문 ${guardianVisitCount30d}회, 리포트 열람 ${reportReadCount30d}회, 보호자 발신 커뮤니케이션 ${guardianConsultingResponses30d}회입니다.`,
-        action: '상담/학부모 탭에서 상담 기록, 보호자 활동, 문자 수신 상태를 한 번에 확인하세요.',
-      },
-      {
-        key: 'reports' as const,
-        title: '리포트',
-        value: `${studentDailyReports.length}건`,
-        subValue: latestReport ? `${latestReport.status === 'sent' ? '최근 발송' : '최근 초안'} ${latestReport.dateKey}` : '발송 기록 없음',
-        icon: ClipboardList,
-        colorClass: 'text-amber-500',
-        tab: 'reports' as Student360Tab,
-        progress: Math.min(100, studentDailyReports.length * 14),
-        detailTitle: '리포트 요약',
-        detailBody: latestReport ? `최근 리포트는 ${latestReport.dateKey} ${latestReport.status === 'sent' ? '발송본' : '초안'}입니다.` : '아직 저장된 데일리 리포트가 없습니다.',
-        action: '리포트 탭에서 AI 리포트 메타와 최근 코칭 포인트까지 이어서 확인하세요.',
-      },
-      {
-        key: 'sms' as const,
-        title: '문자',
-        value: `${studentSmsDeliveryLogs.filter((item) => item.status === 'sent').length}건`,
-        subValue: smsStatusLabel,
-        icon: MessageSquareMore,
-        colorClass: 'text-sky-500',
-        tab: 'guardian' as Student360Tab,
-        progress: enabledSmsRecipients > 0 ? 85 : 25,
-        detailTitle: '문자 운영 요약',
-        detailBody: latestSmsLog ? `최근 문자 ${latestSmsLog.eventType || '이벤트'}는 ${formatDateTimeLabel(latestSmsLog.sentAt || latestSmsLog.failedAt || latestSmsLog.createdAt)}에 ${latestSmsLog.status || '기록'} 상태였습니다.` : '학생 문자 발송 이력이 없습니다.',
-        action: '상담/학부모 탭에서 수신 대상, 문자 발송 이력, 수신 설정을 함께 확인하세요.',
-      },
-    ];
-
-    if (canViewBilling) {
-      rows.push({
-        key: 'billing',
-        title: '수납',
-        value: invoiceStatusSummary,
-        subValue: latestInvoice ? `최근 결제 ${formatDateLabel(latestInvoicePaymentDate)}` : '청구 이력 없음',
-        icon: Building2,
-        colorClass: 'text-emerald-600',
-        tab: 'billing' as Student360Tab,
-        progress: latestInvoice?.status === 'paid' ? 95 : latestInvoice?.status === 'issued' ? 65 : latestInvoice?.status === 'overdue' ? 25 : 50,
-        detailTitle: '수납 요약',
-        detailBody: latestInvoice ? `최근 청구 상태는 ${invoiceStatusLabel(latestInvoice.status)}이며 마지막 기준일은 ${formatDateLabel(latestInvoicePaymentDate)}입니다.` : '아직 연결된 청구/수납 기록이 없습니다.',
-        action: '수납 탭에서 인보이스 상태와 미수금 이력을 바로 확인하세요.',
-      });
-    }
-
-    return rows;
-  }, [
-    attendanceAwayCount30d,
-    attendanceLateCount30d,
-    attendanceRate30d,
-    avgAwayMinutes30d,
-    avgCompletionRate,
-    canViewBilling,
-    checkOutStability30d,
-    enabledSmsRecipients,
-    focusKpi.recent7AvgMinutes,
-    guardianConsultingResponses30d,
-    guardianVisitCount30d,
-    invoiceStatusSummary,
-    latestInvoice,
-    latestInvoicePaymentDate,
-    latestReport,
-    latestSmsLog,
-    progress?.penaltyPoints,
-    progress?.stats?.resilience,
-    reportReadCount30d,
-    routineMissingCount30d,
-    smsStatusLabel,
-    studentDailyReports,
-    studentRiskScore,
-    studentSmsDeliveryLogs,
-    todayStudyMinutes,
-  ]);
-
-  const selectedDomainCard = domainCards.find((item) => item.key === selectedDomain) || domainCards[0];
-  const attendanceHistoryByDateKey = useMemo(() => {
-    const next: Record<string, AttendanceHistoryRecord> = {};
-    attendanceHistoryRows.forEach((row) => {
-      if (row.dateKey) next[row.dateKey] = row;
-    });
-    return next;
-  }, [attendanceHistoryRows]);
-  const attendanceDailyByDateKey = useMemo(() => {
-    const next: Record<string, AttendanceDailyStatRecord> = {};
-    attendanceDailyStatRows.forEach((row) => {
-      if (row.dateKey) next[row.dateKey] = row;
-    });
-    return next;
-  }, [attendanceDailyStatRows]);
-  const counselingCountByDateKey = useMemo(
-    () => buildDateCountMap(studentCounselingLogs, (row) => row.createdAt),
-    [studentCounselingLogs]
-  );
-  const reportCountByDateKey = useMemo(() => {
-    const next: Record<string, number> = {};
-    studentDailyReports.forEach((report) => {
-      const dateKey = report.dateKey || format(toDateSafe(report.createdAt) || today, 'yyyy-MM-dd');
-      next[dateKey] = (next[dateKey] || 0) + 1;
-    });
-    return next;
-  }, [studentDailyReports, today]);
-  const smsCountByDateKey = useMemo(
-    () => buildDateCountMap(studentSmsDeliveryLogs, (row) => row.sentAt || row.failedAt || row.createdAt),
-    [studentSmsDeliveryLogs]
-  );
-  const guardianVisitByDateKey = useMemo(() => {
-    const next: Record<string, number> = {};
-    studentParentActivityEvents.forEach((event) => {
-      if (event.eventType !== 'app_visit') return;
-      const date = toDateSafe(event.createdAt);
-      if (!date) return;
-      const dateKey = format(date, 'yyyy-MM-dd');
-      next[dateKey] = (next[dateKey] || 0) + 1;
-    });
-    return next;
-  }, [studentParentActivityEvents]);
-  const guardianReadByDateKey = useMemo(() => {
-    const next: Record<string, number> = {};
-    studentParentActivityEvents.forEach((event) => {
-      if (event.eventType !== 'report_read') return;
-      const date = toDateSafe(event.createdAt);
-      if (!date) return;
-      const dateKey = format(date, 'yyyy-MM-dd');
-      next[dateKey] = (next[dateKey] || 0) + 1;
-    });
-    return next;
-  }, [studentParentActivityEvents]);
-  const guardianResponseByDateKey = useMemo(
+  const smsDeliveryLogs = useMemo(
     () =>
-      buildDateCountMap(
-        studentParentCommunications.filter((item) => (item.senderRole || '').toLowerCase() === 'parent'),
-        (row) => row.createdAt
-      ),
-    [studentParentCommunications]
+      [...(smsDeliveryLogsRaw || [])].sort((a, b) => {
+        const bTime = toTime((b.sentAt || b.createdAt) as Timestamp | undefined);
+        const aTime = toTime((a.sentAt || a.createdAt) as Timestamp | undefined);
+        return bTime - aTime;
+      }),
+    [smsDeliveryLogsRaw]
   );
-  const invoiceCountByDateKey = useMemo(
-    () => buildDateCountMap(studentInvoices, (row) => row.paidAt || row.updatedAt || row.issuedAt),
-    [studentInvoices]
+  const attendanceRequests = useMemo(
+    () => [...(attendanceRequestsRaw || [])].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt)),
+    [attendanceRequestsRaw]
   );
-  const penaltyDeltaByDateKey = useMemo(() => {
-    const next: Record<string, number> = {};
-    studentPenaltyLogs.forEach((log) => {
-      const date = toDateSafe(log.createdAt);
-      if (!date) return;
-      const dateKey = format(date, 'yyyy-MM-dd');
-      next[dateKey] = (next[dateKey] || 0) + Math.abs(Number(log.pointsDelta || 0));
-    });
-    return next;
-  }, [studentPenaltyLogs]);
-  const overviewStudyTrend30d = useMemo(() => fullSeries.slice(-30), [fullSeries]);
-  const overviewAttendanceStrip30d = useMemo(() => {
-    return Array.from({ length: 30 }, (_, idx) => {
-      const date = subDays(today, 29 - idx);
-      const dateKey = format(date, 'yyyy-MM-dd');
-      const historyRow = attendanceHistoryByDateKey[dateKey];
-      const dailyRow = attendanceDailyByDateKey[dateKey];
-      const status = dailyRow?.attendanceStatus || historyRow?.displayState || historyRow?.status;
-      const tone = attendanceTone(status);
-      const studyMinutes = Math.max(0, Math.round(Number(dailyStatsMap[dateKey]?.totalStudyMinutes || studyLogMap[dateKey]?.totalMinutes || 0)));
-      return {
-        dateKey,
-        dateLabel: format(date, 'M/d', { locale: ko }),
-        status,
-        statusLabel: tone.label,
-        stripClass: tone.stripClass,
-        lateMinutes: Number(dailyRow?.lateMinutes || historyRow?.lateMinutes || 0),
-        awayCount: Number(dailyRow?.awayCount || 0),
-        studyMinutes,
-        hasCheckOut: Boolean(dailyRow?.hasCheckOutRecord || dailyRow?.checkOutAt || historyRow?.checkedOutAt),
-      };
-    });
-  }, [today, attendanceHistoryByDateKey, attendanceDailyByDateKey, dailyStatsMap, studyLogMap]);
-  const overviewAwayTrend14d = useMemo(() => {
-    return Array.from({ length: 14 }, (_, idx) => {
-      const date = subDays(today, 13 - idx);
-      const dateKey = format(date, 'yyyy-MM-dd');
-      return {
-        dateKey,
-        dateLabel: format(date, 'M/d', { locale: ko }),
-        awayMinutes: Math.max(0, Math.round(Number(awayMinutesByDateKey[dateKey] || dailyStatsMap[dateKey]?.awayMinutes || 0))),
-        awayCount: Math.max(0, Math.round(Number(attendanceDailyByDateKey[dateKey]?.awayCount || 0))),
-      };
-    });
-  }, [today, awayMinutesByDateKey, dailyStatsMap, attendanceDailyByDateKey]);
-  const overviewPlanTrend30d = useMemo(() => {
-    return overviewStudyTrend30d.map((item) => {
-      const plan = planByDate[item.dateKey];
-      const status =
-        attendanceDailyByDateKey[item.dateKey]?.attendanceStatus ||
-        attendanceHistoryByDateKey[item.dateKey]?.displayState ||
-        attendanceHistoryByDateKey[item.dateKey]?.status;
-      const routineExpected = plan?.routineCount || 0;
-      const routineDone =
-        routineExpected > 0 && !String(status || '').toLowerCase().includes('missing_routine') ? routineExpected : 0;
-      return {
-        dateKey: item.dateKey,
-        dateLabel: item.dateLabel,
-        completionRate: item.completionRate,
-        routineDone,
-        routineExpected,
-      };
-    });
-  }, [overviewStudyTrend30d, planByDate, attendanceDailyByDateKey, attendanceHistoryByDateKey]);
-  const overviewCommunicationTrend30d = useMemo(() => {
-    return Array.from({ length: 30 }, (_, idx) => {
-      const date = subDays(today, 29 - idx);
-      const dateKey = format(date, 'yyyy-MM-dd');
-      return {
-        dateKey,
-        dateLabel: format(date, 'M/d', { locale: ko }),
-        counseling: counselingCountByDateKey[dateKey] || 0,
-        reports: reportCountByDateKey[dateKey] || 0,
-        sms: smsCountByDateKey[dateKey] || 0,
-      };
-    });
-  }, [today, counselingCountByDateKey, reportCountByDateKey, smsCountByDateKey]);
-  const overviewRiskTrend30d = useMemo(() => {
-    let cumulativePenalty = 0;
-    return overviewStudyTrend30d.map((item) => {
-      const dateKey = item.dateKey;
-      const status =
-        attendanceDailyByDateKey[dateKey]?.attendanceStatus ||
-        attendanceHistoryByDateKey[dateKey]?.displayState ||
-        attendanceHistoryByDateKey[dateKey]?.status;
-      cumulativePenalty += penaltyDeltaByDateKey[dateKey] || 0;
-      const attendancePenalty = String(status || '').toLowerCase().includes('absent')
-        ? 32
-        : String(status || '').toLowerCase().includes('late')
-          ? 18
-          : String(status || '').toLowerCase().includes('missing_routine')
-            ? 14
-            : 0;
-      const awayPenalty = Math.min(18, Math.round(Number(attendanceDailyByDateKey[dateKey]?.awayMinutes || dailyStatsMap[dateKey]?.awayMinutes || 0) / 4));
-      const studyPenalty = Math.max(0, Math.round(((120 - Math.min(120, item.studyMinutes)) / 120) * 24));
-      const completionPenalty = Math.max(0, Math.round(((100 - item.completionRate) / 100) * 26));
-      const penaltyCarry = Math.min(26, cumulativePenalty * 4);
-      const riskScore = Math.max(0, Math.min(100, studyPenalty + completionPenalty + attendancePenalty + awayPenalty + penaltyCarry));
-      return {
-        dateKey,
-        dateLabel: item.dateLabel,
-        riskScore,
-        cumulativePenalty,
-      };
-    });
-  }, [overviewStudyTrend30d, attendanceDailyByDateKey, attendanceHistoryByDateKey, penaltyDeltaByDateKey, dailyStatsMap]);
-  const overviewGuardianBillingTrend30d = useMemo(() => {
-    return Array.from({ length: 30 }, (_, idx) => {
-      const date = subDays(today, 29 - idx);
-      const dateKey = format(date, 'yyyy-MM-dd');
-      return {
-        dateKey,
-        dateLabel: format(date, 'M/d', { locale: ko }),
-        guardianActivity: (guardianVisitByDateKey[dateKey] || 0) + (guardianResponseByDateKey[dateKey] || 0),
-        reportReads: guardianReadByDateKey[dateKey] || 0,
-        billing: canViewBilling ? invoiceCountByDateKey[dateKey] || 0 : 0,
-      };
-    });
-  }, [today, guardianVisitByDateKey, guardianResponseByDateKey, guardianReadByDateKey, invoiceCountByDateKey, canViewBilling]);
-  const overviewQuickPoints = useMemo(() => {
-    const highlights = [...riskSignals, ...coachingHighlights];
-    return highlights.filter((item, index, arr) => arr.indexOf(item) === index).slice(0, 3);
-  }, [riskSignals, coachingHighlights]);
-  const hasOverviewStudyTrend = overviewStudyTrend30d.some((item) => item.studyMinutes > 0);
-  const hasOverviewAttendanceTrend = overviewAttendanceStrip30d.some((item) => Boolean(item.status));
-  const hasOverviewAwayTrend = overviewAwayTrend14d.some((item) => item.awayMinutes > 0 || item.awayCount > 0);
-  const hasOverviewPlanTrend = overviewPlanTrend30d.some((item) => item.completionRate > 0 || item.routineExpected > 0);
-  const hasOverviewCommunicationTrend = overviewCommunicationTrend30d.some((item) => item.counseling > 0 || item.reports > 0 || item.sms > 0);
-  const hasOverviewRiskTrend = overviewRiskTrend30d.some((item) => item.riskScore > 0 || item.cumulativePenalty > 0);
-  const hasOverviewGuardianBillingTrend = overviewGuardianBillingTrend30d.some((item) => item.guardianActivity > 0 || item.reportReads > 0 || item.billing > 0);
-  const studentSummaryCards = [
+  const penaltyLogs = useMemo(
+    () => [...(penaltyLogsRaw || [])].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt)),
+    [penaltyLogsRaw]
+  );
+  const invoices = useMemo(
+    () => [...(invoicesRaw || [])].sort((a, b) => toTime(b.updatedAt) - toTime(a.updatedAt)),
+    [invoicesRaw]
+  );
+  const latestCounselDate = studentCounselingLogs[0]?.createdAt?.toDate() || null;
+  const latestReportSent = studentDailyReports.find((report) => report.status === 'sent');
+  const latestReportSentLabel = latestReportSent?.createdAt?.toDate
+    ? format(latestReportSent.createdAt.toDate(), 'M월 d일')
+    : '없음';
+  const parentVisitCount30d = (parentActivityRaw || []).filter(
+    (event) => event.eventType === 'app_visit' && toTime(event.createdAt) >= days30AgoMs
+  ).length;
+  const reportReadCount30d = (parentActivityRaw || []).filter(
+    (event) => event.eventType === 'report_read' && toTime(event.createdAt) >= days30AgoMs
+  ).length;
+  const counselingCount30d = studentCounselingLogs.filter((log) => toTime(log.createdAt) >= days30AgoMs).length;
+  const reportSentCount30d = studentDailyReports.filter(
+    (report) => report.status === 'sent' && toTime(report.createdAt) >= days30AgoMs
+  ).length;
+  const smsAcceptedCount30d = smsDeliveryLogs.filter((log) => {
+    const status = String(log.status || '').toLowerCase();
+    return toTime((log.sentAt || log.createdAt) as Timestamp | undefined) >= days30AgoMs
+      && !['failed', 'cancelled', 'suppressed_opt_out', '번호없음'].includes(status);
+  }).length;
+  const smsCost30d = Math.round(smsAcceptedCount30d * 8.7);
+  const pendingAttendanceRequestsCount = attendanceRequests.filter((item) => item.status === 'requested').length;
+  const attendanceInstabilityScore = Math.min(
+    100,
+    attendanceRequests.filter((item) => item.status !== 'approved').length * 18
+      + riskSignals.filter((signal) => /공부시간|리듬|상담/.test(signal)).length * 14
+  );
+  const recentPenaltyCount30d = penaltyLogs.filter((log) => toTime(log.createdAt) >= days30AgoMs).length;
+  const latestInvoice = invoices[0];
+  const latestInvoiceStatusLabel = latestInvoice
+    ? latestInvoice.status === 'paid'
+      ? '수납완료'
+      : latestInvoice.status === 'issued'
+        ? '청구됨'
+        : latestInvoice.status === 'overdue'
+          ? '미납/연체'
+          : latestInvoice.status === 'refunded'
+            ? '환불'
+            : '무효'
+    : '미청구';
+  const outstandingAmount = invoices
+    .filter((invoice) => invoice.status === 'issued' || invoice.status === 'overdue')
+    .reduce((sum, invoice) => sum + Number(invoice.finalPrice || 0), 0);
+  const todayActionChecklist = [
+    attendanceCurrent?.status !== 'studying'
+      ? {
+          key: 'attendance',
+          title: '오늘 출결 상태 다시 확인',
+          detail: '공부중이 아니면 등원·외출·하원 상태를 먼저 맞춰 주세요.',
+          href: '/dashboard/attendance',
+          accent: 'bg-rose-100 text-rose-700',
+        }
+      : null,
+    avgCompletionRate < 65
+      ? {
+          key: 'plan',
+          title: '내일 계획 볼륨 조정',
+          detail: '완수율이 낮아 핵심 과제 3~4개 중심으로 줄이는 것이 좋습니다.',
+          href: '/dashboard/teacher/students',
+          accent: 'bg-amber-100 text-amber-700',
+        }
+      : null,
+    latestReportSent && reportReadCount30d === 0
+      ? {
+          key: 'guardian',
+          title: '리포트 미열람 보호자 후속 연락',
+          detail: '최근 발송 리포트가 읽히지 않았습니다. 문자나 상담 연결이 필요합니다.',
+          href: '/dashboard/settings/notifications',
+          accent: 'bg-violet-100 text-violet-700',
+        }
+      : null,
+    pendingAttendanceRequestsCount > 0
+      ? {
+          key: 'request',
+          title: '미처리 출결 요청 검토',
+          detail: `처리 대기 요청 ${pendingAttendanceRequestsCount}건이 남아 있습니다.`,
+          href: '/dashboard/attendance',
+          accent: 'bg-sky-100 text-sky-700',
+        }
+      : null,
+    isAdmin && outstandingAmount > 0
+      ? {
+          key: 'billing',
+          title: '수납 상태 점검',
+          detail: `미정리 금액 ${outstandingAmount.toLocaleString()}원이 남아 있습니다.`,
+          href: '/dashboard/revenue',
+          accent: 'bg-emerald-100 text-emerald-700',
+        }
+      : null,
+  ].filter(Boolean) as Array<{ key: string; title: string; detail: string; href: string; accent: string }>;
+
+  const operatingCostSignals = [
     {
-      key: 'status',
-      title: '오늘 상태',
-      value: currentStatusLabel,
-      subValue: guardianLinkLabel,
-      icon: Activity,
-      colorClass: 'text-blue-500',
-      progress: attendanceCurrent?.status === 'studying' ? 92 : attendanceCurrent?.status === 'away' || attendanceCurrent?.status === 'break' ? 58 : 34,
-    },
-    {
-      key: 'today',
-      title: '오늘 시간',
-      value: minutesToLabel(todayStudyMinutes),
-      subValue: `최근 7일 평균 ${minutesToLabel(focusKpi.recent7AvgMinutes)}`,
-      icon: Clock3,
-      colorClass: 'text-emerald-500',
-      progress: Math.max(12, Math.min(100, Math.round((todayStudyMinutes / 240) * 100))),
-    },
-    {
-      key: 'attendance',
-      title: '30일 출석률',
-      value: `${attendanceRate30d}%`,
-      subValue: `지각 ${attendanceLateCount30d}회 · 외출 ${attendanceAwayCount30d}회`,
-      icon: CalendarCheck2,
-      colorClass: 'text-violet-500',
-      progress: attendanceRate30d,
-    },
-    {
-      key: 'penalty',
-      title: '현재 벌점',
-      value: `${progress?.penaltyPoints || 0}점`,
-      subValue: latestPenaltyLog ? `최근 조정 ${formatDateLabel(latestPenaltyLog.createdAt)}` : '최근 조정 없음',
-      icon: AlertTriangle,
-      colorClass: 'text-rose-500',
-      progress: Math.max(12, 100 - Math.min(100, (progress?.penaltyPoints || 0) * 8)),
+      key: 'sms',
+      title: '문자 발송량',
+      value: `${smsAcceptedCount30d}건`,
+      helper: `최근 30일 비용 약 ${smsCost30d.toLocaleString()}원`,
+      tone: 'border-sky-100 bg-sky-50/70 text-sky-700',
     },
     {
       key: 'counseling',
-      title: '최근 상담일',
-      value: latestCounselingAt ? formatDateLabel(latestCounselingAt) : '없음',
-      subValue: latestReservationAt ? `다음 일정 ${formatDateTimeLabel(latestReservationAt)}` : '예약 일정 없음',
-      icon: MessageSquare,
-      colorClass: 'text-amber-500',
-      progress: Math.min(100, studentCounselingLogs.length * 18),
+      title: '상담 빈도',
+      value: `${counselingCount30d}건`,
+      helper: latestCounselDate ? `최근 상담 ${format(latestCounselDate, 'M월 d일')}` : '최근 상담 기록 없음',
+      tone: 'border-amber-100 bg-amber-50/70 text-amber-700',
     },
     {
-      key: 'reports',
-      title: '최근 리포트',
-      value: latestReport ? latestReport.dateKey : '없음',
-      subValue: reportStatusLabel,
-      icon: ClipboardList,
-      colorClass: 'text-sky-500',
-      progress: Math.min(100, studentDailyReports.length * 14),
+      key: 'report',
+      title: '리포트 발송',
+      value: `${reportSentCount30d}건`,
+      helper: `최근 발송 ${latestReportSentLabel} · 열람 ${reportReadCount30d}회`,
+      tone: 'border-violet-100 bg-violet-50/70 text-violet-700',
     },
     {
-      key: 'sms',
-      title: '문자 수신',
-      value: smsStatusLabel,
-      subValue: latestSmsLog ? `최근 발송 ${formatDateTimeLabel(latestSmsLog.sentAt || latestSmsLog.failedAt || latestSmsLog.createdAt)}` : '문자 이력 없음',
-      icon: MessageSquareMore,
-      colorClass: 'text-blue-500',
-      progress: enabledSmsRecipients > 0 ? 85 : 25,
+      key: 'attendance',
+      title: '출결 불안정도',
+      value: `${attendanceInstabilityScore}점`,
+      helper: `요청 ${pendingAttendanceRequestsCount}건 · 벌점로그 ${recentPenaltyCount30d}건`,
+      tone: 'border-rose-100 bg-rose-50/70 text-rose-700',
     },
-    ...(canViewBilling
-      ? [{
-          key: 'billing',
-          title: '최신 수납 상태',
-          value: invoiceStatusSummary,
-          subValue: latestInvoice ? `최근 기준 ${formatDateLabel(latestInvoicePaymentDate)}` : '청구 이력 없음',
-          icon: Building2,
-          colorClass: 'text-emerald-600',
-          progress: latestInvoice?.status === 'paid' ? 95 : latestInvoice?.status === 'issued' ? 65 : latestInvoice?.status === 'overdue' ? 25 : 50,
-        }]
-      : []),
-  ] as const;
-
-  useEffect(() => {
-    if (!selectedDomainCard) return;
-    const allowed = new Set(domainCards.map((item) => item.key));
-    if (!allowed.has(selectedDomain)) {
-      setSelectedDomain(domainCards[0]?.key || 'learning');
-    }
-  }, [selectedDomain, selectedDomainCard, domainCards]);
+    ...(isAdmin
+      ? [
+          {
+            key: 'billing',
+            title: '수납 상태',
+            value: latestInvoiceStatusLabel,
+            helper: outstandingAmount > 0 ? `미정리 ${outstandingAmount.toLocaleString()}원` : '현재 미정리 금액 없음',
+            tone: 'border-emerald-100 bg-emerald-50/70 text-emerald-700',
+          },
+        ]
+      : [
+          {
+            key: 'guardian',
+            title: '보호자 반응',
+            value: `${parentVisitCount30d}회`,
+            helper: `최근 30일 앱 방문 ${parentVisitCount30d}회 · 리포트 열람 ${reportReadCount30d}회`,
+            tone: 'border-emerald-100 bg-emerald-50/70 text-emerald-700',
+          },
+        ]),
+  ];
 
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId || !canEditStudentInfo) return;
@@ -2500,22 +1822,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {canEditStudentInfo && (
+          {!isStudentSelfView && (
             <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-              <Link href="/dashboard/attendance"><CalendarCheck2 className="h-4 w-4" /> 출결 상태</Link>
+              <Link href="/dashboard/attendance"><CalendarDays className="h-4 w-4" /> 출결 상태</Link>
             </Button>
           )}
           {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
           {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
           {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
-          {canEditStudentInfo && (
+          {!isStudentSelfView && (
             <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-              <Link href={`/dashboard/reports?studentId=${studentId}`}><Sparkles className="h-4 w-4" /> 리포트 생성/확인</Link>
+              <Link href="/dashboard/reports"><PenTool className="h-4 w-4" /> 리포트 생성/확인</Link>
             </Button>
           )}
-          {canEditStudentInfo && (
+          {!isStudentSelfView && (
             <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-              <Link href={`/dashboard/settings/notifications?studentId=${studentId}`}><MessageSquare className="h-4 w-4" /> 문자 보내기</Link>
+              <Link href="/dashboard/settings/notifications"><MessageSquare className="h-4 w-4" /> 문자 보내기</Link>
             </Button>
           )}
           {canEditStudentInfo && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
@@ -2535,160 +1857,132 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-2" : canViewBilling ? "grid-cols-2 xl:grid-cols-4" : "grid-cols-2 xl:grid-cols-3", isAnalysisPresentation && 'analysis-summary-rail')}>
-        {studentSummaryCards.map((card) => (
-          <StatAnalysisCard
-            key={card.key}
-            title={card.title}
-            value={card.value}
-            subValue={card.subValue}
-            icon={card.icon}
-            colorClass={card.colorClass}
-            isMobile={isMobile}
-            presentationMode={presentationMode}
-            progress={card.progress}
-          />
-        ))}
+      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4", isAnalysisPresentation && 'analysis-summary-rail')}>
+        <StatAnalysisCard
+          title="평균 공부시간"
+          value={minutesToLabel(avgStudyMinutes)}
+          subValue={`최근 ${RANGE_MAP[focusedChartView]}일 기준`}
+          icon={Clock3}
+          colorClass="text-blue-500"
+          isMobile={isMobile}
+          onClick={() => setIsAvgStudyModalOpen(true)}
+          presentationMode={presentationMode}
+          progress={(avgStudyMinutes / 180) * 100}
+        />
+        <StatAnalysisCard
+          title="평균 공부 리듬"
+          value={`${rhythmScore}점`}
+          subValue="실제 공부시간 분산 기반 안정성"
+          icon={TrendingUp}
+          colorClass="text-emerald-500"
+          isMobile={isMobile}
+          onClick={() => setIsRhythmGuideModalOpen(true)}
+          presentationMode={presentationMode}
+          progress={rhythmScore}
+        />
+        <StatAnalysisCard
+          title="계획 완수율"
+          value={`${avgCompletionRate}%`}
+          subValue="학습 할 일 완료율"
+          icon={CheckCircle2}
+          colorClass="text-amber-500"
+          isMobile={isMobile}
+          presentationMode={presentationMode}
+          progress={avgCompletionRate}
+        />
+        <StatAnalysisCard
+          title="상담 진행도"
+          value={`${studentReservations.filter((item) => item.status === 'done').length}/${studentReservations.length}`}
+          subValue="완료 상담 / 전체 상담"
+          icon={MessageSquare}
+          colorClass="text-rose-500"
+          isMobile={isMobile}
+          presentationMode={presentationMode}
+          progress={counselingProgress}
+        />
       </section>
 
-      {!isStudentSelfView && selectedDomainCard ? (
-        <section className="space-y-4">
-          <Card className="rounded-[1.8rem] border-none shadow-lg bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-black tracking-tight">운영 KPI 보드</CardTitle>
-              <CardDescription className="font-bold text-[11px]">
-                학습, 출결, 리스크, 학부모, 리포트, 문자{canViewBilling ? ', 수납' : ''} 흐름을 학생 단위로 한 번에 봅니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className={cn("grid gap-3", isMobile ? "grid-cols-2" : canViewBilling ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-2 xl:grid-cols-3")}>
-              {domainCards.map((card) => (
-                <StatAnalysisCard
-                  key={card.key}
-                  title={card.title}
-                  value={card.value}
-                  subValue={card.subValue}
-                  icon={card.icon}
-                  colorClass={card.colorClass}
-                  isMobile={isMobile}
-                  presentationMode={presentationMode}
-                  progress={card.progress}
-                  onClick={() => {
-                    setSelectedDomain(card.key);
-                    setActiveTab('overview');
-                  }}
-                />
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[1.8rem] border-none shadow-lg bg-[linear-gradient(180deg,#ffffff_0%,#f7f9ff_100%)]">
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+      {!isStudentSelfView ? (
+        <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1.15fr_0.95fr]')}>
+          <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-chart-stage')}>
+            <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-base font-black tracking-tight">{selectedDomainCard.detailTitle}</CardTitle>
-                  <CardDescription className="font-bold text-[11px] mt-1">
-                    선택한 도메인의 핵심 이유와 바로 확인할 액션을 상단에서 바로 봅니다.
+                  <CardTitle className="text-xl font-black tracking-tight text-[#14295F]">오늘 액션 체크리스트</CardTitle>
+                  <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                    COO 관점에서 지금 바로 처리할 행동만 먼저 모았습니다.
                   </CardDescription>
                 </div>
-                <Badge className="rounded-full bg-primary text-white px-2.5 py-1 text-[10px] font-black">
-                  {selectedDomainCard.title}
+                <Badge className="rounded-full bg-[#14295F] px-3 py-1 text-[10px] font-black text-white">
+                  {todayActionChecklist.length}개 액션
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              <div className="rounded-2xl border border-border/60 bg-white px-4 py-4">
-                <p className="text-sm font-black text-slate-900">{selectedDomainCard.value}</p>
-                <p className="mt-1 text-xs font-semibold leading-6 text-slate-700">{selectedDomainCard.detailBody}</p>
-                <p className="mt-3 rounded-xl bg-muted/30 px-3 py-3 text-xs font-bold leading-6 text-slate-700">{selectedDomainCard.action}</p>
+            <CardContent className={cn('space-y-3', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+              {todayActionChecklist.length === 0 ? (
+                <div className="rounded-[1.2rem] border border-emerald-100 bg-emerald-50/70 px-4 py-4 text-sm font-bold text-emerald-700">
+                  오늘 바로 처리해야 할 주요 액션은 없습니다. 유지 전략 중심으로 운영해도 좋습니다.
+                </div>
+              ) : (
+                todayActionChecklist.map((item, index) => (
+                  <div key={item.key} className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', item.accent)}>
+                            액션 {index + 1}
+                          </Badge>
+                          <p className="text-sm font-black text-[#14295F]">{item.title}</p>
+                        </div>
+                        <p className="mt-2 text-[12px] font-semibold leading-5 text-slate-600">{item.detail}</p>
+                      </div>
+                      <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-3 text-[11px] font-black">
+                        <Link href={item.href}>바로 이동</Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-chart-stage')}>
+            <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-xl font-black tracking-tight text-[#14295F]">운영 비용 신호</CardTitle>
+                  <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                    문자, 상담, 리포트, 출결, 수납까지 운영 투입 신호를 한 번에 봅니다.
+                  </CardDescription>
+                </div>
+                <Badge className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-700">
+                  최근 30일
+                </Badge>
               </div>
+            </CardHeader>
+            <CardContent className={cn('grid gap-3', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+              {operatingCostSignals.map((signal) => (
+                <div key={signal.key} className={cn('rounded-[1.2rem] border px-4 py-3', signal.tone)}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-black tracking-[0.12em] uppercase">{signal.title}</p>
+                    <p className="text-lg font-black tracking-tight">{signal.value}</p>
+                  </div>
+                  <p className="mt-1 text-[12px] font-semibold leading-5 text-slate-600">{signal.helper}</p>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </section>
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as Student360Tab)} className="space-y-6 min-w-0">
-        <TabsList className={cn(detailTabListClass, !isStudentSelfView && (canViewBilling ? 'h-auto md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8' : 'h-auto md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-7'), !isStudentSelfView && isMobile && 'grid-cols-2')}>
-          {!isStudentSelfView ? (
-            <>
-              <TabsTrigger value="overview" className={detailTabTriggerClass}><LayoutGrid className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">개요</span></TabsTrigger>
-              <TabsTrigger value="learning" className={detailTabTriggerClass}><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">학습</span></TabsTrigger>
-              <TabsTrigger value="attendance" className={detailTabTriggerClass}><CalendarCheck2 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">출결</span></TabsTrigger>
-              <TabsTrigger value="guardian" className={detailTabTriggerClass}><MessageSquare className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">상담/학부모</span></TabsTrigger>
-              <TabsTrigger value="reports" className={detailTabTriggerClass}><ClipboardList className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">리포트</span></TabsTrigger>
-              <TabsTrigger value="risk" className={detailTabTriggerClass}><AlertTriangle className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">리스크/벌점</span></TabsTrigger>
-              {canViewBilling ? <TabsTrigger value="billing" className={detailTabTriggerClass}><Building2 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">수납</span></TabsTrigger> : null}
-              <TabsTrigger value="raw" className={detailTabTriggerClass}><ClipboardList className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">원본 로그</span></TabsTrigger>
-            </>
-          ) : (
-            <>
-              <TabsTrigger value="learning" className={detailTabTriggerClass}><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">학습 분석</span></TabsTrigger>
-              <TabsTrigger value="guardian" className={detailTabTriggerClass}><MessageSquare className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">상담 기록</span></TabsTrigger>
-            </>
-          )}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6 min-w-0">
+        <TabsList className={detailTabListClass}>
+          <TabsTrigger value="overview" className={detailTabTriggerClass}><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">학습 분석</span></TabsTrigger>
+          <TabsTrigger value="counseling" className={detailTabTriggerClass}><MessageSquare className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">상담 기록</span></TabsTrigger>
+          <TabsTrigger value="plans" className={cn(detailTabTriggerClass, isMobile && "col-span-2")}><BookOpen className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">계획/루틴</span></TabsTrigger>
         </TabsList>
 
-        {!isStudentSelfView ? (
         <TabsContent value="overview" className="space-y-6 mt-0">
-            <Student360OverviewDashboard
-              canViewBilling={canViewBilling}
-              isMobile={isMobile}
-              presentationMode={presentationMode}
-              selectedDomain={selectedDomain}
-              onSelectDomain={setSelectedDomain}
-              selectedDomainTitle={selectedDomainCard.title}
-              selectedDomainBody={selectedDomainCard.detailBody}
-              selectedDomainAction={selectedDomainCard.action}
-              riskHeadline={riskSignals.length > 0 ? `${riskSignals[0]} 중심으로 오늘 개입 우선순위를 잡는 것이 좋습니다.` : '현재는 큰 운영 이슈보다 페이스 유지와 리듬 안정화에 초점을 맞추면 됩니다.'}
-              guardianLinkLabel={guardianLinkLabel}
-              guardianVisitCount30d={guardianVisitCount30d}
-              reportReadCount30d={reportReadCount30d}
-              latestCounselingLabel={latestCounselingAt ? formatDateLabel(latestCounselingAt) : '기록 없음'}
-              latestReservationLabel={latestReservationAt ? `다음 예약 ${formatDateTimeLabel(latestReservationAt)}` : '예약 없음'}
-              smsStatusLabel={smsStatusLabel}
-              latestReportLabel={latestReport ? `${latestReport.dateKey} ${latestReport.status}` : '리포트 없음'}
-              invoiceStatusSummary={invoiceStatusSummary}
-              latestInvoicePaymentLabel={latestInvoice ? `최근 결제 ${formatDateLabel(latestInvoicePaymentDate)}` : '청구 이력 없음'}
-              studentRiskScore={studentRiskScore}
-              penaltyPoints={progress?.penaltyPoints || 0}
-              routineMissingCount30d={routineMissingCount30d}
-              overviewQuickPoints={overviewQuickPoints}
-              overviewStudyTrend30d={overviewStudyTrend30d.map((item) => ({ dateLabel: item.dateLabel, studyMinutes: item.studyMinutes }))}
-              hasOverviewStudyTrend={hasOverviewStudyTrend}
-              todayStudyLabel={minutesToLabel(todayStudyMinutes)}
-              recent7AverageLabel={minutesToLabel(focusKpi.recent7AvgMinutes)}
-              latestWeeklyGrowthLabel={formatSignedPercent(latestWeeklyLearningGrowthPercent)}
-              overviewAttendanceStrip30d={overviewAttendanceStrip30d}
-              hasOverviewAttendanceTrend={hasOverviewAttendanceTrend}
-              hasStartEndTimeData={hasStartEndTimeData}
-              startEndTimeTrendData={startEndTimeTrendData}
-              latestStartLabel={latestStartEndSnapshot.start}
-              latestEndLabel={latestStartEndSnapshot.end}
-              averageRhythmScore={averageRhythmScore}
-              hasOverviewAwayTrend={hasOverviewAwayTrend}
-              overviewAwayTrend14d={overviewAwayTrend14d}
-              avgAwayMinutesLabel={minutesToLabel(avgAwayMinutes30d)}
-              attendanceAwayCount30d={attendanceAwayCount30d}
-              checkOutStability30d={checkOutStability30d}
-              hasOverviewPlanTrend={hasOverviewPlanTrend}
-              overviewPlanTrend30d={overviewPlanTrend30d}
-              avgCompletionRate={avgCompletionRate}
-              todayRoutineCount={todayPlanSummary.routineCount}
-              rhythmScore={rhythmScore}
-              hasOverviewCommunicationTrend={hasOverviewCommunicationTrend}
-              overviewCommunicationTrend30d={overviewCommunicationTrend30d}
-              counselingCount={studentCounselingLogs.length}
-              reportCount={studentDailyReports.length}
-              smsCount={studentSmsDeliveryLogs.length}
-              hasOverviewRiskTrend={hasOverviewRiskTrend}
-              overviewRiskTrend30d={overviewRiskTrend30d}
-              resilience={progress?.stats?.resilience || 0}
-              hasOverviewGuardianBillingTrend={hasOverviewGuardianBillingTrend}
-              overviewGuardianBillingTrend30d={overviewGuardianBillingTrend30d}
-            />
-          </TabsContent>
-        ) : null}
-
-        <TabsContent value="learning" className="space-y-6 mt-0">
           {isAnalysisPresentation ? (
             <>
               <Card className="analysis-chart-stage overflow-hidden border-none rounded-[1.85rem] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] shadow-[0_24px_60px_-44px_rgba(20,41,95,0.42)]">
@@ -3651,7 +2945,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           )}
         </TabsContent>
 
-        <TabsContent value="guardian" className="space-y-6 mt-0">
+        <TabsContent value="counseling" className="space-y-6 mt-0">
           <div className="grid gap-6 lg:grid-cols-12">
             <Card className="lg:col-span-5 rounded-[2rem] border-none shadow-lg bg-white">
               <CardHeader><CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><CalendarCheck2 className="h-5 w-5 text-indigo-500" /> 상담 예약 일정</CardTitle></CardHeader>
@@ -3771,106 +3065,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
           </div>
-
-          {!isStudentSelfView ? (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-black tracking-tight">학부모 활동/반응</CardTitle>
-                  <CardDescription className="font-bold text-[11px]">앱 방문, 리포트 열람, 보호자 커뮤니케이션을 한 번에 봅니다.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3 text-center">
-                      <p className="text-xl font-black text-blue-600">{guardianVisitCount30d}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground">앱 방문</p>
-                    </div>
-                    <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3 text-center">
-                      <p className="text-xl font-black text-emerald-600">{reportReadCount30d}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground">리포트 열람</p>
-                    </div>
-                    <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3 text-center">
-                      <p className="text-xl font-black text-violet-600">{guardianConsultingResponses30d}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground">보호자 반응</p>
-                    </div>
-                  </div>
-
-                  {studentParentActivityEvents.length === 0 && studentParentCommunications.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">학부모 활동 기록이 없습니다.</div>
-                  ) : (
-                    <>
-                      {studentParentActivityEvents.slice(0, 6).map((event) => (
-                        <div key={event.id} className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-black text-slate-900">{event.eventType}</p>
-                            <span className="text-[11px] font-bold text-muted-foreground">{formatDateTimeLabel(event.createdAt)}</span>
-                          </div>
-                          <p className="mt-1 text-xs font-semibold text-slate-600">{event.parentUid || '연결 보호자'} 기준 활동</p>
-                        </div>
-                      ))}
-                      {studentParentCommunications.slice(0, 4).map((item) => (
-                        <div key={item.id} className="rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-black text-slate-900">{item.parentName || item.senderName || '학부모'}</p>
-                            <span className="text-[11px] font-bold text-muted-foreground">{formatDateTimeLabel(item.updatedAt || item.createdAt)}</span>
-                          </div>
-                          <p className="mt-1 text-xs font-semibold text-slate-600">{item.title || item.type || '커뮤니케이션'}</p>
-                          {item.message ? <p className="mt-2 text-sm font-semibold leading-6 text-slate-700 whitespace-pre-wrap">{item.message}</p> : null}
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-black tracking-tight">문자 수신/발송 상태</CardTitle>
-                  <CardDescription className="font-bold text-[11px]">수신 대상과 최근 문자 발송 이력을 같은 탭에서 확인합니다.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="rounded-full font-black text-[10px]">수신처 {studentSmsRecipientPreferences.length}개</Badge>
-                    <Badge variant="outline" className="rounded-full font-black text-[10px]">활성 {enabledSmsRecipients}개</Badge>
-                    <Badge variant="outline" className="rounded-full font-black text-[10px]">{smsStatusLabel}</Badge>
-                  </div>
-                  {studentSmsRecipientPreferences.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">등록된 문자 수신 대상이 없습니다.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {studentSmsRecipientPreferences.map((row) => (
-                        <div key={row.id} className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-black text-slate-900">{row.parentName || (row.parentUid === '__student__' ? '학생 본인' : '학부모')}</p>
-                            <Badge variant="outline" className="font-black text-[10px] rounded-full">{row.enabled !== false ? '수신중' : '수신꺼짐'}</Badge>
-                          </div>
-                          <p className="mt-1 text-xs font-semibold text-slate-600">{row.phoneNumber || '번호 미등록'}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    {studentSmsDeliveryLogs.length === 0 ? (
-                      <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">문자 발송 이력이 없습니다.</div>
-                    ) : studentSmsDeliveryLogs.slice(0, 8).map((log) => (
-                      <div key={log.id} className="rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-black text-slate-900">{log.eventType || '문자'}</p>
-                          <Badge variant="outline" className="font-black text-[10px] rounded-full">{log.status || '기록'}</Badge>
-                        </div>
-                        <p className="mt-1 text-xs font-semibold text-slate-600">{formatDateTimeLabel(log.sentAt || log.failedAt || log.createdAt)}</p>
-                        {log.renderedMessage ? <p className="mt-2 text-sm font-semibold leading-6 text-slate-700 whitespace-pre-wrap">{log.renderedMessage}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : null}
         </TabsContent>
 
-        <TabsContent value="learning" className="space-y-6 mt-0">
+        <TabsContent value="plans" className="space-y-6 mt-0">
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> 오늘 학습 계획</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-primary">{todayPlanSummary.studyDone}/{todayPlanSummary.studyTotal}</p><p className="text-xs font-bold text-muted-foreground mt-1">완료 / 전체 학습 할 일</p></CardContent></Card>
             <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Timer className="h-4 w-4 text-blue-500" /> 오늘 루틴 수</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-blue-600">{todayPlanSummary.routineCount}</p><p className="text-xs font-bold text-muted-foreground mt-1">등원/식사/학원 등 시간 루틴</p></CardContent></Card>
@@ -3901,275 +3098,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardContent>
           </Card>
         </TabsContent>
-
-        {!isStudentSelfView ? (
-          <TabsContent value="attendance" className="space-y-6 mt-0">
-            <div className={cn("grid gap-4", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">출석률</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-emerald-600">{attendanceRate30d}%</p><p className="text-xs font-bold text-muted-foreground mt-1">최근 30일 기록 기준</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">지각 횟수</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-amber-600">{attendanceLateCount30d}회</p><p className="text-xs font-bold text-muted-foreground mt-1">최근 30일 누적</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">외출 흐름</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-blue-600">{attendanceAwayCount30d}회</p><p className="text-xs font-bold text-muted-foreground mt-1">평균 {minutesToLabel(avgAwayMinutes30d)}</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">하원 기록 안정도</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-violet-600">{checkOutStability30d}%</p><p className="text-xs font-bold text-muted-foreground mt-1">check-out 기준</p></CardContent></Card>
-            </div>
-
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black tracking-tight">최근 30일 출결 스트립</CardTitle>
-                <CardDescription className="font-bold text-[11px]">출석, 지각, 결석, 루틴 누락 흐름을 날짜순으로 봅니다.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {attendanceWindowLoading ? (
-                  <div className="flex items-center justify-center h-28 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
-                ) : attendanceDailyStatRows.length === 0 && attendanceHistoryRows.length === 0 ? (
-                  <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">최근 30일 출결 기록이 없습니다.</div>
-                ) : (
-                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                    {(attendanceDailyStatRows.length ? attendanceDailyStatRows : attendanceHistoryRows).slice(0, 30).map((row) => {
-                      const status = (row as AttendanceDailyStatRecord).attendanceStatus || (row as AttendanceHistoryRecord).displayState || (row as AttendanceHistoryRecord).status;
-                      return (
-                        <div key={`${row.dateKey}-${row.id}`} className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-black text-slate-900">{format(new Date(`${row.dateKey}T00:00:00`), 'M월 d일 (EEE)', { locale: ko })}</p>
-                            <Badge variant="outline" className="font-black text-[10px] rounded-full">{attendanceRecordLabel(status)}</Badge>
-                          </div>
-                          <p className="mt-2 text-xs font-semibold text-slate-600">
-                            {formatDateTimeLabel((row as AttendanceDailyStatRecord).checkInAt || (row as AttendanceHistoryRecord).checkedInAt, '등원 미기록')}
-                            {' · '}
-                            {formatDateTimeLabel((row as AttendanceDailyStatRecord).checkOutAt || (row as AttendanceHistoryRecord).checkedOutAt, '하원 미기록')}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-black tracking-tight">출결 신청 내역</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {studentAttendanceRequests.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">출결 신청 내역이 없습니다.</div>
-                  ) : studentAttendanceRequests.slice(0, 8).map((request) => (
-                    <div key={request.id} className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-black text-slate-900">{request.type === 'late' ? '지각 신청' : '결석 신청'}</p>
-                        <Badge variant="outline" className="font-black text-[10px] rounded-full">{request.status}</Badge>
-                      </div>
-                      <p className="mt-1 text-xs font-bold text-muted-foreground">{request.date} · {request.reason}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-black tracking-tight">출결 이벤트 로그</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {studentAttendanceEvents.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">출결 이벤트 로그가 없습니다.</div>
-                  ) : studentAttendanceEvents.slice(0, 10).map((event) => (
-                    <div key={event.id} className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-black text-slate-900">{event.eventType || '이벤트'}</p>
-                        <span className="text-[11px] font-bold text-muted-foreground">{formatDateTimeLabel(event.occurredAt || event.createdAt)}</span>
-                      </div>
-                      <p className="mt-1 text-xs font-semibold text-slate-600">{event.statusBefore || '-'} → {event.statusAfter || '-'}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        ) : null}
-
-        {!isStudentSelfView ? (
-          <TabsContent value="reports" className="space-y-6 mt-0">
-            <div className={cn("grid gap-4", isMobile ? "grid-cols-2" : "md:grid-cols-3")}>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">데일리 리포트</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-primary">{studentDailyReports.length}건</p><p className="text-xs font-bold text-muted-foreground mt-1">누적 저장 수</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">최근 발송일</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-sky-600">{latestReport ? latestReport.dateKey : '-'}</p><p className="text-xs font-bold text-muted-foreground mt-1">{latestReport ? latestReport.status : '리포트 없음'}</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">한 줄 피드백</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-amber-600">{studentQuickFeedbacks.length}건</p><p className="text-xs font-bold text-muted-foreground mt-1">학생 알림 기준</p></CardContent></Card>
-            </div>
-
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black tracking-tight">리포트 내역</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {studentDailyReports.length === 0 ? (
-                  <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">생성된 데일리 리포트가 없습니다.</div>
-                ) : studentDailyReports.slice(0, 12).map((report) => (
-                  <div key={report.id} className="rounded-xl border border-border/60 bg-muted/10 px-4 py-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-black text-slate-900">{report.dateKey}</p>
-                        <p className="text-[11px] font-bold text-muted-foreground">{report.aiMeta?.pedagogyLens || '기본 분석'} · {report.aiMeta?.coachingFocus || '코칭 포인트 없음'}</p>
-                      </div>
-                      <Badge variant="outline" className="font-black text-[10px] rounded-full">{report.status}</Badge>
-                    </div>
-                    <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 whitespace-pre-wrap">{report.content}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ) : null}
-
-        {!isStudentSelfView ? (
-          <TabsContent value="risk" className="space-y-6 mt-0">
-            <div className={cn("grid gap-4", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">리스크 점수</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-rose-600">{studentRiskScore}점</p><p className="text-xs font-bold text-muted-foreground mt-1">학습·출결·벌점 기반</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">벌점</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-amber-600">{progress?.penaltyPoints || 0}점</p><p className="text-xs font-bold text-muted-foreground mt-1">현재 누적 벌점</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">루틴 누락</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-blue-600">{routineMissingCount30d}회</p><p className="text-xs font-bold text-muted-foreground mt-1">최근 30일</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">회복력</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-emerald-600">{progress?.stats?.resilience || 0}점</p><p className="text-xs font-bold text-muted-foreground mt-1">성장 지표 기준</p></CardContent></Card>
-            </div>
-
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black tracking-tight">벌점 이력</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {studentPenaltyLogs.length === 0 ? (
-                  <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">벌점 로그가 없습니다.</div>
-                ) : studentPenaltyLogs.slice(0, 12).map((log) => (
-                  <div key={log.id} className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-black text-slate-900">{log.pointsDelta > 0 ? `+${log.pointsDelta}` : log.pointsDelta}점</p>
-                      <span className="text-[11px] font-bold text-muted-foreground">{formatDateTimeLabel(log.createdAt)}</span>
-                    </div>
-                    <p className="mt-1 text-xs font-semibold text-slate-600">{log.reason}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ) : null}
-
-        {!isStudentSelfView && canViewBilling ? (
-          <TabsContent value="billing" className="space-y-6 mt-0">
-            <div className={cn("grid gap-4", isMobile ? "grid-cols-2" : "md:grid-cols-3")}>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">최신 상태</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-emerald-600">{invoiceStatusSummary}</p><p className="text-xs font-bold text-muted-foreground mt-1">가장 최근 인보이스 기준</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">미수금 여부</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-rose-600">{studentInvoices.some((item) => item.status === 'overdue') ? '있음' : '없음'}</p><p className="text-xs font-bold text-muted-foreground mt-1">최근 인보이스 기준</p></CardContent></Card>
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white"><CardHeader className="pb-2"><CardTitle className="text-base font-black tracking-tight">최근 결제일</CardTitle></CardHeader><CardContent><p className="text-3xl font-black tracking-tight text-blue-600">{latestInvoicePaymentDate ? formatDateLabel(latestInvoicePaymentDate) : '-'}</p><p className="text-xs font-bold text-muted-foreground mt-1">청구/결제 기준</p></CardContent></Card>
-            </div>
-
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black tracking-tight">인보이스 이력</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {studentInvoices.length === 0 ? (
-                  <div className="rounded-xl border border-dashed py-8 text-center text-sm font-bold text-muted-foreground">인보이스가 없습니다.</div>
-                ) : studentInvoices.map((invoice) => (
-                  <div key={invoice.id} className="rounded-xl border border-border/60 bg-muted/10 px-4 py-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-black text-slate-900">{invoiceStatusLabel(invoice.status)}</p>
-                      <Badge variant="outline" className="font-black text-[10px] rounded-full">{invoice.finalPrice.toLocaleString()}원</Badge>
-                    </div>
-                    <p className="mt-1 text-xs font-semibold text-slate-600">발행 {formatDateLabel(invoice.issuedAt)} · 최근 기준 {formatDateLabel(invoice.paidAt || invoice.updatedAt)}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ) : null}
-
-        {!isStudentSelfView ? (
-          <TabsContent value="raw" className="space-y-6 mt-0">
-            <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black tracking-tight">원본 로그 모음</CardTitle>
-                <CardDescription className="font-bold text-[11px]">도메인별 raw 데이터를 바로 확인합니다. 필요한 것만 펼쳐서 볼 수 있게 구성했습니다.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
-                  <summary className="cursor-pointer text-sm font-black text-slate-900">studyLogs / plans / daily stats</summary>
-                  <div className="mt-3 space-y-2">
-                    {recentStudySessions.slice(0, 10).map((item) => (
-                      <div key={item.dateKey} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {item.dateKey} · {minutesToLabel(item.minutes)} · {item.hasActualStudyLog ? '실제 로그' : '통계 기반'}
-                      </div>
-                    ))}
-                    {pastPlanGroups.slice(0, 5).map((group) => (
-                      <div key={group.dateKey} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {group.dateKey} · 학습 {group.studies.length} · 루틴 {group.routines.length} · 개인 {group.personals.length}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-
-                <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
-                  <summary className="cursor-pointer text-sm font-black text-slate-900">attendance</summary>
-                  <div className="mt-3 space-y-2">
-                    {attendanceDailyStatRows.slice(0, 12).map((row) => (
-                      <div key={`raw-att-${row.dateKey}`} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {row.dateKey} · {attendanceRecordLabel(row.attendanceStatus)} · 지각 {byteValueLabel(row.lateMinutes || 0, '분')} · 외출 {byteValueLabel(row.awayMinutes || 0, '분')}
-                      </div>
-                    ))}
-                    {studentAttendanceEvents.slice(0, 12).map((event) => (
-                      <div key={`raw-event-${event.id}`} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {event.dateKey || '-'} · {event.eventType || '이벤트'} · {event.statusBefore || '-'} → {event.statusAfter || '-'}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-
-                <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
-                  <summary className="cursor-pointer text-sm font-black text-slate-900">counseling / guardian / sms</summary>
-                  <div className="mt-3 space-y-2">
-                    {studentCounselingLogs.slice(0, 8).map((log) => (
-                      <div key={`raw-c-${log.id}`} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {formatDateTimeLabel(log.createdAt)} · {log.type} · {log.teacherName || '담당 선생님'}
-                      </div>
-                    ))}
-                    {studentParentActivityEvents.slice(0, 8).map((event) => (
-                      <div key={`raw-pa-${event.id}`} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {formatDateTimeLabel(event.createdAt)} · {event.eventType} · {event.parentUid || '보호자'}
-                      </div>
-                    ))}
-                    {studentSmsDeliveryLogs.slice(0, 8).map((log) => (
-                      <div key={`raw-sms-${log.id}`} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {formatDateTimeLabel(log.sentAt || log.failedAt || log.createdAt)} · {log.eventType || '문자'} · {log.status || '기록'}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-
-                <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
-                  <summary className="cursor-pointer text-sm font-black text-slate-900">reports / notifications</summary>
-                  <div className="mt-3 space-y-2">
-                    {studentDailyReports.slice(0, 8).map((report) => (
-                      <div key={`raw-r-${report.id}`} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {report.dateKey} · {report.status} · {report.aiMeta?.pedagogyLens || '기본'}
-                      </div>
-                    ))}
-                    {studentQuickFeedbacks.slice(0, 8).map((feedback) => (
-                      <div key={`raw-n-${feedback.id}`} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        {formatDateTimeLabel(feedback.createdAt)} · 한 줄 피드백 · {feedback.readAt ? '읽음' : '미확인'}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-
-                {canViewBilling ? (
-                  <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
-                    <summary className="cursor-pointer text-sm font-black text-slate-900">billing</summary>
-                    <div className="mt-3 space-y-2">
-                      {studentInvoices.slice(0, 8).map((invoice) => (
-                        <div key={`raw-b-${invoice.id}`} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                          {invoiceStatusLabel(invoice.status)} · {invoice.finalPrice.toLocaleString()}원 · {formatDateLabel(invoice.paidAt || invoice.updatedAt || invoice.issuedAt)}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ) : null}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ) : null}
       </Tabs>
 
       <Dialog open={isAvgStudyModalOpen} onOpenChange={setIsAvgStudyModalOpen}>
