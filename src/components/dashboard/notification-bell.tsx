@@ -193,9 +193,14 @@ export function NotificationBell() {
     const now = Date.now();
     const announcementItems: NotificationFeedItem[] = (studentAnnouncementRows || [])
       .filter((item) => {
-        const status = item?.status || 'published';
-        const audience = item?.audience || 'parent';
-        return status === 'published' && (audience === 'student' || audience === 'all');
+        const normalizedStatus = item?.status?.trim?.().toLowerCase?.();
+        const isPublished = normalizedStatus
+          ? normalizedStatus === 'published'
+          : typeof item?.isPublished === 'boolean'
+            ? item.isPublished
+            : true;
+        const audience = item?.audience || 'student';
+        return isPublished && (audience === 'student' || audience === 'all' || !item?.audience);
       })
       .map((item, index) => {
         const timestamp = Math.max(toMillis(item?.updatedAt), toMillis(item?.createdAt));

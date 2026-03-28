@@ -249,6 +249,12 @@ service cloud.firestore {
         allow delete: if isCenterAdmin(centerId);
       }
 
+      match /centerAnnouncements/{announcementId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn() && (hasMembership(centerId) || hasUserCenter(centerId)));
+        allow create, update, delete: if isTeacherOrAdmin(centerId);
+      }
+
       match /counselingReservations/{resId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid))
