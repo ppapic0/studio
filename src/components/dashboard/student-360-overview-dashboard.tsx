@@ -155,6 +155,13 @@ export function Student360OverviewDashboard(props: Student360OverviewDashboardPr
   const metricPanelClass = 'relative rounded-[1.3rem] border border-slate-100 bg-white/78 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]';
   const chartHeaderClass = cn('relative z-10', props.isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4');
   const chartContentClass = cn('relative z-10 pt-0', props.isMobile ? 'px-4 pb-4' : 'px-5 pb-5');
+  const guardianBillingSeries = [
+    { dataKey: 'guardianActivity', label: '보호자 반응', color: '#7c3aed', formatter: (value: number) => `${Math.round(value)}회` },
+    { dataKey: 'reportReads', label: '리포트 열람', color: '#10b981', formatter: (value: number) => `${Math.round(value)}회` },
+    ...(props.canViewBilling
+      ? [{ dataKey: 'billing', label: '청구/결제', color: '#0ea5e9', formatter: (value: number) => `${Math.round(value)}건` }]
+      : []),
+  ];
 
   return (
     <div className="space-y-6">
@@ -262,8 +269,66 @@ export function Student360OverviewDashboard(props: Student360OverviewDashboardPr
         </Card>
 
         <Card className={cn(cardClass(isHighlighted('guardian', 'billing')), 'cursor-pointer')} onClick={() => props.onSelectDomain(props.canViewBilling ? 'billing' : 'guardian')}>
-          <CardHeader className={chartHeaderClass}><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-lg font-black tracking-tight">{props.canViewBilling ? '수납/보호자 반응' : '보호자 반응 추이'}</CardTitle><CardDescription className="mt-1 text-[11px] font-bold">{props.canViewBilling ? '청구 흐름과 보호자 활동을 같은 축에서 같이 봅니다.' : '앱 방문, 리포트 열람, 보호자 반응 흐름을 봅니다.'}</CardDescription></div><Badge variant="outline" className="rounded-full font-black text-[10px]">{props.canViewBilling ? '수납·학부모' : '학부모'}</Badge></div></CardHeader>
-          <CardContent className={chartContentClass}>{props.hasOverviewGuardianBillingTrend ? <><div className="h-[220px] w-full"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={props.overviewGuardianBillingTrend30d} margin={{ top: 10, right: 12, left: -16, bottom: 0 }}><CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e8edf7" /><XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} /><YAxis yAxisId="left" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={28} /><YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={24} /><Tooltip content={<MultiSeriesTooltip presentationMode={props.presentationMode} series={[{ dataKey: 'guardianActivity', label: '보호자 반응', color: '#7c3aed', formatter: (value) => `${Math.round(value)}회` }, { dataKey: 'reportReads', label: '리포트 열람', color: '#10b981', formatter: (value) => `${Math.round(value)}회` }, ...(props.canViewBilling ? [{ dataKey: 'billing', label: '청구/결제', color: '#0ea5e9', formatter: (value: number) => `${Math.round(value)}건` }] : [])]} />}{props.canViewBilling ? <Bar yAxisId="right" dataKey="billing" fill="#0ea5e9" radius={[8, 8, 0, 0]} maxBarSize={20} /> : null}<Line yAxisId="left" type="monotone" dataKey="guardianActivity" stroke="#7c3aed" strokeWidth={3} dot={false} /><Line yAxisId="left" type="monotone" dataKey="reportReads" stroke="#10b981" strokeWidth={3} dot={false} /></ComposedChart></ResponsiveContainer></div><div className={metricPanelClass}><div className={cn('grid gap-3', props.canViewBilling ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">앱 방문</p><p className="mt-2 text-sm font-black text-[#14295F]">{props.guardianVisitCount30d}회</p></div><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">리포트 열람</p><p className="mt-2 text-sm font-black text-[#14295F]">{props.reportReadCount30d}회</p></div>{props.canViewBilling ? <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">수납 상태</p><p className="mt-2 text-sm font-black text-[#14295F]">{props.invoiceStatusSummary}</p></div> : null}</div></div></> : <div className="rounded-2xl border border-dashed py-16 text-center text-sm font-bold text-muted-foreground">{props.canViewBilling ? '수납 또는 보호자 활동 데이터가 없습니다.' : '보호자 반응 데이터가 없습니다.'}</div>}</CardContent>
+          <CardHeader className={chartHeaderClass}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-black tracking-tight">{props.canViewBilling ? '수납/보호자 반응' : '보호자 반응 추이'}</CardTitle>
+                <CardDescription className="mt-1 text-[11px] font-bold">
+                  {props.canViewBilling ? '청구 흐름과 보호자 활동을 같은 축에서 같이 봅니다.' : '앱 방문, 리포트 열람, 보호자 반응 흐름을 봅니다.'}
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="rounded-full font-black text-[10px]">{props.canViewBilling ? '수납·학부모' : '학부모'}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className={chartContentClass}>
+            {props.hasOverviewGuardianBillingTrend ? (
+              <>
+                <div className="h-[220px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={props.overviewGuardianBillingTrend30d} margin={{ top: 10, right: 12, left: -16, bottom: 0 }}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e8edf7" />
+                      <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} />
+                      <YAxis yAxisId="left" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={28} />
+                      <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} fontSize={10} fontWeight={800} width={24} />
+                      <Tooltip
+                        content={
+                          <MultiSeriesTooltip
+                            presentationMode={props.presentationMode}
+                            series={guardianBillingSeries}
+                          />
+                        }
+                      />
+                      {props.canViewBilling ? <Bar yAxisId="right" dataKey="billing" fill="#0ea5e9" radius={[8, 8, 0, 0]} maxBarSize={20} /> : null}
+                      <Line yAxisId="left" type="monotone" dataKey="guardianActivity" stroke="#7c3aed" strokeWidth={3} dot={false} />
+                      <Line yAxisId="left" type="monotone" dataKey="reportReads" stroke="#10b981" strokeWidth={3} dot={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className={metricPanelClass}>
+                  <div className={cn('grid gap-3', props.canViewBilling ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">앱 방문</p>
+                      <p className="mt-2 text-sm font-black text-[#14295F]">{props.guardianVisitCount30d}회</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">리포트 열람</p>
+                      <p className="mt-2 text-sm font-black text-[#14295F]">{props.reportReadCount30d}회</p>
+                    </div>
+                    {props.canViewBilling ? (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">수납 상태</p>
+                        <p className="mt-2 text-sm font-black text-[#14295F]">{props.invoiceStatusSummary}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-2xl border border-dashed py-16 text-center text-sm font-bold text-muted-foreground">
+                {props.canViewBilling ? '수납 또는 보호자 활동 데이터가 없습니다.' : '보호자 반응 데이터가 없습니다.'}
+              </div>
+            )}
+          </CardContent>
         </Card>
       </div>
     </div>
