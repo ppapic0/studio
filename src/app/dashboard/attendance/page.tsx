@@ -372,7 +372,7 @@ export default function AttendancePage() {
               liveAttendanceStatus !== 'absent' ||
               previousRecordStatus === 'confirmed_present' ||
               previousRecordStatus === 'confirmed_late' ||
-              previousRecordStatus === 'confirmed_present_missing_routine'
+              String(previousRecordStatus) === 'confirmed_present_missing_routine'
             )
           ) {
             void triggerAttendanceSms(studentId, 'study_end');

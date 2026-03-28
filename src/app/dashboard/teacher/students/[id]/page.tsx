@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useCollection, useDoc, useFirestore, useFunctions, useUser } from '@/firebase';
@@ -57,6 +57,19 @@ type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number;
 type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
 type Student360Tab = 'overview' | 'learning' | 'attendance' | 'guardian' | 'reports' | 'risk' | 'billing' | 'raw';
 type Student360Domain = 'learning' | 'attendance' | 'risk' | 'guardian' | 'reports' | 'sms' | 'billing';
+type Student360DomainCard = {
+  key: Student360Domain;
+  title: string;
+  value: string;
+  subValue: string;
+  icon: any;
+  colorClass: string;
+  tab: Student360Tab;
+  progress: number;
+  detailTitle: string;
+  detailBody: string;
+  action: string;
+};
 type AttendanceHistoryRecord = {
   id: string;
   dateKey: string;
@@ -1537,8 +1550,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Math.round((penaltyFactor + completionFactor + attendanceFactor + rhythmFactor) / 4);
   }, [progress?.penaltyPoints, avgCompletionRate, attendanceRate30d, rhythmScore]);
 
-  const domainCards = useMemo(() => {
-    const rows = [
+  const domainCards = useMemo<Student360DomainCard[]>(() => {
+    const rows: Student360DomainCard[] = [
       {
         key: 'learning' as const,
         title: '학습',
@@ -4254,4 +4267,3 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     </div>
   );
 }
-

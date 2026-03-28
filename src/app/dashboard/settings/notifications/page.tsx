@@ -82,6 +82,7 @@ type SmsQueueRow = {
   phoneNumber?: string;
   to?: string;
   eventType?: SmsConsoleEventType;
+  dateKey?: string;
   status?: SmsQueueStatus | string;
   providerStatus?: string;
   renderedMessage?: string;
@@ -672,7 +673,7 @@ export default function NotificationSettingsPage() {
       .map((student) => {
         const studentName = student.name || '학생';
         const className = student.className || student.grade || '-';
-        const parentRows = (student.parentUids || []).map((parentUid) => {
+        const parentRows: RecipientPreferenceRow[] = (student.parentUids || []).map((parentUid) => {
           const member = membersById.get(parentUid);
           const pref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, parentUid));
           const phoneNumber = resolveFirstValidPhoneNumber(
@@ -711,7 +712,7 @@ export default function NotificationSettingsPage() {
           isFallbackRecipient: true,
           isPhoneMissing: !fallbackPhoneNumber,
         } satisfies RecipientPreferenceRow;
-        const effectiveRows = parentRowsWithPhone.length > 0 ? parentRowsWithPhone : [fallbackRow];
+        const effectiveRows: RecipientPreferenceRow[] = parentRowsWithPhone.length > 0 ? parentRowsWithPhone : [fallbackRow];
         return {
           studentId: student.id,
           studentName,

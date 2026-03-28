@@ -13,6 +13,7 @@ export type CenterMembership = {
   displayName?: string;
   linkedStudentIds?: string[];
   className?: string;
+  phoneNumber?: string;
 };
 
 export const TIERS = [
@@ -113,6 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         joinedAt: primary.joinedAt || secondary.joinedAt,
         displayName: primary.displayName || secondary.displayName,
         className: primary.className ?? secondary.className,
+        phoneNumber: primary.phoneNumber ?? secondary.phoneNumber,
         linkedStudentIds: mergedLinkedIds.length > 0 ? mergedLinkedIds : undefined,
       };
     };
@@ -214,6 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               displayName: raw.displayName,
               linkedStudentIds: raw.linkedStudentIds,
               className: raw.className,
+              phoneNumber: raw.phoneNumber,
             } as CenterMembership;
           })
           .filter((membership): membership is CenterMembership => !!membership);
@@ -242,6 +245,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             displayName: raw.displayName,
             linkedStudentIds: raw.linkedStudentIds,
             className: raw.className,
+            phoneNumber: raw.phoneNumber,
           } as CenterMembership;
         });
 
