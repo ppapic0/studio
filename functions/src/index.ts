@@ -3911,15 +3911,17 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
   }
 
-  const [userSnap, memberSnap] = await Promise.all([
-    db.doc(`users/${isStudentFallbackRecipient ? studentId : parentUid}`).get(),
-    db.doc(`centers/${centerId}/members/${isStudentFallbackRecipient ? studentId : parentUid}`).get(),
+  const targetUid = isStudentFallbackRecipient ? studentId : parentUid;
+  const [userSnap, memberSnap, userCenterSnap] = await Promise.all([
+    db.doc(`users/${targetUid}`).get(),
+    db.doc(`centers/${centerId}/members/${targetUid}`).get(),
+    db.doc(`userCenters/${targetUid}/centers/${centerId}`).get(),
   ]);
 
   const studentName = asTrimmedString(studentSnap.data()?.name, "학생");
   const parentName = isStudentFallbackRecipient
     ? "학생 본인"
-    : asTrimmedString(memberSnap.data()?.displayName || userSnap.data()?.displayName || "학부모");
+    : asTrimmedString(memberSnap.data()?.displayName || userCenterSnap.data()?.displayName || userSnap.data()?.displayName || "학부모");
   const phoneNumberOverride = asTrimmedString(data?.phoneNumberOverride);
   const phoneNumber = resolveFirstValidPhoneNumber(
     phoneNumberOverride,
@@ -3927,7 +3929,8 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
       ? studentSnap.data()?.phoneNumber
       : null,
     userSnap.data()?.phoneNumber,
-    memberSnap.data()?.phoneNumber
+    memberSnap.data()?.phoneNumber,
+    userCenterSnap.data()?.phoneNumber
   );
   const enabled = data?.enabled !== false;
   const eventToggles = normalizeSmsEventToggles(data?.eventToggles);

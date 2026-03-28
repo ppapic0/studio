@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
-import { collection, doc, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, orderBy, query, where } from 'firebase/firestore';
 import {
   BellRing,
   Clock3,
@@ -147,6 +147,16 @@ type StudentDoc = {
 
 type MemberDoc = {
   id: string;
+  role?: string;
+  status?: string;
+  displayName?: string;
+  name?: string;
+  phoneNumber?: string;
+};
+
+type UserCenterMemberDoc = {
+  id?: string;
+  centerId?: string;
   role?: string;
   status?: string;
   displayName?: string;
@@ -514,6 +524,7 @@ export default function NotificationSettingsPage() {
   const [recipientPhoneDrafts, setRecipientPhoneDrafts] = useState<Record<string, string>>({});
   const [manualSmsMessage, setManualSmsMessage] = useState('');
   const [manualSmsActionKey, setManualSmsActionKey] = useState<string | null>(null);
+  const [userCenterMembersById, setUserCenterMembersById] = useState<Record<string, UserCenterMemberDoc>>({});
 
   const settingsRef = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -643,6 +654,77 @@ export default function NotificationSettingsPage() {
     [preferencesRaw]
   );
 
+  const userCenterLookupUids = useMemo(() => {
+    const targets = new Set<string>();
+
+    for (const student of studentsRaw || []) {
+      const fallbackPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, STUDENT_SMS_FALLBACK_UID));
+      const studentMember = membersById.get(student.id);
+      const fallbackPhone = resolveFirstValidPhoneNumber(
+        fallbackPref?.phoneNumber,
+        student.phoneNumber,
+        studentMember?.phoneNumber
+      );
+
+      if (!fallbackPhone) {
+        targets.add(student.id);
+      }
+
+      for (const parentUid of student.parentUids || []) {
+        const pref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, parentUid));
+        const member = membersById.get(parentUid);
+        const parentPhone = resolveFirstValidPhoneNumber(
+          pref?.phoneNumber,
+          member?.phoneNumber
+        );
+
+        if (!parentPhone) {
+          targets.add(parentUid);
+        }
+      }
+    }
+
+    return Array.from(targets).sort();
+  }, [membersById, preferencesByKey, studentsRaw]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!firestore || !centerId || !isAdmin || userCenterLookupUids.length === 0) {
+      setUserCenterMembersById({});
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    (async () => {
+      const entries = await Promise.all(
+        userCenterLookupUids.map(async (uid) => {
+          const snap = await getDoc(doc(firestore, 'userCenters', uid, 'centers', centerId));
+          return [uid, snap.exists() ? (snap.data() as UserCenterMemberDoc) : null] as const;
+        })
+      );
+
+      if (cancelled) return;
+
+      setUserCenterMembersById(
+        Object.fromEntries(
+          entries
+            .filter((entry): entry is readonly [string, UserCenterMemberDoc] => Boolean(entry[1]))
+            .map(([uid, value]) => [uid, value])
+        )
+      );
+    })().catch(() => {
+      if (!cancelled) {
+        setUserCenterMembersById({});
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [centerId, firestore, isAdmin, userCenterLookupUids]);
+
   const providerReady = useMemo(() => {
     if (!form.smsEnabled) return false;
     if (form.smsProvider === 'none') return false;
@@ -749,17 +831,19 @@ export default function NotificationSettingsPage() {
         const className = student.className || student.grade || '-';
         const parentRows: RecipientPreferenceRow[] = (student.parentUids || []).map((parentUid) => {
           const member = membersById.get(parentUid);
+          const userCenterMember = userCenterMembersById[parentUid];
           const pref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, parentUid));
           const phoneNumber = resolveFirstValidPhoneNumber(
             pref?.phoneNumber,
-            member?.phoneNumber
+            member?.phoneNumber,
+            userCenterMember?.phoneNumber
           );
           return {
             studentId: student.id,
             studentName,
             className,
             parentUid,
-            parentName: pref?.parentName || member?.displayName || member?.name || '학부모',
+            parentName: pref?.parentName || member?.displayName || member?.name || userCenterMember?.displayName || userCenterMember?.name || '학부모',
             phoneNumber,
             enabled: pref?.enabled !== false,
             eventToggles: mergeEventToggles(pref?.eventToggles),
@@ -769,10 +853,12 @@ export default function NotificationSettingsPage() {
         const parentRowsWithPhone = parentRows.filter((row) => !row.isPhoneMissing);
         const fallbackPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, STUDENT_SMS_FALLBACK_UID));
         const studentMember = membersById.get(student.id);
+        const studentUserCenter = userCenterMembersById[student.id];
         const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
           fallbackPref?.phoneNumber,
           student.phoneNumber,
-          studentMember?.phoneNumber
+          studentMember?.phoneNumber,
+          studentUserCenter?.phoneNumber
         );
         const fallbackRow = {
           studentId: student.id,
@@ -795,7 +881,7 @@ export default function NotificationSettingsPage() {
         };
       })
       .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ko-KR'));
-  }, [membersById, preferencesByKey, studentsRaw]);
+  }, [membersById, preferencesByKey, studentsRaw, userCenterMembersById]);
 
   const todayBoardRows = useMemo<StudentSmsBoardRow[]>(() => {
     const queueRows = smsQueueRaw || [];

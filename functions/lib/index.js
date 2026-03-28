@@ -3076,7 +3076,7 @@ exports.cancelSmsQueueItem = functions.region(region).https.onCall(async (data, 
     return { ok: true };
 });
 exports.updateSmsRecipientPreference = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -3101,18 +3101,20 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
     if (!isStudentFallbackRecipient && !parentUids.includes(parentUid)) {
         throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
     }
-    const [userSnap, memberSnap] = await Promise.all([
-        db.doc(`users/${isStudentFallbackRecipient ? studentId : parentUid}`).get(),
-        db.doc(`centers/${centerId}/members/${isStudentFallbackRecipient ? studentId : parentUid}`).get(),
+    const targetUid = isStudentFallbackRecipient ? studentId : parentUid;
+    const [userSnap, memberSnap, userCenterSnap] = await Promise.all([
+        db.doc(`users/${targetUid}`).get(),
+        db.doc(`centers/${centerId}/members/${targetUid}`).get(),
+        db.doc(`userCenters/${targetUid}/centers/${centerId}`).get(),
     ]);
     const studentName = asTrimmedString((_c = studentSnap.data()) === null || _c === void 0 ? void 0 : _c.name, "학생");
     const parentName = isStudentFallbackRecipient
         ? "학생 본인"
-        : asTrimmedString(((_d = memberSnap.data()) === null || _d === void 0 ? void 0 : _d.displayName) || ((_e = userSnap.data()) === null || _e === void 0 ? void 0 : _e.displayName) || "학부모");
+        : asTrimmedString(((_d = memberSnap.data()) === null || _d === void 0 ? void 0 : _d.displayName) || ((_e = userCenterSnap.data()) === null || _e === void 0 ? void 0 : _e.displayName) || ((_f = userSnap.data()) === null || _f === void 0 ? void 0 : _f.displayName) || "학부모");
     const phoneNumberOverride = asTrimmedString(data === null || data === void 0 ? void 0 : data.phoneNumberOverride);
     const phoneNumber = resolveFirstValidPhoneNumber(phoneNumberOverride, isStudentFallbackRecipient
-        ? (_f = studentSnap.data()) === null || _f === void 0 ? void 0 : _f.phoneNumber
-        : null, (_g = userSnap.data()) === null || _g === void 0 ? void 0 : _g.phoneNumber, (_h = memberSnap.data()) === null || _h === void 0 ? void 0 : _h.phoneNumber);
+        ? (_g = studentSnap.data()) === null || _g === void 0 ? void 0 : _g.phoneNumber
+        : null, (_h = userSnap.data()) === null || _h === void 0 ? void 0 : _h.phoneNumber, (_j = memberSnap.data()) === null || _j === void 0 ? void 0 : _j.phoneNumber, (_k = userCenterSnap.data()) === null || _k === void 0 ? void 0 : _k.phoneNumber);
     const enabled = (data === null || data === void 0 ? void 0 : data.enabled) !== false;
     const eventToggles = normalizeSmsEventToggles(data === null || data === void 0 ? void 0 : data.eventToggles);
     await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
