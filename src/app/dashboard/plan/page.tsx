@@ -1403,7 +1403,7 @@ export default function StudyPlanPage() {
                       <Label className={cn("font-black text-primary uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>등원 계획</Label>
                     </div>
                     <div className={cn("gap-2 sm:gap-3", isMobile ? "flex flex-col" : "flex flex-col xl:flex-row xl:items-end")}>
-                        <div className={cn("grid w-full min-w-0", isMobile ? "grid-cols-2 gap-1 sm:gap-2" : "grid-cols-2 gap-2 sm:gap-3 xl:flex-1")}>
+                        <div className={cn("grid w-full min-w-0", isMobile ? "grid-cols-1 gap-2" : "grid-cols-2 gap-2 sm:gap-3 xl:flex-1")}>
                           <div className="space-y-1">
                             <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>등원 예정</span>
                           <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
@@ -1421,7 +1421,7 @@ export default function StudyPlanPage() {
                         <Label className={cn("font-black text-primary uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>외출 일정</Label>
                         <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>학원/병원/식사 등</span>
                       </div>
-                      <div className={cn("grid", isMobile ? "grid-cols-2 gap-2" : "grid-cols-[minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,1fr)] gap-3")}>
+                      <div className={cn("grid", isMobile ? "grid-cols-1 gap-2" : "grid-cols-[minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,1fr)] gap-3")}>
                         <div className="space-y-1">
                           <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>외출 시작</span>
                           <Input type="time" value={awayStartTime} onChange={e => setAwayStartTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-lg")} />
@@ -1430,7 +1430,7 @@ export default function StudyPlanPage() {
                           <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>복귀 예정</span>
                           <Input type="time" value={awayEndTime} onChange={e => setAwayEndTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-lg")} />
                         </div>
-                        <div className={cn("space-y-1", isMobile ? "col-span-2" : "")}>
+                        <div className="space-y-1">
                           <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>사유</span>
                           <Input value={awayReason} onChange={e => setAwayReason(e.target.value)} placeholder="예: 영어학원, 병원, 저녁 식사" className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-sm")} />
                         </div>
