@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -28,6 +28,7 @@ export const TIERS = [
 ];
 
 const ACTIVE_ATTENDANCE_STATUSES = ['studying', 'away', 'break'] as const;
+const MOBILE_VIEWPORT_QUERY = '(max-width: 768px)';
 
 function getSeatActivityRank(status?: string | null): number {
   if (status === 'studying') return 0;
@@ -352,16 +353,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
-    const isPhoneViewport = window.matchMedia('(max-width: 768px)').matches;
+    const isPhoneViewport = window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
     const shouldUseMobileByDefault =
-      activeMembership?.role === 'parent'
-      || (activeMembership?.role === 'student' && isPhoneViewport);
+      activeMembership?.role === 'parent' ||
+      (activeMembership?.role === 'student' && isPhoneViewport);
 
     if (shouldUseMobileByDefault && viewMode !== 'mobile') {
       setViewMode('mobile');
     }
+  }, [activeMembership?.role, viewMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia(MOBILE_VIEWPORT_QUERY);
+    const syncMobileView = () => {
+      const shouldUseMobileByDefault =
+        activeMembership?.role === 'parent' ||
+        (activeMembership?.role === 'student' && mediaQuery.matches);
+
+      if (shouldUseMobileByDefault && viewMode !== 'mobile') {
+        setViewMode('mobile');
+      }
+    };
+
+    syncMobileView();
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncMobileView);
+      return () => mediaQuery.removeEventListener('change', syncMobileView);
+    }
+
+    mediaQuery.addListener(syncMobileView);
+    return () => mediaQuery.removeListener(syncMobileView);
   }, [activeMembership?.role, viewMode]);
 
   const contextValue = useMemo(
