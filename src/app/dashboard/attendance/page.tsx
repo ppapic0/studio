@@ -27,7 +27,8 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { differenceInMinutes, format, isSameDay } from 'date-fns';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useFunctions, useUser, useMemoFirebase } from '@/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { useAppContext } from '@/contexts/app-context';
 import { collection, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch } from 'firebase/firestore';
 import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3 } from 'lucide-react';
@@ -82,6 +83,7 @@ type StudyLogSummary = {
 export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { activeMembership, memberships, membershipsLoading } = useAppContext();
   const { toast } = useToast();
   
@@ -105,6 +107,24 @@ export default function AttendancePage() {
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const centerId = classroomMembership?.id;
   const isTeacherOrAdmin = Boolean(classroomMembership);
+  const canTriggerAttendanceSms =
+    classroomMembership?.role === 'teacher' ||
+    classroomMembership?.role === 'centerAdmin' ||
+    classroomMembership?.role === 'owner';
+
+  const triggerAttendanceSms = async (
+    studentId: string,
+    eventType: 'study_start' | 'study_end'
+  ) => {
+    if (!functions || !centerId || !canTriggerAttendanceSms) return;
+
+    try {
+      const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
+      await notifyAttendanceSms({ centerId, studentId, eventType });
+    } catch (error) {
+      console.warn('[attendance] notifyAttendanceSms failed', error);
+    }
+  };
 
   // 1. 센터 모든 학생 조회
   const studentsQuery = useMemoFirebase(() => {
@@ -265,6 +285,10 @@ export default function AttendancePage() {
 
       setIsProcessing(true);
       try {
+        const todayDateKey = format(new Date(), 'yyyy-MM-dd');
+        const isTodaySelected = dateKey === todayDateKey;
+        const previousRecordStatus = attendanceMap.get(studentId)?.status || null;
+        const liveAttendanceStatus = attendanceCurrentMap.get(studentId)?.status || 'absent';
         const batch = writeBatch(firestore);
         const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
         const studentData = students?.find(s => s.id === studentId);
@@ -339,6 +363,21 @@ export default function AttendancePage() {
         });
 
         await batch.commit();
+        if (isTodaySelected) {
+          if (status === 'confirmed_present' || status === 'confirmed_late') {
+            void triggerAttendanceSms(studentId, 'study_start');
+          } else if (
+            (status === 'confirmed_absent' || status === 'excused_absent') &&
+            (
+              liveAttendanceStatus !== 'absent' ||
+              previousRecordStatus === 'confirmed_present' ||
+              previousRecordStatus === 'confirmed_late' ||
+              previousRecordStatus === 'confirmed_present_missing_routine'
+            )
+          ) {
+            void triggerAttendanceSms(studentId, 'study_end');
+          }
+        }
         toast({ title: '출결 상태를 저장했습니다.' });
       } catch (error) {
         console.error('[attendance] manual status update failed', error);
