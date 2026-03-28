@@ -59,7 +59,7 @@ function PlaceholderFrame({ screen, featured = false }: ScreenCardProps) {
           alt={screen.title}
           fill
           sizes={screen.frame === 'desktop' ? '(max-width: 1024px) 100vw, 60vw' : '(max-width: 1024px) 100vw, 20vw'}
-          className="object-cover"
+          className="object-contain"
         />
       </div>
     );
@@ -154,10 +154,6 @@ export function AppSystemSection({ appSystem }: AppSystemSectionProps) {
             ))}
           </div>
         </div>
-
-        <p className="mt-6 text-center text-[12px] font-semibold text-[#667A95]">
-          실제 화면은 순차 반영 예정입니다.
-        </p>
       </div>
     </section>
   );
