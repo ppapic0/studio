@@ -50,13 +50,13 @@ export function CenterAdminAttendanceBoard({
   onSeatClick,
 }: CenterAdminAttendanceBoardProps) {
   const summaryItems = [
-    { label: '공부 중', value: summary.normalPresentCount, tone: 'bg-sky-100 text-sky-700' },
-    { label: '미입실/지각', value: summary.lateOrAbsentCount, tone: 'bg-rose-100 text-rose-700' },
-    { label: '루틴 누락', value: summary.routineMissingCount, tone: 'bg-orange-100 text-orange-700' },
-    { label: '외출 중', value: summary.awayCount, tone: 'bg-amber-100 text-amber-700' },
-    { label: '복귀 후 공부', value: summary.returnedCount, tone: 'bg-cyan-100 text-cyan-700' },
-    { label: '퇴실', value: summary.checkedOutCount, tone: 'bg-slate-200 text-slate-700' },
-    { label: '장기외출', value: summary.longAwayCount, tone: 'bg-amber-200 text-amber-800' },
+    { label: '공부 중', value: summary.normalPresentCount, tone: 'bg-sky-200 text-sky-800' },
+    { label: '미입실/지각', value: summary.lateOrAbsentCount, tone: 'bg-rose-200 text-rose-800' },
+    { label: '루틴 누락', value: summary.routineMissingCount, tone: 'bg-orange-200 text-orange-800' },
+    { label: '외출 중', value: summary.awayCount, tone: 'bg-amber-200 text-amber-800' },
+    { label: '복귀 후 공부', value: summary.returnedCount, tone: 'bg-cyan-200 text-cyan-800' },
+    { label: '퇴실', value: summary.checkedOutCount, tone: 'bg-slate-300 text-slate-800' },
+    { label: '장기외출', value: summary.longAwayCount, tone: 'bg-amber-300 text-amber-900' },
   ];
 
   const roomSignals = roomConfigs.map((room) => {
