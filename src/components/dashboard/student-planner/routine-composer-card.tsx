@@ -52,10 +52,10 @@ export function RoutineComposerCard({
             <Sparkles className={compact ? "h-4 w-4" : "h-4 w-4"} />
           </div>
           <div className="min-w-0">
-            <CardTitle className={cn("font-black tracking-tight text-primary", compact ? "text-sm" : isMobile ? "text-base" : "text-lg")}>
+            <CardTitle className={cn("font-black tracking-tight text-primary break-keep", compact ? "text-sm" : isMobile ? "text-base leading-6" : "text-lg")}>
               {title}
             </CardTitle>
-            <CardDescription className={cn("break-keep text-slate-500", compact ? "mt-0.5 text-[10px] leading-4" : "mt-0.5 text-[11px] leading-5")}>
+            <CardDescription className={cn("break-keep text-slate-500", compact ? "mt-0.5 text-[10px] leading-4" : isMobile ? "mt-0.5 text-[11px] leading-5" : "mt-0.5 text-[11px] leading-5")}>
               {description}
             </CardDescription>
           </div>
@@ -71,10 +71,11 @@ export function RoutineComposerCard({
         />
 
         <div className={cn(
-          "flex items-center gap-2 rounded-[1.15rem] border border-slate-200 bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]",
+          "rounded-[1.15rem] border border-slate-200 bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]",
+          compact ? "flex items-center gap-2" : isMobile ? "flex flex-col gap-2.5" : "flex items-center gap-2",
           compact ? "p-1.5" : "p-2"
         )}>
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className={cn("flex min-w-0 items-center gap-2", compact ? "flex-1" : "w-full flex-1")}>
             <PenLine className={cn("shrink-0 text-slate-400", compact ? "ml-1 h-3.5 w-3.5" : "ml-1 h-4 w-4")} />
             <Input
               value={value}
@@ -92,8 +93,8 @@ export function RoutineComposerCard({
             onClick={onSubmit}
             disabled={disabled || isSubmitting || !value.trim()}
             className={cn(
-              "rounded-xl bg-primary font-black text-white shadow-[0_14px_26px_-18px_rgba(20,41,95,0.55)] hover:bg-primary/90",
-              compact ? "h-9 px-3 text-[11px]" : isMobile ? "h-10 px-4 text-xs" : "h-10 px-4 text-sm"
+              "shrink-0 rounded-xl bg-primary font-black text-white shadow-[0_14px_26px_-18px_rgba(20,41,95,0.55)] hover:bg-primary/90",
+              compact ? "h-9 px-3 text-[11px]" : isMobile ? "h-10 w-full px-4 text-xs" : "h-10 px-4 text-sm"
             )}
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : submitLabel}
