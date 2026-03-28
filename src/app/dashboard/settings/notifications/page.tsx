@@ -199,7 +199,7 @@ type RecipientPreferenceRow = {
 
 type StudentDialogLogDetailRow = {
   id: string;
-  type: 'log' | 'queue';
+  type: 'log' | 'queue' | 'synthetic';
   parentName: string;
   phoneNumber: string;
   message: string;
@@ -1706,7 +1706,8 @@ export default function NotificationSettingsPage() {
                   </div>
                   {TODAY_BOARD_EVENTS.map((event) => {
                     const summary = selectedBoardStudent.events[event.value];
-                    const detailRows: StudentDialogLogDetailRow[] = [
+                    const primaryRecipient = selectedBoardStudent.recipients.find((row) => !row.isPhoneMissing) || selectedBoardStudent.recipients[0];
+                    const detailRowsBase: StudentDialogLogDetailRow[] = [
                       ...summary.logRows.map((row) => ({
                         id: `log-${row.id}`,
                         type: 'log' as const,
@@ -1735,7 +1736,30 @@ export default function NotificationSettingsPage() {
                           queueId: row.id,
                           queueStatus: String(row.status || ''),
                         })),
-                    ].sort((a, b) => {
+                    ];
+
+                    const detailRows: StudentDialogLogDetailRow[] = detailRowsBase.length > 0
+                      ? detailRowsBase
+                      : summary.status === 'attendance_only' || summary.status === 'missing_phone'
+                        ? [{
+                            id: `synthetic-${selectedBoardStudent.studentId}-${event.value}`,
+                            type: 'synthetic' as const,
+                            parentName: primaryRecipient?.parentName || selectedBoardStudent.recipientLabel,
+                            phoneNumber: primaryRecipient?.phoneNumber || '',
+                            message:
+                              summary.status === 'attendance_only'
+                                ? `오늘 ${event.label} 기록은 ${summary.timeLabel}에 확인됐지만, 문자 전송 접수 기록이 없습니다. 필요하면 다시 보내기로 즉시 접수해 주세요.`
+                                : `오늘 ${event.label} 기록은 확인됐지만 현재 수신 가능한 번호가 없어 문자 전송 접수가 되지 않았습니다. 번호를 등록한 뒤 다시 보내기 해주세요.`,
+                            statusLabel: summary.badgeLabel,
+                            statusTone: getTodayBoardCellTone(summary.status),
+                            timeLabel: summary.timeLabel,
+                            errorMessage: summary.status === 'missing_phone' ? '수신 번호가 등록되지 않았습니다.' : '출결 기록은 있으나 문자 접수 로그가 없습니다.',
+                            queueId: null,
+                            queueStatus: null,
+                          }]
+                        : [];
+
+                    detailRows.sort((a, b) => {
                       const aTime = a.timeLabel === '-' ? 0 : Date.parse(`2026-01-01T${a.timeLabel.slice(-5)}:00+09:00`);
                       const bTime = b.timeLabel === '-' ? 0 : Date.parse(`2026-01-01T${b.timeLabel.slice(-5)}:00+09:00`);
                       return bTime - aTime;
