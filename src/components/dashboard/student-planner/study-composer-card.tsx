@@ -214,16 +214,19 @@ export function StudyComposerCard({
                 disabled={disabled || isSubmitting}
                 onClick={() => onStudyModeChange(option.value)}
                 className={cn(
-                  "h-auto flex-col items-start rounded-2xl border px-3 py-3 text-left transition-all",
+                  "h-auto rounded-2xl border px-3 py-3 text-left transition-all",
+                  isMobile ? "flex items-center justify-center" : "flex-col items-start",
                   isActive
                     ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-500"
                     : "border-emerald-100 bg-white/88 text-emerald-700 hover:bg-emerald-50"
                 )}
               >
                 <span className="text-xs font-black">{option.label}</span>
-                <span className={cn("mt-1 text-[10px] leading-4", isActive ? "text-white/88" : "text-emerald-700/72")}>
-                  {option.description}
-                </span>
+                {!isMobile ? (
+                  <span className={cn("mt-1 text-[10px] leading-4", isActive ? "text-white/88" : "text-emerald-700/72")}>
+                    {option.description}
+                  </span>
+                ) : null}
               </Button>
             );
           })}
