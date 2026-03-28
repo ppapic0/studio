@@ -3404,225 +3404,176 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </TabsContent>
 
             <TabsContent value="studyDetail" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              {/* 주간 성과 요약 (기존 리포트 내용 통합) */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border-none bg-white p-4 ring-1 ring-slate-100 text-center shadow-sm">
-                  <span className="text-[10px] font-black text-slate-500 block mb-2 uppercase tracking-widest">주간 누적 트랙</span>
-                  <div className="flex items-baseline justify-center gap-0.5 flex-wrap leading-tight">
-                    {Math.floor(weeklyTotalStudyMinutes / 60) > 0 && (
-                      <>
-                        <span className="dashboard-number text-2xl text-[#14295F] tabular-nums leading-none">{Math.floor(weeklyTotalStudyMinutes / 60)}</span>
-                        <span className="text-[11px] font-black text-[#14295F]/50 mr-0.5">시간</span>
-                      </>
-                    )}
-                    <span className="dashboard-number text-2xl text-[#14295F] tabular-nums leading-none">{(weeklyTotalStudyMinutes % 60).toString().padStart(2, '0')}</span>
-                    <span className="text-[11px] font-black text-[#14295F]/50">분</span>
+              <header className={cn("flex justify-between items-center px-1 sm:px-2", isMobile ? "flex-col gap-4" : "flex-row")}>
+                <div className="flex flex-col gap-1">
+                  <h3 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>기록트랙</h3>
+                  <p className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">학습 기록·히스토리</p>
+                  {linkedStudents.length > 1 && (
+                    <div className="mt-3 w-full max-w-[240px]">
+                      <Label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
+                        확인 중인 자녀
+                      </Label>
+                      <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={handleParentStudentChange}>
+                        <SelectTrigger className="h-11 rounded-2xl border bg-white/90 px-4 text-left font-black shadow-sm">
+                          <SelectValue placeholder={activeStudentLabel} />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border bg-white">
+                          {linkedStudents.map((item) => (
+                            <SelectItem key={item.id} value={item.id} className="font-bold">
+                              {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-primary/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbff_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(37,99,235,0.35)] ring-1 ring-white/70">
+                  <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
+                  <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-white/80 bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_30px_-24px_rgba(37,99,235,0.32)]">
+                    <span className="font-black text-sm tracking-tight text-primary">{format(currentCalendarDate, 'yyyy년 M월')}</span>
                   </div>
-                </Card>
-                <Card className="rounded-[1.5rem] border-none bg-white p-6 ring-1 ring-slate-100 text-center shadow-sm">
-                  <span className="text-[10px] font-black text-slate-500 block mb-2 uppercase tracking-widest">평균 목표 달성</span>
-                  <p className="dashboard-number text-2xl text-[#FF7A16]">{weeklyPlanCompletionRate}%</p>
-                </Card>
-              </div>
-
-              <div className="flex flex-col gap-3 px-1 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-col">
-                  <h3 className="text-xl font-black tracking-tighter text-[#14295F]">기록트랙</h3>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">학습 일관성 맵</p>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
                 </div>
-                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.15rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#ffffff_0%,#f5f8ff_100%)] p-1.5 shadow-[0_18px_36px_-28px_rgba(20,41,95,0.24)] ring-1 ring-white/70">
-                  <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/85" />
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[0.9rem] bg-white/75 text-[#14295F] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:bg-[#14295F]/5" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-                  <div className="flex min-w-[86px] items-center justify-center rounded-[0.95rem] border border-white/80 bg-white/92 px-4 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_28px_-24px_rgba(20,41,95,0.24)]">
-                    <span className="text-[11px] font-black text-[#14295F]">{format(currentCalendarDate, 'yyyy년 M월')}</span>
+              </header>
+
+              <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
+                <CardContent className="relative p-0">
+                  <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
+                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/50">학습 흐름</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PARENT_CALENDAR_LEGEND.map((item) => (
+                        <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)] sm:text-[9px]">
+                          <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
+                          {item.label}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[0.9rem] bg-white/75 text-[#14295F] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:bg-[#14295F]/5" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-4 w-4" /></Button>
-                </div>
-              </div>
-
-              <Card className="relative overflow-hidden rounded-[2.5rem] border border-[#14295F]/8 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.06),transparent_26%),linear-gradient(180deg,#ffffff_0%,#f7f9ff_100%)] shadow-[0_28px_70px_-52px_rgba(20,41,95,0.28)] ring-1 ring-white/70">
-                <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-[#14295F]/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
-                  <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#14295F]/50">학습 흐름</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PARENT_CALENDAR_LEGEND.map((item) => (
-                      <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(20,41,95,0.14)] sm:text-[9px]">
-                        <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
-                        {item.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className={cn(
-                  "grid grid-cols-7 border-b border-[#14295F]/10",
-                  isMobile ? "gap-1 px-1.5 py-1.5" : "gap-1.5 px-4 py-3"
-                )}>
-                  {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
-                    <div key={day} className={cn(
-                      isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
-                      "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
-                      i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#14295F]/75"
-                    )}>{day}</div>
-                  ))}
-                </div>
-                <div className={cn("grid grid-cols-7 auto-rows-fr bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.02),transparent_45%)]", isMobile ? "gap-1 p-1.5" : "gap-2.5 p-3")}>
-                  {logsLoading ? (
-                    <div className="col-span-7 h-[300px] flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-[#14295F] opacity-20" /></div>
-                  ) : calendarData.map((day, idx) => {
-                    const dateKey = format(day, 'yyyy-MM-dd');
-                    const log = allLogs?.find(l => l.dateKey === dateKey);
-                    const minutes = log?.totalMinutes || 0;
-                    const isCurrentMonth = isSameMonth(day, currentCalendarDate);
-                    const isTodayCalendar = isSameDay(day, new Date());
-                    const hasPlans = (weeklyPlans || []).some((plan) => plan.dateKey === dateKey);
-                    const hasDeepFocus = isCurrentMonth && minutes >= 180;
-                    const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
-                    const timeLabel = isCurrentMonth
-                      ? (isMobile ? formatCompactCalendarMinutes(minutes) : formatMinutes(minutes))
-                      : '--';
-
-                    return (
-                      <button
-                        type="button"
-                        key={dateKey}
-                        onClick={() => setSelectedCalendarDate(day)}
-                        aria-label={format(day, 'M월 d일 (EEEE)', { locale: ko })}
+                  <div className={cn("grid grid-cols-7 border-b border-primary/10", isMobile ? "gap-1 px-1.5 py-1.5" : "gap-1.5 px-4 py-3")}>
+                    {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
+                      <div
+                        key={day}
                         className={cn(
-                          "group relative overflow-hidden rounded-[1.15rem] text-left transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30",
-                          isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
-                          !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
-                          isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(20,41,95,0.32)] active:translate-y-0",
-                          isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF7A16]/35 shadow-[0_20px_40px_-22px_rgba(20,41,95,0.22)]"
+                          isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
+                          "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
+                          i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
                         )}
                       >
-                        {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.3rem] border border-[#FF7A16]/20" />}
-                        <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
-                        {isCurrentMonth && !isMobile && (
-                          <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-2 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
-                            <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
-                          </div>
-                        )}
-                        {!isMobile && (
-                          <div className="relative z-10 mb-2.5 flex items-start justify-between gap-1.5">
-                            <span
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 p-1.5" : "auto-rows-fr gap-3 p-4")}>
+                    {logsLoading ? (
+                      <div className="col-span-7 h-[400px] flex items-center justify-center">
+                        <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
+                      </div>
+                    ) : calendarData.map((day, idx) => {
+                      const dateKey = format(day, 'yyyy-MM-dd');
+                      const minutes = allLogs?.find((log) => log.dateKey === dateKey)?.totalMinutes || 0;
+                      const hasPlans = weeklyPlans?.some((plan) => plan.dateKey === dateKey);
+                      const isCurrentMonth = isSameMonth(day, currentCalendarDate);
+                      const isTodayCalendar = isSameDay(day, new Date());
+                      const hasDeepFocus = isCurrentMonth && minutes >= 180;
+                      const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
+                      const timeLabel = isCurrentMonth
+                        ? (isMobile ? formatCompactCalendarMinutes(minutes) : formatMinutes(minutes))
+                        : '--';
+
+                      return (
+                        <button
+                          key={dateKey}
+                          type="button"
+                          onClick={() => setSelectedCalendarDate(day)}
+                          aria-label={format(day, 'M월 d일 (EEEE)', { locale: ko })}
+                          className={cn(
+                            "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                            isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
+                            !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
+                            isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
+                            isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
+                          )}
+                        >
+                          {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-primary/20" />}
+                          <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
+                          {isCurrentMonth && !isMobile && (
+                            <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-2 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
+                              <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
+                            </div>
+                          )}
+
+                          {!isMobile && (
+                            <div className="relative z-10 mb-2.5 flex items-start justify-between gap-1.5">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                                  "min-w-[2rem] px-2 py-1 text-xs",
+                                  idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
+                                  isTodayCalendar && "border-primary/20 text-primary"
+                                )}
+                              >
+                                {format(day, 'd')}
+                              </span>
+                              {hasStatusCluster ? (
+                                <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]">
+                                  {hasPlans && <span className="h-2 w-2 rounded-full bg-primary" />}
+                                  {hasDeepFocus && <Zap className="h-3 w-3 fill-amber-500 text-amber-500" />}
+                                </div>
+                              ) : (
+                                <span className="h-6 w-6" aria-hidden="true" />
+                              )}
+                            </div>
+                          )}
+
+                          <div className={cn("absolute left-0 right-0", isMobile ? "inset-y-0 flex items-center justify-center px-1.5" : "bottom-2 px-2")}>
+                            <div
                               className={cn(
-                                "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                                "text-xs min-w-[2rem] px-2 py-1",
-                                idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                                isTodayCalendar && "border-[#FFD1A9] text-[#14295F]"
+                                "overflow-hidden text-center whitespace-nowrap",
+                                isMobile
+                                  ? "min-w-0 rounded-none border-none bg-transparent px-0 py-0 shadow-none"
+                                  : "rounded-[0.95rem] border bg-white px-2.5 py-2 shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
+                                getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                               )}
                             >
-                              {format(day, 'd')}
-                            </span>
-                            {hasStatusCluster ? (
-                              <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.24)]">
-                                {hasPlans && <span className="h-2 w-2 rounded-full bg-[#14295F]" />}
-                                {hasDeepFocus && <Zap className="h-3 w-3 fill-orange-500 text-orange-500" />}
-                              </div>
-                            ) : (
-                              <span className="h-6 w-6" aria-hidden="true" />
-                            )}
-                          </div>
-                        )}
-                        <div className={cn("absolute left-0 right-0", isMobile ? "inset-y-0 flex items-center justify-center px-1.5" : "bottom-2 px-2")}>
-                          <div
-                            className={cn(
-                              "overflow-hidden text-center whitespace-nowrap",
-                              isMobile
-                                ? "min-w-0 rounded-none border-none bg-transparent px-0 py-0 shadow-none"
-                                : "rounded-[0.95rem] border bg-white px-2.5 py-2 shadow-[0_16px_26px_-22px_rgba(20,41,95,0.26)]",
-                              getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
-                            )}
-                          >
-                            {isMobile ? (
-                              <span className="dashboard-number block tabular-nums text-[0.68rem] leading-none tracking-[-0.08em]">
-                                {timeLabel}
-                              </span>
-                            ) : (
-                              <div className="flex min-w-0 items-center gap-2">
-                                <span className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
-                                  공부시간
-                                </span>
-                                <span className="dashboard-number ml-auto shrink-0 tabular-nums text-[1rem] leading-none tracking-[-0.05em]">
+                              {isMobile ? (
+                                <span className="dashboard-number block tabular-nums text-[0.68rem] leading-none tracking-[-0.08em]">
                                   {timeLabel}
                                 </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {!isMobile && isCurrentMonth && (
-                          <div className="pointer-events-none absolute inset-x-3 bottom-12">
-                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                              {minutes > 0 ? '오늘 학습 기록' : '기록 대기'}
+                              ) : (
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                                    공부시간
+                                  </span>
+                                  <span className="dashboard-number ml-auto shrink-0 tabular-nums text-[1rem] leading-none tracking-[-0.05em]">
+                                    {timeLabel}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Card>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Card className="rounded-[1.5rem] border-none shadow-sm bg-white p-5 ring-1 ring-slate-100">
-                  <CardTitle className="text-[10px] font-black tracking-tight mb-4 flex items-center gap-2 text-slate-500 uppercase">
-                    <PieChartIcon className="h-3.5 w-3.5 text-[#FF7A16]" /> 과목별 학습 비중
-                  </CardTitle>
-                  <div className="space-y-4">
-                    {subjectsData.slice(0, 2).map((s) => {
-                      const ratio = Math.min(100, Math.round((s.minutes / (subjectTotalMinutes || 1)) * 100));
-                      return (
-                        <div key={s.subject} className="space-y-1.5">
-                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-700">
-                            <span>{s.subject}</span>
-                            <span className="font-black">{ratio}%</span>
-                          </div>
-                          <Progress value={ratio} className="h-1 bg-slate-100" />
-                        </div>
+
+                          {!isMobile && isCurrentMonth && (
+                            <div className="pointer-events-none absolute inset-x-3 bottom-12">
+                              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                {minutes > 0 ? '오늘 학습 기록' : '기록 대기'}
+                              </div>
+                            </div>
+                          )}
+                        </button>
                       );
                     })}
                   </div>
-                </Card>
+                </CardContent>
+              </Card>
 
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Card className="rounded-[1.5rem] border border-orange-200 bg-orange-50 p-5 flex flex-col justify-center items-center text-center gap-2 cursor-pointer active:scale-95 transition-all">
-                      <BarChart3 className="h-6 w-6 text-[#FF7A16]" />
-                      <div className="grid gap-0.5 text-[#14295F]">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#B85A00]">주간 상세</span>
-                        <span className="text-xs font-black">성과 상세 분석</span>
-                      </div>
-                    </Card>
-                  </DialogTrigger>
-                  <DialogContent className="rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-lg">
-                    <div className="bg-[#14295F] p-10 text-white relative">
-                      <DialogTitle className="text-3xl font-black tracking-tighter text-left text-white">주간 성과 데이터</DialogTitle>
-                      <DialogDescription className="text-white/70 font-bold mt-1 text-sm">최근 7일간의 학습 지표 및 피드백입니다.</DialogDescription>
-                    </div>
-                    <div className="p-8 space-y-10 bg-white overflow-y-auto max-h-[60vh] custom-scrollbar">
-                      <div className="space-y-4">
-                        <h4 className="text-xs font-black uppercase text-[#14295F] tracking-[0.2em] ml-1">일별 집중 시간 (분)</h4>
-                        <div className="h-48 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsLineChart data={dailyStudyTrend}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                              <XAxis dataKey="date" fontSize={10} fontWeight="800" axisLine={false} tickLine={false} />
-                              <YAxis fontSize={10} fontWeight="800" axisLine={false} tickLine={false} width={30} />
-                              <Tooltip contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)'}} />
-                              <Line type="monotone" dataKey="minutes" stroke="#FF7A16" strokeWidth={4} dot={{ r: 4, fill: '#fff', stroke: '#FF7A16', strokeWidth: 2 }} />
-                            </RechartsLineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                      <div className="p-6 rounded-[2rem] bg-orange-50/50 border border-orange-100">
-                        <p className="text-[10px] font-black text-[#FF7A16] uppercase mb-2 tracking-widest">선생님 종합 피드백</p>
-                        <p className="text-base font-bold text-slate-700 leading-relaxed">"{weeklyFeedback}"</p>
-                      </div>
-                    </div>
-                    <DialogFooter className="p-6 bg-white border-t">
-                      <DialogClose asChild><Button className="w-full h-14 rounded-2xl font-black text-lg bg-[#14295F] text-white">확인 완료</Button></DialogClose>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
+              {!selectedCalendarDate && (
+                <div className="mx-1 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-muted-foreground/10 bg-muted/20 px-4 py-2.5">
+                  <Info className="h-3.5 w-3.5 shrink-0 text-primary/30" />
+                  <p className="text-center text-[11px] font-bold leading-relaxed text-muted-foreground/50">날짜를 누르면 그날의 기록을 확인할 수 있어요.</p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="data" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
