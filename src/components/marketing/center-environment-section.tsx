@@ -88,8 +88,8 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
                 </span>
               </div>
 
-              <div className="mt-3 rounded-[1rem] border border-[#14295F]/10 bg-[linear-gradient(160deg,#F7FAFF_0%,#FFFFFF_100%)] p-2.5 sm:mt-4 sm:rounded-[1.25rem] sm:p-3">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-[0.95rem] border border-dashed border-[#14295F]/14 bg-white sm:aspect-[4/3] sm:rounded-[1rem]">
+              <div className="mt-3 rounded-[1rem] border border-[#14295F]/10 bg-[linear-gradient(160deg,#F7FAFF_0%,#FFFFFF_100%)] p-2 sm:mt-4 sm:rounded-[1.25rem] sm:p-3">
+                <div className="relative min-h-[21rem] overflow-hidden rounded-[0.95rem] border border-dashed border-[#14295F]/14 bg-white sm:min-h-0 sm:aspect-[4/3] sm:rounded-[1rem]">
                   {photo.image ? (
                     <Image
                       src={photo.image}
@@ -99,14 +99,14 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
                       className="object-cover"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.10),transparent_34%),linear-gradient(160deg,#F9FBFF_0%,#FFFFFF_100%)] px-3 text-center sm:px-6">
-                      <div className="h-8 w-8 rounded-[0.9rem] border border-[#FF7A16]/14 bg-white shadow-[0_14px_28px_rgba(20,41,95,0.06)] sm:h-14 sm:w-14 sm:rounded-[1.25rem]" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.10),transparent_34%),linear-gradient(160deg,#F9FBFF_0%,#FFFFFF_100%)] px-4 text-center sm:px-6">
+                      <div className="h-10 w-10 rounded-[0.95rem] border border-[#FF7A16]/14 bg-white shadow-[0_14px_28px_rgba(20,41,95,0.06)] sm:h-14 sm:w-14 sm:rounded-[1.25rem]" />
                       <p className="mt-2.5 text-[8.5px] font-black tracking-[0.14em] text-[#FF7A16] sm:mt-4 sm:text-[11px]">CENTER PHOTO</p>
-                      <p className="mt-1.5 break-keep text-[0.78rem] font-black leading-[1.28] text-[#14295F] sm:mt-2 sm:text-[0.98rem]">
+                      <p className="mt-1.5 break-keep text-[0.92rem] font-black leading-[1.32] text-[#14295F] sm:mt-2 sm:text-[0.98rem]">
                         <span className="sm:hidden">센터 사진 예정</span>
                         <span className="hidden sm:inline">실제 센터 사진 예정</span>
                       </p>
-                      <p className="mt-1.5 break-keep text-[10px] font-semibold leading-[1.45] text-[#5B7087] sm:mt-2 sm:text-[12px] sm:leading-[1.7]">
+                      <p className="mt-1.5 break-keep text-[11px] font-semibold leading-[1.55] text-[#5B7087] sm:mt-2 sm:text-[12px] sm:leading-[1.7]">
                         <span className="sm:hidden">준비 후 반영</span>
                         <span className="hidden sm:inline">준비되면 이 자리에 바로 반영됩니다.</span>
                       </p>

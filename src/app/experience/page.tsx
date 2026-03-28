@@ -80,11 +80,11 @@ function ScreenshotCard({
         <div className={`absolute -left-10 bottom-10 h-28 w-28 rounded-full blur-3xl ${style.glow}`} />
         <div className={`absolute -right-6 top-8 h-24 w-24 rounded-full blur-3xl ${style.glow}`} />
 
-        <div className={`relative flex items-center justify-center ${featured ? 'min-h-[26rem] sm:min-h-[31rem]' : 'min-h-[18rem] sm:min-h-[20rem]'}`}>
+        <div className={`relative flex items-center justify-center ${featured ? 'min-h-[29rem] sm:min-h-[31rem]' : 'min-h-[21rem] sm:min-h-[20rem]'}`}>
           <div className={`absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px] ${style.glow}`} />
           <div
             className={`relative aspect-[10/20] w-full overflow-hidden rounded-[2.8rem] border shadow-[0_26px_54px_rgba(20,41,95,0.16)] ${style.device} ${
-              featured ? 'max-w-[19rem]' : 'max-w-[12.5rem]'
+              featured ? 'max-w-[21rem]' : 'max-w-[14.5rem]'
             }`}
           >
             {screen.image ? (
@@ -172,7 +172,7 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
 
         <div className="order-1 lg:order-2">
           <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
             {section.secondaryScreens.map((screen) => (
               <ScreenshotCard key={`${section.mode}-${screen.title}`} screen={screen} tone={tone} />
             ))}

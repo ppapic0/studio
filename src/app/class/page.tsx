@@ -471,7 +471,7 @@ export default async function ClassPage() {
                   <img
                     src={koreanMaterialPreviewImagePath}
                     alt="수업자료 PDF 1페이지 미리보기"
-                    className="h-[250px] w-full object-contain sm:h-[360px]"
+                    className="h-[380px] w-full object-contain sm:h-[360px] lg:h-[420px]"
                   />
                 </a>
               </div>

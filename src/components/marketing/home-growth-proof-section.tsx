@@ -51,7 +51,7 @@ export function HomeGrowthProofSection() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 p-3.5 sm:grid-cols-3 sm:gap-4 sm:p-6">
+          <div className="grid grid-cols-1 gap-4 p-3.5 sm:grid-cols-3 sm:gap-4 sm:p-6">
             {scoreSheetProofs.map((item) => (
               <article
                 key={item.image}
@@ -62,19 +62,19 @@ export function HomeGrowthProofSection() {
                     <span className="sm:hidden">{item.mobileLabel}</span>
                     <span className="hidden sm:inline">{item.label}</span>
                   </p>
-                  <div className="mt-2 rounded-[0.85rem] border border-[#14295F]/8 bg-[#F8FBFF] p-1.5 sm:mt-3 sm:rounded-[1.1rem] sm:p-3">
-                    <div className="relative aspect-[5/6] overflow-hidden rounded-[0.95rem] bg-white sm:aspect-[3/4]">
+                  <div className="mt-2 rounded-[0.85rem] border border-[#14295F]/8 bg-[#F8FBFF] p-1 sm:mt-3 sm:rounded-[1.1rem] sm:p-3">
+                    <div className="relative min-h-[26rem] overflow-hidden rounded-[0.95rem] bg-white sm:min-h-0 sm:aspect-[3/4]">
                       <Image
                         src={item.image}
                         alt={`${item.label} 성적표`}
                         fill
                         sizes="(max-width: 640px) 92vw, (max-width: 1200px) 50vw, 33vw"
-                        className="object-contain"
+                        className="object-cover object-top sm:object-contain"
                       />
                     </div>
                   </div>
-                  <p className="mt-2 break-keep text-[11px] font-black leading-[1.4] text-[#14295F] sm:mt-3 sm:text-[13px]">
-                    <span className="sm:hidden">{item.caption}</span>
+                  <p className="mt-2 break-keep text-[12px] font-black leading-[1.4] text-[#14295F] sm:mt-3 sm:text-[13px]">
+                    <span className="sm:hidden">{item.mobileCaption}</span>
                     <span className="hidden sm:inline">{item.caption}</span>
                   </p>
                 </div>
