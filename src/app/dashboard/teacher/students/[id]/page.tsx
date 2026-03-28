@@ -35,6 +35,7 @@ import {
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
 import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
+import { Student360OverviewDashboard } from '@/components/dashboard/student-360-overview-dashboard';
 
 const STAT_CONFIG = {
   focus: { label: '집중력', sub: '집중', icon: Target, color: 'text-blue-500', accent: 'bg-blue-50', guide: '몰입 시간을 안정적으로 확보하면 상승합니다.' },
@@ -305,6 +306,79 @@ function attendanceRecordLabel(status?: string | null) {
   if (normalized.includes('study')) return '공부중';
   if (normalized.includes('away')) return '외출';
   return status || '기록 없음';
+}
+
+function attendanceTone(status?: string | null) {
+  const normalized = String(status || '').toLowerCase();
+  if (!normalized) {
+    return {
+      label: '기록없음',
+      chipClass: 'border-slate-200 bg-slate-100 text-slate-500',
+      stripClass: 'bg-slate-100 border-slate-200/80',
+    };
+  }
+  if (normalized.includes('late')) {
+    return {
+      label: '지각',
+      chipClass: 'border-amber-200 bg-amber-50 text-amber-700',
+      stripClass: 'bg-amber-100 border-amber-200/80',
+    };
+  }
+  if (normalized.includes('excused')) {
+    return {
+      label: '사유결석',
+      chipClass: 'border-slate-200 bg-slate-100 text-slate-600',
+      stripClass: 'bg-slate-200 border-slate-300/80',
+    };
+  }
+  if (normalized.includes('absent')) {
+    return {
+      label: '결석',
+      chipClass: 'border-rose-200 bg-rose-50 text-rose-700',
+      stripClass: 'bg-rose-200 border-rose-300/80',
+    };
+  }
+  if (normalized.includes('missing_routine')) {
+    return {
+      label: '루틴누락',
+      chipClass: 'border-orange-200 bg-orange-50 text-orange-700',
+      stripClass: 'bg-orange-200 border-orange-300/80',
+    };
+  }
+  if (normalized.includes('away') || normalized.includes('break')) {
+    return {
+      label: '외출',
+      chipClass: 'border-yellow-200 bg-yellow-50 text-yellow-700',
+      stripClass: 'bg-yellow-200 border-yellow-300/80',
+    };
+  }
+  if (normalized.includes('present') || normalized.includes('study')) {
+    return {
+      label: '출석',
+      chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      stripClass: 'bg-emerald-200 border-emerald-300/80',
+    };
+  }
+  return {
+    label: attendanceRecordLabel(status),
+    chipClass: 'border-blue-200 bg-blue-50 text-blue-700',
+    stripClass: 'bg-blue-100 border-blue-200/80',
+  };
+}
+
+function buildDateCountMap<T>(
+  rows: T[],
+  getDateValue: (row: T) => unknown,
+  getValue: (row: T) => number = () => 1
+) {
+  const map: Record<string, number> = {};
+  rows.forEach((row) => {
+    const date = toDateSafe(getDateValue(row));
+    if (!date) return;
+    const dateKey = format(date, 'yyyy-MM-dd');
+    map[dateKey] = (map[dateKey] || 0) + Math.max(0, getValue(row));
+  });
+  return map;
 }
 
 function invoiceStatusLabel(status?: Invoice['status']) {
@@ -1678,6 +1752,200 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   ]);
 
   const selectedDomainCard = domainCards.find((item) => item.key === selectedDomain) || domainCards[0];
+  const attendanceHistoryByDateKey = useMemo(() => {
+    const next: Record<string, AttendanceHistoryRecord> = {};
+    attendanceHistoryRows.forEach((row) => {
+      if (row.dateKey) next[row.dateKey] = row;
+    });
+    return next;
+  }, [attendanceHistoryRows]);
+  const attendanceDailyByDateKey = useMemo(() => {
+    const next: Record<string, AttendanceDailyStatRecord> = {};
+    attendanceDailyStatRows.forEach((row) => {
+      if (row.dateKey) next[row.dateKey] = row;
+    });
+    return next;
+  }, [attendanceDailyStatRows]);
+  const counselingCountByDateKey = useMemo(
+    () => buildDateCountMap(studentCounselingLogs, (row) => row.createdAt),
+    [studentCounselingLogs]
+  );
+  const reportCountByDateKey = useMemo(() => {
+    const next: Record<string, number> = {};
+    studentDailyReports.forEach((report) => {
+      const dateKey = report.dateKey || format(toDateSafe(report.createdAt) || today, 'yyyy-MM-dd');
+      next[dateKey] = (next[dateKey] || 0) + 1;
+    });
+    return next;
+  }, [studentDailyReports, today]);
+  const smsCountByDateKey = useMemo(
+    () => buildDateCountMap(studentSmsDeliveryLogs, (row) => row.sentAt || row.failedAt || row.createdAt),
+    [studentSmsDeliveryLogs]
+  );
+  const guardianVisitByDateKey = useMemo(() => {
+    const next: Record<string, number> = {};
+    studentParentActivityEvents.forEach((event) => {
+      if (event.eventType !== 'app_visit') return;
+      const date = toDateSafe(event.createdAt);
+      if (!date) return;
+      const dateKey = format(date, 'yyyy-MM-dd');
+      next[dateKey] = (next[dateKey] || 0) + 1;
+    });
+    return next;
+  }, [studentParentActivityEvents]);
+  const guardianReadByDateKey = useMemo(() => {
+    const next: Record<string, number> = {};
+    studentParentActivityEvents.forEach((event) => {
+      if (event.eventType !== 'report_read') return;
+      const date = toDateSafe(event.createdAt);
+      if (!date) return;
+      const dateKey = format(date, 'yyyy-MM-dd');
+      next[dateKey] = (next[dateKey] || 0) + 1;
+    });
+    return next;
+  }, [studentParentActivityEvents]);
+  const guardianResponseByDateKey = useMemo(
+    () =>
+      buildDateCountMap(
+        studentParentCommunications.filter((item) => (item.senderRole || '').toLowerCase() === 'parent'),
+        (row) => row.createdAt
+      ),
+    [studentParentCommunications]
+  );
+  const invoiceCountByDateKey = useMemo(
+    () => buildDateCountMap(studentInvoices, (row) => row.paidAt || row.updatedAt || row.issuedAt),
+    [studentInvoices]
+  );
+  const penaltyDeltaByDateKey = useMemo(() => {
+    const next: Record<string, number> = {};
+    studentPenaltyLogs.forEach((log) => {
+      const date = toDateSafe(log.createdAt);
+      if (!date) return;
+      const dateKey = format(date, 'yyyy-MM-dd');
+      next[dateKey] = (next[dateKey] || 0) + Math.abs(Number(log.pointsDelta || 0));
+    });
+    return next;
+  }, [studentPenaltyLogs]);
+  const overviewStudyTrend30d = useMemo(() => fullSeries.slice(-30), [fullSeries]);
+  const overviewAttendanceStrip30d = useMemo(() => {
+    return Array.from({ length: 30 }, (_, idx) => {
+      const date = subDays(today, 29 - idx);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const historyRow = attendanceHistoryByDateKey[dateKey];
+      const dailyRow = attendanceDailyByDateKey[dateKey];
+      const status = dailyRow?.attendanceStatus || historyRow?.displayState || historyRow?.status;
+      const tone = attendanceTone(status);
+      const studyMinutes = Math.max(0, Math.round(Number(dailyStatsMap[dateKey]?.totalStudyMinutes || studyLogMap[dateKey]?.totalMinutes || 0)));
+      return {
+        dateKey,
+        dateLabel: format(date, 'M/d', { locale: ko }),
+        status,
+        statusLabel: tone.label,
+        stripClass: tone.stripClass,
+        lateMinutes: Number(dailyRow?.lateMinutes || historyRow?.lateMinutes || 0),
+        awayCount: Number(dailyRow?.awayCount || 0),
+        studyMinutes,
+        hasCheckOut: Boolean(dailyRow?.hasCheckOutRecord || dailyRow?.checkOutAt || historyRow?.checkedOutAt),
+      };
+    });
+  }, [today, attendanceHistoryByDateKey, attendanceDailyByDateKey, dailyStatsMap, studyLogMap]);
+  const overviewAwayTrend14d = useMemo(() => {
+    return Array.from({ length: 14 }, (_, idx) => {
+      const date = subDays(today, 13 - idx);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      return {
+        dateKey,
+        dateLabel: format(date, 'M/d', { locale: ko }),
+        awayMinutes: Math.max(0, Math.round(Number(awayMinutesByDateKey[dateKey] || dailyStatsMap[dateKey]?.awayMinutes || 0))),
+        awayCount: Math.max(0, Math.round(Number(attendanceDailyByDateKey[dateKey]?.awayCount || 0))),
+      };
+    });
+  }, [today, awayMinutesByDateKey, dailyStatsMap, attendanceDailyByDateKey]);
+  const overviewPlanTrend30d = useMemo(() => {
+    return overviewStudyTrend30d.map((item) => {
+      const plan = planByDate[item.dateKey];
+      const status =
+        attendanceDailyByDateKey[item.dateKey]?.attendanceStatus ||
+        attendanceHistoryByDateKey[item.dateKey]?.displayState ||
+        attendanceHistoryByDateKey[item.dateKey]?.status;
+      const routineExpected = plan?.routineCount || 0;
+      const routineDone =
+        routineExpected > 0 && !String(status || '').toLowerCase().includes('missing_routine') ? routineExpected : 0;
+      return {
+        dateKey: item.dateKey,
+        dateLabel: item.dateLabel,
+        completionRate: item.completionRate,
+        routineDone,
+        routineExpected,
+      };
+    });
+  }, [overviewStudyTrend30d, planByDate, attendanceDailyByDateKey, attendanceHistoryByDateKey]);
+  const overviewCommunicationTrend30d = useMemo(() => {
+    return Array.from({ length: 30 }, (_, idx) => {
+      const date = subDays(today, 29 - idx);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      return {
+        dateKey,
+        dateLabel: format(date, 'M/d', { locale: ko }),
+        counseling: counselingCountByDateKey[dateKey] || 0,
+        reports: reportCountByDateKey[dateKey] || 0,
+        sms: smsCountByDateKey[dateKey] || 0,
+      };
+    });
+  }, [today, counselingCountByDateKey, reportCountByDateKey, smsCountByDateKey]);
+  const overviewRiskTrend30d = useMemo(() => {
+    let cumulativePenalty = 0;
+    return overviewStudyTrend30d.map((item) => {
+      const dateKey = item.dateKey;
+      const status =
+        attendanceDailyByDateKey[dateKey]?.attendanceStatus ||
+        attendanceHistoryByDateKey[dateKey]?.displayState ||
+        attendanceHistoryByDateKey[dateKey]?.status;
+      cumulativePenalty += penaltyDeltaByDateKey[dateKey] || 0;
+      const attendancePenalty = String(status || '').toLowerCase().includes('absent')
+        ? 32
+        : String(status || '').toLowerCase().includes('late')
+          ? 18
+          : String(status || '').toLowerCase().includes('missing_routine')
+            ? 14
+            : 0;
+      const awayPenalty = Math.min(18, Math.round(Number(attendanceDailyByDateKey[dateKey]?.awayMinutes || dailyStatsMap[dateKey]?.awayMinutes || 0) / 4));
+      const studyPenalty = Math.max(0, Math.round(((120 - Math.min(120, item.studyMinutes)) / 120) * 24));
+      const completionPenalty = Math.max(0, Math.round(((100 - item.completionRate) / 100) * 26));
+      const penaltyCarry = Math.min(26, cumulativePenalty * 4);
+      const riskScore = Math.max(0, Math.min(100, studyPenalty + completionPenalty + attendancePenalty + awayPenalty + penaltyCarry));
+      return {
+        dateKey,
+        dateLabel: item.dateLabel,
+        riskScore,
+        cumulativePenalty,
+      };
+    });
+  }, [overviewStudyTrend30d, attendanceDailyByDateKey, attendanceHistoryByDateKey, penaltyDeltaByDateKey, dailyStatsMap]);
+  const overviewGuardianBillingTrend30d = useMemo(() => {
+    return Array.from({ length: 30 }, (_, idx) => {
+      const date = subDays(today, 29 - idx);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      return {
+        dateKey,
+        dateLabel: format(date, 'M/d', { locale: ko }),
+        guardianActivity: (guardianVisitByDateKey[dateKey] || 0) + (guardianResponseByDateKey[dateKey] || 0),
+        reportReads: guardianReadByDateKey[dateKey] || 0,
+        billing: canViewBilling ? invoiceCountByDateKey[dateKey] || 0 : 0,
+      };
+    });
+  }, [today, guardianVisitByDateKey, guardianResponseByDateKey, guardianReadByDateKey, invoiceCountByDateKey, canViewBilling]);
+  const overviewQuickPoints = useMemo(() => {
+    const highlights = [...riskSignals, ...coachingHighlights];
+    return highlights.filter((item, index, arr) => arr.indexOf(item) === index).slice(0, 3);
+  }, [riskSignals, coachingHighlights]);
+  const hasOverviewStudyTrend = overviewStudyTrend30d.some((item) => item.studyMinutes > 0);
+  const hasOverviewAttendanceTrend = overviewAttendanceStrip30d.some((item) => Boolean(item.status));
+  const hasOverviewAwayTrend = overviewAwayTrend14d.some((item) => item.awayMinutes > 0 || item.awayCount > 0);
+  const hasOverviewPlanTrend = overviewPlanTrend30d.some((item) => item.completionRate > 0 || item.routineExpected > 0);
+  const hasOverviewCommunicationTrend = overviewCommunicationTrend30d.some((item) => item.counseling > 0 || item.reports > 0 || item.sms > 0);
+  const hasOverviewRiskTrend = overviewRiskTrend30d.some((item) => item.riskScore > 0 || item.cumulativePenalty > 0);
+  const hasOverviewGuardianBillingTrend = overviewGuardianBillingTrend30d.some((item) => item.guardianActivity > 0 || item.reportReads > 0 || item.billing > 0);
   const studentSummaryCards = [
     {
       key: 'status',
@@ -2306,7 +2574,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   progress={card.progress}
                   onClick={() => {
                     setSelectedDomain(card.key);
-                    setActiveTab(card.tab);
+                    setActiveTab('overview');
                   }}
                 />
               ))}
@@ -2361,47 +2629,62 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         {!isStudentSelfView ? (
         <TabsContent value="overview" className="space-y-6 mt-0">
-            <Card className="rounded-[1.8rem] border-none shadow-lg bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-black tracking-tight">학생 360 전체 요약</CardTitle>
-                <CardDescription className="font-bold text-[11px]">한 학생의 학습, 출결, 상담, 리포트, 문자{canViewBilling ? ', 수납' : ''}을 한 화면 맥락에서 확인합니다.</CardDescription>
-              </CardHeader>
-              <CardContent className={cn("grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3")}>
-                <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/60">운영 브리프</p>
-                  <p className="mt-2 text-sm font-black text-slate-900">
-                    {riskSignals.length > 0 ? `${riskSignals[0]} 중심으로 오늘 개입 우선순위를 잡아야 합니다.` : '현재는 큰 운영 이슈보다 학습 페이스 유지에 집중하면 됩니다.'}
-                  </p>
-                  <ul className="mt-3 space-y-1.5">
-                    {coachingHighlights.slice(0, 3).map((item) => (
-                      <li key={item} className="text-xs font-semibold leading-6 text-slate-700">• {item}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/60">보호자/상담 현황</p>
-                  <div className="mt-3 space-y-2 text-xs font-bold text-slate-700">
-                    <p>학부모 연결 상태: {guardianLinkLabel}</p>
-                    <p>30일 앱 방문: {guardianVisitCount30d}회</p>
-                    <p>리포트 열람: {reportReadCount30d}회</p>
-                    <p>최근 상담일: {latestCounselingAt ? formatDateTimeLabel(latestCounselingAt) : '없음'}</p>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/60">즉시 체크할 항목</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {riskSignals.length > 0 ? riskSignals.map((signal) => (
-                      <Badge key={signal} variant="outline" className="rounded-full font-black text-[10px]">{signal}</Badge>
-                    )) : <Badge variant="outline" className="rounded-full font-black text-[10px]">안정 구간</Badge>}
-                    {attendanceWindowLoading ? <Badge variant="outline" className="rounded-full font-black text-[10px]">출결 로딩중</Badge> : null}
-                    {latestInvoice?.status === 'overdue' ? <Badge variant="outline" className="rounded-full font-black text-[10px] text-rose-600">미수금 확인 필요</Badge> : null}
-                  </div>
-                  <div className="mt-4 rounded-xl bg-white px-3 py-3 text-xs font-semibold leading-6 text-slate-700">
-                    raw 로그가 필요하면 마지막 <span className="font-black">원본 로그</span> 탭에서 출결, 상담, 문자, 리포트, 수납까지 바로 내려가 확인할 수 있습니다.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Student360OverviewDashboard
+              canViewBilling={canViewBilling}
+              isMobile={isMobile}
+              presentationMode={presentationMode}
+              selectedDomain={selectedDomain}
+              onSelectDomain={setSelectedDomain}
+              selectedDomainTitle={selectedDomainCard.title}
+              selectedDomainBody={selectedDomainCard.detailBody}
+              selectedDomainAction={selectedDomainCard.action}
+              riskHeadline={riskSignals.length > 0 ? `${riskSignals[0]} 중심으로 오늘 개입 우선순위를 잡는 것이 좋습니다.` : '현재는 큰 운영 이슈보다 페이스 유지와 리듬 안정화에 초점을 맞추면 됩니다.'}
+              guardianLinkLabel={guardianLinkLabel}
+              guardianVisitCount30d={guardianVisitCount30d}
+              reportReadCount30d={reportReadCount30d}
+              latestCounselingLabel={latestCounselingAt ? formatDateLabel(latestCounselingAt) : '기록 없음'}
+              latestReservationLabel={latestReservationAt ? `다음 예약 ${formatDateTimeLabel(latestReservationAt)}` : '예약 없음'}
+              smsStatusLabel={smsStatusLabel}
+              latestReportLabel={latestReport ? `${latestReport.dateKey} ${latestReport.status}` : '리포트 없음'}
+              invoiceStatusSummary={invoiceStatusSummary}
+              latestInvoicePaymentLabel={latestInvoice ? `최근 결제 ${formatDateLabel(latestInvoicePaymentDate)}` : '청구 이력 없음'}
+              studentRiskScore={studentRiskScore}
+              penaltyPoints={progress?.penaltyPoints || 0}
+              routineMissingCount30d={routineMissingCount30d}
+              overviewQuickPoints={overviewQuickPoints}
+              overviewStudyTrend30d={overviewStudyTrend30d.map((item) => ({ dateLabel: item.dateLabel, studyMinutes: item.studyMinutes }))}
+              hasOverviewStudyTrend={hasOverviewStudyTrend}
+              todayStudyLabel={minutesToLabel(todayStudyMinutes)}
+              recent7AverageLabel={minutesToLabel(focusKpi.recent7AvgMinutes)}
+              latestWeeklyGrowthLabel={formatSignedPercent(latestWeeklyLearningGrowthPercent)}
+              overviewAttendanceStrip30d={overviewAttendanceStrip30d}
+              hasOverviewAttendanceTrend={hasOverviewAttendanceTrend}
+              hasStartEndTimeData={hasStartEndTimeData}
+              startEndTimeTrendData={startEndTimeTrendData}
+              latestStartLabel={latestStartEndSnapshot.start}
+              latestEndLabel={latestStartEndSnapshot.end}
+              averageRhythmScore={averageRhythmScore}
+              hasOverviewAwayTrend={hasOverviewAwayTrend}
+              overviewAwayTrend14d={overviewAwayTrend14d}
+              avgAwayMinutesLabel={minutesToLabel(avgAwayMinutes30d)}
+              attendanceAwayCount30d={attendanceAwayCount30d}
+              checkOutStability30d={checkOutStability30d}
+              hasOverviewPlanTrend={hasOverviewPlanTrend}
+              overviewPlanTrend30d={overviewPlanTrend30d}
+              avgCompletionRate={avgCompletionRate}
+              todayRoutineCount={todayPlanSummary.routineCount}
+              rhythmScore={rhythmScore}
+              hasOverviewCommunicationTrend={hasOverviewCommunicationTrend}
+              overviewCommunicationTrend30d={overviewCommunicationTrend30d}
+              counselingCount={studentCounselingLogs.length}
+              reportCount={studentDailyReports.length}
+              smsCount={studentSmsDeliveryLogs.length}
+              hasOverviewRiskTrend={hasOverviewRiskTrend}
+              overviewRiskTrend30d={overviewRiskTrend30d}
+              resilience={progress?.stats?.resilience || 0}
+              hasOverviewGuardianBillingTrend={hasOverviewGuardianBillingTrend}
+              overviewGuardianBillingTrend30d={overviewGuardianBillingTrend30d}
+            />
           </TabsContent>
         ) : null}
 
