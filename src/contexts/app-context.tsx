@@ -353,7 +353,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
-    if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {
+    if (typeof window === 'undefined') return;
+    const isPhoneViewport = window.matchMedia('(max-width: 768px)').matches;
+    const shouldUseMobileByDefault =
+      activeMembership?.role === 'parent'
+      || (activeMembership?.role === 'student' && isPhoneViewport);
+
+    if (shouldUseMobileByDefault && viewMode !== 'mobile') {
       setViewMode('mobile');
     }
   }, [activeMembership?.role, viewMode]);
