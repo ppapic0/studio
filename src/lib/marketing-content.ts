@@ -390,7 +390,7 @@ export const marketingContent: MarketingContent = {
   webAppShowcase: {
     heading: '실제 화면으로 보는 트랙 웹앱',
     description:
-      '주저리주저리 설명하지 않고, 학생과 학부모가 실제로 어떤 화면으로 관리되는지 먼저 보여드립니다.',
+      '학생과 학부모가 실제로 어떤 화면으로 관리되는지 먼저 보여드립니다.',
     screens: [
       {
         mode: '학생 모드',
