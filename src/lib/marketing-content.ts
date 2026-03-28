@@ -258,9 +258,9 @@ export const marketingContent: MarketingContent = {
     secondaryLabel: '오늘 하루 보지 않기',
   },
   nav: [
-    { label: '운영 방식', href: '/#features' },
-    { label: '웹앱 시스템', href: '/#app' },
-    { label: '합격 실적', href: '/#results' },
+    { label: '센터 환경', href: '/center' },
+    { label: '웹앱 시스템', href: '/experience' },
+    { label: '합격 실적', href: '/results' },
     { label: '국어 수업', href: '/class' },
     { label: '상담 문의', href: '/#consult' },
   ],

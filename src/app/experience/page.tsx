@@ -2,6 +2,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, ChevronLeft, Smartphone, Users } from 'lucide-react';
 
+import { DataAnalyticsPreviewSection } from '@/components/marketing/data-analytics-preview-section';
+import { MarketingFooter } from '@/components/marketing/marketing-footer';
+import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { SectionHeading } from '@/components/marketing/section-heading';
@@ -129,7 +132,7 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
       <div className={`absolute ${reverse ? 'left-[-4%] top-[18%]' : 'right-[-4%] top-[14%]'} h-44 w-44 rounded-full blur-[120px] ${style.glow}`} />
 
       <div className={`relative grid gap-6 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:gap-8 ${reverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`}>
-        <div className="flex flex-col">
+        <div className="order-2 flex flex-col lg:order-1">
           <div className="flex items-center gap-3">
             <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${style.iconWrap}`}>
               <ModeIcon mode={section.mode} />
@@ -167,7 +170,7 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
           </div>
         </div>
 
-        <div>
+        <div className="order-1 lg:order-2">
           <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {section.secondaryScreens.map((screen) => (
@@ -186,6 +189,7 @@ export default function ExperiencePage() {
   return (
     <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#F8F5EF_0%,#FFFFFF_18%,#F7F9FD_100%)] text-[#14295F]">
       <MarketingPageTracker pageType="experience" placement="experience_page" />
+      <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
 
       <div className="pointer-events-none fixed inset-x-0 top-0 h-[26rem] bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.12),transparent_44%),radial-gradient(circle_at_22%_10%,rgba(20,41,95,0.08),transparent_28%)]" />
 
@@ -246,6 +250,10 @@ export default function ExperiencePage() {
         </div>
 
         <ScrollReveal className="mt-8">
+          <DataAnalyticsPreviewSection showNextView={false} />
+        </ScrollReveal>
+
+        <ScrollReveal className="mt-8">
           <div className="space-y-5">
             <p className="text-center text-[12px] font-semibold text-[#667A95]">{experienceShowcase.footerNote}</p>
 
@@ -269,6 +277,7 @@ export default function ExperiencePage() {
           </div>
         </ScrollReveal>
       </div>
+      <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
     </main>
   );
 }

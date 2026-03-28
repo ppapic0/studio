@@ -69,11 +69,11 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
           </div>
         </article>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {centerEnvironment.photos.map((photo, index) => (
             <article
               key={photo.title}
-              className="marketing-card brand-sheen-panel overflow-hidden p-3 sm:p-5"
+              className="marketing-card brand-sheen-panel overflow-hidden p-4 sm:p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -88,14 +88,14 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
                 </span>
               </div>
 
-              <div className="mt-3 rounded-[1rem] border border-[#14295F]/10 bg-[linear-gradient(160deg,#F7FAFF_0%,#FFFFFF_100%)] p-2 sm:mt-4 sm:rounded-[1.25rem] sm:p-3">
-                <div className="relative aspect-[5/4] overflow-hidden rounded-[0.85rem] border border-dashed border-[#14295F]/14 bg-white sm:aspect-[4/3] sm:rounded-[1rem]">
+              <div className="mt-3 rounded-[1rem] border border-[#14295F]/10 bg-[linear-gradient(160deg,#F7FAFF_0%,#FFFFFF_100%)] p-2.5 sm:mt-4 sm:rounded-[1.25rem] sm:p-3">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-[0.95rem] border border-dashed border-[#14295F]/14 bg-white sm:aspect-[4/3] sm:rounded-[1rem]">
                   {photo.image ? (
                     <Image
                       src={photo.image}
                       alt={photo.alt}
                       fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                      sizes="(max-width: 640px) 92vw, (max-width: 1280px) 50vw, 33vw"
                       className="object-cover"
                     />
                   ) : (

@@ -14,6 +14,7 @@ import { AcademyFloatingCTA } from '@/components/marketing/academy-floating-cta'
 import { ConsultForm } from '@/components/marketing/consult-form';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
+import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StaggerChildren } from '@/components/marketing/stagger-children';
 import { adminDb } from '@/lib/firebase-admin';
@@ -282,6 +283,10 @@ export default async function ClassPage() {
             </div>
           </div>
         </section>
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
       </ScrollReveal>
 
       {/* ══════════════════════════════════════════

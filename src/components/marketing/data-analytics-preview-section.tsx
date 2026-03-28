@@ -676,7 +676,7 @@ function BreakTimeChart({ mobile = false }: { mobile?: boolean }) {
   );
 }
 
-export function DataAnalyticsPreviewSection() {
+export function DataAnalyticsPreviewSection({ showNextView = true }: { showNextView?: boolean }) {
   return (
     <section id="data-approach" className="relative scroll-mt-28 overflow-hidden bg-[#F7F9FD] py-12 sm:py-20">
       <div className="pointer-events-none absolute inset-0">
@@ -704,7 +704,7 @@ export function DataAnalyticsPreviewSection() {
           </p>
         </div>
 
-        <StaggerChildren stagger={90} className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+        <StaggerChildren stagger={90} className="mt-6 grid gap-3 sm:grid-cols-3">
           {heroMetrics.map((metric) => (
             <MetricCard
               key={metric.label}
@@ -739,7 +739,7 @@ export function DataAnalyticsPreviewSection() {
           </ChartPanel>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-2">
+        <div className="mt-5 grid gap-4 lg:grid-cols-2 lg:gap-5">
           <ChartPanel
             icon={BarChart3}
             title="주간 학습시간 성장률"
@@ -813,29 +813,31 @@ export function DataAnalyticsPreviewSection() {
           </ChartPanel>
         </div>
 
-        <article className="mt-6 rounded-[1.45rem] border border-[#14295F]/10 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(20,41,95,0.05)] sm:px-6 sm:py-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[12px] font-bold text-[#FF7A16]">NEXT VIEW</p>
-              <p className="mt-1.5 break-keep text-[1.05rem] font-black leading-[1.42] text-[#14295F]">
-                같은 데이터도 학생, 학부모, 운영자는 서로 다르게 읽습니다.
-              </p>
-              <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.68] text-[#52667D] sm:text-[14px]">
-                아래 역할별 화면에서 누가 어떤 그래프를 먼저 보는지 이어서 확인할 수 있게 연결합니다.
-              </p>
-            </div>
+        {showNextView ? (
+          <article className="mt-6 rounded-[1.45rem] border border-[#14295F]/10 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(20,41,95,0.05)] sm:px-6 sm:py-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-[12px] font-bold text-[#FF7A16]">NEXT VIEW</p>
+                <p className="mt-1.5 break-keep text-[1.05rem] font-black leading-[1.42] text-[#14295F]">
+                  같은 데이터도 학생, 학부모, 운영자는 서로 다르게 읽습니다.
+                </p>
+                <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.68] text-[#52667D] sm:text-[14px]">
+                  아래 역할별 화면에서 누가 어떤 그래프를 먼저 보는지 이어서 확인할 수 있게 연결합니다.
+                </p>
+              </div>
 
-            <div className="grid gap-2.5 sm:flex sm:flex-wrap sm:gap-3">
-              <Link href="#app" className="premium-cta premium-cta-primary h-11 w-full gap-1.5 px-5 text-sm sm:w-auto">
-                역할별 화면 이어보기
-                <ArrowRight className="brand-cta-arrow h-3.5 w-3.5" />
-              </Link>
-              <Link href="/experience" className="premium-cta premium-cta-muted h-11 w-full px-5 text-sm sm:w-auto">
-                전체 체험 보기
-              </Link>
+              <div className="grid gap-2.5 sm:flex sm:flex-wrap sm:gap-3">
+                <Link href="#app" className="premium-cta premium-cta-primary h-11 w-full gap-1.5 px-5 text-sm sm:w-auto">
+                  역할별 화면 이어보기
+                  <ArrowRight className="brand-cta-arrow h-3.5 w-3.5" />
+                </Link>
+                <Link href="/experience" className="premium-cta premium-cta-muted h-11 w-full px-5 text-sm sm:w-auto">
+                  전체 체험 보기
+                </Link>
+              </div>
             </div>
-          </div>
-        </article>
+          </article>
+        ) : null}
       </div>
     </section>
   );

@@ -1,18 +1,13 @@
 import { ConsultSection } from '@/components/marketing/consult-section';
-import { CenterEnvironmentSection } from '@/components/marketing/center-environment-section';
-import { DataAnalyticsPreviewSection } from '@/components/marketing/data-analytics-preview-section';
 import { HeroSection } from '@/components/marketing/hero-section';
-import { HomeGrowthProofSection } from '@/components/marketing/home-growth-proof-section';
-import { KoreanClassSection } from '@/components/marketing/korean-class-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingLaunchNoticeModal } from '@/components/marketing/marketing-launch-notice-modal';
-import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
+import { PageGatewaySection } from '@/components/marketing/page-gateway-section';
 import { ResultsSection } from '@/components/marketing/results-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StickyConsultCTA } from '@/components/marketing/sticky-consult-cta';
-import { WebAppShowcaseSection } from '@/components/marketing/web-app-showcase-section';
 import { marketingContent } from '@/lib/marketing-content';
 
 export default function HomePage() {
@@ -26,22 +21,7 @@ export default function HomePage() {
         <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
       </ScrollReveal>
       <ScrollReveal>
-        <HomeGrowthProofSection />
-      </ScrollReveal>
-      <ScrollReveal>
-        <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
-      </ScrollReveal>
-      <ScrollReveal>
-        <CenterEnvironmentSection centerEnvironment={marketingContent.centerEnvironment} />
-      </ScrollReveal>
-      <ScrollReveal>
-        <DataAnalyticsPreviewSection />
-      </ScrollReveal>
-      <ScrollReveal>
-        <WebAppShowcaseSection webAppShowcase={marketingContent.webAppShowcase} />
-      </ScrollReveal>
-      <ScrollReveal>
-        <KoreanClassSection />
+        <PageGatewaySection />
       </ScrollReveal>
       <ScrollReveal>
         <ConsultSection consult={marketingContent.consult} trustMetrics={marketingContent.appSystem.trustMetrics} />

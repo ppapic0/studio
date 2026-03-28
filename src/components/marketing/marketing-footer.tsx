@@ -32,7 +32,7 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
               {footer.line}
             </p>
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-              <a href="#consult" className="premium-cta premium-cta-primary h-10 px-4 text-xs sm:w-auto">
+              <a href="/#consult" className="premium-cta premium-cta-primary h-10 px-4 text-xs sm:w-auto">
                 상담 문의
               </a>
               <a href="/go/login?placement=footer" className="premium-cta premium-cta-ghost h-10 px-4 text-xs sm:w-auto">
