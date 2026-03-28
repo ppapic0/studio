@@ -364,7 +364,7 @@ function resolveTemplateByEvent(settings, eventType) {
 function buildSmsDedupeKey(params) {
     const dateKey = toDateKey(params.eventAt);
     const minuteKey = `${String(params.eventAt.getHours()).padStart(2, "0")}${String(params.eventAt.getMinutes()).padStart(2, "0")}`;
-    if (params.eventType === "study_start" || params.eventType === "study_end" || params.eventType === "late_alert") {
+    if (params.eventType === "late_alert") {
         return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}`;
     }
     return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}_${minuteKey}`;
