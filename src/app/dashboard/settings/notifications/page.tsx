@@ -20,6 +20,7 @@ import { useCollection, useDoc, useFirestore, useFunctions, useMemoFirebase } fr
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
 import { isAdminRole } from '@/lib/dashboard-access';
+import { calculateSmsCost, formatSmsCost } from '@/lib/sms-cost';
 import type { NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -519,7 +520,7 @@ export default function NotificationSettingsPage() {
 
   const smsDeliveryLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
-    return query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), orderBy('createdAt', 'desc'), limit(1200));
+    return query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), orderBy('createdAt', 'desc'), limit(3000));
   }, [firestore, centerId, isAdmin]);
   const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(smsDeliveryLogsQuery, { enabled: isAdmin });
 
@@ -647,6 +648,7 @@ export default function NotificationSettingsPage() {
         label: formatShortDateLabel(date),
         sent: 0,
         issue: 0,
+        cost: 0,
       };
     });
     const dayMap = new Map(range.map((item) => [item.key, item] as const));
@@ -670,11 +672,15 @@ export default function NotificationSettingsPage() {
       const key = toDateKeyFromValue(row.createdAt) || toDateKeyFromValue(row.updatedAt) || toDateKeyFromValue(row.nextAttemptAt);
       return key === todayKey && ['queued', 'processing', 'pending_provider'].includes(String(row.status || ''));
     }).length;
+    range.forEach((item) => {
+      item.cost = calculateSmsCost(item.sent);
+    });
     return {
       range,
       maxCount: Math.max(1, ...range.map((item) => Math.max(item.sent, item.issue))),
       totalSent: range.reduce((sum, item) => sum + item.sent, 0),
       totalIssue: range.reduce((sum, item) => sum + item.issue, 0),
+      totalCost: range.reduce((sum, item) => sum + item.cost, 0),
       pendingTodayCount,
     };
   }, [smsDeliveryLogsRaw, smsQueueRaw]);
@@ -1341,11 +1347,12 @@ export default function NotificationSettingsPage() {
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">최근 7일 문자 전송 현황</p>
                 <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">센터 문자 전송 흐름을 선그래프로 빠르게 확인합니다.</h3>
-                <p className="mt-2 text-sm font-bold text-slate-500">전송 접수와 실패·보류 흐름을 함께 보고, 실제 수신은 통신사·단말 정책에 따라 달라질 수 있습니다.</p>
+                <p className="mt-2 text-sm font-bold text-slate-500">전송 접수와 실패·보류 흐름을 함께 보고, 접수 기준 문자비용도 일자별로 바로 확인합니다.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">전송 접수 {smsTrendSummary.totalSent}건</Badge>
                 <Badge className="border-none bg-rose-100 text-rose-700 font-black">실패·보류 {smsTrendSummary.totalIssue}건</Badge>
+                <Badge className="border-none bg-violet-100 text-violet-700 font-black">7일 비용 {formatSmsCost(smsTrendSummary.totalCost)}</Badge>
                 <Badge className="border-none bg-blue-100 text-blue-700 font-black">오늘 대기 {smsTrendSummary.pendingTodayCount}건</Badge>
               </div>
             </div>
@@ -1378,12 +1385,14 @@ export default function NotificationSettingsPage() {
                       <span className="text-emerald-600">접수 {item.sent}</span>
                       <span className="text-orange-600">이슈 {item.issue}</span>
                     </div>
+                    <p className="mt-2 text-[11px] font-black text-violet-700">비용 {formatSmsCost(item.cost)}</p>
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-slate-600">
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />전송 접수</span>
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />실패·보류</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" />문자비용(접수 기준)</span>
               </div>
             </div>
           </div>
