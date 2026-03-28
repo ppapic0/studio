@@ -1648,7 +1648,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         },
         {
           key: 'lead',
-          title: `상담·리드 ${metrics.consultationRequestCount30d}건`,
+          title: `상담·리드 ${metrics?.consultationRequestCount30d ?? 0}건`,
           detail: '입학 대기와 최근 상담 요청을 같은 흐름에서 확인할 수 있습니다.',
           actionLabel: '리드 워크벤치',
           href: '/dashboard/leads',
