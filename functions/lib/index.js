@@ -336,10 +336,14 @@ async function loadCenterName(db, centerId) {
     try {
         const centerSnap = await db.doc(`centers/${centerId}`).get();
         const name = (_a = centerSnap.data()) === null || _a === void 0 ? void 0 : _a.name;
-        return typeof name === "string" && name.trim().length > 0 ? name.trim() : "센터";
+        const normalizedName = typeof name === "string" ? name.trim() : "";
+        if (normalizedName === "트랙센터") {
+            return "트랙 관리형 스터디센터";
+        }
+        return normalizedName.length > 0 ? normalizedName : "트랙 관리형 스터디센터";
     }
     catch (_b) {
-        return "센터";
+        return "트랙 관리형 스터디센터";
     }
 }
 function resolveTemplateByEvent(settings, eventType) {

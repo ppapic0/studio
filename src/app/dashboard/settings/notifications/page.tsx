@@ -619,7 +619,7 @@ export default function NotificationSettingsPage() {
     studentName: '김재윤',
     time: '18:40',
     expectedTime: form.defaultArrivalTime || '17:00',
-    centerName: '트랙센터',
+    centerName: '트랙 관리형 스터디센터',
   }), [form.defaultArrivalTime]);
 
   const templatePreviews = useMemo(() => {

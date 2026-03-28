@@ -543,9 +543,13 @@ async function loadCenterName(
   try {
     const centerSnap = await db.doc(`centers/${centerId}`).get();
     const name = centerSnap.data()?.name;
-    return typeof name === "string" && name.trim().length > 0 ? name.trim() : "센터";
+    const normalizedName = typeof name === "string" ? name.trim() : "";
+    if (normalizedName === "트랙센터") {
+      return "트랙 관리형 스터디센터";
+    }
+    return normalizedName.length > 0 ? normalizedName : "트랙 관리형 스터디센터";
   } catch {
-    return "센터";
+    return "트랙 관리형 스터디센터";
   }
 }
 
