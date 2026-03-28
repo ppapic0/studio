@@ -52,13 +52,13 @@ export function ReportNotifier() {
               <div className="bg-white/20 p-1.5 rounded-lg">
                 <FileText className="h-4 w-4 text-white animate-bounce" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 whitespace-nowrap">AI 분석 도착</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 whitespace-nowrap">학습 리포트 도착</span>
             </div>
             <DialogTitle className="text-3xl font-black tracking-tighter">
-              데일리 리포트가 도착했습니다
+              학습 리포트가 도착했습니다
             </DialogTitle>
             <DialogDescription className="text-white/70 font-bold mt-1">
-              학생 데이터를 바탕으로 생성된 리포트를 바로 확인할 수 있어요.
+              학부모가 보는 것과 같은 형식으로 오늘의 리포트를 바로 확인할 수 있어요.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -66,7 +66,7 @@ export function ReportNotifier() {
         <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar p-6 sm:p-10">
           <div className="flex justify-center mb-6">
             <Badge variant="secondary" className="rounded-full px-4 py-1.5 bg-white border-2 border-primary/10 shadow-sm font-black text-primary gap-2">
-              <Wand2 className="h-3.5 w-3.5" /> {reportDateKey} 분석 결과
+              <Wand2 className="h-3.5 w-3.5" /> {reportDateKey} 학습 리포트
             </Badge>
           </div>
           <VisualReportViewer

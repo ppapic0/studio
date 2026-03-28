@@ -97,8 +97,8 @@ export default function StudentReportsPage() {
               <FileText className="h-6 w-6" />
             </div>
             <div className="grid">
-              <h1 className={cn('font-black tracking-tighter', isMobile ? 'text-2xl' : 'text-4xl')}>나의 분석 리포트</h1>
-              <p className="ml-1 mt-0.5 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">학습 인사이트 아카이브</p>
+              <h1 className={cn('font-black tracking-tighter', isMobile ? 'text-2xl' : 'text-4xl')}>나의 학습 리포트</h1>
+              <p className="ml-1 mt-0.5 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">학습 리포트 아카이브</p>
             </div>
           </div>
           <Badge className={cn('rounded-full border-none bg-gradient-to-r font-black text-white shadow-lg', isMobile ? 'hidden' : 'h-9 px-4 text-xs', currentTier.gradient)}>
@@ -165,7 +165,7 @@ export default function StudentReportsPage() {
                         </Badge>
                       </div>
 
-                      <h3 className="truncate text-base font-black tracking-tighter text-primary sm:text-xl">분석 리포트</h3>
+                      <h3 className="truncate text-base font-black tracking-tighter text-primary sm:text-xl">학습 리포트</h3>
                       <p className="line-clamp-1 text-[10px] font-bold text-muted-foreground/60 sm:text-[11px]">
                         {preview || '리포트 내용을 확인해보세요.'}
                       </p>
@@ -203,12 +203,12 @@ export default function StudentReportsPage() {
                 </div>
                 <DialogHeader className="relative z-10 text-left">
                   <div className="mb-2 flex items-center gap-2">
-                    <Badge className="border-none bg-white/20 px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white">프리미엄 인공지능 분석</Badge>
+                    <Badge className="border-none bg-white/20 px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white">학습 리포트</Badge>
                     <span className="text-[10px] font-black tracking-widest text-white/60">{selectedReport.dateKey}</span>
                   </div>
-                  <DialogTitle className={cn('font-black tracking-tighter', isMobile ? 'text-3xl' : 'text-5xl')}>정밀 분석 리포트</DialogTitle>
+                  <DialogTitle className={cn('font-black tracking-tighter', isMobile ? 'text-3xl' : 'text-5xl')}>학습 리포트</DialogTitle>
                   <DialogDescription className="mt-1 text-xs font-bold text-white/70 sm:text-sm">
-                    성장 데이터를 바탕으로 인공지능과 선생님의 정밀 리포트가 함께 제공됩니다.
+                    학부모가 보는 것과 같은 형식으로 오늘의 학습 흐름과 코칭을 확인할 수 있어요.
                   </DialogDescription>
                 </DialogHeader>
               </div>
