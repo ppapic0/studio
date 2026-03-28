@@ -147,13 +147,13 @@ export default function DashboardPage() {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
-  const { data: userProfile } = useDoc<UserType>(userProfileRef, { enabled: Boolean(user) });
+  const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserType>(userProfileRef, { enabled: Boolean(user) });
 
   const studentProfileRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
     return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
   }, [firestore, activeMembership, user]);
-  const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudentRole });
+  const { data: studentProfile, isLoading: isStudentProfileLoading } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudentRole });
 
   const studentGrowthRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
@@ -213,17 +213,28 @@ export default function DashboardPage() {
   }, [activeMembership, studentProfile?.phoneNumber, userProfile?.phoneNumber]);
 
   const effectiveSelfPhone = savedPhoneFallback || resolvedSelfPhone;
+  const isPhoneLookupReady = useMemo(() => {
+    if (!activeMembership || !user) return false;
+    if (activeMembership.role === 'student') {
+      return !isUserProfileLoading && !isStudentProfileLoading;
+    }
+    if (activeMembership.role === 'parent') {
+      return !isUserProfileLoading;
+    }
+    return true;
+  }, [activeMembership, user, isStudentProfileLoading, isUserProfileLoading]);
 
   useEffect(() => {
     if (!activeMembership || !user) return;
     if (activeMembership.role !== 'student' && activeMembership.role !== 'parent') return;
+    if (!isPhoneLookupReady) return;
     if (effectiveSelfPhone) {
       setIsPhoneCaptureOpen(false);
       return;
     }
-    setPhoneCaptureValue('');
+    setPhoneCaptureValue((prev) => prev || '');
     setIsPhoneCaptureOpen(true);
-  }, [activeMembership, user, effectiveSelfPhone]);
+  }, [activeMembership, user, effectiveSelfPhone, isPhoneLookupReady]);
 
   async function onInviteSubmit(values: z.infer<typeof inviteFormSchema>) {
     if (!user || !functions) return;
