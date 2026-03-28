@@ -35,6 +35,16 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   Loader2, 
   Plus, 
@@ -205,6 +215,9 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
   const [eHour, setEHour] = useState(initialRange.end.hour);
   const [eMin, setEMin] = useState(initialRange.end.minute);
   const [ePer, setEPer] = useState(initialRange.end.period);
+  const [isPenaltyConfirmOpen, setIsPenaltyConfirmOpen] = useState(false);
+  const [hasConfirmedTodayEdit, setHasConfirmedTodayEdit] = useState(false);
+  const [pendingChange, setPendingChange] = useState<null | { type: 's' | 'e'; field: 'h' | 'm' | 'p'; value: string }>(null);
 
   useEffect(() => {
     const remote = parseRange(timePart);
@@ -216,8 +229,13 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
     setEPer(remote.end.period);
   }, [timePart]);
 
-  const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', val: string) => {
-    if (isPast) return;
+  useEffect(() => {
+    setHasConfirmedTodayEdit(false);
+    setPendingChange(null);
+    setIsPenaltyConfirmOpen(false);
+  }, [item.id]);
+
+  const applyValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', val: string) => {
     let nextSH = sHour, nextSM = sMin, nextSP = sPer;
     let nextEH = eHour, nextEM = eMin, nextEP = ePer;
 
@@ -232,6 +250,31 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
     }
 
     onUpdateRange(item.id, titlePart, { h: nextSH, m: nextSM, p: nextSP }, { h: nextEH, m: nextEM, p: nextEP });
+  };
+
+  const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', val: string) => {
+    if (isPast) return;
+    if (isToday && !hasConfirmedTodayEdit) {
+      setPendingChange({ type, field, value: val });
+      setIsPenaltyConfirmOpen(true);
+      return;
+    }
+
+    applyValueChange(type, field, val);
+  };
+
+  const handleConfirmTodayEdit = () => {
+    if (pendingChange) {
+      setHasConfirmedTodayEdit(true);
+      applyValueChange(pendingChange.type, pendingChange.field, pendingChange.value);
+    }
+    setPendingChange(null);
+    setIsPenaltyConfirmOpen(false);
+  };
+
+  const handleCancelTodayEdit = () => {
+    setPendingChange(null);
+    setIsPenaltyConfirmOpen(false);
   };
 
   const getIcon = (title: string) => {
@@ -315,6 +358,33 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
           </div>
         )}
       </div>
+
+      <AlertDialog open={isPenaltyConfirmOpen} onOpenChange={setIsPenaltyConfirmOpen}>
+        <AlertDialogContent className="max-w-[22rem] rounded-[1.5rem] border-slate-200 bg-white p-6">
+          <AlertDialogHeader className="gap-2 text-left">
+            <AlertDialogTitle className="text-lg font-black tracking-tight text-slate-900">
+              오늘 루틴 수정 시 벌점이 부여돼요
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-slate-600">
+              오늘 날짜의 루틴을 수정하면 하루 최대 1점 벌점이 자동 반영됩니다. 계속 수정할까요?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-2 flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-0">
+            <AlertDialogCancel
+              onClick={handleCancelTodayEdit}
+              className="mt-0 rounded-2xl border-slate-200 font-bold text-slate-600"
+            >
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmTodayEdit}
+              className="rounded-2xl bg-slate-900 font-bold text-white hover:bg-slate-800"
+            >
+              수정 계속
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -6,6 +6,16 @@ import { Clock, Coffee, MapPin, School, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -17,6 +27,11 @@ import { cn } from '@/lib/utils';
 const HOURS = Array.from({ length: 12 }, (_, index) => (index + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, index) => (index * 5).toString().padStart(2, '0'));
 type Meridiem = '오전' | '오후';
+type PendingScheduleChange = {
+  type: 's' | 'e';
+  field: 'h' | 'm' | 'p';
+  value: string;
+};
 
 type ScheduleItemCardProps = {
   item: { id: string; title: string };
@@ -72,6 +87,9 @@ export function ScheduleItemCard({
   const [eHour, setEHour] = useState(initialRange.end.hour);
   const [eMin, setEMin] = useState(initialRange.end.minute);
   const [ePer, setEPer] = useState<Meridiem>(initialRange.end.period);
+  const [isPenaltyConfirmOpen, setIsPenaltyConfirmOpen] = useState(false);
+  const [hasConfirmedTodayEdit, setHasConfirmedTodayEdit] = useState(false);
+  const [pendingChange, setPendingChange] = useState<PendingScheduleChange | null>(null);
 
   useEffect(() => {
     const remote = parseRange(timePart);
@@ -83,9 +101,13 @@ export function ScheduleItemCard({
     setEPer(remote.end.period as Meridiem);
   }, [timePart]);
 
-  const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', value: string) => {
-    if (disabled || isPast) return;
+  useEffect(() => {
+    setHasConfirmedTodayEdit(false);
+    setPendingChange(null);
+    setIsPenaltyConfirmOpen(false);
+  }, [item.id]);
 
+  const applyValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', value: string) => {
     let nextSH = sHour;
     let nextSM = sMin;
     let nextSP: Meridiem = sPer;
@@ -104,6 +126,31 @@ export function ScheduleItemCard({
     }
 
     onUpdateRange(item.id, titlePart, { h: nextSH, m: nextSM, p: nextSP }, { h: nextEH, m: nextEM, p: nextEP });
+  };
+
+  const handleValueChange = (type: 's' | 'e', field: 'h' | 'm' | 'p', value: string) => {
+    if (disabled || isPast) return;
+    if (isToday && !hasConfirmedTodayEdit) {
+      setPendingChange({ type, field, value });
+      setIsPenaltyConfirmOpen(true);
+      return;
+    }
+
+    applyValueChange(type, field, value);
+  };
+
+  const handleConfirmTodayEdit = () => {
+    if (pendingChange) {
+      setHasConfirmedTodayEdit(true);
+      applyValueChange(pendingChange.type, pendingChange.field, pendingChange.value);
+    }
+    setPendingChange(null);
+    setIsPenaltyConfirmOpen(false);
+  };
+
+  const handleCancelTodayEdit = () => {
+    setPendingChange(null);
+    setIsPenaltyConfirmOpen(false);
   };
 
   const getIcon = (title: string) => {
@@ -189,6 +236,33 @@ export function ScheduleItemCard({
         <span className="mx-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">to</span>
         <TimePicker type="e" h={eHour} m={eMin} p={ePer} />
       </div>
+
+      <AlertDialog open={isPenaltyConfirmOpen} onOpenChange={setIsPenaltyConfirmOpen}>
+        <AlertDialogContent className="max-w-[22rem] rounded-[1.5rem] border-slate-200 bg-white p-6">
+          <AlertDialogHeader className="gap-2 text-left">
+            <AlertDialogTitle className="text-lg font-black tracking-tight text-slate-900">
+              오늘 루틴 수정 시 벌점이 부여돼요
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-slate-600">
+              오늘 날짜의 루틴을 수정하면 하루 최대 1점 벌점이 자동 반영됩니다. 계속 수정할까요?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-2 flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-0">
+            <AlertDialogCancel
+              onClick={handleCancelTodayEdit}
+              className="mt-0 rounded-2xl border-slate-200 font-bold text-slate-600"
+            >
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmTodayEdit}
+              className="rounded-2xl bg-slate-900 font-bold text-white hover:bg-slate-800"
+            >
+              수정 계속
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
