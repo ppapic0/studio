@@ -108,6 +108,7 @@ import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-c
 import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
 import { RecentStudySheet } from '@/components/dashboard/student-planner/recent-study-sheet';
 import { RepeatCopySheet } from '@/components/dashboard/student-planner/repeat-copy-sheet';
+import { calculatePlanCompletionLp } from '@/lib/student-rewards';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -1005,14 +1006,16 @@ export default function StudyPlanPage() {
       const batch = writeBatch(firestore);
       const achievementCount = progress?.dailyLpStatus?.[selectedDateKey]?.achievementCount || 0;
       const existingDayStatus = (progress?.dailyLpStatus?.[selectedDateKey] || {}) as Record<string, any>;
+      const rewardLp = calculatePlanCompletionLp(existingDayStatus);
+      const nextDayStatus: Record<string, any> = {
+        ...existingDayStatus,
+        dailyLpAmount: increment(rewardLp),
+      };
+      if (item.category === 'study') nextDayStatus.plan = true;
+      if (item.category === 'schedule') nextDayStatus.routine = true;
       const progressUpdate: Record<string, any> = {
-        seasonLp: increment(10),
-        dailyLpStatus: {
-          [selectedDateKey]: {
-            ...existingDayStatus,
-            dailyLpAmount: increment(10),
-          },
-        },
+        seasonLp: increment(rewardLp),
+        dailyLpStatus: { [selectedDateKey]: nextDayStatus },
         updatedAt: serverTimestamp(),
       };
       if (achievementCount < 5) {
@@ -1025,15 +1028,39 @@ export default function StudyPlanPage() {
   };
 
   const handleCommitStudyActualAmount = async (item: WithId<StudyPlanItem>, nextActualAmount: number) => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
+    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey || !selectedDateKey) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     const safeActualAmount = Math.max(0, Math.round(nextActualAmount));
     const targetAmount = Math.max(0, item.targetAmount || 0);
+    const nextDone = targetAmount > 0 && safeActualAmount >= targetAmount;
     await updateDoc(itemRef, {
       actualAmount: safeActualAmount,
-      done: targetAmount > 0 && safeActualAmount >= targetAmount,
+      done: nextDone,
       updatedAt: serverTimestamp(),
     });
+
+    if (nextDone && !item.done && progressRef) {
+      const batch = writeBatch(firestore);
+      const achievementCount = progress?.dailyLpStatus?.[selectedDateKey]?.achievementCount || 0;
+      const existingDayStatus = (progress?.dailyLpStatus?.[selectedDateKey] || {}) as Record<string, any>;
+      const rewardLp = calculatePlanCompletionLp(existingDayStatus);
+      const nextDayStatus: Record<string, any> = {
+        ...existingDayStatus,
+        plan: true,
+        dailyLpAmount: increment(rewardLp),
+      };
+      const progressUpdate: Record<string, any> = {
+        seasonLp: increment(rewardLp),
+        dailyLpStatus: { [selectedDateKey]: nextDayStatus },
+        updatedAt: serverTimestamp(),
+      };
+      if (achievementCount < 5) {
+        progressUpdate.stats = { achievement: increment(0.1) };
+        progressUpdate.dailyLpStatus[selectedDateKey].achievementCount = increment(1);
+      }
+      batch.set(progressRef, progressUpdate, { merge: true });
+      await batch.commit();
+    }
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {

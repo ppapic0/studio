@@ -74,6 +74,7 @@ import {
 } from 'firebase/firestore';
 import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog, LayoutRoomConfig } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { calculateStudySessionLp } from '@/lib/student-rewards';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { 
@@ -1244,8 +1245,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           const penaltyPoints = p?.penaltyPoints || 0;
           const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
           const finalMultiplier = totalBoost * (1 - penaltyRate);
+          const existingSessionDayStatus = (p?.dailyLpStatus?.[sessionDateKey] || {}) as Record<string, any>;
 
-          const studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
+          const studyLpEarned = calculateStudySessionLp(sessionMinutes, finalMultiplier, existingSessionDayStatus);
           const progressUpdate: Record<string, any> = {
             seasonLp: increment(studyLpEarned),
             stats: {
@@ -1253,6 +1255,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             },
             dailyLpStatus: {
               [sessionDateKey]: {
+                ...existingSessionDayStatus,
                 dailyLpAmount: increment(studyLpEarned),
               },
             },

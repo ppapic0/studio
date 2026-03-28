@@ -85,6 +85,11 @@ import {
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
+import {
+  calculateAttendanceBonusLp,
+  calculateStudySessionLp,
+  createDailyFortuneOutcome,
+} from '@/lib/student-rewards';
 
 const TIER_PRESETS = [
   { label: '브론즈', lp: 0, stats: 10, rank: 999, color: 'bg-orange-700' },
@@ -745,10 +750,6 @@ function LPHistoryDialog({
           {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 포인트가 없습니다.</div>) : (
             <div className="space-y-2">
               {sortedDates.map(([date, data]) => {
-                const discreteLp = (data.attendance ? 100 : 0) + (data.plan ? 100 : 0) + (data.routine ? 100 : 0);
-                const boostedDiscrete = Math.round(discreteLp * totalBoost);
-                const studyLp = Math.max(0, (data.dailyLpAmount || 0) - boostedDiscrete);
-
                 return (
                   <div key={date} className="bg-white p-4 rounded-xl border border-primary/10 flex items-center justify-between">
                     <div className="grid gap-0.5">
@@ -757,7 +758,13 @@ function LPHistoryDialog({
                         {data.attendance && <Badge variant="outline" className="bg-blue-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">출석</Badge>}
                         {data.plan && <Badge variant="outline" className="bg-emerald-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">계획</Badge>}
                         {data.routine && <Badge variant="outline" className="bg-amber-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">루틴</Badge>}
-                        {studyLp > 0 && <Badge variant="outline" className="bg-blue-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">몰입</Badge>}
+                        {data.fortuneOpened && <Badge variant="outline" className="bg-violet-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">운세</Badge>}
+                        {data.fortuneRewardType === 'boost' && Number(data.fortuneBoostPercent || 0) > 0 && (
+                          <Badge variant="outline" className="bg-fuchsia-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">
+                            부스트 +{Number(data.fortuneBoostPercent || 0)}%
+                          </Badge>
+                        )}
+                        {Number(data.dailyLpAmount || 0) > 0 && <Badge variant="outline" className="bg-blue-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">포인트</Badge>}
                       </div>
                     </div>
                     <div className="text-right">
@@ -1055,6 +1062,119 @@ function StudySessionHistoryDialog({
   );
 }
 
+type DailyFortuneDialogProps = {
+  isMobile: boolean;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  stage: 'gift' | 'result';
+  onReveal: () => void;
+  fortuneResult: ReturnType<typeof createDailyFortuneOutcome> | null;
+};
+
+function DailyFortuneDialog({
+  isMobile,
+  isOpen,
+  onOpenChange,
+  stage,
+  onReveal,
+  fortuneResult,
+}: DailyFortuneDialogProps) {
+  if (!fortuneResult) return null;
+
+  const rewardLabel = fortuneResult.rewardType === 'boost'
+    ? `오늘 획득 LP +${fortuneResult.boostPercent}%`
+    : `즉시 ${fortuneResult.pointGift.toLocaleString()}포인트`;
+  const rewardCaption = fortuneResult.rewardType === 'boost'
+    ? '오늘 하루 포인트 획득에 바로 반영됩니다.'
+    : '지금 바로 시즌 포인트에 적립됩니다.';
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent motionPreset="dashboard-premium" className={cn(
+        "overflow-hidden rounded-[2.5rem] border border-[#FFE0C2] bg-white p-0",
+        isMobile ? "w-[min(94vw,25.5rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md"
+      )}>
+        <div className={cn(
+          "relative overflow-hidden bg-[linear-gradient(135deg,#14295F_0%,#2047A8_52%,#26C4A4_100%)] text-white",
+          isMobile ? "px-6 pb-6 pt-7" : "px-8 pb-8 pt-9"
+        )}>
+          <Sparkles className="pointer-events-none absolute -right-1 top-0 h-24 w-24 opacity-20" />
+          <DialogHeader>
+            <DialogTitle className={cn("font-black tracking-tight break-keep text-white", isMobile ? "text-2xl" : "text-3xl")}>
+              오늘의 학업 운세
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-white/75 font-semibold break-keep">
+              하루 첫 공부 시작 보너스예요. 선물상자를 열고 오늘 운세를 확인해 보세요.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className={cn("bg-[linear-gradient(180deg,#fffaf4_0%,#ffffff_100%)]", isMobile ? "p-4" : "p-6")}>
+          {stage === 'gift' ? (
+            <div className="space-y-4">
+              <div className="rounded-[2rem] border border-[#FFE1C7] bg-[radial-gradient(circle_at_top_right,#fff1d8_0%,#fffaf3_48%,#ffffff_100%)] p-5 text-center shadow-[0_18px_45px_-30px_rgba(255,122,22,0.55)]">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.4rem] border border-[#FFD2A4] bg-white shadow-[0_10px_20px_-14px_rgba(255,122,22,0.65)]">
+                  <Sparkles className="h-8 w-8 text-[#FF7A16]" />
+                </div>
+                <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-[#FF7A16]/80">Lucky Start</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-primary break-keep">
+                  선물상자를 열고 오늘의 공부 운을 받아가세요
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 break-keep">
+                  랜덤 포인트 또는 오늘 하루 LP 부스트가 바로 적용됩니다.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={onReveal}
+                className="h-12 w-full rounded-2xl bg-[#FF7A16] text-base font-black shadow-[0_16px_30px_-18px_rgba(255,122,22,0.85)] hover:bg-[#F06C09]"
+              >
+                선물상자 열기
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-[2rem] border border-[#DCE6FF] bg-[linear-gradient(160deg,#ffffff_0%,#f4f8ff_52%,#eef7ff_100%)] p-5 shadow-[0_20px_40px_-32px_rgba(20,41,95,0.45)]">
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#2047A8]">
+                  <Sparkles className="h-4 w-4" />
+                  Positive Fortune
+                </div>
+                <p className="mt-3 text-2xl font-black tracking-tight text-primary break-keep">
+                  {fortuneResult.message.title}
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 break-keep">
+                  {fortuneResult.message.body}
+                </p>
+              </div>
+
+              <div className="rounded-[1.6rem] border border-[#FFE1C7] bg-white p-4 shadow-[0_18px_32px_-30px_rgba(255,122,22,0.9)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#FF7A16]/80">오늘의 선물</p>
+                    <p className="mt-2 text-xl font-black tracking-tight text-primary break-keep">{rewardLabel}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500 break-keep">{rewardCaption}</p>
+                  </div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFF3E7] text-[#FF7A16]">
+                    {fortuneResult.rewardType === 'boost' ? <Zap className="h-6 w-6" /> : <Trophy className="h-6 w-6" />}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="p-0">
+                <DialogClose asChild>
+                  <Button className="h-12 w-full rounded-2xl bg-primary text-base font-black">
+                    좋아, 시작할게
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -1079,6 +1199,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [isExamSaving, setIsExamSaving] = useState(false);
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
+  const [isDailyFortuneDialogOpen, setIsDailyFortuneDialogOpen] = useState(false);
+  const [dailyFortuneStage, setDailyFortuneStage] = useState<'gift' | 'result'>('gift');
+  const [dailyFortuneResult, setDailyFortuneResult] = useState<ReturnType<typeof createDailyFortuneOutcome> | null>(null);
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -1442,13 +1565,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             existingSessionDayMinutes = Number(sessionDaySnap.data()?.totalMinutes || 0);
           }
 
-          let studyLpEarned = Math.round(sessionMinutes * finalMultiplier);
+          let studyLpEarned = calculateStudySessionLp(sessionMinutes, finalMultiplier, existingSessionDayStatus);
           statsUpdate.focus = increment((sessionMinutes / 60) * 0.1);
 
           const totalMinutesAfterSession = existingSessionDayMinutes + sessionMinutes;
 
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[sessionDateKey]?.attendance) {
-            studyLpEarned += Math.round(100 * finalMultiplier);
+            studyLpEarned += calculateAttendanceBonusLp(finalMultiplier, existingSessionDayStatus);
             dailyStatusUpdate.attendance = true;
             toast({ title: '\u0033\uC2DC\uAC04 \uB2EC\uC131! \uCD9C\uC11D \uBCF4\uB108\uC2A4 \uD3EC\uC778\uD2B8 \uD68D\uB4DD' });
           }
@@ -1660,11 +1783,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
       } else {
         const nowTs = Date.now();
+        const existingTodayStatus = (progress?.dailyLpStatus?.[todayKey] || {}) as Record<string, any>;
         const batch = writeBatch(firestore);
         const checkInProgressUpdate: Record<string, any> = {
           updatedAt: serverTimestamp(),
           stats: { consistency: increment(0.5) },
-          dailyLpStatus: { [todayKey]: { checkedIn: true } },
+          dailyLpStatus: { [todayKey]: { ...existingTodayStatus, checkedIn: true } },
         };
         const needsCheckInSync = !progress?.dailyLpStatus?.[todayKey]?.checkedIn;
         let wroteSomething = false;
@@ -1748,6 +1872,46 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             console.warn('[student-track] entry notification skipped', notifyError?.message || notifyError);
           });
 
+        if (!startCommitError && !existingTodayStatus.fortuneOpened) {
+          try {
+            const fortuneOutcome = createDailyFortuneOutcome({
+              userId: user.uid,
+              dateKey: todayKey,
+              stats,
+            });
+            const fortuneDayStatus: Record<string, any> = {
+              ...existingTodayStatus,
+              checkedIn: true,
+              fortuneOpened: true,
+              fortuneRewardType: fortuneOutcome.rewardType,
+              fortunePointGift: fortuneOutcome.pointGift,
+              fortuneBoostPercent: fortuneOutcome.boostPercent,
+              fortuneMessageKey: fortuneOutcome.messageKey,
+              fortuneOpenedAt: Timestamp.fromMillis(nowTs),
+            };
+            if (fortuneOutcome.pointGift > 0) {
+              fortuneDayStatus.dailyLpAmount = increment(fortuneOutcome.pointGift);
+            }
+            const fortuneUpdate: Record<string, any> = {
+              dailyLpStatus: { [todayKey]: fortuneDayStatus },
+              updatedAt: serverTimestamp(),
+            };
+            if (fortuneOutcome.pointGift > 0) {
+              fortuneUpdate.seasonLp = increment(fortuneOutcome.pointGift);
+            }
+            await setDoc(progressRef, fortuneUpdate, { merge: true });
+            setDailyFortuneResult(fortuneOutcome);
+            setDailyFortuneStage('gift');
+            setIsDailyFortuneDialogOpen(true);
+          } catch (fortuneError: any) {
+            console.warn('[student-track] daily fortune skipped', fortuneError?.message || fortuneError);
+            toast({
+              title: '오늘의 운세 준비 중',
+              description: '공부 시작은 정상 반영됐어요. 운세 보상은 잠시 뒤 다시 확인해 주세요.',
+            });
+          }
+        }
+
         setStartTime(nowTs);
         setIsTimerActive(true);
         if (startCommitError) {
@@ -1789,6 +1953,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     todayKey,
     periodKey,
     studyLogRef,
+    stats,
     setIsTimerActive,
     setStartTime,
     toast,
@@ -2195,6 +2360,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         isMobile ? "gap-3 pb-[calc(env(safe-area-inset-bottom)+8.5rem)]" : "gap-6"
       )}
     >
+      <DailyFortuneDialog
+        isMobile={isMobile}
+        isOpen={isDailyFortuneDialogOpen}
+        onOpenChange={(open) => {
+          setIsDailyFortuneDialogOpen(open);
+          if (!open) setDailyFortuneStage('result');
+        }}
+        stage={dailyFortuneStage}
+        onReveal={() => setDailyFortuneStage('result')}
+        fortuneResult={dailyFortuneResult}
+      />
+
       <section className={cn(
         "student-hero-enter relative overflow-hidden text-white border transition-colors duration-200",
         isMobile ? "rounded-[1.5rem] p-5" : "rounded-[2.5rem] p-10"

@@ -21,8 +21,9 @@ import {
   Timestamp,
   getDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, GrowthProgress } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { calculateStudySessionLp } from '@/lib/student-rewards';
 import { 
   Delete, 
   Loader2, 
@@ -290,9 +291,24 @@ export default function KioskPage() {
 
           // 성장 지표 반영 (임시 가중치)
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', student.id);
+          const progressSnap = await getDoc(progressRef);
+          const progress = progressSnap.exists() ? (progressSnap.data() as GrowthProgress) : null;
+          const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+          const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
+          const penaltyPoints = progress?.penaltyPoints || 0;
+          const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
+          const finalMultiplier = totalBoost * (1 - penaltyRate);
+          const existingDayStatus = (progress?.dailyLpStatus?.[todayKey] || {}) as Record<string, any>;
+          const studyLpEarned = calculateStudySessionLp(durationMinutes, finalMultiplier, existingDayStatus);
           batch.set(progressRef, {
-            seasonLp: increment(durationMinutes),
-            'stats.focus': increment(0.1),
+            seasonLp: increment(studyLpEarned),
+            dailyLpStatus: {
+              [todayKey]: {
+                ...existingDayStatus,
+                dailyLpAmount: increment(studyLpEarned),
+              },
+            },
+            'stats.focus': increment((durationMinutes / 60) * 0.1),
             updatedAt: serverTimestamp()
           }, { merge: true });
         }

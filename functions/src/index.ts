@@ -4055,6 +4055,8 @@ export const scheduledAttendanceCheck = functions
     const db = admin.firestore();
     const nowKst = toKstDate();
     const MAX_SESSION_MINUTES = 360; // 6시간
+    const STUDY_SESSION_LP_PER_MINUTE = 0.75;
+    const STUDY_ATTENDANCE_BONUS_LP = 50;
     const cutoffTimestamp = admin.firestore.Timestamp.fromMillis(
       Date.now() - MAX_SESSION_MINUTES * 60 * 1000
     );
@@ -4122,11 +4124,56 @@ export const scheduledAttendanceCheck = functions
         const progressRef = db
           .collection("centers").doc(centerId)
           .collection("growthProgress").doc(studentId);
+        const progressSnap = await progressRef.get();
+        const progressData = progressSnap.exists ? progressSnap.data() : null;
+        const stats = progressData?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+        const totalBoost = 1
+          + (Number(stats.focus || 0) / 100 * 0.05)
+          + (Number(stats.consistency || 0) / 100 * 0.05)
+          + (Number(stats.achievement || 0) / 100 * 0.05)
+          + (Number(stats.resilience || 0) / 100 * 0.05);
+        const penaltyPoints = Number(progressData?.penaltyPoints || 0);
+        const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
+        const finalMultiplier = totalBoost * (1 - penaltyRate);
+        const existingDayStatus = ((progressData?.dailyLpStatus || {}) as Record<string, any>)[sessionDateKey] || {};
+        const fortuneBoostPercent = existingDayStatus?.fortuneRewardType === "boost"
+          ? Math.max(0, Math.min(10, Math.round(Number(existingDayStatus?.fortuneBoostPercent || 0))))
+          : 0;
+        const fortuneBoostMultiplier = 1 + fortuneBoostPercent / 100;
+        const existingDayMinutes = Number((await logRef.get()).data()?.totalMinutes || 0);
+        const totalMinutesAfterSession = existingDayMinutes + MAX_SESSION_MINUTES;
+        let studyLpEarned = Math.max(
+          0,
+          Math.round(MAX_SESSION_MINUTES * STUDY_SESSION_LP_PER_MINUTE * finalMultiplier * fortuneBoostMultiplier)
+        );
+        const nextDayStatus: Record<string, any> = { ...existingDayStatus };
+        const progressUpdate: Record<string, any> = {
+          seasonLp: admin.firestore.FieldValue.increment(0),
+          "stats.focus": admin.firestore.FieldValue.increment((MAX_SESSION_MINUTES / 60) * 0.1),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        if (totalMinutesAfterSession >= 180 && !existingDayStatus?.attendance) {
+          studyLpEarned += Math.max(
+            0,
+            Math.round(STUDY_ATTENDANCE_BONUS_LP * finalMultiplier * fortuneBoostMultiplier)
+          );
+          nextDayStatus.attendance = true;
+        }
+
+        if (totalMinutesAfterSession >= 360 && !existingDayStatus?.bonus6h) {
+          nextDayStatus.bonus6h = true;
+          progressUpdate["stats.resilience"] = admin.firestore.FieldValue.increment(0.5);
+        }
+
+        nextDayStatus.dailyLpAmount = admin.firestore.FieldValue.increment(studyLpEarned);
 
         batch.set(progressRef, {
-          seasonLp: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
-          "stats.focus": admin.firestore.FieldValue.increment(0.1),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          ...progressUpdate,
+          seasonLp: admin.firestore.FieldValue.increment(studyLpEarned),
+          dailyLpStatus: {
+            [sessionDateKey]: nextDayStatus,
+          },
         }, { merge: true });
 
         await batch.commit();
