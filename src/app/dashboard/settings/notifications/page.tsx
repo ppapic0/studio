@@ -184,6 +184,15 @@ type TodayAttendanceRecordDoc = {
   updatedAt?: { toDate?: () => Date };
 };
 
+type TodayAttendanceDailyStatDoc = {
+  id: string;
+  studentId?: string;
+  attendanceStatus?: string;
+  checkInAt?: { toDate?: () => Date };
+  checkOutAt?: { toDate?: () => Date };
+  hasCheckOutRecord?: boolean;
+};
+
 type RecipientPreferenceRow = {
   studentId: string;
   studentName: string;
@@ -542,6 +551,12 @@ export default function NotificationSettingsPage() {
   }, [firestore, centerId, isAdmin, todayKey]);
   const { data: todayAttendanceRecordsRaw } = useCollection<TodayAttendanceRecordDoc>(todayAttendanceRecordsQuery, { enabled: isAdmin });
 
+  const todayAttendanceDailyStatsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(collection(firestore, 'centers', centerId, 'attendanceDailyStats', todayKey, 'students'), limit(800));
+  }, [firestore, centerId, isAdmin, todayKey]);
+  const { data: todayAttendanceDailyStatsRaw } = useCollection<TodayAttendanceDailyStatDoc>(todayAttendanceDailyStatsQuery, { enabled: isAdmin });
+
   const legacySmsLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(collection(firestore, 'centers', centerId, 'smsLogs'), orderBy('createdAt', 'desc'), limit(120));
@@ -787,6 +802,7 @@ export default function NotificationSettingsPage() {
     const deliveryRows = smsDeliveryLogsRaw || [];
     const attendanceEventRows = todayAttendanceEventsRaw || [];
     const attendanceRecordRows = todayAttendanceRecordsRaw || [];
+    const attendanceDailyStatRows = todayAttendanceDailyStatsRaw || [];
     const keyword = studentBoardSearchTerm.trim().toLowerCase();
     return recipientRows
       .map((student) => {
@@ -805,6 +821,7 @@ export default function NotificationSettingsPage() {
           }))
           .filter((row) => row.boardEventType && row.at);
         const studentAttendanceRecord = attendanceRecordRows.find((row) => row.id === student.studentId || row.studentId === student.studentId) || null;
+        const studentAttendanceDailyStat = attendanceDailyStatRows.find((row) => row.id === student.studentId || row.studentId === student.studentId) || null;
         const hasMissingPhone = student.parentRows.every((row) => row.isPhoneMissing);
         const events = TODAY_BOARD_EVENTS.reduce((acc, item) => {
           const logRows = studentLogs
@@ -823,6 +840,8 @@ export default function NotificationSettingsPage() {
           const latestFailedLog = logRows.find((row) => row.status === 'failed');
           const latestQueue = queueRowsForEvent[0];
           const recordCheckInAt = studentAttendanceRecord?.checkInAt?.toDate?.() || studentAttendanceRecord?.updatedAt?.toDate?.() || null;
+          const dailyStatCheckInAt = studentAttendanceDailyStat?.checkInAt?.toDate?.() || null;
+          const dailyStatCheckOutAt = studentAttendanceDailyStat?.checkOutAt?.toDate?.() || null;
           const hasRecordedCheckIn =
             item.value === 'study_start' &&
             (
@@ -830,8 +849,13 @@ export default function NotificationSettingsPage() {
               studentAttendanceRecord?.status === 'confirmed_late' ||
               studentAttendanceRecord?.status === 'confirmed_present_missing_routine'
             ) &&
-            recordCheckInAt;
-          const attendanceFallbackTime = latestAttendanceEvent?.at || (hasRecordedCheckIn ? recordCheckInAt : null);
+            (dailyStatCheckInAt || recordCheckInAt);
+          const attendanceFallbackTime =
+            item.value === 'study_start'
+              ? latestAttendanceEvent?.at || dailyStatCheckInAt || (hasRecordedCheckIn ? recordCheckInAt : null)
+              : item.value === 'study_end'
+                ? latestAttendanceEvent?.at || dailyStatCheckOutAt
+                : latestAttendanceEvent?.at || null;
 
           let summary: StudentSmsBoardEventSummary;
           if (latestSent) {
@@ -963,7 +987,7 @@ export default function NotificationSettingsPage() {
         if (a.needsAttentionRank !== b.needsAttentionRank) return b.needsAttentionRank - a.needsAttentionRank;
         return a.studentName.localeCompare(b.studentName, 'ko-KR');
       });
-  }, [recipientRows, smsDeliveryLogsRaw, smsQueueRaw, studentBoardSearchTerm, todayAttendanceEventsRaw, todayAttendanceRecordsRaw, todayKey]);
+  }, [recipientRows, smsDeliveryLogsRaw, smsQueueRaw, studentBoardSearchTerm, todayAttendanceDailyStatsRaw, todayAttendanceEventsRaw, todayAttendanceRecordsRaw, todayKey]);
 
   const todayBoardSummary = useMemo(() => {
     return {
