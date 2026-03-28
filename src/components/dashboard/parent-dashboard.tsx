@@ -537,6 +537,42 @@ function ParentAnalyticsCard({
   );
 }
 
+function ParentSectionHeader({
+  icon,
+  eyebrow,
+  title,
+  description,
+  badges,
+  className,
+}: {
+  icon: ReactNode;
+  eyebrow: string;
+  title: string;
+  description: string;
+  badges?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between', className)}>
+      <div className="min-w-0">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#d8e4ff] bg-white/92 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5472a4] shadow-sm">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#eef4ff] text-[#14295F]">
+            {icon}
+          </span>
+          {eyebrow}
+        </div>
+        <h3 className="mt-3 text-[1.5rem] font-black leading-none tracking-tight text-[#14295F] sm:text-[1.85rem]">
+          {title}
+        </h3>
+        <p className="mt-2 max-w-[34rem] break-keep text-[13px] font-bold leading-[1.75] text-slate-500 sm:text-[14px]">
+          {description}
+        </p>
+      </div>
+      {badges ? <div className="flex flex-wrap items-center gap-2 self-start">{badges}</div> : null}
+    </div>
+  );
+}
+
 function ParentMetricSparkline({
   tone,
   points,
@@ -2959,18 +2995,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       {linkedStudents.length > 1 && (
         <section
           className={cn(
-            'rounded-[1.7rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-sm sm:p-5',
+            'rounded-[1.85rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#f8fbff_72%,#f2f7ff_100%)] p-4 shadow-[0_18px_34px_-28px_rgba(20,41,95,0.18)] sm:p-5',
             showEntryMotion && 'parent-card-enter parent-entry-delay-1'
           )}
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Parent Profile</p>
-              <h3 className="mt-1 text-lg font-black tracking-tight text-[#14295F]">{activeStudentLabel} 학생 화면</h3>
-              <p className="mt-1 text-sm font-bold text-slate-500">여러 자녀가 연결된 경우, 확인할 학생을 빠르게 전환할 수 있어요.</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Student Switch</p>
+              <h3 className="mt-1 text-lg font-black tracking-tight text-[#14295F]">확인할 자녀를 선택하세요</h3>
+              <p className="mt-1 text-sm font-bold text-slate-500">여러 자녀가 연결되어 있다면, 여기서 빠르게 전환할 수 있어요.</p>
             </div>
             <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={handleStudentChange}>
-              <SelectTrigger className="h-12 w-full rounded-[1.1rem] border border-[#d7e4ff] bg-white px-4 text-left font-black text-[#14295F] shadow-sm sm:w-[220px]">
+              <SelectTrigger className="h-12 w-full rounded-[1.1rem] border border-[#d7e4ff] bg-white px-4 text-left font-black text-[#14295F] shadow-[0_14px_26px_-24px_rgba(20,41,95,0.28)] sm:w-[220px]">
                 <SelectValue placeholder="자녀 선택" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border border-slate-200 bg-white">
@@ -2989,13 +3025,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         <TabsContent value="home" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
           <section
             className={cn(
-              'relative overflow-hidden rounded-[2.25rem] border border-[#d7e5ff] bg-[linear-gradient(145deg,#ffffff_0%,#edf4ff_56%,#fff5e8_100%)] p-5 shadow-[0_12px_26px_rgba(20,41,95,0.10)] sm:p-6',
+              'relative overflow-hidden rounded-[2.4rem] border border-[#dbe6fb] bg-[linear-gradient(155deg,#ffffff_0%,#f4f8ff_48%,#fff7ef_100%)] p-5 shadow-[0_24px_54px_-42px_rgba(20,41,95,0.22)] sm:p-6',
               showEntryMotion && 'parent-hero-enter parent-entry-delay-2'
             )}
           >
-            <div className="soft-glow absolute -right-8 top-2 h-24 w-24 rounded-full bg-[#ffb979]/35 blur-3xl" />
-            <div className="soft-glow absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-[#9bbcff]/30 blur-3xl" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.08),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,122,22,0.10),transparent_32%)]" />
+            <div className="soft-glow absolute -right-8 top-2 h-24 w-24 rounded-full bg-[#ffc48f]/28 blur-3xl" />
+            <div className="soft-glow absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-[#a8c6ff]/24 blur-3xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.06),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,122,22,0.08),transparent_32%)]" />
 
             <div className="relative z-10 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3009,13 +3045,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#7081a1]">Parent App Summary</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#7081a1]">Today Brief</p>
                 <div className="space-y-2">
-                  <p className="text-[12px] font-black tracking-tight text-[#14295F]/70">{student?.name || '자녀'} 학생 현황</p>
-                  <h2 className="max-w-[18ch] break-keep text-[1.38rem] font-black leading-[1.16] tracking-[-0.045em] text-[#14295F] sm:text-[1.82rem] md:max-w-none md:text-[2.15rem]">
+                  <p className="text-[12px] font-black tracking-tight text-[#14295F]/68">{student?.name || '자녀'} 현황</p>
+                  <h2 className="max-w-[18ch] break-keep text-[1.32rem] font-black leading-[1.18] tracking-[-0.042em] text-[#14295F] sm:text-[1.72rem] md:max-w-none md:text-[1.95rem]">
                     {heroTone.title}
                   </h2>
-                  <p className="max-w-2xl break-keep text-[13.5px] font-bold leading-[1.72] text-slate-600 sm:text-sm md:text-[15px]">
+                  <p className="max-w-2xl break-keep text-[13px] font-bold leading-[1.72] text-slate-600 sm:text-sm md:text-[14px]">
                     {heroTone.description}
                   </p>
                 </div>
@@ -3046,7 +3082,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               )}
             >
               <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
-                <div className="min-w-0 space-y-2.5 pr-[5.7rem] sm:pr-0">
+                <div className="min-w-0 space-y-2 pr-[5.7rem] sm:space-y-2.5 sm:pr-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#56739f]">오늘 공부</span>
                     {growthCelebrationCandidate ? (
@@ -3060,14 +3096,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     )}
                   </div>
                   <ParentDurationValue minutes={totalMinutes} className="text-[1.4rem] sm:text-[1.72rem] lg:text-[1.92rem]" />
-                  <p className="text-[11px] font-bold leading-5 text-slate-500">
-                    최근 평균 {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
-                  </p>
-                  <div className="flex items-center justify-between gap-2 rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(20,41,95,0.24)]">
-                    <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">전일 대비</p>
-                    <p className="whitespace-nowrap text-right text-[12px] font-black text-[#14295F]">
-                      {studyTrendHasActivity ? formatSignedMinutes(studyDeltaFromYesterday) : '기록 대기'}
-                    </p>
+                  <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(20,41,95,0.24)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">최근 평균</p>
+                      <p className="whitespace-nowrap text-right text-[12px] font-black text-[#14295F]">
+                        {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
+                      </p>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#dbe6fb] pt-2">
+                      <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">전일 대비</p>
+                      <p className="whitespace-nowrap text-right text-[12px] font-black text-[#14295F]">
+                        {studyTrendHasActivity ? formatSignedMinutes(studyDeltaFromYesterday) : '기록 대기'}
+                      </p>
+                    </div>
                   </div>
                 </div>
                 <div className="absolute right-0 -top-1 w-[4.8rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
@@ -3093,7 +3134,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               )}
             >
               <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
-                <div className="min-w-0 space-y-2.5 pr-[5.7rem] sm:pr-0">
+                <div className="min-w-0 space-y-2 pr-[5.7rem] sm:space-y-2.5 sm:pr-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c66a13]">계획 달성</span>
                     <Badge variant="outline" className="h-6 rounded-full border border-[#ffd8ab] bg-white/90 px-2.5 text-[10px] font-black text-[#b45f0d]">
@@ -3101,14 +3142,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </Badge>
                   </div>
                   <ParentStatValue value={planRate} unit="%" className="text-[1.44rem] sm:text-[1.76rem] lg:text-[1.96rem]" unitClassName="text-[#d09248]" />
-                  <p className="text-[11px] font-bold leading-5 text-slate-500">
-                    주간 평균 {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
-                  </p>
-                  <div className="flex items-center justify-between gap-2 rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(210,109,18,0.24)]">
-                    <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">완료일</p>
-                    <p className="whitespace-nowrap text-right text-[12px] font-black text-[#9b5910]">
-                      {planTrendActiveDays > 0 ? `${planTrendCompletedDays}/${planTrendActiveDays}일` : '최근 7일 대기'}
-                    </p>
+                  <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(210,109,18,0.24)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">주간 평균</p>
+                      <p className="whitespace-nowrap text-right text-[12px] font-black text-[#9b5910]">
+                        {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
+                      </p>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#ffe0c2] pt-2">
+                      <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">완료일</p>
+                      <p className="whitespace-nowrap text-right text-[12px] font-black text-[#9b5910]">
+                        {planTrendActiveDays > 0 ? `${planTrendCompletedDays}/${planTrendActiveDays}일` : '최근 7일 대기'}
+                      </p>
+                    </div>
                   </div>
                 </div>
                 <div className="absolute right-0 -top-1 w-[4.8rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
@@ -3248,7 +3294,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 }
               }}
               className={cn(
-                'group relative overflow-hidden rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#eef4ff_60%,#fff4e8_100%)] p-5 shadow-sm ring-1 ring-[#d7e4ff]/70 transition-[transform,box-shadow] active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_20px_36px_-24px_rgba(20,41,95,0.32)] sm:p-6',
+                'group relative overflow-hidden rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#f1f6ff_58%,#fff7ee_100%)] p-5 shadow-[0_22px_40px_-34px_rgba(20,41,95,0.22)] ring-1 ring-[#d7e4ff]/70 transition-[transform,box-shadow] active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_20px_36px_-24px_rgba(20,41,95,0.32)] sm:p-6',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-4'
               )}
             >
@@ -3274,11 +3320,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <ChevronRight className="h-4 w-4 text-slate-300" />
                   </div>
                 </div>
-                <div className="space-y-2 rounded-[1.6rem] border border-white/80 bg-white/80 p-4 shadow-[0_8px_18px_rgba(20,41,95,0.06)]">
+                <div className="space-y-2 rounded-[1.6rem] border border-white/80 bg-white/84 p-4 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.18)]">
                   <p className="text-sm font-black tracking-tight text-[#14295F]">
-                    오늘 부모님이 가장 먼저 보셔야 할 내용
+                    오늘 먼저 볼 리포트
                   </p>
-                  <p className="line-clamp-4 break-keep text-sm font-bold leading-relaxed text-slate-700">
+                  <p className="line-clamp-4 break-keep text-[13px] font-bold leading-relaxed text-slate-700">
                     {report?.content || '카드를 누르면 자녀의 최근 학습 리포트와 선생님 피드백을 바로 확인할 수 있습니다.'}
                   </p>
                 </div>
@@ -3287,7 +3333,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
             <Card
               className={cn(
-                'rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_72%,#fff8f0_100%)] p-5 shadow-sm sm:p-6',
+                'rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#fbfdff_0%,#ffffff_68%,#fff8f0_100%)] p-5 shadow-[0_20px_40px_-34px_rgba(20,41,95,0.18)] sm:p-6',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-5'
               )}
             >
@@ -3307,7 +3353,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </Badge>
                 </div>
               </div>
-              <p className="mb-3 text-[11px] font-bold text-slate-500">터치하면 상세 내용을 바로 확인할 수 있어요.</p>
+              <p className="mb-3 text-[11px] font-bold text-slate-500">센터 공지와 자녀 알림을 한곳에서 빠르게 확인할 수 있어요.</p>
 
               {recentNotifications.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
@@ -3950,31 +3996,32 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="communication" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <Card className="rounded-[2.2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_72%,#fff8f0_100%)] p-5 shadow-sm sm:p-6">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-[#14295F]" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">센터 공지사항 · 알림</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {unreadRecentCount > 0 && (
-                      <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/15 px-2.5 text-[10px] font-black text-[#FF7A16]">
-                        미확인 {unreadRecentCount}
+              <Card className="rounded-[2.35rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#fbfdff_0%,#ffffff_72%,#fff8f0_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.20)] sm:p-6">
+                <ParentSectionHeader
+                  icon={<Bell className="h-3.5 w-3.5" />}
+                  eyebrow="Communication"
+                  title="센터 공지와 알림"
+                  description="센터관리자 공지사항과 자녀 관련 알림을 한곳에 정리해 두었습니다."
+                  badges={
+                    <>
+                      {unreadRecentCount > 0 && (
+                        <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/15 px-2.5 text-[10px] font-black text-[#FF7A16]">
+                          미확인 {unreadRecentCount}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="h-6 rounded-full border border-slate-200 bg-white px-2.5 text-[10px] font-black text-slate-500">
+                        {recentNotifications.length}건
                       </Badge>
-                    )}
-                    <Badge variant="outline" className="h-6 rounded-full border border-slate-200 bg-white px-2.5 text-[10px] font-black text-slate-500">
-                      {recentNotifications.length}건
-                    </Badge>
-                  </div>
-                </div>
-                <p className="mb-3 text-[11px] font-bold text-slate-500">센터관리자 공지사항과 자녀 관련 알림을 여기서 함께 확인할 수 있어요.</p>
+                    </>
+                  }
+                />
 
                 {recentNotifications.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
+                  <div className="mt-4 rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
                     확인할 공지사항이 없습니다.
                   </div>
                 ) : (
-                  <div className="space-y-2.5">
+                  <div className="mt-4 space-y-2.5">
                     {recentNotifications.map((notification) => {
                       const isRead = notification.isRead || !!readMap[notification.id];
 
@@ -3983,10 +4030,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           type="button"
                           key={notification.id}
                           className={cn(
-                            'relative w-full overflow-hidden rounded-[1.45rem] border p-4 text-left transition-all',
+                            'relative w-full overflow-hidden rounded-[1.55rem] border p-4 text-left transition-all',
                             isRead
-                              ? 'border-[#dde6f9] bg-white'
-                              : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff7ef_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/70 md:hover:shadow-md'
+                              ? 'border-[#dde6f9] bg-white/96 shadow-[0_16px_30px_-28px_rgba(20,41,95,0.14)]'
+                              : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff8f1_0%,#eef4ff_100%)] shadow-[0_18px_32px_-26px_rgba(255,122,22,0.18)] ring-1 ring-[#ffd29f]/70 md:hover:shadow-md'
                           )}
                           onClick={() => void openNotificationDetail(notification)}
                         >
@@ -4018,13 +4065,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 )}
               </Card>
-              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
-                <CardTitle className="text-lg font-black tracking-tighter mb-6 flex items-center gap-2 text-[#14295F]"><Send className="h-5 w-5 text-[#14295F]" /> 상담 및 지원 요청</CardTitle>
+              <Card className="rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8">
+                <ParentSectionHeader
+                  icon={<Send className="h-3.5 w-3.5" />}
+                  eyebrow="Support"
+                  title="상담 및 지원 요청"
+                  description="센터 방문, 전화, 온라인 상담 중 원하는 채널을 선택해 바로 요청할 수 있어요."
+                />
                 <div className="space-y-4">
                   <div className="grid gap-2">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 채널</Label>
                     <Select value={channel} onValueChange={(v) => setChannel(v as any)}>
-                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold text-sm shadow-sm"><SelectValue placeholder="상담 채널 선택" /></SelectTrigger>
+                      <SelectTrigger className="h-12 rounded-[1.1rem] border border-[#d9e4fb] bg-white font-bold text-sm shadow-[0_16px_26px_-24px_rgba(20,41,95,0.18)]"><SelectValue placeholder="상담 채널 선택" /></SelectTrigger>
                       <SelectContent className="rounded-xl border-none shadow-2xl">
                         <SelectItem value="visit" className="font-bold py-3 text-sm">🏫 센터 방문 상담</SelectItem>
                         <SelectItem value="phone" className="font-bold py-3 text-sm">📞 전화 상담</SelectItem>
@@ -4034,26 +4086,28 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <div className="grid gap-2">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 내용</Label>
-                    <Textarea className="min-h-[120px] rounded-[1.5rem] border-2 font-bold p-4 text-sm shadow-inner" value={requestText} onChange={(e) => setRequestText(e.target.value)} placeholder="자녀의 학습이나 생활에 대해 궁금하신 점을 자유롭게 입력해 주세요." />
+                    <Textarea className="min-h-[120px] rounded-[1.5rem] border border-[#d9e4fb] bg-white font-bold p-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_28px_-28px_rgba(20,41,95,0.18)]" value={requestText} onChange={(e) => setRequestText(e.target.value)} placeholder="자녀의 학습이나 생활에 대해 궁금하신 점을 자유롭게 입력해 주세요." />
                   </div>
-                  <Button className="w-full h-16 rounded-[1.5rem] bg-[#14295F] text-white font-black text-lg shadow-xl shadow-[#14295F]/20 active:scale-[0.98] transition-all" onClick={() => submit('consultation')} disabled={submitting}>요청 보내기</Button>
+                  <div className="rounded-[1.35rem] border border-[#dfe7fb] bg-white/90 p-3 shadow-[0_16px_30px_-26px_rgba(20,41,95,0.16)]">
+                    <Button className="h-14 w-full rounded-[1.2rem] bg-[linear-gradient(180deg,#1d356f_0%,#14295F_100%)] text-white font-black text-base shadow-[0_18px_32px_-24px_rgba(20,41,95,0.28)] active:scale-[0.98] transition-all" onClick={() => submit('consultation')} disabled={submitting}>요청 보내기</Button>
+                    <p className="mt-2 text-center text-[11px] font-bold text-slate-500">보내신 요청은 센터에서 확인 후 안내드립니다.</p>
+                  </div>
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
-                <CardTitle className="text-lg font-black tracking-tighter mb-2 flex items-center gap-2 text-[#14295F]">
-                  <MessageCircle className="h-5 w-5 text-[#FF7A16]" />
-                  건의사항 · 질의 · 요청사항
-                </CardTitle>
-                <CardDescription className="mb-6 font-bold text-sm text-slate-500">
-                  학부모님이 남긴 내용을 선생님 또는 센터관리자가 확인하고 답변드립니다.
-                </CardDescription>
+              <Card className="rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#fefcff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8">
+                <ParentSectionHeader
+                  icon={<MessageCircle className="h-3.5 w-3.5" />}
+                  eyebrow="Inquiry"
+                  title="건의사항 · 질의 · 요청사항"
+                  description="남겨주신 내용은 선생님 또는 센터관리자가 확인하고 답변드립니다."
+                />
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
                     <div className="grid gap-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">유형 선택</Label>
                       <Select value={parentInquiryType} onValueChange={(value: 'question' | 'request' | 'suggestion') => setParentInquiryType(value)}>
-                        <SelectTrigger className="h-12 rounded-xl border-2 font-bold text-sm shadow-sm">
+                        <SelectTrigger className="h-12 rounded-[1.1rem] border border-[#d9e4fb] bg-white font-bold text-sm shadow-[0_16px_26px_-24px_rgba(20,41,95,0.18)]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -4066,7 +4120,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="grid min-w-0 gap-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">제목</Label>
                       <Input
-                        className="h-12 w-full rounded-xl border-2 font-bold text-sm shadow-sm"
+                        className="h-12 w-full rounded-[1.1rem] border border-[#d9e4fb] bg-white font-bold text-sm shadow-[0_16px_26px_-24px_rgba(20,41,95,0.18)]"
                         value={parentInquiryTitle}
                         onChange={(e) => setParentInquiryTitle(e.target.value)}
                         placeholder={
@@ -4082,7 +4136,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   <div className="grid gap-2">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">내용</Label>
                     <Textarea
-                      className="min-h-[140px] rounded-[1.5rem] border-2 font-bold p-4 text-sm shadow-inner"
+                      className="min-h-[140px] rounded-[1.5rem] border border-[#d9e4fb] bg-white font-bold p-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_28px_-28px_rgba(20,41,95,0.18)]"
                       value={parentInquiryBody}
                       onChange={(e) => setParentInquiryBody(e.target.value)}
                       placeholder={
@@ -4094,24 +4148,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       }
                     />
                   </div>
-                  <Button
-                    className="w-full h-14 rounded-[1.5rem] bg-[#FF7A16] text-white font-black text-base shadow-xl shadow-[#FF7A16]/20 active:scale-[0.98] transition-all"
-                    onClick={submitParentInquiry}
-                    disabled={submitting || !parentInquiryBody.trim()}
-                  >
-                    전달하기
-                  </Button>
+                  <div className="rounded-[1.35rem] border border-[#ffe0c5] bg-white/90 p-3 shadow-[0_16px_30px_-26px_rgba(255,122,22,0.18)]">
+                    <Button
+                      className="h-14 w-full rounded-[1.2rem] bg-[linear-gradient(180deg,#ff8d34_0%,#FF7A16_100%)] text-white font-black text-base shadow-[0_18px_32px_-24px_rgba(255,122,22,0.28)] active:scale-[0.98] transition-all"
+                      onClick={submitParentInquiry}
+                      disabled={submitting || !parentInquiryBody.trim()}
+                    >
+                      전달하기
+                    </Button>
+                    <p className="mt-2 text-center text-[11px] font-bold text-slate-500">필요한 내용만 간단히 남겨주셔도 됩니다.</p>
+                  </div>
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border-none bg-white p-5 shadow-xl ring-1 ring-slate-100 sm:p-8">
-                <CardTitle className="text-lg font-black tracking-tighter mb-2 flex items-center gap-2 text-[#14295F]">
-                  <Bell className="h-5 w-5 text-[#14295F]" />
-                  문의 내역과 답변
-                </CardTitle>
-                <CardDescription className="mb-6 font-bold text-sm text-slate-500">
-                  최근 문의 내역과 선생님/센터관리자의 답변을 여기서 바로 확인할 수 있어요.
-                </CardDescription>
+              <Card className="rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8">
+                <ParentSectionHeader
+                  icon={<Bell className="h-3.5 w-3.5" />}
+                  eyebrow="Replies"
+                  title="문의 내역과 답변"
+                  description="최근 문의 내역과 선생님 또는 센터관리자의 답변을 여기서 바로 확인할 수 있어요."
+                />
 
                 {parentCommunicationsLoading ? (
                   <div className="flex items-center justify-center py-16">
@@ -4170,35 +4226,29 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="billing" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <Card className="overflow-hidden rounded-[2.2rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#fbfdff_0%,#ffffff_52%,#f6f9ff_100%)] p-5 shadow-[0_26px_54px_-42px_rgba(20,41,95,0.26)] sm:p-6">
+              <Card className="overflow-hidden rounded-[2.35rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#fbfdff_0%,#ffffff_52%,#f6f9ff_100%)] p-5 shadow-[0_28px_58px_-42px_rgba(20,41,95,0.24)] sm:p-6">
                 <div className="space-y-5">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="min-w-0 space-y-2">
-                      <div className="inline-flex items-center gap-2 rounded-full border border-[#d8e4ff] bg-white/92 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5472a4] shadow-sm">
-                        <CreditCard className="h-3.5 w-3.5 text-[#14295F]" />
-                        수납 리포트
-                      </div>
-                      <div className="space-y-1">
-                        <h3 className="text-[2rem] font-black leading-none tracking-tight text-[#14295F] sm:text-[2.4rem]">수납</h3>
-                        <p className="max-w-[28rem] break-keep text-[14px] font-bold leading-relaxed text-slate-600 sm:text-[15px]">
-                          결제 현황과 대표 청구서를 한 번에 확인할 수 있도록 안심형 청구서 센터로 정리했습니다.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 self-start">
-                      <Badge variant="outline" className="h-7 rounded-full border border-[#d9e4fb] bg-white px-3 text-[10px] font-black text-[#5472a4] shadow-sm">
-                        실시간 연동
-                      </Badge>
-                      {mobileBillingStatusMeta && (
-                        <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-[10px] font-black shadow-sm', mobileBillingStatusMeta.className)}>
-                          {mobileBillingStatusMeta.label}
+                  <ParentSectionHeader
+                    icon={<CreditCard className="h-3.5 w-3.5" />}
+                    eyebrow="Billing"
+                    title="수납"
+                    description="결제 현황과 대표 청구서를 한 번에 확인할 수 있도록 안심형 청구서 센터로 정리했습니다."
+                    badges={
+                      <>
+                        <Badge variant="outline" className="h-7 rounded-full border border-[#d9e4fb] bg-white px-3 text-[10px] font-black text-[#5472a4] shadow-sm">
+                          실시간 연동
                         </Badge>
-                      )}
-                    </div>
-                  </div>
+                        {mobileBillingStatusMeta && (
+                          <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-[10px] font-black shadow-sm', mobileBillingStatusMeta.className)}>
+                            {mobileBillingStatusMeta.label}
+                          </Badge>
+                        )}
+                      </>
+                    }
+                  />
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="rounded-[1.6rem] border border-[#d7e4ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-24px_rgba(20,41,95,0.18)]">
+                    <div className="rounded-[1.65rem] border border-[#d7e4ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_30px_-24px_rgba(20,41,95,0.16)]">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#5a709d]">청구금액</p>
                         <div className="h-2.5 w-2.5 rounded-full bg-[#14295F]" />
@@ -4207,7 +4257,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         {formatWon(billingSummary.billed)}
                       </p>
                     </div>
-                    <div className="rounded-[1.6rem] border border-emerald-200 bg-[linear-gradient(180deg,#f9fffc_0%,#ecfff6_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-24px_rgba(16,185,129,0.18)]">
+                    <div className="rounded-[1.65rem] border border-emerald-200 bg-[linear-gradient(180deg,#f9fffc_0%,#ecfff6_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_30px_-24px_rgba(16,185,129,0.16)]">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">수납 완료</p>
                         <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
@@ -4216,7 +4266,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         {formatWon(billingSummary.paid)}
                       </p>
                     </div>
-                    <div className="rounded-[1.6rem] border border-rose-200 bg-[linear-gradient(180deg,#fffdfd_0%,#fff4f4_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-24px_rgba(244,63,94,0.16)]">
+                    <div className="rounded-[1.65rem] border border-rose-200 bg-[linear-gradient(180deg,#fffdfd_0%,#fff4f4_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_30px_-24px_rgba(244,63,94,0.15)]">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[11px] font-black uppercase tracking-[0.16em] text-rose-700">미납 금액</p>
                         <div className="h-2.5 w-2.5 rounded-full bg-rose-500" />
@@ -4238,7 +4288,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     const isActionable = invoice.status === 'issued' || invoice.status === 'overdue';
 
                     return (
-                      <Card className="overflow-hidden rounded-[2.2rem] border border-[#dfe7fb] bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_56%,#f2f7ff_100%)] p-5 shadow-[0_28px_60px_-42px_rgba(20,41,95,0.26)] sm:p-6">
+                      <Card className="overflow-hidden rounded-[2.3rem] border border-[#dfe7fb] bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_56%,#f2f7ff_100%)] p-5 shadow-[0_30px_62px_-42px_rgba(20,41,95,0.24)] sm:p-6">
                         <div className="space-y-5">
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0 space-y-3">
@@ -4267,7 +4317,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               </div>
                             </div>
 
-                            <div className="rounded-[1.65rem] border border-[#d7e4ff] bg-white/92 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_32px_-26px_rgba(20,41,95,0.18)]">
+                            <div className="rounded-[1.7rem] border border-[#d7e4ff] bg-white/94 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_22px_34px_-26px_rgba(20,41,95,0.18)]">
                               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5a709d]">결제 금액</p>
                               <p className="dashboard-number mt-2 whitespace-nowrap text-[2rem] leading-none text-[#14295F] sm:text-[2.5rem]">
                                 {formatWon(Number(invoice.finalPrice || 0))}
@@ -4337,7 +4387,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           const isActionable = invoice.status === 'issued' || invoice.status === 'overdue';
 
                           return (
-                            <Card key={invoice.id} className="rounded-[1.7rem] border border-slate-100 bg-white/95 p-5 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.18)]">
+                            <Card key={invoice.id} className="rounded-[1.75rem] border border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)] p-5 shadow-[0_20px_38px_-30px_rgba(15,23,42,0.16)]">
                               <div className="space-y-4">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0 space-y-2">
@@ -4396,7 +4446,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               )}
 
-              <div className="rounded-[1.5rem] border border-emerald-200 bg-[linear-gradient(180deg,#fbfffd_0%,#f0fcf5_100%)] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <div className="rounded-[1.7rem] border border-emerald-200 bg-[linear-gradient(180deg,#fbfffd_0%,#f0fcf5_100%)] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_28px_-24px_rgba(16,185,129,0.14)]">
                 <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">안심 안내</p>
                 <p className="mt-2 text-[14px] font-bold leading-relaxed text-emerald-900">
                   감사합니다. 결제와 수납 현황은 실시간으로 반영되며, 필요한 경우 센터에서 추가 안내를 드립니다.
