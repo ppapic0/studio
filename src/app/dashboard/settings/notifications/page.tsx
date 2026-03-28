@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
-import { collection, doc, limit, orderBy, query } from 'firebase/firestore';
+import { collection, doc, limit, orderBy, query, where } from 'firebase/firestore';
 import {
   BellRing,
   Clock3,
@@ -165,6 +165,24 @@ type SmsRecipientPreferenceDoc = {
   updatedAt?: { toDate?: () => Date };
 };
 
+type TodayAttendanceEventDoc = {
+  id: string;
+  studentId?: string;
+  dateKey?: string;
+  eventType?: string;
+  occurredAt?: { toDate?: () => Date };
+  createdAt?: { toDate?: () => Date };
+  statusAfter?: string;
+};
+
+type TodayAttendanceRecordDoc = {
+  id: string;
+  studentId?: string;
+  status?: string;
+  checkInAt?: { toDate?: () => Date };
+  updatedAt?: { toDate?: () => Date };
+};
+
 type RecipientPreferenceRow = {
   studentId: string;
   studentName: string;
@@ -196,7 +214,7 @@ type TodayBoardEventType = 'study_start' | 'away_start' | 'away_end' | 'study_en
 
 type StudentSmsBoardEventSummary = {
   eventType: TodayBoardEventType;
-  status: 'sent' | 'queued' | 'failed' | 'suppressed' | 'missing_phone' | 'none';
+  status: 'sent' | 'queued' | 'failed' | 'suppressed' | 'missing_phone' | 'attendance_only' | 'none';
   timeLabel: string;
   badgeLabel: string;
   queueRows: SmsQueueRow[];
@@ -404,11 +422,28 @@ function buildSmsRecipientPreferenceId(studentId: string, parentUid: string) {
 
 function getTodayBoardCellTone(status: StudentSmsBoardEventSummary['status']) {
   if (status === 'sent') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'attendance_only') return 'border-indigo-200 bg-indigo-50 text-indigo-700';
   if (status === 'queued') return 'border-blue-200 bg-blue-50 text-blue-700';
   if (status === 'failed') return 'border-rose-200 bg-rose-50 text-rose-700';
   if (status === 'suppressed') return 'border-amber-200 bg-amber-50 text-amber-700';
   if (status === 'missing_phone') return 'border-slate-300 bg-slate-100 text-slate-600';
   return 'border-slate-200 bg-slate-50 text-slate-400';
+}
+
+function resolveAttendanceEventBoardType(row: TodayAttendanceEventDoc): TodayBoardEventType | null {
+  if (row.eventType === 'check_in') return 'study_start';
+  if (row.eventType === 'check_out') return 'study_end';
+  if (row.eventType === 'away_start') return 'away_start';
+  if (row.eventType === 'away_end') return 'away_end';
+  if (row.eventType === 'status_override') {
+    if (row.statusAfter === 'confirmed_present' || row.statusAfter === 'confirmed_late' || row.statusAfter === 'confirmed_present_missing_routine') {
+      return 'study_start';
+    }
+    if (row.statusAfter === 'confirmed_absent' || row.statusAfter === 'excused_absent') {
+      return 'study_end';
+    }
+  }
+  return null;
 }
 
 function getQueueStatusLabel(status?: string, providerStatus?: string, nextAttemptAt?: { toDate?: () => Date }, attemptCount?: number) {
@@ -487,6 +522,24 @@ export default function NotificationSettingsPage() {
     return query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), orderBy('createdAt', 'desc'), limit(1200));
   }, [firestore, centerId, isAdmin]);
   const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(smsDeliveryLogsQuery, { enabled: isAdmin });
+
+  const todayKey = toDateInputValue(new Date());
+
+  const todayAttendanceEventsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'attendanceEvents'),
+      where('dateKey', '==', todayKey),
+      limit(1200)
+    );
+  }, [firestore, centerId, isAdmin, todayKey]);
+  const { data: todayAttendanceEventsRaw } = useCollection<TodayAttendanceEventDoc>(todayAttendanceEventsQuery, { enabled: isAdmin });
+
+  const todayAttendanceRecordsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(collection(firestore, 'centers', centerId, 'attendanceRecords', todayKey, 'students'), limit(800));
+  }, [firestore, centerId, isAdmin, todayKey]);
+  const { data: todayAttendanceRecordsRaw } = useCollection<TodayAttendanceRecordDoc>(todayAttendanceRecordsQuery, { enabled: isAdmin });
 
   const legacySmsLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -724,9 +777,10 @@ export default function NotificationSettingsPage() {
   }, [membersById, preferencesByKey, studentsRaw]);
 
   const todayBoardRows = useMemo<StudentSmsBoardRow[]>(() => {
-    const todayKey = toDateInputValue(new Date());
     const queueRows = smsQueueRaw || [];
     const deliveryRows = smsDeliveryLogsRaw || [];
+    const attendanceEventRows = todayAttendanceEventsRaw || [];
+    const attendanceRecordRows = todayAttendanceRecordsRaw || [];
     const keyword = studentBoardSearchTerm.trim().toLowerCase();
     return recipientRows
       .map((student) => {
@@ -736,6 +790,15 @@ export default function NotificationSettingsPage() {
         const studentQueueRows = queueRows.filter(
           (row) => row.studentId === student.studentId && row.dateKey === todayKey && TODAY_BOARD_EVENTS.some((item) => item.value === row.eventType)
         );
+        const studentAttendanceEvents = attendanceEventRows
+          .filter((row) => row.studentId === student.studentId)
+          .map((row) => ({
+            row,
+            boardEventType: resolveAttendanceEventBoardType(row),
+            at: row.occurredAt?.toDate?.() || row.createdAt?.toDate?.() || null,
+          }))
+          .filter((row) => row.boardEventType && row.at);
+        const studentAttendanceRecord = attendanceRecordRows.find((row) => row.id === student.studentId || row.studentId === student.studentId) || null;
         const hasMissingPhone = student.parentRows.every((row) => row.isPhoneMissing);
         const events = TODAY_BOARD_EVENTS.reduce((acc, item) => {
           const logRows = studentLogs
@@ -746,10 +809,23 @@ export default function NotificationSettingsPage() {
             .filter((row) => row.eventType === item.value)
             .slice()
             .sort((a, b) => (b.createdAt?.toDate?.().getTime() || 0) - (a.createdAt?.toDate?.().getTime() || 0));
+          const latestAttendanceEvent = studentAttendanceEvents
+            .filter((entry) => entry.boardEventType === item.value)
+            .sort((a, b) => (b.at?.getTime() || 0) - (a.at?.getTime() || 0))[0] || null;
           const latestSent = logRows.find((row) => row.status === 'sent');
           const latestSuppressed = logRows.find((row) => row.status === 'suppressed_opt_out');
           const latestFailedLog = logRows.find((row) => row.status === 'failed');
           const latestQueue = queueRowsForEvent[0];
+          const recordCheckInAt = studentAttendanceRecord?.checkInAt?.toDate?.() || studentAttendanceRecord?.updatedAt?.toDate?.() || null;
+          const hasRecordedCheckIn =
+            item.value === 'study_start' &&
+            (
+              studentAttendanceRecord?.status === 'confirmed_present' ||
+              studentAttendanceRecord?.status === 'confirmed_late' ||
+              studentAttendanceRecord?.status === 'confirmed_present_missing_routine'
+            ) &&
+            recordCheckInAt;
+          const attendanceFallbackTime = latestAttendanceEvent?.at || (hasRecordedCheckIn ? recordCheckInAt : null);
 
           let summary: StudentSmsBoardEventSummary;
           if (latestSent) {
@@ -797,6 +873,15 @@ export default function NotificationSettingsPage() {
               queueRows: queueRowsForEvent,
               logRows,
             };
+          } else if (attendanceFallbackTime) {
+            summary = {
+              eventType: item.value,
+              status: 'attendance_only',
+              timeLabel: formatTimeLabel({ toDate: () => attendanceFallbackTime }),
+              badgeLabel: hasMissingPhone ? '번호없음' : '미접수',
+              queueRows: queueRowsForEvent,
+              logRows,
+            };
           } else if (hasMissingPhone) {
             summary = {
               eventType: item.value,
@@ -825,6 +910,7 @@ export default function NotificationSettingsPage() {
         const hasFailed = Object.values(events).some((event) => event.status === 'failed');
         const hasQueued = Object.values(events).some((event) => event.status === 'queued');
         const hasSuppressed = Object.values(events).some((event) => event.status === 'suppressed');
+        const hasAttendanceOnly = Object.values(events).some((event) => event.status === 'attendance_only');
         const hasNoEvent = Object.values(events).every((event) => event.status === 'none');
         const needsAttentionRank = hasMissingPhone
           ? 500
@@ -832,11 +918,13 @@ export default function NotificationSettingsPage() {
             ? 400
             : hasQueued
               ? 350
-              : hasNoEvent
-                ? 300
-                : hasSuppressed
-                  ? 200
-                  : 100 - todaySentCount;
+              : hasAttendanceOnly
+                ? 325
+                : hasNoEvent
+                  ? 300
+                  : hasSuppressed
+                    ? 200
+                    : 100 - todaySentCount;
         const recipientLabel = hasMissingPhone
           ? '번호 미등록'
           : student.parentRows[0]?.isFallbackRecipient
@@ -869,14 +957,14 @@ export default function NotificationSettingsPage() {
         if (a.needsAttentionRank !== b.needsAttentionRank) return b.needsAttentionRank - a.needsAttentionRank;
         return a.studentName.localeCompare(b.studentName, 'ko-KR');
       });
-  }, [recipientRows, smsDeliveryLogsRaw, smsQueueRaw, studentBoardSearchTerm]);
+  }, [recipientRows, smsDeliveryLogsRaw, smsQueueRaw, studentBoardSearchTerm, todayAttendanceEventsRaw, todayAttendanceRecordsRaw, todayKey]);
 
   const todayBoardSummary = useMemo(() => {
     return {
       sentStudents: todayBoardRows.filter((row) => row.todaySentCount > 0).length,
       failedStudents: todayBoardRows.filter((row) => Object.values(row.events).some((event) => event.status === 'failed')).length,
       missingPhoneStudents: todayBoardRows.filter((row) => row.hasMissingPhone).length,
-      retryStudents: todayBoardRows.filter((row) => Object.values(row.events).some((event) => event.status === 'queued' || event.status === 'failed')).length,
+      retryStudents: todayBoardRows.filter((row) => Object.values(row.events).some((event) => event.status === 'queued' || event.status === 'failed' || event.status === 'attendance_only')).length,
     };
   }, [todayBoardRows]);
 
@@ -1463,7 +1551,12 @@ export default function NotificationSettingsPage() {
                       return (
                         <div key={event.value} className={cn('rounded-xl border px-3 py-3 text-center', getTodayBoardCellTone(summary.status))}>
                           <p className="text-[10px] font-black uppercase tracking-widest opacity-70">{event.label}</p>
-                          <p className="mt-1 text-sm font-black">{summary.status === 'sent' ? summary.timeLabel : summary.badgeLabel}</p>
+                          <p className="mt-1 text-sm font-black">
+                            {summary.status === 'sent' || summary.status === 'attendance_only' ? summary.timeLabel : summary.badgeLabel}
+                          </p>
+                          {summary.status === 'attendance_only' ? (
+                            <p className="mt-1 text-[10px] font-black opacity-70">{summary.badgeLabel}</p>
+                          ) : null}
                         </div>
                       );
                     })}
