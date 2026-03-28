@@ -352,21 +352,23 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
         );
       case 'run':
         return (
-          <g className="track-pace-vehicle track-pace-vehicle--run" transform="translate(58 39)">
-            <ellipse className="track-pace-runner-shadow" cx="23" cy="59" rx="15.5" ry="4.4" fill="rgba(255,236,211,0.18)" />
-            <circle className="track-pace-runner-head" cx="18" cy="10" r="6.9" fill="#FFE0BC" />
+          <g className="track-pace-vehicle track-pace-vehicle--run" transform="translate(50 37)">
+            <path className="track-pace-runner-streak" d="M-6 36H8" stroke="rgba(255,255,255,0.22)" strokeWidth="3.1" strokeLinecap="round" />
+            <path className="track-pace-runner-streak delay-1" d="M2 28H14" stroke="rgba(255,255,255,0.16)" strokeWidth="2.2" strokeLinecap="round" />
+            <ellipse className="track-pace-runner-shadow" cx="28" cy="59" rx="17.2" ry="4.6" fill="rgba(255,236,211,0.18)" />
+            <circle className="track-pace-runner-head" cx="24" cy="10" r="6.8" fill="#FFE0BC" />
             <path
               className="track-pace-runner-torso"
-              d="M15 19L26 30L21 41"
+              d="M20 19L33 29L27 40"
               stroke="#FFF9F3"
               strokeWidth="5.7"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            <path d="M23 27L31 22" stroke="#FFF4E8" strokeWidth="4.6" strokeLinecap="round" />
+            <path d="M31 27L39 22" stroke="#FFF4E8" strokeWidth="4.5" strokeLinecap="round" />
             <path
               className="track-pace-runner-arm-front"
-              d="M25 29L38 23L45 29"
+              d="M31 28L44 19L52 26"
               stroke="#FFE2C0"
               strokeWidth="4.8"
               strokeLinecap="round"
@@ -374,14 +376,15 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
             />
             <path
               className="track-pace-runner-arm-back"
-              d="M20 25L8 31"
+              d="M24 24L14 30L9 38"
               stroke="#FFD9AF"
               strokeWidth="4.7"
               strokeLinecap="round"
+              strokeLinejoin="round"
             />
             <path
               className="track-pace-runner-leg-front"
-              d="M21 41L35 50L45 47"
+              d="M27 40L40 49L52 44"
               stroke="#FFBF77"
               strokeWidth="5.4"
               strokeLinecap="round"
@@ -389,7 +392,7 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
             />
             <path
               className="track-pace-runner-leg-back"
-              d="M21 41L13 54L5 50"
+              d="M27 40L19 52L8 56"
               stroke="#FFCF8C"
               strokeWidth="5.4"
               strokeLinecap="round"
@@ -452,41 +455,52 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
       )}
       data-pace={pace.mode}
     >
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/65">{pace.eyebrow}</p>
-          <p className={cn("font-black tracking-tight text-white break-keep", isMobile ? "text-sm leading-5" : "text-base leading-6")}>{pace.title}</p>
+      <div className="track-pace-surface" />
+      <div className="track-pace-orb track-pace-orb--cool" />
+      <div className="track-pace-orb track-pace-orb--warm" />
+      <div className="track-pace-content">
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/65">{pace.eyebrow}</p>
+            <p className={cn("font-black tracking-tight text-white break-keep", isMobile ? "text-sm leading-5" : "text-base leading-6")}>{pace.title}</p>
+          </div>
+          <div className="track-pace-spark mt-1 h-2.5 w-2.5 rounded-full bg-[#FFD26C] shadow-[0_0_0_6px_rgba(255,210,108,0.18)]" />
         </div>
-        <div className="track-pace-spark mt-1 h-2.5 w-2.5 rounded-full bg-[#FFD26C] shadow-[0_0_0_6px_rgba(255,210,108,0.18)]" />
-      </div>
-      <svg
-        viewBox="0 0 220 120"
-        className={cn("w-full", isMobile ? "h-[74px]" : "h-[90px]")}
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id="trackPaceGlow" x1="22" y1="82" x2="198" y2="54" gradientUnits="userSpaceOnUse">
-            <stop stopColor="rgba(255,255,255,0.2)" />
-            <stop offset="0.48" stopColor="rgba(255,255,255,0.8)" />
-            <stop offset="1" stopColor="rgba(255,210,108,0.9)" />
-          </linearGradient>
-        </defs>
-        <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="rgba(255,255,255,0.16)" strokeWidth="12" strokeLinecap="round" />
-        <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="rgba(255,255,255,0.28)" strokeWidth="2.6" strokeLinecap="round" className="track-pace-lane" />
-        <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="url(#trackPaceGlow)" strokeWidth="3.4" strokeLinecap="round" className="track-pace-dash" />
-        <circle cx="18" cy="88" r="5" fill="#FFF5EA" opacity="0.72" />
-        <circle cx="78" cy="77" r="3.5" fill="#FFF5EA" opacity="0.45" />
-        <circle cx="136" cy="52" r="3.5" fill="#FFF5EA" opacity="0.45" />
-        <circle cx="198" cy="63" r="5.5" fill="#FFD26C" />
-        <circle cx="198" cy="63" r="11" fill="#FFD26C" opacity="0.18" className="track-pace-node-glow" />
-        {vehicle}
-      </svg>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/72">{pace.window}</span>
-        <span className="rounded-full border border-white/22 bg-white/12 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white/88">
-          {pace.badge}
-        </span>
+        <svg
+          viewBox="0 0 220 120"
+          className={cn("w-full", isMobile ? "h-[74px]" : "h-[90px]")}
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <linearGradient id="trackPaceGlow" x1="22" y1="82" x2="198" y2="54" gradientUnits="userSpaceOnUse">
+              <stop stopColor="rgba(255,255,255,0.18)" />
+              <stop offset="0.48" stopColor="rgba(255,248,236,0.82)" />
+              <stop offset="1" stopColor="rgba(255,210,108,0.9)" />
+            </linearGradient>
+            <linearGradient id="trackPaceCore" x1="18" y1="88" x2="198" y2="63" gradientUnits="userSpaceOnUse">
+              <stop stopColor="rgba(255,255,255,0.32)" />
+              <stop offset="0.42" stopColor="rgba(255,255,255,0.56)" />
+              <stop offset="1" stopColor="rgba(255,216,132,0.78)" />
+            </linearGradient>
+          </defs>
+          <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="rgba(255,255,255,0.1)" strokeWidth="16" strokeLinecap="round" />
+          <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="rgba(255,255,255,0.22)" strokeWidth="7.5" strokeLinecap="round" />
+          <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="url(#trackPaceCore)" strokeWidth="2.4" strokeLinecap="round" className="track-pace-lane" />
+          <path d="M18 88C46 88 60 86 74 80C94 72 112 54 134 52C157 50 174 63 198 63" stroke="url(#trackPaceGlow)" strokeWidth="3.4" strokeLinecap="round" className="track-pace-dash" />
+          <circle cx="18" cy="88" r="4.5" fill="#FFF5EA" opacity="0.7" />
+          <circle cx="78" cy="77" r="3" fill="#FFF5EA" opacity="0.36" />
+          <circle cx="136" cy="52" r="3" fill="#FFF5EA" opacity="0.34" />
+          <circle cx="198" cy="63" r="6.2" fill="#FFD26C" />
+          <circle cx="198" cy="63" r="12" fill="#FFD26C" opacity="0.18" className="track-pace-node-glow" />
+          {vehicle}
+        </svg>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/72">{pace.window}</span>
+          <span className="rounded-full border border-white/22 bg-white/12 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white/88">
+            {pace.badge}
+          </span>
+        </div>
       </div>
     </div>
   );

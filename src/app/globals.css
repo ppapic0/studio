@@ -521,6 +521,53 @@
   .track-pace-shell {
     position: relative;
     overflow: hidden;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 82% 16%, rgba(255,220,156,0.18), transparent 22%),
+      linear-gradient(155deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.18),
+      inset 0 -1px 0 rgba(255,255,255,0.08),
+      0 16px 34px -28px rgba(20,41,95,0.42);
+  }
+
+  .track-pace-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  .track-pace-surface {
+    position: absolute;
+    inset: 10px;
+    border-radius: 1.15rem;
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.16);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .track-pace-orb {
+    position: absolute;
+    pointer-events: none;
+    filter: blur(2px);
+    opacity: 0.9;
+    z-index: 0;
+  }
+
+  .track-pace-orb--cool {
+    left: -16px;
+    bottom: -18px;
+    width: 124px;
+    height: 84px;
+    background: radial-gradient(circle at center, rgba(147,227,255,0.2), rgba(147,227,255,0));
+  }
+
+  .track-pace-orb--warm {
+    right: -8px;
+    top: 10px;
+    width: 92px;
+    height: 72px;
+    background: radial-gradient(circle at center, rgba(255,203,122,0.26), rgba(255,203,122,0));
   }
 
   .track-pace-vehicle {
@@ -590,43 +637,47 @@
   }
 
   .track-pace-vehicle--run {
-    transform-origin: 23px 33px;
-    animation: track-pace-run-body 0.82s cubic-bezier(0.48, 0.05, 0.38, 0.97) infinite;
+    transform-origin: 28px 34px;
+    animation: track-pace-run-body 0.9s cubic-bezier(0.52, 0.06, 0.42, 0.96) infinite;
   }
 
   .track-pace-vehicle--run .track-pace-runner-head {
-    transform-origin: 18px 10px;
-    animation: track-pace-run-head 0.82s ease-in-out infinite;
+    transform-origin: 24px 10px;
+    animation: track-pace-run-head 0.9s ease-in-out infinite;
   }
 
   .track-pace-vehicle--run .track-pace-runner-torso {
-    transform-origin: 22px 30px;
-    animation: track-pace-run-torso 0.82s ease-in-out infinite;
+    transform-origin: 28px 30px;
+    animation: track-pace-run-torso 0.9s ease-in-out infinite;
   }
 
   .track-pace-vehicle--run .track-pace-runner-arm-front {
-    transform-origin: 25px 29px;
-    animation: track-pace-run-arm-front 0.82s ease-in-out infinite;
+    transform-origin: 31px 28px;
+    animation: track-pace-run-arm-front 0.9s ease-in-out infinite;
   }
 
   .track-pace-vehicle--run .track-pace-runner-arm-back {
-    transform-origin: 20px 25px;
-    animation: track-pace-run-arm-back 0.82s ease-in-out infinite;
+    transform-origin: 24px 24px;
+    animation: track-pace-run-arm-back 0.9s ease-in-out infinite;
   }
 
   .track-pace-vehicle--run .track-pace-runner-leg-front {
-    transform-origin: 21px 41px;
-    animation: track-pace-run-leg-front 0.82s ease-in-out infinite;
+    transform-origin: 27px 40px;
+    animation: track-pace-run-leg-front 0.9s ease-in-out infinite;
   }
 
   .track-pace-vehicle--run .track-pace-runner-leg-back {
-    transform-origin: 21px 41px;
-    animation: track-pace-run-leg-back 0.82s ease-in-out infinite;
+    transform-origin: 27px 40px;
+    animation: track-pace-run-leg-back 0.9s ease-in-out infinite;
   }
 
   .track-pace-vehicle--run .track-pace-runner-shadow {
     transform-origin: center;
-    animation: track-pace-run-shadow 0.82s ease-in-out infinite;
+    animation: track-pace-run-shadow 0.9s ease-in-out infinite;
+  }
+
+  .track-pace-vehicle--run .track-pace-runner-streak {
+    animation: track-pace-run-streak 0.9s ease-out infinite;
   }
 
   .track-pace-wheel {
@@ -1718,70 +1769,88 @@
 @keyframes track-pace-run-body {
   0%,
   100% {
-    transform: translate3d(0, 0, 0) rotate(-4deg);
+    transform: translate3d(0, 0, 0) rotate(-7deg);
   }
-  50% {
-    transform: translate3d(0, -1.8px, 0) rotate(-7deg);
+  45% {
+    transform: translate3d(1.2px, -2.4px, 0) rotate(-10deg);
+  }
+  70% {
+    transform: translate3d(-0.6px, -0.7px, 0) rotate(-5deg);
   }
 }
 
 @keyframes track-pace-run-head {
   0%,
   100% {
-    transform: translateY(0.1px);
+    transform: translate3d(0, 0.2px, 0) rotate(1deg);
   }
-  50% {
-    transform: translateY(-0.9px);
+  45% {
+    transform: translate3d(0.8px, -1.1px, 0) rotate(-2deg);
   }
 }
 
 @keyframes track-pace-run-torso {
   0%,
   100% {
-    transform: rotate(5deg);
+    transform: rotate(6deg);
   }
-  50% {
-    transform: rotate(9deg);
+  45% {
+    transform: rotate(11deg);
+  }
+  70% {
+    transform: rotate(4deg);
   }
 }
 
 @keyframes track-pace-run-arm-front {
   0%,
   100% {
-    transform: rotate(-14deg);
+    transform: rotate(-18deg);
   }
-  50% {
-    transform: rotate(24deg);
+  45% {
+    transform: rotate(30deg);
+  }
+  70% {
+    transform: rotate(-4deg);
   }
 }
 
 @keyframes track-pace-run-arm-back {
   0%,
   100% {
-    transform: rotate(26deg);
+    transform: rotate(24deg);
   }
-  50% {
-    transform: rotate(-18deg);
+  45% {
+    transform: rotate(-24deg);
+  }
+  70% {
+    transform: rotate(12deg);
   }
 }
 
 @keyframes track-pace-run-leg-front {
   0%,
   100% {
-    transform: rotate(-14deg);
+    transform: rotate(-18deg);
   }
-  50% {
-    transform: rotate(26deg);
+  45% {
+    transform: rotate(30deg);
+  }
+  70% {
+    transform: rotate(2deg);
   }
 }
 
 @keyframes track-pace-run-leg-back {
   0%,
   100% {
-    transform: rotate(24deg);
+    transform: rotate(28deg);
   }
-  50% {
-    transform: rotate(-24deg);
+  45% {
+    transform: rotate(-28deg);
+  }
+  70% {
+    transform: rotate(11deg);
   }
 }
 
@@ -1789,11 +1858,31 @@
   0%,
   100% {
     transform: scaleX(1) scaleY(1);
-    opacity: 0.34;
+    opacity: 0.32;
   }
-  50% {
-    transform: scaleX(0.92) scaleY(0.94);
+  45% {
+    transform: scaleX(0.88) scaleY(0.92);
+    opacity: 0.18;
+  }
+  70% {
+    transform: scaleX(0.95) scaleY(0.97);
+    opacity: 0.24;
+  }
+}
+
+@keyframes track-pace-run-streak {
+  0%,
+  100% {
+    opacity: 0.16;
+    transform: translateX(0);
+  }
+  45% {
+    opacity: 0.42;
+    transform: translateX(-5px);
+  }
+  70% {
     opacity: 0.2;
+    transform: translateX(-2px);
   }
 }
 
@@ -2993,6 +3082,7 @@
   .track-pace-walker-head,
   .track-pace-walker-torso,
   .track-pace-walker-shadow,
+  .track-pace-runner-streak,
   .track-pace-wheel,
   .track-pace-streak,
   .track-pace-contrail,
