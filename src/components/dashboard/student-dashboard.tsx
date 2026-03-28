@@ -1176,7 +1176,7 @@ function DailyFortuneDialog({
 
               <DialogFooter className="p-0">
                 <DialogClose asChild>
-                  <Button className="h-12 w-full rounded-2xl bg-primary text-base font-black">
+                  <Button className="h-12 w-full rounded-2xl bg-primary text-base font-black text-white hover:text-white">
                     좋아, 시작할게
                   </Button>
                 </DialogClose>
