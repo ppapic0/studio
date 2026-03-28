@@ -2140,9 +2140,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   );
   const latestAnnouncement = useMemo(() => {
     return (centerAnnouncements || []).find((item) => {
-      const status = item?.status || 'published';
+      const normalizedStatus = item?.status?.trim?.().toLowerCase?.();
+      const isPublished = normalizedStatus
+        ? normalizedStatus === 'published'
+        : typeof item?.isPublished === 'boolean'
+          ? item.isPublished
+          : true;
       const audience = item?.audience || 'student';
-      return status === 'published' && (audience === 'student' || audience === 'all');
+      return isPublished && (audience === 'student' || audience === 'all' || !item?.audience);
     }) || null;
   }, [centerAnnouncements]);
   const coachSummary = latestCoachReport?.aiMeta?.teacherOneLiner?.trim()
