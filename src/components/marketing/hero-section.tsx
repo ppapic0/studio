@@ -303,7 +303,10 @@ export function HeroSection({ brand }: HeroSectionProps) {
                         >
                           {lineIndex === 1 ? (
                             <>
-                              성장의 길,&nbsp;<span className="hero-headline-token-highlight inline-block text-[#FF7A16]">트랙</span>에서
+                              성장의 길,&nbsp;
+                              <span className="inline-flex items-center whitespace-nowrap">
+                                <span className="hero-headline-token-highlight inline-block text-[#FF7A16]">트랙</span>에서
+                              </span>
                             </>
                           ) : (
                             line
