@@ -50,6 +50,7 @@ import { httpsCallable } from 'firebase/functions';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
+import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 
 export default function KioskPage() {
@@ -335,6 +336,88 @@ export default function KioskPage() {
       }
 
       batch.set(seatRef, updateData, { merge: true });
+
+      appendAttendanceEventToBatch(batch, firestore, centerId, {
+        studentId: student.id,
+        dateKey: todayKey,
+        eventType: 'status_override',
+        occurredAt: new Date(),
+        source: 'kiosk',
+        seatId: seat.id,
+        statusBefore: prevStatus,
+        statusAfter: nextStatus,
+      });
+
+      if (isStudyStart) {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: student.id,
+          dateKey: todayKey,
+          eventType: 'check_in',
+          occurredAt: new Date(),
+          source: 'kiosk',
+          seatId: seat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          checkInAt: new Date(),
+          source: 'kiosk',
+        });
+      } else if (isAwayReturn) {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: student.id,
+          dateKey: todayKey,
+          eventType: 'away_end',
+          occurredAt: new Date(),
+          source: 'kiosk',
+          seatId: seat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          source: 'kiosk',
+        });
+      } else if (isAwayStart) {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: student.id,
+          dateKey: todayKey,
+          eventType: 'away_start',
+          occurredAt: new Date(),
+          source: 'kiosk',
+          seatId: seat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          source: 'kiosk',
+        });
+      } else if (isStudyEnd) {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: student.id,
+          dateKey: todayKey,
+          eventType: 'check_out',
+          occurredAt: new Date(),
+          source: 'kiosk',
+          seatId: seat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          checkOutAt: new Date(),
+          hasCheckOutRecord: true,
+          source: 'kiosk',
+        });
+      } else {
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          source: 'kiosk',
+        });
+      }
+
       await batch.commit();
 
       const autoCheckInAt =
@@ -360,13 +443,13 @@ export default function KioskPage() {
       });
 
       if (isStudyStart) {
-        void triggerAttendanceSms(student.id, 'study_start');
+        await triggerAttendanceSms(student.id, 'study_start');
       } else if (isAwayReturn) {
-        void triggerAttendanceSms(student.id, 'away_end');
+        await triggerAttendanceSms(student.id, 'away_end');
       } else if (isAwayStart) {
-        void triggerAttendanceSms(student.id, 'away_start');
+        await triggerAttendanceSms(student.id, 'away_start');
       } else if (isStudyEnd) {
-        void triggerAttendanceSms(student.id, 'study_end');
+        await triggerAttendanceSms(student.id, 'study_end');
       }
 
       const statusLabels: Record<AttendanceCurrent['status'], string> = {

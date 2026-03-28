@@ -1391,13 +1391,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       });
 
       if (isStudyStart) {
-        void triggerAttendanceSms(studentId, 'study_start');
+        await triggerAttendanceSms(studentId, 'study_start');
       } else if (isAwayReturn) {
-        void triggerAttendanceSms(studentId, 'away_end');
+        await triggerAttendanceSms(studentId, 'away_end');
       } else if (isAwayStart) {
-        void triggerAttendanceSms(studentId, 'away_start');
+        await triggerAttendanceSms(studentId, 'away_start');
       } else if (isStudyEnd) {
-        void triggerAttendanceSms(studentId, 'study_end');
+        await triggerAttendanceSms(studentId, 'study_end');
       }
       
       toast({ title: "학생 상태가 업데이트되었습니다." });

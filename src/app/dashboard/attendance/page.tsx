@@ -354,13 +354,52 @@ export default function AttendancePage() {
           },
         });
 
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
-          attendanceStatus: status,
-          checkInAt: normalizedCheckedAt ?? null,
-          lateMinutes,
-          expectedArrivalTime: routine?.expectedArrivalTime ?? null,
-          source: 'attendance_page',
-        });
+        if (
+          status === 'confirmed_present' ||
+          status === 'confirmed_late' ||
+          status === 'confirmed_present_missing_routine'
+        ) {
+          appendAttendanceEventToBatch(batch, firestore, centerId, {
+            studentId,
+            dateKey,
+            eventType: 'check_in',
+            occurredAt: normalizedCheckedAt || new Date(),
+            source: 'attendance_page',
+            statusAfter: status,
+          });
+          mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
+            attendanceStatus: status,
+            checkInAt: normalizedCheckedAt ?? null,
+            lateMinutes,
+            expectedArrivalTime: routine?.expectedArrivalTime ?? null,
+            source: 'attendance_page',
+          });
+        } else if (status === 'confirmed_absent' || status === 'excused_absent') {
+          appendAttendanceEventToBatch(batch, firestore, centerId, {
+            studentId,
+            dateKey,
+            eventType: 'check_out',
+            occurredAt: new Date(),
+            source: 'attendance_page',
+            statusAfter: status,
+          });
+          mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
+            attendanceStatus: status,
+            checkOutAt: new Date(),
+            hasCheckOutRecord: true,
+            lateMinutes,
+            expectedArrivalTime: routine?.expectedArrivalTime ?? null,
+            source: 'attendance_page',
+          });
+        } else {
+          mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
+            attendanceStatus: status,
+            checkInAt: normalizedCheckedAt ?? null,
+            lateMinutes,
+            expectedArrivalTime: routine?.expectedArrivalTime ?? null,
+            source: 'attendance_page',
+          });
+        }
 
         await batch.commit();
         if (isTodaySelected) {
@@ -369,7 +408,7 @@ export default function AttendancePage() {
             status === 'confirmed_late' ||
             status === 'confirmed_present_missing_routine'
           ) {
-            void triggerAttendanceSms(studentId, 'study_start');
+            await triggerAttendanceSms(studentId, 'study_start');
           } else if (
             (status === 'confirmed_absent' || status === 'excused_absent') &&
             (
@@ -379,7 +418,7 @@ export default function AttendancePage() {
               String(previousRecordStatus) === 'confirmed_present_missing_routine'
             )
           ) {
-            void triggerAttendanceSms(studentId, 'study_end');
+            await triggerAttendanceSms(studentId, 'study_end');
           }
         }
         toast({ title: '출결 상태를 저장했습니다.' });
