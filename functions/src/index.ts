@@ -4047,7 +4047,10 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
 
   const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
   const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  const canNotify = callerRole === "teacher" || isAdminRole(callerRole);
+  const canNotify =
+    callerRole === "teacher" ||
+    isAdminRole(callerRole) ||
+    (callerRole === "student" && context.auth.uid === studentId);
   if (!canNotify) {
     throw new functions.https.HttpsError("permission-denied", "Only teacher/admin can send notifications.");
   }

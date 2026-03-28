@@ -50,9 +50,10 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { addDays, subDays, format, isSameDay, parse, isAfter } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -1192,6 +1193,7 @@ function DailyFortuneDialog({
 export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const functions = useFunctions();
   const router = useRouter();
   const { toast } = useToast();
   const { activeMembership, isTimerActive, setIsTimerActive, startTime, setStartTime, viewMode, currentTier } = useAppContext();
@@ -1216,6 +1218,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isDailyFortuneDialogOpen, setIsDailyFortuneDialogOpen] = useState(false);
   const [dailyFortuneStage, setDailyFortuneStage] = useState<'gift' | 'result'>('gift');
   const [dailyFortuneResult, setDailyFortuneResult] = useState<ReturnType<typeof createDailyFortuneOutcome> | null>(null);
+  const centerId = activeMembership?.id;
+
+  const triggerAttendanceSms = async (eventType: 'study_start' | 'study_end') => {
+    if (!functions || !centerId || !user?.uid) return;
+
+    try {
+      const notifyAttendanceSmsFn = httpsCallable(functions, 'notifyAttendanceSms');
+      await notifyAttendanceSmsFn({ centerId, studentId: user.uid, eventType });
+    } catch (error) {
+      console.warn('[student] notifyAttendanceSms failed', error);
+    }
+  };
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -1780,6 +1794,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             .catch((notifyError: any) => {
               console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
             });
+          await triggerAttendanceSms('study_end');
         }
 
         setIsTimerActive(false);
@@ -1885,6 +1900,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           .catch((notifyError: any) => {
             console.warn('[student-track] entry notification skipped', notifyError?.message || notifyError);
           });
+        await triggerAttendanceSms('study_start');
 
         if (!startCommitError && !existingTodayStatus.fortuneOpened) {
           try {
