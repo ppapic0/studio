@@ -15,12 +15,14 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import {
+  ChevronRight,
+  Crown,
   Flame,
   Gift,
-  MessageCircle,
+  Lock,
   Sparkles,
+  Star,
   Timer,
-  Trophy,
   Wallet,
 } from 'lucide-react';
 
@@ -70,6 +72,12 @@ const FORTUNE_MESSAGES = [
   '작은 몰입이 큰 보상으로 이어지는 날이에요.',
   '한 시간만 더 채우면 리듬이 완전히 살아나요.',
 ];
+
+const RARITY_LABELS: Record<BoxRarity, string> = {
+  common: '커먼',
+  rare: '레어',
+  epic: '에픽',
+};
 
 function formatStudyMinutes(minutes: number) {
   if (minutes <= 0) return '0m';
@@ -192,6 +200,32 @@ function RewardHeroChest({
   );
 }
 
+function RewardCountUp({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let frameId = 0;
+    const duration = 780;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(Math.round(value * eased));
+      if (progress < 1) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    setDisplayValue(0);
+    frameId = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frameId);
+  }, [value]);
+
+  return <>{displayValue.toLocaleString()}</>;
+}
+
 function StatCard({
   icon: Icon,
   label,
@@ -204,14 +238,14 @@ function StatCard({
   accentClass: string;
 }) {
   return (
-    <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.06] px-3 py-3.5 shadow-[0_14px_32px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-      <div className="mb-2 flex items-center gap-2">
-        <span className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10', accentClass)}>
+    <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.05))] px-3.5 py-3.5 shadow-[0_18px_34px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
+      <div className="mb-3 flex items-center justify-between">
+        <span className={cn('inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/12 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
           <Icon className="h-4 w-4" />
         </span>
-        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">{label}</span>
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/48">{label}</span>
       </div>
-      <div className="text-[1.05rem] font-black tracking-tight text-white">{value}</div>
+      <div className="text-[1.35rem] font-black tracking-[-0.04em] text-white">{value}</div>
     </div>
   );
 }
@@ -244,21 +278,43 @@ function InventorySlot({
         box.state === 'locked' && 'point-track-slot--locked'
       )}
     >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span
+          className={cn(
+            'rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]',
+            box.rarity === 'epic'
+              ? 'bg-violet-300/18 text-violet-100'
+              : box.rarity === 'rare'
+                ? 'bg-orange-300/18 text-orange-100'
+                : 'bg-sky-200/14 text-sky-100'
+          )}
+        >
+          {RARITY_LABELS[box.rarity]}
+        </span>
+        {box.state === 'ready' ? (
+          <Star className="h-3.5 w-3.5 text-orange-100" />
+        ) : box.state === 'locked' ? (
+          <Lock className="h-3.5 w-3.5 text-white/35" />
+        ) : null}
+      </div>
       <div className="point-track-slot__box">
         <div className="point-track-slot__lid" />
         <div className="point-track-slot__lock" />
       </div>
-      <div className="mt-3 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
-        <span>{box.hour}h</span>
-        <span>
-          {box.state === 'opened'
-            ? 'done'
-            : box.state === 'ready'
-              ? 'open'
-              : box.state === 'charging'
-                ? 'soon'
-                : 'lock'}
-        </span>
+      <div className="mt-3">
+        <div className="text-[11px] font-black tracking-tight text-white">{box.hour}시간 상자</div>
+        <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+          <span>
+            {box.state === 'opened'
+              ? `+${box.reward || 0}P`
+              : box.state === 'ready'
+                ? 'OPEN'
+                : box.state === 'charging'
+                  ? 'SOON'
+                  : 'LOCK'}
+          </span>
+          <span>{box.state === 'opened' ? '완료' : box.state === 'ready' ? '열기' : box.state === 'charging' ? '준비' : '잠김'}</span>
+        </div>
       </div>
     </button>
   );
@@ -278,15 +334,15 @@ function PodiumCard({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-end rounded-[1.4rem] border px-3 pb-4 pt-3 text-center shadow-[0_18px_42px_-30px_rgba(0,0,0,0.45)]',
-        highlight ? 'border-orange-300/35 bg-orange-300/12' : 'border-white/10 bg-white/[0.05]'
+        'flex flex-col items-center justify-end rounded-[1.55rem] border px-3 pb-4 pt-3 text-center shadow-[0_20px_42px_-28px_rgba(0,0,0,0.48)]',
+        highlight ? 'border-orange-300/45 bg-[linear-gradient(180deg,rgba(255,176,76,0.2),rgba(255,176,76,0.08))]' : 'border-white/10 bg-white/[0.05]'
       )}
     >
-      <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[11px] font-black text-white/80">
-        #{rank}
+      <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-orange-300/20 text-orange-100' : 'bg-white/10 text-white/80')}>
+        {highlight ? <Crown className="h-4 w-4" /> : `#${rank}`}
       </div>
       <div className={cn('text-sm font-black tracking-tight', highlight && 'text-orange-100')}>{name}</div>
-      <div className="mt-1 text-xs font-bold text-white/55">{value}</div>
+      <div className="mt-1 text-sm font-black text-white/85">{value}</div>
     </div>
   );
 }
@@ -561,12 +617,9 @@ export default function GrowthPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.24em] text-white/45">POINT TRACK</p>
               <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
             </div>
-            <Link
-              href="/dashboard/appointments/inquiries"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/75 shadow-[0_14px_28px_-18px_rgba(0,0,0,0.55)]"
-            >
-              <MessageCircle className="h-4 w-4" />
-            </Link>
+            <div className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-orange-100">
+              {totalAvailableBoxes > 0 ? 'BOX READY' : 'CHARGING'}
+            </div>
           </div>
 
           <div className="relative mt-5 flex flex-col items-center gap-4">
@@ -581,10 +634,22 @@ export default function GrowthPage() {
               <div className="mt-1 text-[2rem] font-black tracking-tight text-white">
                 {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 대기 중` : `${nextBoxMinutesLeft}분 남음`}
               </div>
-              <p className="mt-1 text-xs font-bold text-white/45">
-                {totalAvailableBoxes > 0 ? '한 개씩 눌러서 열어보세요' : '1시간 누적마다 상자가 열려요'}
-              </p>
+              <p className="mt-1 text-xs font-bold text-white/45">{totalAvailableBoxes > 0 ? '상자를 눌러 보상을 확인하세요' : '1시간 누적마다 보관함에 쌓여요'}</p>
             </div>
+
+            <Button
+              type="button"
+              onClick={totalAvailableBoxes > 0 ? () => openVault() : undefined}
+              disabled={totalAvailableBoxes <= 0}
+              className={cn(
+                'point-track-hero-cta mt-2 h-14 w-full rounded-[1.4rem] text-base font-black',
+                totalAvailableBoxes > 0
+                  ? 'bg-[linear-gradient(180deg,#ffd089_0%,#ffb357_35%,#ff8a1f_100%)] text-[#15275d]'
+                  : 'bg-white/10 text-white/45'
+              )}
+            >
+              {totalAvailableBoxes > 0 ? '상자 열기' : '공부하고 상자 채우기'}
+            </Button>
           </div>
         </section>
 
@@ -599,11 +664,15 @@ export default function GrowthPage() {
           <div className="rounded-full bg-white/10 p-1">
             <div className="point-track-progress-track">
               <div className="point-track-progress-fill" style={{ width: `${progressPercent}%` }} />
+              <div className="point-track-progress-orb" style={{ left: `calc(${progressPercent}% - 0.65rem)` }} />
+              <div className="point-track-progress-node point-track-progress-node--one" />
+              <div className="point-track-progress-node point-track-progress-node--two" />
+              <div className="point-track-progress-node point-track-progress-node--three" />
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-[11px] font-black text-white/48">
             <span>0분</span>
-            <span>1시간 상자</span>
+            <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : '1시간 상자'}</span>
           </div>
         </section>
 
@@ -619,8 +688,8 @@ export default function GrowthPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/45">VAULT</p>
               <h2 className="mt-1 text-lg font-black tracking-tight text-white">보관함</h2>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-black text-orange-100">
-              +{todayPointGain} 오늘
+            <div className="rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1 text-[11px] font-black text-orange-100">
+              READY {totalAvailableBoxes}
             </div>
           </div>
           <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
@@ -644,7 +713,7 @@ export default function GrowthPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 items-end gap-3">
             {topEntries.length > 0 ? (
               topEntries.map((entry, index) => (
                 <PodiumCard
@@ -664,11 +733,11 @@ export default function GrowthPage() {
             )}
           </div>
 
-          <div className="mt-4 rounded-[1.35rem] border border-white/10 bg-black/15 px-4 py-4">
+          <div className="mt-4 rounded-[1.55rem] border border-orange-300/15 bg-[linear-gradient(180deg,rgba(255,176,76,0.12),rgba(255,255,255,0.04))] px-4 py-4 shadow-[0_16px_34px_-26px_rgba(255,138,31,0.38)]">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">MY RANK</p>
-                <p className="mt-1 text-[1.35rem] font-black tracking-tight text-white">{myRankLabel}</p>
+                <p className="mt-1 text-[1.45rem] font-black tracking-tight text-white">{myRankLabel}</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">MONTH</p>
@@ -679,8 +748,8 @@ export default function GrowthPage() {
         </section>
 
         <section className="rounded-full border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white/85 shadow-[0_16px_40px_-30px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-orange-300/20 text-orange-100">
-            <Sparkles className="h-3.5 w-3.5" />
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-orange-300/20 text-orange-100 shadow-[0_0_20px_rgba(255,176,76,0.25)]">
+            <Star className="h-3.5 w-3.5" />
           </span>
           {fortuneMessage}
         </section>
@@ -704,10 +773,10 @@ export default function GrowthPage() {
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">REWARD SHOP</p>
               <p className="mt-2 text-base font-black tracking-tight text-white">갖고 싶은 선물 문의</p>
-              <p className="mt-1 text-xs font-bold text-white/50">카카오톡 선물하기 상품을 센터 관리자에게 문의할 수 있어요.</p>
+              <p className="mt-1 text-xs font-bold text-white/50">카카오톡 선물하기로 받을 수 있는 선물을 문의해보세요.</p>
             </div>
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-300/20 text-orange-100">
-              <MessageCircle className="h-5 w-5" />
+              <ChevronRight className="h-5 w-5" />
             </div>
           </div>
         </Link>
@@ -732,13 +801,21 @@ export default function GrowthPage() {
                   onClick={selectedBox?.state === 'ready' ? handleRevealBox : undefined}
                 />
 
+                <div className="point-track-modal-particles" aria-hidden="true">
+                  {Array.from({ length: 7 }, (_, index) => (
+                    <span key={`particle-${index}`} className={cn('point-track-modal-particle', boxStage === 'revealed' && 'point-track-modal-particle--visible')} />
+                  ))}
+                </div>
+
                 <div className="mt-4 text-center">
                   <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/45">
                     {selectedBox ? `${selectedBox.hour}시간 상자` : '상자'}
                   </p>
                   {boxStage === 'revealed' && revealedReward !== null ? (
                     <div className="point-track-reward-burst">
-                      <p className="text-[2.4rem] font-black tracking-tight text-orange-100">+{revealedReward}</p>
+                      <p className="text-[2.6rem] font-black tracking-tight text-orange-100">
+                        +<RewardCountUp value={revealedReward} />P
+                      </p>
                       <p className="mt-1 text-xs font-black text-white/55">현재 포인트 {pointBalance.toLocaleString()}</p>
                     </div>
                   ) : (

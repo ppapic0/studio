@@ -3580,7 +3580,8 @@ select {
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 1.25rem;
   background:
-    radial-gradient(circle at 50% 20%, rgba(255, 186, 79, 0.24), transparent 34%),
+    radial-gradient(circle at 50% 18%, rgba(255, 186, 79, 0.38), transparent 30%),
+    radial-gradient(circle at 84% 10%, rgba(255, 138, 31, 0.18), transparent 18%),
     linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
   box-shadow:
     0 28px 64px -38px rgba(0, 0, 0, 0.76),
@@ -3621,22 +3622,22 @@ select {
 
 .point-track-hero-box__glow {
   position: absolute;
-  inset: 1.9rem;
+  inset: 1.2rem;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 173, 67, 0.72) 0%, rgba(255, 173, 67, 0.12) 56%, transparent 76%);
-  filter: blur(18px);
-  opacity: 0.9;
+  background: radial-gradient(circle, rgba(255, 173, 67, 0.88) 0%, rgba(255, 173, 67, 0.18) 48%, transparent 72%);
+  filter: blur(22px);
+  opacity: 0.98;
   animation: point-track-box-glow 1.8s ease-in-out infinite;
 }
 
 .point-track-hero-box__shadow {
   position: absolute;
   bottom: 1rem;
-  width: 6rem;
-  height: 1rem;
+  width: 7rem;
+  height: 1.15rem;
   border-radius: 999px;
   background: rgba(5, 10, 24, 0.4);
-  filter: blur(9px);
+  filter: blur(11px);
   animation: point-track-box-shadow 1.8s ease-in-out infinite;
 }
 
@@ -3649,8 +3650,9 @@ select {
     linear-gradient(180deg, rgba(255, 221, 152, 0.96) 0%, rgba(255, 177, 67, 1) 48%, rgba(242, 132, 20, 1) 100%);
   box-shadow:
     0 0 0 1px rgba(255,255,255,0.16) inset,
-    0 20px 44px -22px rgba(255, 155, 31, 0.82),
-    0 34px 62px -28px rgba(255, 155, 31, 0.54);
+    0 18px 36px -18px rgba(255, 155, 31, 0.88),
+    0 32px 68px -26px rgba(255, 155, 31, 0.6),
+    0 -8px 20px -16px rgba(255,255,255,0.28) inset;
   animation: point-track-box-float 1.8s ease-in-out infinite;
 }
 
@@ -3707,6 +3709,23 @@ select {
   animation-delay: 0.35s;
 }
 
+.point-track-hero-cta {
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 20px 36px -18px rgba(255, 138, 31, 0.55),
+    0 0 0 1px rgba(255,255,255,0.18) inset;
+}
+
+.point-track-hero-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.28) 48%, transparent 100%);
+  transform: translateX(-110%);
+  animation: point-track-cta-sheen 2.6s linear infinite;
+}
+
 .point-track-hero-box--charging .point-track-hero-box__body {
   opacity: 0.84;
   filter: saturate(0.82);
@@ -3742,7 +3761,8 @@ select {
   height: 1rem;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(7, 15, 36, 0.36), rgba(255,255,255,0.03));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 .point-track-progress-fill {
@@ -3763,20 +3783,46 @@ select {
   animation: point-track-progress-sheen 1.9s linear infinite;
 }
 
+.point-track-progress-orb {
+  position: absolute;
+  top: 50%;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: radial-gradient(circle, #fff7d8 0%, #ffd48f 42%, #ff8a1f 100%);
+  box-shadow: 0 0 22px rgba(255, 186, 73, 0.75);
+  transition: left 0.65s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.point-track-progress-node {
+  position: absolute;
+  top: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.22);
+}
+
+.point-track-progress-node--one { left: 24%; }
+.point-track-progress-node--two { left: 49%; }
+.point-track-progress-node--three { left: 74%; }
+
 .point-track-slot {
   position: relative;
   flex: 0 0 auto;
-  min-width: 5.75rem;
+  min-width: 6.5rem;
   border-radius: 1.5rem;
   border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
   padding: 0.9rem;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
 }
 
 .point-track-slot__box {
   position: relative;
-  height: 4.2rem;
+  height: 4.6rem;
   border-radius: 1.2rem;
   background: linear-gradient(180deg, rgba(255, 216, 140, 0.86), rgba(255, 156, 47, 0.96));
   box-shadow:
@@ -3816,11 +3862,11 @@ select {
 }
 
 .point-track-slot--rare.point-track-slot--ready {
-  box-shadow: 0 0 0 1px rgba(255, 176, 76, 0.16) inset, 0 18px 38px -30px rgba(255, 161, 54, 0.42);
+  box-shadow: 0 0 0 1px rgba(255, 176, 76, 0.24) inset, 0 20px 42px -28px rgba(255, 161, 54, 0.52);
 }
 
 .point-track-slot--epic.point-track-slot--ready {
-  box-shadow: 0 0 0 1px rgba(196, 181, 253, 0.16) inset, 0 18px 38px -30px rgba(167, 139, 250, 0.42);
+  box-shadow: 0 0 0 1px rgba(196, 181, 253, 0.18) inset, 0 20px 42px -28px rgba(167, 139, 250, 0.5);
 }
 
 .point-track-slot--charging {
@@ -3852,7 +3898,7 @@ select {
 
 .point-track-modal-shell {
   background:
-    radial-gradient(circle at top, rgba(255, 185, 86, 0.18), transparent 28%),
+    radial-gradient(circle at top, rgba(255, 185, 86, 0.24), transparent 28%),
     linear-gradient(180deg, #14295f 0%, #0d1c45 100%);
 }
 
@@ -3879,6 +3925,36 @@ select {
   background: rgba(0, 0, 0, 0.34);
   filter: blur(10px);
 }
+
+.point-track-modal-particles {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+
+.point-track-modal-particle {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 225, 169, 0.92);
+  box-shadow: 0 0 16px rgba(255, 193, 92, 0.75);
+  opacity: 0;
+}
+
+.point-track-modal-particle--visible {
+  animation: point-track-particle-burst 0.78s ease-out both;
+}
+
+.point-track-modal-particle:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg) translateY(-3.3rem); }
+.point-track-modal-particle:nth-child(2) { transform: translate(-50%, -50%) rotate(45deg) translateY(-3.4rem); }
+.point-track-modal-particle:nth-child(3) { transform: translate(-50%, -50%) rotate(90deg) translateY(-3.4rem); }
+.point-track-modal-particle:nth-child(4) { transform: translate(-50%, -50%) rotate(135deg) translateY(-3.3rem); }
+.point-track-modal-particle:nth-child(5) { transform: translate(-50%, -50%) rotate(180deg) translateY(-3.2rem); }
+.point-track-modal-particle:nth-child(6) { transform: translate(-50%, -50%) rotate(225deg) translateY(-3.3rem); }
+.point-track-modal-particle:nth-child(7) { transform: translate(-50%, -50%) rotate(315deg) translateY(-3.35rem); }
 
 .point-track-reward-burst {
   animation: point-track-reward-pop 0.42s ease-out both;
@@ -3907,6 +3983,11 @@ select {
 @keyframes point-track-progress-sheen {
   0% { transform: translateX(-2.8rem); }
   100% { transform: translateX(22rem); }
+}
+
+@keyframes point-track-cta-sheen {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(130%); }
 }
 
 @keyframes point-track-slot-breathe {
@@ -3950,14 +4031,22 @@ select {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes point-track-particle-burst {
+  0% { opacity: 0; filter: blur(0); }
+  20% { opacity: 1; }
+  100% { opacity: 0; filter: blur(2px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .point-track-hero-box__glow,
   .point-track-hero-box__shadow,
   .point-track-hero-box__body,
   .point-track-hero-box__spark,
+  .point-track-hero-cta::after,
   .point-track-progress-fill::after,
   .point-track-slot--ready .point-track-slot__box,
-  .point-track-reward-burst {
+  .point-track-reward-burst,
+  .point-track-modal-particle--visible {
     animation: none !important;
   }
 
