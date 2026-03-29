@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where, documentId } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 export type CenterMembership = {
@@ -77,8 +77,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const activeMembershipRef = useRef<string | null>(null);
 
   const normalizeRole = (role: CenterMembership['role'] | string | undefined): CenterMembership['role'] => {
-    if (role === 'owner' || role === 'centerManager' || role === 'admin') return 'centerAdmin';
-    if (role === 'student' || role === 'teacher' || role === 'parent' || role === 'centerAdmin') return role;
+    const normalized = String(role || '')
+      .trim()
+      .replace(/[_\s-]+/g, '')
+      .toLowerCase();
+
+    if (normalized === 'owner' || normalized === 'centermanager' || normalized === 'admin' || normalized === 'centeradmin') {
+      return 'centerAdmin';
+    }
+    if (normalized === 'teacher') return 'teacher';
+    if (normalized === 'parent') return 'parent';
+    if (normalized === 'student') return 'student';
     return 'student';
   };
 
@@ -121,7 +130,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const getNormalizedStatus = (value: unknown) =>
-      typeof value === 'string' ? value.trim().toLowerCase() : '';
+      typeof value === 'string' ? value.trim().toLowerCase().replace(/[_\s-]+/g, '') : '';
+
+    const isActiveLikeStatus = (value: unknown) => {
+      const normalized = getNormalizedStatus(value);
+      return !normalized || normalized === 'active' || normalized === 'approved' || normalized === 'enabled' || normalized === 'current';
+    };
 
     const hasLinkedStudents = (membership: CenterMembership) =>
       Array.isArray(membership.linkedStudentIds) &&
@@ -139,10 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pickActiveMembership = (items: CenterMembership[]): CenterMembership | null => {
       if (items.length === 0) return null;
 
-      const activeItems = items.filter((membership) => {
-        const normalized = getNormalizedStatus(membership.status);
-        return !normalized || normalized === 'active';
-      });
+      const activeItems = items.filter((membership) => isActiveLikeStatus(membership.status));
       if (activeItems.length === 0) return null;
 
       return (
@@ -190,21 +201,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeMembershipRef.current = activeKey;
       }
 
-      setMembershipsLoading(false);
+      if (userCentersResolved && fallbackResolved) {
+        setMembershipsLoading(false);
+      }
     };
 
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
-    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
+    const fallbackMembersByFieldQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
+    const fallbackMembersByDocIdQuery = query(collectionGroup(firestore, 'members'), where(documentId(), '==', user.uid));
 
     // Track whether the one-time fallback has already been fetched
     let fallbackFetched = false;
+    let fallbackResolved = false;
+    let userCentersResolved = false;
 
     const fetchFallbackOnce = async () => {
       if (fallbackFetched) return;
       fallbackFetched = true;
       try {
-        const snapshot = await getDocs(fallbackMembersQuery);
-        memberFallbackMemberships = snapshot.docs
+        const [byFieldSnapshot, byDocIdSnapshot] = await Promise.all([
+          getDocs(fallbackMembersByFieldQuery),
+          getDocs(fallbackMembersByDocIdQuery),
+        ]);
+        const mergedDocs = [...byFieldSnapshot.docs, ...byDocIdSnapshot.docs];
+        const uniqueDocs = Array.from(new Map(mergedDocs.map((docSnap) => [docSnap.ref.path, docSnap])).values());
+        memberFallbackMemberships = uniqueDocs
           .map((docSnap) => {
             const raw = docSnap.data() as any;
             const centerId = docSnap.ref.parent.parent?.id;
@@ -221,9 +242,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
             } as CenterMembership;
           })
           .filter((membership): membership is CenterMembership => !!membership);
+        fallbackResolved = true;
         applyMembershipState();
       } catch (error: any) {
         memberFallbackMemberships = [];
+        fallbackResolved = true;
         if (error?.code !== 'permission-denied') {
           console.warn('Membership fallback fetch warning:', error);
         }
@@ -236,6 +259,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const unsubscribeUserCenters = onSnapshot(
       userCentersRef,
       (snapshot) => {
+        userCentersResolved = true;
         userCenterMemberships = snapshot.docs.map((docSnap) => {
           const raw = docSnap.data() as any;
           return {
@@ -254,7 +278,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       (error) => {
         console.error('Membership sync error:', error);
-        setMembershipsLoading(false);
+        userCentersResolved = true;
+        applyMembershipState();
       }
     );
 

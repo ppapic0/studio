@@ -26,7 +26,7 @@ import {
   setDashboardEntryMotionKeys,
 } from '@/lib/dashboard-motion';
 import { Loader2, Mail } from 'lucide-react';
-import { collection, collectionGroup, getDocs, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, documentId, getDocs, query, where } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -61,7 +61,7 @@ export function LoginForm() {
 
   const normalizeMembershipStatus = (value: unknown): string => {
     if (typeof value !== 'string') return '';
-    return value.trim().toLowerCase();
+    return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
   };
 
   const fetchMembershipRecords = async (uid: string) => {
@@ -72,11 +72,17 @@ export function LoginForm() {
       return centersSnap.docs.map((docSnap) => docSnap.data() as { role?: string; status?: string });
     }
 
-    const fallbackSnap = await getDocs(
-      query(collectionGroup(firestore, 'members'), where('id', '==', uid))
+    const [fallbackByFieldSnap, fallbackByDocIdSnap] = await Promise.all([
+      getDocs(query(collectionGroup(firestore, 'members'), where('id', '==', uid))),
+      getDocs(query(collectionGroup(firestore, 'members'), where(documentId(), '==', uid))),
+    ]);
+    const uniqueDocs = Array.from(
+      new Map(
+        [...fallbackByFieldSnap.docs, ...fallbackByDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])
+      ).values()
     );
 
-    return fallbackSnap.docs.map((docSnap) => {
+    return uniqueDocs.map((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
       return {
         role: typeof data.role === 'string' ? data.role : undefined,
@@ -92,7 +98,7 @@ export function LoginForm() {
 
     const hasActiveMembership = studentMemberships.some((membership) => {
       const normalized = normalizeMembershipStatus(membership.status);
-      return !normalized || normalized === 'active';
+      return !normalized || normalized === 'active' || normalized === 'approved' || normalized === 'enabled' || normalized === 'current';
     });
 
     if (hasActiveMembership) return { allowed: true as const };
