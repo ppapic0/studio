@@ -108,10 +108,14 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import {
   ROUTINE_TEMPLATE_OPTIONS,
+  EMPTY_ATTENDANCE_SCHEDULE_DRAFT,
+  type AttendanceScheduleDraft,
   type RecentStudyOption,
+  type SavedAttendanceRoutine,
   type StudyAmountUnit,
   type StudyPlanMode,
 } from '@/components/dashboard/student-planner/planner-constants';
+import { AttendanceScheduleSheet } from '@/components/dashboard/student-planner/attendance-schedule-sheet';
 import { RoutineComposerCard } from '@/components/dashboard/student-planner/routine-composer-card';
 import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
 import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
@@ -133,6 +137,11 @@ const WEEKDAY_OPTIONS = [
   { value: 6, label: '토' },
   { value: 0, label: '일' },
 ];
+
+type AttendanceSettingsDoc = {
+  weekdayTemplates?: Record<string, AttendanceScheduleDraft>;
+  savedRoutines?: SavedAttendanceRoutine[];
+};
 
 const SUBJECTS = [
   { id: 'kor', label: '국어', color: 'bg-red-500', light: 'bg-red-50', text: 'text-red-600' },
@@ -178,6 +187,31 @@ function getPlanTimestampMs(task: Pick<StudyPlanItem, 'updatedAt' | 'createdAt'>
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
+}
+
+function normalizeAttendanceDraft(
+  draft?: Partial<AttendanceScheduleDraft> | null
+): AttendanceScheduleDraft {
+  return {
+    inTime: draft?.inTime || EMPTY_ATTENDANCE_SCHEDULE_DRAFT.inTime,
+    outTime: draft?.outTime || EMPTY_ATTENDANCE_SCHEDULE_DRAFT.outTime,
+    awayStartTime: draft?.awayStartTime || '',
+    awayEndTime: draft?.awayEndTime || '',
+    awayReason: draft?.awayReason || '',
+    isAbsent: Boolean(draft?.isAbsent),
+  };
+}
+
+function hasAttendanceTemplateValue(draft?: Partial<AttendanceScheduleDraft> | null) {
+  if (!draft) return false;
+  return Boolean(
+    draft.isAbsent ||
+    draft.inTime ||
+    draft.outTime ||
+    draft.awayStartTime ||
+    draft.awayEndTime ||
+    draft.awayReason
+  );
 }
 
 function timeToClockProgress(time?: string | null) {
@@ -423,12 +457,17 @@ export default function StudyPlanPage() {
   const [recentStudyOptions, setRecentStudyOptions] = useState<RecentStudyOption[]>([]);
   const [isRecentStudyLoading, setIsRecentStudyLoading] = useState(false);
   const [activeRecentStudyKey, setActiveRecentStudyKey] = useState<string | null>(null);
+  const [isAttendanceSheetOpen, setIsAttendanceSheetOpen] = useState(false);
 
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
   const [awayStartTime, setAwayStartTime] = useState('');
   const [awayEndTime, setAwayEndTime] = useState('');
   const [awayReason, setAwayReason] = useState('');
+  const [attendanceIsAbsent, setAttendanceIsAbsent] = useState(false);
+  const [selectedWeekdayTemplateDay, setSelectedWeekdayTemplateDay] = useState(1);
+  const [weekdayDraft, setWeekdayDraft] = useState<AttendanceScheduleDraft>(EMPTY_ATTENDANCE_SCHEDULE_DRAFT);
+  const [attendancePresetName, setAttendancePresetName] = useState('');
 
   useEffect(() => {
     const requestedDate = searchParams.get('date');
@@ -457,6 +496,7 @@ export default function StudyPlanPage() {
     const day = getDay(selectedDate);
     setTaskCopyDays(prev => prev.length > 0 ? prev : [day]);
     setRoutineCopyDays(prev => prev.length > 0 ? prev : [day]);
+    setSelectedWeekdayTemplateDay(day);
   }, [selectedDate]);
 
   const isStudent = activeMembership?.role === 'student';
@@ -465,6 +505,7 @@ export default function StudyPlanPage() {
 
   const isPast = selectedDate ? isBefore(startOfDay(selectedDate), startOfDay(new Date())) : false;
   const isToday = selectedDate ? isSameDay(selectedDate, new Date()) : false;
+  const selectedDateLabel = selectedDate ? format(selectedDate, 'M월 d일 EEEE', { locale: ko }) : '';
 
   const weekDays = useMemo(() => {
     if (!selectedDate) return [];
@@ -563,6 +604,12 @@ export default function StudyPlanPage() {
   }, [firestore, activeMembership, user]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isStudent });
 
+  const attendanceSettingsRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'settings', 'attendance');
+  }, [firestore, activeMembership, user]);
+  const { data: attendanceSettingsDoc } = useDoc<AttendanceSettingsDoc>(attendanceSettingsRef, { enabled: isStudent });
+
   const fetchRecentStudyOptions = useCallback(async () => {
     if (!firestore || !user || !activeMembership || !isStudent || recentStudyWeekKeys.length === 0) {
       setRecentStudyOptions([]);
@@ -637,27 +684,92 @@ export default function StudyPlanPage() {
   const awayScheduleItem = useMemo(() => scheduleItems.find((item) => item.title.includes('외출 예정')), [scheduleItems]);
   const hasAwayPlan = Boolean(awayScheduleItem);
   const isAbsentMode = useMemo(() => scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [scheduleItems]);
+  const hasExplicitAttendancePlan = hasInPlan || hasOutPlan || hasAwayPlan || isAbsentMode;
+  const attendanceSettings = useMemo(
+    () => ({
+      weekdayTemplates: attendanceSettingsDoc?.weekdayTemplates || {},
+      savedRoutines: attendanceSettingsDoc?.savedRoutines || [],
+    }),
+    [attendanceSettingsDoc]
+  );
+  const selectedWeekdayTemplateRaw = useMemo(
+    () => attendanceSettings.weekdayTemplates?.[String(selectedWeekdayTemplateDay)],
+    [attendanceSettings.weekdayTemplates, selectedWeekdayTemplateDay]
+  );
+  const hasSelectedWeekdayTemplate = hasAttendanceTemplateValue(selectedWeekdayTemplateRaw);
+  const selectedWeekdayTemplate = useMemo(
+    () => normalizeAttendanceDraft(selectedWeekdayTemplateRaw),
+    [selectedWeekdayTemplateRaw]
+  );
+  const savedAttendanceRoutines = useMemo(
+    () => attendanceSettings.savedRoutines || [],
+    [attendanceSettings.savedRoutines]
+  );
 
   useEffect(() => {
     const arrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
     const dismissal = scheduleItems.find((item) => item.title.startsWith('하원 예정: '));
     const awayItem = scheduleItems.find((item) => item.title.startsWith('외출 예정'));
 
-    setInTime(arrival?.title.split(': ')[1] || '09:00');
-    setOutTime(dismissal?.title.split(': ')[1] || '22:00');
-
-    if (awayItem) {
-      const [baseTitle, rangeText = ''] = awayItem.title.split(': ');
-      const [startText = '', endText = ''] = rangeText.split(' ~ ');
-      setAwayStartTime(startText);
-      setAwayEndTime(endText);
-      setAwayReason(baseTitle.replace('외출 예정', '').replace(/^ · /, '').trim());
-    } else {
-      setAwayStartTime('');
-      setAwayEndTime('');
-      setAwayReason('');
+    if (arrival || dismissal || awayItem || isAbsentMode) {
+      setInTime(arrival?.title.split(': ')[1] || EMPTY_ATTENDANCE_SCHEDULE_DRAFT.inTime);
+      setOutTime(dismissal?.title.split(': ')[1] || EMPTY_ATTENDANCE_SCHEDULE_DRAFT.outTime);
+      setAttendanceIsAbsent(isAbsentMode);
+      if (awayItem) {
+        const [baseTitle, rangeText = ''] = awayItem.title.split(': ');
+        const [startText = '', endText = ''] = rangeText.split(' ~ ');
+        setAwayStartTime(startText);
+        setAwayEndTime(endText);
+        setAwayReason(baseTitle.replace('외출 예정', '').replace(/^ · /, '').trim());
+      } else {
+        setAwayStartTime('');
+        setAwayEndTime('');
+        setAwayReason('');
+      }
+      return;
     }
-  }, [scheduleItems]);
+
+    if (hasSelectedWeekdayTemplate) {
+      setInTime(selectedWeekdayTemplate.inTime);
+      setOutTime(selectedWeekdayTemplate.outTime);
+      setAwayStartTime(selectedWeekdayTemplate.awayStartTime);
+      setAwayEndTime(selectedWeekdayTemplate.awayEndTime);
+      setAwayReason(selectedWeekdayTemplate.awayReason);
+      setAttendanceIsAbsent(Boolean(selectedWeekdayTemplate.isAbsent));
+      return;
+    }
+
+    setInTime(EMPTY_ATTENDANCE_SCHEDULE_DRAFT.inTime);
+    setOutTime(EMPTY_ATTENDANCE_SCHEDULE_DRAFT.outTime);
+    setAwayStartTime('');
+    setAwayEndTime('');
+    setAwayReason('');
+    setAttendanceIsAbsent(false);
+  }, [scheduleItems, isAbsentMode, hasSelectedWeekdayTemplate, selectedWeekdayTemplate]);
+
+  useEffect(() => {
+    setWeekdayDraft(selectedWeekdayTemplate);
+  }, [selectedWeekdayTemplate]);
+
+  const resolvedAbsentMode = hasExplicitAttendancePlan ? isAbsentMode : Boolean(selectedWeekdayTemplateRaw?.isAbsent);
+  const attendanceSourceLabel = hasExplicitAttendancePlan
+    ? '오늘 직접 설정'
+    : hasSelectedWeekdayTemplate
+      ? `${WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayTemplateDay)?.label || '이 요일'} 기본값`
+      : '미설정';
+
+  const attendanceSummaryLine = resolvedAbsentMode
+    ? '오늘은 등원하지 않아요'
+    : attendanceSourceLabel === '미설정'
+      ? '아직 출석 정보가 없어요'
+      : `${inTime || '--:--'} ~ ${outTime || '--:--'}`;
+  const attendanceSummarySubline = resolvedAbsentMode
+    ? '수정 버튼에서 다시 출석 일정으로 바꿀 수 있어요.'
+    : attendanceSourceLabel === '미설정'
+      ? '수정 버튼에서 오늘 일정, 요일별 기본값, 저장한 루틴을 한 번에 관리해요.'
+      : hasAwayPlan || (hasSelectedWeekdayTemplate && selectedWeekdayTemplate.awayStartTime && selectedWeekdayTemplate.awayEndTime)
+        ? `외출 ${awayStartTime || selectedWeekdayTemplate.awayStartTime} ~ ${awayEndTime || selectedWeekdayTemplate.awayEndTime}${(awayReason || selectedWeekdayTemplate.awayReason).trim() ? ` · ${(awayReason || selectedWeekdayTemplate.awayReason).trim()}` : ''}`
+        : '앞 화면에서는 오늘 요약만 보고, 수정은 한 번에 열어서 관리해요.';
 
   const studyTimeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
@@ -983,6 +1095,61 @@ export default function StudyPlanPage() {
     }
   };
 
+  const patchTodayAttendanceDraft = (patch: Partial<AttendanceScheduleDraft>) => {
+    if (patch.inTime !== undefined) setInTime(patch.inTime);
+    if (patch.outTime !== undefined) setOutTime(patch.outTime);
+    if (patch.awayStartTime !== undefined) setAwayStartTime(patch.awayStartTime);
+    if (patch.awayEndTime !== undefined) setAwayEndTime(patch.awayEndTime);
+    if (patch.awayReason !== undefined) setAwayReason(patch.awayReason);
+    if (patch.isAbsent !== undefined) setAttendanceIsAbsent(Boolean(patch.isAbsent));
+  };
+
+  const patchWeekdayAttendanceDraft = (patch: Partial<AttendanceScheduleDraft>) => {
+    setWeekdayDraft((prev) => ({
+      ...prev,
+      ...patch,
+      isAbsent: patch.isAbsent ?? prev.isAbsent,
+    }));
+  };
+
+  const buildCurrentAttendanceDraft = useCallback(
+    (): AttendanceScheduleDraft => ({
+      inTime,
+      outTime,
+      awayStartTime,
+      awayEndTime,
+      awayReason,
+      isAbsent: attendanceIsAbsent,
+    }),
+    [inTime, outTime, awayStartTime, awayEndTime, awayReason, attendanceIsAbsent]
+  );
+
+  const saveAttendanceSettings = useCallback(
+    async (patch: Partial<AttendanceSettingsDoc>) => {
+      if (!attendanceSettingsRef) return false;
+      await setDoc(attendanceSettingsRef, { ...patch, updatedAt: serverTimestamp() }, { merge: true });
+      return true;
+    },
+    [attendanceSettingsRef]
+  );
+
+  const handleApplySelectedWeekdayTemplateToToday = () => {
+    if (!hasSelectedWeekdayTemplate) return;
+    patchTodayAttendanceDraft(selectedWeekdayTemplate);
+    toast({
+      title: `${WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayTemplateDay)?.label || '이 요일'} 기본값을 불러왔어요.`,
+      description: '오늘 입력칸에 기본 출석 스케줄을 채웠어요.',
+    });
+  };
+
+  const handleCopyTodayAttendanceToWeekday = () => {
+    setWeekdayDraft(normalizeAttendanceDraft(buildCurrentAttendanceDraft()));
+    toast({
+      title: '오늘 입력을 요일 기본값으로 가져왔어요.',
+      description: '이 상태에서 저장하면 같은 요일 기본 스케줄로 쓸 수 있어요.',
+    });
+  };
+
   const handleSetAttendance = async (type: 'attend' | 'absent') => {
     if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
     setIsSubmitting(true);
@@ -1046,6 +1213,89 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleResetAttendanceOverride = async () => {
+    if (isPast || !firestore || !user || !activeMembership || !weekKey) return;
+    const batch = writeBatch(firestore);
+    const colRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
+    scheduleItems
+      .filter((item) => item.title.includes('등원') || item.title.includes('하원') || item.title.includes('등원하지 않습니다') || item.title.includes('외출 예정'))
+      .forEach((item) => batch.delete(doc(colRef, item.id)));
+
+    await batch.commit();
+
+    if (isToday) {
+      await applySameDayRoutinePenalty('당일 출석 루틴 초기화');
+      toast({
+        title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+        description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+      });
+    }
+
+    toast({
+      title: hasSelectedWeekdayTemplate ? '오늘 설정을 지우고 요일 기본값으로 돌아갑니다.' : '오늘 설정을 초기화했어요.',
+    });
+  };
+
+  const handleSaveWeekdayAttendance = async () => {
+    if (isPast) return;
+    const nextWeekdayTemplates = {
+      ...(attendanceSettings.weekdayTemplates || {}),
+      [String(selectedWeekdayTemplateDay)]: normalizeAttendanceDraft(weekdayDraft),
+    };
+
+    await saveAttendanceSettings({ weekdayTemplates: nextWeekdayTemplates });
+    toast({
+      title: `${WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayTemplateDay)?.label || '이 요일'} 기본 출석 정보를 저장했어요.`,
+      description: '앞으로 같은 요일을 볼 때 기본값으로 바로 불러올 수 있어요.',
+    });
+  };
+
+  const handleSaveAttendancePreset = async () => {
+    const trimmedName = attendancePresetName.trim();
+    if (!trimmedName) {
+      toast({ variant: 'destructive', title: '저장할 루틴 이름을 적어주세요.' });
+      return;
+    }
+
+    const nextPresets: SavedAttendanceRoutine[] = [
+      {
+        id: `${Date.now()}`,
+        name: trimmedName,
+        ...normalizeAttendanceDraft(buildCurrentAttendanceDraft()),
+      },
+      ...savedAttendanceRoutines,
+    ].slice(0, 12);
+
+    await saveAttendanceSettings({ savedRoutines: nextPresets });
+    setAttendancePresetName('');
+    toast({
+      title: '자주 쓰는 출석 루틴으로 저장했어요.',
+      description: '다음부터는 오늘 수정이나 요일 기본값에서 바로 불러올 수 있어요.',
+    });
+  };
+
+  const handleDeleteAttendancePreset = async (presetId: string) => {
+    const nextPresets = savedAttendanceRoutines.filter((preset) => preset.id !== presetId);
+    await saveAttendanceSettings({ savedRoutines: nextPresets });
+    toast({ title: '저장한 루틴을 삭제했어요.' });
+  };
+
+  const handleApplyAttendancePresetToToday = (preset: SavedAttendanceRoutine) => {
+    patchTodayAttendanceDraft(normalizeAttendanceDraft(preset));
+    toast({
+      title: `${preset.name} 루틴을 오늘 입력칸에 불러왔어요.`,
+      description: '시간이나 사유를 조금만 바꿔서 바로 저장할 수 있어요.',
+    });
+  };
+
+  const handleApplyAttendancePresetToWeekday = (preset: SavedAttendanceRoutine) => {
+    setWeekdayDraft(normalizeAttendanceDraft(preset));
+    toast({
+      title: `${preset.name} 루틴을 요일 기본값으로 불러왔어요.`,
+      description: '필요하면 시간이나 사유를 조금만 바꿔서 저장해보세요.',
+    });
   };
 
   const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
@@ -1442,121 +1692,107 @@ export default function StudyPlanPage() {
       </div>
 
       {!isPast && (
-        <Card className={cn(
-          "border-none shadow-2xl overflow-hidden transition-all duration-700 bg-white ring-1 ring-black/[0.03]",
-          "relative group",
-          isMobile ? "rounded-[1.25rem]" : "rounded-[2.5rem]",
-          isToday && "opacity-80"
-        )}>
-          <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
-          <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-4" : "p-8")}>
-            <div className="flex items-center justify-between">
-              <CardTitle className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-base" : "text-2xl")}>
-                <CalendarClock className={cn("text-primary", isMobile ? "h-5 w-5" : "h-7 w-7")} /> {isToday ? '오늘의 출석 정보' : '출석 설정'}
-              </CardTitle>
-              {isToday ? (
-                <Badge className={cn("bg-amber-50 text-amber-700 border border-amber-200 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 shadow-sm")}>
-                  당일 수정 시 벌점 +{SAME_DAY_ROUTINE_PENALTY_POINTS}
-                </Badge>
-              ) : (
-                <Badge className={cn("bg-white text-primary border-none font-black text-[8px] uppercase tracking-widest px-2 py-0.5 shadow-sm")}>1단계</Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className={cn(isMobile ? "p-4" : "p-8 sm:p-10")}>
-            {(!hasInPlan || !hasOutPlan) && !isAbsentMode ? (
-              <div className={isMobile ? "space-y-6" : "flex flex-col gap-10"}>
-                <div className={cn("grid gap-4 sm:gap-8", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.25fr)_minmax(260px,0.75fr)]")}>
-                  <div className={cn(isMobile ? "space-y-3" : "space-y-4", !isMobile && "min-w-0")}>
-                    <div className="flex items-center gap-2 ml-1">
-                      <Zap className={cn("text-amber-500 fill-amber-500", isMobile ? "h-3 w-3" : "h-4 w-4")} />
-                      <Label className={cn("font-black text-primary uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>등원 계획</Label>
+        <>
+          <Card
+            className={cn(
+              "border-none shadow-2xl overflow-hidden transition-all duration-700 bg-white ring-1 ring-black/[0.03] relative",
+              isMobile ? "rounded-[1.25rem]" : "rounded-[2.5rem]"
+            )}
+          >
+            <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
+            <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-4" : "p-8")}>
+              <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
+                <div className="min-w-0">
+                  <CardTitle className={cn("font-black tracking-tighter flex items-center gap-2 text-primary", isMobile ? "text-base" : "text-2xl")}>
+                    <CalendarClock className={cn(isMobile ? "h-5 w-5" : "h-7 w-7")} />
+                    {isToday ? '오늘의 출석 정보' : `${selectedDateLabel} 출석 정보`}
+                  </CardTitle>
+                  <p className={cn("mt-2 break-keep font-semibold text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
+                    앞 화면에는 요약만 남기고, 수정은 버튼 한 번으로 한 곳에서 관리해요.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="rounded-full border border-primary/10 bg-white px-3 py-1 text-[10px] font-black text-primary shadow-sm">
+                    {attendanceSourceLabel}
+                  </Badge>
+                  {isToday ? (
+                    <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
+                      당일 수정 시 벌점 +{SAME_DAY_ROUTINE_PENALTY_POINTS}
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className={cn(isMobile ? "p-4" : "p-8")}>
+              <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto] items-center")}>
+                <div className="min-w-0 rounded-[1.5rem] border border-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.95)_100%)] p-4 shadow-[0_18px_44px_-34px_rgba(20,41,95,0.22)]">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={cn(
+                        "rounded-2xl p-3 text-white shadow-lg",
+                        resolvedAbsentMode ? "bg-gradient-to-br from-rose-500 to-rose-700" : cn("bg-gradient-to-br", currentTier.gradient)
+                      )}
+                    >
+                      {resolvedAbsentMode ? <XCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
                     </div>
-                    <div className={cn("gap-2 sm:gap-3", isMobile ? "flex flex-col" : "flex flex-col xl:flex-row xl:items-end")}>
-                        <div className={cn("grid w-full min-w-0", isMobile ? "grid-cols-1 gap-2" : "grid-cols-2 gap-2 sm:gap-3 xl:flex-1")}>
-                          <div className="space-y-1">
-                            <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>등원 예정</span>
-                          <Input type="time" value={inTime} onChange={e => setInTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
-                        </div>
-                        <div className="space-y-1">
-                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>하원 예정</span>
-                          <Input type="time" value={outTime} onChange={e => setOutTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-14 text-xl")} />
-                          </div>
-                        </div>
-                        <Button onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className={cn("touch-manipulation rounded-xl font-black shadow-xl active:scale-95 transition-all text-white bg-gradient-to-br", isMobile ? "w-full h-10 text-xs" : "h-14 px-10 mt-6 text-lg", currentTier.gradient)}>설정 완료</Button>
-                    </div>
-                    <div className={cn("rounded-[1.2rem] border border-primary/10 bg-primary/[0.03]", isMobile ? "p-3 space-y-2" : "p-4 space-y-3")}>
-                      <div className="flex items-center gap-2 ml-1">
-                        <Clock className={cn("text-primary", isMobile ? "h-3 w-3" : "h-4 w-4")} />
-                        <Label className={cn("font-black text-primary uppercase tracking-widest", isMobile ? "text-[9px]" : "text-xs")}>외출 일정</Label>
-                        <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[8px]" : "text-[10px]")}>학원/병원/식사 등</span>
-                      </div>
-                      <div className={cn("grid", isMobile ? "grid-cols-1 gap-2" : "grid-cols-[minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,1fr)] gap-3")}>
-                        <div className="space-y-1">
-                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>외출 시작</span>
-                          <Input type="time" value={awayStartTime} onChange={e => setAwayStartTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-lg")} />
-                        </div>
-                        <div className="space-y-1">
-                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>복귀 예정</span>
-                          <Input type="time" value={awayEndTime} onChange={e => setAwayEndTime(e.target.value)} className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-lg")} />
-                        </div>
-                        <div className="space-y-1">
-                          <span className={cn("font-black opacity-40 ml-1", isMobile ? "text-[7px]" : "text-[10px]")}>사유</span>
-                          <Input value={awayReason} onChange={e => setAwayReason(e.target.value)} placeholder="예: 영어학원, 병원, 저녁 식사" className={cn("rounded-xl border-2 font-black shadow-inner focus-visible:ring-primary/20", isMobile ? "h-9 text-xs px-2" : "h-12 text-sm")} />
-                        </div>
-                      </div>
-                      <p className={cn("font-semibold text-muted-foreground", isMobile ? "text-[9px]" : "text-[11px]")}>
-                        사유와 시간이 모두 있으면 등원 계획과 함께 외출 일정도 저장됩니다.
+                    <div className="min-w-0">
+                      <p className={cn("font-black tracking-tight text-primary break-keep", isMobile ? "text-lg" : "text-2xl")}>
+                        {attendanceSummaryLine}
+                      </p>
+                      <p className={cn("mt-2 break-keep font-semibold text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
+                        {attendanceSummarySubline}
                       </p>
                     </div>
                   </div>
-                  
-                  <div className={cn("flex flex-col justify-center items-center", isMobile ? "border-t border-dashed pt-4" : "border-t border-dashed pt-6 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0")}>
-                    <p className={cn("font-bold text-muted-foreground mb-3", isMobile ? "text-[10px]" : "text-xs")}>오늘은 공부를 쉬어갑니다.</p>
-                    <Button variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className={cn("touch-manipulation w-full rounded-xl border-2 border-rose-200 text-rose-600 font-black hover:bg-rose-50 gap-2 transition-all active:scale-95", isMobile ? "h-11 text-sm" : "h-14 text-lg")}>
-                      <XCircle className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} /> 이날 등원하지 않습니다
-                    </Button>
-                  </div>
                 </div>
+
+                <Button
+                  type="button"
+                  onClick={() => setIsAttendanceSheetOpen(true)}
+                  className={cn(
+                    "rounded-2xl font-black text-white shadow-xl",
+                    isMobile ? "h-11 w-full text-sm" : "h-12 px-6 text-sm",
+                    cn("bg-gradient-to-r", currentTier.gradient)
+                  )}
+                >
+                  출석 정보 수정
+                </Button>
               </div>
-            ) : (
-              <div className={cn("flex items-center justify-between rounded-[1.5rem] bg-[#fafafa] border-2 border-transparent shadow-inner relative group overflow-hidden", isMobile ? "p-4 gap-3" : "p-8")}>
-                <div className={cn("absolute inset-0 opacity-[0.03] pointer-events-none bg-gradient-to-br", currentTier.gradient)} />
-                <div className={cn("flex items-center gap-4 relative z-10", isMobile ? "flex-row text-left" : "flex-row")}>
-                  <div className={cn("p-2.5 rounded-2xl shadow-lg text-white bg-gradient-to-br", isAbsentMode ? "from-rose-500 to-rose-700" : currentTier.gradient)}>
-                    {isAbsentMode ? <XCircle className={cn(isMobile ? "h-5 w-5" : "h-8 w-8")} /> : <CheckCircle2 className={cn(isMobile ? "h-5 w-5" : "h-8 w-8")} />}
-                  </div>
-                  <div className="grid">
-                    <span className={cn("font-black tracking-tighter text-primary", isMobile ? "text-sm" : "text-2xl")}>{isAbsentMode ? '오늘 휴무' : '출석 설정 완료'}</span>
-                    {!isAbsentMode && <span className={cn("font-bold text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>{inTime} ~ {outTime}</span>}
-                    {!isAbsentMode && hasAwayPlan && awayStartTime && awayEndTime && (
-                      <span className={cn("font-bold text-primary/70 break-keep", isMobile ? "text-[9px]" : "text-xs")}>
-                        외출 {awayStartTime} ~ {awayEndTime}{awayReason.trim() ? ` · ${awayReason.trim()}` : ''}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {!isPast && (
-                  <button onClick={() => {
-                    const batch = writeBatch(firestore!);
-                    const colRef = collection(firestore!, 'centers', activeMembership!.id, 'plans', user!.uid, 'weeks', weekKey, 'items');
-                    scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('등원하지 않습니다') || i.title.includes('외출 예정')).forEach(i => batch.delete(doc(colRef, i.id)));
-                    batch.commit().then(async () => {
-                      if (isToday) {
-                        await applySameDayRoutinePenalty('당일 출석 루틴 초기화');
-                        toast({
-                          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
-                          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
-                        });
-                      }
-                      toast({ title: "설정을 재설정합니다." });
-                    });
-                  }} className={cn("font-black uppercase text-muted-foreground underline underline-offset-4 hover:text-primary transition-all relative z-10", isMobile ? "text-[8px]" : "text-[10px]")}>재설정</button>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <AttendanceScheduleSheet
+            open={isAttendanceSheetOpen}
+            onOpenChange={setIsAttendanceSheetOpen}
+            isMobile={isMobile}
+            isSubmitting={isSubmitting}
+            selectedDateLabel={selectedDateLabel}
+            isToday={isToday}
+            sameDayPenaltyPoints={SAME_DAY_ROUTINE_PENALTY_POINTS}
+            todayDraft={buildCurrentAttendanceDraft()}
+            onTodayChange={patchTodayAttendanceDraft}
+            onSaveToday={() => handleSetAttendance('attend')}
+            onSetTodayAbsent={() => handleSetAttendance('absent')}
+            onResetToday={handleResetAttendanceOverride}
+            hasSelectedWeekdayTemplate={hasSelectedWeekdayTemplate}
+            selectedWeekdayLabel={WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayTemplateDay)?.label || '이 요일'}
+            onApplySelectedWeekdayTemplateToToday={handleApplySelectedWeekdayTemplateToToday}
+            selectedWeekday={selectedWeekdayTemplateDay}
+            onSelectWeekday={setSelectedWeekdayTemplateDay}
+            weekdayOptions={WEEKDAY_OPTIONS}
+            weekdayDraft={weekdayDraft}
+            onWeekdayChange={patchWeekdayAttendanceDraft}
+            onCopyTodayToWeekday={handleCopyTodayAttendanceToWeekday}
+            onSaveWeekday={handleSaveWeekdayAttendance}
+            presetName={attendancePresetName}
+            onPresetNameChange={setAttendancePresetName}
+            onSavePreset={handleSaveAttendancePreset}
+            savedRoutines={savedAttendanceRoutines}
+            onApplyPresetToToday={handleApplyAttendancePresetToToday}
+            onApplyPresetToWeekday={handleApplyAttendancePresetToWeekday}
+            onDeletePreset={handleDeleteAttendancePreset}
+          />
+        </>
       )}
 
       <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile && "rounded-[1.5rem]")}>

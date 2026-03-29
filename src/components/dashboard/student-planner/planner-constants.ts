@@ -28,6 +28,29 @@ export type RecentStudyOption = {
   updatedLabel: string;
 };
 
+export type AttendanceScheduleDraft = {
+  inTime: string;
+  outTime: string;
+  awayStartTime: string;
+  awayEndTime: string;
+  awayReason: string;
+  isAbsent?: boolean;
+};
+
+export type SavedAttendanceRoutine = AttendanceScheduleDraft & {
+  id: string;
+  name: string;
+};
+
+export const EMPTY_ATTENDANCE_SCHEDULE_DRAFT: AttendanceScheduleDraft = {
+  inTime: '09:00',
+  outTime: '22:00',
+  awayStartTime: '',
+  awayEndTime: '',
+  awayReason: '',
+  isAbsent: false,
+};
+
 export const ROUTINE_TEMPLATE_OPTIONS: RoutineTemplateOption[] = [
   { key: 'arrival', label: '등원', title: '등원 예정', icon: 'arrival' },
   { key: 'departure', label: '하원', title: '하원 예정', icon: 'departure' },
