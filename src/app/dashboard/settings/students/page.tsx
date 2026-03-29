@@ -65,7 +65,6 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 import { format } from 'date-fns';
-import Link from 'next/link';
 
 function resolveCallableErrorMessage(error: any, fallback: string): string {
   const detailMessage =
@@ -154,7 +153,7 @@ export default function StudentAccountManagementPage() {
     parentLinkCode: '',
     className: '',
     memberStatus: 'active' as StudentMembershipStatus,
-    seasonLp: 0,
+    pointsBalance: 0,
     stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
     todayStudyMinutes: 0
   });
@@ -246,7 +245,7 @@ export default function StudentAccountManagementPage() {
       parentLinkCode: normalizeParentLinkCode(profile?.parentLinkCode),
       className: member.className || '',
       memberStatus: normalizeStudentMembershipStatus(member.status),
-      seasonLp: progress?.seasonLp || 0,
+      pointsBalance: progress?.pointsBalance || 0,
       stats: {
         focus: progress?.stats?.focus || 0,
         consistency: progress?.stats?.consistency || 0,
@@ -284,7 +283,7 @@ export default function StudentAccountManagementPage() {
         parentLinkCode: normalizedParentLinkCode !== currentParentLinkCode ? (normalizedParentLinkCode || null) : undefined,
         className: editForm.className || null,
         memberStatus: editForm.memberStatus,
-        seasonLp: editForm.seasonLp,
+        pointsBalance: editForm.pointsBalance,
         stats: editForm.stats,
         todayStudyMinutes: editForm.todayStudyMinutes,
         dateKey: todayKey,
@@ -319,8 +318,7 @@ export default function StudentAccountManagementPage() {
         throw new Error(result.data?.message || "처리 실패");
       }
     } catch (e: any) {
-      const message = resolveCallableErrorMessage(e, "학생 계정 삭제 중 오류가 발생했습니다.");
-      toast({ variant: "destructive", title: "삭제 실패", description: message });
+      toast({ variant: "destructive", title: "삭제 실패", description: "데이터가 너무 많아 백그라운드에서 작업이 계속 진행 중일 수 있습니다." });
     } finally {
       setIsDeleting(null);
     }
@@ -432,11 +430,6 @@ export default function StudentAccountManagementPage() {
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto">
-                      <Button asChild variant="outline" size="icon" className="h-11 w-11 rounded-xl border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all">
-                        <Link href={`/dashboard/teacher/students/${member.id}`}>
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
                       <Button variant="outline" size="icon" onClick={() => handleOpenEditModal(member)} className="h-11 w-11 rounded-xl border-2 shadow-sm bg-white hover:bg-primary hover:text-white transition-all"><Edit2 className="h-4 w-4" /></Button>
 
                       <AlertDialog>
@@ -469,7 +462,7 @@ export default function StudentAccountManagementPage() {
       </Card>
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent motionPreset="dashboard-premium" className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-2xl max-h-[95vh]">
+        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-2xl max-h-[95vh]">
           <div className="bg-primary p-8 text-white relative shrink-0">
             <UserCog className="absolute top-0 right-0 p-8 h-24 w-24 opacity-10 rotate-12" />
             <DialogHeader>
@@ -542,8 +535,8 @@ export default function StudentAccountManagementPage() {
               <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest ml-1 flex items-center gap-2"><Zap className="h-3.5 w-3.5" /> 성장 지표 보정 (포인트 & 역량)</h4>
               <Card className="rounded-[1.5rem] border-2 border-emerald-100 bg-white p-6 space-y-6 shadow-sm">
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center"><Label className="text-[10px] font-black text-primary/60 whitespace-nowrap">시즌 포인트</Label><Badge className="bg-emerald-500 text-white font-black whitespace-nowrap">{editForm.seasonLp.toLocaleString()}점</Badge></div>
-                  <Slider value={[editForm.seasonLp]} max={50000} step={100} onValueChange={([v]) => setEditForm({...editForm, seasonLp: v})} />
+                  <div className="flex justify-between items-center"><Label className="text-[10px] font-black text-primary/60 whitespace-nowrap">포인트 지갑</Label><Badge className="bg-emerald-500 text-white font-black whitespace-nowrap">{editForm.pointsBalance.toLocaleString()}점</Badge></div>
+                  <Slider value={[editForm.pointsBalance]} max={50000} step={100} onValueChange={([v]) => setEditForm({...editForm, pointsBalance: v})} />
                 </div>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-6">
                   {Object.entries({ focus: '집중력', consistency: '꾸준함', achievement: '목표달성', resilience: '회복력' }).map(([key, label]) => (

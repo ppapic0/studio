@@ -6,8 +6,6 @@ if (admin.apps.length === 0) {
 }
 
 const region = "asia-northeast3";
-const smsVpcConnector = "sms-egress-connector";
-const smsVpcEgressSettings = "ALL_TRAFFIC" as const;
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
 const adminRoles = new Set(["centerAdmin", "owner"]);
 type AllowedRole = (typeof allowedRoles)[number];
@@ -25,7 +23,6 @@ type InviteDoc = {
 type AttendanceSmsEventType =
   | "study_start"
   | "away_start"
-  | "away_end"
   | "study_end"
   | "late_alert"
   | "check_in"
@@ -33,11 +30,10 @@ type AttendanceSmsEventType =
 type ParentSmsEventType =
   | "study_start"
   | "away_start"
-  | "away_end"
   | "study_end"
   | "late_alert"
   | "weekly_report";
-type SmsQueueEventType = ParentSmsEventType | "risk_alert" | "manual_note";
+type SmsQueueEventType = ParentSmsEventType | "risk_alert";
 type SmsQueueStatus =
   | "queued"
   | "processing"
@@ -59,7 +55,6 @@ type NotificationSettingsDoc = {
   smsTemplateCheckOut?: string;
   smsTemplateStudyStart?: string;
   smsTemplateAwayStart?: string;
-  smsTemplateAwayEnd?: string;
   smsTemplateStudyEnd?: string;
   smsTemplateLateAlert?: string;
   smsApiKeyConfigured?: boolean;
@@ -103,28 +98,12 @@ type SmsDispatchResult =
     };
 
 const SMS_BYTE_LIMIT = 90;
-const STUDENT_SMS_FALLBACK_UID = "__student__";
-type MarketingSmsTargetType = "consulting_lead" | "waitlist";
 
-const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
+const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "study_end" | "late_alert", string> = {
   study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
   away_start: "[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.",
-  away_end: "[{centerName}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.",
   study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
   late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
-};
-
-const STUDY_SESSION_POINTS_PER_MINUTE = 0.42;
-const STUDY_ATTENDANCE_POINTS = 20;
-const STUDY_DEEP_FOCUS_POINTS = 15;
-const STUDY_SESSION_LP_PER_MINUTE = 0.12;
-const STUDY_ATTENDANCE_BONUS_LP = 12;
-const STUDY_DEEP_FOCUS_LP = 8;
-const DAILY_TOP_STUDY_POINTS = 1000;
-const MONTHLY_RANK_POINT_REWARDS: Record<number, number> = {
-  1: 20000,
-  2: 10000,
-  3: 5000,
 };
 
 function normalizePhoneNumber(raw: unknown): string {
@@ -132,14 +111,6 @@ function normalizePhoneNumber(raw: unknown): string {
   const digits = String(raw).replace(/\D/g, "");
   if (digits.length === 11 && digits.startsWith("01")) return digits;
   if (digits.length === 10 && digits.startsWith("01")) return digits;
-  return "";
-}
-
-function resolveFirstValidPhoneNumber(...values: unknown[]): string {
-  for (const value of values) {
-    const normalized = normalizePhoneNumber(value);
-    if (normalized) return normalized;
-  }
   return "";
 }
 
@@ -468,7 +439,7 @@ function applyTemplate(template: string, values: Record<string, string>): string
   }, template);
 }
 
-function normalizeSmsEventType(eventType: AttendanceSmsEventType): "study_start" | "away_start" | "away_end" | "study_end" | "late_alert" {
+function normalizeSmsEventType(eventType: AttendanceSmsEventType): "study_start" | "away_start" | "study_end" | "late_alert" {
   if (eventType === "check_in") return "study_start";
   if (eventType === "check_out") return "study_end";
   return eventType;
@@ -478,7 +449,6 @@ function getDefaultSmsEventToggles(): Record<ParentSmsEventType, boolean> {
   return {
     study_start: true,
     away_start: true,
-    away_end: true,
     study_end: true,
     late_alert: true,
     weekly_report: true,
@@ -492,7 +462,6 @@ function normalizeSmsEventToggles(value: unknown): Record<ParentSmsEventType, bo
   return {
     study_start: source.study_start !== false,
     away_start: source.away_start !== false,
-    away_end: source.away_end !== false,
     study_end: source.study_end !== false,
     late_alert: source.late_alert !== false,
     weekly_report: source.weekly_report !== false,
@@ -556,25 +525,18 @@ async function loadCenterName(
   try {
     const centerSnap = await db.doc(`centers/${centerId}`).get();
     const name = centerSnap.data()?.name;
-    const normalizedName = typeof name === "string" ? name.trim() : "";
-    if (normalizedName === "트랙센터" || normalizedName === "공부트랙 동백센터") {
-      return "트랙 관리형 스터디센터";
-    }
-    return normalizedName.length > 0 ? normalizedName : "트랙 관리형 스터디센터";
+    return typeof name === "string" && name.trim().length > 0 ? name.trim() : "센터";
   } catch {
-    return "트랙 관리형 스터디센터";
+    return "센터";
   }
 }
 
 function resolveTemplateByEvent(
   settings: NotificationSettingsDoc,
-  eventType: "study_start" | "away_start" | "away_end" | "study_end" | "late_alert"
+  eventType: "study_start" | "away_start" | "study_end" | "late_alert"
 ): string {
   if (eventType === "study_start") {
     return settings.smsTemplateStudyStart || settings.smsTemplateCheckIn || DEFAULT_SMS_TEMPLATES.study_start;
-  }
-  if (eventType === "away_end") {
-    return settings.smsTemplateAwayEnd || DEFAULT_SMS_TEMPLATES.away_end;
   }
   if (eventType === "study_end") {
     return settings.smsTemplateStudyEnd || settings.smsTemplateCheckOut || DEFAULT_SMS_TEMPLATES.study_end;
@@ -588,12 +550,12 @@ function resolveTemplateByEvent(
 function buildSmsDedupeKey(params: {
   centerId: string;
   studentId: string;
-  eventType: "study_start" | "away_start" | "away_end" | "study_end" | "late_alert";
+  eventType: "study_start" | "away_start" | "study_end" | "late_alert";
   eventAt: Date;
 }): string {
   const dateKey = toDateKey(params.eventAt);
   const minuteKey = `${String(params.eventAt.getHours()).padStart(2, "0")}${String(params.eventAt.getMinutes()).padStart(2, "0")}`;
-  if (params.eventType === "late_alert") {
+  if (params.eventType === "study_start" || params.eventType === "study_end" || params.eventType === "late_alert") {
     return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}`;
   }
   return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}_${minuteKey}`;
@@ -702,89 +664,31 @@ async function collectParentRecipients(
   const parentUids = Array.isArray(parentUidsRaw)
     ? parentUidsRaw.filter((uid): uid is string => typeof uid === "string" && uid.trim().length > 0)
     : [];
+  if (parentUids.length === 0) return [];
 
   const recipients: SmsRecipient[] = [];
   const usedPhones = new Set<string>();
 
   for (const parentUid of parentUids) {
-    const [userSnap, memberSnap, userCenterSnap] = await Promise.all([
+    const [userSnap, memberSnap] = await Promise.all([
       db.doc(`users/${parentUid}`).get(),
       db.doc(`centers/${centerId}/members/${parentUid}`).get(),
-      db.doc(`userCenters/${parentUid}/centers/${centerId}`).get(),
     ]);
 
     const userData = userSnap.exists ? userSnap.data() : null;
     const memberData = memberSnap.exists ? memberSnap.data() : null;
-    const userCenterData = userCenterSnap.exists ? userCenterSnap.data() : null;
-    const phoneNumber = resolveFirstValidPhoneNumber(
-      userData?.phoneNumber,
-      memberData?.phoneNumber,
-      userCenterData?.phoneNumber
-    );
+    const phoneNumber = normalizePhoneNumber(userData?.phoneNumber || memberData?.phoneNumber);
     if (!phoneNumber || usedPhones.has(phoneNumber)) continue;
 
     recipients.push({
       parentUid,
-      parentName:
-        (memberData?.displayName as string | null) ||
-        (userCenterData?.displayName as string | null) ||
-        (userData?.displayName as string | null) ||
-        null,
+      parentName: (memberData?.displayName as string | null) || (userData?.displayName as string | null) || null,
       phoneNumber,
     });
     usedPhones.add(phoneNumber);
-  }
-
-  if (recipients.length > 0) {
-    return recipients;
-  }
-
-  const [studentUserSnap, studentMemberSnap, studentUserCenterSnap] = await Promise.all([
-    db.doc(`users/${studentId}`).get(),
-    db.doc(`centers/${centerId}/members/${studentId}`).get(),
-    db.doc(`userCenters/${studentId}/centers/${centerId}`).get(),
-  ]);
-  const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
-    studentSnap.data()?.phoneNumber,
-    studentUserSnap.data()?.phoneNumber,
-    studentMemberSnap.data()?.phoneNumber,
-    studentUserCenterSnap.data()?.phoneNumber
-  );
-
-  if (fallbackPhoneNumber) {
-    recipients.push({
-      parentUid: STUDENT_SMS_FALLBACK_UID,
-      parentName: "학생 본인",
-      phoneNumber: fallbackPhoneNumber,
-    });
   }
 
   return recipients;
-}
-
-function normalizeExplicitSmsRecipients(rawRecipients: unknown): SmsRecipient[] {
-  if (!Array.isArray(rawRecipients)) return [];
-
-  const normalized: SmsRecipient[] = [];
-  const usedPhones = new Set<string>();
-
-  for (const raw of rawRecipients) {
-    const row = raw as Record<string, unknown>;
-    const phoneNumber = resolveFirstValidPhoneNumber(row?.phoneNumber);
-    if (!phoneNumber || usedPhones.has(phoneNumber)) continue;
-
-    const parentUid = asTrimmedString(row?.parentUid, STUDENT_SMS_FALLBACK_UID);
-    const parentName = asTrimmedString(row?.parentName, parentUid === STUDENT_SMS_FALLBACK_UID ? "학생 본인" : "학부모");
-
-    normalized.push({
-      parentUid,
-      parentName,
-      phoneNumber,
-    });
-    usedPhones.add(phoneNumber);
-  }
-
-  return normalized;
 }
 
 async function splitRecipientsBySmsPreference(
@@ -792,7 +696,7 @@ async function splitRecipientsBySmsPreference(
   centerId: string,
   studentId: string,
   studentName: string,
-  eventType: ParentSmsEventType | null,
+  eventType: ParentSmsEventType,
   recipients: SmsRecipient[]
 ): Promise<{
   allowedRecipients: SmsRecipient[];
@@ -821,7 +725,7 @@ async function splitRecipientsBySmsPreference(
     const pref = prefMap.get(prefId);
     const enabled = pref?.enabled !== false;
     const toggles = normalizeSmsEventToggles(pref?.eventToggles);
-    const eventEnabled = eventType ? toggles[eventType] !== false : true;
+    const eventEnabled = toggles[eventType] !== false;
 
     if (!enabled) {
       suppressedRecipients.push({
@@ -831,7 +735,7 @@ async function splitRecipientsBySmsPreference(
       continue;
     }
 
-    if (!eventEnabled && eventType) {
+    if (!eventEnabled) {
       suppressedRecipients.push({
         ...recipient,
         suppressedReason: `event_${eventType}_disabled`,
@@ -983,8 +887,6 @@ async function queueParentSmsNotification(
       type: eventType,
       title: eventType === "study_start"
         ? "공부 시작 알림"
-        : eventType === "away_end"
-          ? "복귀 알림"
         : eventType === "study_end"
           ? "공부 종료 알림"
           : eventType === "away_start"
@@ -1022,256 +924,6 @@ async function queueParentSmsNotification(
   );
 
   return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
-}
-
-async function queueManualStudentSms(
-  db: admin.firestore.Firestore,
-  params: {
-    centerId: string;
-    studentId: string;
-    studentName: string;
-    message: string;
-    settings?: NotificationSettingsDoc;
-    recipientOverrides?: SmsRecipient[];
-  }
-): Promise<{ queuedCount: number; recipientCount: number; message: string }> {
-  const { centerId, studentId, studentName } = params;
-  const settings = params.settings || await loadNotificationSettings(db, centerId);
-  const recipients =
-    params.recipientOverrides && params.recipientOverrides.length > 0
-      ? params.recipientOverrides
-      : await collectParentRecipients(db, centerId, studentId);
-  const message = trimSmsToByteLimit(asTrimmedString(params.message));
-  if (!message) {
-    return { queuedCount: 0, recipientCount: 0, message: "" };
-  }
-  if (recipients.length === 0) {
-    return { queuedCount: 0, recipientCount: 0, message };
-  }
-
-  const { allowedRecipients, suppressedRecipients } = await splitRecipientsBySmsPreference(
-    db,
-    centerId,
-    studentId,
-    studentName,
-    null,
-    recipients
-  );
-
-  const provider = settings.smsProvider || "none";
-  const ts = admin.firestore.Timestamp.now();
-  const batch = db.batch();
-  const initialStatus = buildSmsQueueInitialStatus(settings);
-
-  allowedRecipients.forEach((recipient) => {
-    const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
-    batch.set(queueRef, {
-      centerId,
-      studentId,
-      studentName,
-      parentUid: recipient.parentUid,
-      parentName: recipient.parentName,
-      phoneNumber: recipient.phoneNumber,
-      to: recipient.phoneNumber,
-      provider,
-      sender: settings.smsSender || null,
-      endpointUrl: settings.smsEndpointUrl || null,
-      message,
-      renderedMessage: message,
-      messageBytes: calculateSmsBytes(message),
-      dedupeKey: null,
-      eventType: "manual_note",
-      dateKey: toDateKey(ts.toDate()),
-      status: initialStatus.status,
-      providerStatus: initialStatus.providerStatus,
-      attemptCount: 0,
-      manualRetryCount: 0,
-      nextAttemptAt: initialStatus.status === "queued" ? ts : null,
-      sentAt: null,
-      failedAt: null,
-      lastErrorCode: null,
-      lastErrorMessage: null,
-      createdAt: ts,
-      updatedAt: ts,
-      metadata: {
-        studentName,
-        manualSend: true,
-      },
-    });
-
-    const parentNotificationRef = db.collection(`centers/${centerId}/parentNotifications`).doc();
-    batch.set(parentNotificationRef, {
-      centerId,
-      studentId,
-      parentUid: recipient.parentUid,
-      type: "manual_note",
-      title: "센터 수동 문자",
-      body: message,
-      isRead: false,
-      isImportant: true,
-      createdAt: ts,
-      updatedAt: ts,
-    });
-  });
-
-  await batch.commit();
-
-  await Promise.all(
-    suppressedRecipients.map((recipient) =>
-      appendSmsDeliveryLog(db, {
-        centerId,
-        studentId,
-        studentName,
-        parentUid: recipient.parentUid,
-        parentName: recipient.parentName,
-        phoneNumber: recipient.phoneNumber,
-        eventType: "manual_note",
-        renderedMessage: message,
-        messageBytes: calculateSmsBytes(message),
-        provider,
-        attemptNo: 0,
-        status: "suppressed_opt_out",
-        createdAt: ts,
-        suppressedReason: recipient.suppressedReason,
-      })
-    )
-  );
-
-  return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
-}
-
-async function queueMarketingManualSms(
-  db: admin.firestore.Firestore,
-  params: {
-    centerId: string;
-    message: string;
-    settings?: NotificationSettingsDoc;
-    targets: Array<{
-      targetType: MarketingSmsTargetType;
-      targetId: string;
-    }>;
-  }
-): Promise<{
-  queuedCount: number;
-  recipientCount: number;
-  targetCount: number;
-  skippedCount: number;
-  missingCount: number;
-  message: string;
-}> {
-  const { centerId } = params;
-  const settings = params.settings || await loadNotificationSettings(db, centerId);
-  const message = trimSmsToByteLimit(asTrimmedString(params.message));
-  if (!message) {
-    return { queuedCount: 0, recipientCount: 0, targetCount: 0, skippedCount: 0, missingCount: 0, message: "" };
-  }
-
-  const targets = params.targets
-    .map((row) => ({
-      targetType: row.targetType,
-      targetId: asTrimmedString(row.targetId),
-    }))
-    .filter((row) => row.targetId);
-
-  if (targets.length === 0) {
-    return { queuedCount: 0, recipientCount: 0, targetCount: 0, skippedCount: 0, missingCount: 0, message };
-  }
-
-  const initialStatus = buildSmsQueueInitialStatus(settings);
-  const provider = settings.smsProvider || "none";
-  const ts = admin.firestore.Timestamp.now();
-  const batch = db.batch();
-  const usedPhones = new Set<string>();
-  let queuedCount = 0;
-  let skippedCount = 0;
-  let missingCount = 0;
-
-  for (const target of targets) {
-    const refPath =
-      target.targetType === "consulting_lead"
-        ? `centers/${centerId}/consultingLeads/${target.targetId}`
-        : `centers/${centerId}/admissionWaitlist/${target.targetId}`;
-
-    const targetSnap = await db.doc(refPath).get();
-    if (!targetSnap.exists) {
-      missingCount += 1;
-      continue;
-    }
-
-    const targetData = targetSnap.data() || {};
-    const phoneNumber = resolveFirstValidPhoneNumber(targetData.parentPhone, targetData.studentPhone);
-    if (!phoneNumber) {
-      missingCount += 1;
-      continue;
-    }
-    if (usedPhones.has(phoneNumber)) {
-      skippedCount += 1;
-      continue;
-    }
-    usedPhones.add(phoneNumber);
-
-    const studentName = asTrimmedString(targetData.studentName, "문의 학생");
-    const parentName = asTrimmedString(
-      targetData.parentName,
-      target.targetType === "consulting_lead" ? "상담 리드" : "입학 대기"
-    );
-
-    const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
-    batch.set(queueRef, {
-      centerId,
-      studentId: null,
-      studentName,
-      parentUid: `marketing_${target.targetType}:${target.targetId}`,
-      parentName,
-      phoneNumber,
-      to: phoneNumber,
-      provider,
-      sender: settings.smsSender || null,
-      endpointUrl: settings.smsEndpointUrl || null,
-      message,
-      renderedMessage: message,
-      messageBytes: calculateSmsBytes(message),
-      dedupeKey: null,
-      eventType: "manual_note",
-      dateKey: toDateKey(ts.toDate()),
-      status: initialStatus.status,
-      providerStatus: initialStatus.providerStatus,
-      attemptCount: 0,
-      manualRetryCount: 0,
-      nextAttemptAt: initialStatus.status === "queued" ? ts : null,
-      sentAt: null,
-      failedAt: null,
-      lastErrorCode: null,
-      lastErrorMessage: null,
-      createdAt: ts,
-      updatedAt: ts,
-      metadata: {
-        studentName,
-        targetType: target.targetType,
-        targetId: target.targetId,
-        school: asTrimmedString(targetData.school),
-        grade: asTrimmedString(targetData.grade),
-        serviceType: asTrimmedString(targetData.serviceType),
-        requestType: asTrimmedString(targetData.requestType),
-        source: "marketing_crm",
-      },
-    });
-
-    queuedCount += 1;
-  }
-
-  if (queuedCount > 0) {
-    await batch.commit();
-  }
-
-  return {
-    queuedCount,
-    recipientCount: usedPhones.size,
-    targetCount: targets.length,
-    skippedCount,
-    missingCount,
-    message,
-  };
 }
 
 async function runLateArrivalCheckForCenter(
@@ -1386,11 +1038,10 @@ async function sendSmsViaAligo(params: {
   try {
     const formData = new FormData();
     formData.append("key", params.apiKey);
-    formData.append("user_id", params.userId);
+    formData.append("userid", params.userId);
     formData.append("sender", params.sender);
     formData.append("receiver", params.receiver);
     formData.append("msg", params.message);
-    formData.append("msg_type", "SMS");
     formData.append("testmode_yn", "N");
 
     const response = await fetch("https://apis.aligo.in/send/", {
@@ -2262,88 +1913,62 @@ export const deleteStudentAccount = functions.region(region).runWith({
   const { studentId, centerId } = data;
   if (!studentId || !centerId) throw new functions.https.HttpsError("invalid-argument", "ID 누락");
 
-  const callerMembership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
-  if (!isAdminRole(callerMembership.role)) {
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  if (!callerMemberSnap.exists || !isAdminRole(callerMemberSnap.data()?.role)) {
     throw new functions.https.HttpsError("permission-denied", "센터 관리자만 삭제 가능합니다.");
   }
 
   const targetMemberRef = db.doc(`centers/${centerId}/members/${studentId}`);
-  const targetStudentRef = db.doc(`centers/${centerId}/students/${studentId}`);
-  const targetUserCenterRef = db.doc(`userCenters/${studentId}/centers/${centerId}`);
   const targetMemberSnap = await targetMemberRef.get();
-  const [targetStudentSnap, targetUserCenterSnap] = await Promise.all([
-    targetStudentRef.get(),
-    targetUserCenterRef.get(),
-  ]);
-  const targetRole =
-    (typeof targetMemberSnap.data()?.role === "string" ? targetMemberSnap.data()?.role : "") ||
-    (typeof targetUserCenterSnap.data()?.role === "string" ? targetUserCenterSnap.data()?.role : "") ||
-    (targetStudentSnap.exists ? "student" : "");
-  if ((!targetMemberSnap.exists && !targetStudentSnap.exists && !targetUserCenterSnap.exists) || targetRole !== "student") {
+  if (!targetMemberSnap.exists || targetMemberSnap.data()?.role !== "student") {
     throw new functions.https.HttpsError("failed-precondition", "해당 센터의 학생 계정만 삭제할 수 있습니다.");
   }
 
   try {
-    const timestamp = admin.firestore.Timestamp.now();
-    const requiredErrors: string[] = [];
-    const warningErrors: string[] = [];
-    const parentUids = normalizeStringArray(targetStudentSnap.data()?.parentUids);
+    const errors: string[] = [];
 
-    const pushError = (bucket: string[], label: string, error: any) => {
-      bucket.push(`${label}: ${error?.message || "delete failed"}`);
-    };
+    const paths = [
+      `users/${studentId}`,
+      `userCenters/${studentId}`,
+      `centers/${centerId}/members/${studentId}`,
+      `centers/${centerId}/students/${studentId}`,
+      `centers/${centerId}/growthProgress/${studentId}`,
+      `centers/${centerId}/plans/${studentId}`,
+      `centers/${centerId}/studyLogs/${studentId}`,
+    ];
 
-    const deleteTree = async (
-      ref: admin.firestore.DocumentReference,
-      label: string,
-      bucket: string[]
-    ) => {
-      try {
-        await db.recursiveDelete(ref);
-      } catch (error: any) {
-        pushError(bucket, label, error);
-      }
-    };
-
-    const deleteByStudentIdQuery = async (
-      collectionPath: string,
-      label: string,
-      bucket: string[]
-    ) => {
-      try {
-        const snap = await db.collection(collectionPath).where("studentId", "==", studentId).get();
-        await Promise.all(snap.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
-      } catch (error: any) {
-        pushError(bucket, label, error);
-      }
-    };
+    const filterCols = [
+      `centers/${centerId}/counselingReservations`,
+      `centers/${centerId}/counselingLogs`,
+      `centers/${centerId}/attendanceRequests`,
+      `centers/${centerId}/dailyReports`,
+    ];
 
     await Promise.all([
-      deleteTree(db.doc(`users/${studentId}`), "users", requiredErrors),
-      deleteTree(db.doc(`userCenters/${studentId}`), "userCenters", requiredErrors),
-      deleteTree(targetMemberRef, "member", requiredErrors),
-      deleteTree(targetStudentRef, "student", requiredErrors),
-      deleteTree(db.doc(`centers/${centerId}/growthProgress/${studentId}`), "growthProgress", warningErrors),
-      deleteTree(db.doc(`centers/${centerId}/plans/${studentId}`), "plans", warningErrors),
-      deleteTree(db.doc(`centers/${centerId}/studyLogs/${studentId}`), "studyLogs", warningErrors),
-      deleteByStudentIdQuery(`centers/${centerId}/counselingReservations`, "counselingReservations", warningErrors),
-      deleteByStudentIdQuery(`centers/${centerId}/counselingLogs`, "counselingLogs", warningErrors),
-      deleteByStudentIdQuery(`centers/${centerId}/attendanceRequests`, "attendanceRequests", warningErrors),
-      deleteByStudentIdQuery(`centers/${centerId}/dailyReports`, "dailyReports", warningErrors),
-      deleteByStudentIdQuery(`centers/${centerId}/attendanceEvents`, "attendanceEvents", warningErrors),
-      deleteByStudentIdQuery(`centers/${centerId}/smsQueue`, "smsQueue", warningErrors),
-      deleteByStudentIdQuery(`centers/${centerId}/smsDeliveryLogs`, "smsDeliveryLogs", warningErrors),
-      deleteByStudentIdQuery(`centers/${centerId}/invoices`, "invoices", warningErrors),
+      ...paths.map(async (path) => {
+        try {
+          await db.recursiveDelete(db.doc(path));
+        } catch (e: any) {
+          errors.push(`${path}: ${e?.message || "delete failed"}`);
+        }
+      }),
+      ...filterCols.map(async (colPath) => {
+        try {
+          const q = await db.collection(colPath).where("studentId", "==", studentId).get();
+          await Promise.all(q.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
+        } catch (e: any) {
+          errors.push(`${colPath}: ${e?.message || "query delete failed"}`);
+        }
+      }),
       (async () => {
         try {
           const statsSnap = await db.collectionGroup("students").where("studentId", "==", studentId).get();
           const statDocs = statsSnap.docs.filter((docSnap) =>
-            docSnap.ref.path.startsWith(`centers/${centerId}/dailyStudentStats/`) ||
-            docSnap.ref.path.startsWith(`centers/${centerId}/attendanceDailyStats/`)
+            docSnap.ref.path.startsWith(`centers/${centerId}/dailyStudentStats/`)
           );
           await Promise.all(statDocs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
-        } catch (error: any) {
-          pushError(warningErrors, "dailyStats", error);
+        } catch (e: any) {
+          errors.push(`dailyStudentStats: ${e?.message || "stats cleanup failed"}`);
         }
       })(),
       (async () => {
@@ -2353,12 +1978,13 @@ export const deleteStudentAccount = functions.region(region).runWith({
             leaderboardsSnap.docs.map(async (boardDoc) => {
               const directEntryRef = boardDoc.ref.collection("entries").doc(studentId);
               await db.recursiveDelete(directEntryRef);
+
               const byStudentQuery = await boardDoc.ref.collection("entries").where("studentId", "==", studentId).get();
               await Promise.all(byStudentQuery.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
             })
           );
-        } catch (error: any) {
-          pushError(warningErrors, "leaderboards", error);
+        } catch (e: any) {
+          errors.push(`leaderboards: ${e?.message || "leaderboard cleanup failed"}`);
         }
       })(),
       (async () => {
@@ -2369,63 +1995,22 @@ export const deleteStudentAccount = functions.region(region).runWith({
               seatDoc.ref.set(
                 {
                   studentId: null,
-                  roomId: admin.firestore.FieldValue.delete(),
-                  roomSeatNo: admin.firestore.FieldValue.delete(),
-                  seatId: admin.firestore.FieldValue.delete(),
                   status: "absent",
-                  updatedAt: timestamp,
+                  updatedAt: admin.firestore.Timestamp.now(),
                   lastCheckInAt: admin.firestore.FieldValue.delete(),
                 },
                 { merge: true }
               )
             )
           );
-        } catch (error: any) {
-          pushError(warningErrors, "attendanceCurrent", error);
-        }
-      })(),
-      (async () => {
-        try {
-          if (parentUids.length === 0) return;
-          const batch = db.batch();
-          for (const parentUid of parentUids) {
-            batch.set(
-              db.doc(`centers/${centerId}/members/${parentUid}`),
-              {
-                linkedStudentIds: admin.firestore.FieldValue.arrayRemove(studentId),
-                updatedAt: timestamp,
-              },
-              { merge: true }
-            );
-            batch.set(
-              db.doc(`userCenters/${parentUid}/centers/${centerId}`),
-              {
-                linkedStudentIds: admin.firestore.FieldValue.arrayRemove(studentId),
-                updatedAt: timestamp,
-              },
-              { merge: true }
-            );
-          }
-          await batch.commit();
-        } catch (error: any) {
-          pushError(warningErrors, "parentLinks", error);
-        }
-      })(),
-      (async () => {
-        try {
-          const recipientPrefSnap = await db
-            .collection(`centers/${centerId}/smsRecipientPreferences`)
-            .where("studentId", "==", studentId)
-            .get();
-          await Promise.all(recipientPrefSnap.docs.map((docSnap) => db.recursiveDelete(docSnap.ref)));
-        } catch (error: any) {
-          pushError(warningErrors, "smsRecipientPreferences", error);
+        } catch (e: any) {
+          errors.push(`attendanceCurrent: ${e?.message || "seat cleanup failed"}`);
         }
       })(),
     ]);
 
-    if (requiredErrors.length > 0) {
-      throw new Error(`핵심 학생 데이터 삭제 실패 (${requiredErrors.join(" | ")})`);
+    if (errors.length > 0) {
+      throw new Error(`학생 데이터 일부 삭제 실패 (${errors.length}건)`);
     }
 
     try {
@@ -2436,15 +2021,9 @@ export const deleteStudentAccount = functions.region(region).runWith({
       }
     }
 
-    return {
-      ok: true,
-      message: warningErrors.length > 0 ? "학생 계정은 삭제되었고, 일부 보조 기록은 후속 정리되었습니다." : "정리가 완료되었습니다.",
-      warnings: warningErrors,
-    };
+    return { ok: true, message: "정리가 완료되었습니다." };
   } catch (error: any) {
-    throw new functions.https.HttpsError("internal", error?.message || "학생 계정 삭제 중 오류가 발생했습니다.", {
-      userMessage: error?.message || "학생 계정 삭제 중 오류가 발생했습니다.",
-    });
+    throw new functions.https.HttpsError("internal", error.message);
   }
 });
 
@@ -2522,11 +2101,10 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     displayName,
     schoolName,
     grade,
-    phoneNumber,
     parentLinkCode,
     className,
     memberStatus,
-    seasonLp,
+    pointsBalance,
     stats,
     todayStudyMinutes,
     dateKey,
@@ -2594,8 +2172,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
   const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
   const trimmedGrade = typeof grade === "string" ? grade.trim() : "";
-  const phoneNumberProvided = phoneNumber !== undefined;
-  const normalizedPhoneNumber = phoneNumber === null ? "" : normalizePhoneNumber(phoneNumber);
   const hasClassName = className !== undefined;
   const normalizedClassName = hasClassName
     ? (typeof className === "string" && className.trim() ? className.trim() : null)
@@ -2607,7 +2183,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   const normalizedMemberStatus = memberStatusProvided
     ? normalizeStudentMembershipStatusForWrite(memberStatus)
     : null;
-  const normalizedSeasonLp = parseFiniteNumber(seasonLp);
+  const normalizedPointsBalance = parseFiniteNumber(pointsBalance);
   const normalizedTodayStudyMinutes = parseFiniteNumber(todayStudyMinutes);
   const normalizedStats = normalizeStatsPayload(stats);
 
@@ -2620,12 +2196,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   if (memberStatusProvided && !normalizedMemberStatus) {
     throw new functions.https.HttpsError("invalid-argument", "Invalid member status.", {
       userMessage: "상태 값이 올바르지 않습니다. 재원/휴원/퇴원 중에서 선택해 주세요.",
-    });
-  }
-
-  if (phoneNumberProvided && !normalizedPhoneNumber) {
-    throw new functions.https.HttpsError("invalid-argument", "Invalid phone number.", {
-      userMessage: "휴대폰 번호를 01012345678 형식으로 입력해 주세요.",
     });
   }
 
@@ -2731,19 +2301,19 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       trimmedDisplayName.length > 0 ||
       hasClassName ||
       memberStatusProvided ||
-      seasonLp !== undefined ||
+      pointsBalance !== undefined ||
       stats !== undefined ||
       todayStudyMinutes !== undefined ||
       dateKey !== undefined;
 
     if (hasForbiddenUpdate) {
       throw new functions.https.HttpsError("permission-denied", "학생 계정은 일부 항목만 수정할 수 있습니다.", {
-        userMessage: "학생은 학교/학년/본인 전화번호/학부모 연동 코드만 수정할 수 있습니다.",
+        userMessage: "학생은 학교/학년/학부모 연동 코드만 수정할 수 있습니다.",
       });
     }
 
     const hasSelfEditableFieldInPayload =
-      typeof schoolName === "string" || typeof grade === "string" || parentLinkCodeProvided || phoneNumberProvided;
+      typeof schoolName === "string" || typeof grade === "string" || parentLinkCodeProvided;
 
     if (!hasSelfEditableFieldInPayload) {
       throw new functions.https.HttpsError("invalid-argument", "No editable field provided.", {
@@ -2774,8 +2344,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     const userUpdate: any = { updatedAt: timestamp };
     if (trimmedDisplayName) userUpdate.displayName = trimmedDisplayName;
     if (trimmedSchoolName) userUpdate.schoolName = trimmedSchoolName;
-    if (phoneNumberProvided) userUpdate.phoneNumber = normalizedPhoneNumber;
-    const hasUserWrite = trimmedDisplayName.length > 0 || trimmedSchoolName.length > 0 || phoneNumberProvided;
+    const hasUserWrite = trimmedDisplayName.length > 0 || trimmedSchoolName.length > 0;
     if (hasUserWrite) {
       batch.set(userRef, userUpdate, { merge: true });
     }
@@ -2784,7 +2353,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     if (trimmedDisplayName) studentUpdate.name = trimmedDisplayName;
     if (trimmedSchoolName) studentUpdate.schoolName = trimmedSchoolName;
     if (trimmedGrade) studentUpdate.grade = trimmedGrade;
-    if (phoneNumberProvided) studentUpdate.phoneNumber = normalizedPhoneNumber;
     if (parentLinkCodeProvided) studentUpdate.parentLinkCode = normalizedParentLinkCode || null;
     if (canEditOtherStudent && hasClassName) studentUpdate.className = normalizedClassName;
     batch.set(studentRef, studentUpdate, { merge: true });
@@ -2793,10 +2361,8 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     const memberUpdate: any = { updatedAt: timestamp };
     if (trimmedDisplayName) memberUpdate.displayName = trimmedDisplayName;
     if (hasClassName) memberUpdate.className = normalizedClassName;
-    if (phoneNumberProvided) memberUpdate.phoneNumber = normalizedPhoneNumber;
     if (isAdminCaller && memberStatusProvided) memberUpdate.status = normalizedMemberStatus;
-    const shouldWriteMember = canEditOtherStudent || phoneNumberProvided;
-    if (shouldWriteMember) {
+    if (canEditOtherStudent) {
       batch.set(memberRef, memberUpdate, { merge: true });
     }
 
@@ -2805,27 +2371,20 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       className: normalizedClassName,
       updatedAt: timestamp,
     };
-    if (phoneNumberProvided) userCenterUpdate.phoneNumber = normalizedPhoneNumber;
     if (isAdminCaller && memberStatusProvided) userCenterUpdate.status = normalizedMemberStatus;
-    const shouldWriteUserCenter =
-      (canEditOtherStudent && hasClassName) ||
-      (isAdminCaller && memberStatusProvided) ||
-      phoneNumberProvided;
     if (canEditOtherStudent && hasClassName) {
       batch.set(userCenterRef, userCenterUpdate, { merge: true });
     } else if (isAdminCaller && memberStatusProvided) {
       batch.set(userCenterRef, userCenterUpdate, { merge: true });
-    } else if (phoneNumberProvided) {
-      batch.set(userCenterRef, userCenterUpdate, { merge: true });
     }
 
     if (isAdminCaller) {
-      const hasSeasonLp = normalizedSeasonLp !== null;
+      const hasPointsBalance = normalizedPointsBalance !== null;
       const hasStats = normalizedStats !== null;
 
-      if (hasSeasonLp || hasStats) {
+      if (hasPointsBalance || hasStats) {
         const progressUpdate: any = { updatedAt: timestamp };
-        if (hasSeasonLp) progressUpdate.seasonLp = normalizedSeasonLp;
+        if (hasPointsBalance) progressUpdate.pointsBalance = normalizedPointsBalance;
         if (hasStats) progressUpdate.stats = normalizedStats;
         batch.set(db.doc("centers/" + centerId + "/growthProgress/" + studentId), progressUpdate, { merge: true });
       }
@@ -2849,17 +2408,17 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
         );
       }
 
-      if (hasSeasonLp || trimmedDisplayName || hasClassName) {
+      if (normalizedTodayStudyMinutes !== null || trimmedDisplayName || hasClassName) {
         const periodKey = safeDateKey.slice(0, 7);
         const rankUpdate: any = {
           studentId,
           updatedAt: timestamp,
         };
-        if (hasSeasonLp) rankUpdate.value = normalizedSeasonLp;
+        if (normalizedTodayStudyMinutes !== null) rankUpdate.value = Math.max(0, Math.round(normalizedTodayStudyMinutes));
         if (trimmedDisplayName) rankUpdate.displayNameSnapshot = trimmedDisplayName;
         if (hasClassName) rankUpdate.classNameSnapshot = normalizedClassName;
 
-        batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_lp/entries/" + studentId), rankUpdate, {
+        batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_study-time/entries/" + studentId), rankUpdate, {
           merge: true,
         });
       }
@@ -2884,10 +2443,10 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       if (hasUserWrite) {
         coreWrites.push(userRef.set(userUpdate, { merge: true }));
       }
-      if (shouldWriteMember) {
+      if (canEditOtherStudent) {
         coreWrites.push(memberRef.set(memberUpdate, { merge: true }));
       }
-      if (shouldWriteUserCenter) {
+      if (canEditOtherStudent && (hasClassName || (isAdminCaller && memberStatusProvided))) {
         coreWrites.push(userCenterRef.set(userCenterUpdate, { merge: true }));
       }
 
@@ -2927,65 +2486,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     });
   }
 });
-
-export const updateParentProfile = functions.region(region).https.onCall(async (data, context) => {
-  const db = admin.firestore();
-
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "인증 필요");
-  }
-
-  const callerUid = context.auth.uid;
-  const centerId = typeof data?.centerId === "string" ? data.centerId.trim() : "";
-  const schoolName = typeof data?.schoolName === "string" ? data.schoolName.trim() : "";
-  const normalizedPhoneNumber = normalizePhoneNumber(data?.phoneNumber);
-
-  if (!centerId) {
-    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
-      userMessage: "센터 정보가 누락되었습니다. 다시 로그인 후 시도해 주세요.",
-    });
-  }
-
-  if (!normalizedPhoneNumber) {
-    throw new functions.https.HttpsError("invalid-argument", "Invalid phone number.", {
-      userMessage: "휴대폰 번호를 01012345678 형식으로 입력해 주세요.",
-    });
-  }
-
-  const callerMembership = await resolveCenterMembershipRole(db, centerId, callerUid);
-  if (callerMembership.role !== "parent" || !isActiveMembershipStatus(callerMembership.status)) {
-    throw new functions.https.HttpsError("permission-denied", "Only active parent members can update profile.", {
-      userMessage: "학부모 계정만 본인 전화번호를 수정할 수 있습니다.",
-    });
-  }
-
-  const timestamp = admin.firestore.Timestamp.now();
-  const batch = db.batch();
-
-  const userRef = db.doc(`users/${callerUid}`);
-  const memberRef = db.doc(`centers/${centerId}/members/${callerUid}`);
-  const userCenterRef = db.doc(`userCenters/${callerUid}/centers/${centerId}`);
-
-  const userUpdate: any = {
-    phoneNumber: normalizedPhoneNumber,
-    updatedAt: timestamp,
-  };
-  if (schoolName) {
-    userUpdate.schoolName = schoolName;
-  }
-
-  const membershipUpdate: any = {
-    phoneNumber: normalizedPhoneNumber,
-    updatedAt: timestamp,
-  };
-
-  batch.set(userRef, userUpdate, { merge: true });
-  batch.set(memberRef, membershipUpdate, { merge: true });
-  batch.set(userCenterRef, membershipUpdate, { merge: true });
-  await batch.commit();
-
-  return { ok: true };
-});
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
@@ -3012,13 +2512,11 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: "student", status: "active", joinedAt: timestamp });
       t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
       t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
-        seasonLp: 0,
         pointsBalance: 0,
+        totalPointsEarned: 0,
+        dailyPointStatus: {},
         penaltyPoints: 0,
         stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
-        totalLpEarned: 0,
-        totalPointsEarned: 0,
-        lastResetAt: timestamp,
         updatedAt: timestamp,
       });
     });
@@ -3104,7 +2602,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
   const studentLinkCodeInput = data?.studentLinkCode ?? data?.parentLinkCode ?? "";
   const studentLinkCode = String(studentLinkCodeInput).trim();
   const displayNameInput = String(data?.displayName || "").trim();
-  const signupPhoneNumber = normalizePhoneNumber(data?.parentPhoneNumber || data?.phoneNumber || "");
+  const parentPhoneNumber = normalizePhoneNumber(data?.parentPhoneNumber || data?.phoneNumber || "");
 
   if (!allowedRoles.includes(role)) {
     throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.");
@@ -3369,7 +2867,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         ...extractLinkedIds(existingCenterMemberData?.linkedStudentIds),
       ]));
       let linkedStudentIds: string[] = [];
-      let effectiveUserPhone = signupPhoneNumber || normalizePhoneNumber(existingMembershipData?.phoneNumber || existingCenterMemberData?.phoneNumber || "");
+      let effectiveParentPhone = parentPhoneNumber || normalizePhoneNumber(existingMembershipData?.phoneNumber || existingCenterMemberData?.phoneNumber || "");
       const resolvedStatus = "active";
 
       if (role === "student") {
@@ -3383,11 +2881,6 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
             userMessage: "학생 가입에는 6자리 부모 연동 코드가 필요합니다.",
           });
         }
-        if (!effectiveUserPhone) {
-          throw new functions.https.HttpsError("invalid-argument", "Student phone number is required.", {
-            userMessage: "학생 가입 시 본인 휴대폰 번호를 입력해주세요.",
-          });
-        }
       }
 
       if (role === "parent") {
@@ -3397,7 +2890,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           });
         }
 
-        if (!effectiveUserPhone) {
+        if (!effectiveParentPhone) {
           throw new functions.https.HttpsError("invalid-argument", "Parent phone number is required.", {
             userMessage: "학부모 가입/연동 시 휴대폰 번호를 입력해주세요.",
           });
@@ -3425,8 +2918,8 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         updatedAt: ts,
         createdAt: ts,
       };
-      if ((role === "student" || role === "parent") && effectiveUserPhone) {
-        userDocData.phoneNumber = effectiveUserPhone;
+      if (role === "parent" && effectiveParentPhone) {
+        userDocData.phoneNumber = effectiveParentPhone;
       }
       t.set(db.doc(`users/${uid}`), userDocData, { merge: true });
 
@@ -3439,8 +2932,8 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         displayName: resolvedDisplayName,
         className: targetClassName || existingMembershipData?.className || existingCenterMemberData?.className || null,
       };
-      if ((role === "student" || role === "parent") && effectiveUserPhone) {
-        memberData.phoneNumber = effectiveUserPhone;
+      if (role === "parent" && effectiveParentPhone) {
+        memberData.phoneNumber = effectiveParentPhone;
       }
       if (linkedStudentIds.length > 0) {
         memberData.linkedStudentIds = linkedStudentIds;
@@ -3455,8 +2948,8 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         displayName: resolvedDisplayName,
         className: targetClassName || existingMembershipData?.className || existingCenterMemberData?.className || null,
       };
-      if ((role === "student" || role === "parent") && effectiveUserPhone) {
-        userCenterData.phoneNumber = effectiveUserPhone;
+      if (role === "parent" && effectiveParentPhone) {
+        userCenterData.phoneNumber = effectiveParentPhone;
       }
       if (linkedStudentIds.length > 0) {
         userCenterData.linkedStudentIds = linkedStudentIds;
@@ -3471,7 +2964,6 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           name: resolvedDisplayName,
           schoolName,
           grade,
-          phoneNumber: effectiveUserPhone,
           className: targetClassName,
           seatNo: 0,
           targetDailyMinutes: 360,
@@ -3485,14 +2977,12 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           level: 1,
           currentXp: 0,
           nextLevelXp: 1000,
-          seasonLp: 0,
           pointsBalance: 0,
+          totalPointsEarned: 0,
+          dailyPointStatus: {},
           penaltyPoints: 0,
           stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
           skills: {},
-          totalLpEarned: 0,
-          totalPointsEarned: 0,
-          lastResetAt: ts,
           updatedAt: ts,
         }, { merge: true });
       }
@@ -3766,10 +3256,6 @@ export const saveNotificationSettingsSecure = functions.region(region).https.onC
       String(data?.smsTemplateAwayStart || ""),
       "외출 템플릿"
     ) || DEFAULT_SMS_TEMPLATES.away_start,
-    smsTemplateAwayEnd: validateSmsTemplateLength(
-      String(data?.smsTemplateAwayEnd || ""),
-      "복귀 템플릿"
-    ) || DEFAULT_SMS_TEMPLATES.away_end,
     smsTemplateStudyEnd: validateSmsTemplateLength(
       String(data?.smsTemplateStudyEnd || ""),
       "공부 종료 템플릿"
@@ -3927,32 +3413,18 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
   }
 
   const parentUids = normalizeStringArray(studentSnap.data()?.parentUids);
-  const isStudentFallbackRecipient = parentUid === STUDENT_SMS_FALLBACK_UID;
-  if (!isStudentFallbackRecipient && !parentUids.includes(parentUid)) {
+  if (!parentUids.includes(parentUid)) {
     throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
   }
 
-  const targetUid = isStudentFallbackRecipient ? studentId : parentUid;
-  const [userSnap, memberSnap, userCenterSnap] = await Promise.all([
-    db.doc(`users/${targetUid}`).get(),
-    db.doc(`centers/${centerId}/members/${targetUid}`).get(),
-    db.doc(`userCenters/${targetUid}/centers/${centerId}`).get(),
+  const [userSnap, memberSnap] = await Promise.all([
+    db.doc(`users/${parentUid}`).get(),
+    db.doc(`centers/${centerId}/members/${parentUid}`).get(),
   ]);
 
   const studentName = asTrimmedString(studentSnap.data()?.name, "학생");
-  const parentName = isStudentFallbackRecipient
-    ? "학생 본인"
-    : asTrimmedString(memberSnap.data()?.displayName || userCenterSnap.data()?.displayName || userSnap.data()?.displayName || "학부모");
-  const phoneNumberOverride = asTrimmedString(data?.phoneNumberOverride);
-  const phoneNumber = resolveFirstValidPhoneNumber(
-    phoneNumberOverride,
-    isStudentFallbackRecipient
-      ? studentSnap.data()?.phoneNumber
-      : null,
-    userSnap.data()?.phoneNumber,
-    memberSnap.data()?.phoneNumber,
-    userCenterSnap.data()?.phoneNumber
-  );
+  const parentName = asTrimmedString(memberSnap.data()?.displayName || userSnap.data()?.displayName || "학부모");
+  const phoneNumber = normalizePhoneNumber(userSnap.data()?.phoneNumber || memberSnap.data()?.phoneNumber);
   const enabled = data?.enabled !== false;
   const eventToggles = normalizeSmsEventToggles(data?.eventToggles);
 
@@ -3973,10 +3445,6 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
 
 export const scheduledSmsQueueDispatcher = functions
   .region(region)
-  .runWith({
-    vpcConnector: smsVpcConnector,
-    vpcConnectorEgressSettings: smsVpcEgressSettings,
-  })
   .pubsub.schedule("every 1 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -4063,7 +3531,7 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
     });
   }
 
-  if (!(["study_start", "away_start", "away_end", "study_end", "late_alert", "check_in", "check_out"] as AttendanceSmsEventType[]).includes(eventType)) {
+  if (!(["study_start", "away_start", "study_end", "late_alert", "check_in", "check_out"] as AttendanceSmsEventType[]).includes(eventType)) {
     throw new functions.https.HttpsError("invalid-argument", "Invalid event type.", {
       userMessage: "알림 타입이 올바르지 않습니다.",
     });
@@ -4071,10 +3539,7 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
 
   const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
   const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  const canNotify =
-    callerRole === "teacher" ||
-    isAdminRole(callerRole) ||
-    (callerRole === "student" && context.auth.uid === studentId);
+  const canNotify = callerRole === "teacher" || isAdminRole(callerRole);
   if (!canNotify) {
     throw new functions.https.HttpsError("permission-denied", "Only teacher/admin can send notifications.");
   }
@@ -4103,154 +3568,6 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
     ok: true,
     queuedCount: queueResult.queuedCount,
     recipientCount: queueResult.recipientCount,
-    provider: settings.smsProvider || "none",
-    message: queueResult.message,
-  };
-});
-
-export const sendManualStudentSms = functions.region(region).https.onCall(async (data, context) => {
-  const db = admin.firestore();
-
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-
-  const centerId = String(data?.centerId || "").trim();
-  const studentId = String(data?.studentId || "").trim();
-  const rawMessage = String(data?.message || "").replace(/\s+/g, " ").trim();
-
-  if (!centerId || !studentId) {
-    throw new functions.https.HttpsError("invalid-argument", "centerId and studentId are required.", {
-      userMessage: "센터 또는 학생 정보가 누락되었습니다.",
-    });
-  }
-  if (!rawMessage) {
-    throw new functions.https.HttpsError("invalid-argument", "message is required.", {
-      userMessage: "보낼 문자 내용을 입력해 주세요.",
-    });
-  }
-  if (calculateSmsBytes(rawMessage) > SMS_BYTE_LIMIT) {
-    throw new functions.https.HttpsError("invalid-argument", "message exceeds byte limit.", {
-      userMessage: "수동 문자 내용이 90byte를 넘었습니다.",
-    });
-  }
-
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  const canNotify = callerRole === "teacher" || isAdminRole(callerRole);
-  if (!canNotify) {
-    throw new functions.https.HttpsError("permission-denied", "Only teacher/admin can send notifications.");
-  }
-
-  const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
-  if (!studentSnap.exists) {
-    throw new functions.https.HttpsError("failed-precondition", "Student not found.", {
-      userMessage: "학생 정보를 찾을 수 없습니다.",
-    });
-  }
-
-  const studentNameRaw = studentSnap.data()?.name;
-  const studentName = typeof studentNameRaw === "string" && studentNameRaw.trim() ? studentNameRaw.trim() : "학생";
-  const settings = await loadNotificationSettings(db, centerId);
-  const recipientOverrides = normalizeExplicitSmsRecipients(data?.recipientOverrides);
-  const queueResult = await queueManualStudentSms(db, {
-    centerId,
-    studentId,
-    studentName,
-    message: rawMessage,
-    settings,
-    recipientOverrides,
-  });
-
-  if (queueResult.recipientCount === 0) {
-    throw new functions.https.HttpsError("failed-precondition", "No recipients available.", {
-      userMessage: "수신 가능한 번호가 없습니다. 학생 또는 학부모 번호를 먼저 확인해 주세요.",
-    });
-  }
-
-  return {
-    ok: true,
-    queuedCount: queueResult.queuedCount,
-    recipientCount: queueResult.recipientCount,
-    provider: settings.smsProvider || "none",
-    message: queueResult.message,
-  };
-});
-
-export const sendMarketingLeadSms = functions.region(region).https.onCall(async (data, context) => {
-  const db = admin.firestore();
-
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-
-  const centerId = asTrimmedString(data?.centerId);
-  const rawMessage = String(data?.message || "").replace(/\s+/g, " ").trim();
-  const rawTargets = Array.isArray(data?.targets) ? data.targets : [];
-
-  if (!centerId) {
-    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
-      userMessage: "센터 정보가 누락되었습니다.",
-    });
-  }
-  if (!rawMessage) {
-    throw new functions.https.HttpsError("invalid-argument", "message is required.", {
-      userMessage: "보낼 문자 내용을 입력해 주세요.",
-    });
-  }
-  if (calculateSmsBytes(rawMessage) > SMS_BYTE_LIMIT) {
-    throw new functions.https.HttpsError("invalid-argument", "message exceeds byte limit.", {
-      userMessage: "문자 내용이 90byte를 넘었습니다.",
-    });
-  }
-  if (rawTargets.length === 0) {
-    throw new functions.https.HttpsError("invalid-argument", "targets are required.", {
-      userMessage: "문자 대상을 선택해 주세요.",
-    });
-  }
-
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  if (!isAdminRole(callerRole)) {
-    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 리드 문자를 보낼 수 있습니다.");
-  }
-
-  const targets = rawTargets
-    .map((row: any) => {
-      const targetType = asTrimmedString((row as any)?.targetType) as MarketingSmsTargetType;
-      const targetId = asTrimmedString((row as any)?.targetId);
-      return {
-        targetType,
-        targetId,
-      };
-    })
-    .filter(
-      (row: { targetType: MarketingSmsTargetType; targetId: string }) =>
-        row.targetId &&
-        (row.targetType === "consulting_lead" || row.targetType === "waitlist")
-    );
-
-  const settings = await loadNotificationSettings(db, centerId);
-  const queueResult = await queueMarketingManualSms(db, {
-    centerId,
-    message: rawMessage,
-    settings,
-    targets,
-  });
-
-  if (queueResult.queuedCount === 0) {
-    throw new functions.https.HttpsError("failed-precondition", "No recipients available.", {
-      userMessage: "발송 가능한 연락처가 없습니다. 학부모 또는 학생 번호를 먼저 확인해 주세요.",
-    });
-  }
-
-  return {
-    ok: true,
-    queuedCount: queueResult.queuedCount,
-    recipientCount: queueResult.recipientCount,
-    targetCount: queueResult.targetCount,
-    skippedCount: queueResult.skippedCount,
-    missingCount: queueResult.missingCount,
     provider: settings.smsProvider || "none",
     message: queueResult.message,
   };
@@ -4367,78 +3684,22 @@ export const scheduledAttendanceCheck = functions
         const progressRef = db
           .collection("centers").doc(centerId)
           .collection("growthProgress").doc(studentId);
-        const progressSnap = await progressRef.get();
-        const progressData = progressSnap.exists ? progressSnap.data() : null;
-        const stats = progressData?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
-        const totalBoost = 1
-          + (Number(stats.focus || 0) / 100 * 0.05)
-          + (Number(stats.consistency || 0) / 100 * 0.05)
-          + (Number(stats.achievement || 0) / 100 * 0.05)
-          + (Number(stats.resilience || 0) / 100 * 0.05);
-        const penaltyPoints = Number(progressData?.penaltyPoints || 0);
-        const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
-        const finalMultiplier = totalBoost * (1 - penaltyRate);
-        const existingDayStatus = ((progressData?.dailyLpStatus || {}) as Record<string, any>)[sessionDateKey] || {};
-        const existingPointDayStatus = ((progressData?.dailyPointStatus || {}) as Record<string, any>)[sessionDateKey] || {};
-        const fortuneBoostPercent = existingDayStatus?.fortuneRewardType === "boost"
-          ? Math.max(0, Math.min(10, Math.round(Number(existingDayStatus?.fortuneBoostPercent || 0))))
-          : 0;
-        const fortuneBoostMultiplier = 1 + fortuneBoostPercent / 100;
-        const existingDayMinutes = Number((await logRef.get()).data()?.totalMinutes || 0);
-        const totalMinutesAfterSession = existingDayMinutes + MAX_SESSION_MINUTES;
-        let studyPointsEarned = Math.max(
-          0,
-          Math.round(MAX_SESSION_MINUTES * STUDY_SESSION_POINTS_PER_MINUTE * finalMultiplier)
-        );
-        let studyLpEarned = Math.max(
-          0,
-          Math.round(MAX_SESSION_MINUTES * STUDY_SESSION_LP_PER_MINUTE * finalMultiplier * fortuneBoostMultiplier)
-        );
-        const nextDayStatus: Record<string, any> = { ...existingDayStatus };
-        const nextPointDayStatus: Record<string, any> = { ...existingPointDayStatus };
-        const progressUpdate: Record<string, any> = {
-          seasonLp: admin.firestore.FieldValue.increment(0),
-          totalLpEarned: admin.firestore.FieldValue.increment(0),
-          pointsBalance: admin.firestore.FieldValue.increment(0),
-          totalPointsEarned: admin.firestore.FieldValue.increment(0),
-          "stats.focus": admin.firestore.FieldValue.increment((MAX_SESSION_MINUTES / 60) * 0.1),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
-
-        if (totalMinutesAfterSession >= 180 && !existingDayStatus?.attendance) {
-          studyPointsEarned += Math.max(0, Math.round(STUDY_ATTENDANCE_POINTS * finalMultiplier));
-          studyLpEarned += Math.max(
-            0,
-            Math.round(STUDY_ATTENDANCE_BONUS_LP * finalMultiplier * fortuneBoostMultiplier)
-          );
-          nextDayStatus.attendance = true;
-        }
-
-        if (totalMinutesAfterSession >= 360 && !existingDayStatus?.bonus6h) {
-          nextDayStatus.bonus6h = true;
-          studyPointsEarned += Math.max(0, Math.round(STUDY_DEEP_FOCUS_POINTS * finalMultiplier));
-          studyLpEarned += Math.max(
-            0,
-            Math.round(STUDY_DEEP_FOCUS_LP * finalMultiplier * fortuneBoostMultiplier)
-          );
-          progressUpdate["stats.resilience"] = admin.firestore.FieldValue.increment(0.5);
-        }
-
-        nextDayStatus.dailyLpAmount = admin.firestore.FieldValue.increment(studyLpEarned);
-        nextPointDayStatus.dailyPointAmount = admin.firestore.FieldValue.increment(studyPointsEarned);
 
         batch.set(progressRef, {
-          ...progressUpdate,
-          seasonLp: admin.firestore.FieldValue.increment(studyLpEarned),
-          totalLpEarned: admin.firestore.FieldValue.increment(studyLpEarned),
-          pointsBalance: admin.firestore.FieldValue.increment(studyPointsEarned),
-          totalPointsEarned: admin.firestore.FieldValue.increment(studyPointsEarned),
-          dailyLpStatus: {
-            [sessionDateKey]: nextDayStatus,
-          },
-          dailyPointStatus: {
-            [sessionDateKey]: nextPointDayStatus,
-          },
+          "stats.focus": admin.firestore.FieldValue.increment((MAX_SESSION_MINUTES / 60) * 0.1),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
+        const studentProfile = studentSnap.exists ? (studentSnap.data() as any) : null;
+        const periodKey = sessionDateKey.slice(0, 7);
+        const leaderboardRef = db.doc(`centers/${centerId}/leaderboards/${periodKey}_study-time/entries/${studentId}`);
+        batch.set(leaderboardRef, {
+          studentId,
+          displayNameSnapshot: asTrimmedString(studentProfile?.name || studentProfile?.displayName || "학생"),
+          classNameSnapshot: asTrimmedString(studentProfile?.className || null),
+          value: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
 
         await batch.commit();
@@ -4463,152 +3724,170 @@ export const scheduledAttendanceCheck = functions
     return null;
   });
 
-export const scheduledDailyTopStudyReward = functions
+export const scheduledDailyStudyTimeReward = functions
   .region(region)
-  .pubsub.schedule("30 0 * * *")
+  .pubsub.schedule("15 0 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
-    const nowKst = toKstDate();
-    const targetDate = new Date(nowKst);
+    const targetDate = toKstDate();
     targetDate.setDate(targetDate.getDate() - 1);
     const dateKey = toDateKey(targetDate);
     const centersSnap = await db.collection("centers").get();
+    let rewardedStudents = 0;
 
     for (const centerDoc of centersSnap.docs) {
       const centerId = centerDoc.id;
-      const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/daily-top-${dateKey}`);
-      const settlementSnap = await settlementRef.get();
-      if (settlementSnap.exists) continue;
-
       const statsSnap = await db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get();
-      const ranked = statsSnap.docs
-        .map((docSnap) => ({
-          studentId: docSnap.id,
-          totalStudyMinutes: Math.max(0, Math.round(Number(docSnap.data()?.totalStudyMinutes || 0))),
-        }))
-        .filter((item) => item.totalStudyMinutes > 0)
-        .sort((a, b) => b.totalStudyMinutes - a.totalStudyMinutes);
+      if (statsSnap.empty) continue;
+
+      const rankedRows = statsSnap.docs.map((docSnap) => ({
+        studentId: docSnap.id,
+        minutes: Math.max(0, Number(docSnap.data()?.totalStudyMinutes || 0)),
+      }));
+      const maxMinutes = Math.max(...rankedRows.map((row) => row.minutes), 0);
+      if (maxMinutes <= 0) continue;
+
+      const winners = rankedRows.filter((row) => row.minutes === maxMinutes);
+      const settlementChecks = await Promise.all(
+        winners.map((winner) =>
+          db.doc(`centers/${centerId}/rewardSettlements/daily-study-top-${dateKey}-${winner.studentId}`).get()
+        )
+      );
 
       const batch = db.batch();
-      if (ranked.length === 0) {
-        batch.set(settlementRef, {
-          type: "daily-top-study",
-          dateKey,
-          rewardedStudentIds: [],
-          maxMinutes: 0,
-          settledAt: admin.firestore.FieldValue.serverTimestamp(),
-          skippedReason: "no-study-minutes",
-        }, { merge: true });
-        await batch.commit();
-        continue;
-      }
+      let hasWrites = false;
 
-      const maxMinutes = ranked[0].totalStudyMinutes;
-      const winners = ranked.filter((item) => item.totalStudyMinutes === maxMinutes);
+      winners.forEach((winner, index) => {
+        if (settlementChecks[index]?.exists) return;
 
-      for (const winner of winners) {
         const progressRef = db.doc(`centers/${centerId}/growthProgress/${winner.studentId}`);
         batch.set(progressRef, {
-          pointsBalance: admin.firestore.FieldValue.increment(DAILY_TOP_STUDY_POINTS),
-          totalPointsEarned: admin.firestore.FieldValue.increment(DAILY_TOP_STUDY_POINTS),
+          pointsBalance: admin.firestore.FieldValue.increment(1000),
+          totalPointsEarned: admin.firestore.FieldValue.increment(1000),
           dailyPointStatus: {
             [dateKey]: {
-              dailyPointAmount: admin.firestore.FieldValue.increment(DAILY_TOP_STUDY_POINTS),
-              dailyTopRewardGranted: true,
-              dailyTopRewardAmount: DAILY_TOP_STUDY_POINTS,
-              dailyTopRewardMinutes: maxMinutes,
+              dailyTopRewardAmount: admin.firestore.FieldValue.increment(1000),
+              dailyPointAmount: admin.firestore.FieldValue.increment(1000),
             },
           },
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
+
+        const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/daily-study-top-${dateKey}-${winner.studentId}`);
+        batch.set(settlementRef, {
+          type: "daily-study-top",
+          centerId,
+          dateKey,
+          studentId: winner.studentId,
+          rewardAmount: 1000,
+          studyMinutes: winner.minutes,
+          awardedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        hasWrites = true;
+        rewardedStudents += 1;
+      });
+
+      if (hasWrites) {
+        await batch.commit();
       }
-
-      batch.set(settlementRef, {
-        type: "daily-top-study",
-        dateKey,
-        rewardedStudentIds: winners.map((winner) => winner.studentId),
-        maxMinutes,
-        pointsPerWinner: DAILY_TOP_STUDY_POINTS,
-        settledAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-
-      await batch.commit();
     }
 
+    console.log("[daily-study-time-reward] run complete", { dateKey, rewardedStudents });
     return null;
   });
 
-export const scheduledMonthlyLpPointRewards = functions
+export const scheduledMonthlyStudyTimeRankingReward = functions
   .region(region)
-  .pubsub.schedule("15 1 * * *")
+  .pubsub.schedule("35 0 1 * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
-    const nowKst = toKstDate();
-    if (nowKst.getDate() !== 1) return null;
-
-    const targetMonth = new Date(nowKst.getFullYear(), nowKst.getMonth() - 1, 1);
-    const periodKey = `${targetMonth.getFullYear()}-${String(targetMonth.getMonth() + 1).padStart(2, "0")}`;
+    const rewardDate = toKstDate();
+    const rewardDateKey = toDateKey(rewardDate);
+    const targetMonthDate = new Date(rewardDate.getFullYear(), rewardDate.getMonth() - 1, 1);
+    const periodKey = `${targetMonthDate.getFullYear()}-${String(targetMonthDate.getMonth() + 1).padStart(2, "0")}`;
+    const rewardByRank: Record<number, number> = { 1: 20000, 2: 10000, 3: 5000 };
     const centersSnap = await db.collection("centers").get();
+    let rewardedStudents = 0;
 
     for (const centerDoc of centersSnap.docs) {
       const centerId = centerDoc.id;
-      const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/monthly-lp-${periodKey}`);
-      const settlementSnap = await settlementRef.get();
-      if (settlementSnap.exists) continue;
+      const rankingSnap = await db.collection(`centers/${centerId}/leaderboards/${periodKey}_study-time/entries`).get();
+      if (rankingSnap.empty) continue;
 
-      const entrySnap = await db.collection(`centers/${centerId}/leaderboards/${periodKey}_lp/entries`).get();
-      const ranked = entrySnap.docs
+      const rows = rankingSnap.docs
         .map((docSnap) => ({
           studentId: docSnap.id,
-          value: Math.max(0, Number(docSnap.data()?.value || 0)),
+          displayNameSnapshot: asTrimmedString(docSnap.data()?.displayNameSnapshot || "학생"),
+          minutes: Math.max(0, Number(docSnap.data()?.value || 0)),
         }))
-        .filter((item) => item.value > 0)
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 3);
+        .filter((row) => row.minutes > 0)
+        .sort((a, b) => b.minutes - a.minutes || a.displayNameSnapshot.localeCompare(b.displayNameSnapshot, "ko"));
+
+      if (rows.length === 0) continue;
+
+      let currentRank = 0;
+      let previousMinutes: number | null = null;
+      const rankedRows = rows.map((row, index) => {
+        if (previousMinutes === null || row.minutes !== previousMinutes) {
+          currentRank = index + 1;
+          previousMinutes = row.minutes;
+        }
+        return { ...row, rank: currentRank };
+      });
+
+      const winners = rankedRows.filter((row) => rewardByRank[row.rank]);
+      if (winners.length === 0) continue;
+
+      const settlementChecks = await Promise.all(
+        winners.map((winner) =>
+          db.doc(`centers/${centerId}/rewardSettlements/monthly-study-rank-${periodKey}-${winner.rank}-${winner.studentId}`).get()
+        )
+      );
 
       const batch = db.batch();
-      if (ranked.length === 0) {
-        batch.set(settlementRef, {
-          type: "monthly-lp-points",
-          periodKey,
-          placements: [],
-          settledAt: admin.firestore.FieldValue.serverTimestamp(),
-          skippedReason: "no-ranked-entries",
-        }, { merge: true });
-        await batch.commit();
-        continue;
-      }
+      let hasWrites = false;
 
-      const placements = ranked.map((entry, index) => ({
-        rank: index + 1,
-        studentId: entry.studentId,
-        lp: entry.value,
-        points: MONTHLY_RANK_POINT_REWARDS[index + 1] || 0,
-      }));
+      winners.forEach((winner, index) => {
+        if (settlementChecks[index]?.exists) return;
+        const rewardAmount = rewardByRank[winner.rank];
 
-      for (const placement of placements) {
-        const rewardPoints = placement.points;
-        if (rewardPoints <= 0) continue;
-        const progressRef = db.doc(`centers/${centerId}/growthProgress/${placement.studentId}`);
+        const progressRef = db.doc(`centers/${centerId}/growthProgress/${winner.studentId}`);
         batch.set(progressRef, {
-          pointsBalance: admin.firestore.FieldValue.increment(rewardPoints),
-          totalPointsEarned: admin.firestore.FieldValue.increment(rewardPoints),
+          pointsBalance: admin.firestore.FieldValue.increment(rewardAmount),
+          totalPointsEarned: admin.firestore.FieldValue.increment(rewardAmount),
+          dailyPointStatus: {
+            [rewardDateKey]: {
+              monthlyRankRewardAmount: admin.firestore.FieldValue.increment(rewardAmount),
+              dailyPointAmount: admin.firestore.FieldValue.increment(rewardAmount),
+            },
+          },
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
+
+        const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/monthly-study-rank-${periodKey}-${winner.rank}-${winner.studentId}`);
+        batch.set(settlementRef, {
+          type: "monthly-study-rank",
+          centerId,
+          periodKey,
+          rewardDateKey,
+          studentId: winner.studentId,
+          rank: winner.rank,
+          rewardAmount,
+          studyMinutes: winner.minutes,
+          awardedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        hasWrites = true;
+        rewardedStudents += 1;
+      });
+
+      if (hasWrites) {
+        await batch.commit();
       }
-
-      batch.set(settlementRef, {
-        type: "monthly-lp-points",
-        periodKey,
-        placements,
-        settledAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-
-      await batch.commit();
     }
 
+    console.log("[monthly-study-time-ranking-reward] run complete", { periodKey, rewardDateKey, rewardedStudents });
     return null;
   });
 

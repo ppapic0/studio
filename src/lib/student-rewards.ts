@@ -1,270 +1,110 @@
-export const STUDY_SESSION_POINTS_PER_MINUTE = 0.42;
-export const STUDY_ATTENDANCE_POINTS = 20;
-export const STUDY_DEEP_FOCUS_POINTS = 15;
-export const STUDY_PLAN_COMPLETION_POINTS = 10;
-export const STUDY_ROUTINE_COMPLETION_POINTS = 10;
+import type { GrowthProgress } from '@/lib/types';
 
-export const STUDY_SESSION_LP_PER_MINUTE = 0.12;
-export const STUDY_ATTENDANCE_BONUS_LP = 12;
-export const STUDY_DEEP_FOCUS_LP = 8;
-export const STUDY_PLAN_COMPLETION_LP = 3;
-export const STUDY_ROUTINE_COMPLETION_LP = 3;
-
-export const DAILY_FORTUNE_POINT_MAX = 100;
-export const DAILY_FORTUNE_BOOST_MIN_PERCENT = 1;
-export const DAILY_FORTUNE_BOOST_MAX_PERCENT = 10;
-export const DAILY_TOP_STUDY_POINTS = 1000;
-export const MONTHLY_RANK_POINT_REWARDS = {
-  1: 20000,
-  2: 10000,
-  3: 5000,
+export const NAVY_REWARD_THEME = {
+  name: '네이비',
+  min: 0,
+  color: 'text-white',
+  bg: 'bg-[#14295F]',
+  border: 'border-[#223B7A]',
+  gradient: 'from-[#14295F] via-[#1B326D] to-[#233E86]',
 } as const;
 
-export type DailyFortuneRewardType = "points" | "boost";
-
-export interface DailyFortuneMessage {
-  key: string;
-  title: string;
-  body: string;
-}
-
-export interface DailyFortuneOutcome {
-  rewardType: DailyFortuneRewardType;
-  pointGift: number;
-  boostPercent: number;
-  messageKey: string;
-  message: DailyFortuneMessage;
-}
-
-type TaskRewardCategory = 'study' | 'schedule' | 'personal' | undefined;
-
-type TaskCompletionRewardsParams = {
-  category: TaskRewardCategory;
-  lpDayStatus?: Record<string, any> | null;
+export const STUDY_BOX_REWARD_CURVE: Record<number, readonly [number, number]> = {
+  1: [10, 20],
+  2: [15, 25],
+  3: [20, 30],
+  4: [25, 35],
+  5: [30, 40],
+  6: [35, 45],
+  7: [40, 50],
+  8: [45, 55],
 };
 
-const DAILY_FORTUNE_MESSAGES: DailyFortuneMessage[] = [
-  {
-    key: "steady-rise",
-    title: "차분한 상승 운",
-    body: "오늘은 서두르지 않아도 좋아요. 한 번 잡은 흐름이 끝까지 이어질 가능성이 큰 날이에요.",
-  },
-  {
-    key: "focus-lock",
-    title: "집중 고정 운",
-    body: "첫 몰입만 잘 잡으면 뒤가 편해져요. 어려운 과목부터 열면 생각보다 빨리 속도가 붙습니다.",
-  },
-  {
-    key: "finish-strong",
-    title: "마무리 강세 운",
-    body: "오늘은 시작보다 끝이 더 좋습니다. 남겨둔 문제를 정리할수록 만족감이 커지는 흐름이에요.",
-  },
-  {
-    key: "confidence-up",
-    title: "자신감 상승 운",
-    body: "어제보다 조금만 더 하면 체감이 분명하게 올 날이에요. 익숙한 과목으로 리듬을 만들면 좋아요.",
-  },
-  {
-    key: "streak-keeper",
-    title: "꾸준함 유지 운",
-    body: "큰 한 방보다 이어가는 힘이 강한 날입니다. 짧아도 끊기지 않는 공부가 오늘 운을 살려줘요.",
-  },
-  {
-    key: "calm-recovery",
-    title: "회복 집중 운",
-    body: "흐름이 살짝 흔들려도 금방 다시 돌아올 수 있어요. 쉬는 시간을 짧게 나누면 더 안정적입니다.",
-  },
-  {
-    key: "small-wins",
-    title: "작은 승리 운",
-    body: "작은 완료를 여러 번 만들수록 자신감이 커집니다. 오늘은 분량을 끊어 처리할수록 유리해요.",
-  },
-  {
-    key: "breakthrough",
-    title: "돌파력 상승 운",
-    body: "막히던 지점이 풀릴 가능성이 큰 날이에요. 평소 미뤘던 단원도 오늘은 의외로 잘 넘어갑니다.",
-  },
+const FORTUNE_MESSAGES = [
+  '오늘은 차분하게 시작해도 끝이 강해지는 날이에요.',
+  '작은 몰입 하나가 오늘 공부 흐름을 예쁘게 열어 줄 거예요.',
+  '꾸준함이 잘 붙는 날이라, 첫 한 시간을 잡으면 끝까지 이어질 수 있어요.',
+  '오늘의 집중은 천천히 올라오지만 한 번 붙으면 오래 갑니다.',
+  '지금 만든 리듬이 오늘 전체 공부의 분위기를 결정해 줄 거예요.',
+  '생각보다 더 잘 풀리는 날이에요. 첫 문제만 가볍게 열어 보세요.',
+  '오늘은 기록보다 감각이 좋아지는 날이라, 시작만 하면 금방 안정돼요.',
+  '한 번의 깊은 몰입이 오늘 전체 만족감을 크게 끌어올려 줄 거예요.',
 ];
 
-function clampInt(value: unknown, min: number, max: number) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return min;
-  return Math.min(max, Math.max(min, Math.round(num)));
+export type StudyBoxReward = {
+  milestone: number;
+  minReward: number;
+  maxReward: number;
+  awardedPoints: number;
+  multiplier: number;
+};
+
+export function getSkillRewardMultiplier(stats?: GrowthProgress['stats']) {
+  if (!stats) return 1;
+  const safeValues = [stats.focus, stats.consistency, stats.achievement, stats.resilience].map((value) =>
+    Math.max(0, Math.min(100, Number(value || 0)))
+  );
+  const average = safeValues.reduce((sum, value) => sum + value, 0) / safeValues.length;
+  return 1 + Math.min(0.2, average / 100 * 0.2);
 }
 
-function hashString(value: string) {
+export function getClaimedStudyBoxes(dayStatus?: Record<string, any>): number[] {
+  const raw = dayStatus?.claimedStudyBoxes;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
+    .sort((a, b) => a - b);
+}
+
+export function getAvailableStudyBoxMilestones(totalMinutes: number, claimedStudyBoxes?: number[]) {
+  const crossedMilestones = Math.max(0, Math.min(8, Math.floor(Math.max(0, totalMinutes) / 60)));
+  const claimed = new Set((claimedStudyBoxes || []).filter((value) => value >= 1 && value <= 8));
+  return Array.from({ length: crossedMilestones }, (_, index) => index + 1).filter((milestone) => !claimed.has(milestone));
+}
+
+export function rollStudyBoxReward(milestone: number, stats?: GrowthProgress['stats']): StudyBoxReward {
+  const [baseMin, baseMax] = STUDY_BOX_REWARD_CURVE[milestone] || STUDY_BOX_REWARD_CURVE[1];
+  const multiplier = getSkillRewardMultiplier(stats);
+  const minReward = Math.max(1, Math.round(baseMin * multiplier));
+  const maxReward = Math.max(minReward, Math.round(baseMax * multiplier));
+  const awardedPoints = Math.floor(Math.random() * (maxReward - minReward + 1)) + minReward;
+  return {
+    milestone,
+    minReward,
+    maxReward,
+    awardedPoints,
+    multiplier,
+  };
+}
+
+function hashString(input: string) {
   let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(index);
-    hash |= 0;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) >>> 0;
   }
-  return Math.abs(hash);
+  return hash;
 }
 
-export function getDailyFortuneMessage(messageKey?: string | null) {
-  if (messageKey) {
-    const matched = DAILY_FORTUNE_MESSAGES.find((message) => message.key === messageKey);
-    if (matched) return matched;
-  }
-  return DAILY_FORTUNE_MESSAGES[0];
+export function getDailyFortuneMessage(uid: string, dateKey: string) {
+  const safeKey = `${uid || 'student'}:${dateKey || 'today'}`;
+  return FORTUNE_MESSAGES[hashString(safeKey) % FORTUNE_MESSAGES.length];
 }
 
-export function pickDailyFortuneMessageKey(params: {
-  userId: string;
-  dateKey: string;
-  stats?: {
-    focus?: number;
-    consistency?: number;
-    achievement?: number;
-    resilience?: number;
-  } | null;
-}) {
-  const { userId, dateKey, stats } = params;
-  const focusWeight = Math.round(
-    Number(stats?.focus || 0)
-    + Number(stats?.consistency || 0)
-    + Number(stats?.achievement || 0)
-    + Number(stats?.resilience || 0)
-  );
-  const hashed = hashString(`${userId}:${dateKey}:${focusWeight}`);
-  return DAILY_FORTUNE_MESSAGES[hashed % DAILY_FORTUNE_MESSAGES.length].key;
+export function formatStudyMinutes(minutes: number) {
+  const safe = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safe / 60);
+  const remain = safe % 60;
+  if (hours <= 0) return `${remain}분`;
+  if (remain === 0) return `${hours}시간`;
+  return `${hours}시간 ${remain}분`;
 }
 
-export function getDailyFortuneBoostPercent(dayStatus?: Record<string, any> | null) {
-  return clampInt(
-    dayStatus?.fortuneRewardType === "boost" ? dayStatus?.fortuneBoostPercent : 0,
-    0,
-    DAILY_FORTUNE_BOOST_MAX_PERCENT
-  );
-}
-
-export function getDailyFortuneBoostMultiplier(dayStatus?: Record<string, any> | null) {
-  return 1 + getDailyFortuneBoostPercent(dayStatus) / 100;
-}
-
-export function calculateStudySessionLp(
-  sessionMinutes: number,
-  finalMultiplier: number,
-  dayStatus?: Record<string, any> | null,
-) {
-  return Math.max(
-    0,
-    Math.round(sessionMinutes * STUDY_SESSION_LP_PER_MINUTE * finalMultiplier * getDailyFortuneBoostMultiplier(dayStatus))
-  );
-}
-
-export function calculateStudySessionPoints(
-  sessionMinutes: number,
-  finalMultiplier: number,
-) {
-  return Math.max(
-    0,
-    Math.round(sessionMinutes * STUDY_SESSION_POINTS_PER_MINUTE * finalMultiplier)
-  );
-}
-
-export function calculateAttendanceBonusLp(
-  finalMultiplier: number,
-  dayStatus?: Record<string, any> | null,
-) {
-  return Math.max(
-    0,
-    Math.round(STUDY_ATTENDANCE_BONUS_LP * finalMultiplier * getDailyFortuneBoostMultiplier(dayStatus))
-  );
-}
-
-export function calculateAttendanceBonusPoints(finalMultiplier: number) {
-  return Math.max(0, Math.round(STUDY_ATTENDANCE_POINTS * finalMultiplier));
-}
-
-export function calculateDeepFocusBonusLp(
-  finalMultiplier: number,
-  dayStatus?: Record<string, any> | null,
-) {
-  return Math.max(
-    0,
-    Math.round(STUDY_DEEP_FOCUS_LP * finalMultiplier * getDailyFortuneBoostMultiplier(dayStatus))
-  );
-}
-
-export function calculateDeepFocusBonusPoints(finalMultiplier: number) {
-  return Math.max(0, Math.round(STUDY_DEEP_FOCUS_POINTS * finalMultiplier));
-}
-
-export function calculatePlanCompletionLp(dayStatus?: Record<string, any> | null) {
-  return Math.max(
-    1,
-    Math.round(STUDY_PLAN_COMPLETION_LP * getDailyFortuneBoostMultiplier(dayStatus))
-  );
-}
-
-export function calculateTaskCompletionRewards({
-  category,
-  lpDayStatus,
-}: TaskCompletionRewardsParams) {
-  const currentDayStatus = lpDayStatus || {};
-
-  if (category === 'study') {
-    const alreadyGranted = !!currentDayStatus.plan;
-    return {
-      pointReward: alreadyGranted ? 0 : STUDY_PLAN_COMPLETION_POINTS,
-      lpReward: alreadyGranted ? 0 : calculatePlanCompletionLp(currentDayStatus),
-      pointFlagKey: 'plan' as const,
-      lpFlagKey: 'plan' as const,
-    };
-  }
-
-  if (category === 'schedule') {
-    const alreadyGranted = !!currentDayStatus.routine;
-    return {
-      pointReward: alreadyGranted ? 0 : STUDY_ROUTINE_COMPLETION_POINTS,
-      lpReward: alreadyGranted
-        ? 0
-        : Math.max(1, Math.round(STUDY_ROUTINE_COMPLETION_LP * getDailyFortuneBoostMultiplier(currentDayStatus))),
-      pointFlagKey: 'routine' as const,
-      lpFlagKey: 'routine' as const,
-    };
-  }
-
-  return {
-    pointReward: 0,
-    lpReward: 0,
-    pointFlagKey: null,
-    lpFlagKey: null,
-  };
-}
-
-export function createDailyFortuneOutcome(params: {
-  userId: string;
-  dateKey: string;
-  stats?: {
-    focus?: number;
-    consistency?: number;
-    achievement?: number;
-    resilience?: number;
-  } | null;
-}) {
-  const messageKey = pickDailyFortuneMessageKey(params);
-  const message = getDailyFortuneMessage(messageKey);
-  const rewardRoll = Math.random();
-
-  if (rewardRoll < 0.58) {
-    return {
-      rewardType: "points" as const,
-      pointGift: Math.floor(Math.random() * (DAILY_FORTUNE_POINT_MAX + 1)),
-      boostPercent: 0,
-      messageKey,
-      message,
-    };
-  }
-
-  return {
-    rewardType: "boost" as const,
-    pointGift: 0,
-    boostPercent:
-      DAILY_FORTUNE_BOOST_MIN_PERCENT
-      + Math.floor(Math.random() * (DAILY_FORTUNE_BOOST_MAX_PERCENT - DAILY_FORTUNE_BOOST_MIN_PERCENT + 1)),
-    messageKey,
-    message,
-  };
+export function formatStudyMinutesShort(minutes: number) {
+  const safe = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safe / 60);
+  const remain = safe % 60;
+  if (hours <= 0) return `${remain}m`;
+  if (remain === 0) return `${hours}h`;
+  return `${hours}.${Math.round((remain / 60) * 10)}h`;
 }

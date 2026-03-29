@@ -79,18 +79,24 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     // 성장 지표 초기화
     const progressRef = doc(db, 'centers', centerId, 'growthProgress', sUid);
     batch.set(progressRef, {
-      seasonLp: sInfo.lp, level: 5, stats: { focus: 50, consistency: 60, achievement: 40, resilience: 55 },
-      totalLpEarned: 15000, lastResetAt: timestamp, updatedAt: timestamp, penaltyPoints: 0
+      pointsBalance: sInfo.lp,
+      totalPointsEarned: 15000,
+      level: 5,
+      stats: { focus: 50, consistency: 60, achievement: 40, resilience: 55 },
+      lastResetAt: timestamp,
+      updatedAt: timestamp,
+      penaltyPoints: 0,
+      dailyPointStatus: {},
     }, { merge: true });
 
     // 핵심: 랭킹 보드 엔트리 추가 (이 부분이 누락되면 랭킹에 안 뜸)
-    const rankRef = doc(db, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', sUid);
+    const rankRef = doc(db, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', sUid);
     batch.set(rankRef, {
       studentId: sUid,
       displayNameSnapshot: sInfo.name,
       classNameSnapshot: sInfo.class,
       schoolNameSnapshot: '트랙고등학교',
-      value: sInfo.lp,
+      value: 2400 - (sInfo.rank * 60),
       rank: sInfo.rank,
       updatedAt: timestamp
     }, { merge: true });

@@ -75,7 +75,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { getTierTheme } from '@/lib/tier-theme';
 import {
   Dialog,
   DialogContent,
@@ -110,7 +109,6 @@ import { RoutineComposerCard } from '@/components/dashboard/student-planner/rout
 import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
 import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
 import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
-import { calculateTaskCompletionRewards } from '@/lib/student-rewards';
 
 type LinkedStudentOption = {
   id: string;
@@ -304,7 +302,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
 export default function StudyHistoryPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode, currentTier } = useAppContext();
+  const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -686,42 +684,37 @@ export default function StudyHistoryPage() {
 
       if (nextState) {
         const batch = writeBatch(firestore);
-        const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
-        const existingDayStatus = (progress?.dailyLpStatus?.[dateKey] || {}) as Record<string, any>;
-        const existingPointStatus = (progress?.dailyPointStatus?.[dateKey] || {}) as Record<string, any>;
-        const rewards = calculateTaskCompletionRewards({
-          category: item.category,
-          lpDayStatus: existingDayStatus,
-        });
-        const nextDayStatus: Record<string, any> = {
-          ...existingDayStatus,
-        };
-        const nextPointStatus: Record<string, any> = {
-          ...existingPointStatus,
-        };
-        if (item.category === 'study') nextDayStatus.plan = true;
-        if (item.category === 'schedule') nextDayStatus.routine = true;
+        const achievementCount = progress?.dailyPointStatus?.[dateKey]?.achievementCount || 0;
+        const existingDayStatus = (progress?.dailyPointStatus?.[dateKey] || {}) as Record<string, any>;
+        const remainingStudyTasks = dailyPlans
+          .filter((plan) => (plan.category === 'study' || !plan.category) && plan.id !== item.id && !plan.done);
+        const shouldAwardPlanPoints = remainingStudyTasks.length === 0 && !existingDayStatus.plan;
         const progressUpdate: Record<string, any> = {
-          dailyLpStatus: { [dateKey]: nextDayStatus },
+          dailyPointStatus: {
+            [dateKey]: {
+              ...existingDayStatus,
+            },
+          },
           updatedAt: serverTimestamp(),
         };
-        if (rewards.lpReward > 0) {
-          nextDayStatus.dailyLpAmount = increment(rewards.lpReward);
-          progressUpdate.seasonLp = increment(rewards.lpReward);
-          progressUpdate.totalLpEarned = increment(rewards.lpReward);
-        }
-        if (rewards.pointReward > 0) {
-          nextPointStatus.dailyPointAmount = increment(rewards.pointReward);
-          progressUpdate.pointsBalance = increment(rewards.pointReward);
-          progressUpdate.totalPointsEarned = increment(rewards.pointReward);
-          progressUpdate.dailyPointStatus = { [dateKey]: nextPointStatus };
+        if (shouldAwardPlanPoints) {
+          progressUpdate.pointsBalance = increment(10);
+          progressUpdate.totalPointsEarned = increment(10);
+          progressUpdate.dailyPointStatus[dateKey].dailyPointAmount = increment(10);
+          progressUpdate.dailyPointStatus[dateKey].plan = true;
         }
         if (achievementCount < 5) {
           progressUpdate.stats = { achievement: increment(0.1) };
-          progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);
+          progressUpdate.dailyPointStatus[dateKey].achievementCount = increment(1);
         }
         batch.set(progressRef, progressUpdate, { merge: true });
         await batch.commit();
+        if (shouldAwardPlanPoints) {
+          toast({
+            title: '오늘 학습 계획 완료',
+            description: '계획 완료 보상 +10포인트가 반영되었습니다.',
+          });
+        }
       }
     } catch (e: any) {
       toast({
@@ -733,59 +726,18 @@ export default function StudyHistoryPage() {
   };
 
   const handleCommitStudyActualAmount = async (item: WithId<StudyPlanItem>, nextActualAmount: number) => {
-    if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid || !progressRef) return;
+    if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
     const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
     const safeActualAmount = Math.max(0, Math.round(nextActualAmount));
     const targetAmount = Math.max(0, item.targetAmount || 0);
-    const nextDone = targetAmount > 0 && safeActualAmount >= targetAmount;
     await updateDoc(
       doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id),
       {
         actualAmount: safeActualAmount,
-        done: nextDone,
+        done: targetAmount > 0 && safeActualAmount >= targetAmount,
         updatedAt: serverTimestamp(),
       }
     );
-
-    if (nextDone && !item.done) {
-      const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
-      const batch = writeBatch(firestore);
-      const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
-      const existingDayStatus = (progress?.dailyLpStatus?.[dateKey] || {}) as Record<string, any>;
-      const existingPointStatus = (progress?.dailyPointStatus?.[dateKey] || {}) as Record<string, any>;
-      const rewards = calculateTaskCompletionRewards({
-        category: item.category,
-        lpDayStatus: existingDayStatus,
-      });
-      const nextDayStatus: Record<string, any> = {
-        ...existingDayStatus,
-        plan: true,
-      };
-      const nextPointStatus: Record<string, any> = {
-        ...existingPointStatus,
-      };
-      const progressUpdate: Record<string, any> = {
-        dailyLpStatus: { [dateKey]: nextDayStatus },
-        updatedAt: serverTimestamp(),
-      };
-      if (rewards.lpReward > 0) {
-        nextDayStatus.dailyLpAmount = increment(rewards.lpReward);
-        progressUpdate.seasonLp = increment(rewards.lpReward);
-        progressUpdate.totalLpEarned = increment(rewards.lpReward);
-      }
-      if (rewards.pointReward > 0) {
-        nextPointStatus.dailyPointAmount = increment(rewards.pointReward);
-        progressUpdate.pointsBalance = increment(rewards.pointReward);
-        progressUpdate.totalPointsEarned = increment(rewards.pointReward);
-        progressUpdate.dailyPointStatus = { [dateKey]: nextPointStatus };
-      }
-      if (achievementCount < 5) {
-        progressUpdate.stats = { achievement: increment(0.1) };
-        progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);
-      }
-      batch.set(progressRef, progressUpdate, { merge: true });
-      await batch.commit();
-    }
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
@@ -826,8 +778,6 @@ export default function StudyHistoryPage() {
 
   const isActuallyPast = selectedDateForPlan ? isBefore(startOfDay(selectedDateForPlan), startOfDay(new Date())) : false;
   const isToday = selectedDateForPlan ? isSameDay(selectedDateForPlan, new Date()) : false;
-  const tierTheme = getTierTheme(currentTier);
-
   if (!currentDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
   return (
@@ -871,12 +821,12 @@ export default function StudyHistoryPage() {
       <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-3")}>
         <Card
           className={cn(
-            "md:col-span-2 tier-hero-card border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 !text-white"
+            "md:col-span-2 border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 !text-white"
           )}
-          style={{ backgroundImage: tierTheme.heroGradient }}
+          style={{ backgroundImage: 'linear-gradient(135deg,#14295F 0%,#1B326D 55%,#233E86 100%)' }}
         >
           <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
-            {currentTier.name === '챌린저' ? <Crown className="h-48 w-48" /> : <Trophy className="h-48 w-48" />}
+            <CalendarClock className="h-48 w-48" />
           </div>
           <div className="relative z-10">
             <div className="flex justify-between items-center mb-10">
@@ -884,7 +834,7 @@ export default function StudyHistoryPage() {
                 <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/90">월간 분석</span>
                 <Badge className="w-fit bg-white/30 text-white border border-white/30 font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
               </div>
-              <Badge className="bg-white/30 text-white border border-white/30 font-black text-[10px] px-3 py-1 uppercase tracking-widest">{currentTier.name} 티어</Badge>
+              <Badge className="bg-white/30 text-white border border-white/30 font-black text-[10px] px-3 py-1 uppercase tracking-widest">기록 트랙</Badge>
             </div>
             <div className="flex items-baseline gap-2">
               <span className={cn("font-black tracking-tighter tabular-nums leading-none drop-shadow-[0_2px_12px_rgba(5,15,40,0.45)]", isMobile ? "text-5xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
@@ -899,7 +849,7 @@ export default function StudyHistoryPage() {
             <div className="space-y-2">
               <h3 className="font-black text-sm uppercase tracking-widest text-primary/40">학습 인사이트</h3>
               <p className="text-base font-bold leading-relaxed text-foreground/70">
-                {isParent ? '자녀가 매일 3시간 이상 꾸준히 공부하면 번개 아이콘이 표시됩니다.' : '매일 3시간 이상 학습 시 시즌 LP가 대폭 상승합니다.'}
+                {isParent ? '자녀가 매일 1시간씩 꾸준히 쌓을수록 포인트 상자와 월간 공부 랭킹이 안정적으로 올라갑니다.' : '누적 공부시간이 1시간을 넘을 때마다 포인트 상자가 열리고, 월간 공부시간 랭킹도 함께 집계됩니다.'}
               </p>
             </div>
             {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg shadow-primary/20 transition-all active:scale-[0.95]"><Link href="/dashboard/growth">성장트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}

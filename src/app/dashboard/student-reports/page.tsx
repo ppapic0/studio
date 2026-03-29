@@ -43,7 +43,7 @@ function getReportPreviewText(content: string) {
 export default function StudentReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode, currentTier } = useAppContext();
+  const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
 
@@ -101,8 +101,8 @@ export default function StudentReportsPage() {
               <p className="ml-1 mt-0.5 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">학습 리포트 아카이브</p>
             </div>
           </div>
-          <Badge className={cn('rounded-full border-none bg-gradient-to-r font-black text-white shadow-lg', isMobile ? 'hidden' : 'h-9 px-4 text-xs', currentTier.gradient)}>
-            <Sparkles className="mr-2 h-4 w-4" /> {currentTier.name} 티어 분석
+          <Badge className={cn('rounded-full border-none bg-gradient-to-r font-black text-white shadow-lg from-[#14295F] via-[#1B326D] to-[#233E86]', isMobile ? 'hidden' : 'h-9 px-4 text-xs')}>
+            <Sparkles className="mr-2 h-4 w-4" /> 학습 흐름 분석
           </Badge>
         </div>
       </header>

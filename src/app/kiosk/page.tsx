@@ -21,16 +21,8 @@ import {
   Timestamp,
   getDoc
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, GrowthProgress } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import {
-  calculateAttendanceBonusLp,
-  calculateAttendanceBonusPoints,
-  calculateDeepFocusBonusLp,
-  calculateDeepFocusBonusPoints,
-  calculateStudySessionLp,
-  calculateStudySessionPoints,
-} from '@/lib/student-rewards';
 import { 
   Delete, 
   Loader2, 
@@ -57,7 +49,6 @@ import { httpsCallable } from 'firebase/functions';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
-import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 
 export default function KioskPage() {
@@ -74,7 +65,7 @@ export default function KioskPage() {
 
   const triggerAttendanceSms = async (
     studentId: string,
-    eventType: 'study_start' | 'away_start' | 'away_end' | 'study_end'
+    eventType: 'study_start' | 'away_start' | 'study_end'
   ) => {
     if (!functions || !centerId || !canTriggerAttendanceSms) return;
 
@@ -269,13 +260,6 @@ export default function KioskPage() {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id);
       const todayKey = format(new Date(), 'yyyy-MM-dd');
-      const wasAway = prevStatus === 'away' || prevStatus === 'break';
-      const wasStudying = prevStatus === 'studying';
-      const wasActive = wasStudying || wasAway;
-      const isStudyStart = nextStatus === 'studying' && !wasActive;
-      const isAwayReturn = wasAway && nextStatus === 'studying';
-      const isAwayStart = (nextStatus === 'away' || nextStatus === 'break') && wasStudying;
-      const isStudyEnd = nextStatus === 'absent' && wasActive;
       let stopSessionId: string | null = null;
 
       // 퇴실(absent) 처리 시 공부 시간 저장 로직
@@ -304,54 +288,19 @@ export default function KioskPage() {
             createdAt: serverTimestamp()
           });
 
-          // 성장 지표 반영 (임시 가중치)
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', student.id);
-          const progressSnap = await getDoc(progressRef);
-          const progress = progressSnap.exists() ? (progressSnap.data() as GrowthProgress) : null;
-          const dayLogRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey);
-          const dayLogSnap = await getDoc(dayLogRef);
-          const existingDayMinutes = Number(dayLogSnap.data()?.totalMinutes || 0);
-          const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
-          const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
-          const penaltyPoints = progress?.penaltyPoints || 0;
-          const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
-          const finalMultiplier = totalBoost * (1 - penaltyRate);
-          const existingDayStatus = (progress?.dailyLpStatus?.[todayKey] || {}) as Record<string, any>;
-          const existingPointDayStatus = (progress?.dailyPointStatus?.[todayKey] || {}) as Record<string, any>;
-          let studyPointsEarned = calculateStudySessionPoints(durationMinutes, finalMultiplier);
-          let studyLpEarned = calculateStudySessionLp(durationMinutes, finalMultiplier, existingDayStatus);
-          const totalMinutesAfterSession = existingDayMinutes + durationMinutes;
-          const nextLpDayStatus: Record<string, any> = { ...existingDayStatus };
-          const nextPointDayStatus: Record<string, any> = { ...existingPointDayStatus };
-          if (totalMinutesAfterSession >= 180 && !existingDayStatus?.attendance) {
-            studyPointsEarned += calculateAttendanceBonusPoints(finalMultiplier);
-            studyLpEarned += calculateAttendanceBonusLp(finalMultiplier, existingDayStatus);
-            nextLpDayStatus.attendance = true;
-          }
-          if (totalMinutesAfterSession >= 360 && !existingDayStatus?.bonus6h) {
-            studyPointsEarned += calculateDeepFocusBonusPoints(finalMultiplier);
-            studyLpEarned += calculateDeepFocusBonusLp(finalMultiplier, existingDayStatus);
-            nextLpDayStatus.bonus6h = true;
-          }
           batch.set(progressRef, {
-            seasonLp: increment(studyLpEarned),
-            totalLpEarned: increment(studyLpEarned),
-            pointsBalance: increment(studyPointsEarned),
-            totalPointsEarned: increment(studyPointsEarned),
-            dailyLpStatus: {
-              [todayKey]: {
-                ...nextLpDayStatus,
-                dailyLpAmount: increment(studyLpEarned),
-              },
-            },
-            dailyPointStatus: {
-              [todayKey]: {
-                ...nextPointDayStatus,
-                dailyPointAmount: increment(studyPointsEarned),
-              },
-            },
             'stats.focus': increment((durationMinutes / 60) * 0.1),
             updatedAt: serverTimestamp()
+          }, { merge: true });
+
+          const periodKey = todayKey.slice(0, 7);
+          const leaderboardRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', student.id);
+          batch.set(leaderboardRef, {
+            studentId: student.id,
+            displayNameSnapshot: student.name,
+            value: increment(durationMinutes),
+            updatedAt: serverTimestamp(),
           }, { merge: true });
         }
       }
@@ -370,88 +319,6 @@ export default function KioskPage() {
       }
 
       batch.set(seatRef, updateData, { merge: true });
-
-      appendAttendanceEventToBatch(batch, firestore, centerId, {
-        studentId: student.id,
-        dateKey: todayKey,
-        eventType: 'status_override',
-        occurredAt: new Date(),
-        source: 'kiosk',
-        seatId: seat.id,
-        statusBefore: prevStatus,
-        statusAfter: nextStatus,
-      });
-
-      if (isStudyStart) {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId: student.id,
-          dateKey: todayKey,
-          eventType: 'check_in',
-          occurredAt: new Date(),
-          source: 'kiosk',
-          seatId: seat.id,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
-          attendanceStatus: nextStatus,
-          checkInAt: new Date(),
-          source: 'kiosk',
-        });
-      } else if (isAwayReturn) {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId: student.id,
-          dateKey: todayKey,
-          eventType: 'away_end',
-          occurredAt: new Date(),
-          source: 'kiosk',
-          seatId: seat.id,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
-          attendanceStatus: nextStatus,
-          source: 'kiosk',
-        });
-      } else if (isAwayStart) {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId: student.id,
-          dateKey: todayKey,
-          eventType: 'away_start',
-          occurredAt: new Date(),
-          source: 'kiosk',
-          seatId: seat.id,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
-          attendanceStatus: nextStatus,
-          source: 'kiosk',
-        });
-      } else if (isStudyEnd) {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId: student.id,
-          dateKey: todayKey,
-          eventType: 'check_out',
-          occurredAt: new Date(),
-          source: 'kiosk',
-          seatId: seat.id,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
-          attendanceStatus: nextStatus,
-          checkOutAt: new Date(),
-          hasCheckOutRecord: true,
-          source: 'kiosk',
-        });
-      } else {
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
-          attendanceStatus: nextStatus,
-          source: 'kiosk',
-        });
-      }
-
       await batch.commit();
 
       const autoCheckInAt =
@@ -476,14 +343,12 @@ export default function KioskPage() {
         type: kakaoType
       });
 
-      if (isStudyStart) {
-        await triggerAttendanceSms(student.id, 'study_start');
-      } else if (isAwayReturn) {
-        await triggerAttendanceSms(student.id, 'away_end');
-      } else if (isAwayStart) {
-        await triggerAttendanceSms(student.id, 'away_start');
-      } else if (isStudyEnd) {
-        await triggerAttendanceSms(student.id, 'study_end');
+      if (nextStatus === 'studying' && prevStatus === 'absent') {
+        void triggerAttendanceSms(student.id, 'study_start');
+      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+        void triggerAttendanceSms(student.id, 'away_start');
+      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+        void triggerAttendanceSms(student.id, 'study_end');
       }
 
       const statusLabels: Record<AttendanceCurrent['status'], string> = {

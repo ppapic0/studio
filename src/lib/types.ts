@@ -97,7 +97,6 @@ export interface StudentProfile {
   name: string;
   grade: string;
   schoolName: string;
-  phoneNumber?: string;
   className?: string;
   seatNo: number;
   seatId?: string;
@@ -152,8 +151,7 @@ export interface AttendanceCurrent {
 }
 
 export interface GrowthProgress {
-  seasonLp: number;
-  pointsBalance?: number;
+  seasonLp?: number;
   penaltyPoints: number;
   stats: {
     focus: number;
@@ -161,14 +159,15 @@ export interface GrowthProgress {
     achievement: number;
     resilience: number;
   };
-  dailyLpStatus?: {
-    [dateKey: string]: any;
-  };
   dailyPointStatus?: {
     [dateKey: string]: any;
   };
-  totalLpEarned: number;
+  pointsBalance?: number;
   totalPointsEarned?: number;
+  dailyLpStatus?: {
+    [dateKey: string]: any;
+  };
+  totalLpEarned?: number;
   lastResetAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -376,7 +375,6 @@ export interface NotificationSettings {
   smsTemplateCheckOut?: string;
   smsTemplateStudyStart?: string;
   smsTemplateAwayStart?: string;
-  smsTemplateAwayEnd?: string;
   smsTemplateStudyEnd?: string;
   smsTemplateLateAlert?: string;
   smsApiKeyConfigured?: boolean;

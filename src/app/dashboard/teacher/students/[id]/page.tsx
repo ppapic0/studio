@@ -9,10 +9,10 @@ import { ko } from 'date-fns/locale';
 import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, Timestamp, where, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar, ComposedChart, Line, LineChart as RechartsLineChart } from 'recharts';
-import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, Target, RefreshCw, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore, PenTool } from 'lucide-react';
+import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, Target, RefreshCw, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification, DailyReport, AttendanceRequest, PenaltyLog, ParentActivityEvent, Invoice } from '@/lib/types';
+import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatSeatLabel } from '@/lib/seat-layout';
 import { useToast } from '@/hooks/use-toast';
@@ -34,7 +34,6 @@ import {
   buildStartEndInsight,
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
-import { StudentOperationsGraphBoard, type StudentOperationsTimelinePoint } from '@/components/dashboard/student-operations-graph-board';
 import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
 
 const STAT_CONFIG = {
@@ -53,19 +52,6 @@ type DailyStatSnapshot = {
   startHour?: number;
   endHour?: number;
   awayMinutes?: number;
-};
-type SmsDeliveryLogLite = {
-  id: string;
-  studentId?: string;
-  eventType?: string;
-  status?: string;
-  createdAt?: Timestamp;
-  sentAt?: Timestamp;
-  failedAt?: Timestamp;
-  renderedMessage?: string;
-  phoneNumber?: string;
-  parentName?: string;
-  parentUid?: string;
 };
 type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number; personalCount: number };
 type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
@@ -257,20 +243,6 @@ function formatSignedPercent(value: number): string {
   return `${value >= 0 ? '+' : ''}${value}%`;
 }
 
-function timestampToDateKey(value?: Timestamp | null): string | null {
-  if (!value) return null;
-  try {
-    return format(value.toDate(), 'yyyy-MM-dd');
-  } catch {
-    return null;
-  }
-}
-
-function addNumberMapValue(map: Map<string, number>, key: string | null | undefined, amount = 1) {
-  if (!key) return;
-  map.set(key, (map.get(key) || 0) + amount);
-}
-
 const CustomTooltip = ({ active, payload, label, unit = '분', presentationMode = 'default' }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -416,6 +388,7 @@ function StatAnalysisCard({
     </Card>
   );
 }
+
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: studentId } = use(params);
   const presentationMode = useStudentDetailPresentationMode();
@@ -466,7 +439,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isQuickFeedbackSubmitting, setIsQuickFeedbackSubmitting] = useState(false);
 
   const [isEditStats, setIsEditStats] = useState(false);
-  const [editLp, setEditLp] = useState(0);
+  const [editPoints, setEditPoints] = useState(0);
   const [editPenaltyPoints, setEditPenaltyPoints] = useState(0);
   const [editStats, setEditStats] = useState({ focus: 0, consistency: 0, achievement: 0, resilience: 0 });
   const [editTodayMinutes, setEditTodayMinutes] = useState(0);
@@ -524,42 +497,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const reservationsQuery = useMemoFirebase(() => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'counselingReservations'), orderBy('scheduledAt', 'desc'), limit(200))), [firestore, centerId]);
   const { data: reservationsRaw, isLoading: reservationLoading } = useCollection<CounselingReservation>(reservationsQuery, { enabled: !!centerId });
 
-  const dailyReportsQuery = useMemoFirebase(
-    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'dailyReports'), where('studentId', '==', studentId), limit(120))),
-    [firestore, centerId, studentId]
-  );
-  const { data: dailyReportsRaw } = useCollection<DailyReport>(dailyReportsQuery, { enabled: !!centerId });
-
-  const parentActivityQuery = useMemoFirebase(
-    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'parentActivityEvents'), where('studentId', '==', studentId), limit(240))),
-    [firestore, centerId, studentId]
-  );
-  const { data: parentActivityRaw } = useCollection<ParentActivityEvent>(parentActivityQuery, { enabled: !!centerId });
-
-  const smsDeliveryLogsQuery = useMemoFirebase(
-    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), where('studentId', '==', studentId), limit(240))),
-    [firestore, centerId, studentId]
-  );
-  const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogLite>(smsDeliveryLogsQuery, { enabled: !!centerId });
-
-  const penaltyLogsQuery = useMemoFirebase(
-    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(120))),
-    [firestore, centerId, studentId]
-  );
-  const { data: penaltyLogsRaw } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: !!centerId });
-
-  const attendanceRequestsQuery = useMemoFirebase(
-    () => (!firestore || !centerId ? null : query(collection(firestore, 'centers', centerId, 'attendanceRequests'), where('studentId', '==', studentId), limit(120))),
-    [firestore, centerId, studentId]
-  );
-  const { data: attendanceRequestsRaw } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: !!centerId });
-
-  const invoicesQuery = useMemoFirebase(
-    () => (!firestore || !centerId || !isAdmin ? null : query(collection(firestore, 'centers', centerId, 'invoices'), where('studentId', '==', studentId), limit(120))),
-    [firestore, centerId, studentId, isAdmin]
-  );
-  const { data: invoicesRaw } = useCollection<Invoice>(invoicesQuery, { enabled: !!centerId && isAdmin });
-
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
     centerStudents?.forEach((member) => {
@@ -578,7 +515,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (progress) {
-      setEditLp(progress.seasonLp || 0);
+      setEditPoints(progress.pointsBalance || 0);
       setEditPenaltyPoints(progress.penaltyPoints || 0);
       setEditStats({ focus: progress.stats?.focus || 0, consistency: progress.stats?.consistency || 0, achievement: progress.stats?.achievement || 0, resilience: progress.stats?.resilience || 0 });
     }
@@ -1201,332 +1138,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return result;
   }, [focusedChartView, avgStudyMinutes, avgCompletionRate, rhythmScore]);
 
-  const days30AgoMs = subDays(today, 30).getTime();
-  const studentDailyReports = useMemo(
-    () => [...(dailyReportsRaw || [])].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt)),
-    [dailyReportsRaw]
-  );
-  const smsDeliveryLogs = useMemo(
-    () =>
-      [...(smsDeliveryLogsRaw || [])].sort((a, b) => {
-        const bTime = toTime((b.sentAt || b.createdAt) as Timestamp | undefined);
-        const aTime = toTime((a.sentAt || a.createdAt) as Timestamp | undefined);
-        return bTime - aTime;
-      }),
-    [smsDeliveryLogsRaw]
-  );
-  const attendanceRequests = useMemo(
-    () => [...(attendanceRequestsRaw || [])].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt)),
-    [attendanceRequestsRaw]
-  );
-  const penaltyLogs = useMemo(
-    () => [...(penaltyLogsRaw || [])].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt)),
-    [penaltyLogsRaw]
-  );
-  const invoices = useMemo(
-    () => [...(invoicesRaw || [])].sort((a, b) => toTime(b.updatedAt) - toTime(a.updatedAt)),
-    [invoicesRaw]
-  );
-  const latestCounselDate = studentCounselingLogs[0]?.createdAt?.toDate() || null;
-  const latestReportSent = studentDailyReports.find((report) => report.status === 'sent');
-  const latestReportSentLabel = latestReportSent?.createdAt?.toDate
-    ? format(latestReportSent.createdAt.toDate(), 'M월 d일')
-    : '없음';
-  const parentVisitCount30d = (parentActivityRaw || []).filter(
-    (event) => event.eventType === 'app_visit' && toTime(event.createdAt) >= days30AgoMs
-  ).length;
-  const reportReadCount30d = (parentActivityRaw || []).filter(
-    (event) => event.eventType === 'report_read' && toTime(event.createdAt) >= days30AgoMs
-  ).length;
-  const counselingCount30d = studentCounselingLogs.filter((log) => toTime(log.createdAt) >= days30AgoMs).length;
-  const reportSentCount30d = studentDailyReports.filter(
-    (report) => report.status === 'sent' && toTime(report.createdAt) >= days30AgoMs
-  ).length;
-  const smsAcceptedCount30d = smsDeliveryLogs.filter((log) => {
-    const status = String(log.status || '').toLowerCase();
-    return toTime((log.sentAt || log.createdAt) as Timestamp | undefined) >= days30AgoMs
-      && !['failed', 'cancelled', 'suppressed_opt_out', '번호없음'].includes(status);
-  }).length;
-  const smsCost30d = Math.round(smsAcceptedCount30d * 8.7);
-  const pendingAttendanceRequestsCount = attendanceRequests.filter((item) => item.status === 'requested').length;
-  const attendanceInstabilityScore = Math.min(
-    100,
-    attendanceRequests.filter((item) => item.status !== 'approved').length * 18
-      + riskSignals.filter((signal) => /공부시간|리듬|상담/.test(signal)).length * 14
-  );
-  const recentPenaltyCount30d = penaltyLogs.filter((log) => toTime(log.createdAt) >= days30AgoMs).length;
-  const latestInvoice = invoices[0];
-  const latestInvoiceStatusLabel = latestInvoice
-    ? latestInvoice.status === 'paid'
-      ? '수납완료'
-      : latestInvoice.status === 'issued'
-        ? '청구됨'
-        : latestInvoice.status === 'overdue'
-          ? '미납/연체'
-          : latestInvoice.status === 'refunded'
-            ? '환불'
-            : '무효'
-    : '미청구';
-  const outstandingAmount = invoices
-    .filter((invoice) => invoice.status === 'issued' || invoice.status === 'overdue')
-    .reduce((sum, invoice) => sum + Number(invoice.finalPrice || 0), 0);
-  const todayActionChecklist = [
-    attendanceCurrent?.status !== 'studying'
-      ? {
-          key: 'attendance',
-          title: '오늘 출결 상태 다시 확인',
-          detail: '공부중이 아니면 등원·외출·하원 상태를 먼저 맞춰 주세요.',
-          href: '/dashboard/attendance',
-          accent: 'bg-rose-100 text-rose-700',
-        }
-      : null,
-    avgCompletionRate < 65
-      ? {
-          key: 'plan',
-          title: '내일 계획 볼륨 조정',
-          detail: '완수율이 낮아 핵심 과제 3~4개 중심으로 줄이는 것이 좋습니다.',
-          href: '/dashboard/teacher/students',
-          accent: 'bg-amber-100 text-amber-700',
-        }
-      : null,
-    latestReportSent && reportReadCount30d === 0
-      ? {
-          key: 'guardian',
-          title: '리포트 미열람 보호자 후속 연락',
-          detail: '최근 발송 리포트가 읽히지 않았습니다. 문자나 상담 연결이 필요합니다.',
-          href: '/dashboard/settings/notifications',
-          accent: 'bg-violet-100 text-violet-700',
-        }
-      : null,
-    pendingAttendanceRequestsCount > 0
-      ? {
-          key: 'request',
-          title: '미처리 출결 요청 검토',
-          detail: `처리 대기 요청 ${pendingAttendanceRequestsCount}건이 남아 있습니다.`,
-          href: '/dashboard/attendance',
-          accent: 'bg-sky-100 text-sky-700',
-        }
-      : null,
-    isAdmin && outstandingAmount > 0
-      ? {
-          key: 'billing',
-          title: '수납 상태 점검',
-          detail: `미정리 금액 ${outstandingAmount.toLocaleString()}원이 남아 있습니다.`,
-          href: '/dashboard/revenue',
-          accent: 'bg-emerald-100 text-emerald-700',
-        }
-      : null,
-  ].filter(Boolean) as Array<{ key: string; title: string; detail: string; href: string; accent: string }>;
-
-  const operatingCostSignals = [
-    {
-      key: 'sms',
-      title: '문자 발송량',
-      value: `${smsAcceptedCount30d}건`,
-      helper: `최근 30일 비용 약 ${smsCost30d.toLocaleString()}원`,
-      tone: 'border-sky-100 bg-sky-50/70 text-sky-700',
-    },
-    {
-      key: 'counseling',
-      title: '상담 빈도',
-      value: `${counselingCount30d}건`,
-      helper: latestCounselDate ? `최근 상담 ${format(latestCounselDate, 'M월 d일')}` : '최근 상담 기록 없음',
-      tone: 'border-amber-100 bg-amber-50/70 text-amber-700',
-    },
-    {
-      key: 'report',
-      title: '리포트 발송',
-      value: `${reportSentCount30d}건`,
-      helper: `최근 발송 ${latestReportSentLabel} · 열람 ${reportReadCount30d}회`,
-      tone: 'border-violet-100 bg-violet-50/70 text-violet-700',
-    },
-    {
-      key: 'attendance',
-      title: '출결 불안정도',
-      value: `${attendanceInstabilityScore}점`,
-      helper: `요청 ${pendingAttendanceRequestsCount}건 · 벌점로그 ${recentPenaltyCount30d}건`,
-      tone: 'border-rose-100 bg-rose-50/70 text-rose-700',
-    },
-    ...(isAdmin
-      ? [
-          {
-            key: 'billing',
-            title: '수납 상태',
-            value: latestInvoiceStatusLabel,
-            helper: outstandingAmount > 0 ? `미정리 ${outstandingAmount.toLocaleString()}원` : '현재 미정리 금액 없음',
-            tone: 'border-emerald-100 bg-emerald-50/70 text-emerald-700',
-          },
-        ]
-      : [
-          {
-            key: 'guardian',
-            title: '보호자 반응',
-            value: `${parentVisitCount30d}회`,
-            helper: `최근 30일 앱 방문 ${parentVisitCount30d}회 · 리포트 열람 ${reportReadCount30d}회`,
-            tone: 'border-emerald-100 bg-emerald-50/70 text-emerald-700',
-          },
-        ]),
-  ];
-
-  const operationsTimeline = useMemo<StudentOperationsTimelinePoint[]>(() => {
-    const appVisitsByDate = new Map<string, number>();
-    const reportReadsByDate = new Map<string, number>();
-    const counselingByDate = new Map<string, number>();
-    const smsByDate = new Map<string, number>();
-    const reportsByDate = new Map<string, number>();
-    const penaltyCountByDate = new Map<string, number>();
-    const penaltyPointsByDate = new Map<string, number>();
-    const requestCountByDate = new Map<string, number>();
-    const approvedLateByDate = new Map<string, number>();
-    const approvedAbsenceByDate = new Map<string, number>();
-    const invoiceCountByDate = new Map<string, number>();
-    const invoiceAmountByDate = new Map<string, number>();
-
-    (parentActivityRaw || []).forEach((event) => {
-      const dateKey = timestampToDateKey(event.createdAt);
-      if (event.eventType === 'app_visit') addNumberMapValue(appVisitsByDate, dateKey);
-      if (event.eventType === 'report_read') addNumberMapValue(reportReadsByDate, dateKey);
-    });
-
-    studentCounselingLogs.forEach((log) => {
-      addNumberMapValue(counselingByDate, timestampToDateKey(log.createdAt));
-    });
-
-    smsDeliveryLogs.forEach((log) => {
-      const status = String(log.status || '').toLowerCase();
-      if (['failed', 'cancelled', 'suppressed_opt_out', '번호없음'].includes(status)) return;
-      addNumberMapValue(
-        smsByDate,
-        timestampToDateKey((log.sentAt || log.createdAt) as Timestamp | undefined)
-      );
-    });
-
-    studentDailyReports.forEach((report) => {
-      if (report.status !== 'sent') return;
-      addNumberMapValue(reportsByDate, timestampToDateKey(report.createdAt));
-    });
-
-    penaltyLogs.forEach((log) => {
-      const dateKey = timestampToDateKey(log.createdAt);
-      addNumberMapValue(penaltyCountByDate, dateKey);
-      addNumberMapValue(penaltyPointsByDate, dateKey, Math.abs(Number(log.pointsDelta || 0)));
-    });
-
-    attendanceRequests.forEach((request) => {
-      const dateKey = request.date || timestampToDateKey(request.createdAt) || todayKey;
-      addNumberMapValue(requestCountByDate, dateKey);
-      if (request.type === 'late' && request.status === 'approved') addNumberMapValue(approvedLateByDate, dateKey);
-      if (request.type === 'absence' && request.status === 'approved') addNumberMapValue(approvedAbsenceByDate, dateKey);
-    });
-
-    if (isAdmin) {
-      invoices.forEach((invoice) => {
-        const dateKey =
-          timestampToDateKey(invoice.updatedAt)
-          || timestampToDateKey(invoice.paidAt)
-          || timestampToDateKey(invoice.issuedAt);
-        addNumberMapValue(invoiceCountByDate, dateKey);
-        addNumberMapValue(invoiceAmountByDate, dateKey, Math.max(0, Number(invoice.finalPrice || 0)));
-      });
-    }
-
-    return fullSeries.slice(-28).map((item) => {
-      const appVisits = appVisitsByDate.get(item.dateKey) || 0;
-      const reportReads = reportReadsByDate.get(item.dateKey) || 0;
-      const counselingCount = counselingByDate.get(item.dateKey) || 0;
-      const smsCount = smsByDate.get(item.dateKey) || 0;
-      const reportCount = reportsByDate.get(item.dateKey) || 0;
-      const penaltyCount = penaltyCountByDate.get(item.dateKey) || 0;
-      const penaltyPoints = penaltyPointsByDate.get(item.dateKey) || 0;
-      const requestCount = requestCountByDate.get(item.dateKey) || 0;
-      const invoiceCount = invoiceCountByDate.get(item.dateKey) || 0;
-      const invoiceAmount = invoiceAmountByDate.get(item.dateKey) || 0;
-      const guardianTouchCount = appVisits + reportReads;
-      const managementTouchCount = counselingCount + smsCount + reportCount;
-
-      let attendanceStatus: StudentOperationsTimelinePoint['attendanceStatus'] = 'requested';
-      if ((approvedAbsenceByDate.get(item.dateKey) || 0) > 0) {
-        attendanceStatus = 'excused_absent';
-      } else if (item.studyMinutes > 0) {
-        attendanceStatus = (approvedLateByDate.get(item.dateKey) || 0) > 0 ? 'confirmed_late' : 'confirmed_present';
-      } else if (item.dateKey === todayKey && ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '')) {
-        attendanceStatus = attendanceCurrent?.status === 'studying' ? 'confirmed_present' : 'confirmed_present_missing_routine';
-      } else if (requestCount > 0) {
-        attendanceStatus = 'confirmed_absent';
-      }
-
-      const attendanceLabel =
-        attendanceStatus === 'confirmed_present'
-          ? '정상 등원'
-          : attendanceStatus === 'confirmed_present_missing_routine'
-            ? '루틴 누락 등원'
-            : attendanceStatus === 'confirmed_late'
-              ? '지각'
-              : attendanceStatus === 'confirmed_absent'
-                ? '미출석'
-                : attendanceStatus === 'excused_absent'
-                  ? '사유 결석'
-                  : '기록 없음';
-
-      const riskPulse = Math.min(
-        100,
-        Math.round(
-          (attendanceStatus === 'confirmed_absent' ? 34 : attendanceStatus === 'confirmed_late' ? 16 : 0)
-          + (attendanceStatus === 'confirmed_present_missing_routine' ? 12 : 0)
-          + (item.completionRate > 0 && item.completionRate < 60 ? 22 : item.completionRate < 75 ? 10 : 0)
-          + (item.studyMinutes < 90 ? 16 : item.studyMinutes < 150 ? 6 : 0)
-          + penaltyCount * 12
-          + penaltyPoints
-          + requestCount * 9
-        )
-      );
-
-      return {
-        dateKey: item.dateKey,
-        dateLabel: item.dateLabel,
-        studyMinutes: item.studyMinutes,
-        completionRate: item.completionRate,
-        attendanceStatus,
-        attendanceLabel,
-        appVisits,
-        reportReads,
-        counselingCount,
-        smsCount,
-        reportCount,
-        penaltyCount,
-        penaltyPoints,
-        requestCount,
-        invoiceCount,
-        invoiceAmount,
-        guardianTouchCount,
-        managementTouchCount,
-        riskPulse,
-      };
-    });
-  }, [
-    parentActivityRaw,
-    studentCounselingLogs,
-    smsDeliveryLogs,
-    studentDailyReports,
-    penaltyLogs,
-    attendanceRequests,
-    invoices,
-    isAdmin,
-    fullSeries,
-    todayKey,
-    attendanceCurrent?.status,
-  ]);
-
-  const todayStudyMinutes = focusKpi.todayMinutes;
-  const attendanceRate30d = useMemo(() => {
-    const trackedDays = operationsTimeline.filter((item) => item.attendanceStatus !== 'requested');
-    if (!trackedDays.length) return 0;
-    const presentDays = trackedDays.filter((item) =>
-      ['confirmed_present', 'confirmed_present_missing_routine', 'confirmed_late'].includes(item.attendanceStatus)
-    ).length;
-    return Math.round((presentDays / trackedDays.length) * 100);
-  }, [operationsTimeline]);
-
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId || !canEditStudentInfo) return;
 
@@ -1581,7 +1192,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!firestore || !centerId || !studentId || !canEditGrowthData) return;
     setIsUpdating(true);
     try {
-      const normalizedLp = Math.max(0, Math.round(Number(editLp) || 0));
+      const normalizedPoints = Math.max(0, Math.round(Number(editPoints) || 0));
       const normalizedPenaltyPoints = Math.max(0, Math.round(Number(editPenaltyPoints) || 0));
       const normalizedTodayMinutes = Math.max(0, Math.round(Number(editTodayMinutes) || 0));
       const normalizedStats = {
@@ -1596,13 +1207,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       const batch = writeBatch(firestore);
       const pRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
-      const rRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
+      const rRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', studentId);
       const sRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
 
       batch.set(
         pRef,
         {
-          seasonLp: normalizedLp,
+          pointsBalance: normalizedPoints,
           penaltyPoints: normalizedPenaltyPoints,
           stats: normalizedStats,
           updatedAt: serverTimestamp(),
@@ -1610,7 +1221,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         { merge: true }
       );
       batch.set(sRef, { totalStudyMinutes: normalizedTodayMinutes, updatedAt: serverTimestamp() }, { merge: true });
-      batch.set(rRef, { studentId, displayNameSnapshot: student?.name || '학생', value: normalizedLp, updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(rRef, { studentId, displayNameSnapshot: student?.name || '학생', value: normalizedTodayMinutes, updatedAt: serverTimestamp() }, { merge: true });
 
       if (penaltyDelta !== 0) {
         const penaltyLogRef = doc(collection(firestore, 'centers', centerId, 'penaltyLogs'));
@@ -1721,8 +1332,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (error) {
       console.error(error);
-      const message = resolveCallableErrorMessage(error, '학생 계정 삭제 중 오류가 발생했습니다.');
-      toast({ variant: 'destructive', title: '삭제 실패', description: message });
+      toast({ variant: 'destructive', title: '삭제 실패' });
     } finally {
       setIsUpdating(false);
     }
@@ -1996,24 +1606,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {!isStudentSelfView && (
-            <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-              <Link href="/dashboard/attendance"><CalendarDays className="h-4 w-4" /> 출결 상태</Link>
-            </Button>
-          )}
           {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
           {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
           {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
-          {!isStudentSelfView && (
-            <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-              <Link href="/dashboard/reports"><PenTool className="h-4 w-4" /> 리포트 생성/확인</Link>
-            </Button>
-          )}
-          {!isStudentSelfView && (
-            <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-              <Link href="/dashboard/settings/notifications"><MessageSquare className="h-4 w-4" /> 문자 보내기</Link>
-            </Button>
-          )}
           {canEditStudentInfo && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
           {canEditGrowthData && (
             <Button
@@ -2076,82 +1671,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         />
       </section>
 
-      {!isStudentSelfView ? (
-        <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1.15fr_0.95fr]')}>
-          <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-chart-stage')}>
-            <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-xl font-black tracking-tight text-[#14295F]">오늘 액션 체크리스트</CardTitle>
-                  <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                    COO 관점에서 지금 바로 처리할 행동만 먼저 모았습니다.
-                  </CardDescription>
-                </div>
-                <Badge className="rounded-full bg-[#14295F] px-3 py-1 text-[10px] font-black text-white">
-                  {todayActionChecklist.length}개 액션
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className={cn('space-y-3', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
-              {todayActionChecklist.length === 0 ? (
-                <div className="rounded-[1.2rem] border border-emerald-100 bg-emerald-50/70 px-4 py-4 text-sm font-bold text-emerald-700">
-                  오늘 바로 처리해야 할 주요 액션은 없습니다. 유지 전략 중심으로 운영해도 좋습니다.
-                </div>
-              ) : (
-                todayActionChecklist.map((item, index) => (
-                  <div key={item.key} className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 px-4 py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Badge className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', item.accent)}>
-                            액션 {index + 1}
-                          </Badge>
-                          <p className="text-sm font-black text-[#14295F]">{item.title}</p>
-                        </div>
-                        <p className="mt-2 text-[12px] font-semibold leading-5 text-slate-600">{item.detail}</p>
-                      </div>
-                      <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-3 text-[11px] font-black">
-                        <Link href={item.href}>바로 이동</Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-chart-stage')}>
-            <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-xl font-black tracking-tight text-[#14295F]">운영 비용 신호</CardTitle>
-                  <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                    문자, 상담, 리포트, 출결, 수납까지 운영 투입 신호를 한 번에 봅니다.
-                  </CardDescription>
-                </div>
-                <Badge className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-700">
-                  최근 30일
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className={cn('grid gap-3', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
-              {operatingCostSignals.map((signal) => (
-                <div key={signal.key} className={cn('rounded-[1.2rem] border px-4 py-3', signal.tone)}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-black tracking-[0.12em] uppercase">{signal.title}</p>
-                    <p className="text-lg font-black tracking-tight">{signal.value}</p>
-                  </div>
-                  <p className="mt-1 text-[12px] font-semibold leading-5 text-slate-600">{signal.helper}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </section>
-      ) : null}
-
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6 min-w-0">
         <TabsList className={detailTabListClass}>
-          <TabsTrigger value="overview" className={detailTabTriggerClass}><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">운영 그래프</span></TabsTrigger>
+          <TabsTrigger value="overview" className={detailTabTriggerClass}><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">학습 분석</span></TabsTrigger>
           <TabsTrigger value="counseling" className={detailTabTriggerClass}><MessageSquare className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">상담 기록</span></TabsTrigger>
           <TabsTrigger value="plans" className={cn(detailTabTriggerClass, isMobile && "col-span-2")}><BookOpen className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">계획/루틴</span></TabsTrigger>
         </TabsList>
@@ -2329,51 +1851,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </Card>
             </>
           )}
-
-          <Card className="rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] shadow-lg">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base font-black tracking-tight text-[#14295F]">
-                <ClipboardList className="h-4 w-4 text-[#2554d4]" />
-                관리 증빙 요약
-              </CardTitle>
-              <CardDescription className="font-bold text-[11px] text-[#5c6e97]">
-                보호자 상담 시 바로 보여줄 수 있도록, 최근 30일 관리 흐름을 한 문장과 핵심 수치로 먼저 정리했습니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-                <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">학습 관리</p>
-                  <p className="mt-2 text-lg font-black text-[#14295F]">{minutesToLabel(todayStudyMinutes)}</p>
-                  <p className="mt-1 text-xs font-bold text-[#5c6e97]">최근 7일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}%</p>
-                </div>
-                <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">출결 관리</p>
-                  <p className="mt-2 text-lg font-black text-[#14295F]">{attendanceRate30d}%</p>
-                  <p className="mt-1 text-xs font-bold text-[#5c6e97]">
-                    최근 30일 출석률 · 벌점 {Math.max(0, Math.round(Number(progress?.penaltyPoints || 0)))}점 · 외출 {awayTimeData.filter((item) => item.awayMinutes > 0).length}회
-                  </p>
-                </div>
-                <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">소통 관리</p>
-                  <p className="mt-2 text-lg font-black text-[#14295F]">{counselingCount30d + reportSentCount30d + smsAcceptedCount30d}회</p>
-                  <p className="mt-1 text-xs font-bold text-[#5c6e97]">상담 {counselingCount30d} · 리포트 {reportSentCount30d} · 문자 {smsAcceptedCount30d}</p>
-                </div>
-              </div>
-              <div className="rounded-xl border border-[#dbe7ff] bg-[#eef4ff] px-4 py-3">
-                <p className="text-sm font-black leading-6 text-[#14295F]">
-                  최근 30일 동안 학습, 출결, 상담/문자/리포트 기록을 함께 관리하고 있으며, 보호자 반응은 앱 방문 {parentVisitCount30d}회 · 리포트 열람 {reportReadCount30d}회로 추적 중입니다.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <StudentOperationsGraphBoard
-            timeline={operationsTimeline}
-            isAdmin={isAdmin}
-            isMobile={isMobile}
-            className={isAnalysisPresentation ? 'analysis-chart-stage' : undefined}
-          />
 
           {!isMobile && (
           <div className="grid gap-4">
@@ -3320,7 +2797,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Tabs>
 
       <Dialog open={isAvgStudyModalOpen} onOpenChange={setIsAvgStudyModalOpen}>
-      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">과거 7일 학습세션</DialogTitle>
@@ -3409,7 +2886,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isRhythmGuideModalOpen} onOpenChange={setIsRhythmGuideModalOpen}>
-      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
           <div className="bg-gradient-to-r from-[#0f2359] to-[#1d3f8c] px-6 py-5 text-white">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">평균 공부 리듬 그래프</DialogTitle>
@@ -3501,7 +2978,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           if (!open) setIsEditStats(false);
         }}
       >
-      <DialogContent motionPreset="dashboard-premium" className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-xl max-h-[90vh]">
+        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-xl max-h-[90vh]">
           <div className="bg-purple-600 p-10 text-white relative shrink-0">
             <Zap className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
             <DialogHeader>
@@ -3515,15 +2992,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
           <div className="flex-1 overflow-y-auto bg-white p-10 space-y-10 custom-scrollbar">
             <section className="space-y-4">
-              <h4 className="text-xs font-black uppercase text-primary/60 flex items-center gap-2 whitespace-nowrap"><Zap className="h-4 w-4" /> 시즌 보유 포인트</h4>
+              <h4 className="text-xs font-black uppercase text-primary/60 flex items-center gap-2 whitespace-nowrap"><Zap className="h-4 w-4" /> 포인트 지갑</h4>
               <Card className="rounded-[1.5rem] border-2 border-primary/5 bg-muted/5 p-6 flex flex-col items-center text-center gap-4">
                 {isEditStats && canEditGrowthData ? (
                   <div className="w-full space-y-4">
-                    <Slider value={[editLp]} max={50000} step={100} onValueChange={([value]) => setEditLp(value)} />
-                    <Input type="number" value={editLp} onChange={(event) => setEditLp(Number(event.target.value))} className="h-12 rounded-xl text-center font-black text-xl border-2" />
+                    <Slider value={[editPoints]} max={50000} step={100} onValueChange={([value]) => setEditPoints(value)} />
+                    <Input type="number" value={editPoints} onChange={(event) => setEditPoints(Number(event.target.value))} className="h-12 rounded-xl text-center font-black text-xl border-2" />
                   </div>
                 ) : (
-                  <div className="text-5xl font-black text-primary">{(progress?.seasonLp || 0).toLocaleString()}<span className="text-xl opacity-20 ml-1">점</span></div>
+                  <div className="text-5xl font-black text-primary">{(progress?.pointsBalance || 0).toLocaleString()}<span className="text-xl opacity-20 ml-1">점</span></div>
                 )}
               </Card>
             </section>
@@ -3608,7 +3085,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-      <DialogContent motionPreset="dashboard-premium" className="rounded-[2.5rem] sm:max-w-md p-0 overflow-hidden border-none shadow-2xl">
+        <DialogContent className="rounded-[2.5rem] sm:max-w-md p-0 overflow-hidden border-none shadow-2xl">
           <div className="bg-primary p-10 text-white"><DialogTitle className="text-3xl font-black tracking-tighter">프로필 수정</DialogTitle></div>
           <div className="p-8 space-y-4 bg-white">
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">이름</Label><Input value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="rounded-xl h-12 border-2 font-bold" /></div>
@@ -3624,7 +3101,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isReservationModalOpen} onOpenChange={setIsReservationModalOpen}>
-      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] sm:max-w-md border-none shadow-2xl">
+        <DialogContent className="rounded-[2rem] sm:max-w-md border-none shadow-2xl">
           <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">상담 예약 생성</DialogTitle></DialogHeader>
           <div className="space-y-4 py-1">
             <div className="grid grid-cols-2 gap-3">
@@ -3638,7 +3115,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
         <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
-      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
+          <DialogContent className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
             <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">상담 일지 작성</DialogTitle></DialogHeader>
             <div className="space-y-4 py-1">
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">상담 유형</Label><Select value={logType} onValueChange={(value) => setLogType(value as typeof logType)}><SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학습 상담</SelectItem><SelectItem value="life">생활 상담</SelectItem><SelectItem value="career">진로 상담</SelectItem></SelectContent></Select></div>
@@ -3650,7 +3127,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </Dialog>
 
         <Dialog open={isQuickFeedbackModalOpen} onOpenChange={setIsQuickFeedbackModalOpen}>
-      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
+          <DialogContent className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">한 줄 피드백 전송</DialogTitle>
               <DialogDescription className="font-semibold">
@@ -3688,7 +3165,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <CardContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70 whitespace-nowrap">성장 요약</p>
-              <p className="text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap">포인트 {(progress?.seasonLp || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
+              <p className="text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap">포인트 {(progress?.pointsBalance || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
             </div>
             <Button className="rounded-xl font-black bg-white text-emerald-700 hover:bg-white/90" onClick={() => setIsMasteryModalOpen(true)}><Zap className="h-4 w-4 mr-1.5" /> 성장지표 상세 보기</Button>
           </CardContent>
