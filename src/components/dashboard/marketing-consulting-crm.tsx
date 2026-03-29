@@ -863,6 +863,40 @@ export function MarketingConsultingCRM({
     URL.revokeObjectURL(url);
   };
 
+  const exportWaitlistToCsv = () => {
+    const headers = ['대기등록일', '상태', '서비스', '학생명', '학교', '학년', '학생전화번호', '학부모전화번호', '추천경로', '추천인', '메모'];
+    const rows = filteredWaitlist.map((entry) => [
+      entry.waitlistDate || '',
+      WAITLIST_STATUS_META[entry.status || 'waiting']?.label || '',
+      SERVICE_TYPE_META[entry.serviceType]?.label || '',
+      entry.studentName || '',
+      entry.school || '',
+      entry.grade || '',
+      entry.studentPhone || '',
+      entry.parentPhone || '',
+      entry.referralRoute || '',
+      entry.referrerName || '',
+      entry.memo || '',
+    ]);
+    const csvContent =
+      '\uFEFF' + [headers, ...rows].map((row) => row.map((cell) => csvEscape(cell)).join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `입학대기DB_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadCsv = () => {
+    if (activeTab === 'waitlist') {
+      exportWaitlistToCsv();
+      return;
+    }
+    exportToCsv();
+  };
+
   if (!centerId) {
     return (
       <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
