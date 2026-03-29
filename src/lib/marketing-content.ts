@@ -259,7 +259,7 @@ export const marketingContent: MarketingContent = {
   },
   nav: [
     { label: '센터 환경', href: '/center' },
-    { label: '웹앱 시스템', href: '/experience' },
+    { label: '트랙 시스템', href: '/experience' },
     { label: '합격 실적', href: '/results' },
     { label: '국어 수업', href: '/class' },
     { label: '상담 문의', href: '/#consult' },
@@ -475,7 +475,7 @@ export const marketingContent: MarketingContent = {
       },
     ],
     footerNote: '실제 스크린샷은 순차 반영 예정입니다.',
-    closingTitle: '설명보다 실제 화면이 먼저 보이도록 준비했습니다',
+    closingTitle: '트랙은 실제 데이터로 엄밀하게 관리합니다.',
     closingDescription:
       '스크린샷이 반영되면 학생과 학부모가 어떤 구조로 관리되는지 더 선명하게 확인할 수 있습니다.',
     closingHref: '/#consult',

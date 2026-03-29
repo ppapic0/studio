@@ -18,7 +18,7 @@ export function MockExamProgramSection({ mockExamProgram }: MockExamProgramSecti
   return (
     <section
       id="mock-exam-program"
-      className="scroll-mt-28 py-12 sm:py-20"
+      className="scroll-mt-28 pb-12 pt-0 sm:pb-20 sm:pt-0"
       style={{ background: 'linear-gradient(180deg, #f7f9fd 0%, #ffffff 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">

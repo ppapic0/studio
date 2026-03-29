@@ -27,7 +27,7 @@ const pageDestinations = [
   },
   {
     eyebrow: 'WEB APP',
-    title: '웹앱 시스템',
+    title: '트랙 시스템',
     href: '/experience',
     meta: '학생 · 학부모 · 데이터',
     icon: BarChart3,

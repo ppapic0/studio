@@ -90,11 +90,11 @@ export default function CenterPage() {
                 실제 운영 구조와 상담 흐름도 함께 확인해보세요
               </h2>
               <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.8] text-[#425A75]">
-                센터 환경이 마음에 들었다면 웹앱 시스템과 국어 수업 구조까지 이어서 보면 시작 흐름을 더 구체적으로 잡을 수 있습니다.
+                센터 환경이 마음에 들었다면 트랙 시스템과 국어 수업 구조까지 이어서 보면 시작 흐름을 더 구체적으로 잡을 수 있습니다.
               </p>
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link href="/experience" className="premium-cta premium-cta-muted h-11 px-6 text-sm">
-                  웹앱 시스템 보기
+                  트랙 시스템 보기
                 </Link>
                 <Link href="/#consult" className="premium-cta premium-cta-primary h-11 px-6 text-sm">
                   상담 문의하기

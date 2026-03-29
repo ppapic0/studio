@@ -234,6 +234,10 @@ export default async function ClassPage() {
         </div>
       </section>
 
+      <ScrollReveal className="relative z-10 -mt-10 sm:-mt-14">
+        <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
+      </ScrollReveal>
+
       {/* ══════════════════════════════════════════
           1.5 TAGLINE QUOTE
       ══════════════════════════════════════════ */}
@@ -283,10 +287,6 @@ export default async function ClassPage() {
             </div>
           </div>
         </section>
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
       </ScrollReveal>
 
       {/* ══════════════════════════════════════════

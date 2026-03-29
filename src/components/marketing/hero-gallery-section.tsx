@@ -60,9 +60,9 @@ export function HeroGallerySection() {
         <div className="mx-auto max-w-5xl text-center">
           <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">TRACK SPACE & CLASS</p>
           <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.75rem,4.8vw,3.2rem)] font-black leading-[1.22] text-[#14295F]">
-            트랙 관리형 스터디센터 및
+            <span className="text-[#FF7A16]">트랙</span> 관리형 스터디센터 및
             <br />
-            트랙 국어학원에서는 최고의
+            <span className="text-[#FF7A16]">트랙</span> 국어학원에서는 최고의
             <br />
             수업분위기와, 최적의 관리를 제공합니다
           </h2>
