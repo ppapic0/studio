@@ -10,36 +10,48 @@ const pageDestinations = [
     title: '합격 실적',
     href: '/results',
     meta: '실제 성적표 포함',
+    highlights: ['합격 결과', '상승 사례', '실제 성적표'],
     icon: Trophy,
-    cardClass: 'border-[#D8E5FF] bg-white',
+    cardClass: 'border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)]',
     iconClass: 'bg-[#14295F] text-white',
+    chipClass: 'border-[#14295F]/10 bg-white/90 text-[#14295F]',
+    footerClass: 'border-[#14295F]/10 bg-white/90 text-[#14295F]',
   },
   {
     eyebrow: 'CENTER',
     title: '센터 환경',
     href: '/center',
     meta: '보안 운영 · 센터 사진',
+    highlights: ['보안 운영', '센터 사진', '집중 환경'],
     icon: ShieldCheck,
-    cardClass: 'border-[#FFD9BF] bg-white',
+    cardClass: 'border-[#FFD9BF] bg-[linear-gradient(180deg,#FFF9F2_0%,#FFF3E8_100%)]',
     iconClass: 'bg-[#FFF1E4] text-[#FF7A16]',
+    chipClass: 'border-[#FF7A16]/12 bg-white/90 text-[#B55200]',
+    footerClass: 'border-[#FF7A16]/12 bg-white/92 text-[#B55200]',
   },
   {
     eyebrow: 'WEB APP',
     title: '트랙 시스템',
     href: '/experience',
     meta: '학생 · 학부모 · 데이터',
+    highlights: ['학생 모드', '학부모 모드', '데이터'],
     icon: BarChart3,
-    cardClass: 'border-[#D8E5FF] bg-white',
+    cardClass: 'border-[#D9E8FF] bg-[linear-gradient(180deg,#F8FCFF_0%,#EEF6FF_100%)]',
     iconClass: 'bg-[#EEF3FF] text-[#14295F]',
+    chipClass: 'border-[#14295F]/10 bg-white/90 text-[#14295F]',
+    footerClass: 'border-[#14295F]/10 bg-white/92 text-[#14295F]',
   },
   {
     eyebrow: 'KOREAN CLASS',
     title: '국어 수업',
     href: '/class',
     meta: '원장 직강 · 실전 모의',
+    highlights: ['원장 직강', '실전 모의', '수업 자료'],
     icon: GraduationCap,
-    cardClass: 'border-[#D8E5FF] bg-white',
+    cardClass: 'border-[#E3DBFF] bg-[linear-gradient(180deg,#FBFAFF_0%,#F2EEFF_100%)]',
     iconClass: 'bg-[#14295F] text-white',
+    chipClass: 'border-[#6050A8]/10 bg-white/90 text-[#4B3B97]',
+    footerClass: 'border-[#6050A8]/12 bg-white/92 text-[#4B3B97]',
   },
 ] as const;
 
@@ -68,20 +80,20 @@ export function PageGatewaySection() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group relative rounded-[1.9rem] border px-5 py-5 shadow-[0_12px_28px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_18px_34px_rgba(20,41,95,0.10)] sm:px-6 sm:py-6 ${item.cardClass}`}
+                className={`group relative overflow-hidden rounded-[1.9rem] border px-5 py-5 shadow-[0_14px_30px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_22px_40px_rgba(20,41,95,0.12)] sm:px-6 sm:py-6 ${item.cardClass}`}
               >
-                <div className="relative flex min-h-[208px] flex-col justify-between">
-                  <div className="space-y-6">
+                <div className="relative flex min-h-[214px] flex-col justify-between">
+                  <div className="space-y-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-3">
                         <div className="flex items-center gap-2.5">
                           <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">{item.eyebrow}</p>
-                          <span className="rounded-full border border-[#14295F]/10 bg-white/70 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[#14295F]/55">
+                          <span className="rounded-full border border-[#14295F]/10 bg-white/78 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[#14295F]/55">
                             PAGE {pageNumber}
                           </span>
                         </div>
                         <h3 className="break-keep text-[1.32rem] font-black leading-[1.12] text-[#14295F] sm:text-[1.45rem]">
-                        {item.title}
+                          {item.title}
                         </h3>
                       </div>
                       <span
@@ -91,17 +103,26 @@ export function PageGatewaySection() {
                       </span>
                     </div>
 
-                    <div className="max-w-[15rem] space-y-3">
+                    <div className="space-y-3">
                       <p className="text-sm font-bold leading-[1.55] text-[#14295F]/82">
                         {item.meta}
                       </p>
-                      <div className="h-px w-14 bg-[#14295F]/10" />
+                      <div className="flex flex-wrap gap-2">
+                        {item.highlights.map((highlight) => (
+                          <span
+                            key={highlight}
+                            className={`rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.04em] ${item.chipClass}`}
+                          >
+                            {highlight}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="inline-flex items-center gap-2 text-[13px] font-black text-[#14295F]">
-                    자세히 보기
-                    <ArrowRight className="brand-cta-arrow h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1.5" />
+                  <div className={`inline-flex items-center justify-between gap-3 rounded-[1.1rem] border px-4 py-3 text-[13px] font-black ${item.footerClass}`}>
+                    <span>자세히 보기</span>
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1.5" />
                   </div>
                 </div>
               </Link>
