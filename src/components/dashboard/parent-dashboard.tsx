@@ -3073,7 +3073,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </div>
           </section>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-[minmax(0,1.16fr)_minmax(0,1.16fr)_minmax(0,0.92fr)_minmax(0,0.92fr)] xl:gap-4">
+          <div className="grid grid-cols-2 gap-3 xl:gap-4">
             <ParentMetricCardShell
               tone="study"
               className={cn(
@@ -3121,9 +3121,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       {studyTrendHasActivity ? `${dailyStudyTrend.filter((point) => point.minutes > 0).length}일 기록` : '기록 대기'}
                     </p>
                   </div>
-                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
-                    그래프 대신 핵심 수치만 남겨 모바일에서도 잘리지 않게 정리했습니다.
-                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#dbe6fb] pt-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">최고치</p>
+                    <p className="text-[12px] font-black text-[#14295F]">
+                      {studyTrendHasActivity ? toHm(studyTrendPeakMinutes) : '기록 대기'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </ParentMetricCardShell>
@@ -3169,9 +3172,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
                     </p>
                   </div>
-                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
-                    잘리는 그래프 대신 완료 흐름을 숫자로 바로 읽을 수 있게 정리했습니다.
-                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#ffe0c2] pt-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">활성일</p>
+                    <p className="text-[12px] font-black text-[#9b5910]">
+                      {planTrendActiveDays > 0 ? `${planTrendActiveDays}일` : '기록 대기'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </ParentMetricCardShell>
