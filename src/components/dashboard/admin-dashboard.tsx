@@ -148,6 +148,7 @@ const EMPTY_ADMIN_METRICS = {
   activeParentCount30d: 0,
   avgVisitsPerStudent30d: 0,
   consultationRequestCount30d: 0,
+  leadPipelineCount30d: 0,
   consultationRiskIndex30d: 0,
   reportReadCount30d: 0,
   focusKpi: {
@@ -478,6 +479,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'parentCommunications');
   }, [firestore, centerId]);
   const { data: parentCommunications } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
+
+  const consultingLeadsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'consultingLeads'), orderBy('createdAt', 'desc'), limit(800));
+  }, [firestore, centerId]);
+  const { data: consultingLeads } = useCollection<any>(consultingLeadsQuery, { enabled: isActive });
+
+  const websiteConsultRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'websiteConsultRequests'), orderBy('createdAt', 'desc'), limit(800));
+  }, [firestore, centerId]);
+  const { data: websiteConsultRequests } = useCollection<any>(websiteConsultRequestsQuery, { enabled: isActive });
 
   const centerAnnouncementsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -1142,6 +1155,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const consultationEventCount30d = recentParentEvents.filter((event) => event.eventType === 'consultation_request').length;
     const consultationDocCount30d = recentParentCommunications.filter((item: any) => item.type === 'consultation').length;
     const consultationRequestCount30d = Math.max(consultationEventCount30d, consultationDocCount30d);
+    const recentWebsiteConsultRequests = (websiteConsultRequests || []).filter((item: any) => {
+      const createdAtMs = item?.createdAt?.toMillis?.() ?? item?.updatedAt?.toMillis?.() ?? 0;
+      return createdAtMs >= thirtyDaysAgoMs;
+    });
+    const recentWebsiteLeadIds = new Set(
+      recentWebsiteConsultRequests
+        .map((item: any) => item?.linkedLeadId)
+        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+    );
+    const manualLeadCount30d = (consultingLeads || []).filter((lead: any) => {
+      const createdAtMs = lead?.createdAt?.toMillis?.() ?? lead?.updatedAt?.toMillis?.() ?? 0;
+      if (createdAtMs < thirtyDaysAgoMs) return false;
+      if (recentWebsiteLeadIds.has(lead?.id || '')) return false;
+      return !(lead?.source === 'website' || lead?.sourceRequestId);
+    }).length;
+    const leadPipelineCount30d = recentWebsiteConsultRequests.length + manualLeadCount30d;
 
     const reportReadCount30d = recentParentEvents.filter((event) => event.eventType === 'report_read').length;
     const focusRows = filteredStudentMembers.map((member) => {
@@ -1183,6 +1212,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       activeParentCount30d,
       avgVisitsPerStudent30d: targetMemberIds.size > 0 ? Number((parentVisitCount30d / targetMemberIds.size).toFixed(1)) : 0,
       consultationRequestCount30d,
+      leadPipelineCount30d,
       consultationRiskIndex30d: activeParentCount30d > 0
         ? Math.min(100, Math.round((consultationRequestCount30d / activeParentCount30d) * 100))
         : 0,
@@ -1206,7 +1236,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       focusTop10,
       focusBottom10,
     };
-  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs]);
+  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs]);
 
   const selectedFocusStudent = useMemo(() => {
     if (!selectedFocusStudentId || !metrics) return null;
@@ -1709,8 +1739,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         },
         {
           key: 'lead',
-          title: `상담·리드 ${metrics?.consultationRequestCount30d ?? 0}건`,
-          detail: '입학 대기와 최근 상담 요청을 같은 흐름에서 확인할 수 있습니다.',
+          title: `상담·리드 ${metrics?.leadPipelineCount30d ?? 0}건`,
+          detail: '웹 상담폼, 입학 대기, 수동 리드를 같은 흐름에서 확인할 수 있습니다.',
           actionLabel: '리드 워크벤치',
           href: '/dashboard/leads',
           icon: Megaphone,
@@ -1767,7 +1797,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             </div>
             <div className="rounded-xl bg-white/10 px-3 py-2">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/50">상담·리드</p>
-              <p className="mt-1 text-lg font-black">{metrics.consultationRequestCount30d}건</p>
+              <p className="mt-1 text-lg font-black">{metrics.leadPipelineCount30d}건</p>
             </div>
           </div>
         </Card>
