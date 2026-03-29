@@ -196,16 +196,23 @@ export default function GrowthPage() {
       <Card className="overflow-hidden rounded-[2rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#1B326D_55%,#233E86_100%)] text-white shadow-[0_34px_80px_-44px_rgba(20,41,95,0.9)]">
         <CardContent className={cn(isMobile ? 'p-5' : 'p-8')}>
           <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-end justify-between')}>
-            <div className="space-y-3">
-              <Badge className="border-none bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white">
-                포인트 중심 성장
-              </Badge>
-              <h2 className={cn('font-black tracking-tight break-keep', isMobile ? 'text-2xl leading-9' : 'text-[2.7rem] leading-[1.1]')}>
-                이번 달 공부시간을 쌓아<br className={isMobile ? 'hidden' : 'block'} /> 월간 랭킹과 포인트 보상을 함께 가져가요
-              </h2>
-              <p className={cn('font-semibold text-white/75', isMobile ? 'text-sm leading-6' : 'max-w-3xl text-base leading-7')}>
-                보상은 포인트 지갑으로, 경쟁은 월간 공부시간 랭킹으로 정리됐습니다. 첫 공부 시작엔 운세가 뜨고, 누적 1시간마다 포인트 상자가 열립니다.
-              </p>
+            <div
+              className={cn(
+                "rounded-[1.6rem] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.96)_100%)] text-[#14295F] shadow-[0_28px_60px_-42px_rgba(9,19,46,0.58)]",
+                isMobile ? "p-4" : "max-w-3xl p-6"
+              )}
+            >
+              <div className="space-y-3">
+                <Badge className="border-none bg-[#14295F] px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-sm">
+                  포인트 중심 성장
+                </Badge>
+                <h2 className={cn('font-black tracking-tight break-keep text-[#14295F]', isMobile ? 'text-[1.85rem] leading-[1.35]' : 'text-[2.7rem] leading-[1.14]')}>
+                  이번 달 공부시간을 쌓아<br className={isMobile ? 'hidden' : 'block'} /> 월간 랭킹과 포인트 보상을 함께 가져가요
+                </h2>
+                <p className={cn('font-semibold text-slate-600', isMobile ? 'text-sm leading-6' : 'max-w-3xl text-base leading-7')}>
+                  보상은 포인트 지갑으로, 경쟁은 월간 공부시간 랭킹으로 정리됐습니다. 첫 공부 시작엔 운세가 뜨고, 누적 1시간마다 포인트 상자가 열립니다.
+                </p>
+              </div>
             </div>
             <div className={cn('rounded-[1.5rem] border border-white/15 bg-white/10 backdrop-blur-sm', isMobile ? 'p-4' : 'min-w-[18rem] p-5')}>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/60">누적 포인트</p>
