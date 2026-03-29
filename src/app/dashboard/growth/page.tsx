@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { format, subDays } from 'date-fns';
 import {
   collection,
@@ -12,7 +13,6 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc,
 } from 'firebase/firestore';
 import {
   ChevronRight,
@@ -31,18 +31,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { useToast } from '@/hooks/use-toast';
+import { getAvailableStudyBoxMilestones, getClaimedStudyBoxes, getDailyFortuneMessage, rollStudyBoxReward, type StudyBoxReward } from '@/lib/student-rewards';
 import { GrowthProgress, LeaderboardEntry, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type BoxState = 'locked' | 'charging' | 'ready' | 'opened';
 type BoxRarity = 'common' | 'rare' | 'epic';
 type BoxStage = 'idle' | 'shake' | 'burst' | 'revealed';
-
-type BoxCurve = {
-  min: number;
-  max: number;
-  rarity: BoxRarity;
-};
 
 type RewardBox = {
   id: string;
@@ -52,26 +48,21 @@ type RewardBox = {
   reward?: number;
 };
 
-const BOX_CURVES: Record<number, BoxCurve> = {
-  1: { min: 10, max: 20, rarity: 'common' },
-  2: { min: 15, max: 25, rarity: 'common' },
-  3: { min: 20, max: 30, rarity: 'common' },
-  4: { min: 25, max: 35, rarity: 'rare' },
-  5: { min: 30, max: 40, rarity: 'rare' },
-  6: { min: 35, max: 45, rarity: 'rare' },
-  7: { min: 40, max: 50, rarity: 'epic' },
-  8: { min: 45, max: 55, rarity: 'epic' },
+type FloatingGain = {
+  key: number;
+  amount: number;
 };
 
-const FORTUNE_MESSAGES = [
-  '오늘은 한 상자만 열어도 흐름이 붙어요.',
-  '집중이 붙는 날이에요. 1시간만 넘겨보세요.',
-  '짧게 시작해도 상자가 기다리고 있어요.',
-  '오늘은 꾸준함이 포인트로 바로 바뀌어요.',
-  '지금 시작하면 다음 상자까지 더 빨라져요.',
-  '작은 몰입이 큰 보상으로 이어지는 날이에요.',
-  '한 시간만 더 채우면 리듬이 완전히 살아나요.',
-];
+const BOX_RARITIES: Record<number, BoxRarity> = {
+  1: 'common',
+  2: 'common',
+  3: 'common',
+  4: 'rare',
+  5: 'rare',
+  6: 'rare',
+  7: 'epic',
+  8: 'epic',
+};
 
 const RARITY_LABELS: Record<BoxRarity, string> = {
   common: '커먼',
@@ -80,16 +71,28 @@ const RARITY_LABELS: Record<BoxRarity, string> = {
 };
 
 function formatStudyMinutes(minutes: number) {
-  if (minutes <= 0) return '0m';
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours <= 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}h ${mins}m`;
+  const safe = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  if (hours <= 0) return `${mins}분`;
+  if (mins === 0) return `${hours}시간`;
+  return `${hours}시간 ${mins}분`;
 }
 
-function formatCompactProgress(current: number, total: number) {
-  return `${current} / ${total} min`;
+function formatStudyMinutesShort(minutes: number) {
+  const safe = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  if (hours <= 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}.${Math.round((mins / 60) * 10)}h`;
+}
+
+function formatProgressCounter(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = safeSeconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')} / 60:00`;
 }
 
 function formatRankTime(minutes: number) {
@@ -103,50 +106,70 @@ function getTodayKey() {
   return format(new Date(), 'yyyy-MM-dd');
 }
 
-function getFortuneMessage(studentId: string | undefined, todayKey: string) {
-  const seed = `${studentId || 'student'}-${todayKey}`;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) % 2147483647;
+function formatCountdown(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = safeSeconds % 60;
+  return `${mins}분 ${secs.toString().padStart(2, '0')}초`;
+}
+
+function formatHeroTimer(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const mins = Math.floor((safeSeconds % 3600) / 60);
+  const secs = safeSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
-  return FORTUNE_MESSAGES[Math.abs(hash) % FORTUNE_MESSAGES.length];
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function getRewardRange(hour: number, statAverage: number) {
-  const curve = BOX_CURVES[hour] || BOX_CURVES[1];
-  const skillBoost = 1 + Math.min(0.2, (statAverage / 100) * 0.2);
-  return {
-    min: Math.round(curve.min * skillBoost),
-    max: Math.round(curve.max * skillBoost),
-    rarity: curve.rarity,
-  };
-}
-
-function randomBetween(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+function coerceStudyBoxRewards(dayStatus: Record<string, any>): StudyBoxReward[] {
+  const raw = Array.isArray(dayStatus.studyBoxRewards) ? dayStatus.studyBoxRewards : [];
+  return raw
+    .map((entry) => {
+      const milestone = Number(entry?.milestone);
+      const minReward = Number(entry?.minReward);
+      const maxReward = Number(entry?.maxReward);
+      const awardedPoints = Number(entry?.awardedPoints);
+      const multiplier = Number(entry?.multiplier ?? 1);
+      if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
+      if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
+      return {
+        milestone,
+        minReward,
+        maxReward,
+        awardedPoints,
+        multiplier: Number.isFinite(multiplier) ? multiplier : 1,
+      } satisfies StudyBoxReward;
+    })
+    .filter((entry): entry is StudyBoxReward => Boolean(entry))
+    .sort((a, b) => a.milestone - b.milestone);
 }
 
 function buildRewardBoxes({
   earnedHours,
+  claimedHours,
   openedHours,
-  storedRewards,
+  rewardByHour,
 }: {
   earnedHours: number;
+  claimedHours: number[];
   openedHours: number[];
-  storedRewards: Record<string, number>;
+  rewardByHour: Map<number, StudyBoxReward>;
 }) {
+  const claimedSet = new Set(claimedHours);
   const openedSet = new Set(openedHours);
   const cappedEarned = Math.min(8, Math.max(0, earnedHours));
   const nextHour = Math.min(8, cappedEarned + 1);
 
   return Array.from({ length: 8 }, (_, index) => {
     const hour = index + 1;
-    const range = BOX_CURVES[hour];
     const state: BoxState = openedSet.has(hour)
       ? 'opened'
-      : hour <= cappedEarned
+      : claimedSet.has(hour)
         ? 'ready'
-        : hour === nextHour && cappedEarned < 8
+      : hour === nextHour && cappedEarned < 8
           ? 'charging'
           : 'locked';
 
@@ -154,8 +177,8 @@ function buildRewardBoxes({
       id: `point-box-${hour}`,
       hour,
       state,
-      rarity: range.rarity,
-      reward: storedRewards[String(hour)],
+      rarity: BOX_RARITIES[hour] || 'common',
+      reward: rewardByHour.get(hour)?.awardedPoints,
     } satisfies RewardBox;
   });
 }
@@ -164,23 +187,24 @@ function RewardHeroChest({
   state,
   stage,
   label,
+  intense = false,
   onClick,
 }: {
   state: 'ready' | 'charging';
   stage?: BoxStage;
   label: string;
+  intense?: boolean;
   onClick?: () => void;
 }) {
-  const isReady = state === 'ready';
-
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={!isReady || !onClick}
+      disabled={!onClick}
       className={cn(
         'point-track-hero-box',
-        isReady ? 'point-track-hero-box--ready' : 'point-track-hero-box--charging',
+        state === 'ready' ? 'point-track-hero-box--ready' : 'point-track-hero-box--charging',
+        intense && 'point-track-hero-box--intense',
         stage === 'shake' && 'point-track-hero-box--shake',
         stage === 'burst' && 'point-track-hero-box--burst',
         stage === 'revealed' && 'point-track-hero-box--revealed'
@@ -231,14 +255,21 @@ function StatCard({
   label,
   value,
   accentClass,
+  floatingGain,
 }: {
   icon: typeof Flame;
   label: string;
   value: string;
   accentClass: string;
+  floatingGain?: FloatingGain | null;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.05))] px-3.5 py-3.5 shadow-[0_18px_34px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
+    <div className="relative rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.05))] px-3.5 py-3.5 shadow-[0_18px_34px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
+      {floatingGain ? (
+        <div key={floatingGain.key} className="point-track-floating-gain">
+          +{floatingGain.amount}P
+        </div>
+      ) : null}
       <div className="mb-3 flex items-center justify-between">
         <span className={cn('inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/12 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
           <Icon className="h-4 w-4" />
@@ -253,9 +284,15 @@ function StatCard({
 function InventorySlot({
   box,
   onSelect,
+  chargingLabel,
+  chargingPercent,
+  isFresh,
 }: {
   box: RewardBox;
   onSelect: (hour: number) => void;
+  chargingLabel?: string;
+  chargingPercent?: number;
+  isFresh?: boolean;
 }) {
   const rarityClass =
     box.rarity === 'epic'
@@ -275,7 +312,8 @@ function InventorySlot({
         box.state === 'ready' && 'point-track-slot--ready',
         box.state === 'charging' && 'point-track-slot--charging',
         box.state === 'opened' && 'point-track-slot--opened',
-        box.state === 'locked' && 'point-track-slot--locked'
+        box.state === 'locked' && 'point-track-slot--locked',
+        isFresh && 'point-track-slot--fresh'
       )}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -303,18 +341,25 @@ function InventorySlot({
       </div>
       <div className="mt-3">
         <div className="text-[11px] font-black tracking-tight text-white">{box.hour}시간 상자</div>
-        <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
-          <span>
-            {box.state === 'opened'
-              ? `+${box.reward || 0}P`
-              : box.state === 'ready'
-                ? 'OPEN'
-                : box.state === 'charging'
-                  ? 'SOON'
+        {box.state === 'charging' ? (
+          <>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="point-track-slot__meter-fill" style={{ width: `${Math.max(4, Math.min(100, chargingPercent || 0))}%` }} />
+            </div>
+            <div className="mt-1 text-[10px] font-black text-white/55">{chargingLabel}</div>
+          </>
+        ) : (
+          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+            <span>
+              {box.state === 'opened'
+                ? `+${box.reward || 0}P`
+                : box.state === 'ready'
+                  ? 'READY'
                   : 'LOCK'}
-          </span>
-          <span>{box.state === 'opened' ? '완료' : box.state === 'ready' ? '열기' : box.state === 'charging' ? '준비' : '잠김'}</span>
-        </div>
+            </span>
+            <span>{box.state === 'opened' ? '완료' : box.state === 'ready' ? '열기' : '잠김'}</span>
+          </div>
+        )}
       </div>
     </button>
   );
@@ -349,11 +394,28 @@ function PodiumCard({
 
 export default function GrowthPage() {
   const { user } = useUser();
-  const { activeMembership, viewMode } = useAppContext();
+  const router = useRouter();
+  const { toast } = useToast();
+  const { activeMembership, viewMode, isTimerActive, startTime } = useAppContext();
   const firestore = useFirestore();
   const isMobile = viewMode === 'mobile';
   const todayKey = getTodayKey();
   const periodKey = format(new Date(), 'yyyy-MM');
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [selectedBoxHour, setSelectedBoxHour] = useState<number | null>(null);
+  const [boxStage, setBoxStage] = useState<BoxStage>('idle');
+  const [revealedReward, setRevealedReward] = useState<number | null>(null);
+  const [isClaimingBox, setIsClaimingBox] = useState(false);
+  const [floatingGain, setFloatingGain] = useState<FloatingGain | null>(null);
+  const [arrivalEvent, setArrivalEvent] = useState<{ key: number; count: number } | null>(null);
+  const [freshReadyHours, setFreshReadyHours] = useState<number[]>([]);
+  const [claimedBoxes, setClaimedBoxes] = useState<number[]>([]);
+  const [rewardEntries, setRewardEntries] = useState<StudyBoxReward[]>([]);
+  const [openedBoxes, setOpenedBoxes] = useState<number[]>([]);
+  const [pointBalance, setPointBalance] = useState(0);
+  const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const liveClaimKeyRef = useRef<string | null>(null);
 
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -373,14 +435,14 @@ export default function GrowthPage() {
 
   const leaderboardEntryRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+    return doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_study-time`, 'entries', user.uid);
   }, [firestore, activeMembership?.id, periodKey, user?.uid]);
   const { data: ownRankEntry } = useDoc<LeaderboardEntry>(leaderboardEntryRef);
 
   const leaderboardTopQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_lp`, 'entries'),
+      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_study-time`, 'entries'),
       orderBy('value', 'desc'),
       limit(12)
     );
@@ -404,59 +466,54 @@ export default function GrowthPage() {
       .reduce((sum, log) => sum + Math.max(0, Number(log.totalMinutes || 0)), 0);
   }, [seasonStudyLogs, periodKey]);
 
-  const statAverage = useMemo(() => {
-    const values = [
-      Number(progress?.stats?.focus || 0),
-      Number(progress?.stats?.consistency || 0),
-      Number(progress?.stats?.achievement || 0),
-      Number(progress?.stats?.resilience || 0),
-    ];
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  }, [progress?.stats]);
-
   const todayStatus = useMemo(() => {
-    return ((progress?.dailyLpStatus || {})[todayKey] || {}) as Record<string, any>;
-  }, [progress?.dailyLpStatus, todayKey]);
+    return ((progress?.dailyPointStatus || {})[todayKey] || {}) as Record<string, any>;
+  }, [progress?.dailyPointStatus, todayKey]);
 
-  const persistedClaimedBoxes = useMemo(() => {
-    return Array.isArray(todayStatus.claimedPointBoxes)
-      ? todayStatus.claimedPointBoxes
-          .map((value) => Number(value))
-          .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
-      : [];
-  }, [todayStatus.claimedPointBoxes]);
+  const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayStatus), [todayStatus]);
+  const persistedRewardEntries = useMemo(() => coerceStudyBoxRewards(todayStatus), [todayStatus]);
+  const persistedOpenedBoxes = useMemo(() => {
+    const raw = Array.isArray(todayStatus.openedStudyBoxes) ? todayStatus.openedStudyBoxes : [];
+    return raw
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
+      .sort((a, b) => a - b);
+  }, [todayStatus]);
 
-  const persistedRewards = useMemo(() => {
-    const rewards = todayStatus.pointBoxRewards;
-    if (!rewards || typeof rewards !== 'object') return {} as Record<string, number>;
-    return Object.entries(rewards).reduce<Record<string, number>>((acc, [key, value]) => {
-      const numeric = Number(value);
-      if (Number.isFinite(numeric)) acc[key] = numeric;
-      return acc;
-    }, {});
-  }, [todayStatus.pointBoxRewards]);
-
-  const [claimedBoxes, setClaimedBoxes] = useState<number[]>(persistedClaimedBoxes);
-  const [rewardMap, setRewardMap] = useState<Record<string, number>>(persistedRewards);
-  const [pointBalance, setPointBalance] = useState<number>(Math.max(0, Number(progress?.seasonLp || 0)));
-  const [isVaultOpen, setIsVaultOpen] = useState(false);
-  const [selectedBoxHour, setSelectedBoxHour] = useState<number | null>(null);
-  const [boxStage, setBoxStage] = useState<BoxStage>('idle');
-  const [revealedReward, setRevealedReward] = useState<number | null>(null);
-  const [isClaimingBox, setIsClaimingBox] = useState(false);
-  const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const stats = useMemo(() => {
+    const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
+    return {
+      focus: Math.min(100, Number(raw.focus || 0)),
+      consistency: Math.min(100, Number(raw.consistency || 0)),
+      achievement: Math.min(100, Number(raw.achievement || 0)),
+      resilience: Math.min(100, Number(raw.resilience || 0)),
+    };
+  }, [progress?.stats]);
 
   useEffect(() => {
     setClaimedBoxes(persistedClaimedBoxes);
   }, [persistedClaimedBoxes]);
 
   useEffect(() => {
-    setRewardMap(persistedRewards);
-  }, [persistedRewards]);
+    setRewardEntries(persistedRewardEntries);
+  }, [persistedRewardEntries]);
 
   useEffect(() => {
-    setPointBalance(Math.max(0, Number(progress?.seasonLp || 0)));
-  }, [progress?.seasonLp]);
+    setOpenedBoxes(persistedOpenedBoxes);
+  }, [persistedOpenedBoxes]);
+
+  useEffect(() => {
+    setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
+  }, [progress?.pointsBalance]);
+
+  useEffect(() => {
+    if (!isTimerActive || !startTime) return;
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isTimerActive, startTime]);
 
   useEffect(() => {
     return () => {
@@ -464,22 +521,39 @@ export default function GrowthPage() {
     };
   }, []);
 
-  const earnedBoxes = Math.min(8, Math.floor(todayMinutes / 60));
-  const currentCycleMinutes = earnedBoxes >= 8 ? 60 : todayMinutes % 60;
-  const nextBoxMinutesLeft = earnedBoxes >= 8 ? 0 : Math.max(0, 60 - currentCycleMinutes);
-  const progressPercent = earnedBoxes >= 8 ? 100 : Math.max(6, (currentCycleMinutes / 60) * 100);
+  const liveSessionSeconds = isTimerActive && startTime ? Math.max(0, Math.floor((nowMs - startTime) / 1000)) : 0;
+  const liveTodaySeconds = Math.max(0, todayMinutes * 60 + liveSessionSeconds);
+  const liveTodayMinutes = Math.floor(liveTodaySeconds / 60);
+  const rewardByHour = useMemo(() => {
+    const map = new Map<number, StudyBoxReward>();
+    rewardEntries.forEach((entry) => {
+      map.set(entry.milestone, entry);
+    });
+    return map;
+  }, [rewardEntries]);
+  const earnedBoxes = Math.min(8, Math.floor(liveTodaySeconds / 3600));
+  const currentCycleSeconds = earnedBoxes >= 8 ? 3600 : liveTodaySeconds % 3600;
+  const nextBoxSecondsLeft = earnedBoxes >= 8 ? 0 : Math.max(0, 3600 - currentCycleSeconds);
+  const progressPercent = earnedBoxes >= 8 ? 100 : Math.max(4, (currentCycleSeconds / 3600) * 100);
+  const isNearNextBox = progressPercent >= 80 && progressPercent < 100;
 
   const boxes = useMemo(
     () =>
       buildRewardBoxes({
         earnedHours: earnedBoxes,
-        openedHours: claimedBoxes,
-        storedRewards: rewardMap,
+        claimedHours: claimedBoxes,
+        openedHours: openedBoxes,
+        rewardByHour,
       }),
-    [earnedBoxes, claimedBoxes, rewardMap]
+    [earnedBoxes, claimedBoxes, openedBoxes, rewardByHour]
   );
 
   const readyBoxes = boxes.filter((box) => box.state === 'ready');
+  const totalAvailableBoxes = readyBoxes.length;
+  const todayPointGain = rewardEntries.reduce((sum, reward) => sum + Number(reward.awardedPoints || 0), 0);
+  const todayOpenedCount = openedBoxes.length;
+  const fortuneMessage = (todayStatus.fortuneMessage as string | undefined) || getDailyFortuneMessage(user?.uid || 'student', todayKey);
+
   const topEntries = useMemo(() => {
     return (leaderboardTopRaw || [])
       .filter((entry) => typeof entry.studentId === 'string' && !entry.studentId.toLowerCase().startsWith('test-'))
@@ -487,13 +561,104 @@ export default function GrowthPage() {
   }, [leaderboardTopRaw]);
 
   const myRankLabel = ownRankEntry?.rank ? `#${ownRankEntry.rank}` : '집계중';
-  const todayPointGain = Object.values(rewardMap).reduce((sum, value) => sum + Number(value || 0), 0);
-  const fortuneMessage = getFortuneMessage(user?.uid, todayKey);
-  const totalAvailableBoxes = readyBoxes.length;
+  const heroMode = totalAvailableBoxes > 0 ? 'ready' : isTimerActive ? 'studying' : 'idle';
+  const heroPrimaryLabel =
+    totalAvailableBoxes > 1
+      ? `${totalAvailableBoxes}개 대기`
+      : totalAvailableBoxes === 1
+        ? '지금 열기'
+        : isTimerActive
+          ? formatHeroTimer(liveSessionSeconds)
+          : formatCountdown(nextBoxSecondsLeft);
+  const heroSecondaryLabel =
+    totalAvailableBoxes > 0
+      ? '보관함에서 한 개씩 열어보세요'
+      : isTimerActive
+        ? `계속 공부하면 ${formatCountdown(nextBoxSecondsLeft)} 뒤 상자 도착`
+        : '공부를 시작하면 누적 1시간마다 상자가 도착해요';
+  const heroCtaLabel =
+    totalAvailableBoxes > 1
+      ? `상자 ${totalAvailableBoxes}개 열기`
+      : totalAvailableBoxes === 1
+        ? '상자 열기'
+        : isTimerActive
+          ? `계속 공부 중 · ${formatCountdown(nextBoxSecondsLeft)}`
+          : '공부 시작하고 상자 채우기';
 
-  const selectedBox = selectedBoxHour
-    ? boxes.find((box) => box.hour === selectedBoxHour) || null
-    : null;
+  const selectedBox = selectedBoxHour ? boxes.find((box) => box.hour === selectedBoxHour) || null : null;
+
+  useEffect(() => {
+    if (!isTimerActive || !progressRef) return;
+
+    const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, claimedBoxes);
+    if (availableMilestones.length === 0) return;
+
+    const claimKey = `${todayKey}:${availableMilestones.join(',')}:${liveTodayMinutes}`;
+    if (liveClaimKeyRef.current === claimKey) return;
+    liveClaimKeyRef.current = claimKey;
+
+    const nextRewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone, stats));
+    const awardedPoints = nextRewards.reduce((sum, reward) => sum + reward.awardedPoints, 0);
+    const nextClaimedBoxes = Array.from(new Set([...claimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
+    const nextRewardEntries = [...rewardEntries, ...nextRewards].sort((a, b) => a.milestone - b.milestone);
+    const nextDayStatus = {
+      ...todayStatus,
+      claimedStudyBoxes: nextClaimedBoxes,
+      studyBoxRewards: nextRewardEntries,
+      dailyPointAmount: Number(todayStatus.dailyPointAmount || 0) + awardedPoints,
+    };
+
+    setClaimedBoxes(nextClaimedBoxes);
+    setRewardEntries(nextRewardEntries);
+    setPointBalance((prev) => prev + awardedPoints);
+    setArrivalEvent({ key: Date.now(), count: availableMilestones.length });
+    setFreshReadyHours(availableMilestones);
+
+    const clearFresh = setTimeout(() => {
+      setFreshReadyHours((prev) => prev.filter((hour) => !availableMilestones.includes(hour)));
+    }, 1800);
+    timeoutsRef.current.push(clearFresh);
+
+    void setDoc(
+      progressRef,
+      {
+        pointsBalance: increment(awardedPoints),
+        totalPointsEarned: increment(awardedPoints),
+        dailyPointStatus: {
+          [todayKey]: nextDayStatus,
+        },
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    )
+      .then(() => {
+        toast({
+          title: availableMilestones.length > 1 ? `상자 ${availableMilestones.length}개 도착!` : '상자 도착!',
+          description: `+${availableMilestones.length} BOX · 보관함에서 열어보세요.`,
+        });
+      })
+      .catch((error: any) => {
+        console.warn('[point-track] live study box claim failed', error?.message || error);
+        liveClaimKeyRef.current = null;
+        setClaimedBoxes(persistedClaimedBoxes);
+        setRewardEntries(persistedRewardEntries);
+        setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
+        setFreshReadyHours([]);
+      });
+  }, [
+    claimedBoxes,
+    isTimerActive,
+    liveTodayMinutes,
+    persistedClaimedBoxes,
+    persistedRewardEntries,
+    progress?.pointsBalance,
+    progressRef,
+    rewardEntries,
+    stats,
+    todayKey,
+    todayStatus,
+    toast,
+  ]);
 
   const openVault = (hour?: number) => {
     if (totalAvailableBoxes <= 0) return;
@@ -522,7 +687,7 @@ export default function GrowthPage() {
   };
 
   const handleRevealBox = async () => {
-    if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !progressRef || !user || !activeMembership || !firestore) return;
+    if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !progressRef) return;
 
     setIsClaimingBox(true);
     setBoxStage('shake');
@@ -534,43 +699,21 @@ export default function GrowthPage() {
 
     const revealTimeout = setTimeout(async () => {
       try {
-        const storedReward = rewardMap[String(selectedBox.hour)];
-        const { min, max } = getRewardRange(selectedBox.hour, statAverage);
-        const reward = Number.isFinite(storedReward) ? storedReward : randomBetween(min, max);
+        const reward = rewardByHour.get(selectedBox.hour)?.awardedPoints ?? selectedBox.reward ?? 0;
+        const nextOpenedBoxes = Array.from(new Set([...openedBoxes, selectedBox.hour])).sort((a, b) => a - b);
 
-        const nextClaimedBoxes = Array.from(new Set([...claimedBoxes, selectedBox.hour])).sort((a, b) => a - b);
-        const nextRewardMap = { ...rewardMap, [String(selectedBox.hour)]: reward };
-        const nextPointBalance = pointBalance + reward;
-
-        setClaimedBoxes(nextClaimedBoxes);
-        setRewardMap(nextRewardMap);
-        setPointBalance(nextPointBalance);
-
-        await updateDoc(progressRef, {
-          [`dailyLpStatus.${todayKey}.claimedPointBoxes`]: nextClaimedBoxes,
-          [`dailyLpStatus.${todayKey}.pointBoxRewards.${selectedBox.hour}`]: reward,
-          seasonLp: increment(reward),
-          totalLpEarned: increment(reward),
-          updatedAt: serverTimestamp(),
-        });
-
-        const rankRef = doc(
-          firestore,
-          'centers',
-          activeMembership.id,
-          'leaderboards',
-          `${periodKey}_lp`,
-          'entries',
-          user.uid
-        );
+        setOpenedBoxes(nextOpenedBoxes);
         await setDoc(
-          rankRef,
+          progressRef,
           {
-            studentId: user.uid,
-            displayNameSnapshot: user.displayName || activeMembership.displayName || '학생',
-            classNameSnapshot: activeMembership.className || null,
-            schoolNameSnapshot: null,
-            value: nextPointBalance,
+            dailyPointStatus: {
+              [todayKey]: {
+                ...todayStatus,
+                claimedStudyBoxes: claimedBoxes,
+                studyBoxRewards: rewardEntries,
+                openedStudyBoxes: nextOpenedBoxes,
+              },
+            },
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -578,8 +721,15 @@ export default function GrowthPage() {
 
         setRevealedReward(reward);
         setBoxStage('revealed');
+        setFloatingGain({ key: Date.now(), amount: reward });
+
+        const clearFloating = setTimeout(() => {
+          setFloatingGain(null);
+        }, 1800);
+        timeoutsRef.current.push(clearFloating);
       } catch (error) {
         console.error('[point-track] reward box open failed', error);
+        setOpenedBoxes(persistedOpenedBoxes);
         setBoxStage('idle');
       } finally {
         setIsClaimingBox(false);
@@ -600,6 +750,14 @@ export default function GrowthPage() {
     setRevealedReward(null);
   };
 
+  const handleHeroCta = () => {
+    if (totalAvailableBoxes > 0) {
+      openVault();
+      return;
+    }
+    router.push('/dashboard');
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[70vh] items-center justify-center">
@@ -611,44 +769,77 @@ export default function GrowthPage() {
   return (
     <div className="point-track-game-screen pb-24">
       <div className={cn('mx-auto flex w-full max-w-md flex-col gap-4', isMobile ? 'px-0' : 'px-1')}>
-        <section className="point-track-hero-stage">
+        <section className={cn('point-track-hero-stage', arrivalEvent && 'point-track-hero-stage--arrival')}>
+          {arrivalEvent ? (
+            <div key={arrivalEvent.key} className="point-track-arrival-banner">
+              +{arrivalEvent.count} BOX
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.24em] text-white/45">POINT TRACK</p>
               <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
             </div>
-            <div className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-orange-100">
-              {totalAvailableBoxes > 0 ? 'BOX READY' : 'CHARGING'}
+            <div
+              className={cn(
+                'rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em]',
+                totalAvailableBoxes > 0
+                  ? 'border border-orange-300/25 bg-orange-300/12 text-[#FFD089]'
+                  : isTimerActive
+                    ? 'border border-sky-200/20 bg-sky-200/10 text-white/80'
+                    : 'border border-white/10 bg-white/8 text-white/55'
+              )}
+            >
+              {totalAvailableBoxes > 0 ? 'BOX READY' : heroMode === 'studying' ? '집중 중' : '대기'}
             </div>
           </div>
 
           <div className="relative mt-5 flex flex-col items-center gap-4">
             <RewardHeroChest
               state={totalAvailableBoxes > 0 ? 'ready' : 'charging'}
-              label={totalAvailableBoxes > 0 ? '지금 열기' : `${nextBoxMinutesLeft}분 남음`}
+              stage={boxStage}
+              intense={totalAvailableBoxes > 0 || isNearNextBox || Boolean(arrivalEvent)}
+              label={totalAvailableBoxes > 0 ? '지금 열기' : `${nextBoxSecondsLeft}초 남음`}
               onClick={totalAvailableBoxes > 0 ? () => openVault() : undefined}
             />
 
             <div className="text-center">
-              <p className="text-sm font-black text-orange-200/90">{totalAvailableBoxes > 0 ? '지금 열기' : '다음 상자'}</p>
-              <div className="mt-1 text-[2rem] font-black tracking-tight text-white">
-                {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 대기 중` : `${nextBoxMinutesLeft}분 남음`}
-              </div>
-              <p className="mt-1 text-xs font-bold text-white/45">{totalAvailableBoxes > 0 ? '상자를 눌러 보상을 확인하세요' : '1시간 누적마다 보관함에 쌓여요'}</p>
+              <p className="text-sm font-black text-[#FFD089]">
+                {totalAvailableBoxes > 0 ? '상자 도착' : heroMode === 'studying' ? '집중 중' : '다음 상자'}
+              </p>
+              <div className="mt-1 text-[2rem] font-black tracking-tight text-white">{heroPrimaryLabel}</div>
+              <p className="mt-1 text-xs font-bold text-white/55">{heroSecondaryLabel}</p>
             </div>
+
+            {isTimerActive ? (
+              <div className="grid w-full grid-cols-3 gap-2">
+                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">상태</p>
+                  <p className="mt-2 text-sm font-black text-white">집중 중</p>
+                </div>
+                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">세션</p>
+                  <p className="mt-2 text-sm font-black text-white">{formatHeroTimer(liveSessionSeconds)}</p>
+                </div>
+                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">도착</p>
+                  <p className="mt-2 text-sm font-black text-[#FFD089]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
+                </div>
+              </div>
+            ) : null}
 
             <Button
               type="button"
-              onClick={totalAvailableBoxes > 0 ? () => openVault() : undefined}
-              disabled={totalAvailableBoxes <= 0}
+              onClick={handleHeroCta}
               className={cn(
-                'point-track-hero-cta mt-2 h-14 w-full rounded-[1.4rem] text-base font-black',
+                'point-track-hero-cta mt-2 h-14 w-full rounded-[1.4rem] text-base font-black text-white',
                 totalAvailableBoxes > 0
-                  ? 'bg-[linear-gradient(180deg,#ffd089_0%,#ffb357_35%,#ff8a1f_100%)] text-[#15275d]'
-                  : 'bg-white/10 text-white/45'
+                  ? 'bg-[linear-gradient(180deg,#ffd089_0%,#ffb357_35%,#ff8a1f_100%)]'
+                  : 'bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))]'
               )}
             >
-              {totalAvailableBoxes > 0 ? '상자 열기' : '공부하고 상자 채우기'}
+              {heroCtaLabel}
             </Button>
           </div>
         </section>
@@ -656,13 +847,24 @@ export default function GrowthPage() {
         <section className="rounded-[1.7rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-[0_18px_44px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Timer className="h-4 w-4 text-orange-200" />
+              <Timer className="h-4 w-4 text-[#FFD089]" />
               <span className="text-sm font-black text-white">다음 상자</span>
             </div>
-            <span className="text-sm font-black text-white/70">{formatCompactProgress(currentCycleMinutes, 60)}</span>
+            <div className="flex items-center gap-2">
+              {isNearNextBox && totalAvailableBoxes === 0 ? (
+                <span className="rounded-full bg-orange-300/14 px-2 py-1 text-[10px] font-black text-[#FFD089]">곧 도착</span>
+              ) : null}
+              <span className="text-sm font-black text-white/70">{formatProgressCounter(currentCycleSeconds)}</span>
+            </div>
           </div>
           <div className="rounded-full bg-white/10 p-1">
-            <div className="point-track-progress-track">
+            <div
+              className={cn(
+                'point-track-progress-track',
+                isNearNextBox && totalAvailableBoxes === 0 && 'point-track-progress-track--near',
+                arrivalEvent && 'point-track-progress-track--charged'
+              )}
+            >
               <div className="point-track-progress-fill" style={{ width: `${progressPercent}%` }} />
               <div className="point-track-progress-orb" style={{ left: `calc(${progressPercent}% - 0.65rem)` }} />
               <div className="point-track-progress-node point-track-progress-node--one" />
@@ -672,14 +874,29 @@ export default function GrowthPage() {
           </div>
           <div className="mt-3 flex items-center justify-between text-[11px] font-black text-white/48">
             <span>0분</span>
-            <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : '1시간 상자'}</span>
+            <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : `${formatCountdown(nextBoxSecondsLeft)} 남음`}</span>
           </div>
         </section>
 
         <section className="grid grid-cols-3 gap-3">
-          <StatCard icon={Flame} label="오늘 공부" value={formatStudyMinutes(todayMinutes)} accentClass="text-orange-200" />
-          <StatCard icon={Gift} label="열 수 있는 상자" value={`${totalAvailableBoxes}`} accentClass="text-sky-200" />
-          <StatCard icon={Wallet} label="총 포인트" value={pointBalance.toLocaleString()} accentClass="text-amber-200" />
+          <StatCard icon={Flame} label="오늘 공부" value={formatStudyMinutesShort(liveTodayMinutes)} accentClass="text-orange-200" />
+          <StatCard icon={Gift} label="상자" value={`${totalAvailableBoxes}개`} accentClass="text-sky-200" />
+          <StatCard icon={Wallet} label="포인트" value={`${pointBalance.toLocaleString()}P`} accentClass="text-amber-200" floatingGain={floatingGain} />
+        </section>
+
+        <section className="grid grid-cols-3 gap-3">
+          <div className="rounded-[1.2rem] border border-white/10 bg-white/[0.05] px-3 py-3 text-center backdrop-blur-xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">오늘 획득</p>
+            <p className="mt-2 text-base font-black text-white">+{todayPointGain}P</p>
+          </div>
+          <div className="rounded-[1.2rem] border border-white/10 bg-white/[0.05] px-3 py-3 text-center backdrop-blur-xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">연 상자</p>
+            <p className="mt-2 text-base font-black text-white">{todayOpenedCount}개</p>
+          </div>
+          <div className="rounded-[1.2rem] border border-white/10 bg-white/[0.05] px-3 py-3 text-center backdrop-blur-xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">이번 달</p>
+            <p className="mt-2 text-base font-black text-[#FFD089]">{formatStudyMinutesShort(monthlyMinutes)}</p>
+          </div>
         </section>
 
         <section className="rounded-[1.8rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-[0_20px_52px_-34px_rgba(0,0,0,0.54)] backdrop-blur-xl">
@@ -688,13 +905,20 @@ export default function GrowthPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/45">VAULT</p>
               <h2 className="mt-1 text-lg font-black tracking-tight text-white">보관함</h2>
             </div>
-            <div className="rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1 text-[11px] font-black text-orange-100">
+            <div className="rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1 text-[11px] font-black text-[#FFD089]">
               READY {totalAvailableBoxes}
             </div>
           </div>
           <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
             {boxes.map((box) => (
-              <InventorySlot key={box.id} box={box} onSelect={openVault} />
+              <InventorySlot
+                key={box.id}
+                box={box}
+                onSelect={openVault}
+                chargingLabel={box.state === 'charging' ? `${Math.round(progressPercent)}% · ${formatCountdown(nextBoxSecondsLeft)}` : undefined}
+                chargingPercent={box.state === 'charging' ? progressPercent : undefined}
+                isFresh={freshReadyHours.includes(box.hour)}
+              />
             ))}
           </div>
         </section>
@@ -720,7 +944,7 @@ export default function GrowthPage() {
                   key={entry.id}
                   rank={index + 1}
                   name={entry.displayNameSnapshot || '학생'}
-                  value={entry.value.toLocaleString()}
+                  value={formatRankTime(Number(entry.value || 0))}
                   highlight={index === 0}
                 />
               ))
@@ -741,14 +965,14 @@ export default function GrowthPage() {
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">MONTH</p>
-                <p className="mt-1 text-sm font-black text-orange-100">{formatRankTime(monthlyMinutes)}</p>
+                <p className="mt-1 text-sm font-black text-[#FFD089]">{formatRankTime(monthlyMinutes)}</p>
               </div>
             </div>
           </div>
         </section>
 
         <section className="rounded-full border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white/85 shadow-[0_16px_40px_-30px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-orange-300/20 text-orange-100 shadow-[0_0_20px_rgba(255,176,76,0.25)]">
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-orange-300/20 text-[#FFD089] shadow-[0_0_20px_rgba(255,176,76,0.25)]">
             <Star className="h-3.5 w-3.5" />
           </span>
           {fortuneMessage}
@@ -760,8 +984,8 @@ export default function GrowthPage() {
             <p className="mt-2 text-[1.2rem] font-black tracking-tight text-white">{formatStudyMinutes(weeklyMinutes)}</p>
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">이번 달</p>
-            <p className="mt-2 text-[1.2rem] font-black tracking-tight text-white">{formatStudyMinutes(monthlyMinutes)}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">오늘 총합</p>
+            <p className="mt-2 text-[1.2rem] font-black tracking-tight text-white">{formatStudyMinutes(liveTodayMinutes)}</p>
           </div>
         </section>
 
@@ -797,6 +1021,7 @@ export default function GrowthPage() {
                 <RewardHeroChest
                   state={selectedBox?.state === 'ready' ? 'ready' : 'charging'}
                   stage={boxStage}
+                  intense={selectedBox?.state === 'ready'}
                   label={selectedBox ? `${selectedBox.hour}시간 상자` : '상자'}
                   onClick={selectedBox?.state === 'ready' ? handleRevealBox : undefined}
                 />
@@ -833,7 +1058,7 @@ export default function GrowthPage() {
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs font-bold text-white/45">
                   <span>다음 상자까지</span>
-                  <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : `${nextBoxMinutesLeft}분`}</span>
+                  <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : formatCountdown(nextBoxSecondsLeft)}</span>
                 </div>
               </div>
 
