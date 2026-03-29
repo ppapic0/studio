@@ -24,13 +24,8 @@ function getHeroTokens(line: string, lineIndex: number): HeroToken[] {
       { text: '방향이', x: '14px', y: '-24px', rotate: '6deg', scale: '0.92', delay: '0.05s' },
       { text: '중요합니다.', x: '48px', y: '18px', rotate: '-8deg', scale: '0.9', delay: '0.1s' },
     ],
-    line.includes('트랙')
-      ? [
-          { text: '성장의 길, ', x: '-34px', y: '30px', rotate: '8deg', scale: '0.92', delay: '0s' },
-          { text: '트랙', highlight: true, x: '0px', y: '-52px', rotate: '-10deg', scale: '1.24', delay: '0.04s' },
-          { text: '에서', x: '42px', y: '18px', rotate: '7deg', scale: '0.9', delay: '0.1s' },
-        ]
-      : [{ text: line, x: '-18px', y: '28px', rotate: '6deg', scale: '0.94', delay: '0s' }],
+    [{ text: line, x: '-18px', y: '28px', rotate: '6deg', scale: '0.94', delay: '0s' }],
+    [{ text: line, x: '0px', y: '-52px', rotate: '-10deg', scale: '1.02', delay: '0.04s' }],
     [{ text: line, x: '46px', y: '42px', rotate: '-7deg', scale: '0.86', delay: '0s' }],
   ];
 
@@ -41,7 +36,8 @@ export function HeroSection({ brand }: HeroSectionProps) {
   const heroTitleLines = brand.heroTitle.split('\n');
   const mobileHeroLines = [
     '공부는 방향이 중요합니다.',
-    '성장의 길, 트랙에서',
+    '성장의 길,',
+    '트랙에서',
     '시작됩니다.',
   ];
   const heroFireworks = [
@@ -301,9 +297,8 @@ export function HeroSection({ brand }: HeroSectionProps) {
                             } as CSSProperties
                           }
                         >
-                          {lineIndex === 1 ? (
+                          {line === '트랙에서' ? (
                             <>
-                              성장의 길,&nbsp;
                               <span className="inline-flex items-center whitespace-nowrap">
                                 <span className="hero-headline-token-highlight inline-block text-[#FF7A16]">트랙</span>에서
                               </span>
@@ -343,7 +338,13 @@ export function HeroSection({ brand }: HeroSectionProps) {
                               } as CSSProperties
                             }
                           >
-                            {token.text}
+                            {line === '트랙에서' ? (
+                              <span className="inline-flex items-center whitespace-nowrap">
+                                <span className="hero-headline-token-highlight inline-block text-[#FF7A16]">트랙</span>에서
+                              </span>
+                            ) : (
+                              token.text
+                            )}
                           </span>
                         ))}
                       </span>
