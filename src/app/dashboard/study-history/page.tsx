@@ -35,6 +35,7 @@ import {
   endOfWeek, 
   addMonths, 
   subMonths,
+  subDays,
   getDay,
   isBefore,
   startOfDay
@@ -515,6 +516,24 @@ export default function StudyHistoryPage() {
     return logs.filter(log => isSameMonth(new Date(log.dateKey), currentDate)).reduce((acc, log) => acc + log.totalMinutes, 0);
   }, [logs, currentDate]);
 
+  const todayTotalMinutes = useMemo(() => {
+    if (!logs) return 0;
+    return logs.find((log) => log.dateKey === todayStr)?.totalMinutes || 0;
+  }, [logs, todayStr]);
+
+  const recent7DaysTotalMinutes = useMemo(() => {
+    if (!logs) return 0;
+    const windowStartKey = format(subDays(new Date(), 6), 'yyyy-MM-dd');
+    return logs
+      .filter((log) => log.dateKey >= windowStartKey && log.dateKey <= todayStr)
+      .reduce((acc, log) => acc + log.totalMinutes, 0);
+  }, [logs, todayStr]);
+
+  const todayOpenedBoxCount = useMemo(() => {
+    const claimedBoxes = (progress?.dailyPointStatus?.[todayStr] as Record<string, any> | undefined)?.claimedStudyBoxes;
+    return Array.isArray(claimedBoxes) ? claimedBoxes.length : 0;
+  }, [progress?.dailyPointStatus, todayStr]);
+
   const applySameDayRoutinePenalty = async (reason: string) => {
     if (!firestore || !activeMembership || !user || !progressRef || !targetUid || !selectedDateKey) return false;
 
@@ -818,44 +837,85 @@ export default function StudyHistoryPage() {
 
       {isMobile && <StudentTrackSubnav className="mx-1" />}
 
-      <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "md:grid-cols-3")}>
-        <Card
-          className={cn(
-            "md:col-span-2 border-none shadow-2xl rounded-[2.5rem] p-10 overflow-hidden relative group transition-all duration-700 !text-white"
-          )}
-          style={{ backgroundImage: 'linear-gradient(135deg,#14295F 0%,#1B326D 55%,#233E86 100%)' }}
-        >
-          <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12 transition-transform duration-1000 group-hover:scale-110">
-            <CalendarClock className="h-48 w-48" />
-          </div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-center mb-10">
-              <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/90">월간 분석</span>
-                <Badge className="w-fit bg-white/30 text-white border border-white/30 font-black text-[10px] px-3 py-1">이번 달 총 몰입</Badge>
+      <Card className="overflow-hidden rounded-[2.5rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#1B326D_55%,#233E86_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]">
+        <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
+          <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-start justify-between")}>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-none">
+                  기록 요약
+                </Badge>
+                <Badge className="border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black text-white/85 shadow-none">
+                  {isParent ? '자녀 학습 흐름' : '포인트로 이어지는 공부 기록'}
+                </Badge>
               </div>
-              <Badge className="bg-white/30 text-white border border-white/30 font-black text-[10px] px-3 py-1 uppercase tracking-widest">기록 트랙</Badge>
+              <div className="space-y-2">
+                <h2 className={cn("font-black tracking-tight text-white", isMobile ? "text-[1.45rem] leading-[1.15]" : "text-[2.1rem] leading-[1.1]")}>
+                  {isParent ? '이번 달 학습 기록을 빠르게 확인해요' : '이번 달 기록과 포인트 흐름을 한눈에 봐요'}
+                </h2>
+                <p className="max-w-2xl break-keep text-sm font-semibold leading-6 text-white/78">
+                  {isParent
+                    ? '자녀의 오늘 공부시간, 최근 7일 누적, 이번 달 총 학습 시간을 먼저 보고 날짜별 기록을 자세히 확인해보세요.'
+                    : '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록과 포인트 상자 흐름까지 이어서 확인할 수 있어요.'}
+                </p>
+              </div>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className={cn("font-black tracking-tighter tabular-nums leading-none drop-shadow-[0_2px_12px_rgba(5,15,40,0.45)]", isMobile ? "text-5xl" : "text-8xl")}>{formatMinutes(monthTotalMinutes)}</span>
-              <span className="text-xl font-bold opacity-80 uppercase ml-2">총 학습 시간</span>
-            </div>
+            {!isParent ? (
+              <Button
+                asChild
+                className={cn(
+                  "shrink-0 rounded-2xl border border-white/15 bg-white/10 font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15",
+                  isMobile ? "h-11 w-full text-xs" : "h-12 px-5 text-xs"
+                )}
+              >
+                <Link href="/dashboard/growth">
+                  포인트트랙 바로가기
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
           </div>
-        </Card>
-        
-        {!isMobile && (
-          <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white p-10 flex flex-col justify-center gap-6 relative overflow-hidden ring-1 ring-black/[0.03]">
-            <div className="bg-primary/5 p-3 rounded-2xl w-fit"><Sparkles className="h-6 w-6 text-primary" /></div>
-            <div className="space-y-2">
-              <h3 className="font-black text-sm uppercase tracking-widest text-primary/40">학습 인사이트</h3>
-              <p className="text-base font-bold leading-relaxed text-foreground/70">
-                {isParent ? '자녀가 매일 1시간씩 꾸준히 쌓을수록 포인트 상자와 월간 공부 랭킹이 안정적으로 올라갑니다.' : '누적 공부시간이 1시간을 넘을 때마다 포인트 상자가 열리고, 월간 공부시간 랭킹도 함께 집계됩니다.'}
-              </p>
-            </div>
-          {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg shadow-primary/20 transition-all active:scale-[0.95]"><Link href="/dashboard/growth">포인트트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
-          </Card>
-        )}
-      </div>
+
+          <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+            {[
+              {
+                label: '이번 달 총 공부시간',
+                value: formatMinutes(monthTotalMinutes),
+                note: '이번 달 누적 기준',
+              },
+              {
+                label: '오늘 공부시간',
+                value: formatMinutes(todayTotalMinutes),
+                note: isParent
+                  ? '오늘 하루 기준'
+                  : `오늘 열린 포인트 상자 ${todayOpenedBoxCount}개`,
+              },
+              {
+                label: '최근 7일 누적',
+                value: formatMinutes(recent7DaysTotalMinutes),
+                note: '직전 7일 공부 누적',
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[1.8rem] border border-white/14 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">
+                  {item.label}
+                </p>
+                <div className="mt-3 flex items-end gap-2">
+                  <span className="dashboard-number text-[1.9rem] font-black leading-none tracking-[-0.06em] text-white sm:text-[2.35rem]">
+                    {item.value}
+                  </span>
+                </div>
+                <p className="mt-2 break-keep text-xs font-semibold text-white/72">
+                  {item.note}
+                </p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
         <CardContent className="relative p-0">
