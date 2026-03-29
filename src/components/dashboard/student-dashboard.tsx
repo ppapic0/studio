@@ -2301,14 +2301,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <Link href="/dashboard/student-reports" className="block touch-manipulation">
               <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
                 <CardContent className={cn("p-4", !isMobile && "p-5")}>
-                  <div className="flex items-center justify-between">
+                  <div className={cn("flex justify-between gap-2", isMobile ? "flex-col items-start" : "items-center")}>
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
                         <FileText className="h-3.5 w-3.5" />
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-primary">놓치면 아쉬운 것</span>
+                      <span className="min-w-0 text-[10px] font-black uppercase tracking-widest text-primary break-keep">놓치면 아쉬운 것</span>
                     </div>
-                    <Badge className="h-5 border-none bg-[#FF7A16] px-2 text-[9px] font-black text-white">리포트</Badge>
+                    <Badge className="h-5 shrink-0 border-none bg-[#FF7A16] px-2 text-[9px] font-black text-white">리포트</Badge>
                   </div>
                   <div className="mt-3 min-w-0">
                     <p className="text-sm font-black leading-6 text-slate-900 break-keep line-clamp-2">{latestUnreadReport.dateKey} 코칭 도착</p>
