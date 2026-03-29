@@ -26,7 +26,7 @@ import {
   setDashboardEntryMotionKeys,
 } from '@/lib/dashboard-motion';
 import { Loader2, Mail } from 'lucide-react';
-import { collection, collectionGroup, documentId, getDocs, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import {
   Dialog,
@@ -74,16 +74,8 @@ export function LoginForm() {
       return centersSnap.docs.map((docSnap) => docSnap.data() as { role?: string; status?: string });
     }
 
-    const [fallbackSnap, fallbackDocIdSnap] = await Promise.all([
-      getDocs(query(collectionGroup(firestore, 'members'), where('id', '==', uid))),
-      getDocs(query(collectionGroup(firestore, 'members'), where(documentId(), '==', uid))),
-    ]);
-
-    const dedupedDocs = Array.from(
-      new Map(
-        [...fallbackSnap.docs, ...fallbackDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])
-      ).values()
-    );
+    const fallbackByFieldSnap = await getDocs(query(collectionGroup(firestore, 'members'), where('id', '==', uid)));
+    const dedupedDocs = Array.from(new Map(fallbackByFieldSnap.docs.map((docSnap) => [docSnap.ref.path, docSnap])).values());
 
     return dedupedDocs.map((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
