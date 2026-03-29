@@ -43,7 +43,8 @@ import {
   UserMinus,
   QrCode,
   Plus,
-  Trash2
+  Trash2,
+  Gift
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -952,9 +953,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isFortuneDialogOpen, setIsFortuneDialogOpen] = useState(false);
   const [claimedStudyBoxRewards, setClaimedStudyBoxRewards] = useState<StudyBoxReward[]>([]);
   const [isStudyBoxDialogOpen, setIsStudyBoxDialogOpen] = useState(false);
+  const [openedStudyBoxes, setOpenedStudyBoxes] = useState<number[]>([]);
+  const [openingStudyBox, setOpeningStudyBox] = useState<number | null>(null);
   const studyBoxClaimKeyRef = useRef<string | null>(null);
+  const studyBoxRevealTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => { setToday(new Date()); }, []);
+
+  useEffect(() => {
+    return () => {
+      if (studyBoxRevealTimeoutRef.current) {
+        window.clearTimeout(studyBoxRevealTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
@@ -2098,6 +2110,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       },
       updatedAt: serverTimestamp(),
     }, { merge: true }).then(() => {
+      setOpenedStudyBoxes([]);
+      setOpeningStudyBox(null);
       setClaimedStudyBoxRewards(rewards);
       setIsStudyBoxDialogOpen(true);
     }).catch((error: any) => {
@@ -2105,6 +2119,34 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       console.warn('[student-track] study box claim skipped', error?.message || error);
     });
   }, [isActive, isTimerActive, progressRef, todayKey, todayStudyLog, progress?.dailyPointStatus, stats]);
+  const nextStudyBoxToOpen = useMemo(() => {
+    return claimedStudyBoxRewards.find((reward) => !openedStudyBoxes.includes(reward.milestone)) || null;
+  }, [claimedStudyBoxRewards, openedStudyBoxes]);
+
+  const handleStudyBoxDialogChange = useCallback((open: boolean) => {
+    setIsStudyBoxDialogOpen(open);
+    if (!open) {
+      if (studyBoxRevealTimeoutRef.current) {
+        window.clearTimeout(studyBoxRevealTimeoutRef.current);
+        studyBoxRevealTimeoutRef.current = null;
+      }
+      setOpeningStudyBox(null);
+      setOpenedStudyBoxes([]);
+      setClaimedStudyBoxRewards([]);
+    }
+  }, []);
+
+  const handleOpenStudyBox = useCallback((milestone: number) => {
+    if (openingStudyBox !== null) return;
+    if (!nextStudyBoxToOpen || nextStudyBoxToOpen.milestone !== milestone) return;
+
+    setOpeningStudyBox(milestone);
+    studyBoxRevealTimeoutRef.current = window.setTimeout(() => {
+      setOpenedStudyBoxes((prev) => [...prev, milestone]);
+      setOpeningStudyBox(null);
+      studyBoxRevealTimeoutRef.current = null;
+    }, 420);
+  }, [nextStudyBoxToOpen, openingStudyBox]);
   const coachSummary = latestCoachReport?.aiMeta?.teacherOneLiner?.trim()
     || latestCoachReport?.nextAction?.trim()
     || summarizeReportLine(latestCoachReport?.content);
@@ -2827,7 +2869,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isStudyBoxDialogOpen} onOpenChange={setIsStudyBoxDialogOpen}>
+      <Dialog open={isStudyBoxDialogOpen} onOpenChange={handleStudyBoxDialogChange}>
         <DialogContent className={cn("border border-[#223B7A]/10 p-0 overflow-hidden bg-white", isMobile ? "w-[min(92vw,27rem)] rounded-[2rem]" : "sm:max-w-lg rounded-[2.5rem]")}>
           <div className={cn("bg-[#14295F] text-white", isMobile ? "p-6" : "p-8")}>
             <DialogHeader>
@@ -2836,27 +2878,91 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </DialogHeader>
           </div>
           <div className={cn("space-y-5 bg-[radial-gradient(circle_at_top,#eef4ff_0%,#ffffff_72%)]", isMobile ? "p-5" : "p-6")}>
+            <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-3 text-sm font-semibold leading-6 text-slate-600">
+              상자를 한 개씩 터치해서 열어보세요. 열수록 포인트가 바로 확인돼요.
+            </div>
             <div className="grid gap-3">
               {claimedStudyBoxRewards.map((reward) => (
-                <div key={`${reward.milestone}-${reward.awardedPoints}`} className="rounded-[1.5rem] border border-[#D8E2F5] bg-white px-4 py-4 shadow-[0_24px_40px_-32px_rgba(20,41,95,0.35)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">{reward.milestone}시간 상자</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">기본 {reward.minReward}~{reward.maxReward} 포인트</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="dashboard-number text-2xl text-[#14295F]">{reward.awardedPoints}</p>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">포인트</p>
-                    </div>
-                  </div>
-                </div>
+                (() => {
+                  const isOpened = openedStudyBoxes.includes(reward.milestone);
+                  const isOpening = openingStudyBox === reward.milestone;
+                  const isNext = nextStudyBoxToOpen?.milestone === reward.milestone;
+                  return (
+                    <button
+                      key={`${reward.milestone}-${reward.awardedPoints}`}
+                      type="button"
+                      disabled={!isNext || isOpening}
+                      onClick={() => handleOpenStudyBox(reward.milestone)}
+                      className={cn(
+                        "w-full rounded-[1.5rem] border px-4 py-4 text-left shadow-[0_24px_40px_-32px_rgba(20,41,95,0.35)] transition-all duration-300",
+                        isOpened
+                          ? "border-[#BFD0F5] bg-white"
+                          : isNext
+                            ? "border-[#8DA9E8] bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] hover:-translate-y-0.5"
+                            : "border-[#D8E2F5] bg-white/80 opacity-70",
+                        isOpening && "scale-[1.03] -rotate-1 border-[#FFB766] shadow-[0_26px_48px_-28px_rgba(255,122,22,0.55)]"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            className={cn(
+                              "flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border transition-all duration-300",
+                              isOpened
+                                ? "border-[#D8E2F5] bg-[#EEF4FF] text-[#14295F]"
+                                : isNext
+                                  ? "border-[#FFD3A8] bg-[#FFF4E8] text-[#FF7A16]"
+                                  : "border-[#E5ECF8] bg-[#F8FAFF] text-slate-400",
+                              isOpening && "scale-110 rotate-6"
+                            )}
+                          >
+                            <Gift className={cn("h-5 w-5", isOpening && "animate-pulse")} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">{reward.milestone}시간 상자</p>
+                            <p className="mt-1 text-sm font-semibold text-slate-500">
+                              {isOpened
+                                ? `기본 ${reward.minReward}~${reward.maxReward} 포인트`
+                                : isNext
+                                  ? '터치해서 상자를 열어보세요'
+                                  : '앞 상자를 먼저 열어주세요'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {isOpened ? (
+                            <>
+                              <p className="dashboard-number text-2xl text-[#14295F]">{reward.awardedPoints}</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">포인트</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className={cn("text-lg font-black tracking-tight", isNext ? "text-[#FF7A16]" : "text-slate-300")}>
+                                {isOpening ? 'OPEN' : 'BOX'}
+                              </p>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+                                {isNext ? '터치' : '대기'}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })()
               ))}
             </div>
             <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-3 text-sm font-semibold leading-6 text-slate-600">
-              현재 포인트 지갑 {Number(progress?.pointsBalance || 0).toLocaleString()}점 · 다음 상자까지 {formatStudyMinutes(Math.max(0, todayRemainingStudyMinutesToNextBox))} 남았어요.
+              현재 포인트 지갑 {Number(progress?.pointsBalance || 0).toLocaleString()}점 · {nextStudyBoxToOpen ? `남은 상자 ${claimedStudyBoxRewards.length - openedStudyBoxes.length}개` : `다음 상자까지 ${formatStudyMinutes(Math.max(0, todayRemainingStudyMinutesToNextBox))} 남았어요.`}
             </div>
             <DialogFooter className="p-0">
-              <Button className="h-12 w-full rounded-[1rem] bg-[#14295F] text-white hover:bg-[#10214D]">확인했어요</Button>
+              <Button
+                className="h-12 w-full rounded-[1rem] bg-[#14295F] text-white hover:bg-[#10214D] disabled:bg-slate-300 disabled:text-white"
+                disabled={Boolean(nextStudyBoxToOpen)}
+                onClick={() => handleStudyBoxDialogChange(false)}
+              >
+                {nextStudyBoxToOpen ? '상자를 모두 열어보세요' : '확인했어요'}
+              </Button>
             </DialogFooter>
           </div>
         </DialogContent>
