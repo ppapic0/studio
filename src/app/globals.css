@@ -608,28 +608,28 @@
     animation: track-pace-walk-limb-secondary 1.18s ease-in-out infinite;
   }
 
-  .track-pace-vehicle--walk .track-pace-limb-a {
-    transform-origin: 29px 27px;
-  }
+.track-pace-vehicle--walk .track-pace-limb-a {
+  transform-origin: 29px 24px;
+}
 
-  .track-pace-vehicle--walk .track-pace-limb-b {
-    transform-origin: 28px 28px;
-  }
+.track-pace-vehicle--walk .track-pace-limb-b {
+  transform-origin: 27px 24px;
+}
 
-  .track-pace-vehicle--walk .track-pace-limb-c,
-  .track-pace-vehicle--walk .track-pace-limb-d {
-    transform-origin: 29px 42px;
-  }
+.track-pace-vehicle--walk .track-pace-limb-c,
+.track-pace-vehicle--walk .track-pace-limb-d {
+  transform-origin: 30px 39px;
+}
 
-  .track-pace-vehicle--walk .track-pace-walker-head {
-    transform-origin: 28px 11px;
-    animation: track-pace-walk-head 1.18s ease-in-out infinite;
-  }
+.track-pace-vehicle--walk .track-pace-walker-head {
+  transform-origin: 26px 11px;
+  animation: track-pace-walk-head 1.18s ease-in-out infinite;
+}
 
-  .track-pace-vehicle--walk .track-pace-walker-torso {
-    transform-origin: 29px 30px;
-    animation: track-pace-walk-torso 1.18s ease-in-out infinite;
-  }
+.track-pace-vehicle--walk .track-pace-walker-torso {
+  transform-origin: 29px 30px;
+  animation: track-pace-walk-torso 1.18s ease-in-out infinite;
+}
 
   .track-pace-vehicle--walk .track-pace-walker-shadow {
     transform-origin: center;
@@ -1701,56 +1701,56 @@
 @keyframes track-pace-walk-body {
   0%,
   100% {
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) rotate(0.4deg);
   }
   25% {
-    transform: translate3d(0.6px, 0.8px, 0);
+    transform: translate3d(0.5px, 0.6px, 0) rotate(0.8deg);
   }
   50% {
-    transform: translate3d(1.1px, -0.9px, 0);
+    transform: translate3d(0.9px, -0.4px, 0) rotate(-0.6deg);
   }
   75% {
-    transform: translate3d(0.3px, 0.6px, 0);
+    transform: translate3d(0.4px, 0.5px, 0) rotate(0.5deg);
   }
 }
 
 @keyframes track-pace-walk-limb-primary {
   0%,
   100% {
-    transform: rotate(17deg);
+    transform: rotate(18deg);
   }
   50% {
-    transform: rotate(-12deg);
+    transform: rotate(-10deg);
   }
 }
 
 @keyframes track-pace-walk-limb-secondary {
   0%,
   100% {
-    transform: rotate(-15deg);
+    transform: rotate(-14deg);
   }
   50% {
-    transform: rotate(15deg);
+    transform: rotate(12deg);
   }
 }
 
 @keyframes track-pace-walk-head {
   0%,
   100% {
-    transform: translateY(0.2px);
+    transform: translateY(0.1px);
   }
   50% {
-    transform: translateY(-1.2px);
+    transform: translateY(-0.8px);
   }
 }
 
 @keyframes track-pace-walk-torso {
   0%,
   100% {
-    transform: rotate(1.5deg);
+    transform: rotate(1.2deg);
   }
   50% {
-    transform: rotate(-2.2deg);
+    transform: rotate(-1.6deg);
   }
 }
 
@@ -1758,11 +1758,11 @@
   0%,
   100% {
     transform: scaleX(1) scaleY(1);
-    opacity: 0.34;
+    opacity: 0.3;
   }
   50% {
-    transform: scaleX(0.94) scaleY(0.92);
-    opacity: 0.22;
+    transform: scaleX(0.92) scaleY(0.9);
+    opacity: 0.18;
   }
 }
 

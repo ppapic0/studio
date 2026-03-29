@@ -320,22 +320,36 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
       case 'walk':
         return (
           <g className="track-pace-vehicle track-pace-vehicle--walk" transform="translate(56 34)">
-            <ellipse className="track-pace-walker-shadow" cx="30" cy="61" rx="15" ry="4.2" fill="rgba(255,236,211,0.16)" />
-            <circle className="track-pace-walker-head" cx="28" cy="11" r="6.8" fill="#FFE0BC" />
+            <ellipse className="track-pace-walker-shadow" cx="31" cy="60" rx="14.8" ry="4" fill="rgba(255,236,211,0.16)" />
+            <circle className="track-pace-walker-head" cx="26" cy="11" r="6.4" fill="#FFE0BC" />
             <path
               className="track-pace-walker-torso"
-              d="M25 20L31 29L29 42"
+              d="M27 20C31 25 31 32 30 39"
               stroke="#FFF9F3"
               strokeWidth="5.6"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            <path d="M28 18L24 24" stroke="#FFF2E2" strokeWidth="4.1" strokeLinecap="round" />
-            <path className="track-pace-limb-a" d="M29 27L40 32" stroke="#FFE4C7" strokeWidth="4.7" strokeLinecap="round" />
-            <path className="track-pace-limb-b" d="M28 28L17 35" stroke="#FFDAB0" strokeWidth="4.7" strokeLinecap="round" />
+            <path d="M26 18L22 22" stroke="#FFF2E2" strokeWidth="4" strokeLinecap="round" />
+            <path
+              className="track-pace-limb-a"
+              d="M29 24C35 28 38 31 41 35"
+              stroke="#FFE4C7"
+              strokeWidth="4.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              className="track-pace-limb-b"
+              d="M27 24C23 28 21 31 19 35"
+              stroke="#FFDAB0"
+              strokeWidth="4.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
             <path
               className="track-pace-limb-c"
-              d="M29 42L40 53L49 52"
+              d="M30 39C36 45 39 50 37 56C36 58 38 60 41 60"
               stroke="#FFBF77"
               strokeWidth="5.2"
               strokeLinecap="round"
@@ -343,7 +357,7 @@ function TrackRunnerIllustration({ isMobile, totalMinutes }: { isMobile: boolean
             />
             <path
               className="track-pace-limb-d"
-              d="M29 42L21 54L14 50"
+              d="M30 39C25 44 22 50 24 56C25 58 23 60 20 60"
               stroke="#FFCF8C"
               strokeWidth="5.2"
               strokeLinecap="round"
