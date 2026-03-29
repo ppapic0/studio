@@ -92,7 +92,6 @@ import {
   getClaimedStudyBoxes,
   getDailyFortuneMessage,
   rollStudyBoxReward,
-  type StudyBoxReward,
 } from '@/lib/student-rewards';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
@@ -951,22 +950,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
   const [fortuneMessage, setFortuneMessage] = useState<string | null>(null);
   const [isFortuneDialogOpen, setIsFortuneDialogOpen] = useState(false);
-  const [claimedStudyBoxRewards, setClaimedStudyBoxRewards] = useState<StudyBoxReward[]>([]);
-  const [isStudyBoxDialogOpen, setIsStudyBoxDialogOpen] = useState(false);
-  const [openedStudyBoxes, setOpenedStudyBoxes] = useState<number[]>([]);
-  const [openingStudyBox, setOpeningStudyBox] = useState<number | null>(null);
   const studyBoxClaimKeyRef = useRef<string | null>(null);
-  const studyBoxRevealTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => { setToday(new Date()); }, []);
-
-  useEffect(() => {
-    return () => {
-      if (studyBoxRevealTimeoutRef.current) {
-        window.clearTimeout(studyBoxRevealTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
@@ -2009,6 +1995,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const nextMilestoneMinutes = (Math.floor(totalTodayMinutes / 60) + 1) * 60;
     return Math.max(0, nextMilestoneMinutes - totalTodayMinutes);
   }, [todayStudyLog?.totalMinutes]);
+  const todayPointStatusSummary = useMemo(() => {
+    return (progress?.dailyPointStatus?.[todayKey] || {}) as Record<string, any>;
+  }, [progress?.dailyPointStatus, todayKey]);
+  const todayStoredStudyBoxRewards = useMemo(() => {
+    const raw = todayPointStatusSummary.studyBoxRewards;
+    return Array.isArray(raw) ? raw : [];
+  }, [todayPointStatusSummary.studyBoxRewards]);
+  const todayOpenedStudyBoxCount = useMemo(() => {
+    const raw = todayPointStatusSummary.openedStudyBoxes;
+    if (!Array.isArray(raw)) return 0;
+    return raw
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value >= 1)
+      .length;
+  }, [todayPointStatusSummary.openedStudyBoxes]);
+  const pendingStudyBoxCount = Math.max(0, todayStoredStudyBoxRewards.length - todayOpenedStudyBoxCount);
 
   const activeStudentIds = useMemo(() => {
     if (!activeStudentMembers) return null;
@@ -2112,9 +2114,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       },
       updatedAt: serverTimestamp(),
     }, { merge: true }).then(() => {
-      setOpenedStudyBoxes([]);
-      setOpeningStudyBox(null);
-      setClaimedStudyBoxRewards(rewards);
       toast({
         title: `포인트 상자 ${rewards.length}개 도착`,
         description: '포인트트랙에서 상자를 하나씩 열어보세요.',
@@ -2124,34 +2123,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       console.warn('[student-track] study box claim skipped', error?.message || error);
     });
   }, [isActive, isTimerActive, progressRef, todayKey, todayStudyLog, progress?.dailyPointStatus, stats]);
-  const nextStudyBoxToOpen = useMemo(() => {
-    return claimedStudyBoxRewards.find((reward) => !openedStudyBoxes.includes(reward.milestone)) || null;
-  }, [claimedStudyBoxRewards, openedStudyBoxes]);
-
-  const handleStudyBoxDialogChange = useCallback((open: boolean) => {
-    setIsStudyBoxDialogOpen(open);
-    if (!open) {
-      if (studyBoxRevealTimeoutRef.current) {
-        window.clearTimeout(studyBoxRevealTimeoutRef.current);
-        studyBoxRevealTimeoutRef.current = null;
-      }
-      setOpeningStudyBox(null);
-      setOpenedStudyBoxes([]);
-      setClaimedStudyBoxRewards([]);
-    }
-  }, []);
-
-  const handleOpenStudyBox = useCallback((milestone: number) => {
-    if (openingStudyBox !== null) return;
-    if (!nextStudyBoxToOpen || nextStudyBoxToOpen.milestone !== milestone) return;
-
-    setOpeningStudyBox(milestone);
-    studyBoxRevealTimeoutRef.current = window.setTimeout(() => {
-      setOpenedStudyBoxes((prev) => [...prev, milestone]);
-      setOpeningStudyBox(null);
-      studyBoxRevealTimeoutRef.current = null;
-    }, 420);
-  }, [nextStudyBoxToOpen, openingStudyBox]);
   const coachSummary = latestCoachReport?.aiMeta?.teacherOneLiner?.trim()
     || latestCoachReport?.nextAction?.trim()
     || summarizeReportLine(latestCoachReport?.content);
@@ -2262,11 +2233,72 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2" : "grid-cols-12")}>
         <div className={cn(isMobile ? "col-span-2" : "col-span-7")}>
-          <PointHistoryDialog
-            dailyPointStatus={progress?.dailyPointStatus}
-            isMobile={isMobile}
-            variant="featured"
-          />
+          <Link href="/dashboard/growth" className="block h-full touch-manipulation">
+            <Card className={cn(
+              "student-cta student-cta-card group relative h-full min-w-0 overflow-hidden border border-amber-200/80 bg-[radial-gradient(circle_at_top_right,#ffe7a8_0%,#fffdf5_40%,#fff8e1_100%)] shadow-[0_26px_70px_-42px_rgba(245,158,11,0.6)] ring-1 ring-amber-100/80",
+              isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]"
+            )}>
+              <div className={cn("pointer-events-none absolute rounded-full bg-amber-200/60 blur-2xl", isMobile ? "-right-6 -top-8 h-24 w-24" : "-right-10 -top-10 h-36 w-36")} />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0)_42%)]" />
+              <CardHeader className={cn(isMobile ? "px-5 pt-5 pb-2" : "px-8 pt-8 pb-2")}>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-[9px]" : "text-[10px]")}>
+                    포인트 상자 보관함
+                  </CardTitle>
+                  <div className={cn("rounded-xl bg-white/80 text-amber-600 shadow-[0_14px_32px_-24px_rgba(245,158,11,0.8)]", isMobile ? "p-2" : "p-2.5")}>
+                    <Gift className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className={cn("relative z-10", isMobile ? "px-5 pb-5 pt-1" : "px-8 pb-8 pt-1")}>
+                <div className={cn("grid items-end gap-3", isMobile ? "grid-cols-[minmax(0,1fr)_7.2rem]" : "grid-cols-[minmax(0,1fr)_10rem] gap-5")}>
+                  <div className="min-w-0">
+                    <div className={cn("dashboard-number text-amber-600 leading-none tracking-tight", isMobile ? "text-[clamp(2.35rem,12vw,3rem)]" : "text-[clamp(3.2rem,5vw,4.8rem)]")}>
+                      {Number(progress?.pointsBalance || 0).toLocaleString()}
+                      <span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>P</span>
+                    </div>
+                    <p className="mt-3 text-sm font-black leading-6 text-slate-900 break-keep">
+                      {pendingStudyBoxCount > 0
+                        ? `${pendingStudyBoxCount}개의 상자가 도착했어요`
+                        : '포인트트랙에서 상자를 모아보세요'}
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                      {pendingStudyBoxCount > 0
+                        ? '홈에서는 도착 알림만 보여주고, 실제 오픈은 포인트트랙에서 한 개씩 진행돼요.'
+                        : todayRemainingStudyMinutesToNextBox > 0
+                          ? `다음 상자까지 ${formatStudyMinutes(todayRemainingStudyMinutesToNextBox)} 남았어요.`
+                          : '공부가 쌓이면 포인트트랙 보관함에 상자가 저장됩니다.'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-full bg-[#14295F] px-2 py-1 text-[10px] font-black text-white ring-1 ring-[#14295F]/10">
+                        오늘 {Number(todayPointStatusSummary.dailyPointAmount || 0).toLocaleString()}P
+                      </span>
+                      <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500 ring-1 ring-amber-100">
+                        포인트트랙으로 이동
+                      </span>
+                    </div>
+                  </div>
+                  <div className="self-stretch flex items-end justify-end">
+                    <MiniLpTrendSparkline
+                      data={Object.entries(progress?.dailyPointStatus || {})
+                        .sort((a, b) => a[0].localeCompare(b[0]))
+                        .map(([date, data]) => ({
+                          date,
+                          total: Number((data as any)?.dailyPointAmount || 0),
+                        }))
+                        .slice(-8)
+                        .reduce<Array<{ date: string; total: number }>>((acc, item) => {
+                          const previous = acc[acc.length - 1]?.total || 0;
+                          acc.push({ date: item.date, total: previous + item.total });
+                          return acc;
+                        }, [])}
+                      isMobile={isMobile}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-2" : "col-span-5 grid-cols-2")}>
@@ -2869,105 +2901,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </div>
             <DialogFooter className="p-0">
               <Button className="h-12 w-full rounded-[1rem] bg-[#14295F] text-white hover:bg-[#10214D]">좋아, 시작할게</Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isStudyBoxDialogOpen} onOpenChange={handleStudyBoxDialogChange}>
-        <DialogContent className={cn("border border-[#223B7A]/10 p-0 overflow-hidden bg-white", isMobile ? "w-[min(92vw,27rem)] rounded-[2rem]" : "sm:max-w-lg rounded-[2.5rem]")}>
-          <div className={cn("bg-[#14295F] text-white", isMobile ? "p-6" : "p-8")}>
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight">포인트 상자 오픈</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold">누적 공부시간을 채워 보상을 열었어요.</DialogDescription>
-            </DialogHeader>
-          </div>
-          <div className={cn("space-y-5 bg-[radial-gradient(circle_at_top,#eef4ff_0%,#ffffff_72%)]", isMobile ? "p-5" : "p-6")}>
-            <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-3 text-sm font-semibold leading-6 text-slate-600">
-              상자를 한 개씩 터치해서 열어보세요. 열수록 포인트가 바로 확인돼요.
-            </div>
-            <div className="grid gap-3">
-              {claimedStudyBoxRewards.map((reward) => (
-                (() => {
-                  const isOpened = openedStudyBoxes.includes(reward.milestone);
-                  const isOpening = openingStudyBox === reward.milestone;
-                  const isNext = nextStudyBoxToOpen?.milestone === reward.milestone;
-                  return (
-                    <button
-                      key={`${reward.milestone}-${reward.awardedPoints}`}
-                      type="button"
-                      disabled={!isNext || isOpening}
-                      onClick={() => handleOpenStudyBox(reward.milestone)}
-                      className={cn(
-                        "w-full rounded-[1.5rem] border px-4 py-4 text-left shadow-[0_24px_40px_-32px_rgba(20,41,95,0.35)] transition-all duration-300",
-                        isOpened
-                          ? "border-[#BFD0F5] bg-white"
-                          : isNext
-                            ? "border-[#8DA9E8] bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] hover:-translate-y-0.5"
-                            : "border-[#D8E2F5] bg-white/80 opacity-70",
-                        isOpening && "scale-[1.03] -rotate-1 border-[#FFB766] shadow-[0_26px_48px_-28px_rgba(255,122,22,0.55)]"
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div
-                            className={cn(
-                              "flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border transition-all duration-300",
-                              isOpened
-                                ? "border-[#D8E2F5] bg-[#EEF4FF] text-[#14295F]"
-                                : isNext
-                                  ? "border-[#FFD3A8] bg-[#FFF4E8] text-[#FF7A16]"
-                                  : "border-[#E5ECF8] bg-[#F8FAFF] text-slate-400",
-                              isOpening && "scale-110 rotate-6"
-                            )}
-                          >
-                            <Gift className={cn("h-5 w-5", isOpening && "animate-pulse")} />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">{reward.milestone}시간 상자</p>
-                            <p className="mt-1 text-sm font-semibold text-slate-500">
-                              {isOpened
-                                ? `기본 ${reward.minReward}~${reward.maxReward} 포인트`
-                                : isNext
-                                  ? '터치해서 상자를 열어보세요'
-                                  : '앞 상자를 먼저 열어주세요'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {isOpened ? (
-                            <>
-                              <p className="dashboard-number text-2xl text-[#14295F]">{reward.awardedPoints}</p>
-                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">포인트</p>
-                            </>
-                          ) : (
-                            <>
-                              <p className={cn("text-lg font-black tracking-tight", isNext ? "text-[#FF7A16]" : "text-slate-300")}>
-                                {isOpening ? 'OPEN' : 'BOX'}
-                              </p>
-                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">
-                                {isNext ? '터치' : '대기'}
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })()
-              ))}
-            </div>
-            <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-3 text-sm font-semibold leading-6 text-slate-600">
-              현재 포인트 지갑 {Number(progress?.pointsBalance || 0).toLocaleString()}점 · {nextStudyBoxToOpen ? `남은 상자 ${claimedStudyBoxRewards.length - openedStudyBoxes.length}개` : `다음 상자까지 ${formatStudyMinutes(Math.max(0, todayRemainingStudyMinutesToNextBox))} 남았어요.`}
-            </div>
-            <DialogFooter className="p-0">
-              <Button
-                className="h-12 w-full rounded-[1rem] bg-[#14295F] text-white hover:bg-[#10214D] disabled:bg-slate-300 disabled:text-white"
-                disabled={Boolean(nextStudyBoxToOpen)}
-                onClick={() => handleStudyBoxDialogChange(false)}
-              >
-                {nextStudyBoxToOpen ? '상자를 모두 열어보세요' : '확인했어요'}
-              </Button>
             </DialogFooter>
           </div>
         </DialogContent>
