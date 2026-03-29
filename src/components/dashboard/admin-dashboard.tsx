@@ -1762,6 +1762,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       }),
     [attendanceBoardSummary, metrics, parentContactRecommendations]
   );
+  const todayTrackProgress = Math.min(
+    100,
+    Math.round((metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100)
+  );
 
   const todayOperationHeaderSection = hasMetricsReady ? (
     <section className="space-y-4 px-1">
@@ -1772,7 +1776,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           실시간 허브
         </Badge>
       </div>
-      <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3')}>
+      <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-[1.15fr_0.95fr_1fr_1fr]')}>
         <Card className="rounded-[2rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#2754D7_100%)] p-6 text-white shadow-[0_18px_40px_rgba(20,41,95,0.18)]">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
@@ -1801,6 +1805,70 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             </div>
           </div>
         </Card>
+
+        <div className="grid gap-4">
+          <Card className="rounded-[2rem] border border-[#2A4E97]/35 bg-[linear-gradient(145deg,#12275A_0%,#1C4285_58%,#244B90_100%)] p-6 text-white shadow-[0_18px_40px_rgba(20,41,95,0.18)]">
+            <div className="relative overflow-hidden">
+              <div className="absolute -right-6 -top-6 opacity-[0.12]">
+                <Flame className="h-28 w-28" />
+              </div>
+              <div className="relative z-10">
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/70">오늘의 트랙 총량 (누적)</p>
+                <div className="mt-2 flex items-end gap-1">
+                  <p className="text-4xl font-black tracking-tight">{(metrics.totalTodayMins / 60).toFixed(1)}</p>
+                  <span className="pb-1 text-lg font-black text-white/55">시간</span>
+                </div>
+                <div className="mt-5 space-y-2">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/70">
+                    <span>일일 활성 목표 (평균 6시간)</span>
+                    <span>{todayTrackProgress}%</span>
+                  </div>
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/15 shadow-[inset_0_2px_4px_rgba(6,15,38,0.32)]">
+                    <div
+                      className="h-full rounded-full bg-[linear-gradient(90deg,#FFE1C0_0%,#FFB46C_42%,#FF7A16_100%)] shadow-[0_0_18px_rgba(255,122,22,0.38)] transition-all duration-700"
+                      style={{ width: `${todayTrackProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <button
+            type="button"
+            onClick={() => setIsStudyingStudentsDialogOpen(true)}
+            className="block w-full text-left"
+          >
+            <Card className="rounded-[2rem] border-none bg-white p-6 shadow-lg ring-1 ring-black/[0.03] transition-all group cursor-pointer hover:-translate-y-0.5 hover:shadow-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">현재 착석 인원</p>
+                  <h3 className="dashboard-number text-4xl text-primary">
+                    {metrics.checkedInCount}
+                    <span className="ml-1 text-xl opacity-40">명</span>
+                  </h3>
+                </div>
+                <div className="rounded-[1.25rem] bg-blue-50 p-3 shadow-sm transition-all duration-500 group-hover:bg-blue-600 group-hover:text-white">
+                  <Users className="h-6 w-6 text-blue-600 group-hover:text-white" />
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3 border-t border-dashed pt-5">
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">재원생(대상)</p>
+                  <p className="dashboard-number text-lg">{metrics.totalStudents}명</p>
+                </div>
+                <div className="space-y-1 text-right">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">실시간 점유율</p>
+                  <p className="dashboard-number text-lg text-blue-600">{metrics.seatOccupancy}%</p>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-dashed pt-3">
+                <p className="text-[11px] font-bold text-slate-500">누르면 현재 공부중인 학생 목록이 열립니다.</p>
+                <ChevronRight className="h-4 w-4 text-blue-500 transition-transform duration-300 group-hover:translate-x-1" />
+              </div>
+            </Card>
+          </button>
+        </div>
 
         <Card className="rounded-[2rem] border-none bg-white p-6 shadow-lg ring-1 ring-black/[0.03]">
           <div className="flex items-center justify-between gap-3">
@@ -2198,90 +2266,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <Badge className="bg-emerald-600 text-white border-none font-black text-[10px] rounded-full px-2.5">그래프 중심</Badge>
             </div>
             {heatmapGraphSection}
-          </section>
-
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <Activity className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-black tracking-tighter">학생 개입 랭킹</h2>
-              <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5">실시간 추적</Badge>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card className="rounded-[2.5rem] border border-[#2A4E97]/40 bg-[linear-gradient(145deg,#12275A_0%,#1C4285_58%,#244B90_100%)] p-10 text-white shadow-[0_28px_60px_rgba(20,41,95,0.28),0_10px_20px_rgba(20,41,95,0.12),inset_0_1px_0_rgba(255,255,255,0.12)] overflow-hidden relative group">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(255,122,22,0.26),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_34%)]" />
-                <div className="absolute -right-4 -top-4 opacity-[0.12] rotate-12 group-hover:scale-110 transition-transform duration-1000">
-                  <Flame className="h-48 w-48" />
-                </div>
-                <div className="space-y-1 relative z-10">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/70">오늘의 트랙 총량 (누적)</p>
-                  <div className="flex items-baseline gap-1">
-                    <h3 className="dashboard-number text-6xl text-white drop-shadow-[0_10px_24px_rgba(7,16,40,0.35)]">{(metrics.totalTodayMins / 60).toFixed(1)}<span className="ml-1 text-2xl text-white/50">시간</span></h3>
-                  </div>
-                  <div className="pt-8 space-y-3">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/70">
-                      <span>일일 활성 목표 (평균 6시간)</span>
-                      <span>{Math.min(100, Math.round((metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100))}%</span>
-                    </div>
-                    <div className="h-2.5 w-full rounded-full bg-white/15 overflow-hidden shadow-[inset_0_2px_4px_rgba(6,15,38,0.32)]">
-                      <div
-                        className="h-full rounded-full bg-[linear-gradient(90deg,#FFE1C0_0%,#FFB46C_42%,#FF7A16_100%)] shadow-[0_0_18px_rgba(255,122,22,0.38)] transition-all duration-700"
-                        style={{ width: `${Math.min(100, (metrics.totalTodayMins / (metrics.totalStudents * 360 || 1)) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <button
-                type="button"
-                onClick={() => setIsStudyingStudentsDialogOpen(true)}
-                className="block w-full text-left"
-              >
-                <Card className="rounded-[2.5rem] border-none bg-white p-10 shadow-xl ring-1 ring-black/[0.03] transition-all group cursor-pointer hover:-translate-y-0.5 hover:shadow-2xl">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">현재 착석 인원</p>
-                      <h3 className="dashboard-number text-5xl text-primary">{metrics.checkedInCount}<span className="ml-1 text-2xl opacity-40">명</span></h3>
-                    </div>
-                    <div className="rounded-[1.5rem] bg-blue-50 p-4 shadow-sm transition-all duration-500 group-hover:bg-blue-600 group-hover:text-white"><Users className="h-8 w-8 text-blue-600 group-hover:text-white" /></div>
-                  </div>
-                  <div className="mt-8 grid grid-cols-2 gap-4 border-t border-dashed pt-8">
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">재원생(대상)</p>
-                      <p className="dashboard-number text-xl">{metrics.totalStudents}명</p>
-                    </div>
-                    <div className="space-y-1 text-right">
-                      <p className="text-[9px] font-black text-muted-foreground uppercase opacity-60">실시간 점유율</p>
-                      <p className="dashboard-number text-xl text-blue-600">{metrics.seatOccupancy}%</p>
-                    </div>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between border-t border-dashed pt-4">
-                    <p className="text-[11px] font-bold text-slate-500">누르면 현재 공부중인 학생 목록이 열립니다.</p>
-                    <ChevronRight className="h-4 w-4 text-blue-500 transition-transform duration-300 group-hover:translate-x-1" />
-                  </div>
-                </Card>
-              </button>
-
-              <Link
-                href="/dashboard/teacher/students?showRisk=1#risk-analysis"
-                className="block"
-              >
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-10 group hover:shadow-2xl transition-all ring-1 ring-black/[0.03] cursor-pointer">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">이탈 위험 고득점자</p>
-                    <h3 className="dashboard-number text-5xl text-rose-600">{metrics.riskCount}<span className="ml-1 text-2xl opacity-40">명</span></h3>
-                  </div>
-                  <div className="bg-rose-50 p-4 rounded-[1.5rem] group-hover:bg-rose-600 group-hover:text-white transition-all duration-500 shadow-sm"><ShieldAlert className="h-8 w-8 text-rose-600 group-hover:text-white" /></div>
-                </div>
-                <div className="mt-8 pt-8 border-t border-dashed">
-                  <p className="text-[9px] font-bold text-muted-foreground leading-relaxed italic">
-                    "위험 점수 70점 이상의 즉시 개입이 필요한 학생 수입니다."
-                  </p>
-                </div>
-              </Card>
-              </Link>
-            </div>
           </section>
 
           <section className="space-y-4 px-1">
