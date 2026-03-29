@@ -153,6 +153,7 @@ export interface AttendanceCurrent {
 
 export interface GrowthProgress {
   seasonLp: number;
+  pointsBalance?: number;
   penaltyPoints: number;
   stats: {
     focus: number;
@@ -163,7 +164,11 @@ export interface GrowthProgress {
   dailyLpStatus?: {
     [dateKey: string]: any;
   };
+  dailyPointStatus?: {
+    [dateKey: string]: any;
+  };
   totalLpEarned: number;
+  totalPointsEarned?: number;
   lastResetAt: Timestamp;
   updatedAt: Timestamp;
 }

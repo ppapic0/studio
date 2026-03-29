@@ -23,7 +23,14 @@ import {
 } from 'firebase/firestore';
 import { StudentProfile, AttendanceCurrent, GrowthProgress } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { calculateStudySessionLp } from '@/lib/student-rewards';
+import {
+  calculateAttendanceBonusLp,
+  calculateAttendanceBonusPoints,
+  calculateDeepFocusBonusLp,
+  calculateDeepFocusBonusPoints,
+  calculateStudySessionLp,
+  calculateStudySessionPoints,
+} from '@/lib/student-rewards';
 import { 
   Delete, 
   Loader2, 
@@ -301,19 +308,46 @@ export default function KioskPage() {
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', student.id);
           const progressSnap = await getDoc(progressRef);
           const progress = progressSnap.exists() ? (progressSnap.data() as GrowthProgress) : null;
+          const dayLogRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey);
+          const dayLogSnap = await getDoc(dayLogRef);
+          const existingDayMinutes = Number(dayLogSnap.data()?.totalMinutes || 0);
           const stats = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
           const totalBoost = 1 + (stats.focus/100 * 0.05) + (stats.consistency/100 * 0.05) + (stats.achievement/100 * 0.05) + (stats.resilience/100 * 0.05);
           const penaltyPoints = progress?.penaltyPoints || 0;
           const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
           const finalMultiplier = totalBoost * (1 - penaltyRate);
           const existingDayStatus = (progress?.dailyLpStatus?.[todayKey] || {}) as Record<string, any>;
-          const studyLpEarned = calculateStudySessionLp(durationMinutes, finalMultiplier, existingDayStatus);
+          const existingPointDayStatus = (progress?.dailyPointStatus?.[todayKey] || {}) as Record<string, any>;
+          let studyPointsEarned = calculateStudySessionPoints(durationMinutes, finalMultiplier);
+          let studyLpEarned = calculateStudySessionLp(durationMinutes, finalMultiplier, existingDayStatus);
+          const totalMinutesAfterSession = existingDayMinutes + durationMinutes;
+          const nextLpDayStatus: Record<string, any> = { ...existingDayStatus };
+          const nextPointDayStatus: Record<string, any> = { ...existingPointDayStatus };
+          if (totalMinutesAfterSession >= 180 && !existingDayStatus?.attendance) {
+            studyPointsEarned += calculateAttendanceBonusPoints(finalMultiplier);
+            studyLpEarned += calculateAttendanceBonusLp(finalMultiplier, existingDayStatus);
+            nextLpDayStatus.attendance = true;
+          }
+          if (totalMinutesAfterSession >= 360 && !existingDayStatus?.bonus6h) {
+            studyPointsEarned += calculateDeepFocusBonusPoints(finalMultiplier);
+            studyLpEarned += calculateDeepFocusBonusLp(finalMultiplier, existingDayStatus);
+            nextLpDayStatus.bonus6h = true;
+          }
           batch.set(progressRef, {
             seasonLp: increment(studyLpEarned),
+            totalLpEarned: increment(studyLpEarned),
+            pointsBalance: increment(studyPointsEarned),
+            totalPointsEarned: increment(studyPointsEarned),
             dailyLpStatus: {
               [todayKey]: {
-                ...existingDayStatus,
+                ...nextLpDayStatus,
                 dailyLpAmount: increment(studyLpEarned),
+              },
+            },
+            dailyPointStatus: {
+              [todayKey]: {
+                ...nextPointDayStatus,
+                dailyPointAmount: increment(studyPointsEarned),
               },
             },
             'stats.focus': increment((durationMinutes / 60) * 0.1),

@@ -74,7 +74,14 @@ import {
 } from 'firebase/firestore';
 import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog, LayoutRoomConfig } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { calculateStudySessionLp } from '@/lib/student-rewards';
+import {
+  calculateAttendanceBonusLp,
+  calculateAttendanceBonusPoints,
+  calculateDeepFocusBonusLp,
+  calculateDeepFocusBonusPoints,
+  calculateStudySessionLp,
+  calculateStudySessionPoints,
+} from '@/lib/student-rewards';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { 
@@ -1236,6 +1243,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
         if (sessionSeconds > 0) {
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
+          const logSnap = await getDoc(logRef);
+          const existingDayMinutes = Number(logSnap.data()?.totalMinutes || 0);
           batch.set(logRef, { totalMinutes: increment(sessionMinutes), studentId, centerId, dateKey: sessionDateKey, updatedAt: serverTimestamp() }, { merge: true });
 
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
@@ -1253,17 +1262,41 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
           const finalMultiplier = totalBoost * (1 - penaltyRate);
           const existingSessionDayStatus = (p?.dailyLpStatus?.[sessionDateKey] || {}) as Record<string, any>;
+          const existingPointDayStatus = (p?.dailyPointStatus?.[sessionDateKey] || {}) as Record<string, any>;
 
-          const studyLpEarned = calculateStudySessionLp(sessionMinutes, finalMultiplier, existingSessionDayStatus);
+          let studyPointsEarned = calculateStudySessionPoints(sessionMinutes, finalMultiplier);
+          let studyLpEarned = calculateStudySessionLp(sessionMinutes, finalMultiplier, existingSessionDayStatus);
+          const totalMinutesAfterSession = existingDayMinutes + sessionMinutes;
+          const nextLpDayStatus: Record<string, any> = { ...existingSessionDayStatus };
+          const nextPointDayStatus: Record<string, any> = { ...existingPointDayStatus };
+          if (totalMinutesAfterSession >= 180 && !existingSessionDayStatus?.attendance) {
+            studyPointsEarned += calculateAttendanceBonusPoints(finalMultiplier);
+            studyLpEarned += calculateAttendanceBonusLp(finalMultiplier, existingSessionDayStatus);
+            nextLpDayStatus.attendance = true;
+          }
+          if (totalMinutesAfterSession >= 360 && !existingSessionDayStatus?.bonus6h) {
+            studyPointsEarned += calculateDeepFocusBonusPoints(finalMultiplier);
+            studyLpEarned += calculateDeepFocusBonusLp(finalMultiplier, existingSessionDayStatus);
+            nextLpDayStatus.bonus6h = true;
+          }
           const progressUpdate: Record<string, any> = {
             seasonLp: increment(studyLpEarned),
+            totalLpEarned: increment(studyLpEarned),
+            pointsBalance: increment(studyPointsEarned),
+            totalPointsEarned: increment(studyPointsEarned),
             stats: {
               focus: increment((sessionMinutes / 60) * 0.1),
             },
             dailyLpStatus: {
               [sessionDateKey]: {
-                ...existingSessionDayStatus,
+                ...nextLpDayStatus,
                 dailyLpAmount: increment(studyLpEarned),
+              },
+            },
+            dailyPointStatus: {
+              [sessionDateKey]: {
+                ...nextPointDayStatus,
+                dailyPointAmount: increment(studyPointsEarned),
               },
             },
             updatedAt: serverTimestamp(),

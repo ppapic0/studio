@@ -87,7 +87,11 @@ import {
 } from '@/lib/attendance-auto';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import {
+  calculateAttendanceBonusPoints,
   calculateAttendanceBonusLp,
+  calculateDeepFocusBonusLp,
+  calculateDeepFocusBonusPoints,
+  calculateStudySessionPoints,
   calculateStudySessionLp,
   createDailyFortuneOutcome,
 } from '@/lib/student-rewards';
@@ -771,12 +775,12 @@ function LPHistoryDialog({
         <div className={cn("bg-accent text-white relative", isMobile ? "p-6" : "p-10")}>
           <Sparkles className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
-            <DialogTitle className={cn("font-black tracking-tighter break-keep", isMobile ? "text-xl" : "text-3xl")}>포인트 획득 기록</DialogTitle>
-            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">최근 30일간의 러닝 포인트 내역입니다.</DialogDescription>
+            <DialogTitle className={cn("font-black tracking-tighter break-keep", isMobile ? "text-xl" : "text-3xl")}>LP 획득 기록</DialogTitle>
+            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">최근 30일간의 시즌 LP 내역입니다.</DialogDescription>
           </DialogHeader>
         </div>
         <div className={cn("p-6 max-h-[50vh] overflow-y-auto custom-scrollbar bg-[#f5f5f5]", isMobile ? "max-h-[calc(86svh-10.5rem)] p-4" : "")}>
-          {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 포인트가 없습니다.</div>) : (
+          {sortedDates.length === 0 ? (<div className="py-20 text-center opacity-20 italic font-black text-sm">기록된 LP가 없습니다.</div>) : (
             <div className="space-y-2">
               {sortedDates.map(([date, data]) => {
                 return (
@@ -793,12 +797,12 @@ function LPHistoryDialog({
                             부스트 +{Number(data.fortuneBoostPercent || 0)}%
                           </Badge>
                         )}
-                        {Number(data.dailyLpAmount || 0) > 0 && <Badge variant="outline" className="bg-blue-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">포인트</Badge>}
+                        {Number(data.dailyLpAmount || 0) > 0 && <Badge variant="outline" className="bg-blue-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">LP</Badge>}
                       </div>
                     </div>
                     <div className="text-right">
                       <span className="dashboard-number text-sm text-primary">{(data.dailyLpAmount || 0).toLocaleString()}</span>
-                      <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40 whitespace-nowrap">포인트</span>
+                      <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40 whitespace-nowrap">LP</span>
                     </div>
                   </div>
                 );
@@ -1114,8 +1118,8 @@ function DailyFortuneDialog({
     ? `오늘 획득 LP +${fortuneResult.boostPercent}%`
     : `즉시 ${fortuneResult.pointGift.toLocaleString()}포인트`;
   const rewardCaption = fortuneResult.rewardType === 'boost'
-    ? '오늘 하루 포인트 획득에 바로 반영됩니다.'
-    : '지금 바로 시즌 포인트에 적립됩니다.';
+    ? '오늘 하루 새로 얻는 LP에만 바로 반영됩니다.'
+    : '지금 바로 포인트 지갑에 적립됩니다.';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -1591,9 +1595,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const batch = writeBatch(firestore);
         const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
         const existingSessionDayStatus = (progress?.dailyLpStatus?.[sessionDateKey] || {}) as Record<string, any>;
+        const existingSessionPointStatus = (progress?.dailyPointStatus?.[sessionDateKey] || {}) as Record<string, any>;
         const dailyStatusUpdate: Record<string, any> = { ...existingSessionDayStatus };
+        const dailyPointStatusUpdate: Record<string, any> = { ...existingSessionPointStatus };
         const statsUpdate: Record<string, any> = {};
         let finalNewLp = progress?.seasonLp || 0;
+        let earnedPointsThisSession = 0;
         let earnedLpThisSession = false;
         let wroteSomething = false;
 
@@ -1606,13 +1613,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             const sessionDaySnap = await getDoc(sessionStudyLogRef);
             existingSessionDayMinutes = Number(sessionDaySnap.data()?.totalMinutes || 0);
           }
-
+          let studyPointsEarned = calculateStudySessionPoints(sessionMinutes, finalMultiplier);
           let studyLpEarned = calculateStudySessionLp(sessionMinutes, finalMultiplier, existingSessionDayStatus);
           statsUpdate.focus = increment((sessionMinutes / 60) * 0.1);
 
           const totalMinutesAfterSession = existingSessionDayMinutes + sessionMinutes;
 
           if (totalMinutesAfterSession >= 180 && !progress?.dailyLpStatus?.[sessionDateKey]?.attendance) {
+            studyPointsEarned += calculateAttendanceBonusPoints(finalMultiplier);
             studyLpEarned += calculateAttendanceBonusLp(finalMultiplier, existingSessionDayStatus);
             dailyStatusUpdate.attendance = true;
             toast({ title: '\u0033\uC2DC\uAC04 \uB2EC\uC131! \uCD9C\uC11D \uBCF4\uB108\uC2A4 \uD3EC\uC778\uD2B8 \uD68D\uB4DD' });
@@ -1620,13 +1628,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyLpStatus?.[sessionDateKey]?.bonus6h) {
             statsUpdate.resilience = increment(0.5);
+            studyPointsEarned += calculateDeepFocusBonusPoints(finalMultiplier);
+            studyLpEarned += calculateDeepFocusBonusLp(finalMultiplier, existingSessionDayStatus);
             dailyStatusUpdate.bonus6h = true;
             toast({ title: '\u0036\uC2DC\uAC04 \uC5F0\uC18D \uD559\uC2B5! \uD68C\uBCF5\uB825 \uC2A4\uD0EF \uC0C1\uC2B9' });
           }
 
+          earnedPointsThisSession = studyPointsEarned;
           finalNewLp += studyLpEarned;
           earnedLpThisSession = studyLpEarned > 0;
+          if (studyPointsEarned > 0) {
+            progressUpdate.pointsBalance = increment(studyPointsEarned);
+            progressUpdate.totalPointsEarned = increment(studyPointsEarned);
+            dailyPointStatusUpdate.dailyPointAmount = increment(studyPointsEarned);
+          }
           progressUpdate.seasonLp = increment(studyLpEarned);
+          progressUpdate.totalLpEarned = increment(studyLpEarned);
           dailyStatusUpdate.dailyLpAmount = increment(studyLpEarned);
 
           if (Object.keys(statsUpdate).length > 0) {
@@ -1635,6 +1652,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           if (Object.keys(dailyStatusUpdate).length > 0) {
             progressUpdate.dailyLpStatus = {
               [sessionDateKey]: dailyStatusUpdate,
+            };
+          }
+          if (Object.keys(dailyPointStatusUpdate).length > 0) {
+            progressUpdate.dailyPointStatus = {
+              [sessionDateKey]: dailyPointStatusUpdate,
             };
           }
 
@@ -1822,11 +1844,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         } else {
           const _newTotalMin = Number(todayStudyLog?.totalMinutes || 0) + sessionMinutes;
           const _fmtMin = (m: number) => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 > 0 ? ` ${m % 60}분` : ''}` : `${m}분`;
-          toast({ title: '집중 종료됨', description: `이번 세션 ${_fmtMin(sessionMinutes)} · 오늘 총 ${_fmtMin(_newTotalMin)}` });
+          const rewardSummary = [
+            earnedPointsThisSession > 0 ? `+${earnedPointsThisSession.toLocaleString()}포인트` : null,
+            earnedLpThisSession ? `+${Math.max(0, Math.round(finalNewLp - (progress?.seasonLp || 0))).toLocaleString()} LP` : null,
+          ].filter(Boolean).join(' · ');
+          toast({
+            title: '집중 종료됨',
+            description: `${rewardSummary ? `${rewardSummary} · ` : ''}이번 세션 ${_fmtMin(sessionMinutes)} · 오늘 총 ${_fmtMin(_newTotalMin)}`,
+          });
         }
       } else {
         const nowTs = Date.now();
         const existingTodayStatus = (progress?.dailyLpStatus?.[todayKey] || {}) as Record<string, any>;
+        const existingTodayPointStatus = (progress?.dailyPointStatus?.[todayKey] || {}) as Record<string, any>;
         const batch = writeBatch(firestore);
         const checkInProgressUpdate: Record<string, any> = {
           updatedAt: serverTimestamp(),
@@ -1916,14 +1946,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           });
         await triggerAttendanceSms('study_start');
 
-        if (!startCommitError && !existingTodayStatus.fortuneOpened) {
+        if (!startCommitError && !existingTodayPointStatus.fortuneOpened) {
           try {
             const fortuneOutcome = createDailyFortuneOutcome({
               userId: user.uid,
               dateKey: todayKey,
               stats,
             });
-            const fortuneDayStatus: Record<string, any> = {
+            const fortuneLpDayStatus: Record<string, any> = {
               ...existingTodayStatus,
               checkedIn: true,
               fortuneOpened: true,
@@ -1933,15 +1963,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               fortuneMessageKey: fortuneOutcome.messageKey,
               fortuneOpenedAt: Timestamp.fromMillis(nowTs),
             };
+            const fortunePointDayStatus: Record<string, any> = {
+              ...existingTodayPointStatus,
+              fortuneOpened: true,
+              fortuneRewardType: fortuneOutcome.rewardType,
+              fortunePointGift: fortuneOutcome.pointGift,
+              fortuneBoostPercent: fortuneOutcome.boostPercent,
+              fortuneMessageKey: fortuneOutcome.messageKey,
+              fortuneOpenedAt: Timestamp.fromMillis(nowTs),
+            };
             if (fortuneOutcome.pointGift > 0) {
-              fortuneDayStatus.dailyLpAmount = increment(fortuneOutcome.pointGift);
+              fortunePointDayStatus.dailyPointAmount = increment(fortuneOutcome.pointGift);
             }
             const fortuneUpdate: Record<string, any> = {
-              dailyLpStatus: { [todayKey]: fortuneDayStatus },
+              dailyLpStatus: { [todayKey]: fortuneLpDayStatus },
+              dailyPointStatus: { [todayKey]: fortunePointDayStatus },
               updatedAt: serverTimestamp(),
             };
             if (fortuneOutcome.pointGift > 0) {
-              fortuneUpdate.seasonLp = increment(fortuneOutcome.pointGift);
+              fortuneUpdate.pointsBalance = increment(fortuneOutcome.pointGift);
+              fortuneUpdate.totalPointsEarned = increment(fortuneOutcome.pointGift);
             }
             await setDoc(progressRef, fortuneUpdate, { merge: true });
             setDailyFortuneResult(fortuneOutcome);
@@ -2382,6 +2423,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => getNextTierInfo(progress?.seasonLp || 0),
     [progress?.seasonLp]
   );
+  const pointsBalance = Math.max(0, Number(progress?.pointsBalance || 0));
   const latestAnnouncement = useMemo(() => {
     return (centerAnnouncements || []).find((item) => {
       const normalizedStatus = item?.status?.trim?.().toLowerCase?.();
@@ -2438,6 +2480,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               {currentTier.name} 티어
             </Badge>
             <span className={cn("font-black text-white/80", isMobile ? "text-xs" : "text-sm")}>{heroMessage}</span>
+            <Badge
+              variant="outline"
+              className={cn(
+                "border-white/20 bg-white/10 text-white font-black tracking-[0.12em] uppercase",
+                isMobile ? "text-[8px] px-2 py-1" : "text-[10px] px-3 py-1.5"
+              )}
+            >
+              포인트 {pointsBalance.toLocaleString()}
+            </Badge>
           </div>
 
           {/* Row 2: Today study time (large) + yesterday delta */}

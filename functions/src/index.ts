@@ -114,6 +114,19 @@ const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | 
   late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
 };
 
+const STUDY_SESSION_POINTS_PER_MINUTE = 0.42;
+const STUDY_ATTENDANCE_POINTS = 20;
+const STUDY_DEEP_FOCUS_POINTS = 15;
+const STUDY_SESSION_LP_PER_MINUTE = 0.12;
+const STUDY_ATTENDANCE_BONUS_LP = 12;
+const STUDY_DEEP_FOCUS_LP = 8;
+const DAILY_TOP_STUDY_POINTS = 1000;
+const MONTHLY_RANK_POINT_REWARDS: Record<number, number> = {
+  1: 20000,
+  2: 10000,
+  3: 5000,
+};
+
 function normalizePhoneNumber(raw: unknown): string {
   if (typeof raw !== "string" && typeof raw !== "number") return "";
   const digits = String(raw).replace(/\D/g, "");
@@ -3000,8 +3013,12 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
       t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
         seasonLp: 0,
+        pointsBalance: 0,
         penaltyPoints: 0,
         stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
+        totalLpEarned: 0,
+        totalPointsEarned: 0,
+        lastResetAt: timestamp,
         updatedAt: timestamp,
       });
     });
@@ -3469,9 +3486,13 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           currentXp: 0,
           nextLevelXp: 1000,
           seasonLp: 0,
+          pointsBalance: 0,
           penaltyPoints: 0,
           stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
           skills: {},
+          totalLpEarned: 0,
+          totalPointsEarned: 0,
+          lastResetAt: ts,
           updatedAt: ts,
         }, { merge: true });
       }
@@ -4279,8 +4300,6 @@ export const scheduledAttendanceCheck = functions
     const db = admin.firestore();
     const nowKst = toKstDate();
     const MAX_SESSION_MINUTES = 360; // 6시간
-    const STUDY_SESSION_LP_PER_MINUTE = 0.75;
-    const STUDY_ATTENDANCE_BONUS_LP = 50;
     const cutoffTimestamp = admin.firestore.Timestamp.fromMillis(
       Date.now() - MAX_SESSION_MINUTES * 60 * 1000
     );
@@ -4360,24 +4379,34 @@ export const scheduledAttendanceCheck = functions
         const penaltyRate = penaltyPoints >= 30 ? 0.15 : penaltyPoints >= 20 ? 0.10 : penaltyPoints >= 10 ? 0.06 : penaltyPoints >= 5 ? 0.03 : 0;
         const finalMultiplier = totalBoost * (1 - penaltyRate);
         const existingDayStatus = ((progressData?.dailyLpStatus || {}) as Record<string, any>)[sessionDateKey] || {};
+        const existingPointDayStatus = ((progressData?.dailyPointStatus || {}) as Record<string, any>)[sessionDateKey] || {};
         const fortuneBoostPercent = existingDayStatus?.fortuneRewardType === "boost"
           ? Math.max(0, Math.min(10, Math.round(Number(existingDayStatus?.fortuneBoostPercent || 0))))
           : 0;
         const fortuneBoostMultiplier = 1 + fortuneBoostPercent / 100;
         const existingDayMinutes = Number((await logRef.get()).data()?.totalMinutes || 0);
         const totalMinutesAfterSession = existingDayMinutes + MAX_SESSION_MINUTES;
+        let studyPointsEarned = Math.max(
+          0,
+          Math.round(MAX_SESSION_MINUTES * STUDY_SESSION_POINTS_PER_MINUTE * finalMultiplier)
+        );
         let studyLpEarned = Math.max(
           0,
           Math.round(MAX_SESSION_MINUTES * STUDY_SESSION_LP_PER_MINUTE * finalMultiplier * fortuneBoostMultiplier)
         );
         const nextDayStatus: Record<string, any> = { ...existingDayStatus };
+        const nextPointDayStatus: Record<string, any> = { ...existingPointDayStatus };
         const progressUpdate: Record<string, any> = {
           seasonLp: admin.firestore.FieldValue.increment(0),
+          totalLpEarned: admin.firestore.FieldValue.increment(0),
+          pointsBalance: admin.firestore.FieldValue.increment(0),
+          totalPointsEarned: admin.firestore.FieldValue.increment(0),
           "stats.focus": admin.firestore.FieldValue.increment((MAX_SESSION_MINUTES / 60) * 0.1),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
 
         if (totalMinutesAfterSession >= 180 && !existingDayStatus?.attendance) {
+          studyPointsEarned += Math.max(0, Math.round(STUDY_ATTENDANCE_POINTS * finalMultiplier));
           studyLpEarned += Math.max(
             0,
             Math.round(STUDY_ATTENDANCE_BONUS_LP * finalMultiplier * fortuneBoostMultiplier)
@@ -4387,16 +4416,28 @@ export const scheduledAttendanceCheck = functions
 
         if (totalMinutesAfterSession >= 360 && !existingDayStatus?.bonus6h) {
           nextDayStatus.bonus6h = true;
+          studyPointsEarned += Math.max(0, Math.round(STUDY_DEEP_FOCUS_POINTS * finalMultiplier));
+          studyLpEarned += Math.max(
+            0,
+            Math.round(STUDY_DEEP_FOCUS_LP * finalMultiplier * fortuneBoostMultiplier)
+          );
           progressUpdate["stats.resilience"] = admin.firestore.FieldValue.increment(0.5);
         }
 
         nextDayStatus.dailyLpAmount = admin.firestore.FieldValue.increment(studyLpEarned);
+        nextPointDayStatus.dailyPointAmount = admin.firestore.FieldValue.increment(studyPointsEarned);
 
         batch.set(progressRef, {
           ...progressUpdate,
           seasonLp: admin.firestore.FieldValue.increment(studyLpEarned),
+          totalLpEarned: admin.firestore.FieldValue.increment(studyLpEarned),
+          pointsBalance: admin.firestore.FieldValue.increment(studyPointsEarned),
+          totalPointsEarned: admin.firestore.FieldValue.increment(studyPointsEarned),
           dailyLpStatus: {
             [sessionDateKey]: nextDayStatus,
+          },
+          dailyPointStatus: {
+            [sessionDateKey]: nextPointDayStatus,
           },
         }, { merge: true });
 
@@ -4419,6 +4460,155 @@ export const scheduledAttendanceCheck = functions
       totalClosed,
       atKst: nowKst.toISOString(),
     });
+    return null;
+  });
+
+export const scheduledDailyTopStudyReward = functions
+  .region(region)
+  .pubsub.schedule("30 0 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const nowKst = toKstDate();
+    const targetDate = new Date(nowKst);
+    targetDate.setDate(targetDate.getDate() - 1);
+    const dateKey = toDateKey(targetDate);
+    const centersSnap = await db.collection("centers").get();
+
+    for (const centerDoc of centersSnap.docs) {
+      const centerId = centerDoc.id;
+      const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/daily-top-${dateKey}`);
+      const settlementSnap = await settlementRef.get();
+      if (settlementSnap.exists) continue;
+
+      const statsSnap = await db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get();
+      const ranked = statsSnap.docs
+        .map((docSnap) => ({
+          studentId: docSnap.id,
+          totalStudyMinutes: Math.max(0, Math.round(Number(docSnap.data()?.totalStudyMinutes || 0))),
+        }))
+        .filter((item) => item.totalStudyMinutes > 0)
+        .sort((a, b) => b.totalStudyMinutes - a.totalStudyMinutes);
+
+      const batch = db.batch();
+      if (ranked.length === 0) {
+        batch.set(settlementRef, {
+          type: "daily-top-study",
+          dateKey,
+          rewardedStudentIds: [],
+          maxMinutes: 0,
+          settledAt: admin.firestore.FieldValue.serverTimestamp(),
+          skippedReason: "no-study-minutes",
+        }, { merge: true });
+        await batch.commit();
+        continue;
+      }
+
+      const maxMinutes = ranked[0].totalStudyMinutes;
+      const winners = ranked.filter((item) => item.totalStudyMinutes === maxMinutes);
+
+      for (const winner of winners) {
+        const progressRef = db.doc(`centers/${centerId}/growthProgress/${winner.studentId}`);
+        batch.set(progressRef, {
+          pointsBalance: admin.firestore.FieldValue.increment(DAILY_TOP_STUDY_POINTS),
+          totalPointsEarned: admin.firestore.FieldValue.increment(DAILY_TOP_STUDY_POINTS),
+          dailyPointStatus: {
+            [dateKey]: {
+              dailyPointAmount: admin.firestore.FieldValue.increment(DAILY_TOP_STUDY_POINTS),
+              dailyTopRewardGranted: true,
+              dailyTopRewardAmount: DAILY_TOP_STUDY_POINTS,
+              dailyTopRewardMinutes: maxMinutes,
+            },
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+
+      batch.set(settlementRef, {
+        type: "daily-top-study",
+        dateKey,
+        rewardedStudentIds: winners.map((winner) => winner.studentId),
+        maxMinutes,
+        pointsPerWinner: DAILY_TOP_STUDY_POINTS,
+        settledAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      await batch.commit();
+    }
+
+    return null;
+  });
+
+export const scheduledMonthlyLpPointRewards = functions
+  .region(region)
+  .pubsub.schedule("15 1 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const nowKst = toKstDate();
+    if (nowKst.getDate() !== 1) return null;
+
+    const targetMonth = new Date(nowKst.getFullYear(), nowKst.getMonth() - 1, 1);
+    const periodKey = `${targetMonth.getFullYear()}-${String(targetMonth.getMonth() + 1).padStart(2, "0")}`;
+    const centersSnap = await db.collection("centers").get();
+
+    for (const centerDoc of centersSnap.docs) {
+      const centerId = centerDoc.id;
+      const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/monthly-lp-${periodKey}`);
+      const settlementSnap = await settlementRef.get();
+      if (settlementSnap.exists) continue;
+
+      const entrySnap = await db.collection(`centers/${centerId}/leaderboards/${periodKey}_lp/entries`).get();
+      const ranked = entrySnap.docs
+        .map((docSnap) => ({
+          studentId: docSnap.id,
+          value: Math.max(0, Number(docSnap.data()?.value || 0)),
+        }))
+        .filter((item) => item.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 3);
+
+      const batch = db.batch();
+      if (ranked.length === 0) {
+        batch.set(settlementRef, {
+          type: "monthly-lp-points",
+          periodKey,
+          placements: [],
+          settledAt: admin.firestore.FieldValue.serverTimestamp(),
+          skippedReason: "no-ranked-entries",
+        }, { merge: true });
+        await batch.commit();
+        continue;
+      }
+
+      const placements = ranked.map((entry, index) => ({
+        rank: index + 1,
+        studentId: entry.studentId,
+        lp: entry.value,
+        points: MONTHLY_RANK_POINT_REWARDS[index + 1] || 0,
+      }));
+
+      for (const placement of placements) {
+        const rewardPoints = placement.points;
+        if (rewardPoints <= 0) continue;
+        const progressRef = db.doc(`centers/${centerId}/growthProgress/${placement.studentId}`);
+        batch.set(progressRef, {
+          pointsBalance: admin.firestore.FieldValue.increment(rewardPoints),
+          totalPointsEarned: admin.firestore.FieldValue.increment(rewardPoints),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+
+      batch.set(settlementRef, {
+        type: "monthly-lp-points",
+        periodKey,
+        placements,
+        settledAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      await batch.commit();
+    }
+
     return null;
   });
 

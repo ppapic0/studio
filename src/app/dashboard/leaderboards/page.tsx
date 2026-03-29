@@ -458,7 +458,7 @@ export default function LeaderboardsPage() {
         </div>
         <p className={cn("font-bold text-muted-foreground leading-relaxed", isMobile ? "text-xs max-w-xs" : "text-xl max-w-2xl")}>
           {format(targetDate, 'yyyy년 M월')} 시즌 실시간 랭킹입니다. <br/>
-          퇴원생을 제외한 재원생 중 누적 포인트를 통해 여러분의 성장을 증명하세요.
+          퇴원생을 제외한 재원생 중 누적 LP를 통해 여러분의 성장을 증명하세요.
         </p>
       </header>
 
@@ -543,7 +543,7 @@ export default function LeaderboardsPage() {
                 <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-xl" : "text-2xl")}>
                   {nextTierInfo.remainingLp > 0 ? `${nextTierInfo.remainingLp.toLocaleString()}점` : '유지 중'}
                 </p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">다음 티어까지 남은 포인트</p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">다음 티어까지 남은 LP</p>
               </div>
             </CardContent>
           </Card>

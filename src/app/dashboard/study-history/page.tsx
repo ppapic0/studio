@@ -110,7 +110,7 @@ import { RoutineComposerCard } from '@/components/dashboard/student-planner/rout
 import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
 import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
 import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
-import { calculatePlanCompletionLp } from '@/lib/student-rewards';
+import { calculateTaskCompletionRewards } from '@/lib/student-rewards';
 
 type LinkedStudentOption = {
   id: string;
@@ -688,18 +688,34 @@ export default function StudyHistoryPage() {
         const batch = writeBatch(firestore);
         const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
         const existingDayStatus = (progress?.dailyLpStatus?.[dateKey] || {}) as Record<string, any>;
-        const rewardLp = calculatePlanCompletionLp(existingDayStatus);
+        const existingPointStatus = (progress?.dailyPointStatus?.[dateKey] || {}) as Record<string, any>;
+        const rewards = calculateTaskCompletionRewards({
+          category: item.category,
+          lpDayStatus: existingDayStatus,
+        });
         const nextDayStatus: Record<string, any> = {
           ...existingDayStatus,
-          dailyLpAmount: increment(rewardLp),
+        };
+        const nextPointStatus: Record<string, any> = {
+          ...existingPointStatus,
         };
         if (item.category === 'study') nextDayStatus.plan = true;
         if (item.category === 'schedule') nextDayStatus.routine = true;
         const progressUpdate: Record<string, any> = {
-          seasonLp: increment(rewardLp),
           dailyLpStatus: { [dateKey]: nextDayStatus },
           updatedAt: serverTimestamp(),
         };
+        if (rewards.lpReward > 0) {
+          nextDayStatus.dailyLpAmount = increment(rewards.lpReward);
+          progressUpdate.seasonLp = increment(rewards.lpReward);
+          progressUpdate.totalLpEarned = increment(rewards.lpReward);
+        }
+        if (rewards.pointReward > 0) {
+          nextPointStatus.dailyPointAmount = increment(rewards.pointReward);
+          progressUpdate.pointsBalance = increment(rewards.pointReward);
+          progressUpdate.totalPointsEarned = increment(rewards.pointReward);
+          progressUpdate.dailyPointStatus = { [dateKey]: nextPointStatus };
+        }
         if (achievementCount < 5) {
           progressUpdate.stats = { achievement: increment(0.1) };
           progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);
@@ -736,17 +752,33 @@ export default function StudyHistoryPage() {
       const batch = writeBatch(firestore);
       const achievementCount = progress?.dailyLpStatus?.[dateKey]?.achievementCount || 0;
       const existingDayStatus = (progress?.dailyLpStatus?.[dateKey] || {}) as Record<string, any>;
-      const rewardLp = calculatePlanCompletionLp(existingDayStatus);
+      const existingPointStatus = (progress?.dailyPointStatus?.[dateKey] || {}) as Record<string, any>;
+      const rewards = calculateTaskCompletionRewards({
+        category: item.category,
+        lpDayStatus: existingDayStatus,
+      });
       const nextDayStatus: Record<string, any> = {
         ...existingDayStatus,
         plan: true,
-        dailyLpAmount: increment(rewardLp),
+      };
+      const nextPointStatus: Record<string, any> = {
+        ...existingPointStatus,
       };
       const progressUpdate: Record<string, any> = {
-        seasonLp: increment(rewardLp),
         dailyLpStatus: { [dateKey]: nextDayStatus },
         updatedAt: serverTimestamp(),
       };
+      if (rewards.lpReward > 0) {
+        nextDayStatus.dailyLpAmount = increment(rewards.lpReward);
+        progressUpdate.seasonLp = increment(rewards.lpReward);
+        progressUpdate.totalLpEarned = increment(rewards.lpReward);
+      }
+      if (rewards.pointReward > 0) {
+        nextPointStatus.dailyPointAmount = increment(rewards.pointReward);
+        progressUpdate.pointsBalance = increment(rewards.pointReward);
+        progressUpdate.totalPointsEarned = increment(rewards.pointReward);
+        progressUpdate.dailyPointStatus = { [dateKey]: nextPointStatus };
+      }
       if (achievementCount < 5) {
         progressUpdate.stats = { achievement: increment(0.1) };
         progressUpdate.dailyLpStatus[dateKey].achievementCount = increment(1);

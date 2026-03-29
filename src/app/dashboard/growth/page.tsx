@@ -171,7 +171,7 @@ function SystemGuideDialog() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tighter">성장트랙 가이드</DialogTitle>
             <DialogDescription className="text-primary-foreground/70 font-bold mt-1 text-xs">
-              활동량(포인트)으로 증명하는 시즌제 등급 시스템입니다.
+              활동량(LP)으로 증명하는 시즌제 등급 시스템입니다.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -203,9 +203,9 @@ function SystemGuideDialog() {
             </h4>
             <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100">
               <p className="text-[11px] font-bold text-emerald-900/70 leading-relaxed">
-                - **브론즈 ~ 다이아몬드**: 0 ~ 25,000포인트 구간<br/>
-                - **챌린저**: 25,000포인트 이상 중 **센터 1위**<br/>
-                - **그랜드마스터**: 25,000포인트 이상 중 **2, 3위**
+                - **브론즈 ~ 다이아몬드**: 0 ~ 25,000LP 구간<br/>
+                - **챌린저**: 25,000LP 이상 중 **센터 1위**<br/>
+                - **그랜드마스터**: 25,000LP 이상 중 **2, 3위**
               </p>
             </div>
           </div>

@@ -1,9 +1,24 @@
-export const STUDY_SESSION_LP_PER_MINUTE = 0.75;
-export const STUDY_ATTENDANCE_BONUS_LP = 50;
-export const STUDY_PLAN_COMPLETION_LP = 5;
+export const STUDY_SESSION_POINTS_PER_MINUTE = 0.42;
+export const STUDY_ATTENDANCE_POINTS = 20;
+export const STUDY_DEEP_FOCUS_POINTS = 15;
+export const STUDY_PLAN_COMPLETION_POINTS = 10;
+export const STUDY_ROUTINE_COMPLETION_POINTS = 10;
+
+export const STUDY_SESSION_LP_PER_MINUTE = 0.12;
+export const STUDY_ATTENDANCE_BONUS_LP = 12;
+export const STUDY_DEEP_FOCUS_LP = 8;
+export const STUDY_PLAN_COMPLETION_LP = 3;
+export const STUDY_ROUTINE_COMPLETION_LP = 3;
+
 export const DAILY_FORTUNE_POINT_MAX = 100;
 export const DAILY_FORTUNE_BOOST_MIN_PERCENT = 1;
 export const DAILY_FORTUNE_BOOST_MAX_PERCENT = 10;
+export const DAILY_TOP_STUDY_POINTS = 1000;
+export const MONTHLY_RANK_POINT_REWARDS = {
+  1: 20000,
+  2: 10000,
+  3: 5000,
+} as const;
 
 export type DailyFortuneRewardType = "points" | "boost";
 
@@ -20,6 +35,13 @@ export interface DailyFortuneOutcome {
   messageKey: string;
   message: DailyFortuneMessage;
 }
+
+type TaskRewardCategory = 'study' | 'schedule' | 'personal' | undefined;
+
+type TaskCompletionRewardsParams = {
+  category: TaskRewardCategory;
+  lpDayStatus?: Record<string, any> | null;
+};
 
 const DAILY_FORTUNE_MESSAGES: DailyFortuneMessage[] = [
   {
@@ -131,6 +153,16 @@ export function calculateStudySessionLp(
   );
 }
 
+export function calculateStudySessionPoints(
+  sessionMinutes: number,
+  finalMultiplier: number,
+) {
+  return Math.max(
+    0,
+    Math.round(sessionMinutes * STUDY_SESSION_POINTS_PER_MINUTE * finalMultiplier)
+  );
+}
+
 export function calculateAttendanceBonusLp(
   finalMultiplier: number,
   dayStatus?: Record<string, any> | null,
@@ -141,11 +173,65 @@ export function calculateAttendanceBonusLp(
   );
 }
 
+export function calculateAttendanceBonusPoints(finalMultiplier: number) {
+  return Math.max(0, Math.round(STUDY_ATTENDANCE_POINTS * finalMultiplier));
+}
+
+export function calculateDeepFocusBonusLp(
+  finalMultiplier: number,
+  dayStatus?: Record<string, any> | null,
+) {
+  return Math.max(
+    0,
+    Math.round(STUDY_DEEP_FOCUS_LP * finalMultiplier * getDailyFortuneBoostMultiplier(dayStatus))
+  );
+}
+
+export function calculateDeepFocusBonusPoints(finalMultiplier: number) {
+  return Math.max(0, Math.round(STUDY_DEEP_FOCUS_POINTS * finalMultiplier));
+}
+
 export function calculatePlanCompletionLp(dayStatus?: Record<string, any> | null) {
   return Math.max(
     1,
     Math.round(STUDY_PLAN_COMPLETION_LP * getDailyFortuneBoostMultiplier(dayStatus))
   );
+}
+
+export function calculateTaskCompletionRewards({
+  category,
+  lpDayStatus,
+}: TaskCompletionRewardsParams) {
+  const currentDayStatus = lpDayStatus || {};
+
+  if (category === 'study') {
+    const alreadyGranted = !!currentDayStatus.plan;
+    return {
+      pointReward: alreadyGranted ? 0 : STUDY_PLAN_COMPLETION_POINTS,
+      lpReward: alreadyGranted ? 0 : calculatePlanCompletionLp(currentDayStatus),
+      pointFlagKey: 'plan' as const,
+      lpFlagKey: 'plan' as const,
+    };
+  }
+
+  if (category === 'schedule') {
+    const alreadyGranted = !!currentDayStatus.routine;
+    return {
+      pointReward: alreadyGranted ? 0 : STUDY_ROUTINE_COMPLETION_POINTS,
+      lpReward: alreadyGranted
+        ? 0
+        : Math.max(1, Math.round(STUDY_ROUTINE_COMPLETION_LP * getDailyFortuneBoostMultiplier(currentDayStatus))),
+      pointFlagKey: 'routine' as const,
+      lpFlagKey: 'routine' as const,
+    };
+  }
+
+  return {
+    pointReward: 0,
+    lpReward: 0,
+    pointFlagKey: null,
+    lpFlagKey: null,
+  };
 }
 
 export function createDailyFortuneOutcome(params: {
