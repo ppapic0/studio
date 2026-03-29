@@ -2409,7 +2409,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     const hasRecord = (todayLog?.totalMinutes || 0) > 0;
 
     if (isStudying) {
-      return { label: '등원 (학습 중)', color: 'bg-[#eaf2ff] text-[#14295F] border-blue-100', icon: UserCheck };
+      return { label: '등원(학습중)', color: 'bg-[#eaf2ff] text-[#14295F] border-blue-100', icon: UserCheck };
     }
 
     if (!isStudying && hasRecord) {
@@ -2420,7 +2420,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     const isAbsentDay = routineItems.some(p => p.title.includes('등원하지 않습니다'));
     
     if (isAbsentDay) {
-      return { label: '결석 (휴무)', color: 'bg-rose-50 text-rose-600 border-rose-100', icon: CalendarX };
+      return { label: '결석(휴무)', color: 'bg-rose-50 text-rose-600 border-rose-100', icon: CalendarX };
     }
 
     const inTimePlan = routineItems.find(p => p.title.includes('등원 예정'));
@@ -2646,16 +2646,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     const isCurrentlyInside = ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '');
 
     return {
-      dateLabel: today ? format(today, 'MM/dd (EEE)', { locale: ko }) : '오늘',
+      dateLabel: today ? format(today, 'MM/dd(EEE)', { locale: ko }) : '오늘',
       checkInLabel: formatAttendanceTimeLabel(todayCheckInAt, '미기록'),
       checkOutLabel: isCurrentlyInside
         ? todayCheckOutAt
           ? formatAttendanceTimeLabel(todayCheckOutAt)
-          : '학습 중'
+          : '학습중'
         : todayCheckOutAt
           ? formatAttendanceTimeLabel(todayCheckOutAt)
           : todayCheckInAt
-            ? '기록 대기'
+            ? '기록대기'
             : '미기록',
     };
   }, [attendanceCurrent?.status, today, todayCheckInAt, todayCheckOutAt]);
@@ -3242,8 +3242,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             >
               <div className="flex h-full flex-col justify-between gap-3">
                 <div className="space-y-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#477281]">출결 상태</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.14em] text-[#477281]">출결 상태</span>
                     <Badge variant="outline" className="h-6 rounded-full border border-[#d4eaef] bg-white/90 px-2.5 text-[10px] font-black text-[#245565]">
                       실시간
                     </Badge>
@@ -3255,34 +3255,34 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="min-w-0">
                       <div className="mb-1.5 flex items-center gap-2">
                         <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#245565]">앱 연동 중</span>
+                        <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-[0.12em] text-[#245565]">앱 연동 중</span>
                       </div>
-                      <p className="break-keep text-[1rem] font-black leading-[1.18] tracking-[-0.03em] text-[#14295F] sm:text-[1.08rem]">
+                      <p className="whitespace-nowrap text-[0.9rem] font-black leading-none tracking-[-0.04em] text-[#14295F] sm:text-[1.02rem]">
                         {attendanceStatus.label}
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2.5 shadow-[0_10px_16px_-16px_rgba(27,114,141,0.22)]">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#477281]">오늘 출결 기록</p>
-                    <p className="text-[10px] font-black text-[#245565]">{todayAttendanceTimeSummary.dateLabel}</p>
+                  <div className="flex items-center justify-between gap-1.5">
+                    <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#477281]">오늘의 출결기록</p>
+                    <p className="whitespace-nowrap text-[9px] font-black text-[#245565]">{todayAttendanceTimeSummary.dateLabel}</p>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div className="rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#5b7d88]">등원</p>
-                      <p className="mt-1 text-[13px] font-black tracking-tight text-[#14295F]">
+                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                    <div className="min-w-0 rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#5b7d88]">등원시간</p>
+                      <p className="mt-1 whitespace-nowrap text-[12px] font-black leading-none tracking-[-0.03em] text-[#14295F]">
                         {todayAttendanceTimeSummary.checkInLabel}
                       </p>
                     </div>
-                    <div className="rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#5b7d88]">하원</p>
-                      <p className="mt-1 text-[13px] font-black tracking-tight text-[#14295F]">
+                    <div className="min-w-0 rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#5b7d88]">하원시간</p>
+                      <p className="mt-1 whitespace-nowrap text-[12px] font-black leading-none tracking-[-0.03em] text-[#14295F]">
                         {todayAttendanceTimeSummary.checkOutLabel}
                       </p>
                     </div>
                   </div>
-                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">앱에서 실시간 출결 시각 기준</p>
+                  <p className="mt-2 whitespace-nowrap text-[10px] font-bold leading-none tracking-[-0.02em] text-slate-500">앱에서 출결시각 기준</p>
                 </div>
               </div>
             </ParentMetricCardShell>
