@@ -131,6 +131,16 @@ export type MockExamProgramCard = {
   summary: string;
 };
 
+export type MobileStudySystemSection = {
+  title: string;
+  body: string;
+  secondaryBody?: string;
+  href?: string;
+  image?: string;
+  alt?: string;
+  tone: 'navy' | 'slate' | 'orange' | 'violet';
+};
+
 export type MarketingContent = {
   brand: {
     name: string;
@@ -204,6 +214,14 @@ export type MarketingContent = {
     description: string;
     highlights: string[];
     programs: MockExamProgramCard[];
+  };
+  mobileStudySystem: {
+    intro: {
+      eyebrow: string;
+      title: string;
+      description: string;
+    };
+    sections: MobileStudySystemSection[];
   };
   lpSystem: {
     heading: string;
@@ -629,6 +647,40 @@ export const marketingContent: MarketingContent = {
       {
         title: '시대인재 서바이벌 프로',
         summary: '상위권 실전 난이도까지 대비해 시험장에서 흔들리지 않는 난이도 대응력을 만듭니다.',
+      },
+    ],
+  },
+  mobileStudySystem: {
+    intro: {
+      eyebrow: 'TRACK SYSTEM',
+      title: '트랙 스터디센터 학습관리 시스템을 소개합니다',
+      description:
+        '학습 방향 설정부터 웹앱 피드백, 실전 모의고사 운영, 분위기 관리까지 학생의 흐름이 흔들리지 않도록 한 시스템 안에서 운영합니다.',
+    },
+    sections: [
+      {
+        title: '트랙 웹앱을 통해 학습 방향성 설정',
+        body: '오늘의 학습계획을 작성하고 실천',
+        href: '/experience',
+        tone: 'orange',
+      },
+      {
+        title: '트랙 웹앱으로 학습현황 피드백',
+        body: '학습계획에 대한 공부흐름을 진단하고 파악',
+        secondaryBody: '학생 및 부모와 연동되어 확인가능',
+        tone: 'slate',
+      },
+      {
+        title:
+          '더프리미엄 모의고사와 시대인재 서바이벌 프로, 이감, 한수 모의고사를 통한 문제경험 및 실전 감각 향상',
+        body: '대치동에 가지 않아도 동일한 컨텐츠 유료 이용가능',
+        tone: 'navy',
+      },
+      {
+        title: '확실한 벌점제도를 통한 학습분위기 관리 및 포인트제도를 통한 학습흥미 유발',
+        body: '벌점과 포인트를 함께 운영해 학습 집중도와 지속성을 동시에 높입니다.',
+        alt: '모바일 학습관리 시스템 실제 앱 화면 예정 자리',
+        tone: 'violet',
       },
     ],
   },

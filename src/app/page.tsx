@@ -5,6 +5,7 @@ import { HeroSection } from '@/components/marketing/hero-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingLaunchNoticeModal } from '@/components/marketing/marketing-launch-notice-modal';
+import { MobileStudySystemSection } from '@/components/marketing/mobile-study-system-section';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { PageGatewaySection } from '@/components/marketing/page-gateway-section';
 import { ResultsSection } from '@/components/marketing/results-section';
@@ -19,18 +20,27 @@ export default function HomePage() {
       <MarketingLaunchNoticeModal notice={marketingContent.launchNotice} />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
-      <ScrollReveal>
-        <HeroGallerySection />
-      </ScrollReveal>
-      <ScrollReveal>
-        <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
-      </ScrollReveal>
-      <ScrollReveal>
-        <HomeOpsSection />
-      </ScrollReveal>
-      <ScrollReveal>
-        <PageGatewaySection />
-      </ScrollReveal>
+      <MobileStudySystemSection content={marketingContent.mobileStudySystem} />
+      <div className="hidden sm:block">
+        <ScrollReveal>
+          <HeroGallerySection />
+        </ScrollReveal>
+      </div>
+      <div className="hidden sm:block">
+        <ScrollReveal>
+          <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
+        </ScrollReveal>
+      </div>
+      <div className="hidden sm:block">
+        <ScrollReveal>
+          <HomeOpsSection />
+        </ScrollReveal>
+      </div>
+      <div className="hidden sm:block">
+        <ScrollReveal>
+          <PageGatewaySection />
+        </ScrollReveal>
+      </div>
       <ScrollReveal>
         <ConsultSection consult={marketingContent.consult} trustMetrics={marketingContent.appSystem.trustMetrics} />
       </ScrollReveal>
