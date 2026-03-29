@@ -3077,12 +3077,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <ParentMetricCardShell
               tone="study"
               className={cn(
-                'md:min-h-[12.2rem] lg:min-h-[13rem]',
+                'md:min-h-[12rem] lg:min-h-[12.6rem]',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-3'
               )}
             >
-              <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
-                <div className="min-w-0 space-y-2 pr-[5.7rem] sm:space-y-2.5 sm:pr-0">
+              <div className="flex h-full flex-col gap-3">
+                <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#56739f]">오늘 공부</span>
                     {growthCelebrationCandidate ? (
@@ -3096,6 +3096,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     )}
                   </div>
                   <ParentDurationValue minutes={totalMinutes} className="text-[1.4rem] sm:text-[1.72rem] lg:text-[1.92rem]" />
+                  <p className="text-[11px] font-bold leading-5 text-slate-500">
+                    최근 7일 최고 {studyTrendHasActivity ? toHm(studyTrendPeakMinutes) : '기록 대기'}
+                  </p>
                   <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(20,41,95,0.24)]">
                     <div className="flex items-center justify-between gap-2">
                       <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">최근 평균</p>
@@ -3111,17 +3114,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   </div>
                 </div>
-                <div className="absolute right-0 -top-1 w-[4.8rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
-                  <ParentMetricSparkline
-                    tone="study"
-                    points={dailyStudyTrend.map((point) => ({
-                      label: point.date,
-                      value: studyTrendHasActivity ? point.minutes : null,
-                    }))}
-                    label="7일 흐름"
-                    valueLabel={studyTrendHasActivity ? `최고 ${toHm(studyTrendPeakMinutes)}` : '기록 대기'}
-                    className="w-full"
-                  />
+                <div className="rounded-[1rem] border border-[#d9e6ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(239,245,255,0.94)_100%)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#56739f]">최근 7일 흐름</p>
+                    <p className="text-[11px] font-black text-[#204ca3]">
+                      {studyTrendHasActivity ? `${dailyStudyTrend.filter((point) => point.minutes > 0).length}일 기록` : '기록 대기'}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
+                    그래프 대신 핵심 수치만 남겨 모바일에서도 잘리지 않게 정리했습니다.
+                  </p>
                 </div>
               </div>
             </ParentMetricCardShell>
@@ -3129,12 +3131,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <ParentMetricCardShell
               tone="plan"
               className={cn(
-                'md:min-h-[12.2rem] lg:min-h-[13rem]',
+                'md:min-h-[12rem] lg:min-h-[12.6rem]',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-3'
               )}
             >
-              <div className="relative flex h-full flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6.2rem] lg:grid-cols-[minmax(0,1fr)_8.4rem] lg:gap-4">
-                <div className="min-w-0 space-y-2 pr-[5.7rem] sm:space-y-2.5 sm:pr-0">
+              <div className="flex h-full flex-col gap-3">
+                <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c66a13]">계획 달성</span>
                     <Badge variant="outline" className="h-6 rounded-full border border-[#ffd8ab] bg-white/90 px-2.5 text-[10px] font-black text-[#b45f0d]">
@@ -3142,6 +3144,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </Badge>
                   </div>
                   <ParentStatValue value={planRate} unit="%" className="text-[1.44rem] sm:text-[1.76rem] lg:text-[1.96rem]" unitClassName="text-[#d09248]" />
+                  <p className="text-[11px] font-bold leading-5 text-slate-500">
+                    최근 7일 완료 {planTrendActiveDays > 0 ? `${planTrendCompletedDays}일` : '기록 대기'}
+                  </p>
                   <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(210,109,18,0.24)]">
                     <div className="flex items-center justify-between gap-2">
                       <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">주간 평균</p>
@@ -3157,17 +3162,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   </div>
                 </div>
-                <div className="absolute right-0 -top-1 w-[4.8rem] sm:static sm:flex sm:min-w-0 sm:items-center sm:justify-end sm:w-auto">
-                  <ParentMetricSparkline
-                    tone="plan"
-                    points={dailyPlanTrend.map((point) => ({
-                      label: point.date,
-                      value: point.rate,
-                    }))}
-                    label="7일 달성률"
-                    valueLabel={planTrendActiveDays > 0 ? `평균 ${planTrendAverageRate}%` : '계획 대기'}
-                    className="w-full"
-                  />
+                <div className="rounded-[1rem] border border-[#ffe0bf] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,247,236,0.95)_100%)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#c66a13]">최근 7일 달성</p>
+                    <p className="text-[11px] font-black text-[#b45f0d]">
+                      {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
+                    잘리는 그래프 대신 완료 흐름을 숫자로 바로 읽을 수 있게 정리했습니다.
+                  </p>
                 </div>
               </div>
             </ParentMetricCardShell>
