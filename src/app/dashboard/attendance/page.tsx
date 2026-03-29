@@ -27,8 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { differenceInMinutes, format, isSameDay } from 'date-fns';
-import { useCollection, useFirestore, useFunctions, useUser, useMemoFirebase } from '@/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { collection, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch } from 'firebase/firestore';
 import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3 } from 'lucide-react';
@@ -57,6 +56,7 @@ import {
   parseDateInputValue,
   resolveMembershipByRole,
 } from '@/lib/dashboard-access';
+import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 
 type AttendanceRecord = {
   id: string;
@@ -83,7 +83,6 @@ type StudyLogSummary = {
 export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const functions = useFunctions();
   const { activeMembership, memberships, membershipsLoading } = useAppContext();
   const { toast } = useToast();
   
@@ -107,24 +106,6 @@ export default function AttendancePage() {
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const centerId = classroomMembership?.id;
   const isTeacherOrAdmin = Boolean(classroomMembership);
-  const canTriggerAttendanceSms =
-    classroomMembership?.role === 'teacher' ||
-    classroomMembership?.role === 'centerAdmin' ||
-    classroomMembership?.role === 'owner';
-
-  const triggerAttendanceSms = async (
-    studentId: string,
-    eventType: 'study_start' | 'study_end'
-  ) => {
-    if (!functions || !centerId || !canTriggerAttendanceSms) return;
-
-    try {
-      const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
-      await notifyAttendanceSms({ centerId, studentId, eventType });
-    } catch (error) {
-      console.warn('[attendance] notifyAttendanceSms failed', error);
-    }
-  };
 
   // 1. 센터 모든 학생 조회
   const studentsQuery = useMemoFirebase(() => {
@@ -285,10 +266,6 @@ export default function AttendancePage() {
 
       setIsProcessing(true);
       try {
-        const todayDateKey = format(new Date(), 'yyyy-MM-dd');
-        const isTodaySelected = dateKey === todayDateKey;
-        const previousRecordStatus = attendanceMap.get(studentId)?.status || null;
-        const liveAttendanceStatus = attendanceCurrentMap.get(studentId)?.status || 'absent';
         const batch = writeBatch(firestore);
         const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
         const studentData = students?.find(s => s.id === studentId);
@@ -298,7 +275,7 @@ export default function AttendancePage() {
             ? combineDateWithTime(selectedDate, routine.expectedArrivalTime)
             : null;
         const fallbackCheckedAt =
-          status === 'confirmed_present' || status === 'confirmed_present_missing_routine'
+          status === 'confirmed_present'
             ? expectedArrivalAtFromRoutine || selectedDate
             : status === 'confirmed_late'
               ? expectedArrivalAtFromRoutine
@@ -306,7 +283,7 @@ export default function AttendancePage() {
                 : selectedDate
               : null;
         const normalizedCheckedAt =
-          status === 'confirmed_present' || status === 'confirmed_late' || status === 'confirmed_present_missing_routine'
+          status === 'confirmed_present' || status === 'confirmed_late'
             ? checkedAt || fallbackCheckedAt
             : null;
 
@@ -354,73 +331,15 @@ export default function AttendancePage() {
           },
         });
 
-        if (
-          status === 'confirmed_present' ||
-          status === 'confirmed_late' ||
-          status === 'confirmed_present_missing_routine'
-        ) {
-          appendAttendanceEventToBatch(batch, firestore, centerId, {
-            studentId,
-            dateKey,
-            eventType: 'check_in',
-            occurredAt: normalizedCheckedAt || new Date(),
-            source: 'attendance_page',
-            statusAfter: status,
-          });
-          mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
-            attendanceStatus: status,
-            checkInAt: normalizedCheckedAt ?? null,
-            lateMinutes,
-            expectedArrivalTime: routine?.expectedArrivalTime ?? null,
-            source: 'attendance_page',
-          });
-        } else if (status === 'confirmed_absent' || status === 'excused_absent') {
-          appendAttendanceEventToBatch(batch, firestore, centerId, {
-            studentId,
-            dateKey,
-            eventType: 'check_out',
-            occurredAt: new Date(),
-            source: 'attendance_page',
-            statusAfter: status,
-          });
-          mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
-            attendanceStatus: status,
-            checkOutAt: new Date(),
-            hasCheckOutRecord: true,
-            lateMinutes,
-            expectedArrivalTime: routine?.expectedArrivalTime ?? null,
-            source: 'attendance_page',
-          });
-        } else {
-          mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
-            attendanceStatus: status,
-            checkInAt: normalizedCheckedAt ?? null,
-            lateMinutes,
-            expectedArrivalTime: routine?.expectedArrivalTime ?? null,
-            source: 'attendance_page',
-          });
-        }
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, dateKey, {
+          attendanceStatus: status,
+          checkInAt: normalizedCheckedAt ?? null,
+          lateMinutes,
+          expectedArrivalTime: routine?.expectedArrivalTime ?? null,
+          source: 'attendance_page',
+        });
 
         await batch.commit();
-        if (isTodaySelected) {
-          if (
-            status === 'confirmed_present' ||
-            status === 'confirmed_late' ||
-            status === 'confirmed_present_missing_routine'
-          ) {
-            await triggerAttendanceSms(studentId, 'study_start');
-          } else if (
-            (status === 'confirmed_absent' || status === 'excused_absent') &&
-            (
-              liveAttendanceStatus !== 'absent' ||
-              previousRecordStatus === 'confirmed_present' ||
-              previousRecordStatus === 'confirmed_late' ||
-              String(previousRecordStatus) === 'confirmed_present_missing_routine'
-            )
-          ) {
-            await triggerAttendanceSms(studentId, 'study_end');
-          }
-        }
         toast({ title: '출결 상태를 저장했습니다.' });
       } catch (error) {
         console.error('[attendance] manual status update failed', error);
@@ -636,6 +555,27 @@ export default function AttendancePage() {
           <p className="text-xs font-bold text-muted-foreground tracking-widest whitespace-nowrap">출결 및 요청 관리</p>
         </div>
       </header>
+
+      <AdminWorkbenchCommandBar
+        eyebrow="출결 워크벤치"
+        title="출결 운영 워크벤치"
+        description="오늘 출결, KPI, 신청 관리 화면을 같은 빠른 실행과 날짜 기준으로 이어서 봅니다."
+        quickActions={[
+          { label: '실시간 교실', icon: <UserCheck className="h-4 w-4" />, href: '/dashboard/teacher' },
+          { label: '문자 콘솔', icon: <ClipboardCheck className="h-4 w-4" />, href: '/dashboard/settings/notifications' },
+          { label: '학생 관리', icon: <BarChart3 className="h-4 w-4" />, href: '/dashboard/teacher/students' },
+        ]}
+      >
+        <div className="grid gap-1">
+          <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">조회 날짜</Label>
+          <Input
+            type="date"
+            value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+            onChange={(event) => setSelectedDate(parseDateInputValue(event.target.value))}
+            className="h-11 min-w-[180px] rounded-xl border-2 font-black"
+          />
+        </div>
+      </AdminWorkbenchCommandBar>
 
       <Tabs defaultValue="attendance" className="w-full">
         <TabsList className="grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border h-14 mb-8 max-w-2xl">

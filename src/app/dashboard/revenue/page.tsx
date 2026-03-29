@@ -85,6 +85,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { autoCheckPaymentReminders } from '@/lib/kakao-service';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 
 const OperationalIntelligencePanel = dynamic(
   () => import('@/components/dashboard/operational-intelligence').then((mod) => mod.OperationalIntelligence),
@@ -499,6 +500,27 @@ export default function RevenuePage() {
           </Button>
         </div>
       </header>
+
+      <AdminWorkbenchCommandBar
+        eyebrow="매출/수납 워크벤치"
+        title="수납 운영 워크벤치"
+        description="수납, 수익 분석, 운영 인텔리전스를 같은 빠른 실행과 월 기준으로 이어서 확인합니다."
+        quickActions={[
+          { label: '학생 관리', icon: <Users className="h-4 w-4" />, href: '/dashboard/teacher/students' },
+          { label: '문자 콘솔', icon: <BellRing className="h-4 w-4" />, href: '/dashboard/settings/notifications' },
+          { label: '출결 이동', icon: <CalendarCheck className="h-4 w-4" />, href: '/dashboard/attendance' },
+        ]}
+      >
+        <div className="grid gap-1">
+          <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">매출 기준 월</Label>
+          <Input
+            type="month"
+            value={currentChartMonth}
+            onChange={(event) => setCurrentChartMonth(event.target.value)}
+            className="h-11 min-w-[180px] rounded-xl border-2 font-black"
+          />
+        </div>
+      </AdminWorkbenchCommandBar>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-3 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner h-16 max-w-3xl mb-8">

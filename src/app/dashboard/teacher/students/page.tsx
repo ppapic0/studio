@@ -13,7 +13,6 @@ import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { 
-  Search, 
   UserPlus, 
   GraduationCap, 
   ChevronRight, 
@@ -29,6 +28,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
+import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -126,6 +133,7 @@ export default function StudentListPage() {
   const [statusTab, setStatusTab] = useState<string>('active');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [liveStatusFilter, setLiveStatusFilter] = useState<string>('all');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   const isMobile = viewMode === 'mobile';
 
@@ -232,6 +240,39 @@ export default function StudentListPage() {
       })
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
   }, [studentMembers, studentsProfiles, attendanceList, searchTerm, statusTab, classFilter, liveStatusFilter]);
+
+  const selectedStudentPreview = useMemo(() => {
+    if (!selectedStudentId) return null;
+    const member = studentMembers?.find((item) => item.id === selectedStudentId);
+    if (!member) return null;
+
+    const profile = studentsProfiles?.find((item) => item.id === selectedStudentId);
+    const attendance = attendanceList?.find((item) => item.studentId === selectedStudentId);
+    const seatLabel = formatSeatLabel(profile);
+    const attendanceLabel =
+      attendance?.status === 'studying'
+        ? '공부중'
+        : attendance?.status === 'away' || attendance?.status === 'break'
+          ? '외출'
+          : attendance?.status === 'absent'
+            ? '미입실'
+            : '확인중';
+    const attendanceTone =
+      attendance?.status === 'studying'
+        ? 'bg-emerald-100 text-emerald-700'
+        : attendance?.status === 'away' || attendance?.status === 'break'
+          ? 'bg-amber-100 text-amber-700'
+          : 'bg-slate-100 text-slate-700';
+
+    return {
+      member,
+      profile,
+      attendance,
+      seatLabel,
+      attendanceLabel,
+      attendanceTone,
+    };
+  }, [selectedStudentId, studentMembers, studentsProfiles, attendanceList]);
 
   const counts = useMemo(() => {
     if (!studentMembers) return { active: 0, onHold: 0, withdrawn: 0 };
@@ -436,32 +477,31 @@ export default function StudentListPage() {
         ))}
       </section>
 
-      <Card className="rounded-[2rem] border-none bg-white shadow-md ring-1 ring-black/[0.03]">
-        <CardContent className={cn("grid gap-3", isMobile ? "p-4" : "p-5 md:grid-cols-[minmax(0,1.15fr)_220px_220px] md:items-center")}>
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-            <Input
-              placeholder="이름, 학교 또는 좌석 번호로 검색..."
-              className="h-14 rounded-2xl border-2 pl-12 bg-white text-base shadow-sm transition-all focus-visible:ring-primary/10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Select value={classFilter} onValueChange={setClassFilter}>
-            <SelectTrigger className="h-14 rounded-2xl border-2 font-black">
-              <SelectValue placeholder="반 전체" />
-            </SelectTrigger>
-            <SelectContent className="rounded-2xl">
-              <SelectItem value="all" className="font-black">반 전체</SelectItem>
-              {availableClasses.map((className) => (
-                <SelectItem key={className} value={className} className="font-black">
-                  {className}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <AdminWorkbenchCommandBar
+        eyebrow="학생/상담 워크벤치"
+        title="학생 운영 워크벤치"
+        description="같은 필터와 같은 빠른 실행으로 학생 관리, 상담, 문자, 출결 흐름을 빠르게 묶습니다."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="이름, 학교 또는 좌석 번호 검색"
+        selectValue={classFilter}
+        onSelectChange={setClassFilter}
+        selectOptions={[
+          { value: 'all', label: '반 전체' },
+          ...availableClasses.map((className) => ({ value: className, label: className })),
+        ]}
+        selectLabel="반 필터"
+        quickActions={[
+          { label: '신규 가입', icon: <UserPlus className="h-4 w-4" />, onClick: () => setIsAddModalOpen(true) },
+          { label: '상담 등록', icon: <Users className="h-4 w-4" />, href: '/dashboard/leads' },
+          { label: '문자 보내기', icon: <ChevronRight className="h-4 w-4" />, href: '/dashboard/settings/notifications' },
+          { label: '출결 이동', icon: <UserCheck className="h-4 w-4" />, href: '/dashboard/attendance' },
+        ]}
+      >
+        <div className="grid gap-1">
+          <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">실시간 상태</Label>
           <Select value={liveStatusFilter} onValueChange={setLiveStatusFilter}>
-            <SelectTrigger className="h-14 rounded-2xl border-2 font-black">
+            <SelectTrigger className="h-11 min-w-[180px] rounded-xl border-2 font-black">
               <SelectValue placeholder="실시간 상태 전체" />
             </SelectTrigger>
             <SelectContent className="rounded-2xl">
@@ -471,8 +511,8 @@ export default function StudentListPage() {
               <SelectItem value="absent" className="font-black">미입실/퇴실</SelectItem>
             </SelectContent>
           </Select>
-        </CardContent>
-      </Card>
+        </div>
+      </AdminWorkbenchCommandBar>
 
       <Tabs defaultValue="active" className="w-full" onValueChange={setStatusTab}>
         <TabsList className={cn("grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border border-border/50 shadow-inner", isMobile ? "h-14 mb-4" : "h-16 mb-8 max-w-2xl")}>
@@ -502,7 +542,7 @@ export default function StudentListPage() {
                   <CardContent className={isMobile ? "p-5" : "p-6"}>
                     <button
                       type="button"
-                      onClick={() => handleOpenStudent360(member.id)}
+                      onClick={() => setSelectedStudentId(member.id)}
                       className="block w-full text-left rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -548,6 +588,14 @@ export default function StudentListPage() {
                         <ChevronRight className="h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
                       </div>
                     </button>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" className="h-10 rounded-xl px-4 text-xs font-black" onClick={() => setSelectedStudentId(member.id)}>
+                        요약 보기
+                      </Button>
+                      <Button type="button" className="h-10 rounded-xl px-4 text-xs font-black" onClick={() => handleOpenStudent360(member.id)}>
+                        운영 그래프 확인하기
+                      </Button>
+                    </div>
 
                     {statusTab === 'withdrawn' && (
                       <div className="mt-4 pt-4 border-t border-dashed border-rose-100">
@@ -580,6 +628,81 @@ export default function StudentListPage() {
           </div>
         )}
       </Tabs>
+
+      <Sheet open={!!selectedStudentPreview} onOpenChange={(open) => !open && setSelectedStudentId(null)}>
+        <SheetContent side="right" className="w-[96vw] max-w-2xl overflow-y-auto border-none bg-[#f8fbff] px-0 py-0 sm:max-w-2xl">
+          {selectedStudentPreview ? (
+            <>
+              <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white">
+                <SheetHeader className="space-y-2 text-left">
+                  <SheetTitle className="text-2xl font-black tracking-tight text-white">
+                    {selectedStudentPreview.member.displayName}
+                  </SheetTitle>
+                  <SheetDescription className="text-sm font-bold text-white/80">
+                    학생 360으로 들어가기 전에 현재 상태와 운영 액션을 먼저 확인합니다.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {selectedStudentPreview.member.className ? (
+                    <Badge className="border-none bg-white/20 text-white font-black">
+                      {selectedStudentPreview.member.className}
+                    </Badge>
+                  ) : null}
+                  <Badge className={cn('border-none font-black', selectedStudentPreview.attendanceTone)}>
+                    {selectedStudentPreview.attendanceLabel}
+                  </Badge>
+                  <Badge className="border-none bg-white/20 text-white font-black">
+                    {selectedStudentPreview.seatLabel}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-5 p-6">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">학교 / 학년</p>
+                    <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">
+                      {selectedStudentPreview.profile?.schoolName || '학교 미등록'}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">
+                      {selectedStudentPreview.profile?.grade || '학년 미등록'}
+                    </p>
+                  </div>
+                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">계정 상태</p>
+                    <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">
+                      {selectedStudentPreview.member.status === 'active'
+                        ? '재원중'
+                        : selectedStudentPreview.member.status === 'onHold'
+                          ? '휴원'
+                          : '퇴원'}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">학생 운영 인덱스 기준 상태</p>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">바로 할 일</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <Button asChild className="h-11 rounded-xl font-black">
+                      <Link href={`/dashboard/teacher/students/${selectedStudentPreview.member.id}`}>학생 360 열기</Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-11 rounded-xl font-black">
+                      <Link href="/dashboard/attendance">출결 처리</Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-11 rounded-xl font-black">
+                      <Link href="/dashboard/leads">상담 기록</Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-11 rounded-xl font-black">
+                      <Link href="/dashboard/settings/notifications">문자 보내기</Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

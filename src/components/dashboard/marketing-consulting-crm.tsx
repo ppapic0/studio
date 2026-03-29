@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { httpsCallable } from 'firebase/functions';
 import {
   addDoc,
   collection,
@@ -23,14 +22,13 @@ import {
   Phone,
   PlusCircle,
   Save,
-  Search,
   Trash2,
   UserRoundPlus,
   Users,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-import { useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -50,6 +48,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -162,15 +168,6 @@ interface WaitlistModal {
   memo: string;
 }
 
-type MarketingSmsTargetSource = 'lead' | 'waitlist';
-
-interface MarketingSmsDialogState {
-  open: boolean;
-  source: MarketingSmsTargetSource;
-  targetIds: string[];
-  message: string;
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<LeadStatus, { label: string; className: string }> = {
@@ -226,13 +223,6 @@ const INITIAL_WAITLIST_MODAL = (): WaitlistModal => ({
   memo: '',
 });
 
-const INITIAL_SMS_DIALOG = (): MarketingSmsDialogState => ({
-  open: false,
-  source: 'waitlist',
-  targetIds: [],
-  message: '',
-});
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toDateMs(value: any): number {
@@ -277,7 +267,6 @@ export function MarketingConsultingCRM({
   isMobile?: boolean;
 }) {
   const firestore = useFirestore();
-  const functions = useFunctions();
   const { user } = useUser();
   const { toast } = useToast();
 
@@ -296,9 +285,7 @@ export function MarketingConsultingCRM({
   const [waitlistServiceFilter, setWaitlistServiceFilter] = useState<'all' | ServiceType>('all');
   const [waitlistStatusFilter, setWaitlistStatusFilter] = useState<'all' | WaitlistStatus>('all');
   const [waitlistSearch, setWaitlistSearch] = useState('');
-  const [selectedWaitlistIds, setSelectedWaitlistIds] = useState<string[]>([]);
-  const [smsDialog, setSmsDialog] = useState<MarketingSmsDialogState>(INITIAL_SMS_DIALOG);
-  const [isSendingMarketingSms, setIsSendingMarketingSms] = useState(false);
+  const [selectedDrawer, setSelectedDrawer] = useState<{ type: 'lead' | 'website' | 'waitlist'; id: string } | null>(null);
 
   // ── Firestore queries ─────────────────────────────────────────────────────
 
@@ -458,25 +445,20 @@ export function MarketingConsultingCRM({
     });
   }, [waitlist, waitlistServiceFilter, waitlistStatusFilter, waitlistSearch]);
 
-  const selectedWaitingEntries = useMemo(
-    () =>
-      filteredWaitlist.filter(
-        (entry) => entry.status === 'waiting' && !!(entry.parentPhone?.trim() || entry.studentPhone?.trim())
-      ),
-    [filteredWaitlist]
+  const selectedLead = useMemo(
+    () => (selectedDrawer?.type === 'lead' ? leads.find((lead) => lead.id === selectedDrawer.id) || null : null),
+    [leads, selectedDrawer]
   );
 
-  const selectedWaitlistCount = useMemo(
-    () => selectedWaitlistIds.filter((id) => filteredWaitlist.some((entry) => entry.id === id)).length,
-    [filteredWaitlist, selectedWaitlistIds]
+  const selectedWebsiteRequest = useMemo(
+    () => (selectedDrawer?.type === 'website' ? websiteRequests.find((request) => request.id === selectedDrawer.id) || null : null),
+    [selectedDrawer, websiteRequests]
   );
 
-  const smsDialogTargets = useMemo(() => {
-    if (smsDialog.source === 'lead') {
-      return leads.filter((lead) => smsDialog.targetIds.includes(lead.id));
-    }
-    return waitlist.filter((entry) => smsDialog.targetIds.includes(entry.id));
-  }, [leads, smsDialog.source, smsDialog.targetIds, waitlist]);
+  const selectedWaitlistEntry = useMemo(
+    () => (selectedDrawer?.type === 'waitlist' ? waitlist.find((entry) => entry.id === selectedDrawer.id) || null : null),
+    [selectedDrawer, waitlist]
+  );
 
   const summary = useMemo(() => {
     const total = leads.length;
@@ -528,101 +510,6 @@ export function MarketingConsultingCRM({
   const resetForm = () => {
     setForm(INITIAL_FORM());
     setEditingId(null);
-  };
-
-  const toggleWaitlistSelection = (entryId: string) => {
-    setSelectedWaitlistIds((prev) =>
-      prev.includes(entryId) ? prev.filter((id) => id !== entryId) : [...prev, entryId]
-    );
-  };
-
-  const selectAllWaitingEntries = () => {
-    setSelectedWaitlistIds(selectedWaitingEntries.map((entry) => entry.id));
-  };
-
-  const clearWaitlistSelection = () => {
-    setSelectedWaitlistIds([]);
-  };
-
-  const openLeadSmsDialog = (leadId: string) => {
-    setSmsDialog({
-      open: true,
-      source: 'lead',
-      targetIds: [leadId],
-      message: '',
-    });
-  };
-
-  const openWaitlistSmsDialog = () => {
-    const targetIds = selectedWaitlistIds.filter((id) => filteredWaitlist.some((entry) => entry.id === id));
-    if (targetIds.length === 0) {
-      toast({
-        variant: 'destructive',
-        title: '선택 필요',
-        description: '문자를 보낼 입학 대기 학생을 먼저 선택해 주세요.',
-      });
-      return;
-    }
-    setSmsDialog({
-      open: true,
-      source: 'waitlist',
-      targetIds,
-      message: '',
-    });
-  };
-
-  const handleSendMarketingSms = async () => {
-    if (!centerId || !functions) return;
-    const message = smsDialog.message.trim();
-    if (!message) {
-      toast({ variant: 'destructive', title: '입력 필요', description: '보낼 문자 내용을 입력해 주세요.' });
-      return;
-    }
-    if (smsDialog.targetIds.length === 0) {
-      toast({ variant: 'destructive', title: '선택 필요', description: '문자를 받을 대상을 먼저 선택해 주세요.' });
-      return;
-    }
-
-    setIsSendingMarketingSms(true);
-    try {
-      const sendMarketingLeadSms = httpsCallable(functions, 'sendMarketingLeadSms');
-      const result = await sendMarketingLeadSms({
-        centerId,
-        message,
-        targets: smsDialog.targetIds.map((targetId) => ({
-          targetType: smsDialog.source === 'lead' ? 'consulting_lead' : 'waitlist',
-          targetId,
-        })),
-      });
-
-      const data = (result.data || {}) as {
-        queuedCount?: number;
-        recipientCount?: number;
-        skippedCount?: number;
-        missingCount?: number;
-      };
-
-      toast({
-        title: '문자 접수 완료',
-        description: `접수 ${data.queuedCount ?? 0}건 · 수신 대상 ${data.recipientCount ?? 0}명` +
-          ((data.missingCount ?? 0) > 0 ? ` · 번호 없음 ${data.missingCount}건` : '') +
-          ((data.skippedCount ?? 0) > 0 ? ` · 중복 제외 ${data.skippedCount}건` : ''),
-      });
-
-      setSmsDialog(INITIAL_SMS_DIALOG());
-      if (smsDialog.source === 'waitlist') {
-        setSelectedWaitlistIds([]);
-      }
-    } catch (error: any) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: '문자 발송 실패',
-        description: error?.message || '리드 문자 발송 중 오류가 발생했습니다.',
-      });
-    } finally {
-      setIsSendingMarketingSms(false);
-    }
   };
 
   const handleEdit = (lead: ConsultingLead) => {
@@ -1123,9 +1010,9 @@ export function MarketingConsultingCRM({
                                 {request.school}
                               </Badge>
                             )}
-                          {request.grade && (
+                            {request.grade && (
                               <Badge variant="outline" className="text-[10px] font-black text-slate-700">
-                                학년 {request.grade}
+                                {request.grade}
                               </Badge>
                             )}
                             {request.serviceType && (
@@ -1145,6 +1032,14 @@ export function MarketingConsultingCRM({
                           </p>
                         </div>
                         <div className={cn('flex gap-2', isMobile ? 'w-full flex-wrap' : 'items-center')}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-lg px-3 text-xs font-black"
+                            onClick={() => setSelectedDrawer({ type: 'website', id: request.id })}
+                          >
+                            상세 보기
+                          </Button>
                           <Select
                             value={request.status || 'new'}
                             onValueChange={(value) => handleWebsiteStatusUpdate(request.id, value as LeadStatus)}
@@ -1389,29 +1284,26 @@ export function MarketingConsultingCRM({
               </div>
             </div>
 
-            {/* ── 검색 / 필터 ── */}
-            <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-center justify-between')}>
-              <div className="relative w-full md:max-w-sm">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="이름/전화번호/유입경로 검색"
-                  className="h-10 rounded-lg pl-9"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | LeadStatus)}>
-                <SelectTrigger className="h-10 w-full rounded-lg font-bold md:w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 상태</SelectItem>
-                  {Object.entries(STATUS_META).map(([value, meta]) => (
-                    <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <AdminWorkbenchCommandBar
+              eyebrow="홍보/상담 워크벤치"
+              title="상담 리드 워크벤치"
+              description="같은 검색과 같은 상태 필터로 웹 유입과 수동 상담 리드를 이어서 관리합니다."
+              searchValue={searchTerm}
+              onSearchChange={setSearchTerm}
+              searchPlaceholder="이름, 학교, 전화번호, 유입경로 검색"
+              selectValue={statusFilter}
+              onSelectChange={(value) => setStatusFilter(value as 'all' | LeadStatus)}
+              selectOptions={[
+                { value: 'all', label: '전체 상태' },
+                ...Object.entries(STATUS_META).map(([value, meta]) => ({ value, label: meta.label })),
+              ]}
+              selectLabel="리드 상태"
+              quickActions={[
+                { label: editingId ? '입력 초기화' : '상담 리드 등록', icon: <PlusCircle className="h-4 w-4" />, onClick: resetForm },
+                { label: '입학 대기 DB', icon: <ListChecks className="h-4 w-4" />, onClick: () => setActiveTab('waitlist') },
+                { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
+              ]}
+            />
 
             {/* ── 리드 목록 ── */}
             <div className="space-y-2">
@@ -1461,7 +1353,7 @@ export function MarketingConsultingCRM({
                             )}
                             {lead.grade && (
                               <Badge variant="outline" className="text-[10px] font-black text-slate-700">
-                                학년 {lead.grade}
+                                {lead.grade}
                               </Badge>
                             )}
                             {lead.serviceType && leadServiceLabel && (
@@ -1500,6 +1392,14 @@ export function MarketingConsultingCRM({
                         </div>
 
                         <div className={cn('flex gap-2', isMobile ? 'w-full flex-wrap' : 'items-center')}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-lg px-3 text-xs font-black"
+                            onClick={() => setSelectedDrawer({ type: 'lead', id: lead.id })}
+                          >
+                            상세 보기
+                          </Button>
                           <Select
                             value={lead.status || 'new'}
                             onValueChange={(value) => handleQuickStatusUpdate(lead.id, value as LeadStatus)}
@@ -1513,15 +1413,6 @@ export function MarketingConsultingCRM({
                               ))}
                             </SelectContent>
                           </Select>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-lg border-sky-200 px-3 text-xs font-black text-sky-700 hover:bg-sky-50"
-                            onClick={() => openLeadSmsDialog(lead.id)}
-                          >
-                            <Megaphone className="mr-1 h-3.5 w-3.5" />
-                            문자 보내기
-                          </Button>
                           <Button
                             type="button"
                             variant="outline"
@@ -1700,74 +1591,44 @@ export function MarketingConsultingCRM({
               ))}
             </div>
 
-            {/* ── 검색 + 상태 필터 ── */}
-            <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-center')}>
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  value={waitlistSearch}
-                  onChange={(e) => setWaitlistSearch(e.target.value)}
-                  placeholder="이름/전화번호/학교 검색"
-                  className="h-10 rounded-lg pl-9"
-                />
+            <AdminWorkbenchCommandBar
+              eyebrow="입학 대기 워크벤치"
+              title="입학 대기 운영 인덱스"
+              description="학원과 스터디센터 대기 학생을 같은 패턴으로 정렬하고, 우측 상세에서 후속 조치를 이어갑니다."
+              searchValue={waitlistSearch}
+              onSearchChange={setWaitlistSearch}
+              searchPlaceholder="이름, 학교, 전화번호 검색"
+              selectValue={waitlistStatusFilter}
+              onSelectChange={(value) => setWaitlistStatusFilter(value as 'all' | WaitlistStatus)}
+              selectOptions={[
+                { value: 'all', label: '전체 상태' },
+                ...Object.entries(WAITLIST_STATUS_META).map(([value, meta]) => ({ value, label: meta.label })),
+              ]}
+              selectLabel="대기 상태"
+              quickActions={[
+                { label: '상담 리드 탭', icon: <Users className="h-4 w-4" />, onClick: () => setActiveTab('leads') },
+                { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
+              ]}
+            >
+              <div className="grid gap-1">
+                <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">서비스 필터</Label>
+                <Select
+                  value={waitlistServiceFilter}
+                  onValueChange={(value) => setWaitlistServiceFilter(value as 'all' | ServiceType)}
+                >
+                  <SelectTrigger className="h-11 min-w-[180px] rounded-xl border-2 font-black">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 서비스</SelectItem>
+                    <SelectItem value="korean_academy">국어 학원</SelectItem>
+                    <SelectItem value="study_center">관리형 스터디센터</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Select
-                value={waitlistStatusFilter}
-                onValueChange={(value) => setWaitlistStatusFilter(value as 'all' | WaitlistStatus)}
-              >
-                <SelectTrigger className="h-10 w-full rounded-lg font-bold md:w-[160px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 상태</SelectItem>
-                  {Object.entries(WAITLIST_STATUS_META).map(([value, meta]) => (
-                    <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            </AdminWorkbenchCommandBar>
 
             {/* ── 대기 목록 ── */}
-            <div className={cn('flex gap-2 rounded-xl border border-orange-100 bg-orange-50/60 p-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
-              <div className="space-y-1">
-                <p className="text-sm font-black text-slate-900">입학 대기 일괄 문자</p>
-                <p className="text-xs font-semibold text-slate-600">
-                  현재 필터 기준 대기중 학생을 선택해서 같은 안내 문자를 한 번에 보낼 수 있습니다.
-                </p>
-              </div>
-              <div className={cn('flex gap-2', isMobile ? 'flex-wrap' : 'items-center')}>
-                <Badge className="border-none bg-white text-orange-700 shadow-sm">
-                  선택 {selectedWaitlistCount}명
-                </Badge>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 rounded-lg border-orange-200 px-3 text-xs font-black text-orange-700 hover:bg-orange-100"
-                  onClick={selectAllWaitingEntries}
-                  disabled={selectedWaitingEntries.length === 0}
-                >
-                  대기중 전체 선택
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 rounded-lg px-3 text-xs font-black"
-                  onClick={clearWaitlistSelection}
-                  disabled={selectedWaitlistIds.length === 0}
-                >
-                  선택 해제
-                </Button>
-                <Button
-                  type="button"
-                  className="h-9 rounded-lg px-3 text-xs font-black"
-                  onClick={openWaitlistSmsDialog}
-                  disabled={selectedWaitlistCount === 0}
-                >
-                  <Megaphone className="mr-1 h-3.5 w-3.5" />
-                  선택 문자 보내기
-                </Button>
-              </div>
-            </div>
             <div className="space-y-2">
               {waitlistLoading ? (
                 <div className="flex h-28 items-center justify-center rounded-xl border border-dashed">
@@ -1794,14 +1655,6 @@ export function MarketingConsultingCRM({
                       <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-start justify-between')}>
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <label className="mr-1 inline-flex items-center">
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400"
-                                checked={selectedWaitlistIds.includes(entry.id)}
-                                onChange={() => toggleWaitlistSelection(entry.id)}
-                              />
-                            </label>
                             <p className="text-base font-black text-slate-800">{entry.studentName}</p>
                             {typeof entry.queueNumber === 'number' && (
                               <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
@@ -1814,11 +1667,6 @@ export function MarketingConsultingCRM({
                             {entry.school && (
                               <Badge variant="outline" className="max-w-[180px] truncate text-[10px] font-black text-slate-700">
                                 {entry.school}
-                              </Badge>
-                            )}
-                            {entry.grade && (
-                              <Badge variant="outline" className="text-[10px] font-black text-slate-700">
-                                학년 {entry.grade}
                               </Badge>
                             )}
                             <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[entry.serviceType].color)}>
@@ -1843,13 +1691,21 @@ export function MarketingConsultingCRM({
                             </span>
                             {entry.studentPhone && <span>학생: {entry.studentPhone}</span>}
                             {entry.school && <span>학교: {entry.school}</span>}
-                            {entry.grade && <span>학년: {entry.grade}</span>}
+                            {entry.grade && <span>{entry.grade}</span>}
                             <span>대기 등록일: {entry.waitlistDate || '-'}</span>
                           </div>
                           {entry.memo && <p className="text-xs font-medium text-slate-500">{entry.memo}</p>}
                         </div>
 
                         <div className={cn('flex gap-2', isMobile ? 'w-full flex-wrap' : 'items-center')}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-lg px-3 text-xs font-black"
+                            onClick={() => setSelectedDrawer({ type: 'waitlist', id: entry.id })}
+                          >
+                            상세 보기
+                          </Button>
                           <Select
                             value={entry.status || 'waiting'}
                             onValueChange={(value) => handleWaitlistStatusUpdate(entry.id, value as WaitlistStatus)}
@@ -1882,6 +1738,208 @@ export function MarketingConsultingCRM({
           </CardContent>
         </Card>
       )}
+
+      <Sheet
+        open={!!selectedDrawer}
+        onOpenChange={(open) => {
+          if (!open) setSelectedDrawer(null);
+        }}
+      >
+        <SheetContent side="right" className="w-[96vw] max-w-2xl overflow-y-auto border-l-0 p-0 shadow-2xl">
+          <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white">
+            <SheetHeader className="space-y-2 text-left">
+              <SheetTitle className="text-2xl font-black tracking-tight text-white">
+                {selectedLead?.studentName || selectedWebsiteRequest?.studentName || selectedWaitlistEntry?.studentName || '상세 보기'}
+              </SheetTitle>
+              <SheetDescription className="text-sm font-bold text-white/80">
+                {selectedLead
+                  ? '상담 리드의 기본 정보와 후속 조치, 입학 대기 연결 상태를 함께 봅니다.'
+                  : selectedWebsiteRequest
+                    ? '웹 상담 접수의 현재 상태와 리드 DB 연결 가능 여부를 바로 확인합니다.'
+                    : selectedWaitlistEntry
+                      ? '입학 대기 학생의 상태, 서비스, 연락처를 보고 바로 조치합니다.'
+                      : '선택한 항목의 세부 정보를 확인합니다.'}
+              </SheetDescription>
+            </SheetHeader>
+          </div>
+
+          <div className="space-y-5 p-6">
+            {selectedLead ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">기본 정보</p>
+                    <div className="mt-3 space-y-2 text-sm font-bold text-slate-700">
+                      <p>학부모: {selectedLead.parentName || '미입력'}</p>
+                      <p>학부모 연락처: {selectedLead.parentPhone || '-'}</p>
+                      <p>학생 연락처: {selectedLead.studentPhone || '-'}</p>
+                      <p>학교/학년: {[selectedLead.school, selectedLead.grade].filter(Boolean).join(' · ') || '-'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">운영 상태</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge className={cn('border font-black', STATUS_META[selectedLead.status || 'new'].className)}>
+                        {STATUS_META[selectedLead.status || 'new'].label}
+                      </Badge>
+                      {selectedLead.serviceType ? (
+                        <Badge className={cn('border font-black', SERVICE_TYPE_META[selectedLead.serviceType].color)}>
+                          {selectedLead.requestTypeLabel || SERVICE_TYPE_META[selectedLead.serviceType].label}
+                        </Badge>
+                      ) : null}
+                      <Badge variant="outline" className="font-black">
+                        {selectedLead.referralRoute || selectedLead.marketingChannel || '기타'}
+                        {selectedLead.referrerName ? ` · ${selectedLead.referrerName}` : ''}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-sm font-bold text-slate-700">상담일: {selectedLead.consultationDate || '-'}</p>
+                    <p className="mt-1 text-sm font-bold text-slate-500">{selectedLead.memo || '저장된 메모가 없습니다.'}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">바로 할 일</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" className="h-10 rounded-xl font-black" onClick={() => handleEdit(selectedLead)}>
+                      수정 이어서 하기
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 rounded-xl font-black"
+                      onClick={() => openWaitlistModal(selectedLead)}
+                    >
+                      입학 대기 등록
+                    </Button>
+                  </div>
+                  {((waitlistBySourceLeadId.get(selectedLead.id) || []).length > 0) ? (
+                    <div className="mt-4 rounded-xl border border-orange-100 bg-orange-50/70 p-3">
+                      <p className="text-xs font-black text-orange-700">연결된 입학 대기</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(waitlistBySourceLeadId.get(selectedLead.id) || []).map((entry) => (
+                          <Badge key={entry.id} className={cn('border font-black', SERVICE_TYPE_META[entry.serviceType].color)}>
+                            {SERVICE_TYPE_META[entry.serviceType].label} · {WAITLIST_STATUS_META[entry.status || 'waiting'].label}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+
+            {selectedWebsiteRequest ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">웹 접수 정보</p>
+                    <div className="mt-3 space-y-2 text-sm font-bold text-slate-700">
+                      <p>연락처: {selectedWebsiteRequest.consultPhone || '-'}</p>
+                      <p>학교/학년: {[selectedWebsiteRequest.school, selectedWebsiteRequest.grade].filter(Boolean).join(' · ') || '-'}</p>
+                      <p>접수일: {selectedWebsiteRequest.consultationDate || '-'}</p>
+                      <p>접수시각: {formatDateTimeLabel(selectedWebsiteRequest.createdAt)}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">현재 상태</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge className={cn('border font-black', STATUS_META[selectedWebsiteRequest.status || 'new'].className)}>
+                        {STATUS_META[selectedWebsiteRequest.status || 'new'].label}
+                      </Badge>
+                      {selectedWebsiteRequest.serviceType ? (
+                        <Badge className={cn('border font-black', SERVICE_TYPE_META[selectedWebsiteRequest.serviceType].color)}>
+                          {selectedWebsiteRequest.requestTypeLabel || SERVICE_TYPE_META[selectedWebsiteRequest.serviceType].label}
+                        </Badge>
+                      ) : null}
+                      <Badge variant="outline" className="font-black">{selectedWebsiteRequest.sourceLabel || '웹사이트'}</Badge>
+                    </div>
+                    <p className="mt-3 text-sm font-bold text-slate-500">
+                      {selectedWebsiteRequest.linkedLeadId ? '이미 리드 DB로 이동된 접수입니다.' : '아직 리드 DB로 이동되지 않았습니다.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">바로 할 일</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      className="h-10 rounded-xl font-black"
+                      onClick={() => void handlePromoteWebsiteRequest(selectedWebsiteRequest)}
+                      disabled={promotingWebsiteId === selectedWebsiteRequest.id || !!selectedWebsiteRequest.linkedLeadId}
+                    >
+                      {promotingWebsiteId === selectedWebsiteRequest.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {selectedWebsiteRequest.linkedLeadId ? '리드 이동됨' : '리드 DB로 이동'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 rounded-xl font-black text-rose-600"
+                      onClick={() => void handleWebsiteDelete(selectedWebsiteRequest.id)}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {selectedWaitlistEntry ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">대기 정보</p>
+                    <div className="mt-3 space-y-2 text-sm font-bold text-slate-700">
+                      <p>학부모 연락처: {selectedWaitlistEntry.parentPhone || '-'}</p>
+                      <p>학생 연락처: {selectedWaitlistEntry.studentPhone || '-'}</p>
+                      <p>학교/학년: {[selectedWaitlistEntry.school, selectedWaitlistEntry.grade].filter(Boolean).join(' · ') || '-'}</p>
+                      <p>대기 등록일: {selectedWaitlistEntry.waitlistDate || '-'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">현재 상태</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge className={cn('border font-black', WAITLIST_STATUS_META[selectedWaitlistEntry.status || 'waiting'].className)}>
+                        {WAITLIST_STATUS_META[selectedWaitlistEntry.status || 'waiting'].label}
+                      </Badge>
+                      <Badge className={cn('border font-black', SERVICE_TYPE_META[selectedWaitlistEntry.serviceType].color)}>
+                        {SERVICE_TYPE_META[selectedWaitlistEntry.serviceType].label}
+                      </Badge>
+                      {typeof selectedWaitlistEntry.queueNumber === 'number' ? (
+                        <Badge variant="outline" className="font-black">대기번호 {selectedWaitlistEntry.queueNumber}</Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-3 text-sm font-bold text-slate-500">{selectedWaitlistEntry.memo || '저장된 메모가 없습니다.'}</p>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">바로 할 일</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(['waiting', 'admitted', 'cancelled'] as WaitlistStatus[]).map((status) => (
+                      <Button
+                        key={status}
+                        type="button"
+                        variant={selectedWaitlistEntry.status === status ? 'default' : 'outline'}
+                        className="h-10 rounded-xl font-black"
+                        onClick={() => void handleWaitlistStatusUpdate(selectedWaitlistEntry.id, status)}
+                      >
+                        {WAITLIST_STATUS_META[status].label}
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 rounded-xl font-black text-rose-600"
+                      onClick={() => void handleWaitlistDelete(selectedWaitlistEntry.id, selectedWaitlistEntry.sourceLeadId)}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* ════════════════════════════════════════════
           입학 대기 등록 Dialog
@@ -2035,89 +2093,6 @@ export function MarketingConsultingCRM({
             >
               {isSavingWaitlist && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               대기 등록 완료
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={smsDialog.open}
-        onOpenChange={(open) => !open && !isSendingMarketingSms && setSmsDialog(INITIAL_SMS_DIALOG())}
-      >
-        <DialogContent className="max-w-xl rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-black">
-              <Megaphone className="h-5 w-5 text-primary" />
-              {smsDialog.source === 'lead' ? '상담 리드 문자 보내기' : '입학 대기 일괄 문자'}
-            </DialogTitle>
-            <DialogDescription className="font-semibold">
-              {smsDialog.source === 'lead'
-                ? '선택한 홍보/상담 리드에게 바로 문자를 보냅니다.'
-                : '선택한 입학 대기 학생들에게 같은 안내 문자를 한 번에 보냅니다.'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-              <p className="text-xs font-black uppercase tracking-wider text-slate-500">대상 미리보기</p>
-              <div className="mt-2 space-y-2">
-                {smsDialogTargets.map((target) => {
-                  const parentPhone = 'parentPhone' in target ? target.parentPhone : '';
-                  const studentPhone = 'studentPhone' in target ? target.studentPhone : '';
-                  const school = 'school' in target ? target.school : '';
-                  const grade = 'grade' in target ? target.grade : '';
-                  return (
-                    <div key={target.id} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 shadow-sm">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-slate-900">
-                          {'studentName' in target ? target.studentName : ''}
-                        </p>
-                        <p className="truncate text-[11px] font-semibold text-slate-500">
-                          {school || '학교 미입력'}
-                          {grade ? ` · 학년 ${grade}` : ''}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="shrink-0 text-[10px] font-black text-slate-700">
-                        {parentPhone?.trim() || studentPhone?.trim() || '번호 없음'}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label className="text-xs font-black">문자 내용</Label>
-              <Textarea
-                value={smsDialog.message}
-                onChange={(e) => setSmsDialog((prev) => ({ ...prev, message: e.target.value }))}
-                placeholder="입학 대기 안내, 상담 재안내, 공지 문구를 입력하세요."
-                className="min-h-[140px] rounded-lg"
-              />
-              <p className="text-[11px] font-semibold text-slate-500">
-                같은 문자가 선택한 대상에게 발송됩니다. 번호가 없으면 자동으로 제외됩니다.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-lg font-black"
-              onClick={() => setSmsDialog(INITIAL_SMS_DIALOG())}
-              disabled={isSendingMarketingSms}
-            >
-              취소
-            </Button>
-            <Button
-              type="button"
-              className="rounded-lg font-black"
-              onClick={handleSendMarketingSms}
-              disabled={isSendingMarketingSms}
-            >
-              {isSendingMarketingSms && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              문자 보내기
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
-import { collection, doc, getDoc, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, limit, orderBy, query, where } from 'firebase/firestore';
 import {
   BellRing,
   Clock3,
@@ -20,9 +20,9 @@ import { useCollection, useDoc, useFirestore, useFunctions, useMemoFirebase } fr
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
 import { isAdminRole } from '@/lib/dashboard-access';
-import { calculateSmsCost, formatSmsCost } from '@/lib/sms-cost';
 import type { NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,12 +39,12 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 const SMS_BYTE_LIMIT = 90;
 const STUDENT_SMS_FALLBACK_UID = '__student__';
@@ -83,7 +83,6 @@ type SmsQueueRow = {
   phoneNumber?: string;
   to?: string;
   eventType?: SmsConsoleEventType;
-  dateKey?: string;
   status?: SmsQueueStatus | string;
   providerStatus?: string;
   renderedMessage?: string;
@@ -154,16 +153,6 @@ type MemberDoc = {
   phoneNumber?: string;
 };
 
-type UserCenterMemberDoc = {
-  id?: string;
-  centerId?: string;
-  role?: string;
-  status?: string;
-  displayName?: string;
-  name?: string;
-  phoneNumber?: string;
-};
-
 type SmsRecipientPreferenceDoc = {
   id: string;
   studentId: string;
@@ -174,33 +163,6 @@ type SmsRecipientPreferenceDoc = {
   enabled?: boolean;
   eventToggles?: Partial<Record<ParentSmsEventType, boolean>>;
   updatedAt?: { toDate?: () => Date };
-};
-
-type TodayAttendanceEventDoc = {
-  id: string;
-  studentId?: string;
-  dateKey?: string;
-  eventType?: string;
-  occurredAt?: { toDate?: () => Date };
-  createdAt?: { toDate?: () => Date };
-  statusAfter?: string;
-};
-
-type TodayAttendanceRecordDoc = {
-  id: string;
-  studentId?: string;
-  status?: string;
-  checkInAt?: { toDate?: () => Date };
-  updatedAt?: { toDate?: () => Date };
-};
-
-type TodayAttendanceDailyStatDoc = {
-  id: string;
-  studentId?: string;
-  attendanceStatus?: string;
-  checkInAt?: { toDate?: () => Date };
-  checkOutAt?: { toDate?: () => Date };
-  hasCheckOutRecord?: boolean;
 };
 
 type RecipientPreferenceRow = {
@@ -218,7 +180,7 @@ type RecipientPreferenceRow = {
 
 type StudentDialogLogDetailRow = {
   id: string;
-  type: 'log' | 'queue' | 'synthetic';
+  type: 'attendance' | 'log' | 'queue';
   parentName: string;
   phoneNumber: string;
   message: string;
@@ -234,11 +196,38 @@ type TodayBoardEventType = 'study_start' | 'away_start' | 'away_end' | 'study_en
 
 type StudentSmsBoardEventSummary = {
   eventType: TodayBoardEventType;
-  status: 'sent' | 'queued' | 'failed' | 'suppressed' | 'missing_phone' | 'attendance_only' | 'none';
+  status: 'sent' | 'queued' | 'failed' | 'suppressed' | 'missing_phone' | 'recorded' | 'none';
   timeLabel: string;
   badgeLabel: string;
   queueRows: SmsQueueRow[];
   logRows: SmsDeliveryLogRow[];
+};
+
+type AttendanceRecordRow = {
+  id: string;
+  studentId?: string;
+  dateKey?: string;
+  status?: string;
+  checkInAt?: { toDate?: () => Date };
+};
+
+type AttendanceDailyStatRow = {
+  id: string;
+  studentId?: string;
+  dateKey?: string;
+  attendanceStatus?: string;
+  checkInAt?: { toDate?: () => Date };
+  checkOutAt?: { toDate?: () => Date };
+  hasCheckOutRecord?: boolean;
+};
+
+type AttendanceEventRow = {
+  id: string;
+  studentId?: string;
+  dateKey?: string;
+  eventType?: string;
+  occurredAt?: { toDate?: () => Date };
+  createdAt?: { toDate?: () => Date };
 };
 
 type StudentSmsBoardRow = {
@@ -396,6 +385,17 @@ function formatTimeLabel(value?: { toDate?: () => Date }) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function toDateSafe(value?: { toDate?: () => Date } | Date | null) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  return value?.toDate?.() || null;
+}
+
+function formatTimeLabelFromDate(date?: Date | null) {
+  if (!date) return '-';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 function formatShortDateLabel(date: Date) {
   return `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -442,28 +442,12 @@ function buildSmsRecipientPreferenceId(studentId: string, parentUid: string) {
 
 function getTodayBoardCellTone(status: StudentSmsBoardEventSummary['status']) {
   if (status === 'sent') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (status === 'attendance_only') return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+  if (status === 'recorded') return 'border-amber-200 bg-amber-50 text-amber-700';
   if (status === 'queued') return 'border-blue-200 bg-blue-50 text-blue-700';
   if (status === 'failed') return 'border-rose-200 bg-rose-50 text-rose-700';
   if (status === 'suppressed') return 'border-amber-200 bg-amber-50 text-amber-700';
   if (status === 'missing_phone') return 'border-slate-300 bg-slate-100 text-slate-600';
   return 'border-slate-200 bg-slate-50 text-slate-400';
-}
-
-function resolveAttendanceEventBoardType(row: TodayAttendanceEventDoc): TodayBoardEventType | null {
-  if (row.eventType === 'check_in') return 'study_start';
-  if (row.eventType === 'check_out') return 'study_end';
-  if (row.eventType === 'away_start') return 'away_start';
-  if (row.eventType === 'away_end') return 'away_end';
-  if (row.eventType === 'status_override') {
-    if (row.statusAfter === 'confirmed_present' || row.statusAfter === 'confirmed_late' || row.statusAfter === 'confirmed_present_missing_routine') {
-      return 'study_start';
-    }
-    if (row.statusAfter === 'confirmed_absent' || row.statusAfter === 'excused_absent') {
-      return 'study_end';
-    }
-  }
-  return null;
 }
 
 function getQueueStatusLabel(status?: string, providerStatus?: string, nextAttemptAt?: { toDate?: () => Date }, attemptCount?: number) {
@@ -524,7 +508,6 @@ export default function NotificationSettingsPage() {
   const [recipientPhoneDrafts, setRecipientPhoneDrafts] = useState<Record<string, string>>({});
   const [manualSmsMessage, setManualSmsMessage] = useState('');
   const [manualSmsActionKey, setManualSmsActionKey] = useState<string | null>(null);
-  const [userCenterMembersById, setUserCenterMembersById] = useState<Record<string, UserCenterMemberDoc>>({});
 
   const settingsRef = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -540,33 +523,9 @@ export default function NotificationSettingsPage() {
 
   const smsDeliveryLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
-    return query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), orderBy('createdAt', 'desc'), limit(3000));
+    return query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), orderBy('createdAt', 'desc'), limit(1200));
   }, [firestore, centerId, isAdmin]);
   const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(smsDeliveryLogsQuery, { enabled: isAdmin });
-
-  const todayKey = toDateInputValue(new Date());
-
-  const todayAttendanceEventsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'attendanceEvents'),
-      where('dateKey', '==', todayKey),
-      limit(1200)
-    );
-  }, [firestore, centerId, isAdmin, todayKey]);
-  const { data: todayAttendanceEventsRaw } = useCollection<TodayAttendanceEventDoc>(todayAttendanceEventsQuery, { enabled: isAdmin });
-
-  const todayAttendanceRecordsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
-    return query(collection(firestore, 'centers', centerId, 'attendanceRecords', todayKey, 'students'), limit(800));
-  }, [firestore, centerId, isAdmin, todayKey]);
-  const { data: todayAttendanceRecordsRaw } = useCollection<TodayAttendanceRecordDoc>(todayAttendanceRecordsQuery, { enabled: isAdmin });
-
-  const todayAttendanceDailyStatsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
-    return query(collection(firestore, 'centers', centerId, 'attendanceDailyStats', todayKey, 'students'), limit(800));
-  }, [firestore, centerId, isAdmin, todayKey]);
-  const { data: todayAttendanceDailyStatsRaw } = useCollection<TodayAttendanceDailyStatDoc>(todayAttendanceDailyStatsQuery, { enabled: isAdmin });
 
   const legacySmsLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -591,6 +550,30 @@ export default function NotificationSettingsPage() {
     return query(collection(firestore, 'centers', centerId, 'smsRecipientPreferences'), limit(800));
   }, [firestore, centerId, isAdmin]);
   const { data: preferencesRaw } = useCollection<SmsRecipientPreferenceDoc>(preferencesQuery, { enabled: isAdmin });
+
+  const todayDateKey = useMemo(() => toDateInputValue(new Date()), []);
+
+  const attendanceRecordsTodayQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(collection(firestore, 'centers', centerId, 'attendanceRecords', todayDateKey, 'students'), limit(800));
+  }, [firestore, centerId, isAdmin, todayDateKey]);
+  const { data: attendanceRecordsTodayRaw } = useCollection<AttendanceRecordRow>(attendanceRecordsTodayQuery, { enabled: isAdmin });
+
+  const attendanceDailyStatsTodayQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(collection(firestore, 'centers', centerId, 'attendanceDailyStats', todayDateKey, 'students'), limit(800));
+  }, [firestore, centerId, isAdmin, todayDateKey]);
+  const { data: attendanceDailyStatsTodayRaw } = useCollection<AttendanceDailyStatRow>(attendanceDailyStatsTodayQuery, { enabled: isAdmin });
+
+  const attendanceEventsTodayQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'attendanceEvents'),
+      where('dateKey', '==', todayDateKey),
+      limit(1200)
+    );
+  }, [firestore, centerId, isAdmin, todayDateKey]);
+  const { data: attendanceEventsTodayRaw } = useCollection<AttendanceEventRow>(attendanceEventsTodayQuery, { enabled: isAdmin });
 
   useEffect(() => {
     if (!settingsDoc) return;
@@ -630,7 +613,7 @@ export default function NotificationSettingsPage() {
     studentName: '김재윤',
     time: '18:40',
     expectedTime: form.defaultArrivalTime || '17:00',
-    centerName: '트랙 관리형 스터디센터',
+    centerName: '트랙센터',
   }), [form.defaultArrivalTime]);
 
   const templatePreviews = useMemo(() => {
@@ -653,77 +636,34 @@ export default function NotificationSettingsPage() {
     () => new Map((preferencesRaw || []).map((row) => [row.id, row] as const)),
     [preferencesRaw]
   );
-
-  const userCenterLookupUids = useMemo(() => {
-    const targets = new Set<string>();
-
-    for (const student of studentsRaw || []) {
-      const fallbackPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, STUDENT_SMS_FALLBACK_UID));
-      const studentMember = membersById.get(student.id);
-      const fallbackPhone = resolveFirstValidPhoneNumber(
-        fallbackPref?.phoneNumber,
-        student.phoneNumber,
-        studentMember?.phoneNumber
-      );
-
-      if (!fallbackPhone) {
-        targets.add(student.id);
-      }
-
-      for (const parentUid of student.parentUids || []) {
-        const pref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, parentUid));
-        const member = membersById.get(parentUid);
-        const parentPhone = resolveFirstValidPhoneNumber(
-          pref?.phoneNumber,
-          member?.phoneNumber
-        );
-
-        if (!parentPhone) {
-          targets.add(parentUid);
-        }
-      }
-    }
-
-    return Array.from(targets).sort();
-  }, [membersById, preferencesByKey, studentsRaw]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!firestore || !centerId || !isAdmin || userCenterLookupUids.length === 0) {
-      setUserCenterMembersById({});
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    (async () => {
-      const entries = await Promise.all(
-        userCenterLookupUids.map(async (uid) => {
-          const snap = await getDoc(doc(firestore, 'userCenters', uid, 'centers', centerId));
-          return [uid, snap.exists() ? (snap.data() as UserCenterMemberDoc) : null] as const;
+  const attendanceRecordsByStudentId = useMemo<Map<string, AttendanceRecordRow>>(
+    () => new Map((attendanceRecordsTodayRaw || []).filter((row) => row.studentId).map((row) => [row.studentId!, row] as const)),
+    [attendanceRecordsTodayRaw]
+  );
+  const attendanceDailyStatsByStudentId = useMemo<Map<string, AttendanceDailyStatRow>>(
+    () => new Map((attendanceDailyStatsTodayRaw || []).filter((row) => row.studentId).map((row) => [row.studentId!, row] as const)),
+    [attendanceDailyStatsTodayRaw]
+  );
+  const attendanceEventsByStudentId = useMemo<Map<string, AttendanceEventRow[]>>(() => {
+    const next = new Map<string, AttendanceEventRow[]>();
+    (attendanceEventsTodayRaw || []).forEach((row) => {
+      if (!row.studentId) return;
+      const current = next.get(row.studentId) || [];
+      current.push(row);
+      next.set(row.studentId, current);
+    });
+    next.forEach((rows, key) => {
+      next.set(
+        key,
+        rows.slice().sort((a, b) => {
+          const aTime = toDateSafe(a.occurredAt) || toDateSafe(a.createdAt);
+          const bTime = toDateSafe(b.occurredAt) || toDateSafe(b.createdAt);
+          return (bTime?.getTime() || 0) - (aTime?.getTime() || 0);
         })
       );
-
-      if (cancelled) return;
-
-      setUserCenterMembersById(
-        Object.fromEntries(
-          entries
-            .filter((entry): entry is readonly [string, UserCenterMemberDoc] => Boolean(entry[1]))
-            .map(([uid, value]) => [uid, value])
-        )
-      );
-    })().catch(() => {
-      if (!cancelled) {
-        setUserCenterMembersById({});
-      }
     });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [centerId, firestore, isAdmin, userCenterLookupUids]);
+    return next;
+  }, [attendanceEventsTodayRaw]);
 
   const providerReady = useMemo(() => {
     if (!form.smsEnabled) return false;
@@ -745,7 +685,6 @@ export default function NotificationSettingsPage() {
         label: formatShortDateLabel(date),
         sent: 0,
         issue: 0,
-        cost: 0,
       };
     });
     const dayMap = new Map(range.map((item) => [item.key, item] as const));
@@ -769,15 +708,11 @@ export default function NotificationSettingsPage() {
       const key = toDateKeyFromValue(row.createdAt) || toDateKeyFromValue(row.updatedAt) || toDateKeyFromValue(row.nextAttemptAt);
       return key === todayKey && ['queued', 'processing', 'pending_provider'].includes(String(row.status || ''));
     }).length;
-    range.forEach((item) => {
-      item.cost = calculateSmsCost(item.sent);
-    });
     return {
       range,
       maxCount: Math.max(1, ...range.map((item) => Math.max(item.sent, item.issue))),
       totalSent: range.reduce((sum, item) => sum + item.sent, 0),
       totalIssue: range.reduce((sum, item) => sum + item.issue, 0),
-      totalCost: range.reduce((sum, item) => sum + item.cost, 0),
       pendingTodayCount,
     };
   }, [smsDeliveryLogsRaw, smsQueueRaw]);
@@ -829,21 +764,19 @@ export default function NotificationSettingsPage() {
       .map((student) => {
         const studentName = student.name || '학생';
         const className = student.className || student.grade || '-';
-        const parentRows: RecipientPreferenceRow[] = (student.parentUids || []).map((parentUid) => {
+        const parentRows = (student.parentUids || []).map((parentUid) => {
           const member = membersById.get(parentUid);
-          const userCenterMember = userCenterMembersById[parentUid];
           const pref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, parentUid));
           const phoneNumber = resolveFirstValidPhoneNumber(
             pref?.phoneNumber,
-            member?.phoneNumber,
-            userCenterMember?.phoneNumber
+            member?.phoneNumber
           );
           return {
             studentId: student.id,
             studentName,
             className,
             parentUid,
-            parentName: pref?.parentName || member?.displayName || member?.name || userCenterMember?.displayName || userCenterMember?.name || '학부모',
+            parentName: pref?.parentName || member?.displayName || member?.name || '학부모',
             phoneNumber,
             enabled: pref?.enabled !== false,
             eventToggles: mergeEventToggles(pref?.eventToggles),
@@ -853,12 +786,10 @@ export default function NotificationSettingsPage() {
         const parentRowsWithPhone = parentRows.filter((row) => !row.isPhoneMissing);
         const fallbackPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, STUDENT_SMS_FALLBACK_UID));
         const studentMember = membersById.get(student.id);
-        const studentUserCenter = userCenterMembersById[student.id];
         const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
           fallbackPref?.phoneNumber,
           student.phoneNumber,
-          studentMember?.phoneNumber,
-          studentUserCenter?.phoneNumber
+          studentMember?.phoneNumber
         );
         const fallbackRow = {
           studentId: student.id,
@@ -872,7 +803,7 @@ export default function NotificationSettingsPage() {
           isFallbackRecipient: true,
           isPhoneMissing: !fallbackPhoneNumber,
         } satisfies RecipientPreferenceRow;
-        const effectiveRows: RecipientPreferenceRow[] = parentRowsWithPhone.length > 0 ? parentRowsWithPhone : [fallbackRow];
+        const effectiveRows = parentRowsWithPhone.length > 0 ? parentRowsWithPhone : [fallbackRow];
         return {
           studentId: student.id,
           studentName,
@@ -881,33 +812,51 @@ export default function NotificationSettingsPage() {
         };
       })
       .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ko-KR'));
-  }, [membersById, preferencesByKey, studentsRaw, userCenterMembersById]);
+  }, [membersById, preferencesByKey, studentsRaw]);
 
   const todayBoardRows = useMemo<StudentSmsBoardRow[]>(() => {
+    const todayKey = todayDateKey;
     const queueRows = smsQueueRaw || [];
     const deliveryRows = smsDeliveryLogsRaw || [];
-    const attendanceEventRows = todayAttendanceEventsRaw || [];
-    const attendanceRecordRows = todayAttendanceRecordsRaw || [];
-    const attendanceDailyStatRows = todayAttendanceDailyStatsRaw || [];
     const keyword = studentBoardSearchTerm.trim().toLowerCase();
     return recipientRows
       .map((student) => {
+        const attendanceRecord = attendanceRecordsByStudentId.get(student.studentId);
+        const attendanceDailyStat = attendanceDailyStatsByStudentId.get(student.studentId);
+        const attendanceEvents = attendanceEventsByStudentId.get(student.studentId) || [];
+        const resolveAttendanceTime = (eventType: TodayBoardEventType) => {
+          if (eventType === 'study_start') {
+            return (
+              toDateSafe(attendanceDailyStat?.checkInAt) ||
+              toDateSafe(attendanceRecord?.checkInAt) ||
+              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_in')?.occurredAt) ||
+              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_in')?.createdAt)
+            );
+          }
+          if (eventType === 'study_end') {
+            return (
+              toDateSafe(attendanceDailyStat?.checkOutAt) ||
+              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_out')?.occurredAt) ||
+              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_out')?.createdAt)
+            );
+          }
+          if (eventType === 'away_start') {
+            return (
+              toDateSafe(attendanceEvents.find((row) => row.eventType === 'away_start')?.occurredAt) ||
+              toDateSafe(attendanceEvents.find((row) => row.eventType === 'away_start')?.createdAt)
+            );
+          }
+          return (
+            toDateSafe(attendanceEvents.find((row) => row.eventType === 'away_end')?.occurredAt) ||
+            toDateSafe(attendanceEvents.find((row) => row.eventType === 'away_end')?.createdAt)
+          );
+        };
         const studentLogs = deliveryRows.filter(
           (row) => row.studentId === student.studentId && row.dateKey === todayKey && TODAY_BOARD_EVENTS.some((item) => item.value === row.eventType)
         );
         const studentQueueRows = queueRows.filter(
           (row) => row.studentId === student.studentId && row.dateKey === todayKey && TODAY_BOARD_EVENTS.some((item) => item.value === row.eventType)
         );
-        const studentAttendanceEvents = attendanceEventRows
-          .filter((row) => row.studentId === student.studentId)
-          .map((row) => ({
-            row,
-            boardEventType: resolveAttendanceEventBoardType(row),
-            at: row.occurredAt?.toDate?.() || row.createdAt?.toDate?.() || null,
-          }))
-          .filter((row) => row.boardEventType && row.at);
-        const studentAttendanceRecord = attendanceRecordRows.find((row) => row.id === student.studentId || row.studentId === student.studentId) || null;
-        const studentAttendanceDailyStat = attendanceDailyStatRows.find((row) => row.id === student.studentId || row.studentId === student.studentId) || null;
         const hasMissingPhone = student.parentRows.every((row) => row.isPhoneMissing);
         const events = TODAY_BOARD_EVENTS.reduce((acc, item) => {
           const logRows = studentLogs
@@ -918,30 +867,11 @@ export default function NotificationSettingsPage() {
             .filter((row) => row.eventType === item.value)
             .slice()
             .sort((a, b) => (b.createdAt?.toDate?.().getTime() || 0) - (a.createdAt?.toDate?.().getTime() || 0));
-          const latestAttendanceEvent = studentAttendanceEvents
-            .filter((entry) => entry.boardEventType === item.value)
-            .sort((a, b) => (b.at?.getTime() || 0) - (a.at?.getTime() || 0))[0] || null;
           const latestSent = logRows.find((row) => row.status === 'sent');
           const latestSuppressed = logRows.find((row) => row.status === 'suppressed_opt_out');
           const latestFailedLog = logRows.find((row) => row.status === 'failed');
           const latestQueue = queueRowsForEvent[0];
-          const recordCheckInAt = studentAttendanceRecord?.checkInAt?.toDate?.() || studentAttendanceRecord?.updatedAt?.toDate?.() || null;
-          const dailyStatCheckInAt = studentAttendanceDailyStat?.checkInAt?.toDate?.() || null;
-          const dailyStatCheckOutAt = studentAttendanceDailyStat?.checkOutAt?.toDate?.() || null;
-          const hasRecordedCheckIn =
-            item.value === 'study_start' &&
-            (
-              studentAttendanceRecord?.status === 'confirmed_present' ||
-              studentAttendanceRecord?.status === 'confirmed_late' ||
-              studentAttendanceRecord?.status === 'confirmed_present_missing_routine'
-            ) &&
-            (dailyStatCheckInAt || recordCheckInAt);
-          const attendanceFallbackTime =
-            item.value === 'study_start'
-              ? latestAttendanceEvent?.at || dailyStatCheckInAt || (hasRecordedCheckIn ? recordCheckInAt : null)
-              : item.value === 'study_end'
-                ? latestAttendanceEvent?.at || dailyStatCheckOutAt
-                : latestAttendanceEvent?.at || null;
+          const attendanceTime = resolveAttendanceTime(item.value);
 
           let summary: StudentSmsBoardEventSummary;
           if (latestSent) {
@@ -989,11 +919,11 @@ export default function NotificationSettingsPage() {
               queueRows: queueRowsForEvent,
               logRows,
             };
-          } else if (attendanceFallbackTime) {
+          } else if (attendanceTime) {
             summary = {
               eventType: item.value,
-              status: 'attendance_only',
-              timeLabel: formatTimeLabel({ toDate: () => attendanceFallbackTime }),
+              status: hasMissingPhone ? 'missing_phone' : 'recorded',
+              timeLabel: formatTimeLabelFromDate(attendanceTime),
               badgeLabel: hasMissingPhone ? '번호없음' : '미접수',
               queueRows: queueRowsForEvent,
               logRows,
@@ -1026,7 +956,6 @@ export default function NotificationSettingsPage() {
         const hasFailed = Object.values(events).some((event) => event.status === 'failed');
         const hasQueued = Object.values(events).some((event) => event.status === 'queued');
         const hasSuppressed = Object.values(events).some((event) => event.status === 'suppressed');
-        const hasAttendanceOnly = Object.values(events).some((event) => event.status === 'attendance_only');
         const hasNoEvent = Object.values(events).every((event) => event.status === 'none');
         const needsAttentionRank = hasMissingPhone
           ? 500
@@ -1034,13 +963,11 @@ export default function NotificationSettingsPage() {
             ? 400
             : hasQueued
               ? 350
-              : hasAttendanceOnly
-                ? 325
-                : hasNoEvent
-                  ? 300
-                  : hasSuppressed
-                    ? 200
-                    : 100 - todaySentCount;
+              : hasNoEvent
+                ? 300
+                : hasSuppressed
+                  ? 200
+                  : 100 - todaySentCount;
         const recipientLabel = hasMissingPhone
           ? '번호 미등록'
           : student.parentRows[0]?.isFallbackRecipient
@@ -1073,14 +1000,23 @@ export default function NotificationSettingsPage() {
         if (a.needsAttentionRank !== b.needsAttentionRank) return b.needsAttentionRank - a.needsAttentionRank;
         return a.studentName.localeCompare(b.studentName, 'ko-KR');
       });
-  }, [recipientRows, smsDeliveryLogsRaw, smsQueueRaw, studentBoardSearchTerm, todayAttendanceDailyStatsRaw, todayAttendanceEventsRaw, todayAttendanceRecordsRaw, todayKey]);
+  }, [
+    attendanceDailyStatsByStudentId,
+    attendanceEventsByStudentId,
+    attendanceRecordsByStudentId,
+    recipientRows,
+    smsDeliveryLogsRaw,
+    smsQueueRaw,
+    studentBoardSearchTerm,
+    todayDateKey,
+  ]);
 
   const todayBoardSummary = useMemo(() => {
     return {
       sentStudents: todayBoardRows.filter((row) => row.todaySentCount > 0).length,
       failedStudents: todayBoardRows.filter((row) => Object.values(row.events).some((event) => event.status === 'failed')).length,
       missingPhoneStudents: todayBoardRows.filter((row) => row.hasMissingPhone).length,
-      retryStudents: todayBoardRows.filter((row) => Object.values(row.events).some((event) => event.status === 'queued' || event.status === 'failed' || event.status === 'attendance_only')).length,
+      retryStudents: todayBoardRows.filter((row) => Object.values(row.events).some((event) => event.status === 'queued' || event.status === 'failed')).length,
     };
   }, [todayBoardRows]);
 
@@ -1384,22 +1320,10 @@ export default function NotificationSettingsPage() {
     setManualSmsActionKey(actionKey);
     try {
       const sendManualStudentSms = httpsCallable(functions, 'sendManualStudentSms');
-      const recipientOverrides = selectedBoardStudent.recipients
-        .filter((row) => row.enabled)
-        .map((row) => {
-          const key = `${row.studentId}:${row.parentUid}`;
-          return {
-            parentUid: row.parentUid,
-            parentName: row.parentName,
-            phoneNumber: normalizePhoneNumber(recipientPhoneDrafts[key] ?? row.phoneNumber),
-          };
-        })
-        .filter((row) => !!row.phoneNumber);
       await sendManualStudentSms({
         centerId,
         studentId: selectedBoardStudent.studentId,
         message,
-        recipientOverrides,
       });
       setManualSmsMessage('');
       toast({
@@ -1442,6 +1366,22 @@ export default function NotificationSettingsPage() {
           90byte 최적화 · 직접 발송 · 수신 제어 · 30일 히스토리
         </p>
       </header>
+
+      <AdminWorkbenchCommandBar
+        eyebrow="문자 운영 워크벤치"
+        title="센터 문자 운영 워크벤치"
+        description="최근 흐름을 먼저 보고, 학생별 발송 현황과 수신 제어를 같은 패턴으로 이어서 관리합니다."
+        searchValue={studentBoardSearchTerm}
+        onSearchChange={setStudentBoardSearchTerm}
+        searchPlaceholder="학생명, 반 검색"
+        quickActions={[
+          { label: '학생 발송 보기', icon: <MessageSquare className="h-4 w-4" />, onClick: () => setHistoryTab('by-student') },
+          { label: '수신 제어', icon: <ShieldCheck className="h-4 w-4" />, onClick: () => setRecipientSearchTerm('') },
+          { label: '리포트 생성', icon: <Save className="h-4 w-4" />, href: '/dashboard/reports' },
+          { label: '출결 이동', icon: <Clock3 className="h-4 w-4" />, href: '/dashboard/attendance' },
+        ]}
+      />
+
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight">
@@ -1456,13 +1396,12 @@ export default function NotificationSettingsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">최근 7일 문자 전송 현황</p>
-                <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">센터 문자 전송 흐름을 선그래프로 빠르게 확인합니다.</h3>
-                <p className="mt-2 text-sm font-bold text-slate-500">알리고 접수와 실패·보류 흐름을 함께 보고, 접수 기준 문자비용도 일자별로 바로 확인합니다.</p>
+                <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">센터 문자 흐름을 선그래프로 빠르게 확인합니다.</h3>
+                <p className="mt-2 text-sm font-bold text-slate-500">발송완료와 실패·보류 흐름을 함께 보고, 오늘 대기 건수까지 같이 확인합니다.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">알리고 접수 {smsTrendSummary.totalSent}건</Badge>
+                <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">발송완료 {smsTrendSummary.totalSent}건</Badge>
                 <Badge className="border-none bg-rose-100 text-rose-700 font-black">실패·보류 {smsTrendSummary.totalIssue}건</Badge>
-                <Badge className="border-none bg-violet-100 text-violet-700 font-black">7일 비용 {formatSmsCost(smsTrendSummary.totalCost)}</Badge>
                 <Badge className="border-none bg-blue-100 text-blue-700 font-black">오늘 대기 {smsTrendSummary.pendingTodayCount}건</Badge>
               </div>
             </div>
@@ -1492,17 +1431,15 @@ export default function NotificationSettingsPage() {
                   <div key={item.key} className="rounded-xl bg-white px-2 py-2 text-center shadow-sm ring-1 ring-slate-100">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</p>
                     <div className="mt-2 flex items-center justify-center gap-2 text-xs font-black">
-                      <span className="text-emerald-600">접수 {item.sent}</span>
+                      <span className="text-emerald-600">완료 {item.sent}</span>
                       <span className="text-orange-600">이슈 {item.issue}</span>
                     </div>
-                    <p className="mt-2 text-[11px] font-black text-violet-700">비용 {formatSmsCost(item.cost)}</p>
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-black text-slate-600">
-                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />알리고 접수</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />발송완료</span>
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />실패·보류</span>
-                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" />문자비용(접수 기준)</span>
               </div>
             </div>
           </div>
@@ -1614,12 +1551,12 @@ export default function NotificationSettingsPage() {
         <CardHeader className="border-b bg-muted/10">
           <CardTitle className="text-xl font-black tracking-tight">발송 현황</CardTitle>
           <CardDescription className="font-bold text-sm">
-            학생별로 오늘 등원·외출·복귀·하원 문자 접수 시각만 먼저 보고, 상세는 팝업에서 확인합니다.
+            학생별로 오늘 등원·외출·복귀·하원 문자 시각만 먼저 보고, 상세는 팝업에서 확인합니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 p-6">
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 접수 학생</p><p className="mt-2 text-3xl font-black text-emerald-800">{todayBoardSummary.sentStudents}</p></div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 발송완료 학생</p><p className="mt-2 text-3xl font-black text-emerald-800">{todayBoardSummary.sentStudents}</p></div>
             <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-rose-700">실패 학생</p><p className="mt-2 text-3xl font-black text-rose-800">{todayBoardSummary.failedStudents}</p></div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">번호 미등록</p><p className="mt-2 text-3xl font-black text-slate-700">{todayBoardSummary.missingPhoneStudents}</p></div>
             <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-orange-700">재확인 필요</p><p className="mt-2 text-3xl font-black text-orange-800">{todayBoardSummary.retryStudents}</p></div>
@@ -1631,7 +1568,7 @@ export default function NotificationSettingsPage() {
               <Input value={studentBoardSearchTerm} onChange={(e) => setStudentBoardSearchTerm(e.target.value)} placeholder="학생명, 반 검색" className="h-11 rounded-xl border-2 pl-10 font-bold" />
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm font-bold text-slate-600">
-              실패 · 번호없음 · 미접수 학생이 위로 올라오고, 공부시작·외출·복귀·하원은 실시간 교실/키오스크 전환 시 자동으로 큐에 들어갑니다.
+              실패 · 번호없음 · 미발송 학생이 위로 올라옵니다.
             </div>
           </div>
 
@@ -1662,7 +1599,7 @@ export default function NotificationSettingsPage() {
                         </Badge>
                       </div>
                       <p className="mt-1 text-xs font-bold text-slate-500">
-                        수신 대상 {student.recipients.filter((row) => !row.isPhoneMissing).length}명 · 오늘 접수 {student.todaySentCount}건
+                        수신 대상 {student.recipients.filter((row) => !row.isPhoneMissing).length}명 · 오늘 발송 {student.todaySentCount}건
                       </p>
                     </div>
                     {TODAY_BOARD_EVENTS.map((event) => {
@@ -1670,12 +1607,7 @@ export default function NotificationSettingsPage() {
                       return (
                         <div key={event.value} className={cn('rounded-xl border px-3 py-3 text-center', getTodayBoardCellTone(summary.status))}>
                           <p className="text-[10px] font-black uppercase tracking-widest opacity-70">{event.label}</p>
-                          <p className="mt-1 text-sm font-black">
-                            {summary.status === 'sent' || summary.status === 'attendance_only' ? summary.timeLabel : summary.badgeLabel}
-                          </p>
-                          {summary.status === 'attendance_only' ? (
-                            <p className="mt-1 text-[10px] font-black opacity-70">{summary.badgeLabel}</p>
-                          ) : null}
+                          <p className="mt-1 text-sm font-black">{summary.status === 'sent' || summary.status === 'recorded' || summary.status === 'missing_phone' ? summary.timeLabel : summary.badgeLabel}</p>
                         </div>
                       );
                     })}
@@ -1687,22 +1619,28 @@ export default function NotificationSettingsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isStudentDialogOpen && !!selectedBoardStudent} onOpenChange={setIsStudentDialogOpen}>
-        <DialogContent className="max-w-5xl overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl">
+      <Sheet
+        open={isStudentDialogOpen && !!selectedBoardStudent}
+        onOpenChange={(open) => {
+          setIsStudentDialogOpen(open);
+          if (!open) setSelectedBoardStudentId(null);
+        }}
+      >
+        <SheetContent side="right" className="w-[96vw] max-w-5xl overflow-y-auto border-l-0 p-0 shadow-2xl">
           {selectedBoardStudent ? (
             <>
               <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white sm:px-8">
-                <DialogHeader className="space-y-2 text-left">
-                  <DialogTitle className="text-2xl font-black tracking-tight text-white">
+                <SheetHeader className="space-y-2 text-left">
+                  <SheetTitle className="text-2xl font-black tracking-tight text-white">
                     {selectedBoardStudent.studentName}
-                  </DialogTitle>
-                  <DialogDescription className="text-sm font-bold text-white/80">
-                    {selectedBoardStudent.className} · 오늘 문자 접수 흐름과 수신 번호를 함께 확인합니다.
-                  </DialogDescription>
-                </DialogHeader>
+                  </SheetTitle>
+                  <SheetDescription className="text-sm font-bold text-white/80">
+                    {selectedBoardStudent.className} · 오늘 문자 발송 흐름과 수신 번호를 함께 확인합니다.
+                  </SheetDescription>
+                </SheetHeader>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Badge className="border-none bg-white/20 text-white font-black">수신 대상 {selectedBoardStudent.recipients.filter((row) => !row.isPhoneMissing).length}명</Badge>
-                  <Badge className="border-none bg-white/20 text-white font-black">오늘 접수 {selectedBoardStudent.todaySentCount}건</Badge>
+                  <Badge className="border-none bg-white/20 text-white font-black">오늘 발송 {selectedBoardStudent.todaySentCount}건</Badge>
                   <Badge className={cn('border-none font-black', selectedBoardStudent.hasMissingPhone ? 'bg-white text-slate-700' : 'bg-emerald-100 text-emerald-700')}>
                     {selectedBoardStudent.recipientLabel}
                   </Badge>
@@ -1713,7 +1651,7 @@ export default function NotificationSettingsPage() {
                 <section className="space-y-3">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">수신 번호</h3>
-                    <p className="mt-1 text-xs font-bold text-slate-500">보호자 번호가 없으면 학생 본인 번호로 fallback 되고, 아래 시각은 문자 게이트웨이 접수 기준입니다.</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">보호자 번호가 없으면 학생 본인 번호로 fallback 됩니다.</p>
                   </div>
                   <div className="grid gap-3">
                     {selectedBoardStudent.recipients.map((row) => {
@@ -1784,8 +1722,8 @@ export default function NotificationSettingsPage() {
 
                 <section className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">오늘 접수 로그</h3>
-                    <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 오늘 알리고에 접수된 내용과 출결 기록을 함께 보여줍니다.</p>
+                    <h3 className="text-sm font-black text-slate-900">오늘 발송 로그</h3>
+                    <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 오늘 접수된 내용과 출결 기록을 함께 보여줍니다.</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1816,8 +1754,7 @@ export default function NotificationSettingsPage() {
                   </div>
                   {TODAY_BOARD_EVENTS.map((event) => {
                     const summary = selectedBoardStudent.events[event.value];
-                    const primaryRecipient = selectedBoardStudent.recipients.find((row) => !row.isPhoneMissing) || selectedBoardStudent.recipients[0];
-                    const detailRowsBase: StudentDialogLogDetailRow[] = [
+                    const baseDetailRows: StudentDialogLogDetailRow[] = [
                       ...summary.logRows.map((row) => ({
                         id: `log-${row.id}`,
                         type: 'log' as const,
@@ -1848,28 +1785,39 @@ export default function NotificationSettingsPage() {
                         })),
                     ];
 
-                    const detailRows: StudentDialogLogDetailRow[] = detailRowsBase.length > 0
-                      ? detailRowsBase
-                      : summary.status === 'attendance_only' || summary.status === 'missing_phone'
-                        ? [{
-                            id: `synthetic-${selectedBoardStudent.studentId}-${event.value}`,
-                            type: 'synthetic' as const,
-                            parentName: primaryRecipient?.parentName || selectedBoardStudent.recipientLabel,
-                            phoneNumber: primaryRecipient?.phoneNumber || '',
+                    const syntheticAttendanceRow =
+                      baseDetailRows.length === 0 && (summary.status === 'recorded' || summary.status === 'missing_phone')
+                        ? {
+                            id: `attendance-${selectedBoardStudent.studentId}-${event.value}`,
+                            type: 'attendance' as const,
+                            parentName: summary.status === 'missing_phone' ? '번호 미등록' : '출결 기록',
+                            phoneNumber:
+                              selectedBoardStudent.recipients
+                                .map((recipient) => recipient.phoneNumber)
+                                .find(Boolean) || '',
                             message:
-                              summary.status === 'attendance_only'
-                                ? `오늘 ${event.label} 기록은 ${summary.timeLabel}에 확인됐지만, 문자 알리고 접수 기록이 없습니다. 필요하면 다시 보내기로 즉시 접수해 주세요.`
-                                : `오늘 ${event.label} 기록은 확인됐지만 현재 수신 가능한 번호가 없어 문자 알리고 접수가 되지 않았습니다. 번호를 등록한 뒤 다시 보내기 해주세요.`,
-                            statusLabel: summary.badgeLabel,
-                            statusTone: getTodayBoardCellTone(summary.status),
-                            timeLabel: summary.timeLabel,
-                            errorMessage: summary.status === 'missing_phone' ? '수신 번호가 등록되지 않았습니다.' : '출결 기록은 있으나 문자 접수 로그가 없습니다.',
+                              summary.status === 'missing_phone'
+                                ? '오늘 출결 기록은 확인되지만 발송 가능한 번호가 없어 문자 접수가 되지 않았습니다.'
+                                : '오늘 출결 기록은 확인되지만 문자 접수 로그가 없어 다시 보내기가 필요합니다.',
+                            statusLabel: summary.status === 'missing_phone' ? '번호없음' : '미접수',
+                            statusTone:
+                              summary.status === 'missing_phone'
+                                ? 'bg-slate-200 text-slate-700'
+                                : 'bg-amber-100 text-amber-700',
+                            timeLabel:
+                              summary.timeLabel !== '-'
+                                ? `${todayDateKey.slice(5).replace('-', '.')} ${summary.timeLabel}`
+                                : '-',
+                            errorMessage: '',
                             queueId: null,
                             queueStatus: null,
-                          }]
-                        : [];
+                          }
+                        : null;
 
-                    detailRows.sort((a, b) => {
+                    const detailRows: StudentDialogLogDetailRow[] = [
+                      ...baseDetailRows,
+                      ...(syntheticAttendanceRow ? [syntheticAttendanceRow] : []),
+                    ].sort((a, b) => {
                       const aTime = a.timeLabel === '-' ? 0 : Date.parse(`2026-01-01T${a.timeLabel.slice(-5)}:00+09:00`);
                       const bTime = b.timeLabel === '-' ? 0 : Date.parse(`2026-01-01T${b.timeLabel.slice(-5)}:00+09:00`);
                       return bTime - aTime;
@@ -1880,7 +1828,7 @@ export default function NotificationSettingsPage() {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <p className="text-base font-black text-slate-900">{event.label}</p>
-                            <Badge className={cn('border-none font-black', getTodayBoardCellTone(summary.status))}>{summary.status === 'sent' ? summary.timeLabel : summary.badgeLabel}</Badge>
+                            <Badge className={cn('border-none font-black', getTodayBoardCellTone(summary.status))}>{summary.status === 'sent' || summary.status === 'recorded' || summary.status === 'missing_phone' ? summary.timeLabel : summary.badgeLabel}</Badge>
                           </div>
                           <div className="flex items-center gap-2">
                             <p className="text-xs font-bold text-slate-500">오늘 {detailRows.length}건</p>
@@ -1904,7 +1852,7 @@ export default function NotificationSettingsPage() {
                               <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div>
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-sm font-black text-slate-900">{row.parentName}</p>
+                        <p className="text-sm font-black text-slate-900">{row.parentName}</p>
                                     <Badge className={cn('border-none font-black', row.statusTone)}>{row.statusLabel}</Badge>
                                   </div>
                                   <p className="mt-1 text-[11px] font-bold text-slate-500">{row.phoneNumber ? maskPhone(row.phoneNumber) : '번호 미등록'}</p>
@@ -1913,7 +1861,7 @@ export default function NotificationSettingsPage() {
                               </div>
                               <p className="mt-3 rounded-lg bg-white px-3 py-3 text-sm font-bold leading-6 text-slate-800">{row.message}</p>
                               {row.statusLabel === '알리고 접수' ? (
-                                <p className="mt-2 text-[11px] font-bold text-slate-500">알리고 접수 기준입니다. 실제 수신은 통신사와 단말 정책에 따라 달라질 수 있습니다.</p>
+                                <p className="mt-2 text-[11px] font-bold text-slate-500">알리고 접수 기준입니다. 실제 수신은 통신사/단말 정책에 따라 달라질 수 있습니다.</p>
                               ) : null}
                               {row.errorMessage ? <p className="mt-2 text-xs font-bold text-rose-600">{row.errorMessage}</p> : null}
                               {row.type === 'queue' && row.queueId ? (
@@ -1940,8 +1888,8 @@ export default function NotificationSettingsPage() {
               </div>
             </>
           ) : null}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
@@ -2108,7 +2056,7 @@ export default function NotificationSettingsPage() {
                 <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue placeholder="상태 필터" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체 상태</SelectItem>
-                  <SelectItem value="sent">알리고 접수</SelectItem>
+                  <SelectItem value="sent">발송완료</SelectItem>
                   <SelectItem value="failed">실패</SelectItem>
                   <SelectItem value="suppressed_opt_out">수신거부</SelectItem>
                 </SelectContent>

@@ -2320,6 +2320,44 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </>
           )}
 
+          <Card className="rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] shadow-lg">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-black tracking-tight text-[#14295F]">
+                <ClipboardList className="h-4 w-4 text-[#2554d4]" />
+                관리 증빙 요약
+              </CardTitle>
+              <CardDescription className="font-bold text-[11px] text-[#5c6e97]">
+                보호자 상담 시 바로 보여줄 수 있도록, 최근 30일 관리 흐름을 한 문장과 핵심 수치로 먼저 정리했습니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">학습 관리</p>
+                  <p className="mt-2 text-lg font-black text-[#14295F]">{minutesToLabel(todayStudyMinutes)}</p>
+                  <p className="mt-1 text-xs font-bold text-[#5c6e97]">최근 7일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}%</p>
+                </div>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">출결 관리</p>
+                  <p className="mt-2 text-lg font-black text-[#14295F]">{attendanceRate30d}%</p>
+                  <p className="mt-1 text-xs font-bold text-[#5c6e97]">
+                    최근 30일 출석률 · 벌점 {Math.max(0, Math.round(Number(progress?.penaltyPoints || 0)))}점 · 외출 {awayTimeData.filter((item) => item.awayMinutes > 0).length}회
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">소통 관리</p>
+                  <p className="mt-2 text-lg font-black text-[#14295F]">{counselingCount30d + reportSentCount30d + smsAcceptedCount30d}회</p>
+                  <p className="mt-1 text-xs font-bold text-[#5c6e97]">상담 {counselingCount30d} · 리포트 {reportSentCount30d} · 문자 {smsAcceptedCount30d}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-[#dbe7ff] bg-[#eef4ff] px-4 py-3">
+                <p className="text-sm font-black leading-6 text-[#14295F]">
+                  최근 30일 동안 학습, 출결, 상담/문자/리포트 기록을 함께 관리하고 있으며, 보호자 반응은 앱 방문 {parentVisitCount30d}회 · 리포트 열람 {reportReadCount30d}회로 추적 중입니다.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           <StudentOperationsGraphBoard
             timeline={operationsTimeline}
             isAdmin={isAdmin}
