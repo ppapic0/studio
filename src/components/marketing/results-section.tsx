@@ -19,7 +19,7 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
   const universities = outcomes.filter((o) => o.label !== '성장 사례');
 
   return (
-    <section id="results" className="scroll-mt-20 py-10 sm:py-16" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%)' }}>
+    <section id="results" className="hidden scroll-mt-20 py-10 sm:block sm:py-16" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%)' }}>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge">2026 RESULT</span>

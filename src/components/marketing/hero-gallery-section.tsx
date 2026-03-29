@@ -53,7 +53,7 @@ const toneMap = {
 export function HeroGallerySection() {
   return (
     <section
-      className="py-14 sm:py-18"
+      className="hidden py-14 sm:block sm:py-18"
       style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%)' }}
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
