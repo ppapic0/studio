@@ -852,7 +852,7 @@ export default function StudyHistoryPage() {
                 {isParent ? '자녀가 매일 1시간씩 꾸준히 쌓을수록 포인트 상자와 월간 공부 랭킹이 안정적으로 올라갑니다.' : '누적 공부시간이 1시간을 넘을 때마다 포인트 상자가 열리고, 월간 공부시간 랭킹도 함께 집계됩니다.'}
               </p>
             </div>
-            {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg shadow-primary/20 transition-all active:scale-[0.95]"><Link href="/dashboard/growth">성장트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
+          {!isParent && <Button asChild className="rounded-2xl font-black text-xs h-12 shadow-lg shadow-primary/20 transition-all active:scale-[0.95]"><Link href="/dashboard/growth">포인트트랙 바로가기 <ChevronRight className="ml-2 h-4 w-4" /></Link></Button>}
           </Card>
         )}
       </div>

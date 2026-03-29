@@ -2096,9 +2096,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const rewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone, stats));
     const awardedPoints = rewards.reduce((sum, reward) => sum + reward.awardedPoints, 0);
     const nextClaimedStudyBoxes = [...claimedStudyBoxes, ...availableMilestones];
+    const existingStudyBoxRewards = Array.isArray(dayStatus.studyBoxRewards) ? dayStatus.studyBoxRewards : [];
     const nextDayStatus = {
       ...dayStatus,
       claimedStudyBoxes: nextClaimedStudyBoxes,
+      studyBoxRewards: [...existingStudyBoxRewards, ...rewards],
       dailyPointAmount: Number(dayStatus.dailyPointAmount || 0) + awardedPoints,
     };
 
@@ -2113,7 +2115,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setOpenedStudyBoxes([]);
       setOpeningStudyBox(null);
       setClaimedStudyBoxRewards(rewards);
-      setIsStudyBoxDialogOpen(true);
+      toast({
+        title: `포인트 상자 ${rewards.length}개 도착`,
+        description: '포인트트랙에서 상자를 하나씩 열어보세요.',
+      });
     }).catch((error: any) => {
       studyBoxClaimKeyRef.current = null;
       console.warn('[student-track] study box claim skipped', error?.message || error);
@@ -2315,7 +2320,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 ring-1 ring-amber-100">
                       <Trophy className="h-3.5 w-3.5" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">시즌 구간</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">월간 랭킹</span>
                   </div>
                   <ChevronRight className="h-4 w-4 text-slate-300" />
                 </div>

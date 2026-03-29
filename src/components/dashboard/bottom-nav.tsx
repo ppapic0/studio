@@ -15,7 +15,7 @@ import {
   MessageCircle,
   Monitor,
   MonitorSmartphone,
-  Zap,
+  Wallet,
 } from 'lucide-react';
 
 import { useAppContext } from '@/contexts/app-context';
@@ -74,7 +74,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
   const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
     student: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-      { href: '/dashboard/growth', label: '성장', icon: Zap },
+      { href: '/dashboard/growth', label: '포인트', icon: Wallet },
       { href: '/dashboard/study-history', label: '기록', icon: CalendarDays },
       { href: '/dashboard/plan', label: '계획', icon: CalendarDays },
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },

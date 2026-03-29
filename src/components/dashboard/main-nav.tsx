@@ -17,7 +17,7 @@ import {
   MonitorSmartphone,
   Settings,
   Trophy,
-  Zap,
+  Wallet,
 } from 'lucide-react';
 import { usePathname, useSearchParams } from 'next/navigation';
 
@@ -79,7 +79,7 @@ const adminNavGroups: NavGroup[] = [
 const navItems: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
   student: [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-    { href: '/dashboard/growth', label: '성장트랙', icon: Zap },
+    { href: '/dashboard/growth', label: '포인트트랙', icon: Wallet },
     { href: '/dashboard/analysis', label: '분석트랙', icon: FileText },
     { href: '/dashboard/study-history', label: '기록트랙', icon: CalendarDays },
     { href: '/dashboard/plan', label: '계획트랙', icon: ClipboardCheck },
