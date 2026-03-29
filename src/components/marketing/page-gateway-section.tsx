@@ -11,8 +11,7 @@ const pageDestinations = [
     href: '/results',
     meta: '실제 성적표 포함',
     icon: Trophy,
-    cardClass:
-      'border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)]',
+    cardClass: 'border-[#D8E5FF] bg-white',
     iconClass: 'bg-[#14295F] text-white',
   },
   {
@@ -21,8 +20,7 @@ const pageDestinations = [
     href: '/center',
     meta: '보안 운영 · 센터 사진',
     icon: ShieldCheck,
-    cardClass:
-      'border-[#FF7A16]/14 bg-[linear-gradient(180deg,#FFF9F2_0%,#FFFFFF_100%)]',
+    cardClass: 'border-[#FFD9BF] bg-white',
     iconClass: 'bg-[#FFF1E4] text-[#FF7A16]',
   },
   {
@@ -31,8 +29,7 @@ const pageDestinations = [
     href: '/experience',
     meta: '학생 · 학부모 · 데이터',
     icon: BarChart3,
-    cardClass:
-      'border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F6F9FF_100%)]',
+    cardClass: 'border-[#D8E5FF] bg-white',
     iconClass: 'bg-[#EEF3FF] text-[#14295F]',
   },
   {
@@ -41,8 +38,7 @@ const pageDestinations = [
     href: '/class',
     meta: '원장 직강 · 실전 모의',
     icon: GraduationCap,
-    cardClass:
-      'border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)]',
+    cardClass: 'border-[#D8E5FF] bg-white',
     iconClass: 'bg-[#14295F] text-white',
   },
 ] as const;
@@ -72,10 +68,8 @@ export function PageGatewaySection() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`brand-sheen-panel group relative overflow-hidden rounded-[1.9rem] border px-5 py-5 shadow-[0_18px_40px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_52px_rgba(20,41,95,0.12)] sm:px-6 sm:py-6 ${item.cardClass}`}
+                className={`group relative rounded-[1.9rem] border px-5 py-5 shadow-[0_12px_28px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_18px_34px_rgba(20,41,95,0.10)] sm:px-6 sm:py-6 ${item.cardClass}`}
               >
-                <div className="brand-glow-drift absolute -right-8 top-3 h-28 w-28 rounded-full bg-[#FFB878]/12 blur-3xl" />
-                <div className="absolute inset-x-5 bottom-5 h-px bg-[linear-gradient(90deg,rgba(20,41,95,0.14),rgba(20,41,95,0))] sm:inset-x-6 sm:bottom-6" />
                 <div className="relative flex min-h-[208px] flex-col justify-between">
                   <div className="space-y-6">
                     <div className="flex items-start justify-between gap-3">
@@ -101,7 +95,7 @@ export function PageGatewaySection() {
                       <p className="text-sm font-bold leading-[1.55] text-[#14295F]/82">
                         {item.meta}
                       </p>
-                      <div className="h-px w-14 bg-[#FF7A16]/24" />
+                      <div className="h-px w-14 bg-[#14295F]/10" />
                     </div>
                   </div>
 
