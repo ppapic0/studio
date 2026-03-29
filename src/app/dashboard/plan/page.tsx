@@ -117,11 +117,10 @@ import {
 } from '@/components/dashboard/student-planner/planner-constants';
 import { AttendanceScheduleSheet } from '@/components/dashboard/student-planner/attendance-schedule-sheet';
 import { RoutineComposerCard } from '@/components/dashboard/student-planner/routine-composer-card';
-import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
-import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
 import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
 import { RecentStudySheet } from '@/components/dashboard/student-planner/recent-study-sheet';
 import { RepeatCopySheet } from '@/components/dashboard/student-planner/repeat-copy-sheet';
+import { StudyPlanSheet } from '@/components/dashboard/student-planner/study-plan-sheet';
 import { calculatePlanCompletionLp } from '@/lib/student-rewards';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
@@ -458,6 +457,7 @@ export default function StudyPlanPage() {
   const [isRecentStudyLoading, setIsRecentStudyLoading] = useState(false);
   const [activeRecentStudyKey, setActiveRecentStudyKey] = useState<string | null>(null);
   const [isAttendanceSheetOpen, setIsAttendanceSheetOpen] = useState(false);
+  const [isStudyPlanSheetOpen, setIsStudyPlanSheetOpen] = useState(false);
 
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
@@ -853,10 +853,6 @@ export default function StudyPlanPage() {
       badgeClassName: 'border-sky-100 bg-sky-50 text-sky-700',
     }))
   ), [copyableRoutineItems]);
-  const visibleRecentStudyOptions = useMemo(
-    () => recentStudyOptions.slice(0, isMobile ? 3 : 5),
-    [isMobile, recentStudyOptions]
-  );
   const activeRecentStudyOption = useMemo(
     () => recentStudyOptions.find((item) => item.key === activeRecentStudyKey) || null,
     [activeRecentStudyKey, recentStudyOptions]
@@ -1932,7 +1928,7 @@ export default function StudyPlanPage() {
                     <div>
                       <h3 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-base" : "text-xl")}>학습 계획</h3>
                       <p className={cn("break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
-                        전에 쓰던 계획을 불러와서 조금만 바꾸거나, 새 목표를 바로 짧게 적어둘 수 있어요.
+                        추가와 수정은 팝업에서 한 번에 하고, 여기서는 오늘 목표 흐름만 빠르게 확인해요.
                       </p>
                     </div>
                   </div>
@@ -1942,81 +1938,53 @@ export default function StudyPlanPage() {
                     완료 {completedStudyCount}/{studyTasks.length}
                   </Badge>
                   <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
-                    {studyGoalSummaryLabel}
+                    남은 {remainingStudyTasks.length}개
                   </Badge>
                 </div>
               </div>
 
-              {!isPast ? (
-                <StudyComposerCard
-                  title="학습 계획 추가"
-                  description="최근 계획을 먼저 불러오거나, 시간형과 분량형 중 편한 방식으로 바로 적어보세요."
-                  subjectOptions={SUBJECTS}
-                  subjectValue={newStudySubject}
-                  onSubjectChange={setNewStudySubject}
-                  studyModeValue={newStudyMode}
-                  onStudyModeChange={setNewStudyMode}
-                  minuteValue={newStudyMinutes}
-                  onMinuteChange={setNewStudyMinutes}
-                  amountValue={newStudyTargetAmount}
-                  onAmountChange={setNewStudyTargetAmount}
-                  amountUnitValue={newStudyAmountUnit}
-                  onAmountUnitChange={setNewStudyAmountUnit}
-                  customAmountUnitValue={newStudyCustomAmountUnit}
-                  onCustomAmountUnitChange={setNewStudyCustomAmountUnit}
-                  enableVolumeMinutes={enableVolumeStudyMinutes}
-                  onEnableVolumeMinutesChange={setEnableVolumeStudyMinutes}
-                  taskValue={newStudyTask}
-                  onTaskChange={setNewStudyTask}
-                  onSubmit={() => handleAddTask(newStudyTask, 'study')}
-                  isSubmitting={isSubmitting}
-                  isMobile={isMobile}
-                  isRecentLoading={isRecentStudyLoading}
-                  recentOptions={visibleRecentStudyOptions}
-                  onPrefillRecent={handlePrefillRecentStudy}
-                  onOpenRecentSheet={() => setIsRecentStudySheetOpen(true)}
-                  activeRecentTitle={activeRecentStudyOption?.title || null}
-                  onResetRecentPrefill={resetStudyComposerPrefill}
-                />
-              ) : null}
-
-              {studyTasks.length === 0 ? (
-                <div className="rounded-[1.5rem] border border-dashed border-emerald-200 bg-white/80 p-6 text-center">
-                  <p className="text-sm font-black text-emerald-700">첫 학습 계획을 추가해보세요</p>
+              <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]')}>
+                <div className="rounded-[1.35rem] border border-emerald-100 bg-white/88 p-4 shadow-[0_18px_40px_-36px_rgba(16,185,129,0.16)]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">오늘 목표</p>
+                  <p className="mt-2 break-keep text-lg font-black tracking-tight text-slate-900">{studyGoalSummaryLabel}</p>
                   <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
-                    시간을 먼저 정하지 않아도 괜찮아요. 오늘 끝낼 분량부터 적어도 바로 시작할 수 있어요.
+                    {studyTasks.length === 0
+                      ? '아직 학습 계획이 없어요. 팝업에서 최근 계획을 불러오거나 새 목표를 바로 적어보세요.'
+                      : remainingStudyTasks.length === 0
+                        ? '오늘 계획을 모두 마쳤어요. 필요하면 팝업에서 다음 목표를 바로 추가할 수 있어요.'
+                        : `남은 계획 ${remainingStudyTasks.length}개를 팝업에서 한 번에 정리하고 바로 체크할 수 있어요.`}
                   </p>
                 </div>
-              ) : (
-                <div className="grid gap-3">
-                  {studyTasks.map((task) => {
-                    const subject = SUBJECTS.find((item) => item.id === (task.subject || 'etc'));
-                    const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
-                    const unitLabel = resolveAmountUnitLabel(task);
-                    return (
-                      <PlanItemCard
-                        key={task.id}
-                        id={task.id}
-                        title={task.title}
-                        checked={task.done}
-                        onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
-                        onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
-                        disabled={isPast}
-                        isMobile={isMobile}
-                        tone="emerald"
-                        badgeLabel={`${subject?.label || '기타'} · ${isVolumeTask ? '분량형' : '시간형'}`}
-                        metaLabel={buildStudyTaskMeta(task)}
-                        volumeMeta={isVolumeTask ? {
-                          targetAmount: Math.max(0, task.targetAmount || 0),
-                          actualAmount: Math.max(0, task.actualAmount || 0),
-                          unitLabel,
-                          onCommitActual: (value) => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, value),
-                        } : null}
-                      />
-                    );
-                  })}
+                <div className="rounded-[1.35rem] border border-emerald-100 bg-white/88 p-4 shadow-[0_18px_40px_-36px_rgba(16,185,129,0.16)]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">빠른 미리보기</p>
+                  {studyTasks.length === 0 ? (
+                    <p className="mt-3 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                      최근 계획 불러오기와 분량형/시간형 입력은 팝업에서 한 번에 관리해요.
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {studyTasks.slice(0, isMobile ? 2 : 3).map((task) => (
+                        <div key={task.id} className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-2">
+                          <p className="line-clamp-1 break-keep text-[11px] font-black text-slate-900">{task.title}</p>
+                          <p className="mt-1 text-[10px] font-semibold text-slate-500">{buildStudyTaskMeta(task)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => setIsStudyPlanSheetOpen(true)}
+                className={cn(
+                  "rounded-2xl font-black text-white shadow-xl",
+                  isMobile ? "h-11 w-full text-sm" : "h-12 px-6 text-sm",
+                  "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+                )}
+              >
+                학습 계획 수정
+              </Button>
             </div>
           </section>
           {!isPast ? (
@@ -2051,6 +2019,47 @@ export default function StudyPlanPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      <StudyPlanSheet
+        open={isStudyPlanSheetOpen}
+        onOpenChange={setIsStudyPlanSheetOpen}
+        isMobile={isMobile}
+        isSubmitting={isSubmitting}
+        isPast={isPast}
+        selectedDateLabel={selectedDateLabel}
+        totalCount={studyTasks.length}
+        completedCount={completedStudyCount}
+        remainingCount={remainingStudyTasks.length}
+        goalSummaryLabel={studyGoalSummaryLabel}
+        subjectOptions={SUBJECTS}
+        subjectValue={newStudySubject}
+        onSubjectChange={setNewStudySubject}
+        minuteValue={newStudyMinutes}
+        onMinuteChange={setNewStudyMinutes}
+        taskValue={newStudyTask}
+        onTaskChange={setNewStudyTask}
+        studyModeValue={newStudyMode}
+        onStudyModeChange={setNewStudyMode}
+        amountValue={newStudyTargetAmount}
+        onAmountChange={setNewStudyTargetAmount}
+        amountUnitValue={newStudyAmountUnit}
+        onAmountUnitChange={setNewStudyAmountUnit}
+        customAmountUnitValue={newStudyCustomAmountUnit}
+        onCustomAmountUnitChange={setNewStudyCustomAmountUnit}
+        enableVolumeMinutes={enableVolumeStudyMinutes}
+        onEnableVolumeMinutesChange={setEnableVolumeStudyMinutes}
+        onSubmit={() => handleAddTask(newStudyTask, 'study')}
+        isRecentLoading={isRecentStudyLoading}
+        recentOptions={recentStudyOptions}
+        onPrefillRecent={handlePrefillRecentStudy}
+        onOpenRecentSheet={() => setIsRecentStudySheetOpen(true)}
+        activeRecentTitle={activeRecentStudyOption?.title || null}
+        onResetRecentPrefill={resetStudyComposerPrefill}
+        studyTasks={studyTasks as Array<WithId<StudyPlanItem>>}
+        onToggleTask={(task) => handleToggleTask(task)}
+        onDeleteTask={(task) => handleDeleteTask(task)}
+        onCommitActual={(task, value) => handleCommitStudyActualAmount(task, value)}
+      />
 
       <RecentStudySheet
         open={isRecentStudySheetOpen}
