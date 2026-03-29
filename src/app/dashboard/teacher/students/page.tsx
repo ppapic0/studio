@@ -3,15 +3,17 @@
 
 import Link from 'next/link';
 import { useState, useMemo, useEffect } from 'react';
+import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useCollection, useFirestore, useFunctions } from '@/firebase';
+import { Textarea } from '@/components/ui/textarea';
+import { useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { addDoc, collection, doc, increment, serverTimestamp, Timestamp, writeBatch, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { 
   UserPlus, 
@@ -30,6 +32,8 @@ import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types
 import { cn } from '@/lib/utils';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
+import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
+import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
 import {
   Dialog,
   DialogContent,
@@ -125,6 +129,7 @@ const RiskIntelligencePanel = dynamic(
 
 export default function StudentListPage() {
   const { activeMembership, membershipsLoading, viewMode } = useAppContext();
+  const { user: currentUser } = useUser();
   const firestore = useFirestore();
   const functions = useFunctions();
   const searchParams = useSearchParams();
@@ -135,6 +140,14 @@ export default function StudentListPage() {
   const [classFilter, setClassFilter] = useState<string>('all');
   const [liveStatusFilter, setLiveStatusFilter] = useState<string>('all');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [activeQuickAction, setActiveQuickAction] = useState<'attendance' | 'counseling' | 'sms'>('attendance');
+  const [attendanceActionSaving, setAttendanceActionSaving] = useState(false);
+  const [counselingActionSaving, setCounselingActionSaving] = useState(false);
+  const [manualSmsSending, setManualSmsSending] = useState(false);
+  const [counselingType, setCounselingType] = useState<'academic' | 'life' | 'career'>('academic');
+  const [counselingContent, setCounselingContent] = useState('');
+  const [counselingImprovement, setCounselingImprovement] = useState('');
+  const [manualSmsMessage, setManualSmsMessage] = useState('');
   
   const isMobile = viewMode === 'mobile';
 
@@ -250,6 +263,7 @@ export default function StudentListPage() {
     const profile = studentsProfiles?.find((item) => item.id === selectedStudentId);
     const attendance = attendanceList?.find((item) => item.studentId === selectedStudentId);
     const seatLabel = formatSeatLabel(profile);
+    const seatIdentity = resolveSeatIdentity(profile || {});
     const attendanceLabel =
       attendance?.status === 'studying'
         ? '공부중'
@@ -269,11 +283,22 @@ export default function StudentListPage() {
       member,
       profile,
       attendance,
+      seatIdentity,
+      seatDocId: attendance?.id || profile?.seatId || null,
       seatLabel,
       attendanceLabel,
       attendanceTone,
     };
   }, [selectedStudentId, studentMembers, studentsProfiles, attendanceList]);
+
+  useEffect(() => {
+    if (!selectedStudentPreview) return;
+    setActiveQuickAction('attendance');
+    setCounselingType('academic');
+    setCounselingContent('');
+    setCounselingImprovement('');
+    setManualSmsMessage('');
+  }, [selectedStudentPreview?.member.id]);
 
   const counts = useMemo(() => {
     if (!studentMembers) return { active: 0, onHold: 0, withdrawn: 0 };
@@ -369,6 +394,300 @@ export default function StudentListPage() {
   const handleOpenStudent360 = (studentId: string) => {
     if (!studentId) return;
     router.push(`/dashboard/teacher/students/${encodeURIComponent(studentId)}`);
+  };
+
+  const handleInlineAttendanceAction = async (nextStatus: AttendanceCurrent['status']) => {
+    if (!firestore || !functions || !centerId || !selectedStudentPreview) return;
+
+    const studentId = selectedStudentPreview.member.id;
+    const studentName = selectedStudentPreview.member.displayName || '학생';
+    const prevStatus = selectedStudentPreview.attendance?.status || 'absent';
+    const seatDocId = selectedStudentPreview.seatDocId;
+    const seatIdentity = selectedStudentPreview.seatIdentity;
+
+    if (!seatDocId || (!seatIdentity.roomSeatNo && !seatIdentity.seatNo)) {
+      toast({
+        variant: 'destructive',
+        title: '출결 처리 불가',
+        description: '좌석이 배정된 학생만 여기서 바로 출결을 처리할 수 있습니다.',
+      });
+      return;
+    }
+
+    if (prevStatus === nextStatus) {
+      toast({
+        title: '이미 반영된 상태입니다.',
+        description: `${studentName} 학생은 이미 ${nextStatus === 'studying' ? '공부중' : nextStatus === 'away' ? '외출' : '미입실'} 상태입니다.`,
+      });
+      return;
+    }
+
+    setAttendanceActionSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      const nowDate = new Date();
+      const todayDateKey = format(nowDate, 'yyyy-MM-dd');
+      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seatDocId);
+
+      if (prevStatus === 'studying' && nextStatus !== 'studying' && selectedStudentPreview.attendance?.lastCheckInAt) {
+        const nowMs = nowDate.getTime();
+        const startTime = selectedStudentPreview.attendance.lastCheckInAt.toMillis();
+        const sessionDateKey = format(selectedStudentPreview.attendance.lastCheckInAt.toDate(), 'yyyy-MM-dd');
+        const sessionSeconds = Math.max(0, Math.floor((nowMs - startTime) / 1000));
+        const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
+
+        if (sessionSeconds > 0) {
+          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
+          batch.set(
+            logRef,
+            {
+              totalMinutes: increment(sessionMinutes),
+              studentId,
+              centerId,
+              dateKey: sessionDateKey,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+
+          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
+          batch.set(sessionRef, {
+            startTime: selectedStudentPreview.attendance.lastCheckInAt,
+            endTime: Timestamp.fromMillis(nowMs),
+            durationMinutes: sessionMinutes,
+            createdAt: serverTimestamp(),
+          });
+
+          const dailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', studentId);
+          batch.set(
+            dailyStatRef,
+            {
+              totalStudyMinutes: increment(sessionMinutes),
+              studentId,
+              centerId,
+              dateKey: sessionDateKey,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+      }
+
+      const seatPayload: Record<string, unknown> = {
+        studentId,
+        seatNo: seatIdentity.seatNo || 0,
+        roomId: seatIdentity.roomId || null,
+        roomSeatNo: seatIdentity.roomSeatNo || undefined,
+        type: selectedStudentPreview.attendance?.type || 'seat',
+        seatZone: selectedStudentPreview.attendance?.seatZone || null,
+        status: nextStatus,
+        updatedAt: serverTimestamp(),
+        ...(nextStatus === 'studying' ? { lastCheckInAt: serverTimestamp() } : {}),
+      };
+      batch.set(seatRef, seatPayload, { merge: true });
+
+      appendAttendanceEventToBatch(batch, firestore, centerId, {
+        studentId,
+        dateKey: todayDateKey,
+        eventType: 'status_override',
+        occurredAt: nowDate,
+        source: 'student_index',
+        seatId: seatDocId,
+        statusBefore: prevStatus,
+        statusAfter: nextStatus,
+      });
+
+      let smsEventType: 'study_start' | 'away_start' | 'away_end' | 'study_end' | null = null;
+      if (prevStatus === 'absent' && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'check_in',
+          occurredAt: nowDate,
+          source: 'student_index',
+          seatId: seatDocId,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          checkInAt: nowDate,
+          source: 'student_index',
+        });
+        smsEventType = 'study_start';
+      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'away_end',
+          occurredAt: nowDate,
+          source: 'student_index',
+          seatId: seatDocId,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'student_index',
+        });
+        smsEventType = 'away_end';
+      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'away_start',
+          occurredAt: nowDate,
+          source: 'student_index',
+          seatId: seatDocId,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'student_index',
+        });
+        smsEventType = 'away_start';
+      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'check_out',
+          occurredAt: nowDate,
+          source: 'student_index',
+          seatId: seatDocId,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          checkOutAt: nowDate,
+          hasCheckOutRecord: true,
+          source: 'student_index',
+        });
+        smsEventType = 'study_end';
+      } else {
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'student_index',
+        });
+      }
+
+      await batch.commit();
+
+      const autoCheckInAt =
+        nextStatus === 'studying'
+          ? nowDate
+          : selectedStudentPreview.attendance?.lastCheckInAt?.toDate?.() || null;
+      void syncAutoAttendanceRecord({
+        firestore,
+        centerId,
+        studentId,
+        studentName,
+        targetDate: nowDate,
+        checkInAt: autoCheckInAt,
+        confirmedByUserId: currentUser?.uid,
+      }).catch((syncError: any) => {
+        console.warn('[student-index] auto attendance sync skipped', syncError?.message || syncError);
+      });
+
+      if (smsEventType) {
+        const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
+        await notifyAttendanceSms({ centerId, studentId, eventType: smsEventType });
+      }
+
+      toast({
+        title: '출결 처리를 저장했습니다.',
+        description: `${studentName} 학생 상태를 ${nextStatus === 'studying' ? '공부중' : nextStatus === 'away' ? '외출' : '미입실'}으로 반영했습니다.`,
+      });
+    } catch (error) {
+      console.error('[student-index] inline attendance update failed', error);
+      toast({
+        variant: 'destructive',
+        title: '출결 처리 실패',
+        description: '학생 상태를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      });
+    } finally {
+      setAttendanceActionSaving(false);
+    }
+  };
+
+  const handleInlineCounselingSave = async () => {
+    if (!firestore || !centerId || !selectedStudentPreview || !currentUser) return;
+    if (!counselingContent.trim()) {
+      toast({
+        variant: 'destructive',
+        title: '상담 내용이 비어 있습니다.',
+        description: '핵심 상담 내용을 먼저 적어 주세요.',
+      });
+      return;
+    }
+
+    setCounselingActionSaving(true);
+    try {
+      await addDoc(collection(firestore, 'centers', centerId, 'counselingLogs'), {
+        studentId: selectedStudentPreview.member.id,
+        studentName: selectedStudentPreview.member.displayName || '학생',
+        teacherId: currentUser.uid,
+        teacherName: currentUser.displayName || activeMembership?.displayName || '담당 선생님',
+        type: counselingType,
+        content: counselingContent.trim(),
+        improvement: counselingImprovement.trim(),
+        readAt: null,
+        createdAt: serverTimestamp(),
+      });
+      setCounselingContent('');
+      setCounselingImprovement('');
+      toast({
+        title: '상담 기록을 저장했습니다.',
+        description: `${selectedStudentPreview.member.displayName} 학생 상담 일지가 추가되었습니다.`,
+      });
+    } catch (error) {
+      console.error('[student-index] inline counseling save failed', error);
+      toast({
+        variant: 'destructive',
+        title: '상담 저장 실패',
+        description: '상담 기록을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      });
+    } finally {
+      setCounselingActionSaving(false);
+    }
+  };
+
+  const handleInlineManualSms = async () => {
+    if (!functions || !centerId || !selectedStudentPreview) return;
+    const message = manualSmsMessage.trim();
+    if (!message) {
+      toast({
+        variant: 'destructive',
+        title: '문자 내용이 비어 있습니다.',
+        description: '보낼 문구를 먼저 입력해 주세요.',
+      });
+      return;
+    }
+
+    setManualSmsSending(true);
+    try {
+      const sendManualStudentSms = httpsCallable(functions, 'sendManualStudentSms');
+      await sendManualStudentSms({
+        centerId,
+        studentId: selectedStudentPreview.member.id,
+        message,
+      });
+      setManualSmsMessage('');
+      toast({
+        title: '문자 발송을 요청했습니다.',
+        description: `${selectedStudentPreview.member.displayName} 학생 수신 대상에게 문자 발송을 접수했습니다.`,
+      });
+    } catch (error) {
+      console.error('[student-index] inline sms send failed', error);
+      toast({
+        variant: 'destructive',
+        title: '문자 발송 실패',
+        description: '수신 대상이나 발송 상태를 다시 확인해 주세요.',
+      });
+    } finally {
+      setManualSmsSending(false);
+    }
   };
 
   const getStatusBadge = (status?: string) => {
@@ -631,7 +950,11 @@ export default function StudentListPage() {
       </Tabs>
 
       <Sheet open={!!selectedStudentPreview} onOpenChange={(open) => !open && setSelectedStudentId(null)}>
-        <SheetContent side="right" className="w-[96vw] max-w-2xl overflow-y-auto border-none bg-[#f8fbff] px-0 py-0 sm:max-w-2xl">
+        <SheetContent
+          side="right"
+          motionPreset="dashboard-premium"
+          className="w-[96vw] max-w-2xl overflow-y-auto border-none bg-[#f8fbff] px-0 py-0 sm:max-w-2xl"
+        >
           {selectedStudentPreview ? (
             <>
               <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white">
@@ -682,22 +1005,226 @@ export default function StudentListPage() {
                   </div>
                 </div>
 
-                <div className="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="analysis-card rounded-[1.9rem] border-none p-5">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">바로 할 일</p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <Button asChild className="h-11 rounded-xl font-black">
                       <Link href={`/dashboard/teacher/students/${selectedStudentPreview.member.id}`}>학생 360 열기</Link>
                     </Button>
-                    <Button asChild variant="outline" className="h-11 rounded-xl font-black">
-                      <Link href="/dashboard/attendance">출결 처리</Link>
+                    <Button
+                      type="button"
+                      variant={activeQuickAction === 'attendance' ? 'default' : 'outline'}
+                      className={cn(
+                        'h-11 rounded-xl font-black transition-all',
+                        activeQuickAction !== 'attendance' && 'analysis-action-button border-none'
+                      )}
+                      onClick={() => setActiveQuickAction('attendance')}
+                    >
+                      출결 처리
                     </Button>
-                    <Button asChild variant="outline" className="h-11 rounded-xl font-black">
-                      <Link href="/dashboard/leads">상담 기록</Link>
+                    <Button
+                      type="button"
+                      variant={activeQuickAction === 'counseling' ? 'default' : 'outline'}
+                      className={cn(
+                        'h-11 rounded-xl font-black transition-all',
+                        activeQuickAction !== 'counseling' && 'analysis-action-button border-none'
+                      )}
+                      onClick={() => setActiveQuickAction('counseling')}
+                    >
+                      상담 기록
                     </Button>
-                    <Button asChild variant="outline" className="h-11 rounded-xl font-black">
-                      <Link href="/dashboard/settings/notifications">문자 보내기</Link>
+                    <Button
+                      type="button"
+                      variant={activeQuickAction === 'sms' ? 'default' : 'outline'}
+                      className={cn(
+                        'h-11 rounded-xl font-black transition-all',
+                        activeQuickAction !== 'sms' && 'analysis-action-button border-none'
+                      )}
+                      onClick={() => setActiveQuickAction('sms')}
+                    >
+                      문자 보내기
                     </Button>
                   </div>
+
+                  <div className={cn('mt-5 grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)]')}>
+                    <div className="analysis-card rounded-[1.55rem] border-none p-4">
+                      {activeQuickAction === 'attendance' ? (
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">출결 처리</p>
+                            <p className="mt-1 text-sm font-bold text-[#5c6e97]">
+                              페이지 이동 없이 현재 상태를 바로 바꾸고, 필요한 경우 자동 문자도 함께 접수합니다.
+                            </p>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-3">
+                            <Button
+                              type="button"
+                              className="h-11 rounded-xl bg-emerald-600 font-black text-white hover:bg-emerald-700"
+                              disabled={attendanceActionSaving}
+                              onClick={() => handleInlineAttendanceAction('studying')}
+                            >
+                              {attendanceActionSaving && activeQuickAction === 'attendance' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                              공부중
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-11 rounded-xl border-amber-200 bg-amber-50 font-black text-amber-700 hover:bg-amber-100"
+                              disabled={attendanceActionSaving}
+                              onClick={() => handleInlineAttendanceAction('away')}
+                            >
+                              외출 처리
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-11 rounded-xl border-slate-200 bg-white font-black text-slate-700 hover:bg-slate-50"
+                              disabled={attendanceActionSaving}
+                              onClick={() => handleInlineAttendanceAction('absent')}
+                            >
+                              미입실 / 종료
+                            </Button>
+                          </div>
+                          <div className="rounded-[1.1rem] border border-dashed border-[#d6e2ff] bg-[#f7fbff] px-4 py-3">
+                            <p className="text-xs font-black text-[#14295F]">현재 상태</p>
+                            <p className="mt-1 text-sm font-bold text-[#5c6e97]">
+                              {selectedStudentPreview.attendanceLabel} · {selectedStudentPreview.seatLabel}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {activeQuickAction === 'counseling' ? (
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">상담 기록</p>
+                            <p className="mt-1 text-sm font-bold text-[#5c6e97]">
+                              지금 바로 핵심 상담 메모를 남기고 학생 360 상담 트랙과 같은 데이터로 이어집니다.
+                            </p>
+                          </div>
+                          <div className="grid gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-black text-[#14295F]">상담 유형</Label>
+                              <Select value={counselingType} onValueChange={(value: 'academic' | 'life' | 'career') => setCounselingType(value)}>
+                                <SelectTrigger className="h-11 rounded-xl border-[#d6e2ff] bg-white font-bold text-[#14295F]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="academic">학습 상담</SelectItem>
+                                  <SelectItem value="life">생활 상담</SelectItem>
+                                  <SelectItem value="career">진로 상담</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-black text-[#14295F]">상담 내용</Label>
+                              <Textarea
+                                value={counselingContent}
+                                onChange={(event) => setCounselingContent(event.target.value)}
+                                placeholder="오늘 확인한 핵심 이슈나 학생 반응을 적어 주세요."
+                                className="min-h-[108px]"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-black text-[#14295F]">다음 개선 포인트</Label>
+                              <Textarea
+                                value={counselingImprovement}
+                                onChange={(event) => setCounselingImprovement(event.target.value)}
+                                placeholder="다음 상담이나 수업에서 바로 이어갈 조치가 있으면 적어 주세요."
+                                className="min-h-[96px]"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              className="h-11 rounded-xl font-black"
+                              disabled={counselingActionSaving}
+                              onClick={handleInlineCounselingSave}
+                            >
+                              {counselingActionSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                              상담 일지 저장
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {activeQuickAction === 'sms' ? (
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">문자 보내기</p>
+                            <p className="mt-1 text-sm font-bold text-[#5c6e97]">
+                              보호자 번호가 있으면 보호자에게, 없으면 학생 본인 fallback 번호로 접수됩니다.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-black text-[#14295F]">직접 보낼 문구</Label>
+                            <Textarea
+                              value={manualSmsMessage}
+                              onChange={(event) => setManualSmsMessage(event.target.value)}
+                              placeholder={`${selectedStudentPreview.member.displayName} 학생 관련 안내 문구를 입력해 주세요.`}
+                              className="min-h-[136px]"
+                            />
+                            <p className="text-[11px] font-bold text-[#7b8db3]">
+                              학생 상세 문자 콘솔로 이동하지 않고 여기서 바로 문자 발송을 접수합니다.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            className="h-11 rounded-xl font-black"
+                            disabled={manualSmsSending}
+                            onClick={handleInlineManualSms}
+                          >
+                            {manualSmsSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            문자 발송 접수
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="analysis-summary-rail rounded-[1.55rem] border border-[#dbe6ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.98)_100%)] p-4 shadow-[0_22px_36px_-30px_rgba(20,41,95,0.32)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">운영 요약</p>
+                      <div className="mt-3 space-y-3">
+                        <div className="rounded-[1rem] bg-white/90 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]">
+                          <p className="text-[11px] font-black text-[#7b8db3]">학생</p>
+                          <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">
+                            {selectedStudentPreview.member.displayName}
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-[#5c6e97]">
+                            {selectedStudentPreview.profile?.schoolName || '학교 미등록'} · {selectedStudentPreview.profile?.grade || '학년 미등록'}
+                          </p>
+                        </div>
+                        <div className="rounded-[1rem] bg-white/90 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]">
+                          <p className="text-[11px] font-black text-[#7b8db3]">현재 상태</p>
+                          <p className="mt-1 text-sm font-black text-[#14295F]">
+                            {selectedStudentPreview.attendanceLabel}
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-[#5c6e97]">{selectedStudentPreview.seatLabel}</p>
+                        </div>
+                        <div className="rounded-[1rem] bg-[#14295F] px-3.5 py-3 text-white shadow-[0_16px_28px_-22px_rgba(20,41,95,0.75)]">
+                          <p className="text-[11px] font-black text-white/60">바로 처리 포인트</p>
+                          <ul className="mt-2 space-y-2 text-xs font-bold text-white/90">
+                            {activeQuickAction === 'attendance' ? (
+                              <>
+                                <li>현재 상태를 바꾸면 출결 기록과 자동 문자가 함께 이어집니다.</li>
+                                <li>공부중에서 종료로 바꾸면 오늘 세션 시간도 함께 정리됩니다.</li>
+                              </>
+                            ) : null}
+                            {activeQuickAction === 'counseling' ? (
+                              <>
+                                <li>짧게라도 남겨두면 학생 360 상담 기록에 즉시 연결됩니다.</li>
+                                <li>개선 포인트를 적어두면 다음 상담 액션이 더 분명해집니다.</li>
+                              </>
+                            ) : null}
+                            {activeQuickAction === 'sms' ? (
+                              <>
+                                <li>직접 문자를 보내도 수신 우선순위는 보호자 → 학생 fallback으로 유지됩니다.</li>
+                                <li>실제 수신은 통신사와 단말 정책에 따라 다를 수 있습니다.</li>
+                              </>
+                            ) : null}
+                          </ul>
+                        </div>
+                        </div>
+                      </div>
+                    </div>
                 </div>
               </div>
             </>
