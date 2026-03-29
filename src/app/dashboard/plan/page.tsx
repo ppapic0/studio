@@ -531,7 +531,7 @@ export default function StudyPlanPage() {
         weekdayLabel: format(day, 'EEE', { locale: ko }),
         dateLabel: format(day, 'd'),
         isToday: isSameDay(day, new Date()),
-        isSelected: isSameDay(day, selectedDate),
+        isSelected: selectedDate ? isSameDay(day, selectedDate) : false,
         date: day,
       })),
     [weekDays, selectedDate]
@@ -813,10 +813,6 @@ export default function StudyPlanPage() {
     () => studyTasks.filter((task) => !task.done),
     [studyTasks]
   );
-  const remainingPersonalTasks = useMemo(
-    () => personalTasks.filter((task) => !task.done),
-    [personalTasks]
-  );
   const planRewardMultiplier = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
     return 1
@@ -831,10 +827,6 @@ export default function StudyPlanPage() {
   const completedStudyCount = useMemo(
     () => studyTasks.filter((task) => task.done).length,
     [studyTasks]
-  );
-  const completedPersonalCount = useMemo(
-    () => personalTasks.filter((task) => task.done).length,
-    [personalTasks]
   );
   const taskCopyOptions = useMemo(() => (
     copyableTaskItems.map((item) => {
@@ -1811,6 +1803,12 @@ export default function StudyPlanPage() {
             onApplyPresetToToday={handleApplyAttendancePresetToToday}
             onApplyPresetToWeekday={handleApplyAttendancePresetToWeekday}
             onDeletePreset={handleDeleteAttendancePreset}
+            personalTasks={personalTasks as Array<WithId<StudyPlanItem>>}
+            personalTaskDraft={newPersonalTask}
+            onPersonalTaskDraftChange={setNewPersonalTask}
+            onAddPersonalTask={() => handleAddTask(newPersonalTask, 'personal')}
+            onTogglePersonalTask={(task) => handleToggleTask(task)}
+            onDeletePersonalTask={(task) => handleDeleteTask(task)}
           />
         </>
       )}
@@ -2052,95 +2050,6 @@ export default function StudyPlanPage() {
               )}
             </div>
           </section>
-          <section className={cn("overflow-hidden rounded-[1.85rem] border border-amber-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,251,245,0.96)_100%)] shadow-[0_18px_44px_-34px_rgba(251,146,60,0.18)]", isMobile && "rounded-[1.45rem]")}>
-            <div className={cn("space-y-4", isMobile ? "p-4" : "p-6")}>
-              <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-2xl bg-amber-500/10 p-2.5 text-amber-600">
-                      <CalendarDays className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h3 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-base" : "text-xl")}>기타 일정</h3>
-                      <p className={cn("break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
-                        병원, 약속, 시험 준비처럼 공부 외 일정은 보조 카드로 짧게만 관리해요.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <Badge className="rounded-full border border-amber-100 bg-white px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
-                  완료 {completedPersonalCount}/{personalTasks.length}
-                </Badge>
-              </div>
-
-              {!isPast ? (
-                <Card className="overflow-hidden rounded-[1.6rem] border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,251,245,0.96)_100%)] ring-1 ring-amber-100/80 shadow-[0_18px_44px_-34px_rgba(245,158,11,0.18)]">
-                  <CardHeader className={cn(isMobile ? "p-4 pb-3" : "p-6 pb-4")}>
-                    <div className="flex items-center gap-2">
-                      <div className="rounded-2xl bg-amber-500/10 p-2 text-amber-600">
-                        <PlusCircle className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <CardTitle className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-sm" : "text-lg")}>
-                          기타 일정 추가
-                        </CardTitle>
-                        <CardDescription className={cn("break-keep text-slate-500", isMobile ? "mt-0.5 text-[10px] leading-4" : "mt-0.5 text-[11px] leading-5")}>
-                          짧은 제목만 적어도 오늘 일정 보드에 바로 반영돼요.
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className={cn(isMobile ? "p-4 pt-0" : "p-6 pt-0")}>
-                    <div className="flex items-center gap-2 rounded-[1.15rem] border border-amber-100 bg-white/92 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                      <Input
-                        placeholder="예: 병원, 상담, 준비물 챙기기"
-                        value={newPersonalTask}
-                        onChange={(e) => setNewPersonalTask(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
-                        disabled={isSubmitting}
-                        className="h-10 border-none bg-transparent text-sm font-bold shadow-none focus-visible:ring-0"
-                      />
-                      <Button
-                        type="button"
-                        onClick={() => handleAddTask(newPersonalTask, 'personal')}
-                        disabled={isSubmitting || !newPersonalTask.trim()}
-                        className={cn("rounded-xl bg-amber-500 font-black text-white hover:bg-amber-600", isMobile ? "h-10 px-4 text-xs" : "h-10 px-4 text-sm")}
-                      >
-                        추가
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
-
-              {personalTasks.length === 0 ? (
-                <div className="rounded-[1.5rem] border border-dashed border-amber-200 bg-white/80 p-6 text-center">
-                  <p className="text-sm font-black text-amber-700">보조 일정은 필요할 때만 가볍게 추가해요</p>
-                  <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
-                    공부 외 일정은 너무 무겁게 적지 말고, 꼭 챙겨야 할 것만 짧게 남겨두면 충분해요.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {personalTasks.map((task) => (
-                    <PlanItemCard
-                      key={task.id}
-                      id={task.id}
-                      title={task.title}
-                      checked={task.done}
-                      onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
-                      onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
-                      disabled={isPast}
-                      isMobile={isMobile}
-                      tone="amber"
-                      badgeLabel="기타"
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
           {!isPast ? (
             <section className="rounded-[1.65rem] border border-slate-200 bg-white/92 p-4 shadow-[0_20px_42px_-34px_rgba(15,23,42,0.2)]">
               <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>

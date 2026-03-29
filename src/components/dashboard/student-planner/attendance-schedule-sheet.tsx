@@ -1,9 +1,10 @@
 'use client';
 
-import { BookmarkPlus, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock3, Copy, Loader2, RotateCcw, Save, Sparkles, Trash2, XCircle } from 'lucide-react';
+import { BookmarkPlus, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock3, Copy, Loader2, Plus, RotateCcw, Save, Sparkles, Trash2, XCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -15,6 +16,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { StudyPlanItem, WithId } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 import type { AttendanceScheduleDraft, SavedAttendanceRoutine } from './planner-constants';
@@ -67,6 +69,12 @@ type AttendanceScheduleSheetProps = {
   onApplyPresetToToday: (preset: SavedAttendanceRoutine) => void;
   onApplyPresetToWeekday: (preset: SavedAttendanceRoutine) => void;
   onDeletePreset: (presetId: string) => void;
+  personalTasks: Array<WithId<StudyPlanItem>>;
+  personalTaskDraft: string;
+  onPersonalTaskDraftChange: (value: string) => void;
+  onAddPersonalTask: () => void;
+  onTogglePersonalTask: (task: WithId<StudyPlanItem>) => void;
+  onDeletePersonalTask: (task: WithId<StudyPlanItem>) => void;
 };
 
 function AttendanceDraftFields({
@@ -221,6 +229,12 @@ export function AttendanceScheduleSheet({
   onApplyPresetToToday,
   onApplyPresetToWeekday,
   onDeletePreset,
+  personalTasks,
+  personalTaskDraft,
+  onPersonalTaskDraftChange,
+  onAddPersonalTask,
+  onTogglePersonalTask,
+  onDeletePersonalTask,
 }: AttendanceScheduleSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -376,6 +390,80 @@ export function AttendanceScheduleSheet({
               ) : null}
 
               <AttendanceDraftFields draft={todayDraft} onChange={onTodayChange} isMobile={isMobile} disabled={isSubmitting} />
+
+              <div className="rounded-[1.35rem] border border-amber-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,251,245,0.96)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(245,158,11,0.18)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black text-slate-900">기타 일정도 여기서 같이 관리</p>
+                    <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                      병원, 상담, 준비물처럼 오늘만 챙길 일은 여기서 같이 적고 저장해요.
+                    </p>
+                  </div>
+                  <Badge className="rounded-full border border-amber-100 bg-white px-3 py-1 text-[10px] font-black text-amber-700 shadow-none">
+                    {personalTasks.length}개
+                  </Badge>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 rounded-[1.1rem] border border-amber-100 bg-white/92 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                  <Input
+                    placeholder="예: 병원, 상담, 준비물 챙기기"
+                    value={personalTaskDraft}
+                    onChange={(event) => onPersonalTaskDraftChange(event.target.value)}
+                    onKeyDown={(event) => event.key === 'Enter' && onAddPersonalTask()}
+                    disabled={isSubmitting}
+                    className="h-10 border-none bg-transparent text-sm font-bold shadow-none focus-visible:ring-0"
+                  />
+                  <Button
+                    type="button"
+                    onClick={onAddPersonalTask}
+                    disabled={isSubmitting || !personalTaskDraft.trim()}
+                    className="h-10 rounded-xl bg-amber-500 px-4 text-xs font-black text-white hover:bg-amber-600"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    추가
+                  </Button>
+                </div>
+
+                {personalTasks.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {personalTasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center gap-3 rounded-[1rem] border border-amber-100 bg-white/90 px-3 py-3"
+                      >
+                        <Checkbox
+                          id={`sheet-personal-${task.id}`}
+                          checked={task.done}
+                          onCheckedChange={() => onTogglePersonalTask(task)}
+                          className="rounded-lg border-2"
+                        />
+                        <Label
+                          htmlFor={`sheet-personal-${task.id}`}
+                          className={cn(
+                            'min-w-0 flex-1 break-keep text-sm font-black text-slate-800',
+                            task.done && 'text-slate-400 line-through'
+                          )}
+                        >
+                          {task.title}
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDeletePersonalTask(task)}
+                          className="h-8 w-8 shrink-0 text-slate-400 hover:text-rose-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-[1rem] border border-dashed border-amber-200 bg-white/75 px-4 py-4 text-center">
+                    <p className="text-[11px] font-black text-amber-700">필요한 날만 짧게 추가하면 충분해요</p>
+                  </div>
+                )}
+              </div>
 
               <div className={cn('grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
                 <Button
