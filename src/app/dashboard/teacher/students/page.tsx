@@ -25,8 +25,7 @@ import {
   Trash2,
   AlertTriangle
 } from 'lucide-react';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
@@ -121,6 +120,7 @@ export default function StudentListPage() {
   const firestore = useFirestore();
   const functions = useFunctions();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusTab, setStatusTab] = useState<string>('active');
@@ -324,6 +324,11 @@ export default function StudentListPage() {
     }
   };
 
+  const handleOpenStudent360 = (studentId: string) => {
+    if (!studentId) return;
+    router.push(`/dashboard/teacher/students/${encodeURIComponent(studentId)}`);
+  };
+
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'studying': return <Badge className="bg-emerald-500 font-black text-[9px] h-5">공부중</Badge>;
@@ -495,7 +500,11 @@ export default function StudentListPage() {
                 <Card key={member.id} className={cn("rounded-[2rem] border-none shadow-lg hover:shadow-2xl transition-all group overflow-hidden bg-white ring-1 ring-border/50", member.status === 'withdrawn' && "bg-muted/5")}>
                   <div className={cn("h-1.5 w-full", attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted")} />
                   <CardContent className={isMobile ? "p-5" : "p-6"}>
-                    <Link href={`/dashboard/teacher/students/${member.id}`} className="block">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenStudent360(member.id)}
+                      className="block w-full text-left rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-4 min-w-0">
                           <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50"><AvatarFallback className="bg-primary/5 text-primary font-black text-xl">{member.displayName?.charAt(0) || 'S'}</AvatarFallback></Avatar>
@@ -538,7 +547,7 @@ export default function StudentListPage() {
                         </div>
                         <ChevronRight className="h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
                       </div>
-                    </Link>
+                    </button>
 
                     {statusTab === 'withdrawn' && (
                       <div className="mt-4 pt-4 border-t border-dashed border-rose-100">
