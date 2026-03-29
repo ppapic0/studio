@@ -7,7 +7,7 @@ if (admin.apps.length === 0) {
 
 const region = "asia-northeast3";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
-const adminRoles = new Set(["centerAdmin", "owner", "centerManager", "admin"]);
+const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 type AllowedRole = (typeof allowedRoles)[number];
 
 type InviteDoc = {
@@ -114,6 +114,14 @@ function normalizePhoneNumber(raw: unknown): string {
   return "";
 }
 
+function resolveFirstValidPhoneNumber(...values: unknown[]): string {
+  for (const value of values) {
+    const normalized = normalizePhoneNumber(value);
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
 function toKstDate(baseDate: Date = new Date()): Date {
   const formatted = baseDate.toLocaleString("en-US", { timeZone: "Asia/Seoul" });
   return new Date(formatted);
@@ -142,7 +150,7 @@ function parseHourMinute(value: unknown): { hour: number; minute: number } | nul
 
 function normalizeMembershipStatus(value: unknown): string {
   if (typeof value !== "string") return "";
-  return value.trim().toLowerCase().replace(/[_\s-]+/g, "");
+  return value.trim().toLowerCase().replace(/[\s_-]+/g, "");
 }
 
 function isActiveMembershipStatus(value: unknown): boolean {
@@ -152,8 +160,8 @@ function isActiveMembershipStatus(value: unknown): boolean {
 
 function normalizeMembershipRoleValue(value: unknown): string {
   if (typeof value !== "string") return "";
-  const normalized = value.trim().replace(/[_\s-]+/g, "").toLowerCase();
-  if (normalized === "owner" || normalized === "centermanager" || normalized === "admin" || normalized === "centeradmin") {
+  const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (normalized === "owner" || normalized === "admin" || normalized === "centermanager" || normalized === "centeradmin") {
     return "centerAdmin";
   }
   if (normalized === "teacher") return "teacher";
@@ -187,7 +195,7 @@ async function resolveCenterMembershipRole(
   ]);
 
   const memberData = memberSnap.exists ? (memberSnap.data() as any) : null;
-  const memberRole = typeof memberData?.role === "string" ? memberData.role.trim() : "";
+  let memberRole = normalizeMembershipRoleValue(memberData?.role);
   if (memberRole && isActiveMembershipStatus(memberData?.status)) {
     return {
       role: memberRole,
@@ -196,12 +204,34 @@ async function resolveCenterMembershipRole(
   }
 
   const userCenterData = userCenterSnap.exists ? (userCenterSnap.data() as any) : null;
-  const userCenterRole = typeof userCenterData?.role === "string" ? userCenterData.role.trim() : "";
+  const userCenterRole = normalizeMembershipRoleValue(userCenterData?.role);
   if (userCenterRole && isActiveMembershipStatus(userCenterData?.status)) {
     return {
       role: userCenterRole,
       status: userCenterData?.status,
     };
+  }
+
+  if (!memberRole) {
+    const fallbackMemberSnap = await db
+      .collection(`centers/${centerId}/members`)
+      .where("id", "==", uid)
+      .limit(1)
+      .get();
+    const fallbackMemberData = fallbackMemberSnap.empty ? null : (fallbackMemberSnap.docs[0].data() as any);
+    memberRole = normalizeMembershipRoleValue(fallbackMemberData?.role);
+    if (memberRole && isActiveMembershipStatus(fallbackMemberData?.status)) {
+      return {
+        role: memberRole,
+        status: fallbackMemberData?.status,
+      };
+    }
+    if (memberRole) {
+      return {
+        role: memberRole,
+        status: fallbackMemberData?.status,
+      };
+    }
   }
 
   if (memberRole) {
@@ -220,65 +250,6 @@ async function resolveCenterMembershipRole(
 
   return { role: null, status: null };
 }
-
-export const ensureCurrentUserMemberships = functions.region(region).https.onCall(async (_data, context) => {
-  const uid = context.auth?.uid;
-  if (!uid) {
-    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-
-  const db = admin.firestore();
-  const [membersByFieldSnap, membersByDocIdSnap] = await Promise.all([
-    db.collectionGroup("members").where("id", "==", uid).get(),
-    db.collectionGroup("members").where(admin.firestore.FieldPath.documentId(), "==", uid).get(),
-  ]);
-
-  const uniqueDocs = Array.from(
-    new Map(
-      [...membersByFieldSnap.docs, ...membersByDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])
-    ).values()
-  );
-
-  if (uniqueDocs.length === 0) {
-    return { ok: true, hydratedCount: 0, centers: [] };
-  }
-
-  const batch = db.batch();
-  const hydratedCenters: string[] = [];
-
-  for (const docSnap of uniqueDocs) {
-    const centerId = docSnap.ref.parent.parent?.id;
-    if (!centerId) continue;
-
-    const raw = docSnap.data() as any;
-    const normalizedRole = normalizeMembershipRoleValue(raw.role) || "student";
-    const membershipPayload = {
-      id: centerId,
-      centerId,
-      role: normalizedRole,
-      status: typeof raw.status === "string" && raw.status.trim() ? raw.status : "active",
-      joinedAt: raw.joinedAt || admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      displayName: typeof raw.displayName === "string" ? raw.displayName : null,
-      linkedStudentIds: Array.isArray(raw.linkedStudentIds) ? raw.linkedStudentIds.filter((value: unknown) => typeof value === "string") : [],
-      className: typeof raw.className === "string" ? raw.className : null,
-      phoneNumber: typeof raw.phoneNumber === "string" ? raw.phoneNumber : null,
-    };
-
-    batch.set(db.doc(`userCenters/${uid}/centers/${centerId}`), membershipPayload, { merge: true });
-    hydratedCenters.push(centerId);
-  }
-
-  if (hydratedCenters.length > 0) {
-    await batch.commit();
-  }
-
-  return {
-    ok: true,
-    hydratedCount: hydratedCenters.length,
-    centers: hydratedCenters,
-  };
-});
 
 function normalizeParentLinkCodeValue(value: unknown): string {
   if (typeof value === "string") {
@@ -1430,7 +1401,9 @@ async function dispatchSmsQueueItem(
   });
 }
 function isAdminRole(role: unknown): boolean {
-  return typeof role === "string" && adminRoles.has(role);
+  if (typeof role !== "string") return false;
+  const raw = role.trim();
+  return adminRoles.has(raw) || normalizeMembershipRoleValue(raw) === "centerAdmin";
 }
 
 function chunkArray<T>(items: T[], size: number): T[][] {
@@ -2175,7 +2148,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     parentLinkCode,
     className,
     memberStatus,
-    pointsBalance,
+    seasonLp,
     stats,
     todayStudyMinutes,
     dateKey,
@@ -2254,7 +2227,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   const normalizedMemberStatus = memberStatusProvided
     ? normalizeStudentMembershipStatusForWrite(memberStatus)
     : null;
-  const normalizedPointsBalance = parseFiniteNumber(pointsBalance);
+  const normalizedSeasonLp = parseFiniteNumber(seasonLp);
   const normalizedTodayStudyMinutes = parseFiniteNumber(todayStudyMinutes);
   const normalizedStats = normalizeStatsPayload(stats);
 
@@ -2372,7 +2345,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       trimmedDisplayName.length > 0 ||
       hasClassName ||
       memberStatusProvided ||
-      pointsBalance !== undefined ||
+      seasonLp !== undefined ||
       stats !== undefined ||
       todayStudyMinutes !== undefined ||
       dateKey !== undefined;
@@ -2450,12 +2423,12 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     }
 
     if (isAdminCaller) {
-      const hasPointsBalance = normalizedPointsBalance !== null;
+      const hasSeasonLp = normalizedSeasonLp !== null;
       const hasStats = normalizedStats !== null;
 
-      if (hasPointsBalance || hasStats) {
+      if (hasSeasonLp || hasStats) {
         const progressUpdate: any = { updatedAt: timestamp };
-        if (hasPointsBalance) progressUpdate.pointsBalance = normalizedPointsBalance;
+        if (hasSeasonLp) progressUpdate.seasonLp = normalizedSeasonLp;
         if (hasStats) progressUpdate.stats = normalizedStats;
         batch.set(db.doc("centers/" + centerId + "/growthProgress/" + studentId), progressUpdate, { merge: true });
       }
@@ -2479,17 +2452,17 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
         );
       }
 
-      if (normalizedTodayStudyMinutes !== null || trimmedDisplayName || hasClassName) {
+      if (hasSeasonLp || trimmedDisplayName || hasClassName) {
         const periodKey = safeDateKey.slice(0, 7);
         const rankUpdate: any = {
           studentId,
           updatedAt: timestamp,
         };
-        if (normalizedTodayStudyMinutes !== null) rankUpdate.value = Math.max(0, Math.round(normalizedTodayStudyMinutes));
+        if (hasSeasonLp) rankUpdate.value = normalizedSeasonLp;
         if (trimmedDisplayName) rankUpdate.displayNameSnapshot = trimmedDisplayName;
         if (hasClassName) rankUpdate.classNameSnapshot = normalizedClassName;
 
-        batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_study-time/entries/" + studentId), rankUpdate, {
+        batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_lp/entries/" + studentId), rankUpdate, {
           merge: true,
         });
       }
@@ -2583,9 +2556,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: "student", status: "active", joinedAt: timestamp });
       t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
       t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
-        pointsBalance: 0,
-        totalPointsEarned: 0,
-        dailyPointStatus: {},
+        seasonLp: 0,
         penaltyPoints: 0,
         stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
         updatedAt: timestamp,
@@ -3048,9 +3019,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           level: 1,
           currentXp: 0,
           nextLevelXp: 1000,
-          pointsBalance: 0,
-          totalPointsEarned: 0,
-          dailyPointStatus: {},
+          seasonLp: 0,
           penaltyPoints: 0,
           stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
           skills: {},
@@ -3757,19 +3726,8 @@ export const scheduledAttendanceCheck = functions
           .collection("growthProgress").doc(studentId);
 
         batch.set(progressRef, {
-          "stats.focus": admin.firestore.FieldValue.increment((MAX_SESSION_MINUTES / 60) * 0.1),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-
-        const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
-        const studentProfile = studentSnap.exists ? (studentSnap.data() as any) : null;
-        const periodKey = sessionDateKey.slice(0, 7);
-        const leaderboardRef = db.doc(`centers/${centerId}/leaderboards/${periodKey}_study-time/entries/${studentId}`);
-        batch.set(leaderboardRef, {
-          studentId,
-          displayNameSnapshot: asTrimmedString(studentProfile?.name || studentProfile?.displayName || "학생"),
-          classNameSnapshot: asTrimmedString(studentProfile?.className || null),
-          value: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+          seasonLp: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+          "stats.focus": admin.firestore.FieldValue.increment(0.1),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
 
@@ -3792,173 +3750,6 @@ export const scheduledAttendanceCheck = functions
       totalClosed,
       atKst: nowKst.toISOString(),
     });
-    return null;
-  });
-
-export const scheduledDailyStudyTimeReward = functions
-  .region(region)
-  .pubsub.schedule("15 0 * * *")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    const db = admin.firestore();
-    const targetDate = toKstDate();
-    targetDate.setDate(targetDate.getDate() - 1);
-    const dateKey = toDateKey(targetDate);
-    const centersSnap = await db.collection("centers").get();
-    let rewardedStudents = 0;
-
-    for (const centerDoc of centersSnap.docs) {
-      const centerId = centerDoc.id;
-      const statsSnap = await db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get();
-      if (statsSnap.empty) continue;
-
-      const rankedRows = statsSnap.docs.map((docSnap) => ({
-        studentId: docSnap.id,
-        minutes: Math.max(0, Number(docSnap.data()?.totalStudyMinutes || 0)),
-      }));
-      const maxMinutes = Math.max(...rankedRows.map((row) => row.minutes), 0);
-      if (maxMinutes <= 0) continue;
-
-      const winners = rankedRows.filter((row) => row.minutes === maxMinutes);
-      const settlementChecks = await Promise.all(
-        winners.map((winner) =>
-          db.doc(`centers/${centerId}/rewardSettlements/daily-study-top-${dateKey}-${winner.studentId}`).get()
-        )
-      );
-
-      const batch = db.batch();
-      let hasWrites = false;
-
-      winners.forEach((winner, index) => {
-        if (settlementChecks[index]?.exists) return;
-
-        const progressRef = db.doc(`centers/${centerId}/growthProgress/${winner.studentId}`);
-        batch.set(progressRef, {
-          pointsBalance: admin.firestore.FieldValue.increment(1000),
-          totalPointsEarned: admin.firestore.FieldValue.increment(1000),
-          dailyPointStatus: {
-            [dateKey]: {
-              dailyTopRewardAmount: admin.firestore.FieldValue.increment(1000),
-              dailyPointAmount: admin.firestore.FieldValue.increment(1000),
-            },
-          },
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-
-        const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/daily-study-top-${dateKey}-${winner.studentId}`);
-        batch.set(settlementRef, {
-          type: "daily-study-top",
-          centerId,
-          dateKey,
-          studentId: winner.studentId,
-          rewardAmount: 1000,
-          studyMinutes: winner.minutes,
-          awardedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-        hasWrites = true;
-        rewardedStudents += 1;
-      });
-
-      if (hasWrites) {
-        await batch.commit();
-      }
-    }
-
-    console.log("[daily-study-time-reward] run complete", { dateKey, rewardedStudents });
-    return null;
-  });
-
-export const scheduledMonthlyStudyTimeRankingReward = functions
-  .region(region)
-  .pubsub.schedule("35 0 1 * *")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    const db = admin.firestore();
-    const rewardDate = toKstDate();
-    const rewardDateKey = toDateKey(rewardDate);
-    const targetMonthDate = new Date(rewardDate.getFullYear(), rewardDate.getMonth() - 1, 1);
-    const periodKey = `${targetMonthDate.getFullYear()}-${String(targetMonthDate.getMonth() + 1).padStart(2, "0")}`;
-    const rewardByRank: Record<number, number> = { 1: 20000, 2: 10000, 3: 5000 };
-    const centersSnap = await db.collection("centers").get();
-    let rewardedStudents = 0;
-
-    for (const centerDoc of centersSnap.docs) {
-      const centerId = centerDoc.id;
-      const rankingSnap = await db.collection(`centers/${centerId}/leaderboards/${periodKey}_study-time/entries`).get();
-      if (rankingSnap.empty) continue;
-
-      const rows = rankingSnap.docs
-        .map((docSnap) => ({
-          studentId: docSnap.id,
-          displayNameSnapshot: asTrimmedString(docSnap.data()?.displayNameSnapshot || "학생"),
-          minutes: Math.max(0, Number(docSnap.data()?.value || 0)),
-        }))
-        .filter((row) => row.minutes > 0)
-        .sort((a, b) => b.minutes - a.minutes || a.displayNameSnapshot.localeCompare(b.displayNameSnapshot, "ko"));
-
-      if (rows.length === 0) continue;
-
-      let currentRank = 0;
-      let previousMinutes: number | null = null;
-      const rankedRows = rows.map((row, index) => {
-        if (previousMinutes === null || row.minutes !== previousMinutes) {
-          currentRank = index + 1;
-          previousMinutes = row.minutes;
-        }
-        return { ...row, rank: currentRank };
-      });
-
-      const winners = rankedRows.filter((row) => rewardByRank[row.rank]);
-      if (winners.length === 0) continue;
-
-      const settlementChecks = await Promise.all(
-        winners.map((winner) =>
-          db.doc(`centers/${centerId}/rewardSettlements/monthly-study-rank-${periodKey}-${winner.rank}-${winner.studentId}`).get()
-        )
-      );
-
-      const batch = db.batch();
-      let hasWrites = false;
-
-      winners.forEach((winner, index) => {
-        if (settlementChecks[index]?.exists) return;
-        const rewardAmount = rewardByRank[winner.rank];
-
-        const progressRef = db.doc(`centers/${centerId}/growthProgress/${winner.studentId}`);
-        batch.set(progressRef, {
-          pointsBalance: admin.firestore.FieldValue.increment(rewardAmount),
-          totalPointsEarned: admin.firestore.FieldValue.increment(rewardAmount),
-          dailyPointStatus: {
-            [rewardDateKey]: {
-              monthlyRankRewardAmount: admin.firestore.FieldValue.increment(rewardAmount),
-              dailyPointAmount: admin.firestore.FieldValue.increment(rewardAmount),
-            },
-          },
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-
-        const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/monthly-study-rank-${periodKey}-${winner.rank}-${winner.studentId}`);
-        batch.set(settlementRef, {
-          type: "monthly-study-rank",
-          centerId,
-          periodKey,
-          rewardDateKey,
-          studentId: winner.studentId,
-          rank: winner.rank,
-          rewardAmount,
-          studyMinutes: winner.minutes,
-          awardedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-        hasWrites = true;
-        rewardedStudents += 1;
-      });
-
-      if (hasWrites) {
-        await batch.commit();
-      }
-    }
-
-    console.log("[monthly-study-time-ranking-reward] run complete", { periodKey, rewardDateKey, rewardedStudents });
     return null;
   });
 
@@ -4414,5 +4205,77 @@ export const refreshClassroomSignals = functions
       summary: payload.summary,
       classSummaryCount: payload.classSummaries.length,
       incidentCount: payload.incidents.length,
+    };
+  });
+
+export const ensureCurrentUserMemberships = functions
+  .region(region)
+  .https.onCall(async (_data, context) => {
+    const db = admin.firestore();
+
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const uid = context.auth.uid;
+    const [byFieldSnap, byDocIdSnap] = await Promise.all([
+      db.collectionGroup("members").where("id", "==", uid).get(),
+      db.collectionGroup("members").where(admin.firestore.FieldPath.documentId(), "==", uid).get(),
+    ]);
+
+    const dedupedDocs = Array.from(
+      new Map(
+        [...byFieldSnap.docs, ...byDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])
+      ).values()
+    );
+
+    const repairedCenterIds = new Set<string>();
+
+    for (const docSnap of dedupedDocs) {
+      const raw = docSnap.data() as Record<string, unknown>;
+      const centerId = docSnap.ref.parent.parent?.id;
+      if (!centerId) continue;
+
+      const role = normalizeMembershipRoleValue(raw.role) || "student";
+      const normalizedStatus = normalizeMembershipStatus(raw.status);
+      const status =
+        !normalizedStatus || normalizedStatus === "active" || normalizedStatus === "approved" || normalizedStatus === "enabled" || normalizedStatus === "current"
+          ? "active"
+          : normalizedStatus === "onhold" || normalizedStatus === "pending"
+            ? "onHold"
+            : normalizedStatus === "withdrawn" || normalizedStatus === "inactive"
+              ? "withdrawn"
+              : "active";
+
+      const payload: Record<string, unknown> = {
+        role,
+        status,
+        joinedAt: raw.joinedAt || admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (typeof raw.displayName === "string" && raw.displayName.trim()) {
+        payload.displayName = raw.displayName.trim();
+      }
+      if (typeof raw.className === "string" && raw.className.trim()) {
+        payload.className = raw.className.trim();
+      }
+      if (Array.isArray(raw.linkedStudentIds)) {
+        payload.linkedStudentIds = raw.linkedStudentIds
+          .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+          .map((item) => item.trim());
+      }
+      const phoneNumber = resolveFirstValidPhoneNumber(raw.phoneNumber);
+      if (phoneNumber) {
+        payload.phoneNumber = phoneNumber;
+      }
+
+      await db.doc(`userCenters/${uid}/centers/${centerId}`).set(payload, { merge: true });
+      repairedCenterIds.add(centerId);
+    }
+
+    return {
+      ok: true,
+      centerIds: Array.from(repairedCenterIds),
+      repairedCount: repairedCenterIds.size,
     };
   });

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledMonthlyStudyTimeRankingReward = exports.scheduledDailyStudyTimeReward = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.ensureCurrentUserMemberships = void 0;
+exports.ensureCurrentUserMemberships = exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
@@ -8,7 +8,7 @@ if (admin.apps.length === 0) {
 }
 const region = "asia-northeast3";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"];
-const adminRoles = new Set(["centerAdmin", "owner", "centerManager", "admin"]);
+const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 const SMS_BYTE_LIMIT = 90;
 const DEFAULT_SMS_TEMPLATES = {
     study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
@@ -24,6 +24,14 @@ function normalizePhoneNumber(raw) {
         return digits;
     if (digits.length === 10 && digits.startsWith("01"))
         return digits;
+    return "";
+}
+function resolveFirstValidPhoneNumber(...values) {
+    for (const value of values) {
+        const normalized = normalizePhoneNumber(value);
+        if (normalized)
+            return normalized;
+    }
     return "";
 }
 function toKstDate(baseDate = new Date()) {
@@ -53,7 +61,7 @@ function parseHourMinute(value) {
 function normalizeMembershipStatus(value) {
     if (typeof value !== "string")
         return "";
-    return value.trim().toLowerCase().replace(/[_\s-]+/g, "");
+    return value.trim().toLowerCase().replace(/[\s_-]+/g, "");
 }
 function isActiveMembershipStatus(value) {
     const normalized = normalizeMembershipStatus(value);
@@ -62,8 +70,8 @@ function isActiveMembershipStatus(value) {
 function normalizeMembershipRoleValue(value) {
     if (typeof value !== "string")
         return "";
-    const normalized = value.trim().replace(/[_\s-]+/g, "").toLowerCase();
-    if (normalized === "owner" || normalized === "centermanager" || normalized === "admin" || normalized === "centeradmin") {
+    const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+    if (normalized === "owner" || normalized === "admin" || normalized === "centermanager" || normalized === "centeradmin") {
         return "centerAdmin";
     }
     if (normalized === "teacher")
@@ -92,7 +100,7 @@ async function resolveCenterMembershipRole(db, centerId, uid) {
         db.doc(`userCenters/${uid}/centers/${centerId}`).get(),
     ]);
     const memberData = memberSnap.exists ? memberSnap.data() : null;
-    const memberRole = typeof (memberData === null || memberData === void 0 ? void 0 : memberData.role) === "string" ? memberData.role.trim() : "";
+    let memberRole = normalizeMembershipRoleValue(memberData === null || memberData === void 0 ? void 0 : memberData.role);
     if (memberRole && isActiveMembershipStatus(memberData === null || memberData === void 0 ? void 0 : memberData.status)) {
         return {
             role: memberRole,
@@ -100,12 +108,33 @@ async function resolveCenterMembershipRole(db, centerId, uid) {
         };
     }
     const userCenterData = userCenterSnap.exists ? userCenterSnap.data() : null;
-    const userCenterRole = typeof (userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.role) === "string" ? userCenterData.role.trim() : "";
+    const userCenterRole = normalizeMembershipRoleValue(userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.role);
     if (userCenterRole && isActiveMembershipStatus(userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.status)) {
         return {
             role: userCenterRole,
             status: userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.status,
         };
+    }
+    if (!memberRole) {
+        const fallbackMemberSnap = await db
+            .collection(`centers/${centerId}/members`)
+            .where("id", "==", uid)
+            .limit(1)
+            .get();
+        const fallbackMemberData = fallbackMemberSnap.empty ? null : fallbackMemberSnap.docs[0].data();
+        memberRole = normalizeMembershipRoleValue(fallbackMemberData === null || fallbackMemberData === void 0 ? void 0 : fallbackMemberData.role);
+        if (memberRole && isActiveMembershipStatus(fallbackMemberData === null || fallbackMemberData === void 0 ? void 0 : fallbackMemberData.status)) {
+            return {
+                role: memberRole,
+                status: fallbackMemberData === null || fallbackMemberData === void 0 ? void 0 : fallbackMemberData.status,
+            };
+        }
+        if (memberRole) {
+            return {
+                role: memberRole,
+                status: fallbackMemberData === null || fallbackMemberData === void 0 ? void 0 : fallbackMemberData.status,
+            };
+        }
     }
     if (memberRole) {
         return {
@@ -121,53 +150,6 @@ async function resolveCenterMembershipRole(db, centerId, uid) {
     }
     return { role: null, status: null };
 }
-exports.ensureCurrentUserMemberships = functions.region(region).https.onCall(async (_data, context) => {
-    var _a, _b;
-    const uid = (_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid;
-    if (!uid) {
-        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-    const db = admin.firestore();
-    const [membersByFieldSnap, membersByDocIdSnap] = await Promise.all([
-        db.collectionGroup("members").where("id", "==", uid).get(),
-        db.collectionGroup("members").where(admin.firestore.FieldPath.documentId(), "==", uid).get(),
-    ]);
-    const uniqueDocs = Array.from(new Map([...membersByFieldSnap.docs, ...membersByDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])).values());
-    if (uniqueDocs.length === 0) {
-        return { ok: true, hydratedCount: 0, centers: [] };
-    }
-    const batch = db.batch();
-    const hydratedCenters = [];
-    for (const docSnap of uniqueDocs) {
-        const centerId = (_b = docSnap.ref.parent.parent) === null || _b === void 0 ? void 0 : _b.id;
-        if (!centerId)
-            continue;
-        const raw = docSnap.data();
-        const normalizedRole = normalizeMembershipRoleValue(raw.role) || "student";
-        const membershipPayload = {
-            id: centerId,
-            centerId,
-            role: normalizedRole,
-            status: typeof raw.status === "string" && raw.status.trim() ? raw.status : "active",
-            joinedAt: raw.joinedAt || admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            displayName: typeof raw.displayName === "string" ? raw.displayName : null,
-            linkedStudentIds: Array.isArray(raw.linkedStudentIds) ? raw.linkedStudentIds.filter((value) => typeof value === "string") : [],
-            className: typeof raw.className === "string" ? raw.className : null,
-            phoneNumber: typeof raw.phoneNumber === "string" ? raw.phoneNumber : null,
-        };
-        batch.set(db.doc(`userCenters/${uid}/centers/${centerId}`), membershipPayload, { merge: true });
-        hydratedCenters.push(centerId);
-    }
-    if (hydratedCenters.length > 0) {
-        await batch.commit();
-    }
-    return {
-        ok: true,
-        hydratedCount: hydratedCenters.length,
-        centers: hydratedCenters,
-    };
-});
 function normalizeParentLinkCodeValue(value) {
     if (typeof value === "string") {
         return value.trim();
@@ -1053,7 +1035,10 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
     });
 }
 function isAdminRole(role) {
-    return typeof role === "string" && adminRoles.has(role);
+    if (typeof role !== "string")
+        return false;
+    const raw = role.trim();
+    return adminRoles.has(raw) || normalizeMembershipRoleValue(raw) === "centerAdmin";
 }
 function chunkArray(items, size) {
     if (size <= 0)
@@ -1642,7 +1627,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     var _a, _b;
     const db = admin.firestore();
     const auth = admin.auth();
-    const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode, className, memberStatus, pointsBalance, stats, todayStudyMinutes, dateKey, } = data;
+    const { studentId, centerId, password, displayName, schoolName, grade, parentLinkCode, className, memberStatus, seasonLp, stats, todayStudyMinutes, dateKey, } = data;
     if (!context.auth)
         throw new functions.https.HttpsError("unauthenticated", "인증 필요");
     if (!studentId || !centerId)
@@ -1709,7 +1694,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     const normalizedMemberStatus = memberStatusProvided
         ? normalizeStudentMembershipStatusForWrite(memberStatus)
         : null;
-    const normalizedPointsBalance = parseFiniteNumber(pointsBalance);
+    const normalizedSeasonLp = parseFiniteNumber(seasonLp);
     const normalizedTodayStudyMinutes = parseFiniteNumber(todayStudyMinutes);
     const normalizedStats = normalizeStatsPayload(stats);
     if (memberStatusProvided && !isAdminCaller) {
@@ -1812,7 +1797,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             trimmedDisplayName.length > 0 ||
             hasClassName ||
             memberStatusProvided ||
-            pointsBalance !== undefined ||
+            seasonLp !== undefined ||
             stats !== undefined ||
             todayStudyMinutes !== undefined ||
             dateKey !== undefined;
@@ -1893,12 +1878,12 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             batch.set(userCenterRef, userCenterUpdate, { merge: true });
         }
         if (isAdminCaller) {
-            const hasPointsBalance = normalizedPointsBalance !== null;
+            const hasSeasonLp = normalizedSeasonLp !== null;
             const hasStats = normalizedStats !== null;
-            if (hasPointsBalance || hasStats) {
+            if (hasSeasonLp || hasStats) {
                 const progressUpdate = { updatedAt: timestamp };
-                if (hasPointsBalance)
-                    progressUpdate.pointsBalance = normalizedPointsBalance;
+                if (hasSeasonLp)
+                    progressUpdate.seasonLp = normalizedSeasonLp;
                 if (hasStats)
                     progressUpdate.stats = normalizedStats;
                 batch.set(db.doc("centers/" + centerId + "/growthProgress/" + studentId), progressUpdate, { merge: true });
@@ -1915,19 +1900,19 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
                     updatedAt: timestamp,
                 }, { merge: true });
             }
-            if (normalizedTodayStudyMinutes !== null || trimmedDisplayName || hasClassName) {
+            if (hasSeasonLp || trimmedDisplayName || hasClassName) {
                 const periodKey = safeDateKey.slice(0, 7);
                 const rankUpdate = {
                     studentId,
                     updatedAt: timestamp,
                 };
-                if (normalizedTodayStudyMinutes !== null)
-                    rankUpdate.value = Math.max(0, Math.round(normalizedTodayStudyMinutes));
+                if (hasSeasonLp)
+                    rankUpdate.value = normalizedSeasonLp;
                 if (trimmedDisplayName)
                     rankUpdate.displayNameSnapshot = trimmedDisplayName;
                 if (hasClassName)
                     rankUpdate.classNameSnapshot = normalizedClassName;
-                batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_study-time/entries/" + studentId), rankUpdate, {
+                batch.set(db.doc("centers/" + centerId + "/leaderboards/" + periodKey + "_lp/entries/" + studentId), rankUpdate, {
                     merge: true,
                 });
             }
@@ -2015,9 +2000,7 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
             t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: "student", status: "active", joinedAt: timestamp });
             t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
             t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
-                pointsBalance: 0,
-                totalPointsEarned: 0,
-                dailyPointStatus: {},
+                seasonLp: 0,
                 penaltyPoints: 0,
                 stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
                 updatedAt: timestamp,
@@ -2419,9 +2402,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                     level: 1,
                     currentXp: 0,
                     nextLevelXp: 1000,
-                    pointsBalance: 0,
-                    totalPointsEarned: 0,
-                    dailyPointStatus: {},
+                    seasonLp: 0,
                     penaltyPoints: 0,
                     stats: { focus: 0, consistency: 0, achievement: 0, resilience: 0 },
                     skills: {},
@@ -3009,18 +2990,8 @@ exports.scheduledAttendanceCheck = functions
                 .collection("centers").doc(centerId)
                 .collection("growthProgress").doc(studentId);
             batch.set(progressRef, {
-                "stats.focus": admin.firestore.FieldValue.increment((MAX_SESSION_MINUTES / 60) * 0.1),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-            const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
-            const studentProfile = studentSnap.exists ? studentSnap.data() : null;
-            const periodKey = sessionDateKey.slice(0, 7);
-            const leaderboardRef = db.doc(`centers/${centerId}/leaderboards/${periodKey}_study-time/entries/${studentId}`);
-            batch.set(leaderboardRef, {
-                studentId,
-                displayNameSnapshot: asTrimmedString((studentProfile === null || studentProfile === void 0 ? void 0 : studentProfile.name) || (studentProfile === null || studentProfile === void 0 ? void 0 : studentProfile.displayName) || "학생"),
-                classNameSnapshot: asTrimmedString((studentProfile === null || studentProfile === void 0 ? void 0 : studentProfile.className) || null),
-                value: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+                seasonLp: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
+                "stats.focus": admin.firestore.FieldValue.increment(0.1),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             }, { merge: true });
             await batch.commit();
@@ -3040,157 +3011,6 @@ exports.scheduledAttendanceCheck = functions
         totalClosed,
         atKst: nowKst.toISOString(),
     });
-    return null;
-});
-exports.scheduledDailyStudyTimeReward = functions
-    .region(region)
-    .pubsub.schedule("15 0 * * *")
-    .timeZone("Asia/Seoul")
-    .onRun(async () => {
-    const db = admin.firestore();
-    const targetDate = toKstDate();
-    targetDate.setDate(targetDate.getDate() - 1);
-    const dateKey = toDateKey(targetDate);
-    const centersSnap = await db.collection("centers").get();
-    let rewardedStudents = 0;
-    for (const centerDoc of centersSnap.docs) {
-        const centerId = centerDoc.id;
-        const statsSnap = await db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get();
-        if (statsSnap.empty)
-            continue;
-        const rankedRows = statsSnap.docs.map((docSnap) => {
-            var _a;
-            return ({
-                studentId: docSnap.id,
-                minutes: Math.max(0, Number(((_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.totalStudyMinutes) || 0)),
-            });
-        });
-        const maxMinutes = Math.max(...rankedRows.map((row) => row.minutes), 0);
-        if (maxMinutes <= 0)
-            continue;
-        const winners = rankedRows.filter((row) => row.minutes === maxMinutes);
-        const settlementChecks = await Promise.all(winners.map((winner) => db.doc(`centers/${centerId}/rewardSettlements/daily-study-top-${dateKey}-${winner.studentId}`).get()));
-        const batch = db.batch();
-        let hasWrites = false;
-        winners.forEach((winner, index) => {
-            var _a;
-            if ((_a = settlementChecks[index]) === null || _a === void 0 ? void 0 : _a.exists)
-                return;
-            const progressRef = db.doc(`centers/${centerId}/growthProgress/${winner.studentId}`);
-            batch.set(progressRef, {
-                pointsBalance: admin.firestore.FieldValue.increment(1000),
-                totalPointsEarned: admin.firestore.FieldValue.increment(1000),
-                dailyPointStatus: {
-                    [dateKey]: {
-                        dailyTopRewardAmount: admin.firestore.FieldValue.increment(1000),
-                        dailyPointAmount: admin.firestore.FieldValue.increment(1000),
-                    },
-                },
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-            const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/daily-study-top-${dateKey}-${winner.studentId}`);
-            batch.set(settlementRef, {
-                type: "daily-study-top",
-                centerId,
-                dateKey,
-                studentId: winner.studentId,
-                rewardAmount: 1000,
-                studyMinutes: winner.minutes,
-                awardedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-            hasWrites = true;
-            rewardedStudents += 1;
-        });
-        if (hasWrites) {
-            await batch.commit();
-        }
-    }
-    console.log("[daily-study-time-reward] run complete", { dateKey, rewardedStudents });
-    return null;
-});
-exports.scheduledMonthlyStudyTimeRankingReward = functions
-    .region(region)
-    .pubsub.schedule("35 0 1 * *")
-    .timeZone("Asia/Seoul")
-    .onRun(async () => {
-    const db = admin.firestore();
-    const rewardDate = toKstDate();
-    const rewardDateKey = toDateKey(rewardDate);
-    const targetMonthDate = new Date(rewardDate.getFullYear(), rewardDate.getMonth() - 1, 1);
-    const periodKey = `${targetMonthDate.getFullYear()}-${String(targetMonthDate.getMonth() + 1).padStart(2, "0")}`;
-    const rewardByRank = { 1: 20000, 2: 10000, 3: 5000 };
-    const centersSnap = await db.collection("centers").get();
-    let rewardedStudents = 0;
-    for (const centerDoc of centersSnap.docs) {
-        const centerId = centerDoc.id;
-        const rankingSnap = await db.collection(`centers/${centerId}/leaderboards/${periodKey}_study-time/entries`).get();
-        if (rankingSnap.empty)
-            continue;
-        const rows = rankingSnap.docs
-            .map((docSnap) => {
-            var _a, _b;
-            return ({
-                studentId: docSnap.id,
-                displayNameSnapshot: asTrimmedString(((_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.displayNameSnapshot) || "학생"),
-                minutes: Math.max(0, Number(((_b = docSnap.data()) === null || _b === void 0 ? void 0 : _b.value) || 0)),
-            });
-        })
-            .filter((row) => row.minutes > 0)
-            .sort((a, b) => b.minutes - a.minutes || a.displayNameSnapshot.localeCompare(b.displayNameSnapshot, "ko"));
-        if (rows.length === 0)
-            continue;
-        let currentRank = 0;
-        let previousMinutes = null;
-        const rankedRows = rows.map((row, index) => {
-            if (previousMinutes === null || row.minutes !== previousMinutes) {
-                currentRank = index + 1;
-                previousMinutes = row.minutes;
-            }
-            return Object.assign(Object.assign({}, row), { rank: currentRank });
-        });
-        const winners = rankedRows.filter((row) => rewardByRank[row.rank]);
-        if (winners.length === 0)
-            continue;
-        const settlementChecks = await Promise.all(winners.map((winner) => db.doc(`centers/${centerId}/rewardSettlements/monthly-study-rank-${periodKey}-${winner.rank}-${winner.studentId}`).get()));
-        const batch = db.batch();
-        let hasWrites = false;
-        winners.forEach((winner, index) => {
-            var _a;
-            if ((_a = settlementChecks[index]) === null || _a === void 0 ? void 0 : _a.exists)
-                return;
-            const rewardAmount = rewardByRank[winner.rank];
-            const progressRef = db.doc(`centers/${centerId}/growthProgress/${winner.studentId}`);
-            batch.set(progressRef, {
-                pointsBalance: admin.firestore.FieldValue.increment(rewardAmount),
-                totalPointsEarned: admin.firestore.FieldValue.increment(rewardAmount),
-                dailyPointStatus: {
-                    [rewardDateKey]: {
-                        monthlyRankRewardAmount: admin.firestore.FieldValue.increment(rewardAmount),
-                        dailyPointAmount: admin.firestore.FieldValue.increment(rewardAmount),
-                    },
-                },
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-            const settlementRef = db.doc(`centers/${centerId}/rewardSettlements/monthly-study-rank-${periodKey}-${winner.rank}-${winner.studentId}`);
-            batch.set(settlementRef, {
-                type: "monthly-study-rank",
-                centerId,
-                periodKey,
-                rewardDateKey,
-                studentId: winner.studentId,
-                rank: winner.rank,
-                rewardAmount,
-                studyMinutes: winner.minutes,
-                awardedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-            hasWrites = true;
-            rewardedStudents += 1;
-        });
-        if (hasWrites) {
-            await batch.commit();
-        }
-    }
-    console.log("[monthly-study-time-ranking-reward] run complete", { periodKey, rewardDateKey, rewardedStudents });
     return null;
 });
 /**
@@ -3588,6 +3408,64 @@ exports.refreshClassroomSignals = functions
         summary: payload.summary,
         classSummaryCount: payload.classSummaries.length,
         incidentCount: payload.incidents.length,
+    };
+});
+exports.ensureCurrentUserMemberships = functions
+    .region(region)
+    .https.onCall(async (_data, context) => {
+    var _a, _b;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const uid = context.auth.uid;
+    const [byFieldSnap, byDocIdSnap] = await Promise.all([
+        db.collectionGroup("members").where("id", "==", uid).get(),
+        db.collectionGroup("members").where(admin.firestore.FieldPath.documentId(), "==", uid).get(),
+    ]);
+    const dedupedDocs = Array.from(new Map([...byFieldSnap.docs, ...byDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])).values());
+    const repairedCenterIds = new Set();
+    for (const docSnap of dedupedDocs) {
+        const raw = docSnap.data();
+        const centerId = (_b = docSnap.ref.parent.parent) === null || _b === void 0 ? void 0 : _b.id;
+        if (!centerId)
+            continue;
+        const role = normalizeMembershipRoleValue(raw.role) || "student";
+        const normalizedStatus = normalizeMembershipStatus(raw.status);
+        const status = !normalizedStatus || normalizedStatus === "active" || normalizedStatus === "approved" || normalizedStatus === "enabled" || normalizedStatus === "current"
+            ? "active"
+            : normalizedStatus === "onhold" || normalizedStatus === "pending"
+                ? "onHold"
+                : normalizedStatus === "withdrawn" || normalizedStatus === "inactive"
+                    ? "withdrawn"
+                    : "active";
+        const payload = {
+            role,
+            status,
+            joinedAt: raw.joinedAt || admin.firestore.FieldValue.serverTimestamp(),
+        };
+        if (typeof raw.displayName === "string" && raw.displayName.trim()) {
+            payload.displayName = raw.displayName.trim();
+        }
+        if (typeof raw.className === "string" && raw.className.trim()) {
+            payload.className = raw.className.trim();
+        }
+        if (Array.isArray(raw.linkedStudentIds)) {
+            payload.linkedStudentIds = raw.linkedStudentIds
+                .filter((item) => typeof item === "string" && item.trim().length > 0)
+                .map((item) => item.trim());
+        }
+        const phoneNumber = resolveFirstValidPhoneNumber(raw.phoneNumber);
+        if (phoneNumber) {
+            payload.phoneNumber = phoneNumber;
+        }
+        await db.doc(`userCenters/${uid}/centers/${centerId}`).set(payload, { merge: true });
+        repairedCenterIds.add(centerId);
+    }
+    return {
+        ok: true,
+        centerIds: Array.from(repairedCenterIds),
+        repairedCount: repairedCenterIds.size,
     };
 });
 //# sourceMappingURL=index.js.map

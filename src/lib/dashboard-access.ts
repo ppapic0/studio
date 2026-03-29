@@ -6,28 +6,32 @@ type MembershipLike = {
   status?: string | null;
 };
 
-function normalizeMembershipStatusValue(value?: string | null) {
-  if (!value) return '';
-  return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
+function normalizeMembershipStatus(status?: string | null) {
+  return typeof status === 'string' ? status.trim().toLowerCase().replace(/[\s_-]+/g, '') : '';
 }
 
-function normalizeMembershipRoleValue(value?: string | null) {
-  if (!value) return '';
-  return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
+function normalizeMembershipRole(role?: string | null) {
+  const normalized = typeof role === 'string' ? role.trim().toLowerCase().replace(/[\s_-]+/g, '') : '';
+  if (normalized === 'owner' || normalized === 'admin' || normalized === 'centermanager' || normalized === 'centeradmin') {
+    return 'centerAdmin';
+  }
+  if (normalized === 'teacher') return 'teacher';
+  if (normalized === 'parent') return 'parent';
+  if (normalized === 'student') return 'student';
+  return '';
 }
 
 export function isActiveMembershipStatus(status?: string | null) {
-  const normalized = normalizeMembershipStatusValue(status);
+  const normalized = normalizeMembershipStatus(status);
   return !normalized || normalized === 'active' || normalized === 'approved' || normalized === 'enabled' || normalized === 'current';
 }
 
 export function isAdminRole(role?: string | null) {
-  const normalized = normalizeMembershipRoleValue(role);
-  return normalized === 'centeradmin' || normalized === 'owner' || normalized === 'centermanager' || normalized === 'admin';
+  return normalizeMembershipRole(role) === 'centerAdmin';
 }
 
 export function isTeacherOrAdminRole(role?: string | null) {
-  return normalizeMembershipRoleValue(role) === 'teacher' || isAdminRole(role);
+  return normalizeMembershipRole(role) === 'teacher' || isAdminRole(role);
 }
 
 export function resolveMembershipByRole(

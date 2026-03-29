@@ -1,11 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useFunctions } from '@/firebase';
-import { usePathname } from 'next/navigation';
-import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
+import { collection, collectionGroup, documentId, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
+import { httpsCallable } from 'firebase/functions';
 
 export type CenterMembership = {
   id: string; // centerId
@@ -30,24 +29,6 @@ export const TIERS = [
 ];
 
 const ACTIVE_ATTENDANCE_STATUSES = ['studying', 'away', 'break'] as const;
-const MOBILE_VIEWPORT_QUERY = '(max-width: 768px)';
-const PUBLIC_ROUTES = new Set([
-  '/',
-  '/login',
-  '/signup',
-  '/experience',
-  '/class',
-  '/lp',
-  '/center',
-  '/results',
-  '/consult/check',
-]);
-
-function isPublicRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  if (PUBLIC_ROUTES.has(pathname)) return true;
-  return pathname.startsWith('/consult/check');
-}
 
 function getSeatActivityRank(status?: string | null): number {
   if (status === 'studying') return 0;
@@ -82,7 +63,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const functions = useFunctions();
-  const pathname = usePathname();
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
@@ -98,30 +78,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const activeMembershipRef = useRef<string | null>(null);
 
   const normalizeRole = (role: CenterMembership['role'] | string | undefined): CenterMembership['role'] => {
-    const normalized = String(role || '')
-      .trim()
-      .replace(/[_\s-]+/g, '')
-      .toLowerCase();
-
-    if (normalized === 'owner' || normalized === 'centermanager' || normalized === 'admin' || normalized === 'centeradmin') {
-      return 'centerAdmin';
-    }
-    if (normalized === 'teacher') return 'teacher';
-    if (normalized === 'parent') return 'parent';
-    if (normalized === 'student') return 'student';
+    if (role === 'owner' || role === 'centerManager' || role === 'admin') return 'centerAdmin';
+    if (role === 'student' || role === 'teacher' || role === 'parent' || role === 'centerAdmin') return role;
     return 'student';
   };
 
-  useEffect(() => {
-    if (isPublicRoute(pathname)) {
-      setMemberships([]);
-      setActiveMembership(null);
-      setMembershipsLoading(false);
-      activeMembershipRef.current = null;
-      setCurrentTier(TIERS[0]);
-      return;
+  const normalizeStatus = (status: unknown): CenterMembership['status'] => {
+    if (typeof status !== 'string') return 'active';
+    const normalized = status.trim().toLowerCase().replace(/[\s_-]+/g, '');
+    if (!normalized || normalized === 'active' || normalized === 'approved' || normalized === 'enabled' || normalized === 'current') {
+      return 'active';
     }
+    if (normalized === 'onhold' || normalized === 'pending') return 'onHold';
+    if (normalized === 'withdrawn' || normalized === 'inactive') return 'withdrawn';
+    return 'active';
+  };
 
+  useEffect(() => {
     if (!user || !firestore) {
       setMemberships([]);
       setActiveMembership(null);
@@ -135,6 +108,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     let userCenterMemberships: CenterMembership[] = [];
     let memberFallbackMemberships: CenterMembership[] = [];
+    let userCentersResolved = false;
+    let fallbackResolved = false;
+    let bootstrapResolved = !functions;
+    let disposed = false;
     const normalizeLinkedStudentIds = (value: unknown): string[] => {
       if (!Array.isArray(value)) return [];
       return value
@@ -146,26 +123,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const primaryLinkedIds = normalizeLinkedStudentIds(primary.linkedStudentIds);
       const secondaryLinkedIds = normalizeLinkedStudentIds(secondary.linkedStudentIds);
       const mergedLinkedIds = Array.from(new Set(primaryLinkedIds.length > 0 ? primaryLinkedIds : secondaryLinkedIds));
-      return {
-        ...secondary,
-        ...primary,
-        role: normalizeRole(primary.role || secondary.role),
-        status: (primary.status || secondary.status || 'active') as CenterMembership['status'],
-        joinedAt: primary.joinedAt || secondary.joinedAt,
-        displayName: primary.displayName || secondary.displayName,
-        className: primary.className ?? secondary.className,
-        phoneNumber: primary.phoneNumber ?? secondary.phoneNumber,
-        linkedStudentIds: mergedLinkedIds.length > 0 ? mergedLinkedIds : undefined,
+        return {
+          ...secondary,
+          ...primary,
+          role: normalizeRole(primary.role || secondary.role),
+          status: normalizeStatus(primary.status || secondary.status || 'active'),
+          joinedAt: primary.joinedAt || secondary.joinedAt,
+          displayName: primary.displayName || secondary.displayName,
+          className: primary.className ?? secondary.className,
+          linkedStudentIds: mergedLinkedIds.length > 0 ? mergedLinkedIds : undefined,
+          phoneNumber: primary.phoneNumber || secondary.phoneNumber,
+        };
       };
-    };
 
-    const getNormalizedStatus = (value: unknown) =>
-      typeof value === 'string' ? value.trim().toLowerCase().replace(/[_\s-]+/g, '') : '';
-
-    const isActiveLikeStatus = (value: unknown) => {
-      const normalized = getNormalizedStatus(value);
-      return !normalized || normalized === 'active' || normalized === 'approved' || normalized === 'enabled' || normalized === 'current';
-    };
+      const getNormalizedStatus = (value: unknown) =>
+      typeof value === 'string' ? value.trim().toLowerCase().replace(/[\s_-]+/g, '') : '';
 
     const hasLinkedStudents = (membership: CenterMembership) =>
       Array.isArray(membership.linkedStudentIds) &&
@@ -183,7 +155,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pickActiveMembership = (items: CenterMembership[]): CenterMembership | null => {
       if (items.length === 0) return null;
 
-      const activeItems = items.filter((membership) => isActiveLikeStatus(membership.status));
+      const activeItems = items.filter((membership) => {
+        const normalized = getNormalizedStatus(membership.status);
+        return !normalized || normalized === 'active';
+      });
       if (activeItems.length === 0) return null;
 
       return (
@@ -201,6 +176,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const applyMembershipState = () => {
+      if (disposed) return;
+      if (!userCentersResolved || !fallbackResolved || !bootstrapResolved) return;
+
       const map = new Map<string, CenterMembership>();
 
       userCenterMemberships.forEach((membership) => {
@@ -231,28 +209,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeMembershipRef.current = activeKey;
       }
 
-      if (userCentersResolved && fallbackResolved && bootstrapResolved) {
-        setMembershipsLoading(false);
-      }
+      setMembershipsLoading(false);
     };
 
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
-    const fallbackMembersByFieldQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
+    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
+    const fallbackMembersByDocIdQuery = query(collectionGroup(firestore, 'members'), where(documentId(), '==', user.uid));
 
     // Track whether the one-time fallback has already been fetched
     let fallbackFetched = false;
-    let fallbackResolved = false;
-    let userCentersResolved = false;
-    let bootstrapResolved = false;
 
     const ensureMembershipBootstrap = async () => {
+      if (!functions) {
+        bootstrapResolved = true;
+        applyMembershipState();
+        return;
+      }
+
       try {
-        const ensureCurrentUserMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
-        await ensureCurrentUserMemberships({});
-      } catch (error: any) {
-        if (error?.code !== 'permission-denied') {
-          console.warn('Membership bootstrap warning:', error);
-        }
+        const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
+        await ensureMemberships({});
+      } catch (error) {
+        console.warn('Membership bootstrap warning:', error);
       } finally {
         bootstrapResolved = true;
         applyMembershipState();
@@ -263,9 +241,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (fallbackFetched) return;
       fallbackFetched = true;
       try {
-        const byFieldSnapshot = await getDocs(fallbackMembersByFieldQuery);
-        const uniqueDocs = Array.from(new Map(byFieldSnapshot.docs.map((docSnap) => [docSnap.ref.path, docSnap])).values());
-        memberFallbackMemberships = uniqueDocs
+        const [snapshotByField, snapshotByDocId] = await Promise.all([
+          getDocs(fallbackMembersQuery),
+          getDocs(fallbackMembersByDocIdQuery),
+        ]);
+        const dedupedDocs = Array.from(
+          new Map(
+            [...snapshotByField.docs, ...snapshotByDocId.docs].map((docSnap) => [docSnap.ref.path, docSnap])
+          ).values()
+        );
+        memberFallbackMemberships = dedupedDocs
           .map((docSnap) => {
             const raw = docSnap.data() as any;
             const centerId = docSnap.ref.parent.parent?.id;
@@ -273,7 +258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return {
               id: centerId,
               role: normalizeRole(raw.role),
-              status: raw.status || 'active',
+              status: normalizeStatus(raw.status || 'active'),
               joinedAt: raw.joinedAt,
               displayName: raw.displayName,
               linkedStudentIds: raw.linkedStudentIds,
@@ -282,14 +267,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
             } as CenterMembership;
           })
           .filter((membership): membership is CenterMembership => !!membership);
-        fallbackResolved = true;
-        applyMembershipState();
-      } catch (error: any) {
+      } catch (error) {
         memberFallbackMemberships = [];
+        console.warn('Membership fallback fetch warning:', error);
+      } finally {
         fallbackResolved = true;
-        if (error?.code !== 'permission-denied') {
-          console.warn('Membership fallback fetch warning:', error);
-        }
         applyMembershipState();
       }
     };
@@ -300,13 +282,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const unsubscribeUserCenters = onSnapshot(
       userCentersRef,
       (snapshot) => {
-        userCentersResolved = true;
         userCenterMemberships = snapshot.docs.map((docSnap) => {
           const raw = docSnap.data() as any;
           return {
             id: docSnap.id,
             role: normalizeRole(raw.role),
-            status: raw.status || 'active',
+            status: normalizeStatus(raw.status || 'active'),
             joinedAt: raw.joinedAt,
             displayName: raw.displayName,
             linkedStudentIds: raw.linkedStudentIds,
@@ -315,6 +296,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } as CenterMembership;
         });
 
+        userCentersResolved = true;
         applyMembershipState();
       },
       (error) => {
@@ -325,9 +307,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
+      disposed = true;
       unsubscribeUserCenters();
     };
-  }, [user, firestore, functions, pathname]);
+  }, [user, firestore, functions]);
 
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
@@ -419,41 +402,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') return;
-    const isPhoneViewport = window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
-    const shouldUseMobileByDefault =
-      activeMembership?.role === 'parent' ||
-      (activeMembership?.role === 'student' && isPhoneViewport);
-
-    if (shouldUseMobileByDefault && viewMode !== 'mobile') {
+  useEffect(() => {
+    if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {
       setViewMode('mobile');
     }
-  }, [activeMembership?.role, viewMode]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const mediaQuery = window.matchMedia(MOBILE_VIEWPORT_QUERY);
-    const syncMobileView = () => {
-      const shouldUseMobileByDefault =
-        activeMembership?.role === 'parent' ||
-        (activeMembership?.role === 'student' && mediaQuery.matches);
-
-      if (shouldUseMobileByDefault && viewMode !== 'mobile') {
-        setViewMode('mobile');
-      }
-    };
-
-    syncMobileView();
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', syncMobileView);
-      return () => mediaQuery.removeEventListener('change', syncMobileView);
-    }
-
-    mediaQuery.addListener(syncMobileView);
-    return () => mediaQuery.removeListener(syncMobileView);
   }, [activeMembership?.role, viewMode]);
 
   const contextValue = useMemo(

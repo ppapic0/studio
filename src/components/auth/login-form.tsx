@@ -17,7 +17,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore, useFunctions } from '@/firebase';
 import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
@@ -28,6 +27,7 @@ import {
 } from '@/lib/dashboard-motion';
 import { Loader2, Mail } from 'lucide-react';
 import { collection, collectionGroup, documentId, getDocs, query, where } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import {
   Dialog,
   DialogContent,
@@ -63,7 +63,7 @@ export function LoginForm() {
 
   const normalizeMembershipStatus = (value: unknown): string => {
     if (typeof value !== 'string') return '';
-    return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
+    return value.trim().toLowerCase().replace(/[\s_-]+/g, '');
   };
 
   const fetchMembershipRecords = async (uid: string) => {
@@ -74,17 +74,18 @@ export function LoginForm() {
       return centersSnap.docs.map((docSnap) => docSnap.data() as { role?: string; status?: string });
     }
 
-    const [fallbackByFieldSnap, fallbackByDocIdSnap] = await Promise.all([
+    const [fallbackSnap, fallbackDocIdSnap] = await Promise.all([
       getDocs(query(collectionGroup(firestore, 'members'), where('id', '==', uid))),
       getDocs(query(collectionGroup(firestore, 'members'), where(documentId(), '==', uid))),
     ]);
-    const uniqueDocs = Array.from(
+
+    const dedupedDocs = Array.from(
       new Map(
-        [...fallbackByFieldSnap.docs, ...fallbackByDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])
+        [...fallbackSnap.docs, ...fallbackDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])
       ).values()
     );
 
-    return uniqueDocs.map((docSnap) => {
+    return dedupedDocs.map((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
       return {
         role: typeof data.role === 'string' ? data.role : undefined,
@@ -100,7 +101,7 @@ export function LoginForm() {
 
     const hasActiveMembership = studentMemberships.some((membership) => {
       const normalized = normalizeMembershipStatus(membership.status);
-      return !normalized || normalized === 'active' || normalized === 'approved' || normalized === 'enabled' || normalized === 'current';
+      return !normalized || normalized === 'active';
     });
 
     if (hasActiveMembership) return { allowed: true as const };
@@ -164,10 +165,10 @@ export function LoginForm() {
       const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
       if (functions) {
         try {
-          const ensureCurrentUserMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
-          await ensureCurrentUserMemberships({});
+          const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
+          await ensureMemberships({});
         } catch (error) {
-          console.warn('Membership bootstrap after login warning:', error);
+          console.warn('Membership bootstrap warning:', error);
         }
       }
       const memberships = await fetchMembershipRecords(userCredential.user.uid);
