@@ -3561,3 +3561,411 @@ select {
     opacity: 0 !important;
   }
 }
+
+/* ───────────────────────────────────────────────
+   Point Track Game Screen
+─────────────────────────────────────────────── */
+
+.point-track-game-screen {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top, rgba(54, 88, 175, 0.58), transparent 28%),
+    linear-gradient(180deg, #14295f 0%, #0b1633 100%);
+}
+
+.point-track-hero-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 186, 79, 0.24), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+  box-shadow:
+    0 28px 64px -38px rgba(0, 0, 0, 0.76),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(20px);
+}
+
+.point-track-hero-stage::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2rem;
+  width: 13rem;
+  height: 5rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 176, 76, 0.22), transparent 72%);
+  filter: blur(22px);
+  pointer-events: none;
+}
+
+.point-track-hero-box {
+  position: relative;
+  display: inline-flex;
+  height: 12rem;
+  width: 12rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.point-track-hero-box:disabled {
+  cursor: default;
+}
+
+.point-track-hero-box__glow {
+  position: absolute;
+  inset: 1.9rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 173, 67, 0.72) 0%, rgba(255, 173, 67, 0.12) 56%, transparent 76%);
+  filter: blur(18px);
+  opacity: 0.9;
+  animation: point-track-box-glow 1.8s ease-in-out infinite;
+}
+
+.point-track-hero-box__shadow {
+  position: absolute;
+  bottom: 1rem;
+  width: 6rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: rgba(5, 10, 24, 0.4);
+  filter: blur(9px);
+  animation: point-track-box-shadow 1.8s ease-in-out infinite;
+}
+
+.point-track-hero-box__body {
+  position: relative;
+  height: 8.2rem;
+  width: 8.2rem;
+  border-radius: 2rem;
+  background:
+    linear-gradient(180deg, rgba(255, 221, 152, 0.96) 0%, rgba(255, 177, 67, 1) 48%, rgba(242, 132, 20, 1) 100%);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.16) inset,
+    0 20px 44px -22px rgba(255, 155, 31, 0.82),
+    0 34px 62px -28px rgba(255, 155, 31, 0.54);
+  animation: point-track-box-float 1.8s ease-in-out infinite;
+}
+
+.point-track-hero-box__lid {
+  position: absolute;
+  inset: 0.9rem 1rem auto;
+  height: 2.15rem;
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, rgba(255,255,255,0.34), rgba(255,255,255,0.1));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.36) inset;
+}
+
+.point-track-hero-box__lock {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 1rem;
+  width: 1rem;
+  transform: translate(-50%, -42%);
+  border-radius: 999px;
+  background: #fff6d7;
+  box-shadow: 0 0 20px rgba(255, 248, 214, 0.9);
+}
+
+.point-track-hero-box__shine {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  width: 1.8rem;
+  height: 4rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.48), rgba(255,255,255,0));
+  transform: rotate(12deg);
+  opacity: 0.8;
+}
+
+.point-track-hero-box__spark {
+  position: absolute;
+  top: 1.7rem;
+  height: 0.4rem;
+  width: 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 243, 190, 0.98);
+  box-shadow: 0 0 14px rgba(255, 228, 135, 0.95);
+  animation: point-track-spark-twinkle 1.6s ease-in-out infinite;
+}
+
+.point-track-hero-box__spark--left {
+  left: 0.9rem;
+}
+
+.point-track-hero-box__spark--right {
+  right: 0.9rem;
+  animation-delay: 0.35s;
+}
+
+.point-track-hero-box--charging .point-track-hero-box__body {
+  opacity: 0.84;
+  filter: saturate(0.82);
+}
+
+.point-track-hero-box--charging .point-track-hero-box__glow {
+  opacity: 0.55;
+}
+
+.point-track-hero-box--shake .point-track-hero-box__body {
+  animation: point-track-box-shake 0.42s ease-in-out both;
+}
+
+.point-track-hero-box--shake .point-track-hero-box__shadow {
+  animation: point-track-box-shadow-shake 0.42s ease-in-out both;
+}
+
+.point-track-hero-box--burst .point-track-hero-box__glow {
+  animation: point-track-box-burst 0.62s ease-out both;
+}
+
+.point-track-hero-box--burst .point-track-hero-box__lid {
+  animation: point-track-box-lid-open 0.65s ease-out forwards;
+  transform-origin: center top;
+}
+
+.point-track-hero-box--revealed .point-track-hero-box__glow {
+  animation: point-track-box-revealed 0.5s ease-out forwards;
+}
+
+.point-track-progress-track {
+  position: relative;
+  height: 1rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+}
+
+.point-track-progress-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffb74f 0%, #ffd86d 44%, #8ae4ff 100%);
+  box-shadow: 0 0 18px rgba(255, 186, 73, 0.42);
+  transition: width 0.65s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.point-track-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2.8rem;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: point-track-progress-sheen 1.9s linear infinite;
+}
+
+.point-track-slot {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 5.75rem;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
+  padding: 0.9rem;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.point-track-slot__box {
+  position: relative;
+  height: 4.2rem;
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, rgba(255, 216, 140, 0.86), rgba(255, 156, 47, 0.96));
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.14) inset,
+    0 16px 30px -22px rgba(255, 156, 47, 0.65);
+}
+
+.point-track-slot__lid {
+  position: absolute;
+  inset: 0.55rem 0.65rem auto;
+  height: 1.05rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.2);
+}
+
+.point-track-slot__lock {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.7rem;
+  height: 0.7rem;
+  transform: translate(-50%, -42%);
+  border-radius: 999px;
+  background: rgba(255, 248, 217, 0.94);
+}
+
+.point-track-slot--ready {
+  background: rgba(255,255,255,0.1);
+}
+
+.point-track-slot--ready .point-track-slot__box {
+  animation: point-track-slot-breathe 1.8s ease-in-out infinite;
+}
+
+.point-track-slot--common.point-track-slot--ready {
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.16) inset, 0 18px 38px -30px rgba(34, 211, 238, 0.34);
+}
+
+.point-track-slot--rare.point-track-slot--ready {
+  box-shadow: 0 0 0 1px rgba(255, 176, 76, 0.16) inset, 0 18px 38px -30px rgba(255, 161, 54, 0.42);
+}
+
+.point-track-slot--epic.point-track-slot--ready {
+  box-shadow: 0 0 0 1px rgba(196, 181, 253, 0.16) inset, 0 18px 38px -30px rgba(167, 139, 250, 0.42);
+}
+
+.point-track-slot--charging {
+  background: rgba(138, 218, 255, 0.08);
+}
+
+.point-track-slot--charging .point-track-slot__box {
+  opacity: 0.82;
+  filter: saturate(0.8);
+}
+
+.point-track-slot--opened {
+  opacity: 0.58;
+}
+
+.point-track-slot--opened .point-track-slot__box {
+  background: linear-gradient(180deg, rgba(155, 166, 189, 0.42), rgba(108, 120, 147, 0.62));
+  box-shadow: none;
+}
+
+.point-track-slot--locked {
+  opacity: 0.34;
+}
+
+.point-track-slot--locked .point-track-slot__box {
+  background: linear-gradient(180deg, rgba(129, 139, 165, 0.32), rgba(86, 97, 121, 0.58));
+  box-shadow: none;
+}
+
+.point-track-modal-shell {
+  background:
+    radial-gradient(circle at top, rgba(255, 185, 86, 0.18), transparent 28%),
+    linear-gradient(180deg, #14295f 0%, #0d1c45 100%);
+}
+
+.point-track-modal-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.8rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 1.25rem 1rem 1.4rem;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(255, 176, 76, 0.22), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+}
+
+.point-track-modal-stage::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  width: 8.5rem;
+  height: 1.2rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.34);
+  filter: blur(10px);
+}
+
+.point-track-reward-burst {
+  animation: point-track-reward-pop 0.42s ease-out both;
+}
+
+@keyframes point-track-box-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(-1.5deg); }
+}
+
+@keyframes point-track-box-shadow {
+  0%, 100% { transform: scale(1); opacity: 0.42; }
+  50% { transform: scale(0.92); opacity: 0.28; }
+}
+
+@keyframes point-track-box-glow {
+  0%, 100% { opacity: 0.56; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes point-track-spark-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.86); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+
+@keyframes point-track-progress-sheen {
+  0% { transform: translateX(-2.8rem); }
+  100% { transform: translateX(22rem); }
+}
+
+@keyframes point-track-slot-breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes point-track-box-shake {
+  0% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-5px) rotate(-2deg); }
+  40% { transform: translateX(5px) rotate(2deg); }
+  60% { transform: translateX(-4px) rotate(-1deg); }
+  80% { transform: translateX(4px) rotate(1deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+
+@keyframes point-track-box-shadow-shake {
+  0% { transform: scale(1); opacity: 0.42; }
+  50% { transform: scale(1.08); opacity: 0.28; }
+  100% { transform: scale(1); opacity: 0.42; }
+}
+
+@keyframes point-track-box-burst {
+  0% { opacity: 0.65; transform: scale(1); }
+  55% { opacity: 1; transform: scale(1.24); }
+  100% { opacity: 0.92; transform: scale(1.08); }
+}
+
+@keyframes point-track-box-lid-open {
+  0% { transform: translateY(0) scaleX(1) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-1.15rem) scaleX(0.96) rotate(-8deg); opacity: 0.42; }
+}
+
+@keyframes point-track-box-revealed {
+  0% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 0.82; transform: scale(1.02); }
+}
+
+@keyframes point-track-reward-pop {
+  0% { opacity: 0; transform: translateY(16px) scale(0.82); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .point-track-hero-box__glow,
+  .point-track-hero-box__shadow,
+  .point-track-hero-box__body,
+  .point-track-hero-box__spark,
+  .point-track-progress-fill::after,
+  .point-track-slot--ready .point-track-slot__box,
+  .point-track-reward-burst {
+    animation: none !important;
+  }
+
+  .point-track-hero-box--shake .point-track-hero-box__body,
+  .point-track-hero-box--shake .point-track-hero-box__shadow,
+  .point-track-hero-box--burst .point-track-hero-box__glow,
+  .point-track-hero-box--burst .point-track-hero-box__lid,
+  .point-track-hero-box--revealed .point-track-hero-box__glow {
+    animation: none !important;
+  }
+}
