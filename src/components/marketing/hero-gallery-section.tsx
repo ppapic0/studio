@@ -34,7 +34,7 @@ export function HeroGallerySection() {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl text-center">
           <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">TRACK SPACE & CLASS</p>
-          <h2 className="mt-4 break-keep text-[clamp(1.7rem,4.8vw,3rem)] font-black leading-[1.28] text-[#14295F]">
+          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.7rem,4.8vw,3rem)] font-black leading-[1.28] text-[#14295F]">
             트랙 관리형 스터디센터 및
             <br />
             트랙 국어학원에서는 최고의
