@@ -822,8 +822,6 @@ export default function StudyPlanPage() {
       + (Math.min(100, raw.resilience || 0) / 100) * 0.05;
   }, [progress?.stats]);
   const routineCountLabel = `${scheduleItems.length}개`;
-  const studyCountLabel = `${studyTasks.length}개`;
-  const personalCountLabel = `${personalTasks.length}개`;
   const completedStudyCount = useMemo(
     () => studyTasks.filter((task) => task.done).length,
     [studyTasks]
@@ -1815,35 +1813,6 @@ export default function StudyPlanPage() {
 
       <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile && "rounded-[1.5rem]")}>
         <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
-        <CardHeader className={cn("border-b bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,249,255,0.94)_100%)]", isMobile ? "p-4" : "p-8")}>
-          <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-start justify-between")}>
-            <div className="min-w-0">
-              <Badge className="border-none bg-primary/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-primary shadow-none">
-                설정 스튜디오
-              </Badge>
-              <CardTitle className={cn("mt-3 font-black tracking-tight text-primary break-keep", isMobile ? "text-xl" : "text-3xl")}>
-                루틴과 공부 계획을 한 곳에서 빠르게 정리해요
-              </CardTitle>
-              <CardDescription className={cn("mt-2 break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
-                생활 루틴부터 학습 계획, 기타 일정까지 여기서 전체 설정을 끝내고 기록트랙에서는 빠르게만 손보세요.
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge className="rounded-full border border-primary/10 bg-white px-3 py-1 text-[10px] font-black text-primary shadow-sm">
-                {format(selectedDate, 'yyyy. MM. dd', { locale: ko })}
-              </Badge>
-              <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
-                루틴 {routineCountLabel}
-              </Badge>
-              <Badge className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700 shadow-sm">
-                학습 {studyCountLabel}
-              </Badge>
-              <Badge className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
-                기타 {personalCountLabel}
-              </Badge>
-            </div>
-          </div>
-        </CardHeader>
         <CardContent className={cn("bg-[#fafafa] space-y-5", isMobile ? "p-4" : "p-8")}>
           <section className={cn("overflow-hidden rounded-[1.85rem] border border-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_100%)] shadow-[0_18px_44px_-34px_rgba(20,41,95,0.22)]", isMobile && "rounded-[1.45rem]")}>
             <div className={cn("space-y-4", isMobile ? "p-4" : "p-6")}>
