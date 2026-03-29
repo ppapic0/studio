@@ -780,9 +780,10 @@ export default function StudyPlanPage() {
     ? '수정 버튼에서 다시 출석 일정으로 바꿀 수 있어요.'
     : attendanceSourceLabel === '미설정'
       ? '수정 버튼에서 오늘 일정, 요일별 기본값, 저장한 루틴을 한 번에 관리해요.'
-      : hasAwayPlan || (hasSelectedWeekdayTemplate && selectedWeekdayTemplate.awayStartTime && selectedWeekdayTemplate.awayEndTime)
-        ? `외출 ${awayStartTime || selectedWeekdayTemplate.awayStartTime} ~ ${awayEndTime || selectedWeekdayTemplate.awayEndTime}${(awayReason || selectedWeekdayTemplate.awayReason).trim() ? ` · ${(awayReason || selectedWeekdayTemplate.awayReason).trim()}` : ''}`
-        : '앞 화면에서는 오늘 요약만 보고, 수정은 한 번에 열어서 관리해요.';
+        : hasAwayPlan || (hasSelectedWeekdayTemplate && selectedWeekdayTemplate.awayStartTime && selectedWeekdayTemplate.awayEndTime)
+          ? `외출 ${awayStartTime || selectedWeekdayTemplate.awayStartTime} ~ ${awayEndTime || selectedWeekdayTemplate.awayEndTime}${(awayReason || selectedWeekdayTemplate.awayReason).trim() ? ` · ${(awayReason || selectedWeekdayTemplate.awayReason).trim()}` : ''}`
+          : '앞 화면에서는 오늘 요약만 보고, 수정은 한 번에 열어서 관리해요.';
+  const routineCountLabel = `${scheduleItems.length}개`;
 
   const studyTimeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
@@ -821,7 +822,6 @@ export default function StudyPlanPage() {
       + (Math.min(100, raw.achievement || 0) / 100) * 0.05
       + (Math.min(100, raw.resilience || 0) / 100) * 0.05;
   }, [progress?.stats]);
-  const routineCountLabel = `${scheduleItems.length}개`;
   const completedStudyCount = useMemo(
     () => studyTasks.filter((task) => task.done).length,
     [studyTasks]
@@ -1810,6 +1810,7 @@ export default function StudyPlanPage() {
       <Card className={cn("border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white ring-1 ring-black/[0.03]", isMobile && "rounded-[1.5rem]")}>
         <div className={cn("h-1.5 w-full bg-gradient-to-r", currentTier.gradient)} />
         <CardContent className={cn("bg-[#fafafa] space-y-5", isMobile ? "p-4" : "p-8")}>
+          {false && (
           <section className={cn("overflow-hidden rounded-[1.85rem] border border-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_100%)] shadow-[0_18px_44px_-34px_rgba(20,41,95,0.22)]", isMobile && "rounded-[1.45rem]")}>
             <div className={cn("space-y-4", isMobile ? "p-4" : "p-6")}>
               <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
@@ -1917,6 +1918,7 @@ export default function StudyPlanPage() {
               )}
             </div>
           </section>
+          )}
           <section className={cn("overflow-hidden rounded-[1.85rem] border border-emerald-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(244,253,248,0.96)_100%)] shadow-[0_18px_44px_-34px_rgba(16,185,129,0.18)]", isMobile && "rounded-[1.45rem]")}>
             <div className={cn("space-y-4", isMobile ? "p-4" : "p-6")}>
               <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
