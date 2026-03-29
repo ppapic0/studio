@@ -1,4 +1,5 @@
 import { ConsultSection } from '@/components/marketing/consult-section';
+import { HeroGallerySection } from '@/components/marketing/hero-gallery-section';
 import { HeroSection } from '@/components/marketing/hero-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
@@ -17,6 +18,9 @@ export default function HomePage() {
       <MarketingLaunchNoticeModal notice={marketingContent.launchNotice} />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
+      <ScrollReveal>
+        <HeroGallerySection />
+      </ScrollReveal>
       <ScrollReveal>
         <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
       </ScrollReveal>
