@@ -4,7 +4,7 @@ import { SectionHeading } from './section-heading';
 
 const firewallHighlights = [
   '학습 시간에는 필요한 학습 사이트만 열어 집중 흐름을 유지합니다.',
-  '영상, 게임, SNS처럼 흔들리는 경로는 와이파이 단에서 먼저 정리합니다.',
+  '영상, 게임, SNS처럼 흔들리는 경로는 와이파이에서 먼저 정리합니다.',
   '학생마다 필요한 허용 목록만 남겨 억지 통제가 아니라 공부 몰입 환경을 만듭니다.',
 ] as const;
 
@@ -12,7 +12,7 @@ const mockExamFlow = [
   {
     step: '01',
     title: '월간 모의고사 운영',
-    detail: '더프, 사설, 자체 점검 일정을 같은 흐름으로 관리합니다.',
+    detail: '더프, 사설, 자체 점검 일정을 기준에 맞게 체계적으로 운영합니다.',
   },
   {
     step: '02',
@@ -21,12 +21,12 @@ const mockExamFlow = [
   },
   {
     step: '03',
-    title: '결과 입력과 바로 피드백',
-    detail: '성적과 체감 난도를 바로 기록해 이후 계획 조정으로 이어집니다.',
+    title: '결과 입력 후 상담 진행',
+    detail: '성적과 체감 난도를 기록한 뒤 바로 상담으로 이어 철저하게 점검합니다.',
   },
 ] as const;
 
-const supportChips = ['집중 와이파이 환경', '실전 모의고사 운영', '시험 후 바로 피드백'] as const;
+const supportChips = ['집중 와이파이 환경', '실전 모의고사 운영', '결과 입력 후 상담'] as const;
 
 export function HomeOpsSection() {
   return (
@@ -130,7 +130,7 @@ export function HomeOpsSection() {
               </div>
 
               <p className="mt-5 break-keep text-[14px] font-semibold leading-[1.85] text-[#425A75]">
-                더프, 사설, 자체 점검까지 시험 일정과 응시 흐름을 분리하지 않고, 성적 기록과 이후 개입까지 같은 운영 루틴으로 묶습니다.
+                더프, 사설, 자체 점검까지 시험 일정부터 결과 입력, 상담 진행까지 끊기지 않도록 운영합니다. 시험이 끝난 뒤에도 학생별 상태를 체계적으로, 철저히 관리합니다.
               </p>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -162,7 +162,7 @@ export function HomeOpsSection() {
 
               <div className="mt-6 flex items-center gap-2 text-[12px] font-black text-[#14295F]">
                 <ArrowRight className="h-4 w-4" />
-                운영 환경도 기록과 피드백까지 이어지는 하나의 관리 루틴입니다.
+                모의고사는 결과 입력 후 상담까지 체계적으로, 철저히 관리합니다.
               </div>
             </div>
           </article>
