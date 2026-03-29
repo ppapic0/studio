@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useFunctions } from '@/firebase';
-import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where, documentId } from 'firebase/firestore';
+import { usePathname } from 'next/navigation';
+import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { format } from 'date-fns';
 
@@ -30,6 +31,23 @@ export const TIERS = [
 
 const ACTIVE_ATTENDANCE_STATUSES = ['studying', 'away', 'break'] as const;
 const MOBILE_VIEWPORT_QUERY = '(max-width: 768px)';
+const PUBLIC_ROUTES = new Set([
+  '/',
+  '/login',
+  '/signup',
+  '/experience',
+  '/class',
+  '/lp',
+  '/center',
+  '/results',
+  '/consult/check',
+]);
+
+function isPublicRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (PUBLIC_ROUTES.has(pathname)) return true;
+  return pathname.startsWith('/consult/check');
+}
 
 function getSeatActivityRank(status?: string | null): number {
   if (status === 'studying') return 0;
@@ -64,6 +82,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const functions = useFunctions();
+  const pathname = usePathname();
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
@@ -94,6 +113,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (isPublicRoute(pathname)) {
+      setMemberships([]);
+      setActiveMembership(null);
+      setMembershipsLoading(false);
+      activeMembershipRef.current = null;
+      setCurrentTier(TIERS[0]);
+      return;
+    }
+
     if (!user || !firestore) {
       setMemberships([]);
       setActiveMembership(null);
@@ -210,7 +238,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
     const fallbackMembersByFieldQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
-    const fallbackMembersByDocIdQuery = query(collectionGroup(firestore, 'members'), where(documentId(), '==', user.uid));
 
     // Track whether the one-time fallback has already been fetched
     let fallbackFetched = false;
@@ -236,12 +263,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (fallbackFetched) return;
       fallbackFetched = true;
       try {
-        const [byFieldSnapshot, byDocIdSnapshot] = await Promise.all([
-          getDocs(fallbackMembersByFieldQuery),
-          getDocs(fallbackMembersByDocIdQuery),
-        ]);
-        const mergedDocs = [...byFieldSnapshot.docs, ...byDocIdSnapshot.docs];
-        const uniqueDocs = Array.from(new Map(mergedDocs.map((docSnap) => [docSnap.ref.path, docSnap])).values());
+        const byFieldSnapshot = await getDocs(fallbackMembersByFieldQuery);
+        const uniqueDocs = Array.from(new Map(byFieldSnapshot.docs.map((docSnap) => [docSnap.ref.path, docSnap])).values());
         memberFallbackMemberships = uniqueDocs
           .map((docSnap) => {
             const raw = docSnap.data() as any;
@@ -304,7 +327,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribeUserCenters();
     };
-  }, [user, firestore, functions]);
+  }, [user, firestore, functions, pathname]);
 
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {

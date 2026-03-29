@@ -5,7 +5,23 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
-const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/experience', '/class', '/lp']);
+const PUBLIC_ROUTES = new Set([
+  '/',
+  '/login',
+  '/signup',
+  '/experience',
+  '/class',
+  '/lp',
+  '/center',
+  '/results',
+  '/consult/check',
+]);
+
+function isPublicRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (PUBLIC_ROUTES.has(pathname)) return true;
+  return pathname.startsWith('/consult/check');
+}
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading: userLoading } = useUser();
@@ -21,7 +37,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (userLoading || !mounted) return;
 
     if (!user) {
-      if (!PUBLIC_ROUTES.has(pathname)) {
+      if (!isPublicRoute(pathname)) {
         router.replace('/login');
       }
     } else {
@@ -41,7 +57,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // 로그인/회원가입 페이지는 인증 체크 없이 노출
-  if (PUBLIC_ROUTES.has(pathname)) {
+  if (isPublicRoute(pathname)) {
     return <>{children}</>;
   }
 
@@ -56,7 +72,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // 로그인이 되어 있지 않은 상태에서 보호된 경로 접근 시 (useEffect에서 처리하지만 렌더링 방지)
-  if (!user && !PUBLIC_ROUTES.has(pathname)) {
+  if (!user && !isPublicRoute(pathname)) {
     return null;
   }
   
