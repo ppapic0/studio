@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
 
 import { FirebaseErrorListener } from "@/components/FirebaseErrorListener";
-import { AuthGuard } from "@/components/auth/auth-guard";
+import { RouteAwareAppShell } from "@/components/auth/route-aware-app-shell";
 import { Toaster } from "@/components/ui/toaster";
-import { AppProvider } from "@/contexts/app-context";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
 
 import "./globals.css";
@@ -43,9 +42,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body className="font-body antialiased selection:bg-primary selection:text-white">
         <FirebaseClientProvider>
-          <AppProvider>
-            <AuthGuard>{children}</AuthGuard>
-          </AppProvider>
+          <RouteAwareAppShell>{children}</RouteAwareAppShell>
           <Toaster />
           <FirebaseErrorListener />
         </FirebaseClientProvider>
