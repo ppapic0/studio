@@ -63,36 +63,51 @@ export function PageGatewaySection() {
           />
         </div>
 
-        <StaggerChildren stagger={90} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {pageDestinations.map((item) => {
+        <StaggerChildren stagger={90} className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {pageDestinations.map((item, index) => {
             const Icon = item.icon;
+            const pageNumber = String(index + 1).padStart(2, '0');
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`brand-sheen-panel group relative overflow-hidden rounded-[1.7rem] border px-5 py-5 shadow-[0_16px_34px_rgba(20,41,95,0.08)] transition-transform hover:-translate-y-1 sm:px-6 sm:py-6 ${item.cardClass}`}
+                className={`brand-sheen-panel group relative overflow-hidden rounded-[1.9rem] border px-5 py-5 shadow-[0_18px_40px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_52px_rgba(20,41,95,0.12)] sm:px-6 sm:py-6 ${item.cardClass}`}
               >
-                <div className="brand-glow-drift absolute -right-10 top-4 h-24 w-24 rounded-full bg-[#FFB878]/12 blur-3xl" />
-                <div className="relative flex h-full flex-col">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black tracking-[0.2em] text-[#FF7A16]">{item.eyebrow}</p>
-                      <h3 className="mt-3 break-keep text-[1.22rem] font-black leading-[1.22] text-[#14295F]">
+                <div className="brand-glow-drift absolute -right-8 top-3 h-28 w-28 rounded-full bg-[#FFB878]/12 blur-3xl" />
+                <div className="absolute inset-x-5 bottom-5 h-px bg-[linear-gradient(90deg,rgba(20,41,95,0.14),rgba(20,41,95,0))] sm:inset-x-6 sm:bottom-6" />
+                <div className="relative flex min-h-[208px] flex-col justify-between">
+                  <div className="space-y-6">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2.5">
+                          <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">{item.eyebrow}</p>
+                          <span className="rounded-full border border-[#14295F]/10 bg-white/70 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[#14295F]/55">
+                            PAGE {pageNumber}
+                          </span>
+                        </div>
+                        <h3 className="break-keep text-[1.32rem] font-black leading-[1.12] text-[#14295F] sm:text-[1.45rem]">
                         {item.title}
-                      </h3>
-                      <p className="mt-2 text-[11px] font-black tracking-[0.08em] text-[#14295F]/54">
+                        </h3>
+                      </div>
+                      <span
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-[0_12px_24px_rgba(20,41,95,0.10)] ${item.iconClass}`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </span>
+                    </div>
+
+                    <div className="max-w-[15rem] space-y-3">
+                      <p className="text-sm font-bold leading-[1.55] text-[#14295F]/82">
                         {item.meta}
                       </p>
+                      <div className="h-px w-14 bg-[#FF7A16]/24" />
                     </div>
-                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-[0_12px_24px_rgba(20,41,95,0.10)] ${item.iconClass}`}>
-                      <Icon className="h-5 w-5" />
-                    </span>
                   </div>
 
-                  <div className="mt-8 inline-flex items-center gap-2 text-[13px] font-black text-[#14295F]">
+                  <div className="inline-flex items-center gap-2 text-[13px] font-black text-[#14295F]">
                     자세히 보기
-                    <ArrowRight className="brand-cta-arrow h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                    <ArrowRight className="brand-cta-arrow h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1.5" />
                   </div>
                 </div>
               </Link>
