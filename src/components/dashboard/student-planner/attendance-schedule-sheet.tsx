@@ -253,6 +253,30 @@ export function AttendanceScheduleSheet({
         </div>
 
         <div className={cn('overflow-y-auto bg-white', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'h-full p-5')}>
+          <div className="mb-4 rounded-[1.45rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.18)]">
+            <p className="text-[11px] font-black text-slate-900">세 가지 방식으로 관리해요</p>
+            <div className={cn('mt-3 grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+              <div className="rounded-[1rem] border border-primary/10 bg-white/90 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">특정 날짜</p>
+                <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-600">
+                  오늘이나 특정 일자만 따로 바꿔요.
+                </p>
+              </div>
+              <div className="rounded-[1rem] border border-emerald-100 bg-white/90 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">매주 반복</p>
+                <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-600">
+                  월요일, 화요일처럼 같은 요일 기본값을 저장해요.
+                </p>
+              </div>
+              <div className="rounded-[1rem] border border-amber-100 bg-white/90 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">저장한 루틴</p>
+                <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-600">
+                  자주 쓰는 패턴을 저장해두고 날짜나 반복값에 복사해요.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <Tabs defaultValue="today" className="space-y-4">
             <TabsList className="grid w-full grid-cols-3 rounded-2xl bg-slate-100 p-1">
               <TabsTrigger value="today" className="rounded-xl text-[11px] font-black">특정 날짜</TabsTrigger>
