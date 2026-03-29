@@ -1779,7 +1779,7 @@ export function MarketingConsultingCRM({
           if (!open) setSelectedDrawer(null);
         }}
       >
-        <SheetContent side="right" className="w-[96vw] max-w-2xl overflow-y-auto border-l-0 p-0 shadow-2xl">
+      <SheetContent side="right" motionPreset="dashboard-premium" className="w-[96vw] max-w-2xl overflow-y-auto border-l-0 p-0 shadow-2xl">
           <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white">
             <SheetHeader className="space-y-2 text-left">
               <SheetTitle className="text-2xl font-black tracking-tight text-white">
@@ -1982,7 +1982,7 @@ export function MarketingConsultingCRM({
         open={waitlistModal.open}
         onOpenChange={(open) => !open && setWaitlistModal(INITIAL_WAITLIST_MODAL())}
       >
-        <DialogContent className="max-w-md rounded-2xl">
+      <DialogContent motionPreset="dashboard-premium" className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-black">
               <ListChecks className="h-5 w-5 text-orange-500" />

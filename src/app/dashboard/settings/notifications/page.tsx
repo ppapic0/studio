@@ -1634,7 +1634,7 @@ export default function NotificationSettingsPage() {
           if (!open) setSelectedBoardStudentId(null);
         }}
       >
-        <SheetContent side="right" className="w-[96vw] max-w-5xl overflow-y-auto border-l-0 p-0 shadow-2xl">
+      <SheetContent side="right" motionPreset="dashboard-premium" className="w-[96vw] max-w-5xl overflow-y-auto border-l-0 p-0 shadow-2xl">
           {selectedBoardStudent ? (
             <>
               <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white sm:px-8">

@@ -1060,7 +1060,7 @@ export default function RevenuePage() {
       </Tabs>
 
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl sm:max-w-lg">
+      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tight">수납/인보이스 설정</DialogTitle>
             <DialogDescription className="font-semibold">

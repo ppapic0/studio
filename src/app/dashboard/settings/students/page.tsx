@@ -469,7 +469,7 @@ export default function StudentAccountManagementPage() {
       </Card>
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-2xl max-h-[95vh]">
+        <DialogContent motionPreset="dashboard-premium" className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-2xl max-h-[95vh]">
           <div className="bg-primary p-8 text-white relative shrink-0">
             <UserCog className="absolute top-0 right-0 p-8 h-24 w-24 opacity-10 rotate-12" />
             <DialogHeader>

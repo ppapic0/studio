@@ -3320,7 +3320,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Tabs>
 
       <Dialog open={isAvgStudyModalOpen} onOpenChange={setIsAvgStudyModalOpen}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
+      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">과거 7일 학습세션</DialogTitle>
@@ -3409,7 +3409,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isRhythmGuideModalOpen} onOpenChange={setIsRhythmGuideModalOpen}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
+      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
           <div className="bg-gradient-to-r from-[#0f2359] to-[#1d3f8c] px-6 py-5 text-white">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">평균 공부 리듬 그래프</DialogTitle>
@@ -3501,7 +3501,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           if (!open) setIsEditStats(false);
         }}
       >
-        <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-xl max-h-[90vh]">
+      <DialogContent motionPreset="dashboard-premium" className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-xl max-h-[90vh]">
           <div className="bg-purple-600 p-10 text-white relative shrink-0">
             <Zap className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
             <DialogHeader>
@@ -3608,7 +3608,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="rounded-[2.5rem] sm:max-w-md p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent motionPreset="dashboard-premium" className="rounded-[2.5rem] sm:max-w-md p-0 overflow-hidden border-none shadow-2xl">
           <div className="bg-primary p-10 text-white"><DialogTitle className="text-3xl font-black tracking-tighter">프로필 수정</DialogTitle></div>
           <div className="p-8 space-y-4 bg-white">
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">이름</Label><Input value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="rounded-xl h-12 border-2 font-bold" /></div>
@@ -3624,7 +3624,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isReservationModalOpen} onOpenChange={setIsReservationModalOpen}>
-        <DialogContent className="rounded-[2rem] sm:max-w-md border-none shadow-2xl">
+      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] sm:max-w-md border-none shadow-2xl">
           <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">상담 예약 생성</DialogTitle></DialogHeader>
           <div className="space-y-4 py-1">
             <div className="grid grid-cols-2 gap-3">
@@ -3638,7 +3638,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
         <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
-          <DialogContent className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
+      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
             <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">상담 일지 작성</DialogTitle></DialogHeader>
             <div className="space-y-4 py-1">
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">상담 유형</Label><Select value={logType} onValueChange={(value) => setLogType(value as typeof logType)}><SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학습 상담</SelectItem><SelectItem value="life">생활 상담</SelectItem><SelectItem value="career">진로 상담</SelectItem></SelectContent></Select></div>
@@ -3650,7 +3650,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </Dialog>
 
         <Dialog open={isQuickFeedbackModalOpen} onOpenChange={setIsQuickFeedbackModalOpen}>
-          <DialogContent className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
+      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] sm:max-w-lg border-none shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">한 줄 피드백 전송</DialogTitle>
               <DialogDescription className="font-semibold">

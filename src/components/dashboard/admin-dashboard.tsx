@@ -2145,7 +2145,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       />
 
       <Dialog open={isAttendanceFullscreenOpen} onOpenChange={setIsAttendanceFullscreenOpen}>
-        <DialogContent className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden rounded-[2rem] border-none bg-[#f6f8ff] p-0 shadow-[0_24px_80px_rgba(20,41,95,0.28)]">
+        <DialogContent motionPreset="dashboard-premium" className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden rounded-[2rem] border-none bg-[#f6f8ff] p-0 shadow-[0_24px_80px_rgba(20,41,95,0.28)]">
           <div className="border-b border-primary/10 bg-white/90 px-5 py-4 backdrop-blur sm:px-6">
             <DialogHeader className="gap-2 text-left">
               <div className="flex flex-wrap items-center gap-2">
@@ -2609,7 +2609,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </div>
       )}
       <Dialog open={isStudyingStudentsDialogOpen} onOpenChange={setIsStudyingStudentsDialogOpen}>
-        <DialogContent className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-2xl">
+          <DialogContent motionPreset="dashboard-premium" className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-2xl">
           <div className="bg-[linear-gradient(135deg,#14295F_0%,#2754D7_100%)] px-6 py-6 text-white">
             <DialogHeader className="space-y-2 text-left">
               <div className="flex flex-wrap items-center gap-2">
@@ -2693,7 +2693,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </DialogContent>
       </Dialog>
       <Dialog open={!!selectedFocusStudentId} onOpenChange={(open) => !open && setSelectedFocusStudentId(null)}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl max-h-[92vh] flex flex-col">
+          <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl max-h-[92vh] flex flex-col">
 
           {/* ── HEADER ── */}
           <div className="bg-[#14295F] p-6 text-white flex-shrink-0">
@@ -3087,7 +3087,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isParentTrustDialogOpen} onOpenChange={setIsParentTrustDialogOpen}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-4xl">
+          <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-4xl">
           <div className="bg-primary p-6 text-primary-foreground">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">부모님별 신뢰 지표 상세</DialogTitle>
@@ -3185,7 +3185,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={!!selectedTeacher} onOpenChange={(open) => !open && setSelectedTeacherId(null)}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl">
+          <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-3xl">
           {selectedTeacher && (
             <>
               <div className="bg-primary p-6 text-primary-foreground">

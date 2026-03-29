@@ -2266,7 +2266,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </div>
 
       <Dialog open={!!selectedRecentReport} onOpenChange={(open) => !open && setSelectedRecentReport(null)}>
-        <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
+        <DialogContent motionPreset="dashboard-premium" className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
           {selectedRecentReport && (
             <>
               <div className="bg-emerald-600 text-white p-8 relative shrink-0">
@@ -2302,6 +2302,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       <Dialog open={isManaging} onOpenChange={setIsManaging}>
         <DialogContent
+          motionPreset="dashboard-premium"
           className={cn(
             "flex min-h-0 flex-col overflow-hidden border-none p-0 shadow-2xl",
             isMobile
@@ -2814,7 +2815,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       </Tabs>
 
                       <Dialog open={isPenaltyGuideOpen} onOpenChange={setIsPenaltyGuideOpen}>
-                        <DialogContent className={cn("rounded-[2rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-[420px]" : "sm:max-w-lg")}>
+        <DialogContent motionPreset="dashboard-premium" className={cn("rounded-[2rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-[420px]" : "sm:max-w-lg")}>
                           <div className="bg-gradient-to-r from-rose-600 to-rose-500 p-6 text-white">
                             <DialogHeader>
                               <DialogTitle className="text-xl font-black tracking-tight">벌점 규정 안내</DialogTitle>
@@ -2850,7 +2851,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       </Dialog>
 
                       <Dialog open={!!selectedReportPreview} onOpenChange={(open) => !open && setSelectedReportPreview(null)}>
-                        <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
+        <DialogContent motionPreset="dashboard-premium" className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
                           {selectedReportPreview && (
                             <>
                               <div className="bg-amber-500 text-white p-8 relative shrink-0">
@@ -2894,7 +2895,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isAssigning} onOpenChange={setIsAssigning}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-none rounded-none" : "sm:max-w-md")}>
+        <DialogContent motionPreset="dashboard-premium" className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-none rounded-none" : "sm:max-w-md")}>
           <div className="bg-primary p-8 text-white relative shrink-0">
             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
             <DialogHeader className="relative z-10"><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3">{selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}배정 설정</DialogTitle><p className="text-white/60 font-bold mt-1 text-xs">{selectedSeatLabel}</p></DialogHeader>

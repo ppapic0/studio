@@ -393,7 +393,7 @@ export function CenterAdminHeatmapCharts({
       </Card>
 
       <Dialog open={!!selectedRow} onOpenChange={(open) => !open && setSelectedRowId(null)}>
-        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl">
+      <DialogContent motionPreset="dashboard-premium" className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl">
           {selectedRow && (
             <>
               <div className="shrink-0 bg-gradient-to-r from-[#14295F] to-[#1d3f89] p-6 text-white sm:p-8">

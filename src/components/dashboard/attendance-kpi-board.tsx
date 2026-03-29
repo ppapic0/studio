@@ -777,7 +777,7 @@ export function AttendanceKpiBoard({
       </CardContent>
 
       <Sheet open={!isDesktop && mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
-        <SheetContent side="bottom" className="max-h-[88vh] overflow-y-auto rounded-t-[2rem] border-none px-0 pb-8 pt-12">
+      <SheetContent side="bottom" motionPreset="dashboard-premium" className="max-h-[88vh] overflow-y-auto rounded-t-[2rem] border-none px-0 pb-8 pt-12">
           <div className="px-6">
             <SheetHeader className="mb-4 text-left">
               <SheetTitle className="text-xl font-black tracking-tight text-[#14295F]">
