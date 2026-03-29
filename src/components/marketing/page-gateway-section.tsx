@@ -19,10 +19,10 @@ const pageDestinations = [
   },
   {
     eyebrow: 'CENTER',
-    title: '센터 환경',
+    title: '센터 소개',
     href: '/center',
-    meta: '보안 운영 · 센터 사진',
-    highlights: ['보안 운영', '센터 사진', '집중 환경'],
+    meta: '집중 환경 · 앱 연동 · 모의 운영',
+    highlights: ['집중 환경', '앱 연동', '모의 운영'],
     icon: ShieldCheck,
     cardClass: 'border-[#FFD9BF] bg-[linear-gradient(180deg,#FFF9F2_0%,#FFF3E8_100%)]',
     iconClass: 'bg-[#FFF1E4] text-[#FF7A16]',

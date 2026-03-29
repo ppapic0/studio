@@ -79,11 +79,11 @@ export default function ResultsPage() {
                 결과가 만들어진 운영 구조도 이어서 확인해보세요
               </h2>
               <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.8] text-[#425A75]">
-                센터 환경, 웹앱 데이터, 국어 수업 구조를 함께 보면 왜 결과가 이어졌는지 더 선명하게 읽을 수 있습니다.
+                센터 소개, 트랙 시스템, 국어 수업 구조를 함께 보면 왜 결과가 이어졌는지 더 선명하게 읽을 수 있습니다.
               </p>
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link href="/center" className="premium-cta premium-cta-muted h-11 px-6 text-sm">
-                  센터 환경 보기
+                  센터 소개 보기
                 </Link>
                 <Link href="/#consult" className="premium-cta premium-cta-primary h-11 px-6 text-sm">
                   상담 문의하기
