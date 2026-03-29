@@ -1920,8 +1920,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             </div>
             <ChevronRight className="h-6 w-6 text-primary" />
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {quickActionLinks.slice(0, 4).map((item) => (
+          <div className={cn('mt-4 grid gap-2', isMobile ? 'grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-3')}>
+            {quickActionLinks.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -2048,32 +2048,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             </div>
           </Card>
 
-          <Card className="rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-black/[0.03]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">빠른 드릴다운</p>
-                <p className="mt-1 text-sm font-bold text-slate-500">도메인별 워크벤치로 바로 이동합니다.</p>
-              </div>
-            </div>
-            <div className="mt-4 grid gap-2">
-              {quickActionLinks.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3 transition-all hover:border-primary/20 hover:bg-white hover:shadow-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <item.icon className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="text-sm font-black text-[#14295F]">{item.label}</p>
-                      <p className="text-[11px] font-bold text-slate-500">{item.description}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
-                </Link>
-              ))}
-            </div>
-          </Card>
         </div>
       </div>
     </section>
