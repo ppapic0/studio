@@ -1,5 +1,6 @@
 import { ConsultSection } from '@/components/marketing/consult-section';
 import { HeroGallerySection } from '@/components/marketing/hero-gallery-section';
+import { HomeOpsSection } from '@/components/marketing/home-ops-section';
 import { HeroSection } from '@/components/marketing/hero-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
@@ -23,6 +24,9 @@ export default function HomePage() {
       </ScrollReveal>
       <ScrollReveal>
         <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
+      </ScrollReveal>
+      <ScrollReveal>
+        <HomeOpsSection />
       </ScrollReveal>
       <ScrollReveal>
         <PageGatewaySection />
