@@ -1517,6 +1517,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     attendanceCurrent?.status,
   ]);
 
+  const todayStudyMinutes = focusKpi.todayMinutes;
+  const attendanceRate30d = useMemo(() => {
+    const trackedDays = operationsTimeline.filter((item) => item.attendanceStatus !== 'requested');
+    if (!trackedDays.length) return 0;
+    const presentDays = trackedDays.filter((item) =>
+      ['confirmed_present', 'confirmed_present_missing_routine', 'confirmed_late'].includes(item.attendanceStatus)
+    ).length;
+    return Math.round((presentDays / trackedDays.length) * 100);
+  }, [operationsTimeline]);
+
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId || !canEditStudentInfo) return;
 
