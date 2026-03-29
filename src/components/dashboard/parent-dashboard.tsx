@@ -3587,6 +3587,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
                       const flowLabel = getParentCalendarFlowLabel(minutes);
                       const exactTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
+                      const isLongTimeLabel = exactTimeLabel.length >= 5;
 
                       return (
                         <button
@@ -3640,15 +3641,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             {isCurrentMonth ? (
                               <div
                                 className={cn(
-                                  "inline-flex max-w-full flex-col items-center justify-center rounded-[0.95rem] border px-2.5 py-1.5 text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
-                                  isMobile ? "min-w-[3.1rem]" : "min-w-[4.65rem]",
+                                  "inline-flex max-w-full flex-col items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
+                                  isMobile ? "min-w-[3rem] px-1.5 py-1.5" : "min-w-[4.65rem] px-2.5 py-1.5",
                                   getParentCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                                 )}
                               >
                                 <span
                                   className={cn(
-                                    "dashboard-number block tabular-nums leading-none tracking-[-0.08em]",
-                                    isMobile ? "text-[0.72rem]" : "text-[1rem]"
+                                    "dashboard-number block whitespace-nowrap tabular-nums leading-none",
+                                    isMobile
+                                      ? isLongTimeLabel
+                                        ? "text-[0.64rem] tracking-[-0.04em]"
+                                        : "text-[0.72rem] tracking-[-0.06em]"
+                                      : "text-[1rem] tracking-[-0.05em]"
                                   )}
                                 >
                                   {exactTimeLabel}
