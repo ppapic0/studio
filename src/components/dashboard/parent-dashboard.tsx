@@ -1524,7 +1524,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     [linkedStudents, student?.name, studentId, linkedStudentIds.length]
   );
   const shouldLoadStudyAnalytics = isActive && !!centerId && !!studentId && tab !== 'communication' && tab !== 'billing';
-  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && tab === 'home';
+  const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && (tab === 'home' || tab === 'communication');
   const shouldLoadReportArchive = isActive && !!studentId && isReportArchiveOpen;
   const shouldLoadParentCommunications = isActive && !!centerId && !!user && tab === 'communication';
   const shouldLoadInvoices = isActive && !!studentId && tab === 'billing';
@@ -2475,6 +2475,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return 'border-sky-300/95 bg-white/95 text-[#14295F]';
   };
 
+  const getParentCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
+    if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
+    if (minutes === 0) return 'border-slate-200/90 bg-white/96 text-slate-500';
+    if (minutes < 60) return 'border-emerald-300/95 bg-white text-slate-900';
+    if (minutes < 300) return 'border-teal-300/95 bg-white text-slate-950';
+    return 'border-sky-300/95 bg-white text-[#14295F]';
+  };
+
   const announcementNotifications = useMemo<ParentNotificationItem[]>(() => {
     const now = Date.now();
     return (rawCenterAnnouncements || [])
@@ -2565,6 +2573,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [notifications]);
 
   const recentNotifications = useMemo(() => sortedNotifications.slice(0, 3), [sortedNotifications]);
+  const recentAnnouncementNotifications = useMemo(
+    () => sortedNotifications.filter((notification) => notification.type === 'announcement').slice(0, 3),
+    [sortedNotifications]
+  );
+  const recentAlertNotifications = useMemo(
+    () => sortedNotifications.filter((notification) => notification.type !== 'announcement').slice(0, 3),
+    [sortedNotifications]
+  );
   const unreadRecentCount = useMemo(
     () => recentNotifications.filter((notification) => !(notification.isRead || !!readMap[notification.id])).length,
     [recentNotifications, readMap]
@@ -3570,6 +3586,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const hasDeepFocus = isCurrentMonth && minutes >= 180;
                       const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
                       const flowLabel = getParentCalendarFlowLabel(minutes);
+                      const exactTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
 
                       return (
                         <button
@@ -3619,16 +3636,34 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             )}
                           </div>
 
-                          <div className={cn("mt-auto flex", isMobile ? "justify-center pb-1" : "justify-start pt-8")}>
+                          <div className={cn("mt-auto flex", isMobile ? "justify-center pb-1" : "justify-start pt-6")}>
                             {isCurrentMonth ? (
                               <div
                                 className={cn(
-                                  "inline-flex max-w-full items-center justify-center rounded-full border px-2.5 text-center font-black tracking-tight shadow-[0_12px_24px_-20px_rgba(15,23,42,0.22)]",
-                                  isMobile ? "min-h-[1.35rem] text-[8px]" : "min-h-[2rem] text-[11px]",
-                                  getParentCalendarFlowChipClass(minutes, isCurrentMonth)
+                                  "inline-flex max-w-full flex-col items-center justify-center rounded-[0.95rem] border px-2.5 py-1.5 text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
+                                  isMobile ? "min-w-[3.1rem]" : "min-w-[4.65rem]",
+                                  getParentCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                                 )}
                               >
-                                <span className="truncate">{flowLabel}</span>
+                                <span
+                                  className={cn(
+                                    "dashboard-number block tabular-nums leading-none tracking-[-0.08em]",
+                                    isMobile ? "text-[0.72rem]" : "text-[1rem]"
+                                  )}
+                                >
+                                  {exactTimeLabel}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "mt-1 max-w-full truncate font-black tracking-tight",
+                                    isMobile ? "text-[7px]" : "text-[10px]",
+                                    getParentCalendarFlowChipClass(minutes, isCurrentMonth).includes('text-')
+                                      ? getParentCalendarFlowChipClass(minutes, isCurrentMonth).split(' ').find((token) => token.startsWith('text-')) || 'text-slate-500'
+                                      : 'text-slate-500'
+                                  )}
+                                >
+                                  {flowLabel}
+                                </span>
                               </div>
                             ) : (
                               <span className={cn(isMobile ? "h-[1.35rem]" : "h-[2rem]")} aria-hidden="true" />
@@ -3644,7 +3679,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               {!selectedCalendarDate && (
                 <div className="mx-1 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-muted-foreground/10 bg-muted/20 px-4 py-2.5">
                   <Info className="h-3.5 w-3.5 shrink-0 text-primary/30" />
-                <p className="text-center text-[11px] font-bold leading-relaxed text-muted-foreground/50">날짜를 누르면 그날의 핵심 기록만 볼 수 있어요.</p>
+                  <p className="text-center text-[11px] font-bold leading-relaxed text-muted-foreground/50">날짜를 누르면 그날의 핵심 기록만 볼 수 있어요.</p>
                 </div>
               )}
             </TabsContent>
@@ -4043,52 +4078,109 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   }
                 />
 
-                {recentNotifications.length === 0 ? (
+                {recentAnnouncementNotifications.length === 0 && recentAlertNotifications.length === 0 ? (
                   <div className="mt-4 rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
                     확인할 공지사항이 없습니다.
                   </div>
                 ) : (
-                  <div className="mt-4 space-y-2.5">
-                    {recentNotifications.map((notification) => {
-                      const isRead = notification.isRead || !!readMap[notification.id];
+                  <div className="mt-4 space-y-5">
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#14295F]/60">센터 공지사항</p>
+                        <Badge variant="outline" className="h-5 rounded-full border border-[#d7e4ff] bg-white px-2 text-[10px] font-black text-[#14295F]">
+                          {recentAnnouncementNotifications.length}건
+                        </Badge>
+                      </div>
+                      {recentAnnouncementNotifications.length === 0 ? (
+                        <div className="rounded-[1.35rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-5 text-center text-[11px] font-bold text-slate-400">
+                          현재 전달된 센터 공지사항이 없습니다.
+                        </div>
+                      ) : (
+                        recentAnnouncementNotifications.map((notification) => {
+                          const isRead = notification.isRead || !!readMap[notification.id];
 
-                      return (
-                        <button
-                          type="button"
-                          key={notification.id}
-                          className={cn(
-                            'relative w-full overflow-hidden rounded-[1.55rem] border p-4 text-left transition-all',
-                            isRead
-                              ? 'border-[#dde6f9] bg-white/96 shadow-[0_16px_30px_-28px_rgba(20,41,95,0.14)]'
-                              : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff8f1_0%,#eef4ff_100%)] shadow-[0_18px_32px_-26px_rgba(255,122,22,0.18)] ring-1 ring-[#ffd29f]/70 md:hover:shadow-md'
-                          )}
-                          onClick={() => void openNotificationDetail(notification)}
-                        >
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{notification.createdAtLabel}</span>
-                            <div className="flex items-center gap-2">
-                              {!isRead && <span className="h-2 w-2 rounded-full bg-[#FF7A16]" />}
-                              {notification.type === 'announcement' && (
-                                <Badge variant="outline" className="h-5 border-none bg-[#14295F]/10 px-2 text-[10px] font-black text-[#14295F]">
-                                  공지
-                                </Badge>
+                          return (
+                            <button
+                              type="button"
+                              key={notification.id}
+                              className={cn(
+                                'relative w-full overflow-hidden rounded-[1.55rem] border p-4 text-left transition-all',
+                                isRead
+                                  ? 'border-[#dde6f9] bg-white/96 shadow-[0_16px_30px_-28px_rgba(20,41,95,0.14)]'
+                                  : 'border-[#d7e4ff] bg-[linear-gradient(135deg,#f7faff_0%,#ffffff_100%)] shadow-[0_18px_32px_-26px_rgba(20,41,95,0.16)] ring-1 ring-[#d7e4ff]/70 md:hover:shadow-md'
                               )}
-                              {notification.isImportant && (
-                                <Badge variant="outline" className="h-5 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
-                                  중요
-                                </Badge>
+                              onClick={() => void openNotificationDetail(notification)}
+                            >
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{notification.createdAtLabel}</span>
+                                <div className="flex items-center gap-2">
+                                  {!isRead && <span className="h-2 w-2 rounded-full bg-[#FF7A16]" />}
+                                  <Badge variant="outline" className="h-5 border-none bg-[#14295F]/10 px-2 text-[10px] font-black text-[#14295F]">
+                                    공지
+                                  </Badge>
+                                </div>
+                              </div>
+                              <p className="text-sm font-black leading-snug tracking-tight text-[#14295F] sm:text-base">{notification.title}</p>
+                              {notification.body && (
+                                <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-relaxed text-slate-500">
+                                  {notification.body}
+                                </p>
                               )}
-                            </div>
-                          </div>
-                          <p className="text-sm font-black leading-snug tracking-tight text-[#14295F] sm:text-base">{notification.title}</p>
-                          {notification.body && (
-                            <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-relaxed text-slate-500">
-                              {notification.body}
-                            </p>
-                          )}
-                        </button>
-                      );
-                    })}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#14295F]/60">자녀 알림</p>
+                        <Badge variant="outline" className="h-5 rounded-full border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-500">
+                          {recentAlertNotifications.length}건
+                        </Badge>
+                      </div>
+                      {recentAlertNotifications.length === 0 ? (
+                        <div className="rounded-[1.35rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-5 text-center text-[11px] font-bold text-slate-400">
+                          아직 확인할 자녀 알림이 없습니다.
+                        </div>
+                      ) : (
+                        recentAlertNotifications.map((notification) => {
+                          const isRead = notification.isRead || !!readMap[notification.id];
+
+                          return (
+                            <button
+                              type="button"
+                              key={notification.id}
+                              className={cn(
+                                'relative w-full overflow-hidden rounded-[1.55rem] border p-4 text-left transition-all',
+                                isRead
+                                  ? 'border-[#dde6f9] bg-white/96 shadow-[0_16px_30px_-28px_rgba(20,41,95,0.14)]'
+                                  : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff8f1_0%,#eef4ff_100%)] shadow-[0_18px_32px_-26px_rgba(255,122,22,0.18)] ring-1 ring-[#ffd29f]/70 md:hover:shadow-md'
+                              )}
+                              onClick={() => void openNotificationDetail(notification)}
+                            >
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{notification.createdAtLabel}</span>
+                                <div className="flex items-center gap-2">
+                                  {!isRead && <span className="h-2 w-2 rounded-full bg-[#FF7A16]" />}
+                                  {notification.isImportant && (
+                                    <Badge variant="outline" className="h-5 border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
+                                      중요
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm font-black leading-snug tracking-tight text-[#14295F] sm:text-base">{notification.title}</p>
+                              {notification.body && (
+                                <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-relaxed text-slate-500">
+                                  {notification.body}
+                                </p>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 )}
               </Card>
