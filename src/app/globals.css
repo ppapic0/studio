@@ -313,17 +313,26 @@
     word-break: keep-all;
   }
 
-  button,
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 768px) and (pointer: coarse) {
   input,
   textarea,
   select {
-    font: inherit;
+    font-size: 16px !important;
+    line-height: 1.35;
   }
+}
 
-  /* ── Light-bg context: slate text overrides ─────────── */
-  .text-slate-300 {
-    color: #7a8fa8 !important;
-  }
+/* ── Light-bg context: slate text overrides ─────────── */
+.text-slate-300 {
+  color: #7a8fa8 !important;
+}
 
   .text-slate-400 {
     color: #607088 !important;
