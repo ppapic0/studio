@@ -1130,13 +1130,6 @@ function formatMinutes(minutes: number) {
   return `${h}:${m.toString().padStart(2, '0')}`;
 }
 
-function formatCompactCalendarMinutes(minutes: number) {
-  if (minutes <= 0) return '--';
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round((minutes / 60) * 10) / 10;
-  return Number.isInteger(hours) ? `${hours.toFixed(0)}h` : `${hours.toFixed(1)}h`;
-}
-
 function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록') {
   if (!value || Number.isNaN(value.getTime())) return emptyLabel;
   return format(value, 'HH:mm');
@@ -1144,10 +1137,17 @@ function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록')
 
 const PARENT_CALENDAR_LEGEND = [
   { label: '기록 없음', swatch: 'from-white via-slate-50 to-slate-100 ring-slate-200/90' },
-  { label: '짧은 몰입', swatch: 'from-white via-emerald-100 to-emerald-200 ring-emerald-300/90' },
+  { label: '짧은 학습', swatch: 'from-white via-emerald-100 to-emerald-200 ring-emerald-300/90' },
   { label: '집중 흐름', swatch: 'from-white via-teal-100 to-cyan-200 ring-teal-300/90' },
   { label: '깊은 몰입', swatch: 'from-white via-sky-100 to-indigo-200 ring-blue-300/90' },
 ] as const;
+
+function getParentCalendarFlowLabel(minutes: number) {
+  if (minutes <= 0) return '기록 없음';
+  if (minutes < 60) return '짧은 학습';
+  if (minutes < 300) return '집중 흐름';
+  return '깊은 몰입';
+}
 
 function formatWon(value: number) {
   const safe = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
@@ -1592,6 +1592,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, centerId, studentId, selectedDateKey, selectedDateWeekKey]);
   const { data: selectedDatePlans, isLoading: isSelectedDatePlansLoading } = useCollection<StudyPlanItem>(selectedDatePlansQuery, {
+    enabled: isActive && !!studentId && !!selectedDateKey,
+  });
+  const selectedDateAttendanceRecordRef = useMemoFirebase(
+    () =>
+      !firestore || !centerId || !studentId || !selectedDateKey
+        ? null
+        : doc(firestore, 'centers', centerId, 'attendanceRecords', selectedDateKey, 'students', studentId),
+    [firestore, centerId, studentId, selectedDateKey]
+  );
+  const { data: selectedDateAttendanceRecord } = useDoc<Record<string, unknown>>(selectedDateAttendanceRecordRef, {
     enabled: isActive && !!studentId && !!selectedDateKey,
   });
 
@@ -2457,14 +2467,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return 'from-sky-500 via-blue-500 to-indigo-600';
   };
 
-  const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
-    if (!isCurrentMonth) return 'border-slate-200 text-slate-400';
-    if (minutes === 0) return 'border-slate-200 text-slate-500';
-    if (minutes < 60) return 'border-emerald-300/95 text-slate-900';
-    if (minutes < 180) return 'border-emerald-400/95 text-slate-950';
-    if (minutes < 300) return 'border-teal-400/95 text-slate-950';
-    if (minutes < 480) return 'border-sky-400/95 text-slate-950';
-    return 'border-indigo-400/95 text-slate-950';
+  const getParentCalendarFlowChipClass = (minutes: number, isCurrentMonth: boolean) => {
+    if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300';
+    if (minutes === 0) return 'border-slate-200 bg-white/95 text-slate-500';
+    if (minutes < 60) return 'border-emerald-200/95 bg-white/95 text-emerald-700';
+    if (minutes < 300) return 'border-teal-300/95 bg-white/95 text-teal-800';
+    return 'border-sky-300/95 bg-white/95 text-[#14295F]';
   };
 
   const announcementNotifications = useMemo<ParentNotificationItem[]>(() => {
@@ -2636,6 +2644,38 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [attendanceCurrent?.status, today, todayCheckInAt, todayCheckOutAt]);
 
+  const selectedDateCheckInAt = useMemo(() => {
+    if (!selectedDateKey) return null;
+    if (selectedDateKey === todayKey && todayCheckInAt) return todayCheckInAt;
+    return toDateSafe(
+      (selectedDateAttendanceRecord?.checkInAt as TimestampLike) || (selectedDateAttendanceRecord?.updatedAt as TimestampLike)
+    );
+  }, [selectedDateAttendanceRecord, selectedDateKey, todayCheckInAt, todayKey]);
+
+  const selectedDateCheckOutAt = useMemo(() => {
+    if (!selectedDateKey) return null;
+    if (selectedDateKey === todayKey && todayCheckOutAt) return todayCheckOutAt;
+    return toDateSafe(selectedDateAttendanceRecord?.checkOutAt as TimestampLike);
+  }, [selectedDateAttendanceRecord, selectedDateKey, todayCheckOutAt, todayKey]);
+
+  const selectedDateAttendanceSummary = useMemo(() => {
+    const isSelectedToday = !!selectedDateKey && selectedDateKey === todayKey;
+    const isCurrentlyInside = isSelectedToday && ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '');
+
+    return {
+      checkInLabel: formatAttendanceTimeLabel(selectedDateCheckInAt, '미기록'),
+      checkOutLabel: isCurrentlyInside
+        ? selectedDateCheckOutAt
+          ? formatAttendanceTimeLabel(selectedDateCheckOutAt)
+          : '학습 중'
+        : selectedDateCheckOutAt
+          ? formatAttendanceTimeLabel(selectedDateCheckOutAt)
+          : selectedDateCheckInAt
+            ? '기록 대기'
+            : '미기록',
+    };
+  }, [attendanceCurrent?.status, selectedDateCheckInAt, selectedDateCheckOutAt, selectedDateKey, todayKey]);
+
   const recentLifeAttendanceSummary = useMemo(() => {
     const isAwayNow = attendanceCurrent?.status === 'away' || attendanceCurrent?.status === 'break';
     const hasAwayRecord = isAwayNow || !!latestAwayNotification;
@@ -2738,11 +2778,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const selectedDatePlanTotal = selectedDateStudyPlans.length;
   const selectedDatePlanDone = selectedDateStudyPlans.filter((item) => item.done).length;
   const selectedDatePlanRate = selectedDatePlanTotal > 0 ? Math.round((selectedDatePlanDone / selectedDatePlanTotal) * 100) : 0;
-  const selectedDateLp = Number(growth?.dailyLpStatus?.[selectedDateKey]?.dailyLpAmount || 0);
-  const selectedDateRequest = useMemo(
-    () => (attendance요청 || []).find((request) => request.date === selectedDateKey),
-    [attendance요청, selectedDateKey]
-  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3463,7 +3498,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <header className={cn("flex justify-between items-center px-1 sm:px-2", isMobile ? "flex-col gap-4" : "flex-row")}>
                 <div className="flex flex-col gap-1">
                   <h3 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>기록트랙</h3>
-                  <p className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">학습 기록·히스토리</p>
+                  <p className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">학습 흐름 요약</p>
                   {linkedStudents.length > 1 && (
                     <div className="mt-3 w-full max-w-[240px]">
                       <Label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
@@ -3497,7 +3532,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
                 <CardContent className="relative p-0">
                   <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
-                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/50">학습 흐름</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/50">월간 흐름 요약</span>
                     <div className="flex flex-wrap gap-1.5">
                       {PARENT_CALENDAR_LEGEND.map((item) => (
                         <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)] sm:text-[9px]">
@@ -3534,9 +3569,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const isTodayCalendar = isSameDay(day, new Date());
                       const hasDeepFocus = isCurrentMonth && minutes >= 180;
                       const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
-                      const timeLabel = isCurrentMonth
-                        ? (isMobile ? formatCompactCalendarMinutes(minutes) : formatMinutes(minutes))
-                        : '--';
+                      const flowLabel = getParentCalendarFlowLabel(minutes);
 
                       return (
                         <button
@@ -3545,7 +3578,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           onClick={() => setSelectedCalendarDate(day)}
                           aria-label={format(day, 'M월 d일 (EEEE)', { locale: ko })}
                           className={cn(
-                            "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                            "group relative flex flex-col overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                             isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
                             !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                             isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
@@ -3554,69 +3587,53 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         >
                           {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-primary/20" />}
                           <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
-                          {isCurrentMonth && !isMobile && (
-                            <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-2 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
+                          {isCurrentMonth && (
+                            <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-1.5 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
                               <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
                             </div>
                           )}
 
-                          {!isMobile && (
-                            <div className="relative z-10 mb-2.5 flex items-start justify-between gap-1.5">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                                  "min-w-[2rem] px-2 py-1 text-xs",
-                                  idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                                  isTodayCalendar && "border-primary/20 text-primary"
-                                )}
-                              >
-                                {format(day, 'd')}
-                              </span>
-                              {hasStatusCluster ? (
-                                <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 px-2 py-1 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]">
-                                  {hasPlans && <span className="h-2 w-2 rounded-full bg-primary" />}
-                                  {hasDeepFocus && <Zap className="h-3 w-3 fill-amber-500 text-amber-500" />}
-                                </div>
-                              ) : (
-                                <span className="h-6 w-6" aria-hidden="true" />
-                              )}
-                            </div>
-                          )}
-
-                          <div className={cn("absolute left-0 right-0", isMobile ? "inset-y-0 flex items-center justify-center px-1.5" : "bottom-2 px-2")}>
-                            <div
+                          <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isMobile ? "mb-auto" : "mb-2.5")}>
+                            <span
                               className={cn(
-                                "overflow-hidden text-center whitespace-nowrap",
-                                isMobile
-                                  ? "min-w-0 rounded-none border-none bg-transparent px-0 py-0 shadow-none"
-                                  : "rounded-[0.95rem] border bg-white px-2.5 py-2 shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
-                                getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
+                                "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                                isMobile ? "min-w-[1.45rem] px-1.5 py-0.5 text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
+                                idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
+                                isTodayCalendar && "border-primary/20 text-primary"
                               )}
                             >
-                              {isMobile ? (
-                                <span className="dashboard-number block tabular-nums text-[0.68rem] leading-none tracking-[-0.08em]">
-                                  {timeLabel}
-                                </span>
-                              ) : (
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
-                                    공부시간
-                                  </span>
-                                  <span className="dashboard-number ml-auto shrink-0 tabular-nums text-[1rem] leading-none tracking-[-0.05em]">
-                                    {timeLabel}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                              {format(day, 'd')}
+                            </span>
+                            {hasStatusCluster ? (
+                              <div
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded-full border border-slate-200/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]",
+                                  isMobile ? "px-1.5 py-0.5" : "px-2 py-1"
+                                )}
+                              >
+                                {hasPlans && <span className={cn("rounded-full bg-primary", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
+                                {hasDeepFocus && <Zap className={cn("fill-amber-500 text-amber-500", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />}
+                              </div>
+                            ) : (
+                              <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
+                            )}
                           </div>
 
-                          {!isMobile && isCurrentMonth && (
-                            <div className="pointer-events-none absolute inset-x-3 bottom-12">
-                              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                                {minutes > 0 ? '오늘 학습 기록' : '기록 대기'}
+                          <div className={cn("mt-auto flex", isMobile ? "justify-center pb-1" : "justify-start pt-8")}>
+                            {isCurrentMonth ? (
+                              <div
+                                className={cn(
+                                  "inline-flex max-w-full items-center justify-center rounded-full border px-2.5 text-center font-black tracking-tight shadow-[0_12px_24px_-20px_rgba(15,23,42,0.22)]",
+                                  isMobile ? "min-h-[1.35rem] text-[8px]" : "min-h-[2rem] text-[11px]",
+                                  getParentCalendarFlowChipClass(minutes, isCurrentMonth)
+                                )}
+                              >
+                                <span className="truncate">{flowLabel}</span>
                               </div>
-                            </div>
-                          )}
+                            ) : (
+                              <span className={cn(isMobile ? "h-[1.35rem]" : "h-[2rem]")} aria-hidden="true" />
+                            )}
+                          </div>
                         </button>
                       );
                     })}
@@ -3627,7 +3644,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               {!selectedCalendarDate && (
                 <div className="mx-1 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-muted-foreground/10 bg-muted/20 px-4 py-2.5">
                   <Info className="h-3.5 w-3.5 shrink-0 text-primary/30" />
-                  <p className="text-center text-[11px] font-bold leading-relaxed text-muted-foreground/50">날짜를 누르면 그날의 기록을 확인할 수 있어요.</p>
+                <p className="text-center text-[11px] font-bold leading-relaxed text-muted-foreground/50">날짜를 누르면 그날의 핵심 기록만 볼 수 있어요.</p>
                 </div>
               )}
             </TabsContent>
@@ -4645,12 +4662,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <div className="absolute inset-x-0 top-0 h-px bg-white/70" />
             <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-white/12 blur-2xl" />
             <div className="relative z-10 space-y-3">
-              <Badge className="w-fit border border-white/18 bg-white/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white">학습 브리핑</Badge>
+              <Badge className="w-fit border border-white/18 bg-white/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white">핵심 기록</Badge>
               <div>
                 <DialogTitle className="text-xl font-black tracking-tight">
                   {selectedCalendarDate ? format(selectedCalendarDate, 'yyyy.MM.dd (EEE)', { locale: ko }) : '날짜 상세'}
                 </DialogTitle>
-                <DialogDescription className="mt-1 text-xs font-bold text-white/72">해당 날짜의 학습 흐름과 계획 요약입니다.</DialogDescription>
+                <DialogDescription className="mt-1 text-xs font-bold text-white/72">해당 날짜의 핵심 기록만 간단히 확인할 수 있어요.</DialogDescription>
               </div>
             </div>
           </div>
@@ -4662,44 +4679,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
               <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">계획 달성</p>
-                <p className="dashboard-number mt-1 text-xl text-[#FF7A16]">{selectedDatePlanRate}%</p>
-              </Card>
-              <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">획득 포인트</p>
-                <p className="dashboard-number mt-1 text-xl text-emerald-600">{selectedDateLp.toLocaleString()}점</p>
-              </Card>
-              <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">출결 요청</p>
-                <p className="mt-1 text-sm font-black text-[#14295F]">
-                  {selectedDateRequest ? (selectedDateRequest.type === 'late' ? '지각 신청' : '결석 신청') : '기록 없음'}
+                <p className="dashboard-number mt-1 text-xl text-[#FF7A16]">{isSelectedDatePlansLoading ? '...' : `${selectedDatePlanRate}%`}</p>
+                <p className="mt-1 text-[11px] font-bold text-slate-500">
+                  {isSelectedDatePlansLoading ? '계획 확인 중' : selectedDatePlanTotal > 0 ? `${selectedDatePlanDone}/${selectedDatePlanTotal} 완료` : '등록된 계획 없음'}
                 </p>
               </Card>
+              <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">등원 시간</p>
+                <p className="dashboard-number mt-1 text-xl text-emerald-600">{selectedDateAttendanceSummary.checkInLabel}</p>
+              </Card>
+              <Card className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-none">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">하원 시간</p>
+                <p className="dashboard-number mt-1 text-xl text-[#14295F]">{selectedDateAttendanceSummary.checkOutLabel}</p>
+              </Card>
             </div>
-
-            <Card className="rounded-xl border border-slate-100 p-4 shadow-none">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">학습 계획 내역</p>
-                <Badge variant="outline" className="h-5 border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-500">
-                  {selectedDatePlanDone}/{selectedDatePlanTotal}
-                </Badge>
-              </div>
-              {isSelectedDatePlansLoading ? (
-                <div className="py-6 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-300" /></div>
-              ) : selectedDateStudyPlans.length === 0 ? (
-                <p className="py-6 text-center text-xs font-bold text-slate-400">등록된 학습 계획이 없습니다.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {selectedDateStudyPlans.slice(0, 6).map((plan) => (
-                    <div key={plan.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                      <p className="line-clamp-1 text-xs font-bold text-slate-700">{plan.title}</p>
-                      <Badge variant="outline" className={cn('h-5 border-none px-2 text-[10px] font-black', plan.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600')}>
-                        {plan.done ? '완료' : '진행중'}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
           </div>
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
