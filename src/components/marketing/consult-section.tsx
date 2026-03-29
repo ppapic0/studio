@@ -71,7 +71,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
         >
           <SectionHeading eyebrow="Consulting" title={consult.heading} description={consult.description} light />
 
-          <StaggerChildren className="mt-6 grid grid-cols-5 gap-2 sm:gap-3" stagger={85}>
+          <StaggerChildren className="mt-6 hidden grid-cols-5 gap-2 sm:grid sm:gap-3" stagger={85}>
             {trustMetrics.map((metric) => (
               <article
                 key={`${metric.label}-${metric.value}`}

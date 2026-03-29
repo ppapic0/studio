@@ -71,19 +71,19 @@ export function HeroGallerySection() {
           </p>
         </div>
 
-        <div className="mt-9 grid grid-cols-2 gap-3 sm:mt-12 sm:gap-4 lg:gap-5">
+        <div className="mt-9 grid grid-cols-1 gap-4 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:gap-5">
           {heroGalleryCards.map((card) => {
             const tone = toneMap[card.tone];
 
             return (
               <article
                 key={card.title}
-                className={`group relative overflow-hidden rounded-[1.45rem] border p-2.5 shadow-[0_18px_36px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1 sm:rounded-[2rem] sm:p-3 ${tone.shell}`}
+                className={`group relative overflow-hidden rounded-[1.65rem] border p-3 shadow-[0_18px_36px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1 sm:rounded-[2rem] sm:p-3 ${tone.shell}`}
               >
                 <div className={`pointer-events-none absolute -right-10 top-4 h-24 w-24 rounded-full blur-3xl ${tone.glow}`} />
                 <div className={`pointer-events-none absolute -left-8 bottom-0 h-20 w-20 rounded-full blur-3xl ${tone.glow}`} />
 
-                <div className={`relative overflow-hidden rounded-[1.2rem] border p-3 sm:rounded-[1.65rem] sm:p-4 ${tone.image}`}>
+                <div className={`relative overflow-hidden rounded-[1.35rem] border p-4 sm:rounded-[1.65rem] sm:p-4 ${tone.image}`}>
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="min-w-0">
                       <p className={`text-[7.5px] font-black tracking-[0.2em] text-[#FF7A16] sm:text-[9px]`}>
@@ -98,24 +98,24 @@ export function HeroGallerySection() {
                     </span>
                   </div>
 
-                  <div className="mt-3 sm:mt-4">
-                    <div className="relative min-h-[10.5rem] overflow-hidden rounded-[1rem] border border-dashed border-[#14295F]/14 bg-white/88 sm:min-h-[15rem] sm:rounded-[1.4rem]">
+                  <div className="mt-4 sm:mt-4">
+                    <div className="relative min-h-[16.5rem] overflow-hidden rounded-[1.15rem] border border-dashed border-[#14295F]/14 bg-white/88 sm:min-h-[15rem] sm:rounded-[1.4rem]">
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.72),transparent_58%)]" />
-                      <div className={`absolute left-1/2 top-[34%] h-14 w-14 -translate-x-1/2 rounded-[1.1rem] border border-white bg-white shadow-[0_14px_28px_rgba(20,41,95,0.08)] sm:h-16 sm:w-16 sm:rounded-[1.3rem]`} />
-                      <div className="absolute inset-x-[8%] bottom-[11%] rounded-[0.95rem] border border-white/75 bg-white/88 px-3 py-3 text-center shadow-[0_16px_28px_rgba(20,41,95,0.07)] backdrop-blur sm:rounded-[1.2rem] sm:px-4 sm:py-4">
-                        <p className="text-[8px] font-black tracking-[0.18em] text-[#FF7A16] sm:text-[9.5px]">PHOTO PLACEHOLDER</p>
-                        <p className="mt-1.5 break-keep text-[0.88rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.02rem]">
+                      <div className={`absolute left-1/2 top-[30%] h-16 w-16 -translate-x-1/2 rounded-[1.2rem] border border-white bg-white shadow-[0_14px_28px_rgba(20,41,95,0.08)] sm:top-[34%] sm:h-16 sm:w-16 sm:rounded-[1.3rem]`} />
+                      <div className="absolute inset-x-[8%] bottom-[10%] rounded-[1.05rem] border border-white/75 bg-white/88 px-4 py-4 text-center shadow-[0_16px_28px_rgba(20,41,95,0.07)] backdrop-blur sm:rounded-[1.2rem] sm:px-4 sm:py-4">
+                        <p className="text-[9px] font-black tracking-[0.18em] text-[#FF7A16] sm:text-[9.5px]">PHOTO PLACEHOLDER</p>
+                        <p className="mt-2 break-keep text-[1rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.02rem]">
                           실제 사진 예정
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-3 sm:mt-4">
-                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black sm:hidden ${tone.badge}`}>
+                  <div className="mt-4 sm:mt-4">
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black sm:hidden ${tone.badge}`}>
                       {card.badge}
                     </span>
-                    <p className="mt-2 break-keep text-[11px] font-semibold leading-[1.65] text-[#51667D] sm:text-[13px] sm:leading-[1.75]">
+                    <p className="mt-3 break-keep text-[12px] font-semibold leading-[1.72] text-[#51667D] sm:text-[13px] sm:leading-[1.75]">
                       {card.summary}
                     </p>
                   </div>

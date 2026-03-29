@@ -124,7 +124,7 @@ const contactItems = [
 ];
 
 const mobileContactLayoutClass: Record<string, string> = {
-  CONTACT: '',
+  CONTACT: 'col-span-2',
   LOCATION: 'col-span-2',
   HOURS: 'col-span-2',
 };
@@ -606,6 +606,10 @@ export default async function ClassPage() {
                             </p>
                           ))}
                         </div>
+                      ) : item.label === 'CONTACT' ? (
+                        <p className="mt-2 whitespace-nowrap text-[0.82rem] font-black leading-[1.4] tracking-[-0.04em] text-white sm:text-[1.05rem] sm:leading-relaxed sm:tracking-normal">
+                          {item.value}
+                        </p>
                       ) : (
                         <p className="mt-2 break-keep text-[0.94rem] font-black leading-[1.65] text-white sm:text-[1.05rem] sm:leading-relaxed">
                           {item.value}
