@@ -80,15 +80,15 @@ export function PageGatewaySection() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group relative overflow-hidden rounded-[1.9rem] border px-5 py-5 shadow-[0_14px_30px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_22px_40px_rgba(20,41,95,0.12)] sm:px-6 sm:py-6 ${item.cardClass}`}
+                className={`group block h-full rounded-[2rem] border px-5 py-5 shadow-[0_16px_34px_rgba(20,41,95,0.08)] transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_44px_rgba(20,41,95,0.12)] sm:px-6 sm:py-6 ${item.cardClass}`}
               >
-                <div className="relative flex min-h-[214px] flex-col justify-between">
+                <div className="flex min-h-[250px] flex-col rounded-[1.5rem] border border-white/70 bg-white/82 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-[1px] sm:min-h-[264px] sm:p-5">
                   <div className="space-y-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-3">
                         <div className="flex items-center gap-2.5">
                           <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">{item.eyebrow}</p>
-                          <span className="rounded-full border border-[#14295F]/10 bg-white/78 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[#14295F]/55">
+                          <span className="rounded-full border border-[#14295F]/10 bg-white px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[#14295F]/55">
                             PAGE {pageNumber}
                           </span>
                         </div>
@@ -120,9 +120,11 @@ export function PageGatewaySection() {
                     </div>
                   </div>
 
-                  <div className={`inline-flex items-center justify-between gap-3 rounded-[1.1rem] border px-4 py-3 text-[13px] font-black ${item.footerClass}`}>
-                    <span>자세히 보기</span>
-                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1.5" />
+                  <div className="mt-auto pt-5">
+                    <div className={`inline-flex w-full items-center justify-between gap-3 rounded-[1.1rem] border px-4 py-3 text-[13px] font-black ${item.footerClass}`}>
+                      <span>자세히 보기</span>
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1.5" />
+                    </div>
                   </div>
                 </div>
               </Link>
