@@ -524,6 +524,19 @@ export default function StudyPlanPage() {
     return `${format(start, 'yyyy.MM.dd')} - ${format(end, 'yyyy.MM.dd')}`;
   }, [weekDays]);
 
+  const attendanceCalendarDays = useMemo(
+    () =>
+      weekDays.map((day) => ({
+        key: day.toISOString(),
+        weekdayLabel: format(day, 'EEE', { locale: ko }),
+        dateLabel: format(day, 'd'),
+        isToday: isSameDay(day, new Date()),
+        isSelected: isSameDay(day, selectedDate),
+        date: day,
+      })),
+    [weekDays, selectedDate]
+  );
+
   const moveWeek = (direction: -1 | 1) => {
     if (!selectedDate) return;
     setSelectedDate(addDays(selectedDate, direction * 7));
@@ -1203,7 +1216,10 @@ export default function StudyPlanPage() {
           description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
         });
       }
-      toast({ title: type === 'attend' ? "출석 일정이 등록되었습니다." : "미등원 처리가 완료되었습니다." });
+      toast({
+        title: type === 'attend' ? '이 날짜 출석 정보가 저장되었습니다.' : '이 날짜를 미등원으로 저장했습니다.',
+        description: type === 'attend' ? '특정 날짜에만 적용되고, 매주 반복 기본값은 그대로 유지됩니다.' : '필요하면 다시 출석 일정으로 바꿀 수 있어요.',
+      });
     } catch (e: any) {
       toast({
         variant: 'destructive',
@@ -1234,7 +1250,7 @@ export default function StudyPlanPage() {
     }
 
     toast({
-      title: hasSelectedWeekdayTemplate ? '오늘 설정을 지우고 요일 기본값으로 돌아갑니다.' : '오늘 설정을 초기화했어요.',
+      title: hasSelectedWeekdayTemplate ? '이 날짜 설정을 지우고 매주 반복 기본값으로 돌아갑니다.' : '이 날짜 설정을 초기화했습니다.',
     });
   };
 
@@ -1247,8 +1263,8 @@ export default function StudyPlanPage() {
 
     await saveAttendanceSettings({ weekdayTemplates: nextWeekdayTemplates });
     toast({
-      title: `${WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayTemplateDay)?.label || '이 요일'} 기본 출석 정보를 저장했어요.`,
-      description: '앞으로 같은 요일을 볼 때 기본값으로 바로 불러올 수 있어요.',
+      title: `매주 ${WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayTemplateDay)?.label || '이 요일'} 반복 출석 정보가 저장되었습니다.`,
+      description: '같은 요일 날짜에서는 이 기본값을 바로 불러와 사용할 수 있어요.',
     });
   };
 
@@ -1271,8 +1287,8 @@ export default function StudyPlanPage() {
     await saveAttendanceSettings({ savedRoutines: nextPresets });
     setAttendancePresetName('');
     toast({
-      title: '자주 쓰는 출석 루틴으로 저장했어요.',
-      description: '다음부터는 오늘 수정이나 요일 기본값에서 바로 불러올 수 있어요.',
+      title: '출석 루틴으로 저장되었습니다.',
+      description: '다음부터는 특정 날짜나 매주 반복값에 바로 복사할 수 있어요.',
     });
   };
 
@@ -1285,16 +1301,16 @@ export default function StudyPlanPage() {
   const handleApplyAttendancePresetToToday = (preset: SavedAttendanceRoutine) => {
     patchTodayAttendanceDraft(normalizeAttendanceDraft(preset));
     toast({
-      title: `${preset.name} 루틴을 오늘 입력칸에 불러왔어요.`,
-      description: '시간이나 사유를 조금만 바꿔서 바로 저장할 수 있어요.',
+      title: `${preset.name} 루틴을 이 날짜에 복사했습니다.`,
+      description: '필요한 시간이나 사유만 조금 바꾼 뒤 저장하면 돼요.',
     });
   };
 
   const handleApplyAttendancePresetToWeekday = (preset: SavedAttendanceRoutine) => {
     setWeekdayDraft(normalizeAttendanceDraft(preset));
     toast({
-      title: `${preset.name} 루틴을 요일 기본값으로 불러왔어요.`,
-      description: '필요하면 시간이나 사유를 조금만 바꿔서 저장해보세요.',
+      title: `${preset.name} 루틴을 매주 ${WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayTemplateDay)?.label || '이 요일'} 반복값에 복사했습니다.`,
+      description: '필요하면 시간이나 사유를 조금만 바꾼 뒤 저장해보세요.',
     });
   };
 
@@ -1769,6 +1785,10 @@ export default function StudyPlanPage() {
             selectedDateLabel={selectedDateLabel}
             isToday={isToday}
             sameDayPenaltyPoints={SAME_DAY_ROUTINE_PENALTY_POINTS}
+            weekRangeLabel={weekRangeLabel}
+            calendarDays={attendanceCalendarDays}
+            onMoveWeek={moveWeek}
+            onSelectDate={setSelectedDate}
             todayDraft={buildCurrentAttendanceDraft()}
             onTodayChange={patchTodayAttendanceDraft}
             onSaveToday={() => handleSetAttendance('attend')}

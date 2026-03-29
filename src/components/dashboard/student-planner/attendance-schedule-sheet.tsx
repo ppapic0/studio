@@ -1,6 +1,6 @@
 'use client';
 
-import { BookmarkPlus, CalendarClock, Clock3, Copy, Loader2, RotateCcw, Save, Sparkles, Trash2, XCircle } from 'lucide-react';
+import { BookmarkPlus, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock3, Copy, Loader2, RotateCcw, Save, Sparkles, Trash2, XCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,15 @@ type WeekdayOption = {
   label: string;
 };
 
+type CalendarDayOption = {
+  key: string;
+  weekdayLabel: string;
+  dateLabel: string;
+  isToday: boolean;
+  isSelected: boolean;
+  date: Date;
+};
+
 type AttendanceScheduleSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -32,6 +41,10 @@ type AttendanceScheduleSheetProps = {
   selectedDateLabel: string;
   isToday: boolean;
   sameDayPenaltyPoints: number;
+  weekRangeLabel: string;
+  calendarDays: CalendarDayOption[];
+  onMoveWeek: (direction: -1 | 1) => void;
+  onSelectDate: (date: Date) => void;
   todayDraft: AttendanceScheduleDraft;
   onTodayChange: (patch: Partial<AttendanceScheduleDraft>) => void;
   onSaveToday: () => void;
@@ -182,6 +195,10 @@ export function AttendanceScheduleSheet({
   selectedDateLabel,
   isToday,
   sameDayPenaltyPoints,
+  weekRangeLabel,
+  calendarDays,
+  onMoveWeek,
+  onSelectDate,
   todayDraft,
   onTodayChange,
   onSaveToday,
@@ -238,35 +255,87 @@ export function AttendanceScheduleSheet({
         <div className={cn('overflow-y-auto bg-white', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'h-full p-5')}>
           <Tabs defaultValue="today" className="space-y-4">
             <TabsList className="grid w-full grid-cols-3 rounded-2xl bg-slate-100 p-1">
-              <TabsTrigger value="today" className="rounded-xl text-[11px] font-black">오늘 수정</TabsTrigger>
-              <TabsTrigger value="weekday" className="rounded-xl text-[11px] font-black">요일별 기본값</TabsTrigger>
+              <TabsTrigger value="today" className="rounded-xl text-[11px] font-black">특정 날짜</TabsTrigger>
+              <TabsTrigger value="weekday" className="rounded-xl text-[11px] font-black">매주 반복</TabsTrigger>
               <TabsTrigger value="saved" className="rounded-xl text-[11px] font-black">저장한 루틴</TabsTrigger>
             </TabsList>
 
             <TabsContent value="today" className="space-y-4">
               <div className="rounded-[1.45rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.2)]">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black text-slate-900">특정 날짜만 변경</p>
+                    <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                      선택한 날짜에만 적용되고, 매주 반복 기본값은 그대로 유지돼요.
+                    </p>
+                  </div>
                   <Badge className="rounded-full border border-primary/10 bg-white px-3 py-1 text-[10px] font-black text-primary shadow-none">
                     {selectedDateLabel}
                   </Badge>
-                  {isToday ? (
-                    <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-none">
-                      당일 수정 시 벌점 +{sameDayPenaltyPoints}
-                    </Badge>
-                  ) : null}
                 </div>
-                <p className="mt-3 break-keep text-[11px] font-semibold leading-5 text-slate-500">
-                  앞 화면엔 요약만 보여주고, 실제 수정은 여기서 한 번에 끝내요.
-                </p>
+
+                <div className="mt-4 rounded-[1.2rem] border border-primary/10 bg-white/80 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => onMoveWeek(-1)}
+                      className="h-8 w-8 rounded-full border-primary/10 text-primary"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="min-w-0 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">바로 날짜 선택</p>
+                      <p className="mt-1 text-[11px] font-black text-slate-700">{weekRangeLabel}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => onMoveWeek(1)}
+                      className="h-8 w-8 rounded-full border-primary/10 text-primary"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-7 gap-1.5">
+                    {calendarDays.map((day) => (
+                      <button
+                        key={day.key}
+                        type="button"
+                        onClick={() => onSelectDate(day.date)}
+                        className={cn(
+                          'rounded-[1rem] border px-1 py-2 text-center transition-all',
+                          day.isSelected
+                            ? 'border-transparent bg-[#14295F] text-white shadow-md'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-primary/20',
+                          day.isToday && !day.isSelected && 'border-primary/25'
+                        )}
+                      >
+                        <span className={cn('block text-[8px] font-black uppercase tracking-[0.18em]', day.isSelected ? 'text-white/70' : 'text-slate-400')}>
+                          {day.weekdayLabel}
+                        </span>
+                        <span className="mt-1 block text-sm font-black leading-none">{day.dateLabel}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {isToday ? (
+                  <Badge className="mt-4 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-none">
+                    당일 수정 시 벌점 +{sameDayPenaltyPoints}
+                  </Badge>
+                ) : null}
               </div>
 
               {hasSelectedWeekdayTemplate ? (
                 <div className="rounded-[1.35rem] border border-emerald-200 bg-emerald-50/70 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-[11px] font-black text-emerald-800">{selectedWeekdayLabel} 기본값이 있어요</p>
+                      <p className="text-[11px] font-black text-emerald-800">{selectedWeekdayLabel} 반복 기본값이 있어요</p>
                       <p className="mt-1 text-[11px] font-semibold leading-5 text-emerald-800/80">
-                        기본 출석 정보를 오늘 입력칸으로 바로 불러올 수 있어요.
+                        저장해둔 반복 스케줄을 이 날짜 입력칸으로 바로 가져올 수 있어요.
                       </p>
                     </div>
                     <Button
@@ -276,7 +345,7 @@ export function AttendanceScheduleSheet({
                       className="h-9 rounded-full border-emerald-200 bg-white px-4 text-[11px] font-black text-emerald-700"
                     >
                       <Copy className="mr-1.5 h-3.5 w-3.5" />
-                      기본값 불러오기
+                      이 날짜에 복사
                     </Button>
                   </div>
                 </div>
@@ -292,7 +361,7 @@ export function AttendanceScheduleSheet({
                   className="h-11 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224d]"
                 >
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  오늘 저장
+                  이 날짜만 저장
                 </Button>
                 <Button
                   type="button"
@@ -302,7 +371,7 @@ export function AttendanceScheduleSheet({
                   className="h-11 rounded-xl border-rose-200 font-black text-rose-600"
                 >
                   <XCircle className="mr-2 h-4 w-4" />
-                  미등원
+                  이 날짜만 미등원
                 </Button>
                 <Button
                   type="button"
@@ -312,13 +381,19 @@ export function AttendanceScheduleSheet({
                   className="h-11 rounded-xl border-slate-200 font-black text-slate-600"
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
-                  오늘 초기화
+                  이 날짜만 초기화
                 </Button>
               </div>
             </TabsContent>
 
             <TabsContent value="weekday" className="space-y-4">
               <div className="rounded-[1.45rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.2)]">
+                <div className="mb-3">
+                  <p className="text-[11px] font-black text-slate-900">매주 반복 스케줄</p>
+                  <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                    한 번 저장해두면 같은 요일 날짜에서는 자동 기본값처럼 불러와서 쓸 수 있어요.
+                  </p>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {weekdayOptions.map((option) => (
                     <Button
@@ -332,9 +407,9 @@ export function AttendanceScheduleSheet({
                     </Button>
                   ))}
                 </div>
-                <p className="mt-3 break-keep text-[11px] font-semibold leading-5 text-slate-500">
-                  한 번 저장해두면 같은 요일 날짜에서는 기본 출석 정보로 바로 불러와 쓸 수 있어요.
-                </p>
+                <div className="mt-3 rounded-[1rem] border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
+                  저장 대상: <span className="font-black text-slate-900">매주 {selectedWeekdayLabel}</span>
+                </div>
               </div>
 
               <AttendanceDraftFields draft={weekdayDraft} onChange={onWeekdayChange} isMobile={isMobile} disabled={isSubmitting} />
@@ -348,7 +423,7 @@ export function AttendanceScheduleSheet({
                   className="h-11 rounded-xl border-primary/15 font-black text-primary"
                 >
                   <Copy className="mr-2 h-4 w-4" />
-                  오늘 입력 복사
+                  이 날짜 입력 복사
                 </Button>
                 <Button
                   type="button"
@@ -357,13 +432,22 @@ export function AttendanceScheduleSheet({
                   className="h-11 rounded-xl bg-emerald-500 font-black text-white hover:bg-emerald-600"
                 >
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  {selectedWeekdayLabel} 저장
+                  매주 {selectedWeekdayLabel} 저장
                 </Button>
               </div>
             </TabsContent>
 
             <TabsContent value="saved" className="space-y-4">
               <div className="rounded-[1.45rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.2)]">
+                <div className="mb-3 flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black text-slate-900">자주 쓰는 루틴 저장/복사</p>
+                    <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                      학원 있는 날처럼 자주 쓰는 출석 패턴을 저장해두고 이 날짜나 매주 반복값으로 바로 복사해요.
+                    </p>
+                  </div>
+                </div>
                 <div className={cn('grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]')}>
                   <Input
                     value={presetName}
@@ -378,12 +462,9 @@ export function AttendanceScheduleSheet({
                     className="h-11 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224d]"
                   >
                     <BookmarkPlus className="mr-2 h-4 w-4" />
-                    현재 입력 저장
+                    루틴으로 저장
                   </Button>
                 </div>
-                <p className="mt-3 break-keep text-[11px] font-semibold leading-5 text-slate-500">
-                  자주 쓰는 출석 패턴을 저장해두면 오늘 수정이나 요일 기본값에 바로 불러올 수 있어요.
-                </p>
               </div>
 
               {savedRoutines.length === 0 ? (
@@ -426,7 +507,7 @@ export function AttendanceScheduleSheet({
                           onClick={() => onApplyPresetToToday(preset)}
                           className="h-10 rounded-xl border-primary/15 font-black text-primary"
                         >
-                          오늘에 불러오기
+                          이 날짜에 복사
                         </Button>
                         <Button
                           type="button"
@@ -434,7 +515,7 @@ export function AttendanceScheduleSheet({
                           onClick={() => onApplyPresetToWeekday(preset)}
                           className="h-10 rounded-xl border-emerald-200 font-black text-emerald-700"
                         >
-                          요일 기본값으로 불러오기
+                          매주 {selectedWeekdayLabel}에 복사
                         </Button>
                       </div>
                     </div>
