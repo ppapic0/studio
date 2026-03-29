@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledMonthlyStudyTimeRankingReward = exports.scheduledDailyStudyTimeReward = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledMonthlyStudyTimeRankingReward = exports.scheduledDailyStudyTimeReward = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.ensureCurrentUserMemberships = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
@@ -8,7 +8,7 @@ if (admin.apps.length === 0) {
 }
 const region = "asia-northeast3";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"];
-const adminRoles = new Set(["centerAdmin", "owner"]);
+const adminRoles = new Set(["centerAdmin", "owner", "centerManager", "admin"]);
 const SMS_BYTE_LIMIT = 90;
 const DEFAULT_SMS_TEMPLATES = {
     study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
@@ -53,11 +53,26 @@ function parseHourMinute(value) {
 function normalizeMembershipStatus(value) {
     if (typeof value !== "string")
         return "";
-    return value.trim().toLowerCase();
+    return value.trim().toLowerCase().replace(/[_\s-]+/g, "");
 }
 function isActiveMembershipStatus(value) {
     const normalized = normalizeMembershipStatus(value);
-    return !normalized || normalized === "active";
+    return !normalized || normalized === "active" || normalized === "approved" || normalized === "enabled" || normalized === "current";
+}
+function normalizeMembershipRoleValue(value) {
+    if (typeof value !== "string")
+        return "";
+    const normalized = value.trim().replace(/[_\s-]+/g, "").toLowerCase();
+    if (normalized === "owner" || normalized === "centermanager" || normalized === "admin" || normalized === "centeradmin") {
+        return "centerAdmin";
+    }
+    if (normalized === "teacher")
+        return "teacher";
+    if (normalized === "parent")
+        return "parent";
+    if (normalized === "student")
+        return "student";
+    return "";
 }
 function normalizeStudentMembershipStatusForWrite(value) {
     if (typeof value !== "string")
@@ -106,6 +121,53 @@ async function resolveCenterMembershipRole(db, centerId, uid) {
     }
     return { role: null, status: null };
 }
+exports.ensureCurrentUserMemberships = functions.region(region).https.onCall(async (_data, context) => {
+    var _a, _b;
+    const uid = (_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid;
+    if (!uid) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const db = admin.firestore();
+    const [membersByFieldSnap, membersByDocIdSnap] = await Promise.all([
+        db.collectionGroup("members").where("id", "==", uid).get(),
+        db.collectionGroup("members").where(admin.firestore.FieldPath.documentId(), "==", uid).get(),
+    ]);
+    const uniqueDocs = Array.from(new Map([...membersByFieldSnap.docs, ...membersByDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])).values());
+    if (uniqueDocs.length === 0) {
+        return { ok: true, hydratedCount: 0, centers: [] };
+    }
+    const batch = db.batch();
+    const hydratedCenters = [];
+    for (const docSnap of uniqueDocs) {
+        const centerId = (_b = docSnap.ref.parent.parent) === null || _b === void 0 ? void 0 : _b.id;
+        if (!centerId)
+            continue;
+        const raw = docSnap.data();
+        const normalizedRole = normalizeMembershipRoleValue(raw.role) || "student";
+        const membershipPayload = {
+            id: centerId,
+            centerId,
+            role: normalizedRole,
+            status: typeof raw.status === "string" && raw.status.trim() ? raw.status : "active",
+            joinedAt: raw.joinedAt || admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            displayName: typeof raw.displayName === "string" ? raw.displayName : null,
+            linkedStudentIds: Array.isArray(raw.linkedStudentIds) ? raw.linkedStudentIds.filter((value) => typeof value === "string") : [],
+            className: typeof raw.className === "string" ? raw.className : null,
+            phoneNumber: typeof raw.phoneNumber === "string" ? raw.phoneNumber : null,
+        };
+        batch.set(db.doc(`userCenters/${uid}/centers/${centerId}`), membershipPayload, { merge: true });
+        hydratedCenters.push(centerId);
+    }
+    if (hydratedCenters.length > 0) {
+        await batch.commit();
+    }
+    return {
+        ok: true,
+        hydratedCount: hydratedCenters.length,
+        centers: hydratedCenters,
+    };
+});
 function normalizeParentLinkCodeValue(value) {
     if (typeof value === "string") {
         return value.trim();

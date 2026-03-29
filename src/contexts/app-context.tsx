@@ -1,8 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useFunctions } from '@/firebase';
 import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where, documentId } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { format } from 'date-fns';
 
 export type CenterMembership = {
@@ -62,6 +63,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const functions = useFunctions();
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
@@ -201,7 +203,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeMembershipRef.current = activeKey;
       }
 
-      if (userCentersResolved && fallbackResolved) {
+      if (userCentersResolved && fallbackResolved && bootstrapResolved) {
         setMembershipsLoading(false);
       }
     };
@@ -214,6 +216,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let fallbackFetched = false;
     let fallbackResolved = false;
     let userCentersResolved = false;
+    let bootstrapResolved = false;
+
+    const ensureMembershipBootstrap = async () => {
+      try {
+        const ensureCurrentUserMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
+        await ensureCurrentUserMemberships({});
+      } catch (error: any) {
+        if (error?.code !== 'permission-denied') {
+          console.warn('Membership bootstrap warning:', error);
+        }
+      } finally {
+        bootstrapResolved = true;
+        applyMembershipState();
+      }
+    };
 
     const fetchFallbackOnce = async () => {
       if (fallbackFetched) return;
@@ -254,6 +271,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    void ensureMembershipBootstrap();
     void fetchFallbackOnce();
 
     const unsubscribeUserCenters = onSnapshot(
@@ -286,7 +304,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribeUserCenters();
     };
-  }, [user, firestore]);
+  }, [user, firestore, functions]);
 
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {

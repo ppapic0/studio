@@ -6,16 +6,28 @@ type MembershipLike = {
   status?: string | null;
 };
 
+function normalizeMembershipStatusValue(value?: string | null) {
+  if (!value) return '';
+  return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
+}
+
+function normalizeMembershipRoleValue(value?: string | null) {
+  if (!value) return '';
+  return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
+}
+
 export function isActiveMembershipStatus(status?: string | null) {
-  return !status || status === 'active';
+  const normalized = normalizeMembershipStatusValue(status);
+  return !normalized || normalized === 'active' || normalized === 'approved' || normalized === 'enabled' || normalized === 'current';
 }
 
 export function isAdminRole(role?: string | null) {
-  return role === 'centerAdmin' || role === 'owner';
+  const normalized = normalizeMembershipRoleValue(role);
+  return normalized === 'centeradmin' || normalized === 'owner' || normalized === 'centermanager' || normalized === 'admin';
 }
 
 export function isTeacherOrAdminRole(role?: string | null) {
-  return role === 'teacher' || isAdminRole(role);
+  return normalizeMembershipRoleValue(role) === 'teacher' || isAdminRole(role);
 }
 
 export function resolveMembershipByRole(

@@ -7,7 +7,7 @@ if (admin.apps.length === 0) {
 
 const region = "asia-northeast3";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
-const adminRoles = new Set(["centerAdmin", "owner"]);
+const adminRoles = new Set(["centerAdmin", "owner", "centerManager", "admin"]);
 type AllowedRole = (typeof allowedRoles)[number];
 
 type InviteDoc = {
@@ -142,12 +142,24 @@ function parseHourMinute(value: unknown): { hour: number; minute: number } | nul
 
 function normalizeMembershipStatus(value: unknown): string {
   if (typeof value !== "string") return "";
-  return value.trim().toLowerCase();
+  return value.trim().toLowerCase().replace(/[_\s-]+/g, "");
 }
 
 function isActiveMembershipStatus(value: unknown): boolean {
   const normalized = normalizeMembershipStatus(value);
-  return !normalized || normalized === "active";
+  return !normalized || normalized === "active" || normalized === "approved" || normalized === "enabled" || normalized === "current";
+}
+
+function normalizeMembershipRoleValue(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim().replace(/[_\s-]+/g, "").toLowerCase();
+  if (normalized === "owner" || normalized === "centermanager" || normalized === "admin" || normalized === "centeradmin") {
+    return "centerAdmin";
+  }
+  if (normalized === "teacher") return "teacher";
+  if (normalized === "parent") return "parent";
+  if (normalized === "student") return "student";
+  return "";
 }
 
 function normalizeStudentMembershipStatusForWrite(value: unknown): "active" | "onHold" | "withdrawn" | null {
@@ -208,6 +220,65 @@ async function resolveCenterMembershipRole(
 
   return { role: null, status: null };
 }
+
+export const ensureCurrentUserMemberships = functions.region(region).https.onCall(async (_data, context) => {
+  const uid = context.auth?.uid;
+  if (!uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const db = admin.firestore();
+  const [membersByFieldSnap, membersByDocIdSnap] = await Promise.all([
+    db.collectionGroup("members").where("id", "==", uid).get(),
+    db.collectionGroup("members").where(admin.firestore.FieldPath.documentId(), "==", uid).get(),
+  ]);
+
+  const uniqueDocs = Array.from(
+    new Map(
+      [...membersByFieldSnap.docs, ...membersByDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])
+    ).values()
+  );
+
+  if (uniqueDocs.length === 0) {
+    return { ok: true, hydratedCount: 0, centers: [] };
+  }
+
+  const batch = db.batch();
+  const hydratedCenters: string[] = [];
+
+  for (const docSnap of uniqueDocs) {
+    const centerId = docSnap.ref.parent.parent?.id;
+    if (!centerId) continue;
+
+    const raw = docSnap.data() as any;
+    const normalizedRole = normalizeMembershipRoleValue(raw.role) || "student";
+    const membershipPayload = {
+      id: centerId,
+      centerId,
+      role: normalizedRole,
+      status: typeof raw.status === "string" && raw.status.trim() ? raw.status : "active",
+      joinedAt: raw.joinedAt || admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      displayName: typeof raw.displayName === "string" ? raw.displayName : null,
+      linkedStudentIds: Array.isArray(raw.linkedStudentIds) ? raw.linkedStudentIds.filter((value: unknown) => typeof value === "string") : [],
+      className: typeof raw.className === "string" ? raw.className : null,
+      phoneNumber: typeof raw.phoneNumber === "string" ? raw.phoneNumber : null,
+    };
+
+    batch.set(db.doc(`userCenters/${uid}/centers/${centerId}`), membershipPayload, { merge: true });
+    hydratedCenters.push(centerId);
+  }
+
+  if (hydratedCenters.length > 0) {
+    await batch.commit();
+  }
+
+  return {
+    ok: true,
+    hydratedCount: hydratedCenters.length,
+    centers: hydratedCenters,
+  };
+});
 
 function normalizeParentLinkCodeValue(value: unknown): string {
   if (typeof value === "string") {

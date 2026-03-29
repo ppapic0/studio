@@ -15,8 +15,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useFunctions } from '@/firebase';
 import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
@@ -54,6 +55,7 @@ export function LoginForm() {
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
@@ -160,6 +162,14 @@ export function LoginForm() {
     try {
       const trimmedEmail = values.email.trim();
       const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
+      if (functions) {
+        try {
+          const ensureCurrentUserMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
+          await ensureCurrentUserMemberships({});
+        } catch (error) {
+          console.warn('Membership bootstrap after login warning:', error);
+        }
+      }
       const memberships = await fetchMembershipRecords(userCredential.user.uid);
       const validation = validateStudentMembershipStatus(memberships);
       if (!validation.allowed) {
