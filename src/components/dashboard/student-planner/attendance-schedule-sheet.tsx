@@ -5,16 +5,16 @@ import { BookmarkPlus, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, C
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { StudyPlanItem, WithId } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -237,36 +237,35 @@ export function AttendanceScheduleSheet({
   onDeletePersonalTask,
 }: AttendanceScheduleSheetProps) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side={isMobile ? 'bottom' : 'right'}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
         motionPreset="dashboard-premium"
         className={cn(
           'overflow-hidden border-none bg-white p-0 shadow-2xl',
           isMobile
-            ? 'h-auto max-h-[90dvh] rounded-t-[2rem] pb-[calc(1rem+env(safe-area-inset-bottom))]'
-            : 'w-[34rem] max-w-[34rem] rounded-l-[2rem]'
+            ? 'w-[min(94vw,34rem)] max-h-[90dvh] rounded-[2rem]'
+            : 'w-[min(92vw,54rem)] max-w-[54rem] max-h-[88dvh] rounded-[2rem]'
         )}
       >
         <div className="bg-[linear-gradient(135deg,#14295F_0%,#1d4ed8_48%,#10b981_100%)] p-6 text-white">
-          <SheetHeader className="text-left">
+          <DialogHeader className="text-left">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-white/12 p-2.5">
                 <CalendarClock className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <SheetTitle className="text-xl font-black tracking-tight text-white">
+                <DialogTitle className="text-xl font-black tracking-tight text-white">
                   출석 정보 수정
-                </SheetTitle>
-                <SheetDescription className="mt-1 text-[11px] font-semibold text-white/76">
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-[11px] font-semibold text-white/76">
                   오늘 수정, 요일별 기본값, 저장한 루틴을 한 곳에서 함께 관리해요.
-                </SheetDescription>
+                </DialogDescription>
               </div>
             </div>
-          </SheetHeader>
+          </DialogHeader>
         </div>
 
-        <div className={cn('overflow-y-auto bg-white', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'h-full p-5')}>
+        <div className={cn('overflow-y-auto bg-white', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'max-h-[calc(88dvh-9rem)] p-5')}>
           <div className="mb-4 rounded-[1.45rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.94)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.18)]">
             <p className="text-[11px] font-black text-slate-900">세 가지 방식으로 관리해요</p>
             <div className={cn('mt-3 grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
@@ -638,7 +637,7 @@ export function AttendanceScheduleSheet({
           </Tabs>
         </div>
 
-        <SheetFooter className="border-t bg-slate-50/70 p-4">
+        <DialogFooter className="border-t bg-slate-50/70 p-4">
           <Button
             type="button"
             variant="outline"
@@ -647,8 +646,8 @@ export function AttendanceScheduleSheet({
           >
             닫기
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -5,13 +5,13 @@ import { History, Loader2, PenLine, PlusCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 import type { RecentStudyOption } from './planner-constants';
@@ -36,35 +36,35 @@ export function RecentStudySheet({
   isMobile,
 }: RecentStudySheetProps) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side={isMobile ? 'bottom' : 'right'}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        motionPreset="dashboard-premium"
         className={cn(
           'overflow-hidden border-none bg-white p-0 shadow-2xl',
           isMobile
-            ? 'h-auto max-h-[85dvh] rounded-t-[2rem] pb-[calc(1rem+env(safe-area-inset-bottom))]'
-            : 'w-[27rem] max-w-[27rem] rounded-l-[2rem]'
+            ? 'w-[min(94vw,32rem)] max-h-[88dvh] rounded-[2rem]'
+            : 'w-[min(92vw,42rem)] max-w-[42rem] max-h-[86dvh] rounded-[2rem]'
         )}
       >
         <div className="bg-[linear-gradient(135deg,#10295f_0%,#1d4ed8_48%,#10b981_100%)] p-6 text-white">
-          <SheetHeader className="text-left">
+          <DialogHeader className="text-left">
             <div className="flex items-center gap-2">
               <div className="rounded-2xl bg-white/12 p-2">
                 <History className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <SheetTitle className="text-xl font-black tracking-tight text-white">
+                <DialogTitle className="text-xl font-black tracking-tight text-white">
                   최근 학습 계획 불러오기
-                </SheetTitle>
-                <SheetDescription className="mt-1 text-[11px] font-semibold text-white/76">
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-[11px] font-semibold text-white/76">
                   전에 적어둔 계획을 바로 불러와서 제목이나 수치만 가볍게 바꿔보세요.
-                </SheetDescription>
+                </DialogDescription>
               </div>
             </div>
-          </SheetHeader>
+          </DialogHeader>
         </div>
 
-        <div className={cn('space-y-3 overflow-y-auto bg-white', isMobile ? 'max-h-[calc(85dvh-11rem)] p-4' : 'h-full p-5')}>
+        <div className={cn('space-y-3 overflow-y-auto bg-white', isMobile ? 'max-h-[calc(88dvh-11rem)] p-4' : 'max-h-[calc(86dvh-11rem)] p-5')}>
           {items.length === 0 ? (
             <div className="rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
               <p className="text-sm font-black text-slate-700">최근 학습 계획이 아직 없어요</p>
@@ -123,7 +123,7 @@ export function RecentStudySheet({
           )}
         </div>
 
-        <SheetFooter className="border-t bg-slate-50/70 p-4">
+        <DialogFooter className="border-t bg-slate-50/70 p-4">
           <Button
             type="button"
             variant="outline"
@@ -132,8 +132,8 @@ export function RecentStudySheet({
           >
             닫기
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

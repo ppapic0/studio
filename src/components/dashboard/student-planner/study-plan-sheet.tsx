@@ -5,12 +5,12 @@ import { BookOpen, Loader2, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { StudyPlanItem, WithId } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -133,36 +133,35 @@ export function StudyPlanSheet({
   onCommitActual,
 }: StudyPlanSheetProps) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side={isMobile ? 'bottom' : 'right'}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
         motionPreset="dashboard-premium"
         className={cn(
           'overflow-hidden border-none bg-white p-0 shadow-2xl',
           isMobile
-            ? 'h-auto max-h-[90dvh] rounded-t-[2rem] pb-[calc(1rem+env(safe-area-inset-bottom))]'
-            : 'w-[36rem] max-w-[36rem] rounded-l-[2rem]'
+            ? 'w-[min(94vw,35rem)] max-h-[90dvh] rounded-[2rem]'
+            : 'w-[min(92vw,56rem)] max-w-[56rem] max-h-[88dvh] rounded-[2rem]'
         )}
       >
         <div className="bg-[linear-gradient(135deg,#0f766e_0%,#10b981_48%,#34d399_100%)] p-6 text-white">
-          <SheetHeader className="text-left">
+          <DialogHeader className="text-left">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-white/12 p-2.5">
                 <BookOpen className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <SheetTitle className="text-xl font-black tracking-tight text-white">
+                <DialogTitle className="text-xl font-black tracking-tight text-white">
                   학습 계획 수정
-                </SheetTitle>
-                <SheetDescription className="mt-1 text-[11px] font-semibold text-white/76">
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-[11px] font-semibold text-white/76">
                   최근 계획 불러오기부터 분량형·시간형 추가, 체크까지 한 번에 관리해요.
-                </SheetDescription>
+                </DialogDescription>
               </div>
             </div>
-          </SheetHeader>
+          </DialogHeader>
         </div>
 
-        <div className={cn('overflow-y-auto bg-white', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'h-full p-5')}>
+        <div className={cn('overflow-y-auto bg-white', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'max-h-[calc(88dvh-9rem)] p-5')}>
           <div className="rounded-[1.45rem] border border-emerald-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(244,253,248,0.94)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(16,185,129,0.18)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -272,7 +271,7 @@ export function StudyPlanSheet({
             최근 계획을 불러와서 살짝 수정하거나, 분량형/시간형 중 편한 방식으로 새 계획을 짧게 추가해보세요.
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
