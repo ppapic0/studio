@@ -411,9 +411,9 @@ export const marketingContent: MarketingContent = {
     ],
   },
   experienceShowcase: {
-    heading: '실제 화면으로 보는 트랙 웹앱',
+    heading: '트랙이 자체 개발한 웹앱으로 학습 효율과 흥미를 함께 높입니다',
     description:
-      '학생은 무엇을 바로 실행해야 하는지, 학부모는 어떤 변화를 먼저 확인해야 하는지 실제 화면 기준으로 보여드립니다.',
+      '학생은 더 분명하게 실행하고, 학부모는 더 빠르게 흐름을 확인할 수 있도록 트랙에서 직접 설계한 웹앱입니다.',
     sections: [
       {
         mode: '학생 모드',

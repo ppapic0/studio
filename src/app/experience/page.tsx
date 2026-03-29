@@ -313,13 +313,13 @@ export default function ExperiencePage() {
                 <div className="rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF] px-5 py-5">
                   <p className="text-[11px] font-black tracking-[0.18em] text-[#14295F]/52">STUDENT VIEW</p>
                   <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
-                    학생은 오늘 무엇을 해야 하는지가 먼저 보여야 합니다.
+                    학생이 더 효율적으로 움직이도록 해야 할 일과 실행 흐름이 먼저 보입니다.
                   </p>
                 </div>
                 <div className="rounded-[1.45rem] border border-[#FF7A16]/12 bg-[#FFF9F3] px-5 py-5">
                   <p className="text-[11px] font-black tracking-[0.18em] text-[#B55200]/70">PARENT VIEW</p>
                   <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
-                    학부모는 짧은 시간 안에 현재 상태와 방향을 읽어야 합니다.
+                    학부모는 짧은 확인만으로도 변화 흐름과 학습 흥미까지 읽을 수 있어야 합니다.
                   </p>
                 </div>
               </div>
