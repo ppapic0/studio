@@ -540,7 +540,7 @@ export default function StudentListPage() {
                               </div>
                               <div className="rounded-xl bg-slate-50 px-3 py-2">
                                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">운영 이동</p>
-                                <p className="mt-1 text-sm font-black text-[#14295F]">학생 360 열기</p>
+                                <p className="mt-1 text-sm font-black text-[#14295F]">운영 그래프 확인하기</p>
                               </div>
                             </div>
                           </div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useCollection, useDoc, useFirestore, useFunctions, useUser } from '@/firebase';
@@ -34,6 +34,7 @@ import {
   buildStartEndInsight,
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
+import { StudentOperationsGraphBoard, type StudentOperationsTimelinePoint } from '@/components/dashboard/student-operations-graph-board';
 import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
 
 const STAT_CONFIG = {
@@ -254,6 +255,20 @@ function getPresentationTone(colorClass: string) {
 
 function formatSignedPercent(value: number): string {
   return `${value >= 0 ? '+' : ''}${value}%`;
+}
+
+function timestampToDateKey(value?: Timestamp | null): string | null {
+  if (!value) return null;
+  try {
+    return format(value.toDate(), 'yyyy-MM-dd');
+  } catch {
+    return null;
+  }
+}
+
+function addNumberMapValue(map: Map<string, number>, key: string | null | undefined, amount = 1) {
+  if (!key) return;
+  map.set(key, (map.get(key) || 0) + amount);
 }
 
 const CustomTooltip = ({ active, payload, label, unit = '분', presentationMode = 'default' }: any) => {
@@ -1353,6 +1368,155 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         ]),
   ];
 
+  const operationsTimeline = useMemo<StudentOperationsTimelinePoint[]>(() => {
+    const appVisitsByDate = new Map<string, number>();
+    const reportReadsByDate = new Map<string, number>();
+    const counselingByDate = new Map<string, number>();
+    const smsByDate = new Map<string, number>();
+    const reportsByDate = new Map<string, number>();
+    const penaltyCountByDate = new Map<string, number>();
+    const penaltyPointsByDate = new Map<string, number>();
+    const requestCountByDate = new Map<string, number>();
+    const approvedLateByDate = new Map<string, number>();
+    const approvedAbsenceByDate = new Map<string, number>();
+    const invoiceCountByDate = new Map<string, number>();
+    const invoiceAmountByDate = new Map<string, number>();
+
+    (parentActivityRaw || []).forEach((event) => {
+      const dateKey = timestampToDateKey(event.createdAt);
+      if (event.eventType === 'app_visit') addNumberMapValue(appVisitsByDate, dateKey);
+      if (event.eventType === 'report_read') addNumberMapValue(reportReadsByDate, dateKey);
+    });
+
+    studentCounselingLogs.forEach((log) => {
+      addNumberMapValue(counselingByDate, timestampToDateKey(log.createdAt));
+    });
+
+    smsDeliveryLogs.forEach((log) => {
+      const status = String(log.status || '').toLowerCase();
+      if (['failed', 'cancelled', 'suppressed_opt_out', '번호없음'].includes(status)) return;
+      addNumberMapValue(
+        smsByDate,
+        timestampToDateKey((log.sentAt || log.createdAt) as Timestamp | undefined)
+      );
+    });
+
+    studentDailyReports.forEach((report) => {
+      if (report.status !== 'sent') return;
+      addNumberMapValue(reportsByDate, timestampToDateKey(report.createdAt));
+    });
+
+    penaltyLogs.forEach((log) => {
+      const dateKey = timestampToDateKey(log.createdAt);
+      addNumberMapValue(penaltyCountByDate, dateKey);
+      addNumberMapValue(penaltyPointsByDate, dateKey, Math.abs(Number(log.pointsDelta || 0)));
+    });
+
+    attendanceRequests.forEach((request) => {
+      const dateKey = request.date || timestampToDateKey(request.createdAt) || todayKey;
+      addNumberMapValue(requestCountByDate, dateKey);
+      if (request.type === 'late' && request.status === 'approved') addNumberMapValue(approvedLateByDate, dateKey);
+      if (request.type === 'absence' && request.status === 'approved') addNumberMapValue(approvedAbsenceByDate, dateKey);
+    });
+
+    if (isAdmin) {
+      invoices.forEach((invoice) => {
+        const dateKey =
+          timestampToDateKey(invoice.updatedAt)
+          || timestampToDateKey(invoice.paidAt)
+          || timestampToDateKey(invoice.issuedAt);
+        addNumberMapValue(invoiceCountByDate, dateKey);
+        addNumberMapValue(invoiceAmountByDate, dateKey, Math.max(0, Number(invoice.finalPrice || 0)));
+      });
+    }
+
+    return fullSeries.slice(-28).map((item) => {
+      const appVisits = appVisitsByDate.get(item.dateKey) || 0;
+      const reportReads = reportReadsByDate.get(item.dateKey) || 0;
+      const counselingCount = counselingByDate.get(item.dateKey) || 0;
+      const smsCount = smsByDate.get(item.dateKey) || 0;
+      const reportCount = reportsByDate.get(item.dateKey) || 0;
+      const penaltyCount = penaltyCountByDate.get(item.dateKey) || 0;
+      const penaltyPoints = penaltyPointsByDate.get(item.dateKey) || 0;
+      const requestCount = requestCountByDate.get(item.dateKey) || 0;
+      const invoiceCount = invoiceCountByDate.get(item.dateKey) || 0;
+      const invoiceAmount = invoiceAmountByDate.get(item.dateKey) || 0;
+      const guardianTouchCount = appVisits + reportReads;
+      const managementTouchCount = counselingCount + smsCount + reportCount;
+
+      let attendanceStatus: StudentOperationsTimelinePoint['attendanceStatus'] = 'requested';
+      if ((approvedAbsenceByDate.get(item.dateKey) || 0) > 0) {
+        attendanceStatus = 'excused_absent';
+      } else if (item.studyMinutes > 0) {
+        attendanceStatus = (approvedLateByDate.get(item.dateKey) || 0) > 0 ? 'confirmed_late' : 'confirmed_present';
+      } else if (item.dateKey === todayKey && ['studying', 'away', 'break'].includes(attendanceCurrent?.status || '')) {
+        attendanceStatus = attendanceCurrent?.status === 'studying' ? 'confirmed_present' : 'confirmed_present_missing_routine';
+      } else if (requestCount > 0) {
+        attendanceStatus = 'confirmed_absent';
+      }
+
+      const attendanceLabel =
+        attendanceStatus === 'confirmed_present'
+          ? '정상 등원'
+          : attendanceStatus === 'confirmed_present_missing_routine'
+            ? '루틴 누락 등원'
+            : attendanceStatus === 'confirmed_late'
+              ? '지각'
+              : attendanceStatus === 'confirmed_absent'
+                ? '미출석'
+                : attendanceStatus === 'excused_absent'
+                  ? '사유 결석'
+                  : '기록 없음';
+
+      const riskPulse = Math.min(
+        100,
+        Math.round(
+          (attendanceStatus === 'confirmed_absent' ? 34 : attendanceStatus === 'confirmed_late' ? 16 : 0)
+          + (attendanceStatus === 'confirmed_present_missing_routine' ? 12 : 0)
+          + (item.completionRate > 0 && item.completionRate < 60 ? 22 : item.completionRate < 75 ? 10 : 0)
+          + (item.studyMinutes < 90 ? 16 : item.studyMinutes < 150 ? 6 : 0)
+          + penaltyCount * 12
+          + penaltyPoints
+          + requestCount * 9
+        )
+      );
+
+      return {
+        dateKey: item.dateKey,
+        dateLabel: item.dateLabel,
+        studyMinutes: item.studyMinutes,
+        completionRate: item.completionRate,
+        attendanceStatus,
+        attendanceLabel,
+        appVisits,
+        reportReads,
+        counselingCount,
+        smsCount,
+        reportCount,
+        penaltyCount,
+        penaltyPoints,
+        requestCount,
+        invoiceCount,
+        invoiceAmount,
+        guardianTouchCount,
+        managementTouchCount,
+        riskPulse,
+      };
+    });
+  }, [
+    parentActivityRaw,
+    studentCounselingLogs,
+    smsDeliveryLogs,
+    studentDailyReports,
+    penaltyLogs,
+    attendanceRequests,
+    invoices,
+    isAdmin,
+    fullSeries,
+    todayKey,
+    attendanceCurrent?.status,
+  ]);
+
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId || !canEditStudentInfo) return;
 
@@ -1977,7 +2141,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6 min-w-0">
         <TabsList className={detailTabListClass}>
-          <TabsTrigger value="overview" className={detailTabTriggerClass}><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">학습 분석</span></TabsTrigger>
+          <TabsTrigger value="overview" className={detailTabTriggerClass}><BarChart3 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">운영 그래프</span></TabsTrigger>
           <TabsTrigger value="counseling" className={detailTabTriggerClass}><MessageSquare className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">상담 기록</span></TabsTrigger>
           <TabsTrigger value="plans" className={cn(detailTabTriggerClass, isMobile && "col-span-2")}><BookOpen className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">계획/루틴</span></TabsTrigger>
         </TabsList>
@@ -2155,6 +2319,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </Card>
             </>
           )}
+
+          <StudentOperationsGraphBoard
+            timeline={operationsTimeline}
+            isAdmin={isAdmin}
+            isMobile={isMobile}
+            className={isAnalysisPresentation ? 'analysis-chart-stage' : undefined}
+          />
 
           {!isMobile && (
           <div className="grid gap-4">
