@@ -16,17 +16,18 @@ import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
-import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
+import { recoverLegacyMemberships } from '@/lib/legacy-membership-recovery';
 import {
   PARENT_POST_LOGIN_ENTRY_MOTION_KEY,
   STUDENT_POST_LOGIN_ENTRY_MOTION_KEY,
   setDashboardEntryMotionKeys,
 } from '@/lib/dashboard-motion';
 import { Loader2, Mail } from 'lucide-react';
-import { collection, collectionGroup, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -64,25 +65,28 @@ export function LoginForm() {
     return value.trim().toLowerCase();
   };
 
-  const fetchMembershipRecords = async (uid: string) => {
+  const fetchMembershipRecords = async (authUser: User) => {
     if (!firestore) return [] as { role?: string; status?: string }[];
 
+    const uid = authUser.uid;
     const centersSnap = await getDocs(collection(firestore, 'userCenters', uid, 'centers'));
     if (!centersSnap.empty) {
       return centersSnap.docs.map((docSnap) => docSnap.data() as { role?: string; status?: string });
     }
 
-    const fallbackSnap = await getDocs(
-      query(collectionGroup(firestore, 'members'), where('id', '==', uid))
-    );
+    try {
+      const recoveredMemberships = await recoverLegacyMemberships(authUser);
+      if (recoveredMemberships.length > 0) {
+        return recoveredMemberships.map((membership) => ({
+          role: membership.role,
+          status: membership.status,
+        }));
+      }
+    } catch (error) {
+      console.warn('Legacy membership recovery warning:', error);
+    }
 
-    return fallbackSnap.docs.map((docSnap) => {
-      const data = docSnap.data() as Record<string, unknown>;
-      return {
-        role: typeof data.role === 'string' ? data.role : undefined,
-        status: typeof data.status === 'string' ? data.status : undefined,
-      };
-    });
+    return [];
   };
 
   const validateStudentMembershipStatus = (memberships: { role?: string; status?: string }[]) => {
@@ -154,7 +158,7 @@ export function LoginForm() {
     try {
       const trimmedEmail = values.email.trim();
       const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
-      const memberships = await fetchMembershipRecords(userCredential.user.uid);
+      const memberships = await fetchMembershipRecords(userCredential.user);
       const validation = validateStudentMembershipStatus(memberships);
       if (!validation.allowed) {
         await signOut(auth);

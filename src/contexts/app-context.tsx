@@ -2,8 +2,10 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
+import { usePathname } from 'next/navigation';
+import { recoverLegacyMemberships } from '@/lib/legacy-membership-recovery';
 
 export type CenterMembership = {
   id: string; // centerId
@@ -27,6 +29,23 @@ export const TIERS = [
 ];
 
 const ACTIVE_ATTENDANCE_STATUSES = ['studying', 'away', 'break'] as const;
+const PUBLIC_APP_CONTEXT_ROUTES = new Set([
+  '/',
+  '/login',
+  '/signup',
+  '/experience',
+  '/class',
+  '/lp',
+  '/center',
+  '/results',
+  '/consult/check',
+]);
+
+function isPublicAppContextRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (PUBLIC_APP_CONTEXT_ROUTES.has(pathname)) return true;
+  return pathname.startsWith('/consult/check');
+}
 
 function getSeatActivityRank(status?: string | null): number {
   if (status === 'studying') return 0;
@@ -60,6 +79,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const pathname = usePathname();
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
@@ -71,6 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('desktop');
   const [currentTier, setCurrentTier] = useState(TIERS[0]);
   const isNativeDevice = false;
+  const isPublicRoute = isPublicAppContextRoute(pathname);
 
   const activeMembershipRef = useRef<string | null>(null);
 
@@ -81,6 +102,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (isPublicRoute) {
+      setMemberships([]);
+      setActiveMembership(null);
+      setMembershipsLoading(false);
+      activeMembershipRef.current = null;
+      setCurrentTier(TIERS[0]);
+      return;
+    }
+
     if (!user || !firestore) {
       setMemberships([]);
       setActiveMembership(null);
@@ -191,40 +221,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
-    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
+    let legacyRecoveryRequested = false;
+    let legacyRecoveryFinished = false;
 
-    // Track whether the one-time fallback has already been fetched
-    let fallbackFetched = false;
-
-    const fetchFallbackOnce = async () => {
-      if (fallbackFetched) return;
-      fallbackFetched = true;
+    const recoverLegacyMembershipsOnce = async () => {
+      if (legacyRecoveryRequested) return;
+      legacyRecoveryRequested = true;
       try {
-        const snapshot = await getDocs(fallbackMembersQuery);
-        memberFallbackMemberships = snapshot.docs
-          .map((docSnap) => {
-            const raw = docSnap.data() as any;
-            const centerId = docSnap.ref.parent.parent?.id;
-            if (!centerId) return null;
-            return {
-              id: centerId,
-              role: normalizeRole(raw.role),
-              status: raw.status || 'active',
-              joinedAt: raw.joinedAt,
-              displayName: raw.displayName,
-              linkedStudentIds: raw.linkedStudentIds,
-              className: raw.className,
-            } as CenterMembership;
-          })
-          .filter((membership): membership is CenterMembership => !!membership);
+        const recoveredMemberships = await recoverLegacyMemberships(user);
+        memberFallbackMemberships = recoveredMemberships.map((membership) => ({
+          id: membership.id,
+          role: normalizeRole(membership.role),
+          status: membership.status || 'active',
+          joinedAt: membership.joinedAt,
+          displayName: membership.displayName,
+          linkedStudentIds: membership.linkedStudentIds,
+          className: membership.className,
+        } as CenterMembership));
+      } catch (error: any) {
+        memberFallbackMemberships = [];
+        if (error?.message !== 'legacy-membership-recovery-failed:401') {
+          console.warn('Membership fallback fetch warning:', error);
+        }
+      } finally {
+        legacyRecoveryFinished = true;
         applyMembershipState();
-      } catch (error) {
-        console.warn('Membership fallback fetch warning:', error);
-        setMembershipsLoading(false);
       }
     };
-
-    void fetchFallbackOnce();
 
     const unsubscribeUserCenters = onSnapshot(
       userCentersRef,
@@ -242,6 +265,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } as CenterMembership;
         });
 
+        if (snapshot.empty && !legacyRecoveryFinished) {
+          void recoverLegacyMembershipsOnce();
+          if (memberFallbackMemberships.length === 0) {
+            return;
+          }
+        }
+
         applyMembershipState();
       },
       (error) => {
@@ -253,9 +283,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribeUserCenters();
     };
-  }, [user, firestore]);
+  }, [user, firestore, isPublicRoute]);
 
   useEffect(() => {
+    if (isPublicRoute) {
+      setIsTimerActive(false);
+      setStartTime(null);
+      return;
+    }
+
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
       setIsTimerActive(false);
       setStartTime(null);
@@ -297,9 +333,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role, isPublicRoute]);
 
   useEffect(() => {
+    if (isPublicRoute) {
+      setCurrentTier(TIERS[0]);
+      return;
+    }
+
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
       setCurrentTier(TIERS[0]);
       return;
@@ -343,13 +384,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubProgress();
       unsubRank();
     };
-  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role, isPublicRoute]);
 
   useEffect(() => {
-    if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {
+    if (isPublicRoute) {
+      if (viewMode !== 'desktop') {
+        setViewMode('desktop');
+      }
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    const isPhoneViewport = window.matchMedia('(max-width: 768px)').matches;
+    const shouldUseMobileByDefault =
+      activeMembership?.role === 'parent'
+      || (activeMembership?.role === 'student' && isPhoneViewport);
+
+    if (shouldUseMobileByDefault && viewMode !== 'mobile') {
       setViewMode('mobile');
     }
-  }, [activeMembership?.role, viewMode]);
+  }, [activeMembership?.role, viewMode, isPublicRoute]);
 
   const contextValue = useMemo(
     () => ({
