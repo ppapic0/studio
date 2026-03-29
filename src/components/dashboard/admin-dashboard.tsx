@@ -134,6 +134,66 @@ type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomSeatNo: number;
 };
 
+const EMPTY_ADMIN_METRICS = {
+  totalTodayMins: 0,
+  checkedInCount: 0,
+  seatOccupancy: 0,
+  totalStudents: 0,
+  avgCompletion: 0,
+  riskCount: 0,
+  regularityRate: 0,
+  readRate: 0,
+  commentWriteRate: 0,
+  parentVisitCount30d: 0,
+  activeParentCount30d: 0,
+  avgVisitsPerStudent30d: 0,
+  consultationRequestCount30d: 0,
+  consultationRiskIndex30d: 0,
+  reportReadCount30d: 0,
+  focusKpi: {
+    score: 0,
+    levelLabel: '집계 대기',
+    levelBadgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
+    delta: 0,
+    completion: 0,
+    avgStudyMinutes: 0,
+    avgAwayMinutes: 0,
+    avgGrowthRate: 0,
+    highPenaltyCount: 0,
+    lowCompletionCount: 0,
+    strengths: [] as string[],
+    risks: [] as string[],
+    actions: [] as string[],
+  },
+  focusRows: [] as Array<{
+    studentId: string;
+    name: string;
+    className: string;
+    score: number;
+    completion: number;
+    studyMinutes: number;
+    todayMinutes: number;
+  }>,
+  focusTop10: [] as Array<{
+    studentId: string;
+    name: string;
+    className: string;
+    score: number;
+    completion: number;
+    studyMinutes: number;
+    todayMinutes: number;
+  }>,
+  focusBottom10: [] as Array<{
+    studentId: string;
+    name: string;
+    className: string;
+    score: number;
+    completion: number;
+    studyMinutes: number;
+    todayMinutes: number;
+  }>,
+};
+
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const functions = useFunctions();
@@ -263,6 +323,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
+  const hasMetricsReady = Boolean(activeMembers && attendanceList && isMounted && progressList);
 
   // 4. 실시간 학습 로그 집계
   const todayStatsQuery = useMemoFirebase(() => {
@@ -961,7 +1022,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const metrics = useMemo(() => {
-    if (!activeMembers || !attendanceList || !isMounted || !progressList) return null;
+    if (!activeMembers || !attendanceList || !isMounted || !progressList) return EMPTY_ADMIN_METRICS;
 
     let totalTodayMins = 0;
     let highRiskCount = 0;
@@ -1672,7 +1733,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [attendanceBoardSummary, metrics, parentContactRecommendations]
   );
 
-  const todayOperationHeaderSection = metrics ? (
+  const todayOperationHeaderSection = hasMetricsReady ? (
     <section className="space-y-4 px-1">
       <div className="flex items-center gap-2">
         <Activity className="h-5 w-5 text-primary" />
@@ -1816,7 +1877,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     </section>
   ) : null;
 
-  const interventionZoneSection = metrics ? (
+  const interventionZoneSection = hasMetricsReady ? (
     <section className="space-y-4 px-1">
       <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1.45fr_0.95fr]')}>
         <div className="space-y-4">
@@ -2092,7 +2153,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </header>
 
-      {metrics ? (
+          {hasMetricsReady ? (
         <>
           {todayOperationHeaderSection}
 
