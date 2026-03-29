@@ -4606,13 +4606,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       </Tabs>
 
       <Dialog open={isReportArchiveOpen} onOpenChange={setIsReportArchiveOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl md:max-w-4xl">
+        <DialogContent className="w-[95vw] max-w-[95vw] max-h-[82dvh] overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-h-[calc(100dvh-1rem)] md:max-w-4xl">
           <div className="bg-[#14295F] p-6 text-white">
             <DialogTitle className="text-xl font-black tracking-tight">우리 아이 학습 리포트</DialogTitle>
             <DialogDescription className="mt-1 text-xs font-bold text-white/70">받은 리포트를 날짜별로 확인할 수 있어요.</DialogDescription>
           </div>
-          <div className="bg-white p-4 md:grid md:grid-cols-[260px_minmax(0,1fr)] md:gap-4 md:p-6">
-            <div className="space-y-2 max-h-[220px] overflow-y-auto md:max-h-[62vh] md:pr-1">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white p-4 md:grid md:max-h-[70vh] md:grid-cols-[260px_minmax(0,1fr)] md:gap-4 md:p-6">
+            <div className="max-h-[22vh] shrink-0 space-y-2 overflow-y-auto pb-2 md:max-h-[62vh] md:pr-1">
               {reportsArchive.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-xs font-bold text-slate-400">
                   아직 받은 리포트가 없습니다.
@@ -4637,7 +4637,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 })
               )}
             </div>
-            <div className="mt-3 max-h-[42vh] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4 md:mt-0 md:max-h-[62vh] md:p-5">
+            <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4 md:mt-0 md:max-h-[62vh] md:p-5">
               {selectedChildReport ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-2">
