@@ -31,7 +31,7 @@ import { differenceInMinutes, format, isSameDay } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { collection, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch } from 'firebase/firestore';
-import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3, Megaphone, TrendingUp } from 'lucide-react';
 import { CenterMembership, AttendanceRequest, AttendanceCurrent } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -564,6 +564,8 @@ export default function AttendancePage() {
         quickActions={[
           { label: '실시간 교실', icon: <UserCheck className="h-4 w-4" />, href: '/dashboard/teacher' },
           { label: '문자 콘솔', icon: <ClipboardCheck className="h-4 w-4" />, href: '/dashboard/settings/notifications' },
+          { label: '리드상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
+          { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
           { label: '학생 관리', icon: <BarChart3 className="h-4 w-4" />, href: '/dashboard/teacher/students' },
         ]}
       >

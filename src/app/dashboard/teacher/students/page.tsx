@@ -25,7 +25,9 @@ import {
   PauseCircle,
   Users,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Megaphone,
+  TrendingUp,
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
@@ -813,7 +815,8 @@ export default function StudentListPage() {
         selectLabel="반 필터"
         quickActions={[
           { label: '신규 가입', icon: <UserPlus className="h-4 w-4" />, onClick: () => setIsAddModalOpen(true) },
-          { label: '상담 등록', icon: <Users className="h-4 w-4" />, href: '/dashboard/leads' },
+          { label: '리드상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
+          { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
           { label: '문자 보내기', icon: <ChevronRight className="h-4 w-4" />, href: '/dashboard/settings/notifications' },
           { label: '출결 이동', icon: <UserCheck className="h-4 w-4" />, href: '/dashboard/attendance' },
         ]}

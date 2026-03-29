@@ -8,11 +8,13 @@ import {
   Clock3,
   Loader2,
   MessageSquare,
+  Megaphone,
   PlugZap,
   RefreshCcw,
   Save,
   Search,
   ShieldCheck,
+  TrendingUp,
   XCircle,
 } from 'lucide-react';
 
@@ -1385,6 +1387,8 @@ export default function NotificationSettingsPage() {
         quickActions={[
           { label: '학생 발송 보기', icon: <MessageSquare className="h-4 w-4" />, onClick: () => setHistoryTab('by-student') },
           { label: '수신 제어', icon: <ShieldCheck className="h-4 w-4" />, onClick: () => setRecipientSearchTerm('') },
+          { label: '리드상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
+          { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
           { label: '리포트 생성', icon: <Save className="h-4 w-4" />, href: '/dashboard/reports' },
           { label: '출결 이동', icon: <Clock3 className="h-4 w-4" />, href: '/dashboard/attendance' },
         ]}

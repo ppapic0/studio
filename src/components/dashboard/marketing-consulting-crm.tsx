@@ -22,6 +22,7 @@ import {
   Phone,
   PlusCircle,
   Save,
+  TrendingUp,
   Trash2,
   UserRoundPlus,
   Users,
@@ -1335,6 +1336,7 @@ export function MarketingConsultingCRM({
               quickActions={[
                 { label: editingId ? '입력 초기화' : '상담 리드 등록', icon: <PlusCircle className="h-4 w-4" />, onClick: resetForm },
                 { label: '입학 대기 DB', icon: <ListChecks className="h-4 w-4" />, onClick: () => setActiveTab('waitlist') },
+                { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
                 { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
               ]}
             />
@@ -1641,6 +1643,7 @@ export function MarketingConsultingCRM({
               selectLabel="대기 상태"
               quickActions={[
                 { label: '상담 리드 탭', icon: <Users className="h-4 w-4" />, onClick: () => setActiveTab('leads') },
+                { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
                 { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
               ]}
             >

@@ -39,6 +39,7 @@ import {
   ExternalLink,
   PlusCircle,
   BellRing,
+  Megaphone,
   CheckCircle2,
   FileText,
   Clock,
@@ -507,6 +508,7 @@ export default function RevenuePage() {
         description="수납, 수익 분석, 운영 인텔리전스를 같은 빠른 실행과 월 기준으로 이어서 확인합니다."
         quickActions={[
           { label: '학생 관리', icon: <Users className="h-4 w-4" />, href: '/dashboard/teacher/students' },
+          { label: '리드상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
           { label: '문자 콘솔', icon: <BellRing className="h-4 w-4" />, href: '/dashboard/settings/notifications' },
           { label: '출결 이동', icon: <CalendarCheck className="h-4 w-4" />, href: '/dashboard/attendance' },
         ]}
