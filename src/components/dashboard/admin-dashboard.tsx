@@ -1888,7 +1888,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               도면 + 바로조치
             </Badge>
           </div>
-          {attendanceDashboardSection}
+          {renderAttendanceDashboardSection()}
         </div>
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -1981,8 +1981,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     </section>
   ) : null;
 
-  const attendanceDashboardSection = (
-    <section className="space-y-4 px-1">
+  function renderAttendanceDashboardSection() {
+    return (
+      <section className="space-y-4 px-1">
       <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
         <div className="grid gap-1">
           <div className="flex items-center gap-2 text-primary/65">
@@ -2091,8 +2092,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           </div>
         </DialogContent>
       </Dialog>
-    </section>
-  );
+      </section>
+    );
+  }
 
   const heatmapGraphSection = (
     <section className="px-1">
