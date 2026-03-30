@@ -14,7 +14,6 @@ import {
   Zap,
   Square,
   Timer,
-  CalendarClock,
   AlertCircle,
   Check,
   CircleDot,
@@ -1906,49 +1905,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => studyTimeTrend.reduce((sum, item) => sum + item.minutes, 0),
     [studyTimeTrend]
   );
-  const previousWeekStudyMinutes = useMemo(() => {
-    if (!today) return 0;
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = subDays(today, 13 - index);
-      const dateKey = format(day, 'yyyy-MM-dd');
-      return logMinutesByDateKey.get(dateKey) || 0;
-    }).reduce((sum, minutes) => sum + minutes, 0);
-  }, [today, logMinutesByDateKey]);
-  const weeklyStudyDelta = weeklyStudyMinutes - previousWeekStudyMinutes;
-  const sevenDayAverageMinutes = useMemo(
-    () => {
-      if (!studyTimeTrend.length) return 0;
-      return Math.round(weeklyStudyMinutes / studyTimeTrend.length);
-    },
-    [studyTimeTrend, weeklyStudyMinutes]
-  );
-  const sevenDayAverageTrend = useMemo(() => {
-    const hasWeeklyFlow = studyTimeTrend.some((item) => item.minutes > 0);
-    if (hasWeeklyFlow) {
-      return {
-        modeLabel: '7일 흐름',
-        data: studyTimeTrend,
-      };
-    }
-
-    const recentLoggedDays = [...(recentLogs || [])]
-      .slice(0, 7)
-      .reverse()
-      .map((item) => ({
-        date: item.dateKey?.slice(5).replace('-', '/') || '',
-        minutes: Math.max(0, Number(item.totalMinutes || 0)),
-      }));
-
-    return {
-      modeLabel: recentLoggedDays.length > 0 ? '최근 로그' : '7일 흐름',
-      data: recentLoggedDays,
-    };
-  }, [studyTimeTrend, recentLogs]);
-  const weeklyStudyDeltaLabel = useMemo(() => {
-    if (weeklyStudyDelta === 0) return '지난주와 같은 흐름';
-    const diffLabel = formatMinutesToKorean(Math.abs(weeklyStudyDelta));
-    return weeklyStudyDelta > 0 ? `지난주 대비 +${diffLabel}` : `지난주 대비 -${diffLabel}`;
-  }, [weeklyStudyDelta]);
   const todayRemainingTasks = useMemo(
     () => todayStudyTasks.filter((item) => !item.done),
     [todayStudyTasks]
@@ -2275,45 +2231,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </Link>
         </div>
 
-        <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-2" : "col-span-5 grid-cols-2")}>
-          <Card className="overflow-hidden rounded-[1.5rem] border border-[#D9E1F2] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] shadow-[0_22px_52px_-34px_rgba(23,58,130,0.26)]">
-            <CardContent className={cn("p-4", !isMobile && "p-5")}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#173A82]/72">7일 평균</span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#173A82] text-white shadow-[0_10px_24px_-16px_rgba(23,58,130,0.7)]">
-                  <CalendarClock className="h-4 w-4" />
-                </div>
-              </div>
-              <div className={cn("mt-3 gap-3", isMobile ? "flex flex-col" : "flex items-end justify-between")}>
-                <div className="min-w-0 flex-1">
-                  <p className={cn("font-black tracking-tight text-[#173A82] whitespace-normal break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
-                    {formatMinutesToKorean(sevenDayAverageMinutes)}
-                  </p>
-                  <p className="mt-1 text-[11px] font-semibold text-[#173A82]/58">
-                    최근 7일 누적 기준
-                  </p>
-                  <span className={cn(
-                    "mt-2 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black",
-                    weeklyStudyDelta >= 0
-                      ? "border-[#FF7A16]/18 bg-[#FF7A16]/10 text-[#FF7A16]"
-                      : "border-[#173A82]/12 bg-[#173A82]/[0.06] text-[#173A82]/70"
-                  )}>
-                    {weeklyStudyDeltaLabel}
-                  </span>
-                </div>
-                <div className={cn("shrink-0", isMobile ? "w-full max-w-[6.2rem] self-end" : "w-[7rem]")}>
-                  <MiniBestStudySparkline
-                    data={sevenDayAverageTrend.data}
-                    isMobile={isMobile}
-                    modeLabel={sevenDayAverageTrend.modeLabel}
-                    peakMinutes={sevenDayAverageMinutes}
-                    valueLabel={formatMinutesMini(sevenDayAverageMinutes)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
+        <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-1" : "col-span-5 grid-cols-1")}>
           <Link href="/dashboard/leaderboards?range=daily" className="block touch-manipulation">
             <Card className="h-full overflow-hidden rounded-[1.5rem] border border-[#274A9B] bg-[linear-gradient(180deg,#173A82_0%,#234A99_100%)] shadow-[0_24px_54px_-34px_rgba(23,58,130,0.52)] transition-transform duration-200 hover:-translate-y-0.5">
               <CardContent className={cn("p-4", !isMobile && "p-5")}>

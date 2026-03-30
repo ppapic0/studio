@@ -250,7 +250,7 @@ function RewardCountUp({ value }: { value: number }) {
   return <>{displayValue.toLocaleString()}</>;
 }
 
-function StatCard({
+function HeroMetricChip({
   icon: Icon,
   label,
   value,
@@ -264,20 +264,22 @@ function StatCard({
   floatingGain?: FloatingGain | null;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[1.5rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-3.5 py-3.5 shadow-[0_18px_34px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
+    <div className="relative overflow-hidden rounded-[1.35rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.08))] px-3.5 py-3 shadow-[0_18px_30px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
       {floatingGain ? (
         <div key={floatingGain.key} className="point-track-floating-gain">
           +{floatingGain.amount}P
         </div>
       ) : null}
-      <div className="mb-3 flex items-center justify-between">
-        <span className={cn('inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/12 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
+      <div className="flex items-center gap-3">
+        <span className={cn('inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/12 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
           <Icon className="h-4 w-4" />
         </span>
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/58">{label}</span>
+        <div className="min-w-0">
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/52">{label}</div>
+          <div className="mt-1 text-[1.12rem] font-black tracking-[-0.04em] text-white sm:text-[1.2rem]">{value}</div>
+        </div>
       </div>
-      <div className="text-[1.25rem] font-black tracking-[-0.04em] text-white sm:text-[1.35rem]">{value}</div>
     </div>
   );
 }
@@ -781,6 +783,21 @@ export default function GrowthPage() {
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.24em] text-white/45">POINT TRACK</p>
               <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
+              <div className="mt-3 grid grid-cols-2 gap-2.5">
+                <HeroMetricChip
+                  icon={Flame}
+                  label="오늘 공부"
+                  value={formatStudyMinutesShort(liveTodayMinutes)}
+                  accentClass="text-orange-200"
+                />
+                <HeroMetricChip
+                  icon={Wallet}
+                  label="포인트"
+                  value={`${pointBalance.toLocaleString()}P`}
+                  accentClass="text-amber-200"
+                  floatingGain={floatingGain}
+                />
+              </div>
             </div>
             <div
               className={cn(
@@ -877,12 +894,6 @@ export default function GrowthPage() {
             <span>0분</span>
             <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : `${formatCountdown(nextBoxSecondsLeft)} 남음`}</span>
           </div>
-        </section>
-
-        <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
-          <StatCard icon={Flame} label="오늘 공부" value={formatStudyMinutesShort(liveTodayMinutes)} accentClass="text-orange-200" />
-          <StatCard icon={Gift} label="상자" value={`${totalAvailableBoxes}개`} accentClass="text-sky-200" />
-          <StatCard icon={Wallet} label="포인트" value={`${pointBalance.toLocaleString()}P`} accentClass="text-amber-200" floatingGain={floatingGain} />
         </section>
 
         <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
