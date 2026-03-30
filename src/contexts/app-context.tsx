@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useFunctions } from '@/firebase';
-import { collection, collectionGroup, documentId, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { httpsCallable } from 'firebase/functions';
 
@@ -214,7 +214,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
     const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
-    const fallbackMembersByDocIdQuery = query(collectionGroup(firestore, 'members'), where(documentId(), '==', user.uid));
 
     // Track whether the one-time fallback has already been fetched
     let fallbackFetched = false;
@@ -241,16 +240,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (fallbackFetched) return;
       fallbackFetched = true;
       try {
-        const [snapshotByField, snapshotByDocId] = await Promise.all([
-          getDocs(fallbackMembersQuery),
-          getDocs(fallbackMembersByDocIdQuery),
-        ]);
-        const dedupedDocs = Array.from(
-          new Map(
-            [...snapshotByField.docs, ...snapshotByDocId.docs].map((docSnap) => [docSnap.ref.path, docSnap])
-          ).values()
-        );
-        memberFallbackMemberships = dedupedDocs
+        const snapshotByField = await getDocs(fallbackMembersQuery);
+        memberFallbackMemberships = snapshotByField.docs
           .map((docSnap) => {
             const raw = docSnap.data() as any;
             const centerId = docSnap.ref.parent.parent?.id;
