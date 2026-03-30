@@ -4197,6 +4197,16 @@ select {
   100% { opacity: 0; transform: translateY(-34px) scale(0.84); }
 }
 
+@keyframes planner-shimmer-slide {
+  0% { transform: translateX(-6rem); }
+  100% { transform: translateX(22rem); }
+}
+
+@keyframes planner-cta-breathe {
+  0%, 100% { box-shadow: 0 18px 34px -24px rgba(255, 150, 38, 0.45); transform: translateY(0); }
+  50% { box-shadow: 0 24px 40px -22px rgba(255, 150, 38, 0.58); transform: translateY(-1px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .point-track-hero-box__glow,
   .point-track-hero-box__shadow,

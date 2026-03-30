@@ -16,6 +16,10 @@ type PlannerChecklistItemProps = {
   badgeClassName: string;
   durationLabel: string;
   detailLabel?: string | null;
+  rewardLabel?: string | null;
+  statusLabel?: string | null;
+  statusTone?: 'planned' | 'active' | 'completed';
+  progressPercent?: number;
   isVolumeTask: boolean;
   isMobile: boolean;
   disabled?: boolean;
@@ -33,6 +37,10 @@ export function PlannerChecklistItem({
   badgeClassName,
   durationLabel,
   detailLabel,
+  rewardLabel,
+  statusLabel,
+  statusTone = 'planned',
+  progressPercent = 0,
   isVolumeTask,
   isMobile,
   disabled = false,
@@ -59,11 +67,24 @@ export function PlannerChecklistItem({
   const safeProgress = isVolumeTask && (task.targetAmount || 0) > 0
     ? Math.min(100, Math.round(((task.actualAmount || 0) / Math.max(1, task.targetAmount || 1)) * 100))
     : 0;
+  const displayedProgress = isVolumeTask ? safeProgress : Math.max(0, Math.min(100, progressPercent));
+  const containerClass =
+    statusTone === 'completed'
+      ? 'border-[#2FAA7D]/22 bg-[linear-gradient(180deg,#FFFFFF_0%,#F1FBF7_100%)]'
+      : statusTone === 'active'
+        ? 'border-[#173A82]/18 bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_52%,#FFF7EC_100%)] shadow-[0_20px_36px_-28px_rgba(23,58,130,0.22)]'
+        : 'border-[#E3EAF4] bg-white/92 hover:border-[#D1DAE9] hover:bg-white';
+  const statusBadgeClass =
+    statusTone === 'completed'
+      ? 'border border-[#2FAA7D]/18 bg-[#ECFDF5] text-[#0F766E]'
+      : statusTone === 'active'
+        ? 'border border-[#FF9626]/18 bg-[#FFF4E8] text-[#FF9626]'
+        : 'border border-[#DDE7F6] bg-[#F6F8FC] text-[#17326B]/72';
 
   return (
     <div className={cn(
-      'rounded-[1.35rem] border border-[#E3EAF4] bg-white/88 transition-all',
-      task.done ? 'bg-[#F8FBFF]' : 'hover:border-[#D1DAE9] hover:bg-white/96'
+      'rounded-[1.5rem] border transition-all',
+      containerClass
     )}>
       <div
         role="button"
@@ -75,10 +96,7 @@ export function PlannerChecklistItem({
             onExpandedChange(!expanded);
           }
         }}
-        className={cn(
-          'flex items-start gap-3 px-4 py-4 outline-none',
-          isMobile ? 'min-h-[4.85rem]' : 'min-h-[5.2rem]'
-        )}
+        className={cn('flex items-start gap-3 px-4 py-4 outline-none', isMobile ? 'min-h-[5.2rem]' : 'min-h-[5.6rem]')}
       >
         <div className="pt-1">
           {isVolumeTask ? (
@@ -104,6 +122,16 @@ export function PlannerChecklistItem({
             <Badge className={cn('rounded-full px-2.5 py-0.5 text-[9px] font-black shadow-none', badgeClassName)}>
               {badgeLabel}
             </Badge>
+            {statusLabel ? (
+              <Badge className={cn('rounded-full px-2.5 py-0.5 text-[9px] font-black shadow-none', statusBadgeClass)}>
+                {statusLabel}
+              </Badge>
+            ) : null}
+            {rewardLabel ? (
+              <Badge className="rounded-full border border-[#FF9626]/15 bg-[#FFF7EC] px-2.5 py-0.5 text-[9px] font-black text-[#FF9626] shadow-none">
+                {rewardLabel}
+              </Badge>
+            ) : null}
             {task.priority ? (
               <Badge className="rounded-full border border-[#FF7A16]/15 bg-[#FFF7EC] px-2 py-0.5 text-[9px] font-black text-[#FF7A16] shadow-none">
                 {task.priority === 'high' ? '중요' : task.priority === 'medium' ? '보통' : '가볍게'}
@@ -131,6 +159,20 @@ export function PlannerChecklistItem({
 
           {detailLabel ? (
             <p className="mt-2 line-clamp-1 text-[11px] font-semibold leading-5 text-[#173A82]/56">{detailLabel}</p>
+          ) : null}
+
+          {!task.done && displayedProgress > 0 ? (
+            <div className="mt-3">
+              <div className="rounded-full bg-[#E9EFF9] p-1">
+                <div className="relative overflow-hidden rounded-full">
+                  <div
+                    className="h-2.5 rounded-full bg-[linear-gradient(90deg,#173A82_0%,#28478F_48%,#FFB347_100%)] transition-[width] duration-500"
+                    style={{ width: `${displayedProgress}%` }}
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 w-16 animate-[planner-shimmer-slide_2.6s_linear_infinite] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.42)_55%,rgba(255,255,255,0)_100%)]" />
+                </div>
+              </div>
+            </div>
           ) : null}
         </div>
 
