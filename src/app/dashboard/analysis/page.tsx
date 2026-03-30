@@ -49,7 +49,6 @@ import StudentDetailPage from '../teacher/students/[id]/page';
 import { StudentDetailPresentationProvider } from '@/components/dashboard/student-detail-presentation-mode';
 
 type ToneKey = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose';
-type GraphCardId = '' | 'focus' | 'density' | 'rhythm' | 'slot';
 type RewardBurst = { id: number; title: string; points: number };
 
 const TONE_STYLES: Record<ToneKey, { chip: string; text: string; bar: string; ring: string; soft: string }> = {
@@ -373,10 +372,8 @@ function GraphDungeonCard({
   insight,
   reward,
   unlocked,
-  active,
   preview,
   previewHint,
-  onToggle,
   children,
 }: {
   title: string;
@@ -384,10 +381,8 @@ function GraphDungeonCard({
   insight: string;
   reward: number;
   unlocked: boolean;
-  active: boolean;
   preview: React.ReactNode;
   previewHint: string;
-  onToggle: () => void;
   children: ReactNode;
 }) {
   return (
@@ -398,37 +393,31 @@ function GraphDungeonCard({
         unlocked ? 'border-white/10 bg-[#13285A]/82' : 'border-white/6 bg-[#10224D]/72'
       )}
     >
-      <button type="button" onClick={onToggle} className="w-full text-left">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="border-[#FFB347]/18 bg-[#FF9626]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
-                {eyebrow}
-              </Badge>
-              <span className={cn('text-[10px] font-black uppercase tracking-[0.18em]', unlocked ? 'text-white/42' : 'inline-flex items-center gap-1 text-white/35')}>
-                {unlocked ? '🔓 unlocked' : <><Lock className="h-3 w-3" /> locked</>}
-              </span>
-            </div>
-            <h3 className="mt-3 text-lg font-black tracking-tight text-white">{title}</h3>
-            <p className="mt-1 text-sm font-semibold text-white/58">{insight}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="border-[#FFB347]/18 bg-[#FF9626]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
+              {eyebrow}
+            </Badge>
+            <span className={cn('text-[10px] font-black uppercase tracking-[0.18em]', unlocked ? 'text-white/42' : 'inline-flex items-center gap-1 text-white/35')}>
+              {unlocked ? '🔓 unlocked' : <><Lock className="h-3 w-3" /> locked</>}
+            </span>
           </div>
-          <div className="text-right">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">Reward</p>
-            <p className="mt-1 text-lg font-black text-[#FFD79F]">+{reward}P</p>
-          </div>
+          <h3 className="mt-3 text-lg font-black tracking-tight text-white">{title}</h3>
+          <p className="mt-1 text-sm font-semibold text-white/58">{insight}</p>
         </div>
+        <div className="text-right">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">Reward</p>
+          <p className="mt-1 text-lg font-black text-[#FFD79F]">+{reward}P</p>
+        </div>
+      </div>
 
-        <div className="mt-4 rounded-[1.35rem] border border-white/8 bg-white/5 px-3 py-3">
-          {preview}
-          <p className="mt-3 text-right text-[11px] font-semibold text-white/58">{previewHint}</p>
-        </div>
-      </button>
+      <div className="mt-4 rounded-[1.35rem] border border-white/8 bg-white/5 px-3 py-3">
+        {preview}
+        <p className="mt-3 text-right text-[11px] font-semibold text-white/58">{previewHint}</p>
+      </div>
 
-      {active ? (
-        <div className="overflow-hidden transition-all duration-300 ease-out">
-          <div className="mt-4 border-t border-white/10 pt-4">{children}</div>
-        </div>
-      ) : null}
+      <div className="mt-4 border-t border-white/10 pt-4">{children}</div>
     </section>
   );
 }
@@ -685,8 +674,6 @@ export default function AnalysisTrackPage() {
     ],
     [sessionMetrics]
   );
-  const [activeCard, setActiveCard] = useState<GraphCardId>('focus');
-  const [claimedCards, setClaimedCards] = useState<GraphCardId[]>([]);
   const [analysisRewardPoints, setAnalysisRewardPoints] = useState(0);
   const [rewardBurst, setRewardBurst] = useState<RewardBurst | null>(null);
 
@@ -742,15 +729,6 @@ export default function AnalysisTrackPage() {
     ],
     [insight.trend, kpi.studyDays, kpi.weekDiffPct, sessionMetrics]
   );
-
-  const handleToggleCard = (cardId: GraphCardId) => {
-    setActiveCard((prev) => (prev === cardId ? '' as GraphCardId : cardId));
-    const card = dungeonCards.find((item) => item.id === cardId);
-    if (card?.unlocked && !claimedCards.includes(cardId)) {
-      setClaimedCards((prev) => [...prev, cardId]);
-      grantReward(`${card.title} 분석`, card.reward);
-    }
-  };
 
   const handleApplyStrategy = (title: string, points: number) => {
     grantReward(title, points);
@@ -907,7 +885,7 @@ export default function AnalysisTrackPage() {
                 <Badge className="border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-white/72 shadow-none">GRAPH DUNGEON</Badge>
                 <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">그래프 던전들</h2>
               </div>
-              <p className="text-sm font-semibold text-white/58">눌러서 펼치고, 해석하고, 전략으로 연결하세요.</p>
+              <p className="text-sm font-semibold text-white/58">핵심 그래프를 한 번에 보고, 해석하고, 전략으로 연결하세요.</p>
             </div>
 
             {dungeonCards.map((card) => (
@@ -918,8 +896,6 @@ export default function AnalysisTrackPage() {
                 insight={card.insight}
                 reward={card.reward}
                 unlocked={card.unlocked}
-                active={activeCard === card.id}
-                onToggle={() => handleToggleCard(card.id)}
                 previewHint={card.previewHint}
                 preview={
                   card.id === 'density' ? (
