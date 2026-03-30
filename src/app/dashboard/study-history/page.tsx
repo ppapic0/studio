@@ -837,7 +837,7 @@ export default function StudyHistoryPage() {
 
       {isMobile && <StudentTrackSubnav className="mx-1" />}
 
-      <Card className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.22),transparent_22%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]">
+      <Card className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_20%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.12),transparent_24%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]">
         <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
           <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-start justify-between")}>
             <div className="space-y-3">
@@ -876,40 +876,54 @@ export default function StudyHistoryPage() {
             ) : null}
           </div>
 
-          <div className={cn("mt-5 grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+          <div className={cn("mt-5 grid", isMobile ? "grid-cols-3 gap-2" : "md:grid-cols-3 gap-3")}>
             {[
               {
                 label: '이번 달 총 공부시간',
+                mobileLabel: '이번 달',
                 value: formatMinutes(monthTotalMinutes),
                 note: '이번 달 누적 기준',
+                mobileNote: '누적',
               },
               {
                 label: '오늘 공부시간',
+                mobileLabel: '오늘',
                 value: formatMinutes(todayTotalMinutes),
                 note: isParent
                   ? '오늘 하루 기준'
                   : `오늘 열린 포인트 상자 ${todayOpenedBoxCount}개`,
+                mobileNote: isParent
+                  ? '하루 기준'
+                  : `상자 ${todayOpenedBoxCount}개`,
               },
               {
                 label: '최근 7일 누적',
+                mobileLabel: '7일 누적',
                 value: formatMinutes(recent7DaysTotalMinutes),
                 note: '직전 7일 공부 누적',
+                mobileNote: '직전 7일',
               },
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-[1.8rem] border border-white/14 bg-[linear-gradient(180deg,rgba(11,30,82,0.34),rgba(255,255,255,0.08))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+                className={cn(
+                  "min-w-0 overflow-hidden border border-white/14 bg-[linear-gradient(180deg,rgba(9,25,69,0.72),rgba(28,59,131,0.86))] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.4)] backdrop-blur-xl",
+                  isMobile ? "rounded-[1.35rem] p-3" : "rounded-[1.8rem] p-4"
+                )}
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">
-                  {item.label}
+                <p className={cn("font-black uppercase tracking-[0.18em] text-[#FFD089]", isMobile ? "text-[9px]" : "text-[10px]")}>
+                  {isMobile ? item.mobileLabel : item.label}
                 </p>
-                <div className="mt-3 flex items-end gap-2">
-                  <span className="dashboard-number text-[1.9rem] font-black leading-none tracking-[-0.06em] text-white sm:text-[2.35rem]">
+                <div className={cn("flex items-end gap-2", isMobile ? "mt-2" : "mt-3")}>
+                  <span className={cn(
+                    "dashboard-number min-w-0 font-black leading-none tracking-[-0.06em] text-white",
+                    isMobile ? "text-[1.2rem]" : "text-[1.9rem] sm:text-[2.35rem]"
+                  )}>
                     {item.value}
                   </span>
                 </div>
-                <p className="mt-2 break-keep text-xs font-semibold text-white/80">
-                  {item.note}
+                <p className={cn("break-keep font-semibold text-white/78", isMobile ? "mt-1 text-[10px] leading-4" : "mt-2 text-xs")}>
+                  {isMobile ? item.mobileNote : item.note}
                 </p>
               </div>
             ))}
