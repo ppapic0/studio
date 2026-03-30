@@ -184,6 +184,12 @@ function formatMinutesMini(minutes: number): string {
   return `${hours}h ${remain}m`;
 }
 
+function formatPenaltyLogDate(value?: Timestamp | null): string {
+  const date = value?.toDate?.();
+  if (!date) return '기록 시간 없음';
+  return format(date, 'M/d HH:mm');
+}
+
 function toClockLabel(totalMinutes: number): string {
   const safe = Math.max(0, Math.min(24 * 60, Math.round(totalMinutes)));
   const h = Math.floor(safe / 60).toString().padStart(2, '0');
@@ -1368,6 +1374,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [weeklyPlans]);
 
   const penaltyPoints = progress?.penaltyPoints || 0;
+  const latestPenaltyLog = myPenaltyLogs[0] || null;
+  const penaltyStatusLabel = penaltyPoints > 0 ? `${penaltyPoints}점 누적` : '현재 벌점 없음';
+  const penaltyStatusCaption = latestPenaltyLog
+    ? `${PENALTY_SOURCE_LABEL[latestPenaltyLog.source]} · ${formatPenaltyLogDate(latestPenaltyLog.createdAt)}`
+    : '최근 반영 내역 없음';
   const boxRewardBoostPercent = Math.round(
     (((stats.focus / 100) * 0.05) + ((stats.consistency / 100) * 0.05) + ((stats.achievement / 100) * 0.05) + ((stats.resilience / 100) * 0.05)) * 100
   );
@@ -2918,6 +2929,129 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         {/* Utility column */}
         <div className={cn("flex flex-col gap-3", isMobile ? "" : "")}>
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="group text-left h-full w-full touch-manipulation"
+              >
+                <Card
+                  className={cn(
+                    "student-cta student-cta-card student-utility-card h-full border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
+                    isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6",
+                    penaltyPoints > 0 && "ring-1 ring-[#EF476F]/20 border-[#F5C4CF]"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "rounded-2xl border flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]",
+                      penaltyPoints > 0
+                        ? "border-[#F7CBD4] bg-[linear-gradient(180deg,#FFF0F3_0%,#FFE1E8_100%)]"
+                        : "border-[#D7E3F8] bg-[linear-gradient(180deg,#EFF4FF_0%,#E3EBFB_100%)]",
+                      isMobile ? "h-12 w-12" : "h-16 w-16"
+                    )}
+                  >
+                    <ShieldAlert className={cn(penaltyPoints > 0 ? "text-[#EF476F]" : "text-[#17326B]", isMobile ? "h-6 w-6" : "h-8 w-8")} />
+                  </div>
+                  <div className="grid min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={cn("font-black tracking-tighter text-[#17326B] break-keep", isMobile ? "text-sm" : "text-xl")}>나의 벌점 현황</span>
+                      <Badge
+                        className={cn(
+                          "border-none font-black h-5 px-2 shrink-0",
+                          penaltyPoints > 0 ? "bg-[#EF476F] text-white" : "bg-[#17326B] text-white"
+                        )}
+                      >
+                        {penaltyPoints}점
+                      </Badge>
+                    </div>
+                    <span className={cn("font-bold uppercase tracking-widest truncate", isMobile ? "text-[8px]" : "text-[10px]", penaltyPoints > 0 ? "text-[#B85A6E]" : "text-[#6781AE]")}>
+                      {penaltyStatusCaption}
+                    </span>
+                  </div>
+                  <ChevronRight className="ml-auto h-5 w-5 text-[#8AA0C7]" />
+                </Card>
+              </button>
+            </DialogTrigger>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-lg max-h-[90vh]")}>
+              <div className="bg-[linear-gradient(180deg,#17326B_0%,#10244F_100%)] p-8 text-white relative shrink-0">
+                <ShieldAlert className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black tracking-tight">나의 벌점 현황</DialogTitle>
+                  <DialogDescription className="text-white/72 font-bold">
+                    누적 벌점과 최근 반영 사유를 한눈에 확인할 수 있어요.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className={cn("flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar", isMobile ? "max-h-[calc(88svh-10.5rem)]" : "")}>
+                <div className={cn("p-8 space-y-5", isMobile ? "p-4" : "")}>
+                  <div className="rounded-[2rem] border border-[#D9E1F2] bg-white p-5 shadow-[0_18px_42px_-32px_rgba(10,28,72,0.18)]">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#6781AE]">CURRENT PENALTY</p>
+                        <p className="mt-2 text-4xl font-black tracking-tight text-[#17326B]">{penaltyPoints}점</p>
+                        <p className="mt-2 text-sm font-semibold text-[#5A6F95]">
+                          {penaltyPoints > 0 ? '최근 반영된 벌점 내역을 확인해 보세요.' : '현재 누적 벌점이 없어요.'}
+                        </p>
+                      </div>
+                      <div className={cn(
+                        "rounded-2xl border px-3 py-2 text-sm font-black",
+                        penaltyPoints > 0
+                          ? "border-[#F7CBD4] bg-[#FFF0F3] text-[#EF476F]"
+                          : "border-[#D7E3F8] bg-[#EFF4FF] text-[#17326B]"
+                      )}>
+                        {penaltyStatusLabel}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-[#17326B]" />
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-[#6781AE]">최근 반영 내역</h4>
+                    </div>
+                    {myPenaltyLogs.length === 0 ? (
+                      <div className="rounded-[1.5rem] border-2 border-dashed border-[#D9E1F2] bg-white px-4 py-10 text-center text-[11px] font-semibold text-[#7A8EAE]">
+                        아직 반영된 벌점 기록이 없어요.
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        {myPenaltyLogs.slice(0, 8).map((log) => (
+                          <div
+                            key={log.id}
+                            className="rounded-[1.35rem] border border-[#D9E1F2] bg-white px-4 py-4 shadow-[0_18px_36px_-30px_rgba(10,28,72,0.16)]"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded-full bg-[#EFF4FF] px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#17326B]">
+                                    {PENALTY_SOURCE_LABEL[log.source]}
+                                  </span>
+                                  <span className="text-[10px] font-black text-[#8AA0C7]">{formatPenaltyLogDate(log.createdAt)}</span>
+                                </div>
+                                <p className="mt-2 break-keep text-sm font-black text-[#17326B]">{log.reason}</p>
+                              </div>
+                              <Badge className="bg-[#EF476F] text-white border-none font-black shrink-0">
+                                {log.pointsDelta > 0 ? `+${log.pointsDelta}` : log.pointsDelta}점
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className={cn("border-t shrink-0 bg-white", isMobile ? "p-4" : "p-6")}>
+                <DialogClose asChild>
+                  <Button variant="ghost" className="w-full h-12 rounded-xl font-black">닫기</Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Dialog>
             <DialogTrigger asChild>
               <button
