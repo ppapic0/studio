@@ -349,10 +349,10 @@ function InventorySlot({
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
               <div className="point-track-slot__meter-fill" style={{ width: `${Math.max(4, Math.min(100, chargingPercent || 0))}%` }} />
             </div>
-            <div className="mt-1 text-[10px] font-black text-white/55">{chargingLabel}</div>
+          <div className="mt-1 text-[10px] font-black text-white/74">{chargingLabel}</div>
           </>
         ) : (
-          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/74">
             <span>
               {box.state === 'opened'
                 ? `+${box.reward || 0}P`
@@ -808,7 +808,7 @@ export default function GrowthPage() {
                   ? 'border border-orange-300/25 bg-orange-300/12 text-[#FFD089]'
                   : isTimerActive
                     ? 'border border-sky-200/20 bg-sky-200/10 text-white/80'
-                    : 'border border-white/10 bg-white/8 text-white/55'
+                    : 'border border-white/10 bg-white/8 text-white/78'
               )}
             >
               {totalAvailableBoxes > 0 ? 'BOX READY' : heroMode === 'studying' ? '집중 중' : '대기'}
@@ -835,15 +835,15 @@ export default function GrowthPage() {
             {isTimerActive ? (
               <div className="grid w-full grid-cols-3 gap-2">
                 <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">상태</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/74">상태</p>
                   <p className="mt-2 text-sm font-black text-white">집중 중</p>
                 </div>
                 <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">세션</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/74">세션</p>
                   <p className="mt-2 text-sm font-black text-white">{formatHeroTimer(liveSessionSeconds)}</p>
                 </div>
                 <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">도착</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/74">도착</p>
                   <p className="mt-2 text-sm font-black text-[#FFD089]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
                 </div>
               </div>
@@ -1063,7 +1063,7 @@ export default function GrowthPage() {
                   <span>오늘 획득</span>
                   <span>{todayPointGain.toLocaleString()}P</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs font-bold text-white/45">
+                <div className="mt-2 flex items-center justify-between text-xs font-bold text-white/68">
                   <span>다음 상자까지</span>
                   <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : formatCountdown(nextBoxSecondsLeft)}</span>
                 </div>

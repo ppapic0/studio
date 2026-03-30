@@ -164,7 +164,7 @@ function TopSummaryCard({
       <div className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black tracking-[0.18em] text-white/48">{label}</p>
+            <p className="text-[11px] font-black tracking-[0.18em] text-white/68">{label}</p>
             <p className="mt-3 text-3xl font-black tracking-tight text-white">{value}</p>
             <p className="mt-2 text-sm font-semibold text-white/68">{sub}</p>
           </div>
@@ -197,7 +197,7 @@ function RewardGoalCard() {
             ['3위', '5,000P'],
           ].map(([place, reward]) => (
             <div key={place} className="rounded-2xl border border-white/10 bg-white/6 p-3">
-              <p className="text-[11px] font-black tracking-[0.18em] text-white/45">{place}</p>
+              <p className="text-[11px] font-black tracking-[0.18em] text-white/68">{place}</p>
               <p className="mt-1 text-sm font-black text-white">{reward}</p>
             </div>
           ))}
@@ -306,7 +306,7 @@ function LeaderboardRow({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 truncate text-xs font-semibold text-white/45">{player.classNameSnapshot || '반 미지정'}</p>
+          <p className="mt-1 truncate text-xs font-semibold text-white/68">{player.classNameSnapshot || '반 미지정'}</p>
           <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/8">
             <div
               className={cn(
