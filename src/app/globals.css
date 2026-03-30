@@ -3569,8 +3569,11 @@ select {
 .point-track-game-screen {
   min-height: 100%;
   background:
-    radial-gradient(circle at top, rgba(54, 88, 175, 0.58), transparent 28%),
-    linear-gradient(180deg, #14295f 0%, #0b1633 100%);
+    radial-gradient(circle at top, rgba(255, 181, 88, 0.2), transparent 18%),
+    radial-gradient(circle at 50% 12%, rgba(89, 126, 217, 0.44), transparent 34%),
+    linear-gradient(180deg, #14295f 0%, #102454 44%, #0b1633 100%);
+  color: rgba(255, 255, 255, 0.96);
+  overflow-x: hidden;
 }
 
 .point-track-hero-stage {
@@ -3580,9 +3583,9 @@ select {
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 1.25rem;
   background:
-    radial-gradient(circle at 50% 18%, rgba(255, 186, 79, 0.38), transparent 30%),
-    radial-gradient(circle at 84% 10%, rgba(255, 138, 31, 0.18), transparent 18%),
-    linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+    radial-gradient(circle at 50% 18%, rgba(255, 186, 79, 0.48), transparent 28%),
+    radial-gradient(circle at 84% 10%, rgba(255, 138, 31, 0.28), transparent 18%),
+    linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.07) 100%);
   box-shadow:
     0 28px 64px -38px rgba(0, 0, 0, 0.76),
     inset 0 1px 0 rgba(255,255,255,0.08);
@@ -3649,8 +3652,8 @@ select {
   position: absolute;
   inset: 1.2rem;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 173, 67, 0.88) 0%, rgba(255, 173, 67, 0.18) 48%, transparent 72%);
-  filter: blur(22px);
+  background: radial-gradient(circle, rgba(255, 173, 67, 0.98) 0%, rgba(255, 173, 67, 0.26) 46%, transparent 74%);
+  filter: blur(24px);
   opacity: 0.98;
   animation: point-track-box-glow 1.8s ease-in-out infinite;
 }
@@ -3752,6 +3755,7 @@ select {
   overflow: hidden;
   box-shadow:
     0 20px 36px -18px rgba(255, 138, 31, 0.55),
+    0 10px 22px -14px rgba(255, 213, 148, 0.38) inset,
     0 0 0 1px rgba(255,255,255,0.18) inset;
 }
 
@@ -3799,8 +3803,10 @@ select {
   height: 1rem;
   overflow: hidden;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(7, 15, 36, 0.36), rgba(255,255,255,0.03));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(10, 21, 49, 0.42));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    0 0 0 1px rgba(255,255,255,0.04);
 }
 
 .point-track-progress-track--near {
@@ -3868,7 +3874,7 @@ select {
   min-width: 6.5rem;
   border-radius: 1.5rem;
   border: 1px solid rgba(255,255,255,0.1);
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+  background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
   padding: 0.9rem;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
 }
@@ -3911,7 +3917,9 @@ select {
 }
 
 .point-track-slot--ready {
-  background: rgba(255,255,255,0.1);
+  background:
+    radial-gradient(circle at top, rgba(255, 205, 133, 0.18), transparent 52%),
+    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.08));
 }
 
 .point-track-slot--ready .point-track-slot__box {
@@ -3941,7 +3949,9 @@ select {
 }
 
 .point-track-slot--charging {
-  background: rgba(138, 218, 255, 0.08);
+  background:
+    radial-gradient(circle at top, rgba(125, 225, 255, 0.12), transparent 56%),
+    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05));
 }
 
 .point-track-slot--charging .point-track-slot__box {
@@ -3959,7 +3969,7 @@ select {
 }
 
 .point-track-slot--locked {
-  opacity: 0.34;
+  opacity: 0.42;
 }
 
 .point-track-slot--locked .point-track-slot__box {
@@ -3988,7 +3998,7 @@ select {
 
 .point-track-modal-shell {
   background:
-    radial-gradient(circle at top, rgba(255, 185, 86, 0.24), transparent 28%),
+    radial-gradient(circle at top, rgba(255, 185, 86, 0.34), transparent 28%),
     linear-gradient(180deg, #14295f 0%, #0d1c45 100%);
 }
 
@@ -3999,8 +4009,30 @@ select {
   border: 1px solid rgba(255,255,255,0.08);
   padding: 1.25rem 1rem 1.4rem;
   background:
-    radial-gradient(circle at 50% 24%, rgba(255, 176, 76, 0.22), transparent 30%),
-    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    radial-gradient(circle at 50% 24%, rgba(255, 176, 76, 0.3), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+}
+
+@media (max-width: 430px) {
+  .point-track-hero-stage {
+    padding: 1rem;
+    border-radius: 1.65rem;
+  }
+
+  .point-track-hero-box {
+    height: 10.5rem;
+    width: 10.5rem;
+  }
+
+  .point-track-hero-box__body {
+    height: 7.3rem;
+    width: 7.3rem;
+    border-radius: 1.7rem;
+  }
+
+  .point-track-slot {
+    min-width: 6rem;
+  }
 }
 
 .point-track-modal-stage::after {
