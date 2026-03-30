@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { format, isSameDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
@@ -369,6 +370,9 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
   const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
   const [isOutingModalOpen, setIsOutingModalOpen] = useState(false);
+  const [isRoutineEditOpen, setIsRoutineEditOpen] = useState(false);
+  const [routineDraftInTime, setRoutineDraftInTime] = useState(inTime || '17:30');
+  const [routineDraftOutTime, setRoutineDraftOutTime] = useState(outTime || '22:30');
   const [questEndTimeChoice, setQuestEndTimeChoice] = useState(outTime || '22:00');
   const [questFocusSubjects, setQuestFocusSubjects] = useState<string[]>(newStudySubject ? [newStudySubject] : []);
   const [questMissionId, setQuestMissionId] = useState(PLANNER_QUICK_TASK_SUGGESTIONS[0]?.id || 'math-problem');
@@ -378,6 +382,11 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
   useEffect(() => {
     setQuestEndTimeChoice(outTime || '22:00');
   }, [outTime]);
+
+  useEffect(() => {
+    setRoutineDraftInTime(inTime || '17:30');
+    setRoutineDraftOutTime(outTime || '22:30');
+  }, [inTime, outTime]);
 
   useEffect(() => {
     if (questFocusSubjects.length === 0 && subjectBalance.length > 0) {
@@ -412,6 +421,89 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     if ((topSubject?.percent || 0) <= 35) return '과목 밸런스가 안정적이에요. 지금 흐름을 유지해보세요.';
     return `${topSubject.label}을 중심으로 잘 잡혀 있어요. 다음은 ${nextSubject?.label || '보조 과목'} 차례예요.`;
   }, [subjectBalance]);
+
+  const routineWindowLabel = isAbsentMode
+    ? '--:--'
+    : `${inTime || '17:30'} → ${outTime || questEndTimeChoice || '22:30'}`;
+  const todayHeaderSummary = `🔥 ${todayPointTotal} / ${dailyPointCap} pt · ${Math.max(1, todayStreakDays || 0)}일 연속`;
+  const totalMissionReward = Math.min(
+    dailyPointCap,
+    orderedChecklistTasks.reduce((sum: number, task: any) => sum + estimateTaskReward(task), 0)
+  );
+  const startCtaCaption = orderedChecklistTasks.length === 0
+    ? '미션을 추가해주세요'
+    : `예상 ${plannedStudyMinutes > 0 ? formatMinutesShort(plannedStudyMinutes) : '자율'} · +${totalMissionReward}P`;
+  const routineStateLabel = isAbsentMode
+    ? '미등원'
+    : hasAwayPlan
+      ? '외출 중'
+      : hasInPlan || hasOutPlan
+        ? `입장 ${inTime || '미정'}`
+        : '등원 전';
+  const moveSelectedDate = (offset: number) => {
+    const nextDate = new Date(selectedDate);
+    nextDate.setDate(nextDate.getDate() + offset);
+    setSelectedDate(nextDate);
+  };
+  const taskCount = orderedChecklistTasks.length;
+  const unfinishedCount = remainingStudyTasks.length + remainingPersonalTasks.length;
+  const recommendedTasks = PLANNER_QUICK_TASK_SUGGESTIONS.slice(0, 4);
+  const isRoutineActive = !isAbsentMode && (hasInPlan || hasOutPlan);
+  const startButtonLabel = isAbsentMode
+    ? '등원 시작 ▶'
+    : taskCount === 0
+      ? '미션을 추가해주세요'
+      : '시작하기 ▶';
+
+  const handleApplyRoutineEdit = async () => {
+    flushSync(() => {
+      setInTime(routineDraftInTime);
+      setOutTime(routineDraftOutTime);
+    });
+    await handleSetAttendance('attend');
+    setIsRoutineEditOpen(false);
+  };
+
+  const handleExtendRoutine = async () => {
+    const nextOutTime = addMinutesToClock(outTime || routineDraftOutTime || '22:30', 30);
+    flushSync(() => {
+      setOutTime(nextOutTime);
+      setRoutineDraftOutTime(nextOutTime);
+    });
+    await handleSetAttendance('attend');
+  };
+
+  const handleFinishRoutineNow = async () => {
+    const currentClock = createClockFromNow();
+    flushSync(() => {
+      setOutTime(currentClock);
+      setRoutineDraftOutTime(currentClock);
+    });
+    await handleSetAttendance('attend');
+  };
+
+  const handleAddSuggestedTask = async (item: any) => {
+    setNewStudySubject(item.subject || 'etc');
+    setNewStudyMode('time');
+    setNewStudyMinutes(String(item.targetMinutes || 60));
+    setNewStudyTask(item.title);
+    setQuickStudyType(item.tag || '문제풀이');
+
+    const windowPreview = getNextAutoWindow(studyTasks, item.targetMinutes || 60, PLAN_DEFAULT_START_TIME);
+    await handleAddTask(item.title, 'study', {
+      taskBlueprint: {
+        category: 'study',
+        title: item.title,
+        subject: item.subject || 'etc',
+        studyPlanMode: 'time',
+        targetMinutes: item.targetMinutes || 60,
+        priority: questFocusSubjects.includes(item.subject || 'etc') ? 'high' : 'medium',
+        tag: item.tag || '문제풀이',
+        startTime: windowPreview?.startTime,
+        endTime: windowPreview?.endTime,
+      },
+    });
+  };
 
   const toggleQuestSubject = (subjectId: string) => {
     setQuestFocusSubjects((current) => {
@@ -500,67 +592,34 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
   return (
     <>
-      <div className={cn('planner-main-view student-night-page mx-auto flex w-full max-w-5xl flex-col pb-24', isMobile ? 'gap-4 px-3 pt-3' : 'gap-6 px-4 pt-4')}>
-        <header className="space-y-4">
-          <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-end justify-between')}>
-            <div className="min-w-0">
-              <p className="text-[11px] font-black tracking-[0.24em] text-white/45">PLAN</p>
-              <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white md:text-[2.7rem]">계획</h1>
-              <p className="mt-1 text-sm font-semibold text-white/62">오늘의 퀘스트 보드</p>
+      <div className={cn('planner-main-view student-night-page mx-auto flex w-full max-w-3xl flex-col pb-28', isMobile ? 'gap-4 px-3 pt-3' : 'gap-5 px-4 pt-4')}>
+        <header className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black tracking-[0.22em] text-white/42">PLAN</p>
+              <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">계획</h1>
             </div>
-            <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] px-4 py-2 text-sm font-black text-white shadow-[0_20px_40px_-30px_rgba(0,0,0,0.42)]">
-              <span>🔥 {todayPointTotal} / {dailyPointCap} pt</span>
-              <span className="text-white/25">|</span>
-              <span>{completionPercent}% 완료</span>
-              {todayStreakDays > 0 ? (
-                <>
-                  <span className="text-white/25">|</span>
-                  <span>{todayStreakDays}일 연속</span>
-                </>
-              ) : null}
+            <div className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-[13px] font-black text-white/88">
+              {todayHeaderSummary}
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(13,28,69,0.92)_100%)] p-3 shadow-[0_22px_44px_-36px_rgba(0,0,0,0.52)]">
-            <div className="flex items-center justify-between gap-2">
-              <Button type="button" variant="ghost" onClick={() => moveWeek(-1)} className="h-10 w-10 rounded-full bg-white/8 p-0 text-white hover:bg-white/12">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="rounded-full border border-[#FFB347]/25 bg-[#FF9626]/12 px-4 py-2 text-xs font-black tracking-[0.18em] text-[#FFD79F]">
-                {weekRangeLabel}
-              </div>
-              <Button type="button" variant="ghost" onClick={() => moveWeek(1)} className="h-10 w-10 rounded-full bg-white/8 p-0 text-white hover:bg-white/12">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+          <div className="flex items-center justify-between rounded-[1.3rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.9)_0%,rgba(13,28,69,0.84)_100%)] px-3 py-2">
+            <Button type="button" variant="ghost" onClick={() => moveSelectedDate(-1)} className="h-9 w-9 rounded-full bg-white/8 p-0 text-white hover:bg-white/12">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-center">
+              <p className="text-xs font-black text-white">{selectedDateLabel}</p>
+              <p className="mt-0.5 text-[11px] font-semibold text-white/55">{isToday ? '오늘 퀘스트' : '다른 날짜 보기'}</p>
             </div>
-
-            <div className="mt-3 grid grid-cols-7 gap-2">
-              {weekDays.map((day: Date) => {
-                const selected = isSameDay(day, selectedDate);
-                return (
-                  <button
-                    key={day.toISOString()}
-                    type="button"
-                    onClick={() => setSelectedDate(day)}
-                    className={cn(
-                      'rounded-[1rem] border px-1 py-2 text-center transition-all',
-                      selected
-                        ? 'border-[#FFB347]/28 bg-[linear-gradient(180deg,#17326B_0%,#28478F_100%)] text-white shadow-[0_14px_28px_-18px_rgba(0,0,0,0.45)]'
-                        : 'border-white/10 bg-white/8 text-white/82 hover:border-white/16 hover:bg-white/12'
-                    )}
-                  >
-                    <p className="text-[10px] font-black text-current/68">{format(day, 'EEE', { locale: ko })}</p>
-                    <p className="mt-1 text-sm font-black">{format(day, 'd')}</p>
-                  </button>
-                );
-              })}
-            </div>
+            <Button type="button" variant="ghost" onClick={() => moveSelectedDate(1)} className="h-9 w-9 rounded-full bg-white/8 p-0 text-white hover:bg-white/12">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </header>
 
-        <section className="relative overflow-hidden rounded-[2.2rem] border border-[#17326B]/12 bg-[linear-gradient(135deg,#17326B_0%,#28478F_58%,#FFB347_145%)] px-5 py-5 text-white shadow-[0_28px_60px_-34px_rgba(23,50,107,0.48)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,214,155,0.34),transparent_32%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_28%)]" />
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,#17326B_0%,#244991_62%,#1A356A_100%)] px-5 py-5 text-white shadow-[0_28px_50px_-36px_rgba(0,0,0,0.55)] animate-[planner-fade-rise_0.22s_ease-out]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.22),transparent_34%)]" />
           <div className="relative">
             {floatingPointBursts.map((burst: { id: number; label: string }, index: number) => (
               <div
@@ -572,598 +631,425 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
               </div>
             ))}
 
-            <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.18fr)_minmax(0,0.82fr)]')}>
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-white/88">
-                  <Sparkles className="h-3.5 w-3.5 text-[#FFD79F]" />
-                  {heroStatus.label}
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3 py-1 text-[11px] font-black text-white/82">
+                  오늘 루틴
                 </div>
-                <h2 className="mt-4 text-[2rem] font-black tracking-tight md:text-[2.6rem]">
-                  오늘의 성장 루트
-                </h2>
-                <p className="mt-2 max-w-xl break-keep text-sm font-semibold leading-6 text-white/74">
-                  {heroStatus.summary}
-                </p>
-
-                <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
-                  <div className="rounded-[1.2rem] border border-white/12 bg-white/[0.08] px-3 py-3 backdrop-blur-sm">
-                    <p className="text-[10px] font-black tracking-[0.18em] text-white/58">입실</p>
-                    <p className="mt-2 text-[1rem] font-black text-white">{isAbsentMode ? '미등원' : (inTime || '미정')}</p>
-                  </div>
-                  <div className="rounded-[1.2rem] border border-white/12 bg-white/[0.08] px-3 py-3 backdrop-blur-sm">
-                    <p className="text-[10px] font-black tracking-[0.18em] text-white/58">목표 퇴실</p>
-                    <p className="mt-2 text-[1rem] font-black text-[#FFD79F]">{isAbsentMode ? '--:--' : (questEndTimeChoice || outTime || '--:--')}</p>
-                  </div>
-                  <div className="rounded-[1.2rem] border border-white/12 bg-white/[0.08] px-3 py-3 backdrop-blur-sm">
-                    <p className="text-[10px] font-black tracking-[0.18em] text-white/58">오늘 목표</p>
-                    <p className="mt-2 text-[1rem] font-black text-white">{plannedStudyMinutes > 0 ? formatMinutesShort(plannedStudyMinutes) : studyGoalSummaryLabel}</p>
-                  </div>
-                  <div className="rounded-[1.2rem] border border-white/12 bg-white/[0.08] px-3 py-3 backdrop-blur-sm">
-                    <p className="text-[10px] font-black tracking-[0.18em] text-white/58">진행률</p>
-                    <p className="mt-2 text-[1rem] font-black text-[#FFD79F]">{completionPercent}%</p>
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-[1.5rem] border border-white/12 bg-white/[0.08] p-4 backdrop-blur-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-black">
-                    <span className="text-white/72">퀘스트 진행률</span>
-                    <span className="text-[#FFD79F]">{todayCompletionLabel} · {completionPercent}%</span>
-                  </div>
-                  <div className="mt-3 rounded-full bg-white/10 p-1">
-                    <div className="relative overflow-hidden rounded-full">
-                      <Progress
-                        value={completionPercent}
-                        className="h-3 bg-white/10 [&>div]:bg-[linear-gradient(90deg,#FFD79F_0%,#FFB347_32%,#FF9626_62%,#2FAA7D_100%)]"
-                      />
-                      <div className="pointer-events-none absolute inset-y-0 w-20 animate-[planner-shimmer-slide_2.8s_linear_infinite] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.42)_55%,rgba(255,255,255,0)_100%)]" />
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-white/68">
-                    <span>{selectedDateLabel}</span>
-                    <span className="text-white/24">·</span>
-                    <span>실제 공부 {formatMinutesShort(actualStudyMinutes)}</span>
-                    <span className="text-white/24">·</span>
-                    <span>계획 {formatMinutesShort(plannedStudyMinutes)}</span>
-                  </div>
-                </div>
-
-                {!isPast ? (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => handleSetAttendance('attend')}
-                      disabled={isSubmitting}
-                      className={cn('h-11 rounded-full px-5 font-black text-white shadow-[0_18px_34px_-24px_rgba(255,150,38,0.6)] animate-[planner-cta-breathe_2.8s_ease-in-out_infinite]', rewardGradient)}
-                    >
-                      <CalendarCheck2 className="mr-2 h-4 w-4" />
-                      출석 저장
-                    </Button>
-                    <ActionChipButton
-                      icon={hasAwayPlan ? ArrowRight : Clock3}
-                      label={hasAwayPlan ? '복귀하기' : '외출하기'}
-                      onClick={() => (hasAwayPlan ? clearAwayPlan() : setIsOutingModalOpen(true))}
-                      disabled={isSubmitting}
-                      tone="white"
-                    />
-                    <ActionChipButton
-                      icon={StickyNote}
-                      label="미등원"
-                      onClick={() => handleSetAttendance('absent')}
-                      disabled={isSubmitting}
-                      tone="orange"
-                    />
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="rounded-[1.9rem] border border-white/12 bg-white/[0.08] p-4 shadow-[0_22px_44px_-32px_rgba(6,12,34,0.32)] backdrop-blur-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-black tracking-[0.18em] text-white/54">QUEST SETUP</p>
-                    <h3 className="mt-1 text-xl font-black tracking-tight text-white">오늘의 퀘스트 시작</h3>
-                  </div>
-                  <Badge className="rounded-full border border-white/12 bg-white/10 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
-                    {questFocusSubjects.length}/2 과목
-                  </Badge>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  <div>
-                    <p className="text-[11px] font-black text-white/62">오늘은 몇 시까지 집중할까요?</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {QUEST_END_OPTIONS.map((clock) => (
-                        <button
-                          key={clock}
-                          type="button"
-                          onClick={() => setQuestEndTimeChoice(clock)}
-                          className={cn(
-                            'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
-                            questEndTimeChoice === clock
-                              ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
-                              : 'border-white/12 bg-white/10 text-white'
-                          )}
-                        >
-                          {clock}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[11px] font-black text-white/62">오늘의 메인 과목</p>
-                      <span className="text-[11px] font-bold text-[#FFD79F]">{questFocusSummary}</span>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {subjectOptions.map((subject: any) => {
-                        const selected = questFocusSubjects.includes(subject.id);
-                        return (
-                          <button
-                            key={subject.id}
-                            type="button"
-                            onClick={() => toggleQuestSubject(subject.id)}
-                            className={cn(
-                              'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
-                              selected
-                                ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
-                                : 'border-white/12 bg-white/10 text-white'
-                            )}
-                          >
-                            {subject.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] font-black text-white/62">오늘의 핵심 미션</p>
-                    <div className="mt-2 grid gap-2">
-                      {PLANNER_QUICK_TASK_SUGGESTIONS.slice(0, 3).map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setQuestMissionId(item.id)}
-                          className={cn(
-                            'rounded-[1.1rem] border px-3 py-3 text-left transition-all',
-                            questMissionId === item.id
-                              ? 'border-[#FFB347]/24 bg-[#FF9626]/14 text-white'
-                              : 'border-white/12 bg-white/10 text-white'
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-black">{item.title}</p>
-                              <p className={cn('mt-1 text-[11px] font-semibold', questMissionId === item.id ? 'text-white/72' : 'text-white/64')}>
-                                {item.tag} · {item.targetMinutes}분
-                              </p>
-                            </div>
-                            <Target className={cn('h-4 w-4', questMissionId === item.id ? 'text-[#FF9626]' : 'text-[#FFD79F]')} />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={handleQuestKickoff}
-                    className={cn('h-12 w-full rounded-full px-5 font-black text-white shadow-[0_18px_34px_-24px_rgba(255,150,38,0.6)] animate-[planner-cta-breathe_2.8s_ease-in-out_infinite]', rewardGradient)}
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    오늘 시작하기
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {!isPast ? (
-              <>
-                <ActionChipButton icon={Copy} label="어제 계획 그대로" onClick={handleCopyYesterdayPlan} disabled={isSubmitting} />
-                <ActionChipButton icon={Sparkles} label="평일 루틴" onClick={() => applyTemplateToToday(weekdayTemplate)} disabled={isSubmitting} tone="orange" />
-                <ActionChipButton icon={Flame} label="시험기간 루틴" onClick={() => applyTemplateToToday(examTemplate)} disabled={isSubmitting} tone="orange" />
-                <ActionChipButton
-                  icon={Layers3}
-                  label={recentTemplateCandidate ? '최근 템플릿 불러오기' : '템플릿 보관함'}
-                  onClick={() => (recentTemplateCandidate ? applyTemplateToToday(recentTemplateCandidate) : setIsTemplateSheetOpen(true))}
-                  disabled={isSubmitting}
-                  tone="white"
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await clearTodayPlans();
-                    setShowQuickAddCard(true);
-                  }}
-                  disabled={isSubmitting}
-                  className="rounded-full px-3 py-2 text-[11px] font-black text-white/55 transition hover:text-white disabled:opacity-45"
-                >
-                  빈 상태에서 새로 만들기
-                </button>
-              </>
-            ) : (
-              <div className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-black text-white/65">
-                지난 날짜는 기록 확인 중심으로 보여드릴게요.
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] shadow-[0_28px_50px_-38px_rgba(0,0,0,0.48)]">
-          <div className="border-b border-white/10 px-5 py-5">
-            <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-end justify-between')}>
-              <div className="min-w-0">
-                <p className="text-[11px] font-black tracking-[0.18em] text-white/42">TODAY QUEST</p>
-                <h3 className="mt-1 text-[1.7rem] font-black tracking-tight text-white">오늘 해야 할 것</h3>
-                <p className="mt-2 max-w-2xl break-keep text-sm font-semibold leading-6 text-white/58">
-                  긴 설명 대신 오늘 블록만 먼저 체크하세요. 필요한 설정은 눌렀을 때만 펼쳐집니다.
+                <p className="mt-2 text-sm font-semibold text-white/68">
+                  {format(selectedDate, 'EEEE', { locale: ko })} · 자동 적용됨
                 </p>
               </div>
               {!isPast ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => setShowQuickAddCard((prev: boolean) => !prev)}
-                    className={cn('h-11 rounded-full px-5 font-black text-white shadow-[0_18px_34px_-24px_rgba(255,150,38,0.55)] animate-[planner-cta-breathe_2.8s_ease-in-out_infinite]', rewardGradient)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    + 할 일 추가
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsStudyPlanSheetOpen(true)}
-                    className="h-10 rounded-full border border-white/10 bg-white/8 px-4 text-[11px] font-black text-white hover:bg-white/12"
-                  >
-                    전체 편집
-                  </Button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRoutineEditOpen(true)}
+                  className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-[#FFD79F]"
+                >
+                  ⚡ 오늘만 수정
+                </button>
               ) : null}
             </div>
-          </div>
 
-          {showQuickAddCard && !isPast ? (
-            <div className="mx-4 mt-4 overflow-hidden rounded-[1.7rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.12),transparent_24%),linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(18,34,70,0.92)_100%)] p-4 shadow-[0_20px_40px_-34px_rgba(0,0,0,0.44)] animate-[planner-fade-rise_0.22s_ease-out] md:mx-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-white/42">QUICK CREATE</p>
-                  <p className="mt-1 text-lg font-black tracking-tight text-white">다음 공부 추가</p>
-                  <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-white/55">
-                    직접 길게 쓰지 않아도 과목, 유형, 시간만 고르면 자동으로 오늘 루트에 붙어요.
-                  </p>
-                </div>
-                {activeRecentStudyOption ? (
-                  <button
+            <div className="mt-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[2.2rem] font-black tracking-tight text-white md:text-[2.8rem]">{routineWindowLabel}</p>
+                <p className="mt-2 text-sm font-semibold text-white/72">{routineStateLabel}</p>
+              </div>
+              <div className="rounded-2xl border border-white/12 bg-white/[0.08] px-4 py-3 text-right">
+                <p className="text-[10px] font-black tracking-[0.18em] text-white/45">오늘 목표</p>
+                <p className="mt-2 text-lg font-black text-[#FFD79F]">{plannedStudyMinutes > 0 ? formatMinutesShort(plannedStudyMinutes) : studyGoalSummaryLabel}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-full bg-white/10 p-1">
+              <div className="relative overflow-hidden rounded-full">
+                <Progress
+                  value={completionPercent}
+                  className="h-3 bg-white/10 [&>div]:bg-[linear-gradient(90deg,#FFD79F_0%,#FFB347_32%,#FF9626_72%,#2FAA7D_100%)]"
+                />
+                <div className="pointer-events-none absolute inset-y-0 w-20 animate-[planner-shimmer-slide_2.8s_linear_infinite] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.42)_55%,rgba(255,255,255,0)_100%)]" />
+              </div>
+            </div>
+
+            {!isPast ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {!isRoutineActive ? (
+                  <Button
                     type="button"
-                    onClick={resetStudyComposerPrefill}
-                    className="rounded-full border border-[#FFB347]/22 bg-[#FF9626]/12 px-3 py-1 text-[10px] font-black text-[#FFD79F]"
+                    onClick={() => handleSetAttendance('attend')}
+                    disabled={isSubmitting}
+                    className={cn('h-12 rounded-full px-5 font-black text-white shadow-[0_18px_34px_-24px_rgba(255,150,38,0.6)] animate-[planner-cta-breathe_2.8s_ease-in-out_infinite]', rewardGradient)}
                   >
-                    불러온 계획 해제
-                  </button>
+                    <CalendarCheck2 className="mr-2 h-4 w-4" />
+                    등원 시작
+                  </Button>
+                ) : null}
+                {hasAwayPlan ? (
+                  <ActionChipButton icon={ArrowRight} label="복귀하기" onClick={clearAwayPlan} disabled={isSubmitting} tone="white" />
+                ) : null}
+                {isRoutineActive && !hasAwayPlan ? (
+                  <>
+                    <ActionChipButton icon={Clock3} label="+30분 연장" onClick={handleExtendRoutine} disabled={isSubmitting} tone="white" />
+                    <ActionChipButton icon={CalendarCheck2} label="하원 완료" onClick={handleFinishRoutineNow} disabled={isSubmitting} tone="orange" />
+                  </>
+                ) : null}
+                {!hasAwayPlan ? (
+                  <ActionChipButton icon={Clock3} label="외출하기" onClick={() => setIsOutingModalOpen(true)} disabled={isSubmitting} tone="white" />
                 ) : null}
               </div>
+            ) : null}
+          </div>
+        </section>
 
-              <div className="mt-4 space-y-4">
-                <div>
-                  <p className="text-[11px] font-black text-white/62">과목 선택</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {subjectOptions.map((subject: any) => (
-                      <button
-                        key={subject.id}
-                        type="button"
-                        onClick={() => setNewStudySubject(subject.id)}
+        <section className="rounded-[1.8rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] px-4 py-4 shadow-[0_22px_46px_-34px_rgba(0,0,0,0.48)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black tracking-[0.18em] text-white/42">TODAY MISSION</p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-white">오늘 미션</h2>
+            </div>
+            {!isPast ? (
+              <div className="flex gap-2">
+                <button type="button" onClick={handleCopyYesterdayPlan} className="rounded-full border border-white/10 bg-white/8 px-3 py-2 text-[11px] font-black text-white">
+                  어제 복사
+                </button>
+                <button type="button" onClick={() => setIsTemplateSheetOpen(true)} className="rounded-full border border-[#FFB347]/22 bg-[#FF9626]/12 px-3 py-2 text-[11px] font-black text-[#FFD79F]">
+                  템플릿
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {isPast ? (
+            <div className="mt-4 rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-black text-white/65">
+              지난 날짜는 기록 확인 중심으로 보여드릴게요.
+            </div>
+          ) : (
+            <>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {recommendedTasks.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleAddSuggestedTask(item)}
+                    disabled={isSubmitting}
+                    className="rounded-full border border-white/10 bg-white/8 px-3 py-2 text-[12px] font-black text-white transition hover:bg-white/12 disabled:opacity-45"
+                  >
+                    {item.title}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 space-y-2.5">
+                {taskCount === 0 ? (
+                  <div className="rounded-[1.3rem] border border-dashed border-white/10 bg-white/6 px-4 py-5 text-center">
+                    <p className="text-sm font-black text-white">아직 미션이 없어요</p>
+                    <p className="mt-2 text-[12px] font-semibold text-white/58">추천을 누르거나 어제 계획을 바로 불러오세요.</p>
+                  </div>
+                ) : (
+                  orderedChecklistTasks.map((task: any) => {
+                    const isStudyTask = task.category === 'study';
+                    const isDone = task.done;
+                    const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
+                    const durationLabel = task.startTime && task.endTime
+                      ? formatClockRange(task.startTime, task.endTime)
+                      : task.targetMinutes
+                        ? formatDurationLabel(task.targetMinutes)
+                        : '자율';
+                    const detailLabel = isStudyTask ? buildStudyTaskMeta(task) : (task.tag || '보조 일정');
+                    const rewardLabel = `+${estimateTaskReward(task)}P`;
+                    const progressPercent = isVolumeTask ? 0 : computeTimeProgressPercent(task, isToday);
+                    const badge = getChecklistBadge(task, subjectOptions);
+
+                    return (
+                      <div
+                        key={task.id}
                         className={cn(
-                          'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
-                          resolvedSubjectValue === subject.id
-                            ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
-                            : 'border-white/10 bg-white/8 text-white hover:bg-white/12'
+                          'rounded-[1.35rem] border px-4 py-3 transition-all animate-[planner-fade-rise_0.18s_ease-out]',
+                          isDone
+                            ? 'border-emerald-400/18 bg-emerald-500/8'
+                            : progressPercent > 0
+                              ? 'border-[#FFB347]/24 bg-[#FF9626]/10'
+                              : 'border-white/10 bg-white/8'
                         )}
                       >
-                        {subject.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTask(task)}
+                            className={cn(
+                              'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-black transition',
+                              isDone ? 'border-emerald-300/40 bg-emerald-400/20 text-emerald-100' : 'border-white/16 bg-white/10 text-white'
+                            )}
+                          >
+                            {isDone ? '✔' : ''}
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className={cn('truncate text-[15px] font-black', isDone ? 'text-white/88 line-through decoration-white/30' : 'text-white')}>
+                                {task.title}
+                              </p>
+                              <Badge className={cn('rounded-full px-2 py-0.5 text-[10px] font-black shadow-none', badge.className)}>
+                                {badge.label}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-[12px] font-semibold text-white/58">{durationLabel} · {detailLabel}</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-[11px] font-black text-[#FFD79F]">{rewardLabel}</p>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                              className="mt-1 text-[11px] font-black text-white/62"
+                            >
+                              {isDone ? '완료됨' : progressPercent > 0 ? '진행 중' : '시작 ▶'}
+                            </button>
+                          </div>
+                        </div>
 
-                <div>
-                  <p className="text-[11px] font-black text-white/62">공부 유형 선택</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {QUICK_STUDY_TYPES.map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => {
-                          setQuickStudyType(type);
-                          if (!newStudyTask.trim()) setNewStudyTask(`${resolvedSubjectLabel} ${type}`);
-                        }}
-                        className={cn(
-                          'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
-                          quickStudyType === type
-                            ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
-                            : 'border-white/10 bg-white/8 text-white hover:bg-white/12'
-                        )}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                        {progressPercent > 0 && !isDone ? (
+                          <div className="mt-3 rounded-full bg-white/10 p-1">
+                            <div className="relative overflow-hidden rounded-full">
+                              <Progress
+                                value={progressPercent}
+                                className="h-2.5 bg-white/10 [&>div]:bg-[linear-gradient(90deg,#FFD79F_0%,#FFB347_40%,#FF9626_100%)]"
+                              />
+                              <div className="pointer-events-none absolute inset-y-0 w-14 animate-[planner-shimmer-slide_2.4s_linear_infinite] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.36)_52%,rgba(255,255,255,0)_100%)]" />
+                            </div>
+                          </div>
+                        ) : null}
 
-                <div>
-                  <p className="text-[11px] font-black text-white/62">예상 시간 선택</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {QUICK_TIME_PRESETS.map((minute) => (
-                      <button
-                        key={minute}
-                        type="button"
-                        onClick={() => setNewStudyMinutes(String(minute))}
-                        className={cn(
-                          'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
-                          Number(newStudyMinutes || missionSuggestion?.targetMinutes || 0) === minute
-                            ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
-                            : 'border-white/10 bg-white/8 text-white hover:bg-white/12'
-                        )}
-                      >
-                        {minute}분
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                        {expandedTaskId === task.id ? (
+                          <div className="mt-3 rounded-[1.1rem] border border-white/10 bg-[#0F2149]/80 p-3">
+                            {isStudyTask && !isVolumeTask ? (
+                              <div className={cn('grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
+                                <Input
+                                  type="time"
+                                  value={task.startTime || ''}
+                                  onChange={(event) => handleUpdateStudyWindow(task, event.target.value, task.endTime || '')}
+                                  className="h-10 rounded-xl border-white/10 bg-white/8 font-bold text-white"
+                                />
+                                <Input
+                                  type="time"
+                                  value={task.endTime || ''}
+                                  onChange={(event) => handleUpdateStudyWindow(task, task.startTime || '', event.target.value)}
+                                  className="h-10 rounded-xl border-white/10 bg-white/8 font-bold text-white"
+                                />
+                              </div>
+                            ) : null}
 
-                <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]')}>
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-black text-white/62">할 일 제목</p>
+                            {isStudyTask && isVolumeTask ? (
+                              <div className="flex flex-wrap gap-2">
+                                {[10, 20, 30, 50].map((value) => (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => handleCommitStudyActualAmount(task, value)}
+                                    className="rounded-full border border-white/10 bg-white/8 px-3 py-2 text-[11px] font-black text-white"
+                                  >
+                                    +{value}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {!isDone ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleTask(task)}
+                                  className="rounded-full bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-4 py-2 text-[11px] font-black text-white"
+                                >
+                                  완료
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTask(task)}
+                                className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[11px] font-black text-white/72"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickAddCard((prev: boolean) => !prev)}
+                  className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[12px] font-black text-white"
+                >
+                  + 추가
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyYesterdayPlan}
+                  className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[12px] font-black text-white/72"
+                >
+                  어제 불러오기
+                </button>
+              </div>
+
+              {showQuickAddCard ? (
+                <div className="mt-4 rounded-[1.45rem] border border-white/10 bg-[#0F2149]/82 p-4 animate-[planner-fade-rise_0.22s_ease-out]">
+                  <div className="space-y-3">
                     <Input
                       value={newStudyTask}
                       onChange={(event) => setNewStudyTask(event.target.value)}
                       placeholder={`예: ${resolvedSubjectLabel} ${quickStudyType}`}
-                      className="h-12 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
+                      className="h-11 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
                     />
-                  </div>
-                  {newStudyMode === 'volume' ? (
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-black text-white/62">목표 분량</p>
-                      <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,0.75fr)] gap-2">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={newStudyTargetAmount}
-                          onChange={(event) => setNewStudyTargetAmount(event.target.value)}
-                          placeholder="수치"
-                          className="h-12 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
-                        />
-                        <Select value={newStudyAmountUnit} onValueChange={setNewStudyAmountUnit}>
-                          <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/8 font-bold text-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STUDY_AMOUNT_UNIT_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+
+                    <div className="flex flex-wrap gap-2">
+                      {subjectOptions.map((subject: any) => (
+                        <button
+                          key={subject.id}
+                          type="button"
+                          onClick={() => setNewStudySubject(subject.id)}
+                          className={cn(
+                            'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
+                            resolvedSubjectValue === subject.id
+                              ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
+                              : 'border-white/10 bg-white/8 text-white'
+                          )}
+                        >
+                          {subject.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {QUICK_TIME_PRESETS.map((minute) => (
+                        <button
+                          key={minute}
+                          type="button"
+                          onClick={() => setNewStudyMinutes(String(minute))}
+                          className={cn(
+                            'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
+                            Number(newStudyMinutes || missionSuggestion?.targetMinutes || 0) === minute
+                              ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
+                              : 'border-white/10 bg-white/8 text-white'
+                          )}
+                        >
+                          {minute}분
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {QUICK_STUDY_TYPES.slice(0, 4).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            setQuickStudyType(type);
+                            if (!newStudyTask.trim()) setNewStudyTask(`${resolvedSubjectLabel} ${type}`);
+                          }}
+                          className={cn(
+                            'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
+                            quickStudyType === type
+                              ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
+                              : 'border-white/10 bg-white/8 text-white'
+                          )}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className={cn('rounded-[1.1rem] border border-white/10 bg-white/6 px-4 py-3', isMobile ? 'space-y-3' : 'flex items-center justify-between gap-3')}>
+                      <div>
+                        <p className="text-[10px] font-black tracking-[0.18em] text-[#FF9626]">AUTO SCHEDULE</p>
+                        <p className="mt-1 text-[12px] font-bold text-white">{resolvedWindowPreview ? `${resolvedWindowPreview.startTime} → ${resolvedWindowPreview.endTime}` : '시간은 자동으로 이어 붙어요'}</p>
                       </div>
-                      {newStudyAmountUnit === '직접입력' ? (
-                        <Input
-                          value={newStudyCustomAmountUnit}
-                          onChange={(event) => setNewStudyCustomAmountUnit(event.target.value)}
-                          placeholder="예: 세트, 회차"
-                          className="h-11 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
-                        />
-                      ) : null}
+                      <Button
+                        type="button"
+                        onClick={handleCreateQuickBlock}
+                        disabled={isSubmitting || !resolvedSubjectValue}
+                        className={cn('h-11 rounded-2xl px-5 font-black text-white shadow-[0_18px_30px_-20px_rgba(23,58,130,0.45)]', rewardGradient, isMobile && 'w-full')}
+                      >
+                        블록 추가
+                      </Button>
                     </div>
-                  ) : null}
-                </div>
-
-                <div className={cn('rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-3', isMobile ? 'space-y-3' : 'flex items-center justify-between gap-3')}>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black tracking-[0.18em] text-[#FF9626]">AUTO SCHEDULE</p>
-                    <p className="mt-1 break-keep text-[12px] font-bold text-white">
-                      {resolvedWindowPreview ? `${resolvedWindowPreview.startTime} - ${resolvedWindowPreview.endTime}` : '시간은 필요할 때만 적어도 괜찮아요'}
-                    </p>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={handleCreateQuickBlock}
-                    disabled={isSubmitting || !resolvedSubjectValue}
-                    className={cn('h-11 rounded-2xl px-5 font-black text-white shadow-[0_18px_30px_-20px_rgba(23,58,130,0.45)]', rewardGradient, isMobile && 'w-full')}
-                  >
-                    블록 추가
-                  </Button>
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {quickRecentItems.map((item: any) => (
-                    <button
-                      type="button"
-                      key={item.key}
-                      onClick={() => handlePrefillRecentStudy(item)}
-                      className={cn(
-                        'rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] font-black text-white',
-                        isMobile && 'w-full text-left'
-                      )}
-                    >
-                      최근 · {item.title}
-                    </button>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsRecentStudySheetOpen(true)}
-                    className={cn('h-9 rounded-full border border-white/10 bg-white/8 px-3 text-[11px] font-black text-white/72 hover:bg-white/12', isMobile && 'w-full justify-center')}
-                  >
-                    {isRecentStudyLoading ? '불러오는 중...' : '최근 더보기'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className={cn('relative mt-4 px-4 pb-4 md:px-5 md:pb-5')}>
-            <div className="pointer-events-none absolute inset-0 opacity-45 [background-image:repeating-linear-gradient(180deg,transparent_0,transparent_67px,rgba(217,225,242,0.62)_68px)]" />
-            <div className="relative space-y-3">
-              {orderedChecklistTasks.length === 0 ? (
-                <div className="rounded-[1.45rem] border border-dashed border-white/10 bg-white/6 px-5 py-7 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-[#FFD79F]">
-                    <ListTodo className="h-6 w-6" />
-                  </div>
-                  <p className="mt-4 text-lg font-black text-white">오늘 할 일을 비워뒀어요</p>
-                  <p className="mt-2 break-keep text-sm font-semibold leading-6 text-white/55">
-                    어제 계획이나 템플릿을 고르면 오늘 체크리스트가 바로 채워져요.
-                  </p>
-                  {!isPast ? (
-                    <div className="mt-5 flex flex-wrap justify-center gap-2">
-                      <ActionChipButton icon={Copy} label="어제 복사" onClick={handleCopyYesterdayPlan} disabled={isSubmitting} />
-                      <ActionChipButton icon={Sparkles} label="평일 루틴" onClick={() => applyTemplateToToday(weekdayTemplate)} disabled={isSubmitting} tone="orange" />
-                      <ActionChipButton icon={Flame} label="시험기간" onClick={() => applyTemplateToToday(examTemplate)} disabled={isSubmitting} tone="orange" />
-                      <ActionChipButton icon={Plus} label="직접 추가" onClick={() => setShowQuickAddCard(true)} disabled={isSubmitting} tone="white" />
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                orderedChecklistTasks.map((task: any) => {
-                  const badge = getChecklistBadge(task, subjectOptions);
-                  const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
-                  const timeProgress = computeTimeProgressPercent(task, isToday);
-                  const rewardLabel = `+${estimateTaskReward(task)}P`;
-                  const statusTone = task.done ? 'completed' : timeProgress > 0 ? 'active' : 'planned';
-                  const statusLabel = task.done
-                    ? '완료'
-                    : timeProgress > 0
-                      ? `${timeProgress}% 진행`
-                      : '시작 전';
-                  const durationLabel = task.startTime && task.endTime
-                    ? formatClockRange(task.startTime, task.endTime)
-                    : task.targetMinutes
-                      ? formatDurationLabel(task.targetMinutes)
-                      : '오늘 안에';
-                  const detailLabel = task.category === 'study'
-                    ? buildStudyTaskMeta(task)
-                    : task.tag || null;
-                  return (
-                    <div key={task.id} className="animate-[planner-fade-rise_0.18s_ease-out]">
-                      <PlannerChecklistItem
-                        task={task}
-                        badgeLabel={badge.label}
-                        badgeClassName={badge.className}
-                        durationLabel={durationLabel}
-                        detailLabel={detailLabel}
-                        isVolumeTask={isVolumeTask}
-                        isMobile={isMobile}
-                        disabled={isPast}
-                        expanded={expandedTaskId === task.id}
-                        onExpandedChange={(expanded) => setExpandedTaskId(expanded ? task.id : null)}
-                        onToggle={() => handleToggleTask(task)}
-                        onDelete={() => handleDeleteTask(task)}
-                        onCommitActual={(value) => handleCommitStudyActualAmount(task, value)}
-                        onUpdateWindow={(startTime, endTime) => handleUpdateStudyWindow(task, startTime, endTime)}
-                        rewardLabel={rewardLabel}
-                        statusLabel={statusLabel}
-                        statusTone={statusTone}
-                        progressPercent={isVolumeTask ? undefined : timeProgress}
-                      />
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {completionPercent >= 100 && checklistTasks.length > 0 ? (
-            <div className="mx-4 mb-4 rounded-[1.35rem] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(47,170,125,0.18)_0%,rgba(13,28,69,0.9)_100%)] px-4 py-4 text-white animate-[planner-fade-rise_0.24s_ease-out] md:mx-5 md:mb-5">
-              <p className="text-lg font-black tracking-tight">오늘 계획을 다 끝냈어요</p>
-              <p className="mt-1 text-sm font-semibold text-white/62">포인트와 연속 달성이 바로 반영됐어요.</p>
-            </div>
-          ) : null}
+              ) : null}
+            </>
+          )}
         </section>
 
-        <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]')}>
-          <section className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] p-5 shadow-[0_24px_48px_-38px_rgba(0,0,0,0.52)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-black tracking-[0.18em] text-white/42">SUBJECT FLOW</p>
-                <h3 className="mt-1 text-xl font-black tracking-tight text-white">과목 밸런스</h3>
-              </div>
-              <Badge className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
-                {subjectBalance.length}과목
-              </Badge>
-            </div>
+        {!isPast ? (
+          <section className="sticky bottom-24 z-20 rounded-[1.7rem] border border-[#FFB347]/18 bg-[linear-gradient(135deg,rgba(255,179,71,0.16)_0%,rgba(22,40,79,0.96)_38%,rgba(12,27,63,0.94)_100%)] px-4 py-4 shadow-[0_24px_50px_-30px_rgba(0,0,0,0.58)] backdrop-blur-sm">
+            <p className="text-[12px] font-black tracking-[0.18em] text-[#FFD79F]">🔥 오늘 플레이 시작</p>
+            <p className="mt-2 text-sm font-semibold text-white/72">{startCtaCaption}</p>
+            <Button
+              type="button"
+              disabled={isSubmitting || taskCount === 0}
+              onClick={async () => {
+                if (!isAbsentMode && !hasInPlan && !hasOutPlan) {
+                  await handleSetAttendance('attend');
+                }
+                const nextTask = orderedChecklistTasks.find((task: any) => !task.done) || orderedChecklistTasks[0];
+                if (nextTask) setExpandedTaskId(nextTask.id);
+              }}
+              className={cn('mt-4 h-12 w-full rounded-[1.4rem] px-5 font-black text-white shadow-[0_20px_36px_-24px_rgba(255,150,38,0.55)]', rewardGradient)}
+            >
+              {startButtonLabel}
+            </Button>
+          </section>
+        ) : null}
 
-            <div className="mt-4 space-y-3">
-              {subjectBalance.length === 0 ? (
-                <div className="rounded-[1.3rem] border border-dashed border-white/10 bg-white/6 px-4 py-5 text-sm font-semibold text-white/55">
-                  오늘 공부 블록을 추가하면 과목 밸런스가 여기에 바로 보입니다.
+        <Collapsible open={isWrapUpOpen} onOpenChange={setIsWrapUpOpen}>
+          <section className="rounded-[1.7rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] shadow-[0_20px_44px_-36px_rgba(0,0,0,0.5)]">
+            <CollapsibleTrigger asChild>
+              <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left">
+                <div>
+                  <p className="text-[11px] font-black tracking-[0.18em] text-white/42">SUMMARY</p>
+                  <p className="mt-1 text-lg font-black text-white">오늘 요약</p>
+                </div>
+                <ChevronDown className={cn('h-5 w-5 text-white transition-transform', isWrapUpOpen && 'rotate-180')} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-t border-white/10 px-4 pb-4">
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3">
+                  <p className="text-[10px] font-black tracking-[0.16em] text-white/42">계획 시간</p>
+                  <p className="mt-2 text-lg font-black text-white">{formatMinutesShort(plannedStudyMinutes)}</p>
+                </div>
+                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3">
+                  <p className="text-[10px] font-black tracking-[0.16em] text-white/42">실제 공부</p>
+                  <p className="mt-2 text-lg font-black text-white">{formatMinutesShort(actualStudyMinutes)}</p>
+                </div>
+                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3">
+                  <p className="text-[10px] font-black tracking-[0.16em] text-white/42">완료율</p>
+                  <p className="mt-2 text-lg font-black text-white">{completionPercent}%</p>
+                </div>
+                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3">
+                  <p className="text-[10px] font-black tracking-[0.16em] text-white/42">외출 횟수</p>
+                  <p className="mt-2 text-lg font-black text-white">{outingCount}회</p>
+                </div>
+              </div>
+
+              {unfinishedCount > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <ActionChipButton icon={ChevronRight} label="내일로 미루기" onClick={handleMoveUnfinishedToTomorrow} disabled={isSubmitting} />
+                  <ActionChipButton icon={BookCopy} label="템플릿 반영" onClick={handleSaveUnfinishedAsTemplate} disabled={isSubmitting} tone="white" />
+                  <ActionChipButton icon={StickyNote} label="삭제하기" onClick={handleDeleteUnfinished} disabled={isSubmitting} tone="orange" />
                 </div>
               ) : (
-                subjectBalance.map((entry) => (
-                  <div key={entry.key} className="space-y-2">
-                    <div className="flex items-center justify-between gap-3 text-sm font-black text-white">
-                      <span>{entry.label}</span>
-                      <span>{entry.percent}% · {formatMinutesShort(entry.minutes)}</span>
-                    </div>
-                    <div className="rounded-full bg-white/10 p-1">
-                      <div
-                        className="h-3 rounded-full bg-[linear-gradient(90deg,#17326B_0%,#28478F_55%,#FFB347_100%)] transition-[width] duration-300"
-                        style={{ width: `${Math.max(12, entry.percent)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))
+                <div className="mt-4 rounded-[1.2rem] border border-dashed border-white/10 bg-white/6 px-4 py-4 text-sm font-semibold text-white/58">
+                  오늘 정리할 남은 미션이 없어요.
+                </div>
               )}
-            </div>
-
-            <div className="mt-4 rounded-[1.35rem] border border-[#FFB347]/18 bg-[#FF9626]/10 px-4 py-3 text-sm font-semibold leading-6 text-[#FFE6BF]">
-              {subjectBalanceFeedback}
-            </div>
+            </CollapsibleContent>
           </section>
-
-          <section className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] p-5 shadow-[0_24px_48px_-38px_rgba(0,0,0,0.52)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-black tracking-[0.18em] text-white/42">DAY SUMMARY</p>
-                <h3 className="mt-1 text-xl font-black tracking-tight text-white">오늘 요약</h3>
-              </div>
-              <Badge className="rounded-full border border-[#FFB347]/18 bg-[#FF9626]/10 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
-                {todayCompletionLabel}
-              </Badge>
-            </div>
-
-            <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-2')}>
-              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.18em] text-white/42">계획 시간</p>
-                <p className="mt-2 text-xl font-black text-white">{formatMinutesShort(plannedStudyMinutes)}</p>
-              </div>
-              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.18em] text-white/42">실제 공부</p>
-                <p className="mt-2 text-xl font-black text-white">{formatMinutesShort(actualStudyMinutes)}</p>
-              </div>
-              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.18em] text-white/42">완료율</p>
-                <p className="mt-2 text-xl font-black text-white">{completionPercent}%</p>
-              </div>
-              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.18em] text-white/42">외출 횟수</p>
-                <p className="mt-2 text-xl font-black text-white">{outingCount}회</p>
-              </div>
-            </div>
-
-            {!isPast ? (
-              <div className="mt-4">
-                <Button
-                  type="button"
-                  onClick={() => setIsWrapUpOpen(true)}
-                  className={cn('h-11 w-full rounded-2xl px-5 font-black text-white shadow-[0_18px_30px_-20px_rgba(23,58,130,0.45)]', rewardGradient)}
-                >
-                  오늘 마감하기
-                </Button>
-              </div>
-            ) : null}
-          </section>
-        </div>
+        </Collapsible>
 
         <Collapsible open={isRoutineSectionOpen} onOpenChange={setIsRoutineSectionOpen}>
           <section className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] shadow-[0_24px_48px_-38px_rgba(0,0,0,0.52)]">
@@ -1454,6 +1340,57 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           </Collapsible>
         ) : null}
       </div>
+
+      <Dialog open={isRoutineEditOpen} onOpenChange={setIsRoutineEditOpen}>
+        <DialogContent className="fixed inset-x-0 bottom-0 top-auto w-full max-w-none translate-x-0 translate-y-0 rounded-t-[2rem] rounded-b-none border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#0F2149_100%)] p-0 text-white shadow-[0_-24px_60px_-30px_rgba(0,0,0,0.65)] sm:left-1/2 sm:max-w-md sm:-translate-x-1/2">
+          <div className="p-5">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-[1.4rem] font-black tracking-tight text-white">오늘만 수정</DialogTitle>
+              <DialogDescription className="text-sm font-semibold leading-6 text-white/58">
+                오늘 등원과 하원 시간만 빠르게 바꾸고 바로 반영할 수 있어요.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <p className="text-[11px] font-black text-white/55">등원</p>
+                <Input
+                  type="time"
+                  value={routineDraftInTime}
+                  onChange={(event) => setRoutineDraftInTime(event.target.value)}
+                  className="h-12 rounded-2xl border-white/10 bg-white/8 font-black text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-[11px] font-black text-white/55">하원</p>
+                <Input
+                  type="time"
+                  value={routineDraftOutTime}
+                  onChange={(event) => setRoutineDraftOutTime(event.target.value)}
+                  className="h-12 rounded-2xl border-white/10 bg-white/8 font-black text-white"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-2">
+              <Button type="button" onClick={handleApplyRoutineEdit} className={cn('h-12 w-full rounded-2xl font-black text-white', rewardGradient)}>
+                오늘만 적용
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsRoutineEditOpen(false);
+                  setIsRoutineSectionOpen(true);
+                }}
+                className="h-12 w-full rounded-2xl border-white/10 bg-white/8 font-black text-white"
+              >
+                기본 루틴 수정
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isOutingModalOpen} onOpenChange={setIsOutingModalOpen}>
         <DialogContent className="max-w-[26rem] rounded-[2rem] border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.12),transparent_24%),linear-gradient(180deg,#16284F_0%,#0F2149_100%)] p-0 text-white shadow-[0_28px_60px_-30px_rgba(0,0,0,0.58)]">
