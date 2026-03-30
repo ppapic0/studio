@@ -145,7 +145,7 @@ function QuestRow({
         "relative flex w-full items-center gap-3 rounded-[1.25rem] border px-4 py-3 text-left transition-all duration-200",
         quest.done
           ? "border-emerald-300/30 bg-emerald-300/10"
-          : "border-white/10 bg-white/[0.06] hover:border-white/16 hover:bg-white/[0.1]",
+          : "border-[#32579C] bg-[#1B3466] hover:border-[#4A76C6] hover:bg-[#224078]",
       )}
     >
       {gainKey ? (
@@ -162,7 +162,7 @@ function QuestRow({
           "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all",
           quest.done
             ? "border-emerald-300/40 bg-emerald-300/18 text-emerald-100"
-            : "border-white/18 bg-white/6 text-white/75",
+            : "border-[#7EA7FF]/24 bg-[#10224B] text-white/82",
         )}
       >
         {quest.done ? <Check className="h-4 w-4" /> : <Target className="h-4 w-4" />}
@@ -188,7 +188,7 @@ function QuestRow({
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">reward</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">reward</div>
         <div className="mt-1 text-sm font-black text-[#FFD089]">+{quest.reward}</div>
       </div>
     </button>
@@ -486,6 +486,7 @@ export function StudentHomeGamePanel({
 
   return (
     <>
+      <div className={cn("point-track-game-screen rounded-[2.25rem]", isMobile ? "p-3" : "p-4")}>
       <section
         className={cn(
           "point-track-hero-stage relative overflow-hidden",
@@ -503,20 +504,20 @@ export function StudentHomeGamePanel({
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   variant="outline"
-                  className="border-white/16 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/78"
+                  className="border-white/12 bg-[#0D1D44]/84 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/78"
                 >
                   Home Lobby
                 </Badge>
-                <span className="text-[11px] font-black text-[#FFD089]">{dateLabel}</span>
+                <span className="text-[11px] font-black text-[#FFB347]">{dateLabel}</span>
               </div>
               <h2 className={cn("break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
                 오늘도 성장한 하루
               </h2>
-              <p className="text-sm font-semibold text-white/68">{heroMessage}</p>
+              <p className="text-sm font-semibold text-white/82">{heroMessage}</p>
             </div>
 
-            <div className={cn("rounded-full border border-white/12 bg-white/8 px-3 py-2", isMobile ? "self-start" : "")}>
-              <div className="flex items-center gap-2 text-[11px] font-black text-white/72">
+            <div className={cn("rounded-full border border-white/10 bg-[#0F2149]/92 px-3 py-2 shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)]", isMobile ? "self-start" : "")}>
+              <div className="flex items-center gap-2 text-[11px] font-black text-white/82">
                 <CalendarDays className="h-3.5 w-3.5 text-[#FFD089]" />
                 <span>{todayPointLabel}</span>
                 <span className="text-white/35">|</span>
@@ -528,37 +529,37 @@ export function StudentHomeGamePanel({
           </div>
 
           <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-[1.35fr_0.95fr]")}>
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-xl">
+            <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,#17326B_0%,#142650_100%)] p-4 shadow-[0_24px_54px_-32px_rgba(3,8,24,0.65)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">growth</div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">growth</div>
                   <div className={cn("mt-2 font-black tracking-tight text-white", isMobile ? "text-[2.4rem]" : "text-[3rem]")}>
                     {totalMinutesLabel}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-white/62">
+                    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-white/72">
                       {growthLabel}
                     </span>
-                    <span className="rounded-full bg-[#FF8A1F]/14 px-2.5 py-1 text-[10px] font-black text-[#FFD089]">
+                    <span className="rounded-full bg-[#FF8A1F]/18 px-2.5 py-1 text-[10px] font-black text-[#FFD089]">
                       {growthDeltaLabel}
                     </span>
                   </div>
                 </div>
                 {sessionTimerLabel ? (
-                  <div className="rounded-[1.1rem] border border-white/12 bg-[#0F204F]/75 px-3 py-2 text-right shadow-[0_18px_34px_-24px_rgba(0,0,0,0.58)]">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">live</div>
+                  <div className="rounded-[1.1rem] border border-[#FFB357]/18 bg-[#0F204F]/88 px-3 py-2 text-right shadow-[0_18px_34px_-24px_rgba(0,0,0,0.58)]">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/45">live</div>
                     <div className="mt-1 text-lg font-black text-[#FFD089]">{sessionTimerLabel}</div>
                   </div>
                 ) : null}
               </div>
 
-              <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-[#0B1738]/48 p-3">
+              <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-[#0E1B3D]/82 p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-white/55">
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-white/58">
                     <Flame className="h-3.5 w-3.5 text-[#FFD089]" />
                     성장 게이지
                   </span>
-                  <span className="text-[11px] font-black text-white/72">{growthLabel}</span>
+                  <span className="text-[11px] font-black text-white/78">{growthLabel}</span>
                 </div>
                 <div className={cn("point-track-progress-track", growthPercent >= 100 && "point-track-progress-track--charged")}>
                   <div className="point-track-progress-fill" style={{ width: `${Math.max(6, Math.min(100, growthPercent))}%` }} />
@@ -579,7 +580,7 @@ export function StudentHomeGamePanel({
                   "point-track-hero-cta mt-4 h-12 w-full rounded-[1.1rem] border-0 text-base font-black",
                   primaryActionActive
                     ? "bg-[linear-gradient(180deg,#FFA33B_0%,#FF7A16_100%)] text-white"
-                    : "bg-white text-[#14295F]",
+                    : "bg-[#F3F6FB] text-[#17326B]",
                 )}
               >
                 {primaryActionActive ? <Timer className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4 fill-current" />}
@@ -587,16 +588,16 @@ export function StudentHomeGamePanel({
               </Button>
             </div>
 
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-xl">
+            <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,#142650_0%,#101F45_100%)] p-4 shadow-[0_24px_54px_-32px_rgba(3,8,24,0.65)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">reward</div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">reward</div>
                   <div className="mt-2 text-[1.65rem] font-black tracking-tight text-white">
-                    {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 대기` : "채워지는 중"}
+                    {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 대기` : "상자 생성중"}
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-white/65">{boxSubLabel}</div>
+                  <div className="mt-1 text-sm font-semibold text-white/82">{boxSubLabel}</div>
                 </div>
-                <div className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#FFD089]">
+                <div className="rounded-full border border-[#FFB357]/20 bg-[#FFF4E8] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#17326B]">
                   {boxStatusLabel}
                 </div>
               </div>
@@ -612,7 +613,7 @@ export function StudentHomeGamePanel({
 
               <div className="mt-2 text-center">
                 <div className="text-sm font-black text-white">{totalAvailableBoxes > 0 ? "지금 열기" : nextBoxCounter}</div>
-                <div className="mt-1 text-[11px] font-semibold text-white/55">{nextBoxCaption}</div>
+                <div className="mt-1 text-[11px] font-semibold text-white/58">{nextBoxCaption}</div>
               </div>
 
               <Button
@@ -629,17 +630,17 @@ export function StudentHomeGamePanel({
         </div>
       </section>
 
-      <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[1.2fr_0.8fr]")}>
-        <div className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,rgba(20,41,95,0.94),rgba(14,28,66,0.94))] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.72)]">
+      <section className={cn("mt-3 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[1.2fr_0.8fr]")}>
+        <div className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,#17326B_0%,#142650_100%)] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.72)]">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/42">quest board</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">quest board</div>
               <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">오늘의 퀘스트</h3>
             </div>
             <Button
               type="button"
               variant="ghost"
-              className="h-9 rounded-full px-3 text-[11px] font-black text-white/72 hover:bg-white/8 hover:text-white"
+              className="h-9 rounded-full px-3 text-[11px] font-black text-white/78 hover:bg-white/8 hover:text-white"
               onClick={onOpenPlan}
             >
               더보기 <ChevronRight className="ml-1 h-4 w-4" />
@@ -656,29 +657,29 @@ export function StudentHomeGamePanel({
                 />
               ))
             ) : (
-              <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-white/[0.04] px-4 py-6 text-center">
+              <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-[#11214A] px-4 py-6 text-center">
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/8 text-[#FFD089]">
                   <Swords className="h-5 w-5" />
                 </div>
                 <div className="mt-3 text-base font-black text-white">아직 오늘 퀘스트가 없어요</div>
-                <div className="mt-1 text-sm font-semibold text-white/55">계획트랙에서 오늘 할 일을 추가해 보세요.</div>
+                <div className="mt-1 text-sm font-semibold text-white/58">계획트랙에서 오늘 할 일을 추가해 보세요.</div>
               </div>
             )}
           </div>
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)] backdrop-blur-xl">
+          <div className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#122246_100%)] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)]">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-[1.15rem] bg-white/8 px-3 py-3">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+              <div className="rounded-[1.15rem] border border-white/8 bg-[#1D3565] px-3 py-3">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/58">
                   <Clock3 className="h-3.5 w-3.5 text-[#FFD089]" />
                   오늘
                 </div>
                 <div className="mt-2 text-xl font-black text-white">{todayStudyLabel}</div>
               </div>
-              <div className="rounded-[1.15rem] bg-white/8 px-3 py-3">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+              <div className="rounded-[1.15rem] border border-white/8 bg-[#1D3565] px-3 py-3">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/58">
                   <Wallet className="h-3.5 w-3.5 text-[#FFD089]" />
                   포인트
                 </div>
@@ -688,7 +689,7 @@ export function StudentHomeGamePanel({
             </div>
             <div className="mt-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/42">growth log</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">growth log</div>
                 <div className="text-[11px] font-black text-[#FFD089]">최고 {bestDayLabel}</div>
               </div>
               <div className="mt-4 flex items-end gap-2">
@@ -696,16 +697,16 @@ export function StudentHomeGamePanel({
                   const height = Math.max(0.5, item.minutes / maxTrend);
                   return (
                     <div key={item.date} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                      <div className="flex h-24 w-full items-end rounded-full bg-white/[0.05] px-1.5 py-1.5">
+                      <div className="flex h-24 w-full items-end rounded-full bg-[#102049] px-1.5 py-1.5">
                         <div
                           className={cn(
-                            "w-full rounded-full bg-[linear-gradient(180deg,#FFD089_0%,#FF8A1F_100%)] shadow-[0_10px_20px_-14px_rgba(255,138,31,0.7)]",
-                            item.date === bestDayLabel && "bg-[linear-gradient(180deg,#FFE6AB_0%,#FF9E2C_100%)]",
+                            "w-full rounded-full bg-[linear-gradient(180deg,#FFB347_0%,#FF8A1F_100%)] shadow-[0_10px_20px_-14px_rgba(255,138,31,0.7)]",
+                            item.date === bestDayLabel && "bg-[linear-gradient(180deg,#FFE6AB_0%,#FFB347_32%,#FF8A1F_100%)]",
                           )}
                           style={{ height: `${height * 100}%` }}
                         />
                       </div>
-                      <div className="text-[10px] font-black text-white/42">{item.date}</div>
+                      <div className="text-[10px] font-black text-white/58">{item.date}</div>
                     </div>
                   );
                 })}
@@ -716,11 +717,11 @@ export function StudentHomeGamePanel({
           <button
             type="button"
             onClick={onOpenLeaderboard}
-            className="w-full rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] p-4 text-left text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)] backdrop-blur-xl"
+            className="w-full rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#122246_100%)] p-4 text-left text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)]"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/42">{selectedHomeRank.title}</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">{selectedHomeRank.title}</div>
                 <div className="mt-1 text-[1.35rem] font-black tracking-tight">
                   {selectedHomeRank.isLoading
                     ? "집계 중..."
@@ -728,9 +729,9 @@ export function StudentHomeGamePanel({
                       ? `${selectedHomeRank.rank}위`
                       : "집계 준비중"}
                 </div>
-                <div className="mt-1 text-[11px] font-semibold text-white/60">{selectedHomeRank.caption}</div>
+                <div className="mt-1 text-[11px] font-semibold text-white/72">{selectedHomeRank.caption}</div>
               </div>
-              <ChevronRight className="mt-1 h-4 w-4 text-white/42" />
+              <ChevronRight className="mt-1 h-4 w-4 text-white/58" />
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {(["daily", "weekly", "monthly"] as RankRange[]).map((range) => (
@@ -745,7 +746,7 @@ export function StudentHomeGamePanel({
                     "rounded-full px-2.5 py-1 text-[10px] font-black transition-all",
                     selectedRankRange === range
                       ? "bg-[#FF7A16] text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]"
-                      : "bg-white/10 text-[#D9E1F2] ring-1 ring-white/10",
+                      : "bg-[#1D3565] text-[#D9E1F2] ring-1 ring-white/10",
                   )}
                 >
                   {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
@@ -761,7 +762,7 @@ export function StudentHomeGamePanel({
                       "rounded-[1.15rem] border px-2.5 py-3 text-center shadow-[0_18px_34px_-28px_rgba(0,0,0,0.42)]",
                       entry.rank === 1
                         ? "border-orange-300/35 bg-[linear-gradient(180deg,rgba(255,176,76,0.18),rgba(255,176,76,0.08))]"
-                        : "border-white/10 bg-white/[0.05]",
+                        : "border-white/10 bg-[#1D3565]",
                     )}
                   >
                     <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[11px] font-black text-white/80">
@@ -772,7 +773,7 @@ export function StudentHomeGamePanel({
                   </div>
                 ))
               ) : (
-                <div className="col-span-3 rounded-[1.15rem] border border-dashed border-white/12 px-3 py-4 text-center text-[11px] font-semibold text-white/52">
+                <div className="col-span-3 rounded-[1.15rem] border border-dashed border-white/12 px-3 py-4 text-center text-[11px] font-semibold text-white/58">
                   아직 표시할 랭킹이 없어요.
                 </div>
               )}
@@ -781,16 +782,16 @@ export function StudentHomeGamePanel({
         </div>
       </section>
 
-      <section className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)] backdrop-blur-xl">
+      <section className="mt-3 rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#122246_100%)] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)]">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/42">reward vault</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">reward vault</div>
             <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">상자 보관함</h3>
           </div>
           <Button
             type="button"
             variant="ghost"
-            className="h-9 rounded-full px-3 text-[11px] font-black text-white/72 hover:bg-white/8 hover:text-white"
+            className="h-9 rounded-full px-3 text-[11px] font-black text-white/78 hover:bg-white/8 hover:text-white"
             onClick={() => onOpenMainBox()}
           >
             모두 보기 <ChevronRight className="ml-1 h-4 w-4" />
@@ -809,6 +810,8 @@ export function StudentHomeGamePanel({
           ))}
         </div>
       </section>
+
+      </div>
 
       <RewardModal
         open={isVaultOpen}

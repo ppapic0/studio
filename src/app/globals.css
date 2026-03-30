@@ -3569,9 +3569,9 @@ select {
 .point-track-game-screen {
   min-height: 100%;
   background:
-    radial-gradient(circle at top, rgba(255, 181, 88, 0.2), transparent 18%),
-    radial-gradient(circle at 50% 12%, rgba(89, 126, 217, 0.44), transparent 34%),
-    linear-gradient(180deg, #14295f 0%, #102454 44%, #0b1633 100%);
+    radial-gradient(circle at top, rgba(255, 165, 60, 0.08), transparent 28%),
+    radial-gradient(circle at 50% 14%, rgba(64, 102, 194, 0.16), transparent 34%),
+    linear-gradient(180deg, #13285A 0%, #0E1B3D 100%);
   color: rgba(255, 255, 255, 0.96);
   overflow-x: hidden;
 }
@@ -3583,9 +3583,9 @@ select {
   border: 1px solid rgba(255, 224, 183, 0.12);
   padding: 1.25rem;
   background:
-    radial-gradient(circle at 50% 18%, rgba(255, 186, 79, 0.28), transparent 24%),
-    radial-gradient(circle at 84% 10%, rgba(255, 138, 31, 0.24), transparent 16%),
-    linear-gradient(180deg, rgba(18,43,103,0.97) 0%, rgba(11,24,58,0.98) 100%);
+    radial-gradient(circle at 82% 14%, rgba(255, 165, 60, 0.16), transparent 18%),
+    radial-gradient(circle at 28% 100%, rgba(255,255,255,0.04), transparent 26%),
+    linear-gradient(135deg, #17326B 0%, #28478F 58%, #18346F 100%);
   box-shadow:
     0 28px 64px -38px rgba(0, 0, 0, 0.76),
     inset 0 1px 0 rgba(255,255,255,0.08);
@@ -3874,7 +3874,7 @@ select {
   min-width: 6.5rem;
   border-radius: 1.5rem;
   border: 1px solid rgba(255,224,183,0.12);
-  background: linear-gradient(180deg, rgba(11,24,58,0.95), rgba(20,41,95,0.82));
+  background: linear-gradient(180deg, #142650 0%, #0F1E43 100%);
   padding: 0.9rem;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
 }
@@ -3950,8 +3950,8 @@ select {
 
 .point-track-slot--charging {
   background:
-    radial-gradient(circle at top, rgba(125, 225, 255, 0.12), transparent 56%),
-    linear-gradient(180deg, rgba(13,28,69,0.94), rgba(25,52,117,0.78));
+    radial-gradient(circle at top, rgba(255, 179, 87, 0.08), transparent 52%),
+    linear-gradient(180deg, #16284F 0%, #122246 100%);
 }
 
 .point-track-slot--charging .point-track-slot__box {
@@ -3960,7 +3960,7 @@ select {
 }
 
 .point-track-slot--opened {
-  opacity: 0.58;
+  opacity: 0.72;
 }
 
 .point-track-slot--opened .point-track-slot__box {
@@ -3969,7 +3969,7 @@ select {
 }
 
 .point-track-slot--locked {
-  opacity: 0.42;
+  opacity: 0.5;
 }
 
 .point-track-slot--locked .point-track-slot__box {
