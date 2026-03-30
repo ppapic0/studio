@@ -369,6 +369,20 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     () => scheduleItems.filter((item: any) => String(item.title || '').startsWith('외출 예정')).length,
     [scheduleItems]
   );
+  const [customSubjectLabel, setCustomSubjectLabel] = useState(DEFAULT_CUSTOM_SUBJECT_LABEL);
+  const [customMinutePreset, setCustomMinutePreset] = useState(DEFAULT_CUSTOM_TIME_PRESET);
+  const [customStudyTypeLabel, setCustomStudyTypeLabel] = useState(DEFAULT_CUSTOM_STUDY_TYPE);
+  const [presetEditorKind, setPresetEditorKind] = useState<QuickPresetEditorKind>(null);
+  const [presetEditorDraft, setPresetEditorDraft] = useState('');
+  const quickSubjectOptions = useMemo(
+    () =>
+      subjectOptions.map((subject: any) =>
+        subject.id === 'etc' ? { ...subject, label: customSubjectLabel } : subject
+      ),
+    [customSubjectLabel, subjectOptions]
+  );
+  const quickTimePresets = useMemo(() => [...QUICK_BASE_TIME_PRESETS, customMinutePreset], [customMinutePreset]);
+  const quickStudyTypes = useMemo(() => [...QUICK_BASE_STUDY_TYPES, customStudyTypeLabel], [customStudyTypeLabel]);
   const subjectBalance = useMemo(() => {
     const totals = studyTasks.reduce((acc: Record<string, number>, task: any) => {
       const key = task.subject || 'etc';
@@ -396,11 +410,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
   const [questMissionId, setQuestMissionId] = useState(PLANNER_QUICK_TASK_SUGGESTIONS[0]?.id || 'math-problem');
   const [quickStudyType, setQuickStudyType] = useState(QUICK_BASE_STUDY_TYPES[0]);
   const [outingDuration, setOutingDuration] = useState('20');
-  const [customSubjectLabel, setCustomSubjectLabel] = useState(DEFAULT_CUSTOM_SUBJECT_LABEL);
-  const [customMinutePreset, setCustomMinutePreset] = useState(DEFAULT_CUSTOM_TIME_PRESET);
-  const [customStudyTypeLabel, setCustomStudyTypeLabel] = useState(DEFAULT_CUSTOM_STUDY_TYPE);
-  const [presetEditorKind, setPresetEditorKind] = useState<QuickPresetEditorKind>(null);
-  const [presetEditorDraft, setPresetEditorDraft] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -441,16 +450,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
       // ignore local preset persistence errors
     }
   }, [customMinutePreset, customStudyTypeLabel, customSubjectLabel]);
-
-  const quickSubjectOptions = useMemo(
-    () =>
-      subjectOptions.map((subject: any) =>
-        subject.id === 'etc' ? { ...subject, label: customSubjectLabel } : subject
-      ),
-    [customSubjectLabel, subjectOptions]
-  );
-  const quickTimePresets = useMemo(() => [...QUICK_BASE_TIME_PRESETS, customMinutePreset], [customMinutePreset]);
-  const quickStudyTypes = useMemo(() => [...QUICK_BASE_STUDY_TYPES, customStudyTypeLabel], [customStudyTypeLabel]);
 
   useEffect(() => {
     setQuestEndTimeChoice(outTime || '22:00');
