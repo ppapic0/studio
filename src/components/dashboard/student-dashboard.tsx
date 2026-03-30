@@ -95,7 +95,6 @@ import {
   formatStudyMinutesShort,
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
-  getDailyFortuneMessage,
   rollStudyBoxReward,
 } from '@/lib/student-rewards';
 
@@ -231,13 +230,14 @@ function pickPreferredSeatDoc<T extends { data: () => AttendanceCurrent | undefi
   })[0] || null;
 }
 
-function shouldShowDailyCheckInToast(centerId: string, userId: string, dateKey: string): boolean {
+function shouldShowStudyBoxArrivalToast(centerId: string, userId: string, dateKey: string, milestones: number[]): boolean {
   if (typeof window === 'undefined') return true;
   try {
-    const storageKey = `track:checkin-toast:${centerId}:${userId}`;
-    const lastShownDate = window.localStorage.getItem(storageKey);
-    if (lastShownDate === dateKey) return false;
-    window.localStorage.setItem(storageKey, dateKey);
+    const storageKey = `track:study-box-toast:${centerId}:${userId}`;
+    const eventKey = `${dateKey}:${milestones.sort((a, b) => a - b).join(',')}`;
+    const lastShownKey = window.localStorage.getItem(storageKey);
+    if (lastShownKey === eventKey) return false;
+    window.localStorage.setItem(storageKey, eventKey);
     return true;
   } catch {
     return true;
@@ -1031,8 +1031,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [isExamSaving, setIsExamSaving] = useState(false);
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
-  const [fortuneMessage, setFortuneMessage] = useState<string | null>(null);
-  const [isFortuneDialogOpen, setIsFortuneDialogOpen] = useState(false);
   const [selectedRankRange, setSelectedRankRange] = useState<RankRange>('daily');
   const [weeklyRankRows, setWeeklyRankRows] = useState<Array<{ studentId: string; totalStudyMinutes: number }>>([]);
   const [weeklyRankLoading, setWeeklyRankLoading] = useState(false);
@@ -1480,7 +1478,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             statsUpdate.resilience = increment(0.5);
             dailyStatusUpdate.bonus6h = true;
             earnedPointsThisSession += 15;
-            toast({ title: '6시간 몰입 달성! 회복력과 보너스 포인트가 반영됐어요.' });
+            toast({ title: '6시간 몰입 달성! 보너스 포인트가 반영됐어요.' });
           }
 
           if (earnedPointsThisSession > 0) {
@@ -1689,15 +1687,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const batch = writeBatch(firestore);
         const todayPointStatus = (progress?.dailyPointStatus?.[todayKey] || {}) as Record<string, any>;
         const isFirstCheckInToday = !todayPointStatus.checkedIn;
-        const shouldShowFortune = !todayPointStatus.fortuneShown;
         const checkInProgressUpdate: Record<string, any> = {
           updatedAt: serverTimestamp(),
           dailyPointStatus: {
             [todayKey]: {
               ...todayPointStatus,
               checkedIn: true,
-              fortuneShown: shouldShowFortune ? true : todayPointStatus.fortuneShown,
-              fortuneMessage: shouldShowFortune ? getDailyFortuneMessage(user.uid, todayKey) : todayPointStatus.fortuneMessage,
             },
           },
         };
@@ -1705,12 +1700,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         if (isFirstCheckInToday) {
           checkInProgressUpdate.stats = { consistency: increment(0.5) };
-          batch.set(progressRef, checkInProgressUpdate, { merge: true });
-          if (shouldShowDailyCheckInToast(centerId, user.uid, todayKey)) {
-            toast({ title: '\uC785\uC2E4 \uD655\uC778! \uAFB8\uC900\uD568 \uC2A4\uD0EF +0.5 \uC0C1\uC2B9' });
-          }
-          wroteSomething = true;
-        } else if (shouldShowFortune) {
           batch.set(progressRef, checkInProgressUpdate, { merge: true });
           wroteSomething = true;
         }
@@ -1756,7 +1745,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               dateKey: todayKey,
               updatedAt: serverTimestamp(),
             }, { merge: true });
-            if (isFirstCheckInToday || shouldShowFortune) {
+            if (isFirstCheckInToday) {
               await setDoc(progressRef, checkInProgressUpdate, { merge: true });
             }
             usedStartFallback = true;
@@ -1788,10 +1777,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         setStartTime(nowTs);
         setIsTimerActive(true);
-        if (shouldShowFortune) {
-          setFortuneMessage(getDailyFortuneMessage(user.uid, todayKey));
-          setIsFortuneDialogOpen(true);
-        }
         if (startCommitError) {
           toast({
             variant: 'destructive',
@@ -2280,6 +2265,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayPointStatus), [todayPointStatus]);
   const persistedRewardEntries = useMemo(() => coerceStudyBoxRewards(todayPointStatus), [todayPointStatus]);
   const persistedOpenedBoxes = useMemo(() => coerceOpenedStudyBoxes(todayPointStatus), [todayPointStatus]);
+  const syncedClaimedBoxes = useMemo(
+    () => Array.from(new Set([...persistedClaimedBoxes, ...homeClaimedBoxes])).sort((a, b) => a - b),
+    [persistedClaimedBoxes, homeClaimedBoxes]
+  );
+  const syncedRewardEntries = useMemo(() => {
+    const merged = new Map<number, StudyBoxReward>();
+    [...persistedRewardEntries, ...homeRewardEntries].forEach((entry) => {
+      merged.set(entry.milestone, entry);
+    });
+    return Array.from(merged.values()).sort((a, b) => a.milestone - b.milestone);
+  }, [persistedRewardEntries, homeRewardEntries]);
+  const syncedOpenedBoxes = useMemo(
+    () => Array.from(new Set([...persistedOpenedBoxes, ...homeOpenedBoxes])).sort((a, b) => a - b),
+    [persistedOpenedBoxes, homeOpenedBoxes]
+  );
 
   useEffect(() => {
     setHomeClaimedBoxes(persistedClaimedBoxes);
@@ -2305,11 +2305,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const rewardByHour = useMemo(() => {
     const map = new Map<number, { awardedPoints: number }>();
-    homeRewardEntries.forEach((entry) => {
+    syncedRewardEntries.forEach((entry) => {
       map.set(entry.milestone, entry);
     });
     return map;
-  }, [homeRewardEntries]);
+  }, [syncedRewardEntries]);
   const earnedBoxes = Math.min(8, Math.floor(liveTodaySeconds / 3600));
   const currentCycleSeconds = earnedBoxes >= 8 ? 3600 : liveTodaySeconds % 3600;
   const nextBoxSecondsLeft = earnedBoxes >= 8 ? 0 : Math.max(0, 3600 - currentCycleSeconds);
@@ -2319,11 +2319,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () =>
       buildRewardBoxes({
         earnedHours: earnedBoxes,
-        claimedHours: homeClaimedBoxes,
-        openedHours: homeOpenedBoxes,
+        claimedHours: syncedClaimedBoxes,
+        openedHours: syncedOpenedBoxes,
         rewardByHour,
       }),
-    [earnedBoxes, homeClaimedBoxes, homeOpenedBoxes, rewardByHour]
+    [earnedBoxes, syncedClaimedBoxes, syncedOpenedBoxes, rewardByHour]
   );
   const readyBoxes = homeRewardBoxes.filter((box) => box.state === 'ready');
   const selectedHomeBox = selectedBoxHour ? homeRewardBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
@@ -2341,7 +2341,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (!isActive || !isTimerActive || !progressRef || !todayKey) return;
 
-    const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, homeClaimedBoxes);
+    const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, syncedClaimedBoxes);
     if (availableMilestones.length === 0) return;
 
     const claimKey = `${todayKey}:${availableMilestones.join(',')}:${liveTodayMinutes}`;
@@ -2350,8 +2350,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
     const rewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone, stats));
     const awardedPoints = rewards.reduce((sum, reward) => sum + reward.awardedPoints, 0);
-    const nextClaimedBoxes = Array.from(new Set([...homeClaimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
-    const nextRewardEntries = [...homeRewardEntries, ...rewards].sort((a, b) => a.milestone - b.milestone);
+    const nextClaimedBoxes = Array.from(new Set([...syncedClaimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
+    const nextRewardEntries = [...syncedRewardEntries, ...rewards].sort((a, b) => a.milestone - b.milestone);
     const nextDayStatus = {
       ...todayPointStatus,
       claimedStudyBoxes: nextClaimedBoxes,
@@ -2379,10 +2379,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       },
       updatedAt: serverTimestamp(),
     }, { merge: true }).then(() => {
-      toast({
-        title: availableMilestones.length > 1 ? `상자 ${availableMilestones.length}개 도착!` : '상자 도착!',
-        description: '+1 BOX · 홈에서 바로 열어보세요.',
-      });
+      if (shouldShowStudyBoxArrivalToast(activeMembership.id, user.uid, todayKey, availableMilestones)) {
+        toast({
+          title: availableMilestones.length > 1 ? `상자 ${availableMilestones.length}개 도착!` : '상자 도착!',
+          description: `+${availableMilestones.length} BOX · 홈에서 바로 열어보세요.`,
+        });
+      }
     }).catch((error: any) => {
       homeLiveClaimKeyRef.current = null;
       console.warn('[student-track] live study box claim failed', error?.message || error);
@@ -2393,11 +2395,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setFreshReadyHours([]);
     });
   }, [
-    homeClaimedBoxes,
-    homeRewardEntries,
     isActive,
     isTimerActive,
     liveTodayMinutes,
+    syncedClaimedBoxes,
+    syncedRewardEntries,
     persistedClaimedBoxes,
     persistedRewardEntries,
     progress?.pointsBalance,
@@ -2406,6 +2408,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     todayKey,
     todayPointStatus,
     toast,
+    activeMembership?.id,
+    user?.uid,
   ]);
 
   const homeQuestList = useMemo(() => {
@@ -2952,34 +2956,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </Dialog>
         </div>
       </section>
-
-      <Dialog open={isFortuneDialogOpen} onOpenChange={setIsFortuneDialogOpen}>
-        <DialogContent className={cn("border border-[#223B7A]/10 p-0 overflow-hidden bg-white", isMobile ? "w-[min(92vw,26rem)] rounded-[2rem]" : "sm:max-w-md rounded-[2.5rem]")}>
-          <div className={cn("bg-[#14295F] text-white", isMobile ? "p-6" : "p-8")}>
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight">오늘의 학업 운세</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold">첫 공부 시작을 응원하는 오늘의 한마디예요.</DialogDescription>
-            </DialogHeader>
-          </div>
-          <div className={cn("space-y-4 bg-[radial-gradient(circle_at_top,#eef4ff_0%,#ffffff_72%)]", isMobile ? "p-5" : "p-6")}>
-            <div className="rounded-[1.5rem] border border-[#D8E2F5] bg-white px-4 py-5 shadow-[0_24px_40px_-32px_rgba(20,41,95,0.35)]">
-              <div className="flex items-center gap-2 text-[#14295F]">
-                <Sparkles className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-[0.18em]">Good Study Signal</span>
-              </div>
-              <p className="mt-3 text-base font-black leading-7 text-slate-900 break-keep">
-                {fortuneMessage || getDailyFortuneMessage(user?.uid || 'student', todayKey)}
-              </p>
-            </div>
-            <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-3 text-sm font-semibold leading-6 text-slate-600">
-              오늘은 누적 공부시간이 1시간을 넘을 때마다 포인트 상자가 열려요.
-            </div>
-            <DialogFooter className="p-0">
-              <Button className="h-12 w-full rounded-[1rem] bg-[#14295F] text-white hover:bg-[#10214D]">좋아, 시작할게</Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
 
     </div>
   );
