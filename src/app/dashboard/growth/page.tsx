@@ -829,21 +829,21 @@ export default function GrowthPage() {
                 {totalAvailableBoxes > 0 ? '상자 도착' : heroMode === 'studying' ? '집중 중' : '다음 상자'}
               </p>
               <div className="mt-1 text-[2rem] font-black tracking-tight text-white">{heroPrimaryLabel}</div>
-              <p className="mt-1 text-xs font-bold text-white/55">{heroSecondaryLabel}</p>
+              <p className="mt-1 text-sm font-bold text-white/82">{heroSecondaryLabel}</p>
             </div>
 
             {isTimerActive ? (
               <div className="grid w-full grid-cols-3 gap-2">
                 <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">상태</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">상태</p>
                   <p className="mt-2 text-sm font-black text-white">집중 중</p>
                 </div>
                 <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">세션</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">세션</p>
                   <p className="mt-2 text-sm font-black text-white">{formatHeroTimer(liveSessionSeconds)}</p>
                 </div>
                 <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">도착</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">도착</p>
                   <p className="mt-2 text-sm font-black text-[#FFD089]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
                 </div>
               </div>
@@ -1002,9 +1002,9 @@ export default function GrowthPage() {
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#173A82]/55">REWARD SHOP</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4D679F]">REWARD SHOP</p>
               <p className="mt-2 text-base font-black tracking-tight text-[#14295F]">갖고 싶은 선물 문의</p>
-              <p className="mt-1 text-xs font-bold text-[#173A82]/78">카카오톡 선물하기로 받을 수 있는 선물을 문의해보세요.</p>
+              <p className="mt-1 text-sm font-semibold leading-5 text-[#385287]">카카오톡 선물하기로 받을 수 있는 선물을 문의해보세요.</p>
             </div>
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(180deg,#ffcb82_0%,#ff9b2b_100%)] text-[#173A82] shadow-[0_12px_24px_-16px_rgba(255,138,31,0.55)]">
               <ChevronRight className="h-5 w-5" />
