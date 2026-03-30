@@ -853,10 +853,10 @@ export default function GrowthPage() {
               type="button"
               onClick={handleHeroCta}
               className={cn(
-                'point-track-hero-cta mt-2 h-14 w-full rounded-[1.4rem] text-base font-black text-white',
+                'point-track-hero-cta mt-2 h-14 w-full rounded-[1.4rem] text-base font-black',
                 totalAvailableBoxes > 0
-                  ? 'bg-[linear-gradient(180deg,#ffd089_0%,#ffb357_35%,#ff8a1f_100%)]'
-                  : 'bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))]'
+                  ? 'bg-[linear-gradient(180deg,#ffd089_0%,#ffb357_35%,#ff8a1f_100%)] text-[#173A82]'
+                  : 'bg-[linear-gradient(180deg,#ffffff_0%,#eef4ff_100%)] text-[#173A82]'
               )}
             >
               {heroCtaLabel}

@@ -772,7 +772,7 @@ export default function AnalysisTrackPage() {
               <Badge className="border-[#FFB347]/18 bg-[#FF9626]/12 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">오늘 버프 {dailyBuff}</Badge>
             </div>
 
-            <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
+            <div className={cn('mt-5 grid gap-5', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]')}>
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <p className="text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight text-white">{displayName} Lv.{level}</p>
