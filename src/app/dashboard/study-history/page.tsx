@@ -841,13 +841,14 @@ export default function StudyHistoryPage() {
         className={cn(
           "overflow-hidden rounded-[2.5rem]",
           isMobile
-            ? "border border-[#D9E1F2] bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.18),transparent_24%),linear-gradient(180deg,#173A82_0%,#1E3D8E_26%,#fff7ec_26.5%,#f6f9ff_100%)] text-[#173A82] shadow-[0_26px_56px_-42px_rgba(20,41,95,0.28)]"
+            ? "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.2),transparent_18%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_24%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.52)]"
             : "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_20%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.12),transparent_24%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]"
         )}
       >
         <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
-          <div className={cn("gap-4", isMobile ? "flex flex-col rounded-[1.75rem] bg-[linear-gradient(180deg,rgba(23,58,130,0.98),rgba(30,61,142,0.94))] px-4 py-4 shadow-[0_18px_40px_-28px_rgba(8,17,48,0.65)]" : "flex items-start justify-between")}>
-            <div className="space-y-3">
+          <div className={cn(isMobile ? "space-y-4" : "flex items-start justify-between gap-4")}>
+            <div className={cn(isMobile ? "flex items-start justify-between gap-3" : "space-y-3")}>
+              <div className="min-w-0 flex-1 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   className={cn(
@@ -882,30 +883,31 @@ export default function StudyHistoryPage() {
                 <p
                   className={cn(
                     "max-w-2xl break-keep font-semibold",
-                    isMobile ? "text-[13px] leading-6 text-white/78" : "text-sm leading-6 text-white/86"
+                    isMobile ? "text-[13px] leading-6 text-white/82" : "text-sm leading-6 text-white/86"
                   )}
                 >
                   {isParent
                     ? (isMobile ? '오늘과 7일 누적, 이번 달 학습 흐름부터 바로 확인해요.' : '자녀의 오늘 공부시간, 최근 7일 누적, 이번 달 총 학습 시간을 먼저 보고 날짜별 기록을 자세히 확인해보세요.')
-                    : (isMobile ? '오늘, 7일, 이번 달 기록을 빠르게 보고 날짜별 흐름으로 이어서 보세요.' : '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록과 포인트 상자 흐름까지 이어서 확인할 수 있어요.')}
+                    : (isMobile ? '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록 흐름까지 이어서 확인해요.' : '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록과 포인트 상자 흐름까지 이어서 확인할 수 있어요.')}
                 </p>
               </div>
+              </div>
+              {!isParent ? (
+                <Button
+                  asChild
+                  className={cn(
+                    isMobile
+                      ? "mt-0 shrink-0 rounded-[1.2rem] border border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-3.5 py-2 text-[11px] font-black text-white shadow-[0_16px_32px_-22px_rgba(5,15,40,0.5)] hover:bg-white/15"
+                      : "shrink-0 rounded-2xl border border-orange-200/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.08))] font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15 h-12 px-5 text-xs"
+                  )}
+                >
+                  <Link href="/dashboard/growth">
+                    포인트트랙
+                    <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              ) : null}
             </div>
-            {!isParent ? (
-              <Button
-                asChild
-                className={cn(
-                  isMobile
-                    ? "h-11 w-full rounded-2xl border border-[#FFB357]/40 bg-[linear-gradient(180deg,#FFD89D_0%,#FFB357_50%,#FF7A16_100%)] font-black text-[#173A82] shadow-[0_18px_36px_-24px_rgba(255,122,22,0.45)] hover:brightness-105"
-                    : "shrink-0 rounded-2xl border border-orange-200/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.08))] font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15 h-12 px-5 text-xs"
-                )}
-              >
-                <Link href="/dashboard/growth">
-                  포인트트랙 바로가기
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            ) : null}
           </div>
 
           <div className={cn("mt-5 grid", isMobile ? "grid-cols-3 gap-2.5" : "md:grid-cols-3 gap-3")}>
@@ -940,7 +942,7 @@ export default function StudyHistoryPage() {
                 key={item.label}
                 className={cn(
                   isMobile
-                    ? "min-w-0 overflow-hidden rounded-[1.4rem] border border-[#173A82]/10 bg-[radial-gradient(circle_at_top,rgba(255,186,118,0.2),transparent_48%),linear-gradient(180deg,#35549E_0%,#173A82_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(20,41,95,0.42)]"
+                    ? "min-w-0 overflow-hidden rounded-[1.55rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,25,69,0.8),rgba(28,59,131,0.92))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.42)] backdrop-blur-xl"
                     : "min-w-0 overflow-hidden rounded-[1.8rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,25,69,0.72),rgba(28,59,131,0.86))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.4)] backdrop-blur-xl"
                 )}
               >
