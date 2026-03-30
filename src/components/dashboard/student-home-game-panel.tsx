@@ -480,8 +480,13 @@ export function StudentHomeGamePanel({
   revealedReward: number | null;
   onNextBox: () => void;
   nextCountdownLabel: string;
-}) {
+  }) {
   const maxTrend = weeklyTrend.reduce((max, item) => Math.max(max, item.minutes), 1);
+  const trendAxisMarks = [1, 0.75, 0.5, 0.25].map((ratio, index) => {
+    const minutes = Math.max(1, Math.round(maxTrend * ratio));
+    const label = minutes >= 60 ? `${Math.max(1, Math.round(minutes / 60))}h` : `${minutes}m`;
+    return { id: `trend-mark-${index}`, label };
+  });
   const hasMoreReadyBoxes = boxes.filter((box) => box.state === "ready").length > 1;
 
   return (
@@ -693,32 +698,56 @@ export function StudentHomeGamePanel({
                 <div className="mt-1 text-[11px] font-black text-[#FFD089]">오늘 +{todayPointGain}P</div>
               </div>
             </div>
-            <div className="mt-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">growth log</div>
-                <div className="text-[11px] font-black text-[#FFD089]">최고 {bestDayLabel}</div>
-              </div>
-              <div className="mt-4 flex items-end gap-2">
-                {weeklyTrend.map((item) => {
-                  const height = Math.max(0.5, item.minutes / maxTrend);
-                  return (
-                    <div key={item.date} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                      <div className="flex h-24 w-full items-end rounded-full bg-[#102049] px-1.5 py-1.5">
-                        <div
-                          className={cn(
-                            "w-full rounded-full bg-[linear-gradient(180deg,#FFB347_0%,#FF8A1F_100%)] shadow-[0_10px_20px_-14px_rgba(255,138,31,0.7)]",
-                            item.date === bestDayLabel && "bg-[linear-gradient(180deg,#FFE6AB_0%,#FFB347_32%,#FF8A1F_100%)]",
-                          )}
-                          style={{ height: `${height * 100}%` }}
-                        />
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">growth log</div>
+                  <div className="text-[11px] font-black text-[#FFD089]">최고 {bestDayLabel}</div>
+                </div>
+                <div className="mt-4 grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
+                  <div className="flex h-24 flex-col justify-between pt-1">
+                    {trendAxisMarks.map((mark) => (
+                      <div key={mark.id} className="text-right text-[10px] font-black text-white/42">
+                        {mark.label}
                       </div>
-                      <div className="text-[10px] font-black text-white/58">{item.date}</div>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="relative h-24">
+                      <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                        {trendAxisMarks.map((mark) => (
+                          <div key={`${mark.id}-line`} className="border-t border-dashed border-white/8" />
+                        ))}
+                      </div>
+                      <div className="relative flex h-24 items-end gap-2">
+                        {weeklyTrend.map((item) => {
+                          const height = Math.max(0.5, item.minutes / maxTrend);
+                          return (
+                            <div key={item.date} className="flex min-w-0 flex-1 items-end">
+                              <div className="flex h-24 w-full items-end rounded-full bg-[#102049] px-1.5 py-1.5">
+                                <div
+                                  className={cn(
+                                    "w-full rounded-full bg-[linear-gradient(180deg,#FFB347_0%,#FF8A1F_100%)] shadow-[0_10px_20px_-14px_rgba(255,138,31,0.7)]",
+                                    item.date === bestDayLabel && "bg-[linear-gradient(180deg,#FFE6AB_0%,#FFB347_32%,#FF8A1F_100%)]",
+                                  )}
+                                  style={{ height: `${height * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  );
-                })}
+                    <div className="flex gap-2">
+                      {weeklyTrend.map((item) => (
+                        <div key={`${item.date}-label`} className="min-w-0 flex-1 text-center text-[10px] font-black text-white/58">
+                          {item.date}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
           <button
             type="button"
