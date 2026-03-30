@@ -863,8 +863,8 @@ export default function StudyHistoryPage() {
         className={cn(
           "overflow-hidden rounded-[2.5rem]",
           isMobile
-            ? "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.2),transparent_18%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_24%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.52)]"
-            : "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_20%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.12),transparent_24%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]"
+            ? "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.18),transparent_18%),linear-gradient(135deg,#10224D_0%,#173A82_52%,#244A9A_100%)] text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.52)]"
+            : "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.2),transparent_20%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]"
         )}
       >
         <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
@@ -876,7 +876,7 @@ export default function StudyHistoryPage() {
                   className={cn(
                     "px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-none",
                     isMobile
-                      ? "border border-white/18 bg-white/10 text-white"
+                      ? "border border-[#FFD6A3]/35 bg-[#FFF3E0] text-[#173A82]"
                       : "border border-white/18 bg-white/12 text-white"
                   )}
                 >
@@ -919,7 +919,7 @@ export default function StudyHistoryPage() {
                   asChild
                   className={cn(
                     isMobile
-                      ? "mt-0 shrink-0 rounded-[1.2rem] border border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-3.5 py-2 text-[11px] font-black text-white shadow-[0_16px_32px_-22px_rgba(5,15,40,0.5)] hover:bg-white/15"
+                      ? "mt-0 shrink-0 rounded-[1.2rem] border border-[#FFD6A3]/45 bg-[linear-gradient(180deg,#FFF7EC_0%,#FFE5BD_100%)] px-3.5 py-2 text-[11px] font-black text-[#173A82] shadow-[0_16px_32px_-22px_rgba(5,15,40,0.5)] hover:bg-[#FFF4E6]"
                       : "shrink-0 rounded-2xl border border-orange-200/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.08))] font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15 h-12 px-5 text-xs"
                   )}
                 >
