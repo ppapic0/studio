@@ -2715,25 +2715,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <DialogTrigger asChild>
               <button className="group text-left h-full w-full touch-manipulation">
                 <Card className={cn(
-                  "student-cta student-cta-card h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4",
+                  "student-cta student-cta-card h-full border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
                   "rounded-2xl p-4",
-                  unreadReportCount > 0 ? "border-[#FF7A16] ring-1 ring-[#FF7A16]/30" : "border border-slate-200/80"
+                  unreadReportCount > 0 && "ring-1 ring-[#FF7A16]/35 border-[#FFBE73]"
                 )}>
-                  <div className="rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 h-12 w-12">
-                    <FileText className="h-6 w-6 text-primary" />
+                  <div className="rounded-2xl bg-[linear-gradient(180deg,#EFF4FF_0%,#E3EBFB_100%)] border border-[#D7E3F8] flex items-center justify-center shrink-0 h-12 w-12 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                    <FileText className="h-6 w-6 text-[#17326B]" />
                   </div>
                   <div className="grid min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-black tracking-tighter text-sm break-keep">선생님 리포트</span>
+                      <span className="font-black tracking-tighter text-sm text-[#17326B] break-keep">선생님 리포트</span>
                       {unreadReportCount > 0 && (
                         <Badge className="bg-[#FF7A16] text-white border-none font-black text-[8px] h-5 px-2 shrink-0">
                           {unreadReportCount} 새 리포트
                         </Badge>
                       )}
                     </div>
-                    <span className="font-bold text-muted-foreground uppercase tracking-widest text-[8px]">학습 피드백</span>
+                    <span className="font-bold text-[#6781AE] uppercase tracking-widest text-[8px]">학습 피드백</span>
                   </div>
-                  <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
+                  <ChevronRight className="ml-auto h-5 w-5 text-[#8AA0C7]" />
                 </Card>
               </button>
             </DialogTrigger>
@@ -2843,17 +2843,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <DialogTrigger asChild>
               <button className="group text-left h-full w-full touch-manipulation">
               <Card className={cn(
-                "student-cta student-cta-card h-full border border-slate-200/80 bg-white transition-colors duration-200 flex flex-row items-center gap-4",
+                "student-cta student-cta-card h-full border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
                 isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
               )}>
-                <div className={cn("rounded-2xl bg-amber-50 flex items-center justify-center shrink-0", isMobile ? "h-12 w-12" : "h-16 w-16")}>
-                  <ClipboardPen className={cn("text-amber-600", isMobile ? "h-6 w-6" : "h-8 w-8")} />
+                <div className={cn("rounded-2xl border border-[#FFE0B7] bg-[linear-gradient(180deg,#FFF3E2_0%,#FFE6C7_100%)] flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]", isMobile ? "h-12 w-12" : "h-16 w-16")}>
+                  <ClipboardPen className={cn("text-[#FF9626]", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                 </div>
                 <div className="grid min-w-0">
-                  <span className={cn("font-black tracking-tighter break-keep", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
-                  <span className={cn("font-bold text-muted-foreground uppercase tracking-widest text-[8px] sm:text-[10px]")}>빠른 요청</span>
+                  <span className={cn("font-black tracking-tighter text-[#17326B] break-keep", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
+                  <span className={cn("font-bold text-[#6781AE] uppercase tracking-widest text-[8px] sm:text-[10px]")}>빠른 요청</span>
                 </div>
-                <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
+                <ChevronRight className="ml-auto h-5 w-5 text-[#8AA0C7]" />
               </Card>
             </button>
           </DialogTrigger>
@@ -2919,11 +2919,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <button
                 type="button"
                 className={cn(
-                  "student-cta w-full rounded-2xl border border-slate-200/80 bg-white font-black gap-2 flex items-center justify-center text-primary transition-colors hover:bg-slate-50",
+                  "student-cta w-full rounded-2xl border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] font-black gap-3 flex items-center justify-center text-[#17326B] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
                   isMobile ? "h-12 text-sm" : "h-14 text-base"
                 )}
               >
-                <QrCode className="h-4 w-4" /> 나의 출입 QR
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#D7E3F8] bg-[linear-gradient(180deg,#EFF4FF_0%,#E3EBFB_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                  <QrCode className="h-4 w-4 text-[#17326B]" />
+                </span>
+                나의 출입 QR
               </button>
             </DialogTrigger>
             <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 sm:max-w-sm", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "")}>
