@@ -189,6 +189,10 @@ export interface StudyPlanItem {
   actualAmount?: number;
   amountUnit?: '문제' | '페이지' | '챕터' | '지문' | '세트' | '회독' | '직접입력';
   amountUnitLabel?: string;
+  startTime?: string;
+  endTime?: string;
+  priority?: 'low' | 'medium' | 'high';
+  tag?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

@@ -78,6 +78,7 @@ import {
   setDoc,
   increment,
   limit,
+  arrayUnion,
 } from 'firebase/firestore';
 import { 
   format, 
@@ -96,6 +97,8 @@ import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   ROUTINE_TEMPLATE_OPTIONS,
   type RecentStudyOption,
@@ -108,6 +111,25 @@ import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-c
 import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
 import { RecentStudySheet } from '@/components/dashboard/student-planner/recent-study-sheet';
 import { RepeatCopySheet } from '@/components/dashboard/student-planner/repeat-copy-sheet';
+import { StudyPlanSheet } from '@/components/dashboard/student-planner/study-plan-sheet';
+import { PlannerTemplateSheet } from '@/components/dashboard/student-planner/planner-template-sheet';
+import { PlannerChecklistItem } from '@/components/dashboard/student-planner/planner-checklist-item';
+import { PlannerMainView } from '@/components/dashboard/student-planner/planner-main-view';
+import {
+  BUILTIN_PLANNER_TEMPLATES,
+  PLAN_DEFAULT_START_TIME,
+  PLAN_TRACK_DAILY_POINT_CAP,
+  PLANNER_QUICK_TASK_SUGGESTIONS,
+  assignAutoWindowsToTasks,
+  buildPlannerTemplateRecentKey,
+  buildPlannerTemplateStorageKey,
+  computePlannerStreak,
+  formatClockRange,
+  formatDurationLabel,
+  getNextAutoWindow,
+  type PlannerTaskDraft,
+  type PlannerTemplateRecord,
+} from '@/lib/plan-track';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -344,6 +366,17 @@ export default function StudyPlanPage() {
   const [isTaskCopyDialogOpen, setIsTaskCopyDialogOpen] = useState(false);
   const [isRoutineCopyDialogOpen, setIsRoutineCopyDialogOpen] = useState(false);
   const [isRecentStudySheetOpen, setIsRecentStudySheetOpen] = useState(false);
+  const [isStudyPlanSheetOpen, setIsStudyPlanSheetOpen] = useState(false);
+  const [isTemplateSheetOpen, setIsTemplateSheetOpen] = useState(false);
+  const [isRoutineSectionOpen, setIsRoutineSectionOpen] = useState(false);
+  const [isMemoSectionOpen, setIsMemoSectionOpen] = useState(false);
+  const [showQuickAddCard, setShowQuickAddCard] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [templateNameDraft, setTemplateNameDraft] = useState('');
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [customTemplates, setCustomTemplates] = useState<PlannerTemplateRecord[]>([]);
+  const [recentTemplateIds, setRecentTemplateIds] = useState<string[]>([]);
+  const [floatingPointBursts, setFloatingPointBursts] = useState<Array<{ id: number; label: string }>>([]);
   const [taskCopyWeeks, setTaskCopyWeeks] = useState('4');
   const [routineCopyWeeks, setRoutineCopyWeeks] = useState('4');
   const [taskCopyDays, setTaskCopyDays] = useState<number[]>([]);
@@ -412,6 +445,65 @@ export default function StudyPlanPage() {
     }
     return `${format(start, 'yyyy.MM.dd')} - ${format(end, 'yyyy.MM.dd')}`;
   }, [weekDays]);
+
+  const templateStorageKey = useMemo(
+    () => (activeMembership?.id && user?.uid ? buildPlannerTemplateStorageKey(activeMembership.id, user.uid) : ''),
+    [activeMembership?.id, user?.uid]
+  );
+  const templateRecentStorageKey = useMemo(
+    () => (activeMembership?.id && user?.uid ? buildPlannerTemplateRecentKey(activeMembership.id, user.uid) : ''),
+    [activeMembership?.id, user?.uid]
+  );
+
+  useEffect(() => {
+    if (!templateStorageKey) {
+      setCustomTemplates([]);
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(templateStorageKey);
+      if (!raw) {
+        setCustomTemplates([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as PlannerTemplateRecord[];
+      setCustomTemplates(Array.isArray(parsed) ? parsed : []);
+    } catch (error) {
+      console.error('저장된 계획 템플릿을 읽지 못했습니다.', error);
+      setCustomTemplates([]);
+    }
+  }, [templateStorageKey]);
+
+  useEffect(() => {
+    if (!templateRecentStorageKey) {
+      setRecentTemplateIds([]);
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(templateRecentStorageKey);
+      if (!raw) {
+        setRecentTemplateIds([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as string[];
+      setRecentTemplateIds(Array.isArray(parsed) ? parsed : []);
+    } catch (error) {
+      console.error('최근 템플릿 기록을 읽지 못했습니다.', error);
+      setRecentTemplateIds([]);
+    }
+  }, [templateRecentStorageKey]);
+
+  useEffect(() => {
+    if (!templateStorageKey) return;
+    window.localStorage.setItem(templateStorageKey, JSON.stringify(customTemplates));
+  }, [customTemplates, templateStorageKey]);
+
+  useEffect(() => {
+    if (!templateRecentStorageKey) return;
+    window.localStorage.setItem(templateRecentStorageKey, JSON.stringify(recentTemplateIds));
+  }, [recentTemplateIds, templateRecentStorageKey]);
 
   const moveWeek = (direction: -1 | 1) => {
     if (!selectedDate) return;
@@ -676,6 +768,57 @@ export default function StudyPlanPage() {
     () => recentStudyOptions.find((item) => item.key === activeRecentStudyKey) || null,
     [activeRecentStudyKey, recentStudyOptions]
   );
+  const allTemplates = useMemo(
+    () => [...BUILTIN_PLANNER_TEMPLATES, ...customTemplates],
+    [customTemplates]
+  );
+  const recentTemplates = useMemo(
+    () => recentTemplateIds
+      .map((id) => allTemplates.find((template) => template.id === id))
+      .filter((template): template is PlannerTemplateRecord => Boolean(template))
+      .slice(0, 4),
+    [allTemplates, recentTemplateIds]
+  );
+  const latestRecentTemplate = recentTemplates[0] || null;
+  const checklistTasks = useMemo(
+    () => [...studyTasks, ...personalTasks],
+    [personalTasks, studyTasks]
+  );
+  const completedChecklistCount = useMemo(
+    () => checklistTasks.filter((task) => task.done).length,
+    [checklistTasks]
+  );
+  const completionRate = checklistTasks.length > 0
+    ? Math.round((completedChecklistCount / checklistTasks.length) * 100)
+    : 0;
+  const selectedDayPointStatus = useMemo(
+    () => ((progress?.dailyPointStatus?.[selectedDateKey] || {}) as Record<string, any>),
+    [progress?.dailyPointStatus, selectedDateKey]
+  );
+  const todayPointTotal = Math.min(
+    PLAN_TRACK_DAILY_POINT_CAP,
+    Number(selectedDayPointStatus.dailyPointAmount || 0)
+  );
+  const planTrackPointTotal = Math.max(0, Number(selectedDayPointStatus.planTrackPointAmount || 0));
+  const todayStreakDays = useMemo(
+    () => computePlannerStreak(progress?.dailyPointStatus, selectedDateKey),
+    [progress?.dailyPointStatus, selectedDateKey]
+  );
+  const todayPointGaugeLabel = `${todayPointTotal} / ${PLAN_TRACK_DAILY_POINT_CAP}`;
+  const todayCompletionLabel = checklistTasks.length > 0 ? `${completedChecklistCount}/${checklistTasks.length}` : '0/0';
+  const autoSchedulePreview = useMemo(
+    () => getNextAutoWindow(studyTasks, Number(newStudyMinutes) || 30, PLAN_DEFAULT_START_TIME),
+    [newStudyMinutes, studyTasks]
+  );
+  const orderedChecklistTasks = useMemo(
+    () => [...checklistTasks].sort((left, right) => {
+      const leftProgress = timeToClockProgress(left.startTime);
+      const rightProgress = timeToClockProgress(right.startTime);
+      if (leftProgress !== rightProgress) return leftProgress - rightProgress;
+      return getPlanTimestampMs(right) - getPlanTimestampMs(left);
+    }),
+    [checklistTasks]
+  );
 
   useEffect(() => {
     if (!activeRecentStudyKey) return;
@@ -683,6 +826,12 @@ export default function StudyPlanPage() {
       setActiveRecentStudyKey(null);
     }
   }, [activeRecentStudyKey, recentStudyOptions]);
+
+  useEffect(() => {
+    if (checklistTasks.length === 0) {
+      setShowQuickAddCard(true);
+    }
+  }, [checklistTasks.length]);
 
   useEffect(() => {
     if (!isTaskCopyDialogOpen) return;
@@ -728,6 +877,456 @@ export default function StudyPlanPage() {
     setActiveRecentStudyKey(item.key);
     setIsRecentStudySheetOpen(false);
   };
+
+  const pushFloatingPointBurst = useCallback((label: string) => {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setFloatingPointBursts((prev) => [...prev, { id, label }]);
+    window.setTimeout(() => {
+      setFloatingPointBursts((prev) => prev.filter((item) => item.id !== id));
+    }, 950);
+  }, []);
+
+  const markTemplateAsRecent = useCallback((templateId: string) => {
+    setRecentTemplateIds((prev) => [templateId, ...prev.filter((id) => id !== templateId)].slice(0, 6));
+  }, []);
+
+  const buildTemplateDraftFromTask = useCallback((task: WithId<StudyPlanItem>): PlannerTaskDraft => ({
+    category: (task.category === 'personal' ? 'personal' : 'study'),
+    title: task.title,
+    subject: task.subject || 'etc',
+    studyPlanMode: resolveStudyPlanMode(task),
+    targetMinutes: task.targetMinutes || undefined,
+    targetAmount: task.targetAmount || undefined,
+    amountUnit: task.amountUnit as StudyAmountUnit | undefined,
+    amountUnitLabel: task.amountUnitLabel || undefined,
+    startTime: task.startTime || undefined,
+    endTime: task.endTime || undefined,
+    priority: task.priority || 'medium',
+    tag: task.tag || undefined,
+  }), []);
+
+  const saveCurrentPlanTemplate = useCallback(() => {
+    const tasksToSave = checklistTasks.map((task) => buildTemplateDraftFromTask(task));
+    if (tasksToSave.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: '저장할 계획이 없어요',
+        description: '오늘 계획을 한 개 이상 만든 뒤 템플릿으로 저장해보세요.',
+      });
+      return;
+    }
+    const templateId = editingTemplateId || `custom-${Date.now()}`;
+    const nextTemplate: PlannerTemplateRecord = {
+      id: templateId,
+      name: templateNameDraft.trim(),
+      description: `${tasksToSave.length}개 항목 · 오늘 계획에서 저장`,
+      kind: 'custom',
+      icon: 'custom',
+      tasks: tasksToSave,
+      updatedAt: Date.now(),
+    };
+
+    setCustomTemplates((prev) => {
+      const existing = prev.some((template) => template.id === templateId);
+      if (existing) {
+        return prev.map((template) => (template.id === templateId ? nextTemplate : template));
+      }
+      return [nextTemplate, ...prev];
+    });
+    markTemplateAsRecent(templateId);
+    setTemplateNameDraft('');
+    setEditingTemplateId(null);
+    toast({
+      title: editingTemplateId ? '템플릿을 수정했어요' : '템플릿으로 저장했어요',
+      description: `${nextTemplate.name}을(를) 빠른 시작에서 다시 불러올 수 있어요.`,
+    });
+  }, [buildTemplateDraftFromTask, checklistTasks, editingTemplateId, markTemplateAsRecent, templateNameDraft, toast]);
+
+  const startEditingTemplate = useCallback((template: PlannerTemplateRecord) => {
+    setEditingTemplateId(template.id);
+    setTemplateNameDraft(template.name);
+    setIsTemplateSheetOpen(true);
+  }, []);
+
+  const deleteTemplate = useCallback((template: PlannerTemplateRecord) => {
+    setCustomTemplates((prev) => prev.filter((item) => item.id !== template.id));
+    setRecentTemplateIds((prev) => prev.filter((id) => id !== template.id));
+    if (editingTemplateId === template.id) {
+      setEditingTemplateId(null);
+      setTemplateNameDraft('');
+    }
+    toast({
+      title: '템플릿을 삭제했어요',
+      description: `${template.name}은(는) 보관함에서 제거되었습니다.`,
+    });
+  }, [editingTemplateId, toast]);
+
+  const replaceTodayPlansFromDrafts = useCallback(async (drafts: PlannerTaskDraft[], sourceLabel: string) => {
+    if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return false;
+
+    setIsSubmitting(true);
+    const itemsCollectionRef = collection(
+      firestore,
+      'centers',
+      activeMembership.id,
+      'plans',
+      user.uid,
+      'weeks',
+      weekKey,
+      'items'
+    );
+
+    try {
+      const batch = writeBatch(firestore);
+      dailyPlans?.filter((plan) => plan.category !== 'schedule').forEach((plan) => {
+        batch.delete(doc(itemsCollectionRef, plan.id));
+      });
+
+      const normalizedDrafts = assignAutoWindowsToTasks(drafts, PLAN_DEFAULT_START_TIME);
+
+      normalizedDrafts.forEach((task) => {
+        const nextRef = doc(itemsCollectionRef);
+        batch.set(nextRef, {
+          title: task.title.trim(),
+          done: false,
+          weight: task.category === 'personal' ? 0 : 1,
+          dateKey: selectedDateKey,
+          category: task.category,
+          subject: task.category === 'study' ? task.subject || 'etc' : null,
+          studyPlanMode: task.category === 'study' ? task.studyPlanMode || 'time' : null,
+          targetMinutes: task.category === 'study' ? task.targetMinutes || 0 : 0,
+          targetAmount: task.category === 'study' ? task.targetAmount || 0 : 0,
+          actualAmount: task.category === 'study' && task.studyPlanMode === 'volume' ? 0 : 0,
+          amountUnit: task.category === 'study' ? task.amountUnit || null : null,
+          amountUnitLabel: task.category === 'study' ? task.amountUnitLabel || null : null,
+          startTime: task.startTime || null,
+          endTime: task.endTime || null,
+          priority: task.priority || 'medium',
+          tag: task.tag || null,
+          studyPlanWeekId: weekKey,
+          centerId: activeMembership.id,
+          studentId: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      await batch.commit();
+      setExpandedTaskId(null);
+      setShowQuickAddCard(normalizedDrafts.length === 0);
+      toast({
+        title: '오늘 계획을 준비했어요',
+        description: sourceLabel,
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '오늘 계획을 만들지 못했어요',
+        description: typeof error?.message === 'string' ? error.message : '다시 한 번 시도해주세요.',
+      });
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [activeMembership, dailyPlans, firestore, isPast, selectedDateKey, toast, user, weekKey]);
+
+  const applyTemplateToToday = useCallback(async (template: PlannerTemplateRecord) => {
+    const applied = await replaceTodayPlansFromDrafts(template.tasks, `${template.name} 템플릿을 오늘 계획에 적용했어요.`);
+    if (applied) {
+      markTemplateAsRecent(template.id);
+      setIsTemplateSheetOpen(false);
+    }
+  }, [markTemplateAsRecent, replaceTodayPlansFromDrafts]);
+
+  const handleCopyYesterdayPlan = useCallback(async () => {
+    if (isPast || !selectedDate || !firestore || !user || !activeMembership) return;
+
+    const yesterday = addDays(selectedDate, -1);
+    const yesterdayWeekKey = format(yesterday, "yyyy-'W'II");
+    const yesterdayDateKey = format(yesterday, 'yyyy-MM-dd');
+
+    setIsSubmitting(true);
+    try {
+      const snapshot = await getDocs(
+        query(
+          collection(
+            firestore,
+            'centers',
+            activeMembership.id,
+            'plans',
+            user.uid,
+            'weeks',
+            yesterdayWeekKey,
+            'items'
+          ),
+          where('dateKey', '==', yesterdayDateKey)
+        )
+      );
+
+      const drafts = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as StudyPlanItem) }))
+        .filter((item) => item.category !== 'schedule')
+        .map((item) => buildTemplateDraftFromTask(item as WithId<StudyPlanItem>));
+
+      if (drafts.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: '어제 계획이 비어 있어요',
+          description: '복사할 계획이 없어서 오늘 계획을 바로 만들 수 없었어요.',
+        });
+        return;
+      }
+
+      await replaceTodayPlansFromDrafts(drafts, '어제 계획을 오늘 플래너로 그대로 가져왔어요.');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '어제 계획을 불러오지 못했어요',
+        description: typeof error?.message === 'string' ? error.message : '다시 시도해주세요.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [activeMembership, buildTemplateDraftFromTask, firestore, isPast, replaceTodayPlansFromDrafts, selectedDate, toast, user]);
+
+  const clearTodayPlans = useCallback(async () => {
+    if (checklistTasks.length > 0) {
+      const shouldClear = window.confirm('오늘 계획을 비우고 새로 시작할까요?');
+      if (!shouldClear) return;
+    }
+    await replaceTodayPlansFromDrafts([], '오늘 계획을 비우고 새로 시작할 준비를 했어요.');
+  }, [checklistTasks.length, replaceTodayPlansFromDrafts]);
+
+  const handleMoveUnfinishedToTomorrow = useCallback(async () => {
+    if (!firestore || !user || !activeMembership || !selectedDate) return;
+    const drafts = remainingStudyTasks
+      .map((task) => buildTemplateDraftFromTask(task as WithId<StudyPlanItem>));
+    if (drafts.length === 0) return;
+
+    const tomorrow = addDays(selectedDate, 1);
+    const tomorrowDateKey = format(tomorrow, 'yyyy-MM-dd');
+    const tomorrowWeekKey = format(tomorrow, "yyyy-'W'II");
+    const tomorrowItemsRef = collection(
+      firestore,
+      'centers',
+      activeMembership.id,
+      'plans',
+      user.uid,
+      'weeks',
+      tomorrowWeekKey,
+      'items'
+    );
+
+    setIsSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+      assignAutoWindowsToTasks(drafts, PLAN_DEFAULT_START_TIME).forEach((task) => {
+        batch.set(doc(tomorrowItemsRef), {
+          title: task.title,
+          done: false,
+          weight: 1,
+          dateKey: tomorrowDateKey,
+          category: task.category,
+          subject: task.subject || 'etc',
+          studyPlanMode: task.studyPlanMode || 'time',
+          targetMinutes: task.targetMinutes || 0,
+          targetAmount: task.targetAmount || 0,
+          actualAmount: 0,
+          amountUnit: task.amountUnit || null,
+          amountUnitLabel: task.amountUnitLabel || null,
+          startTime: task.startTime || null,
+          endTime: task.endTime || null,
+          priority: task.priority || 'medium',
+          tag: task.tag || null,
+          studyPlanWeekId: tomorrowWeekKey,
+          centerId: activeMembership.id,
+          studentId: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+      remainingStudyTasks.forEach((task) => {
+        batch.delete(doc(
+          firestore,
+          'centers',
+          activeMembership.id,
+          'plans',
+          user.uid,
+          'weeks',
+          weekKey,
+          'items',
+          task.id
+        ));
+      });
+      await batch.commit();
+      toast({
+        title: '미완료 계획을 내일로 옮겼어요',
+        description: '남은 항목을 그대로 이어서 다시 시작할 수 있어요.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '내일로 미루지 못했어요',
+        description: typeof error?.message === 'string' ? error.message : '다시 시도해주세요.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [activeMembership, buildTemplateDraftFromTask, firestore, remainingStudyTasks, selectedDate, toast, user, weekKey]);
+
+  const handleSaveUnfinishedAsTemplate = useCallback(() => {
+    if (remainingStudyTasks.length === 0) return;
+    const weekdayLabel = selectedDate ? format(selectedDate, 'EEEE', { locale: ko }) : '이번 주';
+    const nextTemplate: PlannerTemplateRecord = {
+      id: `custom-${Date.now()}`,
+      name: `${weekdayLabel} 미완료 정리`,
+      description: '남은 계획을 다시 쓰기 쉽게 템플릿으로 저장',
+      kind: 'custom',
+      icon: 'custom',
+      tasks: remainingStudyTasks.map((task) => buildTemplateDraftFromTask(task as WithId<StudyPlanItem>)),
+      updatedAt: Date.now(),
+    };
+    setCustomTemplates((prev) => [nextTemplate, ...prev]);
+    markTemplateAsRecent(nextTemplate.id);
+    toast({
+      title: '미완료 항목을 템플릿으로 저장했어요',
+      description: `${nextTemplate.name} 템플릿에서 다시 불러올 수 있어요.`,
+    });
+  }, [buildTemplateDraftFromTask, markTemplateAsRecent, remainingStudyTasks, selectedDate, toast]);
+
+  const handleDeleteUnfinished = useCallback(async () => {
+    if (!firestore || !user || !activeMembership || remainingStudyTasks.length === 0) return;
+    const shouldDelete = window.confirm('남은 항목을 오늘 계획에서 삭제할까요?');
+    if (!shouldDelete) return;
+    setIsSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+      remainingStudyTasks.forEach((task) => {
+        batch.delete(doc(
+          firestore,
+          'centers',
+          activeMembership.id,
+          'plans',
+          user.uid,
+          'weeks',
+          weekKey,
+          'items',
+          task.id
+        ));
+      });
+      await batch.commit();
+      toast({
+        title: '미완료 항목을 정리했어요',
+        description: '오늘 계획에서 남은 항목을 삭제했습니다.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '미완료 항목을 삭제하지 못했어요',
+        description: typeof error?.message === 'string' ? error.message : '다시 시도해주세요.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [activeMembership, firestore, remainingStudyTasks, toast, user, weekKey]);
+
+  const awardPlannerCompletionPoints = useCallback(async (
+    item: WithId<StudyPlanItem>,
+    nextCompletedCount: number,
+    totalTaskCount: number
+  ) => {
+    if (!progressRef || !selectedDateKey) return 0;
+
+    const existingDayStatus = (progress?.dailyPointStatus?.[selectedDateKey] || {}) as Record<string, any>;
+    const requestedRewards: number[] = [];
+    const nextDayStatus: Record<string, any> = {
+      ...existingDayStatus,
+    };
+
+    const completedTaskIds = Array.isArray(existingDayStatus.planTrackCompletedTaskIds)
+      ? existingDayStatus.planTrackCompletedTaskIds
+      : [];
+    const hourRewardTaskIds = Array.isArray(existingDayStatus.planTrackHourTaskIds)
+      ? existingDayStatus.planTrackHourTaskIds
+      : [];
+
+    if (!completedTaskIds.includes(item.id)) {
+      requestedRewards.push(3);
+      nextDayStatus.planTrackCompletedTaskIds = arrayUnion(item.id);
+    }
+
+    if ((item.targetMinutes || 0) >= 60 && !hourRewardTaskIds.includes(item.id)) {
+      requestedRewards.push(5);
+      nextDayStatus.planTrackHourTaskIds = arrayUnion(item.id);
+    }
+
+    const completionRatio = totalTaskCount > 0 ? nextCompletedCount / totalTaskCount : 0;
+
+    if (completionRatio >= 0.5 && !existingDayStatus.planTrackHalfBonus) {
+      requestedRewards.push(10);
+      nextDayStatus.planTrackHalfBonus = true;
+    }
+
+    let nextStreak = 0;
+    if (totalTaskCount > 0 && nextCompletedCount === totalTaskCount && !existingDayStatus.planTrackFullBonus) {
+      requestedRewards.push(30);
+      nextDayStatus.planTrackFullBonus = true;
+      nextDayStatus.planTrackCompleted = true;
+      nextStreak = computePlannerStreak(
+        {
+          ...(progress?.dailyPointStatus || {}),
+          [selectedDateKey]: {
+            ...existingDayStatus,
+            planTrackCompleted: true,
+          },
+        },
+        selectedDateKey
+      );
+
+      if (nextStreak >= 3 && !existingDayStatus.planTrackStreakBonus) {
+        const streakBonus = nextStreak >= 7 ? 7 : 5;
+        requestedRewards.push(streakBonus);
+        nextDayStatus.planTrackStreakBonus = true;
+        nextDayStatus.planTrackStreakDays = nextStreak;
+      }
+    }
+
+    const requestedTotal = requestedRewards.reduce((sum, reward) => sum + reward, 0);
+    const remainingAllowance = Math.max(
+      0,
+      PLAN_TRACK_DAILY_POINT_CAP - Number(existingDayStatus.dailyPointAmount || 0)
+    );
+    const awarded = Math.min(requestedTotal, remainingAllowance);
+
+    if (awarded > 0) {
+      await setDoc(progressRef, {
+        pointsBalance: increment(awarded),
+        totalPointsEarned: increment(awarded),
+        dailyPointStatus: {
+          [selectedDateKey]: {
+            ...nextDayStatus,
+            dailyPointAmount: increment(awarded),
+            planTrackPointAmount: increment(awarded),
+            updatedAt: serverTimestamp(),
+          },
+        },
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    } else if (Object.keys(nextDayStatus).length > Object.keys(existingDayStatus).length) {
+      await setDoc(progressRef, {
+        dailyPointStatus: {
+          [selectedDateKey]: {
+            ...nextDayStatus,
+            updatedAt: serverTimestamp(),
+          },
+        },
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    }
+
+    return awarded;
+  }, [progress?.dailyPointStatus, progressRef, selectedDateKey]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
     if (!firestore || !activeMembership || !user || !progressRef || !selectedDateKey) return false;
@@ -796,6 +1395,7 @@ export default function StudyPlanPage() {
     options?: {
       studyPrefill?: RecentStudyOption;
       preserveStudyComposer?: boolean;
+      taskBlueprint?: PlannerTaskDraft;
     }
   ) => {
     if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent || !weekKey || !selectedDateKey) {
@@ -816,8 +1416,9 @@ export default function StudyPlanPage() {
 
     try {
       const recentStudy = options?.studyPrefill;
+      const taskBlueprint = options?.taskBlueprint;
       const data: any = {
-        title: title.trim(),
+        title: taskBlueprint?.title?.trim() || title.trim(),
         done: false,
         weight: category === 'schedule' ? 0 : 1,
         dateKey: selectedDateKey,
@@ -825,6 +1426,10 @@ export default function StudyPlanPage() {
         studyPlanWeekId: weekKey,
         centerId: activeMembership.id,
         studentId: user.uid,
+        startTime: taskBlueprint?.startTime || null,
+        endTime: taskBlueprint?.endTime || null,
+        priority: taskBlueprint?.priority || 'medium',
+        tag: taskBlueprint?.tag || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -832,19 +1437,30 @@ export default function StudyPlanPage() {
       if (category === 'schedule' && !title.includes('등원하지 않습니다')) {
         data.title = `${title.trim()}: 09:00 ~ 10:00`;
       } else if (category === 'study') {
-        const studyMode = recentStudy?.studyModeValue || newStudyMode;
-        const studyMinutes = recentStudy?.minuteValue ?? newStudyMinutes;
-        const studyAmount = recentStudy?.amountValue ?? newStudyTargetAmount;
-        const studyAmountUnit = recentStudy?.amountUnitValue || newStudyAmountUnit;
-        const customUnitLabel = (recentStudy?.customAmountUnitValue ?? newStudyCustomAmountUnit).trim();
-        const subjectValue = recentStudy?.subjectValue || newStudySubject;
-        const shouldKeepMinutes = recentStudy ? recentStudy.enableVolumeMinutes : enableVolumeStudyMinutes;
+        const studyMode = taskBlueprint?.studyPlanMode || recentStudy?.studyModeValue || newStudyMode;
+        const studyMinutes = taskBlueprint?.targetMinutes
+          ? String(taskBlueprint.targetMinutes)
+          : (recentStudy?.minuteValue ?? newStudyMinutes);
+        const studyAmount = taskBlueprint?.targetAmount
+          ? String(taskBlueprint.targetAmount)
+          : (recentStudy?.amountValue ?? newStudyTargetAmount);
+        const studyAmountUnit = taskBlueprint?.amountUnit || recentStudy?.amountUnitValue || newStudyAmountUnit;
+        const customUnitLabel = (taskBlueprint?.amountUnitLabel ?? recentStudy?.customAmountUnitValue ?? newStudyCustomAmountUnit).trim();
+        const subjectValue = taskBlueprint?.subject || recentStudy?.subjectValue || newStudySubject;
+        const shouldKeepMinutes = taskBlueprint
+          ? Boolean(taskBlueprint.targetMinutes && studyMode === 'volume')
+          : recentStudy ? recentStudy.enableVolumeMinutes : enableVolumeStudyMinutes;
 
         data.subject = subjectValue;
         data.studyPlanMode = studyMode;
 
         if (studyMode === 'time') {
           data.targetMinutes = Number(studyMinutes) || 0;
+          if (!data.startTime && Number(studyMinutes) > 0) {
+            const nextWindow = getNextAutoWindow(studyTasks, Number(studyMinutes) || 0, PLAN_DEFAULT_START_TIME);
+            data.startTime = nextWindow.startTime;
+            data.endTime = nextWindow.endTime;
+          }
         } else {
           data.targetAmount = Number(studyAmount) || 0;
           data.actualAmount = 0;
@@ -854,6 +1470,11 @@ export default function StudyPlanPage() {
           }
           if (shouldKeepMinutes && Number(studyMinutes) > 0) {
             data.targetMinutes = Number(studyMinutes) || 0;
+            if (!data.startTime) {
+              const nextWindow = getNextAutoWindow(studyTasks, Number(studyMinutes) || 0, PLAN_DEFAULT_START_TIME);
+              data.startTime = nextWindow.startTime;
+              data.endTime = nextWindow.endTime;
+            }
           }
         }
       }
@@ -910,6 +1531,39 @@ export default function StudyPlanPage() {
         title: '최근 계획을 그대로 추가했어요.',
         description: '제목과 목표는 유지하고, 완료 상태는 새로 시작하도록 초기화했어요.',
       });
+    }
+  };
+
+  const handleQuickAddSuggestion = async (suggestionId: string) => {
+    const suggestion = PLANNER_QUICK_TASK_SUGGESTIONS.find((item) => item.id === suggestionId);
+    if (!suggestion) return;
+    const nextWindow = getNextAutoWindow(studyTasks, suggestion.targetMinutes, PLAN_DEFAULT_START_TIME);
+    const added = await handleAddTask(suggestion.title, 'study', {
+      taskBlueprint: {
+        category: 'study',
+        title: suggestion.title,
+        subject: suggestion.subject,
+        studyPlanMode: 'time',
+        targetMinutes: suggestion.targetMinutes,
+        startTime: nextWindow.startTime,
+        endTime: nextWindow.endTime,
+        priority: suggestion.priority || 'medium',
+        tag: suggestion.tag,
+      },
+    });
+    if (added) {
+      setShowQuickAddCard(false);
+      toast({
+        title: '할 일을 빠르게 추가했어요',
+        description: `${suggestion.title}을(를) 오늘 계획에 넣었습니다.`,
+      });
+    }
+  };
+
+  const handleSubmitInlineStudyTask = async () => {
+    const added = await handleAddTask(newStudyTask, 'study');
+    if (added) {
+      setShowQuickAddCard(false);
     }
   };
 
@@ -1022,35 +1676,15 @@ export default function StudyPlanPage() {
     await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
     
     if (nextState) {
-      const batch = writeBatch(firestore);
-      const achievementCount = progress?.dailyPointStatus?.[selectedDateKey]?.achievementCount || 0;
-      const existingDayStatus = (progress?.dailyPointStatus?.[selectedDateKey] || {}) as Record<string, any>;
-      const remainingStudyTasks = studyTasks.filter((task) => task.id !== item.id && !task.done);
-      const shouldAwardPlanPoints = remainingStudyTasks.length === 0 && !existingDayStatus.plan;
-      const progressUpdate: Record<string, any> = {
-        dailyPointStatus: {
-          [selectedDateKey]: {
-            ...existingDayStatus,
-          },
-        },
-        updatedAt: serverTimestamp(),
-      };
-      if (shouldAwardPlanPoints) {
-        progressUpdate.pointsBalance = increment(10);
-        progressUpdate.totalPointsEarned = increment(10);
-        progressUpdate.dailyPointStatus[selectedDateKey].dailyPointAmount = increment(10);
-        progressUpdate.dailyPointStatus[selectedDateKey].plan = true;
-      }
-      if (achievementCount < 5) {
-        progressUpdate.stats = { achievement: increment(0.1) };
-        progressUpdate.dailyPointStatus[selectedDateKey].achievementCount = increment(1);
-      }
-      batch.set(progressRef!, progressUpdate, { merge: true });
-      await batch.commit();
-      if (shouldAwardPlanPoints) {
+      const nextCompletedCount = checklistTasks.filter((task) => task.id !== item.id && task.done).length + 1;
+      const awarded = await awardPlannerCompletionPoints(item, nextCompletedCount, checklistTasks.length);
+      if (awarded > 0) {
+        pushFloatingPointBurst(`+${awarded}`);
         toast({
-          title: '오늘 학습 계획 완료',
-          description: '계획 완료 보상 +10포인트가 반영되었습니다.',
+          title: `+${awarded} 포인트`,
+          description: nextCompletedCount === checklistTasks.length
+            ? '오늘 계획을 끝까지 밀어붙였어요.'
+            : '체크와 동시에 포인트가 반영됐어요.',
         });
       }
     }
@@ -1061,9 +1695,31 @@ export default function StudyPlanPage() {
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     const safeActualAmount = Math.max(0, Math.round(nextActualAmount));
     const targetAmount = Math.max(0, item.targetAmount || 0);
+    const willBeDone = targetAmount > 0 && safeActualAmount >= targetAmount;
     await updateDoc(itemRef, {
       actualAmount: safeActualAmount,
-      done: targetAmount > 0 && safeActualAmount >= targetAmount,
+      done: willBeDone,
+      updatedAt: serverTimestamp(),
+    });
+    if (!item.done && willBeDone) {
+      const nextCompletedCount = checklistTasks.filter((task) => task.id !== item.id && task.done).length + 1;
+      const awarded = await awardPlannerCompletionPoints(item, nextCompletedCount, checklistTasks.length);
+      if (awarded > 0) {
+        pushFloatingPointBurst(`+${awarded}`);
+        toast({
+          title: `+${awarded} 포인트`,
+          description: '분량 목표를 채워서 즉시 포인트가 반영됐어요.',
+        });
+      }
+    }
+  };
+
+  const handleUpdateStudyWindow = async (item: WithId<StudyPlanItem>, startTime: string, endTime: string) => {
+    if (isPast || !firestore || !user || !activeMembership || !weekKey) return;
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    await updateDoc(itemRef, {
+      startTime,
+      endTime,
       updatedAt: serverTimestamp(),
     });
   };
@@ -1289,11 +1945,159 @@ export default function StudyPlanPage() {
     if (copied) setIsRoutineCopyDialogOpen(false);
   };
 
+  const weekdayTemplate = BUILTIN_PLANNER_TEMPLATES.find((template) => template.id === 'builtin-weekday') || BUILTIN_PLANNER_TEMPLATES[0];
+  const examTemplate = BUILTIN_PLANNER_TEMPLATES.find((template) => template.id === 'builtin-exam') || BUILTIN_PLANNER_TEMPLATES[0];
+
   if (!isStudent) {
     return <div className="flex items-center justify-center h-[400px] px-4"><Card className="max-w-md w-full rounded-[2.5rem] border-none shadow-2xl"><CardHeader className="text-center"><CardTitle className="font-black text-2xl tracking-tighter">학생 전용 페이지</CardTitle><CardDescription className="font-bold">학생 계정으로 로그인해야 학습 계획을 관리할 수 있습니다.</CardDescription></CardHeader></Card></div>;
   }
 
   if (!selectedDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
+
+  const shouldRenderLegacyPlanner = process.env.NEXT_PUBLIC_PLAN_TRACK_LEGACY === '1';
+  if (!shouldRenderLegacyPlanner) {
+    return (
+      <PlannerMainView
+        model={{
+          isMobile,
+          isPast,
+          isToday,
+          isSubmitting,
+          selectedDate,
+          setSelectedDate,
+          weekDays,
+          moveWeek,
+          weekRangeLabel,
+          checklistTasks,
+          orderedChecklistTasks,
+          completedChecklistCount,
+          completionRate,
+          todayPointGaugeLabel,
+          todayCompletionLabel,
+          todayStreakDays,
+          planTrackPointTotal,
+          rewardGradient,
+          floatingPointBursts,
+          showQuickAddCard,
+          setShowQuickAddCard,
+          expandedTaskId,
+          setExpandedTaskId,
+          studyTasks,
+          personalTasks,
+          scheduleItems,
+          remainingStudyTasks,
+          remainingPersonalTasks,
+          completedStudyCount,
+          completedPersonalCount,
+          routineCountLabel,
+          studyGoalSummaryLabel,
+          subjectOptions: SUBJECTS,
+          newStudyTask,
+          setNewStudyTask,
+          newStudySubject,
+          setNewStudySubject,
+          newStudyMode,
+          setNewStudyMode,
+          newStudyMinutes,
+          setNewStudyMinutes,
+          newStudyTargetAmount,
+          setNewStudyTargetAmount,
+          newStudyAmountUnit,
+          setNewStudyAmountUnit,
+          newStudyCustomAmountUnit,
+          setNewStudyCustomAmountUnit,
+          enableVolumeStudyMinutes,
+          setEnableVolumeStudyMinutes,
+          handleSubmitInlineStudyTask,
+          handleQuickAddSuggestion,
+          recentStudyOptions,
+          activeRecentStudyOption,
+          handlePrefillRecentStudy,
+          handleQuickAddRecentStudy,
+          resetStudyComposerPrefill,
+          isRecentStudyLoading,
+          isRecentStudySheetOpen,
+          setIsRecentStudySheetOpen,
+          isStudyPlanSheetOpen,
+          setIsStudyPlanSheetOpen,
+          isTemplateSheetOpen,
+          setIsTemplateSheetOpen,
+          customTemplates,
+          recentTemplates,
+          latestRecentTemplate,
+          templateNameDraft,
+          setTemplateNameDraft,
+          editingTemplateId,
+          setEditingTemplateId,
+          saveCurrentPlanTemplate,
+          startEditingTemplate,
+          deleteTemplate,
+          applyTemplateToToday,
+          weekdayTemplate,
+          examTemplate,
+          handleCopyYesterdayPlan,
+          clearTodayPlans,
+          handleMoveUnfinishedToTomorrow,
+          handleSaveUnfinishedAsTemplate,
+          handleDeleteUnfinished,
+          handleToggleTask,
+          handleDeleteTask,
+          handleCommitStudyActualAmount,
+          handleUpdateStudyWindow,
+          isRoutineSectionOpen,
+          setIsRoutineSectionOpen,
+          isMemoSectionOpen,
+          setIsMemoSectionOpen,
+          inTime,
+          setInTime,
+          outTime,
+          setOutTime,
+          awayStartTime,
+          setAwayStartTime,
+          awayEndTime,
+          setAwayEndTime,
+          awayReason,
+          setAwayReason,
+          isAbsentMode,
+          hasAwayPlan,
+          hasInPlan,
+          hasOutPlan,
+          handleSetAttendance,
+          newRoutineTitle,
+          setNewRoutineTitle,
+          selectedRoutineTemplateKey,
+          handleRoutineTemplateSelect,
+          newPersonalTask,
+          setNewPersonalTask,
+          handleAddTask,
+          handleUpdateScheduleRange,
+          routineCopyWeeks,
+          setRoutineCopyWeeks,
+          routineCopyDays,
+          routineCopyOptions,
+          routineCopyItemIds,
+          setRoutineCopyItemIds,
+          handleApplyRoutineToAllWeekdays,
+          isRoutineCopyDialogOpen,
+          setIsRoutineCopyDialogOpen,
+          hasCopyableRoutines,
+          taskCopyWeeks,
+          setTaskCopyWeeks,
+          taskCopyDays,
+          taskCopyOptions,
+          taskCopyItemIds,
+          setTaskCopyItemIds,
+          handleApplyTasksToAllWeekdays,
+          isTaskCopyDialogOpen,
+          setIsTaskCopyDialogOpen,
+          hasCopyableTasks,
+          toggleCopyDay,
+          toggleCopyItem,
+          autoSchedulePreview,
+        }}
+      />
+    );
+  }
 
   return (
     <div className={cn("flex flex-col w-full max-w-5xl mx-auto pb-24", isMobile ? "gap-3 px-0" : "gap-10")}>
