@@ -3580,12 +3580,12 @@ select {
   position: relative;
   overflow: hidden;
   border-radius: 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 224, 183, 0.12);
   padding: 1.25rem;
   background:
-    radial-gradient(circle at 50% 18%, rgba(255, 186, 79, 0.48), transparent 28%),
-    radial-gradient(circle at 84% 10%, rgba(255, 138, 31, 0.28), transparent 18%),
-    linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.07) 100%);
+    radial-gradient(circle at 50% 18%, rgba(255, 186, 79, 0.28), transparent 24%),
+    radial-gradient(circle at 84% 10%, rgba(255, 138, 31, 0.24), transparent 16%),
+    linear-gradient(180deg, rgba(18,43,103,0.97) 0%, rgba(11,24,58,0.98) 100%);
   box-shadow:
     0 28px 64px -38px rgba(0, 0, 0, 0.76),
     inset 0 1px 0 rgba(255,255,255,0.08);
@@ -3873,8 +3873,8 @@ select {
   flex: 0 0 auto;
   min-width: 6.5rem;
   border-radius: 1.5rem;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+  border: 1px solid rgba(255,224,183,0.12);
+  background: linear-gradient(180deg, rgba(11,24,58,0.95), rgba(20,41,95,0.82));
   padding: 0.9rem;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
 }
@@ -3919,7 +3919,7 @@ select {
 .point-track-slot--ready {
   background:
     radial-gradient(circle at top, rgba(255, 205, 133, 0.18), transparent 52%),
-    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.08));
+    linear-gradient(180deg, rgba(20,41,95,0.96), rgba(31,62,137,0.84));
 }
 
 .point-track-slot--ready .point-track-slot__box {
@@ -3951,7 +3951,7 @@ select {
 .point-track-slot--charging {
   background:
     radial-gradient(circle at top, rgba(125, 225, 255, 0.12), transparent 56%),
-    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05));
+    linear-gradient(180deg, rgba(13,28,69,0.94), rgba(25,52,117,0.78));
 }
 
 .point-track-slot--charging .point-track-slot__box {

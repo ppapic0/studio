@@ -264,7 +264,7 @@ function HeroMetricChip({
   floatingGain?: FloatingGain | null;
 }) {
   return (
-    <div className="relative min-w-0 overflow-hidden rounded-[1.35rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.2),rgba(255,255,255,0.08))] px-3 py-3 shadow-[0_18px_30px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
+    <div className="relative min-w-0 overflow-hidden rounded-[1.35rem] border border-[#FFE0B7]/14 bg-[linear-gradient(180deg,rgba(11,24,58,0.95),rgba(23,58,130,0.84))] px-3 py-3 shadow-[0_18px_30px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
       {floatingGain ? (
         <div key={floatingGain.key} className="point-track-floating-gain">
@@ -272,11 +272,11 @@ function HeroMetricChip({
         </div>
       ) : null}
       <div className="flex items-center gap-2.5">
-        <span className={cn('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/12 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
+        <span className={cn('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
           <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/60">{label}</div>
+          <div className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/72">{label}</div>
           <div className="mt-1 truncate text-[0.98rem] font-black tracking-[-0.04em] text-white sm:text-[1.2rem]">{value}</div>
         </div>
       </div>
@@ -383,14 +383,16 @@ function PodiumCard({
     <div
       className={cn(
         'flex flex-col items-center justify-end rounded-[1.55rem] border px-3 pb-4 pt-3 text-center shadow-[0_20px_42px_-28px_rgba(0,0,0,0.48)]',
-        highlight ? 'border-orange-300/45 bg-[linear-gradient(180deg,rgba(255,176,76,0.2),rgba(255,176,76,0.08))]' : 'border-white/10 bg-white/[0.05]'
+        highlight
+          ? 'border-orange-300/45 bg-[linear-gradient(180deg,rgba(255,176,76,0.2),rgba(255,176,76,0.08))]'
+          : 'border-white/10 bg-[linear-gradient(180deg,rgba(12,27,63,0.88),rgba(20,41,95,0.78))]'
       )}
     >
-      <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-orange-300/20 text-orange-100' : 'bg-white/10 text-white/80')}>
+      <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-orange-300/20 text-orange-100' : 'bg-white/10 text-white/88')}>
         {highlight ? <Crown className="h-4 w-4" /> : `#${rank}`}
       </div>
-      <div className={cn('text-sm font-black tracking-tight text-white/92', highlight && 'text-orange-100')}>{name}</div>
-      <div className={cn('mt-1 text-sm font-black', highlight ? 'text-[#FFE2B6]' : 'text-white/76')}>{value}</div>
+      <div className={cn('text-sm font-black tracking-tight text-white', highlight && 'text-orange-100')}>{name}</div>
+      <div className={cn('mt-1 text-sm font-black', highlight ? 'text-[#FFE2B6]' : 'text-white/82')}>{value}</div>
     </div>
   );
 }
@@ -862,7 +864,7 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <section className="rounded-[1.7rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.07))] px-4 py-4 shadow-[0_18px_44px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+        <section className="rounded-[1.7rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(11,24,58,0.92),rgba(23,58,130,0.84))] px-4 py-4 shadow-[0_18px_44px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Timer className="h-4 w-4 text-[#FFD089]" />
@@ -875,7 +877,7 @@ export default function GrowthPage() {
               <span className="text-sm font-black text-white/70">{formatProgressCounter(currentCycleSeconds)}</span>
             </div>
           </div>
-          <div className="rounded-full bg-white/10 p-1">
+          <div className="rounded-full bg-[#091633]/68 p-1 ring-1 ring-white/10">
             <div
               className={cn(
                 'point-track-progress-track',
@@ -890,31 +892,31 @@ export default function GrowthPage() {
               <div className="point-track-progress-node point-track-progress-node--three" />
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between text-[11px] font-black text-white/48">
+          <div className="mt-3 flex items-center justify-between text-[11px] font-black text-white/60">
             <span>0분</span>
             <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : `${formatCountdown(nextBoxSecondsLeft)} 남음`}</span>
           </div>
         </section>
 
         <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
-          <div className="rounded-[1.2rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.07))] px-3 py-3 text-center backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">오늘 획득</p>
+          <div className="rounded-[1.2rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.92),rgba(26,52,117,0.84))] px-3 py-3 text-center backdrop-blur-xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">오늘 획득</p>
             <p className="mt-2 text-base font-black text-white">+{todayPointGain}P</p>
           </div>
-          <div className="rounded-[1.2rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.07))] px-3 py-3 text-center backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">연 상자</p>
+          <div className="rounded-[1.2rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.92),rgba(26,52,117,0.84))] px-3 py-3 text-center backdrop-blur-xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">연 상자</p>
             <p className="mt-2 text-base font-black text-white">{todayOpenedCount}개</p>
           </div>
-          <div className="rounded-[1.2rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,240,221,0.18),rgba(255,255,255,0.08))] px-3 py-3 text-center backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">이번 달</p>
+          <div className="rounded-[1.2rem] border border-[#FFBE73]/24 bg-[radial-gradient(circle_at_top,rgba(255,176,76,0.2),transparent_62%),linear-gradient(180deg,rgba(18,43,103,0.96),rgba(39,73,151,0.92))] px-3 py-3 text-center backdrop-blur-xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFE1B7]">이번 달</p>
             <p className="mt-2 text-base font-black text-[#FFD089]">{formatStudyMinutesShort(monthlyMinutes)}</p>
           </div>
         </section>
 
-        <section className="rounded-[1.8rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.07))] px-4 py-4 shadow-[0_20px_52px_-34px_rgba(0,0,0,0.54)] backdrop-blur-xl">
+        <section className="rounded-[1.8rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.93),rgba(20,41,95,0.84))] px-4 py-4 shadow-[0_20px_52px_-34px_rgba(0,0,0,0.54)] backdrop-blur-xl">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/45">VAULT</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/58">VAULT</p>
               <h2 className="mt-1 text-lg font-black tracking-tight text-white">보관함</h2>
             </div>
             <div className="rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1 text-[11px] font-black text-[#FFD089]">
@@ -935,15 +937,15 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <section className="rounded-[1.8rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.07))] px-4 py-4 shadow-[0_20px_52px_-34px_rgba(0,0,0,0.54)] backdrop-blur-xl">
+        <section className="rounded-[1.8rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.93),rgba(20,41,95,0.84))] px-4 py-4 shadow-[0_20px_52px_-34px_rgba(0,0,0,0.54)] backdrop-blur-xl">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/45">LEADERBOARD</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/58">LEADERBOARD</p>
               <h2 className="mt-1 text-lg font-black tracking-tight text-white">이번 달 TOP</h2>
             </div>
             <Link
               href="/dashboard/leaderboards"
-              className="inline-flex items-center rounded-full border border-white/14 bg-white/12 px-3 py-1 text-[11px] font-black text-white/88 shadow-[0_10px_24px_-18px_rgba(0,0,0,0.55)]"
+              className="inline-flex items-center rounded-full border border-[#FFBE73]/28 bg-orange-300/12 px-3 py-1 text-[11px] font-black text-[#FFE1B7] shadow-[0_10px_24px_-18px_rgba(0,0,0,0.55)]"
             >
               더 보기
             </Link>
@@ -969,14 +971,14 @@ export default function GrowthPage() {
             )}
           </div>
 
-          <div className="mt-4 rounded-[1.55rem] border border-orange-300/15 bg-[linear-gradient(180deg,rgba(255,176,76,0.12),rgba(255,255,255,0.04))] px-4 py-4 shadow-[0_16px_34px_-26px_rgba(255,138,31,0.38)]">
+          <div className="mt-4 rounded-[1.55rem] border border-orange-300/18 bg-[radial-gradient(circle_at_top,rgba(255,176,76,0.16),transparent_62%),linear-gradient(180deg,rgba(18,43,103,0.96),rgba(34,62,132,0.88))] px-4 py-4 shadow-[0_16px_34px_-26px_rgba(255,138,31,0.38)]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">MY RANK</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">MY RANK</p>
                 <p className="mt-1 text-[1.45rem] font-black tracking-tight text-white">{myRankLabel}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">MONTH</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">MONTH</p>
                 <p className="mt-1 text-sm font-black text-[#FFD089]">{formatRankTime(monthlyMinutes)}</p>
               </div>
             </div>
@@ -984,27 +986,27 @@ export default function GrowthPage() {
         </section>
 
         <section className="grid grid-cols-2 gap-3">
-          <div className="rounded-[1.5rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.07))] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/48">이번 주</p>
+          <div className="rounded-[1.5rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.92),rgba(20,41,95,0.8))] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">이번 주</p>
             <p className="mt-2 text-[1.2rem] font-black tracking-tight text-white">{formatStudyMinutes(weeklyMinutes)}</p>
           </div>
-          <div className="rounded-[1.5rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.07))] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/48">오늘 총합</p>
+          <div className="rounded-[1.5rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.92),rgba(20,41,95,0.8))] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">오늘 총합</p>
             <p className="mt-2 text-[1.2rem] font-black tracking-tight text-white">{formatStudyMinutes(liveTodayMinutes)}</p>
           </div>
         </section>
 
         <Link
           href="/dashboard/appointments/inquiries"
-          className="rounded-[1.8rem] border border-orange-200/14 bg-[linear-gradient(180deg,rgba(255,240,220,0.12),rgba(255,255,255,0.06))] px-4 py-4 shadow-[0_20px_48px_-34px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          className="rounded-[1.8rem] border border-[#FFE1B7]/50 bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] px-4 py-4 shadow-[0_20px_48px_-34px_rgba(0,0,0,0.28)] backdrop-blur-xl"
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/48">REWARD SHOP</p>
-              <p className="mt-2 text-base font-black tracking-tight text-white">갖고 싶은 선물 문의</p>
-              <p className="mt-1 text-xs font-bold text-white/62">카카오톡 선물하기로 받을 수 있는 선물을 문의해보세요.</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#173A82]/55">REWARD SHOP</p>
+              <p className="mt-2 text-base font-black tracking-tight text-[#14295F]">갖고 싶은 선물 문의</p>
+              <p className="mt-1 text-xs font-bold text-[#173A82]/78">카카오톡 선물하기로 받을 수 있는 선물을 문의해보세요.</p>
             </div>
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-300/20 text-orange-100 shadow-[0_12px_24px_-16px_rgba(255,138,31,0.55)]">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(180deg,#ffcb82_0%,#ff9b2b_100%)] text-[#173A82] shadow-[0_12px_24px_-16px_rgba(255,138,31,0.55)]">
               <ChevronRight className="h-5 w-5" />
             </div>
           </div>
