@@ -51,7 +51,7 @@ import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
-import { addDays, subDays, format, isSameDay, parse, isAfter } from 'date-fns';
+import { addDays, subDays, format, isSameDay, parse, isAfter, eachDayOfInterval, startOfWeek } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -129,6 +129,8 @@ const PENALTY_SOURCE_LABEL: Record<PenaltyLog['source'], string> = {
   reset: '초기화',
   routine_missing: '루틴 미실행',
 };
+
+type RankRange = 'daily' | 'weekly' | 'monthly';
 
 type ExamCountdownSetting = {
   id: string;
@@ -940,6 +942,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
   const [fortuneMessage, setFortuneMessage] = useState<string | null>(null);
   const [isFortuneDialogOpen, setIsFortuneDialogOpen] = useState(false);
+  const [selectedRankRange, setSelectedRankRange] = useState<RankRange>('daily');
+  const [weeklyRankRows, setWeeklyRankRows] = useState<Array<{ studentId: string; totalStudyMinutes: number }>>([]);
+  const [weeklyRankLoading, setWeeklyRankLoading] = useState(false);
   const studyBoxClaimKeyRef = useRef<string | null>(null);
 
   useEffect(() => { setToday(new Date()); }, []);
@@ -949,6 +954,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const tomorrowKey = today ? format(addDays(today, 1), 'yyyy-MM-dd') : '';
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
   const periodKey = today ? format(today, 'yyyy-MM') : '';
+  const weekDateKeys = useMemo(
+    () => (today
+      ? eachDayOfInterval({ start: startOfWeek(today, { weekStartsOn: 1 }), end: today }).map((date) => format(date, 'yyyy-MM-dd'))
+      : []),
+    [today]
+  );
 
   // 1. 성장 및 통계 데이터 조회
   const progressRef = useMemoFirebase(() => {
@@ -1084,6 +1095,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, activeMembership?.id]);
   const { data: activeStudentMembers, isLoading: activeMembersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
+  const memberProfileMap = useMemo(() => {
+    const map = new Map<string, { displayName: string; className: string | null }>();
+    (activeStudentMembers || []).forEach((member) => {
+      map.set(member.id, {
+        displayName: member.displayName || '학생',
+        className: member.className || null,
+      });
+    });
+    return map;
+  }, [activeStudentMembers]);
 
   const attendanceCurrentQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
@@ -1109,6 +1130,54 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const timeoutId = window.setTimeout(prefetchRoutes, 800);
     return () => window.clearTimeout(timeoutId);
   }, [isActive, router]);
+
+  useEffect(() => {
+    if (!firestore || !activeMembership || !isActive || weekDateKeys.length === 0) {
+      setWeeklyRankRows([]);
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      setWeeklyRankLoading(true);
+      try {
+        const snapshots = await Promise.all(
+          weekDateKeys.map((dateKey) =>
+            getDocs(collection(firestore, 'centers', activeMembership.id, 'dailyStudentStats', dateKey, 'students'))
+          )
+        );
+
+        const totals = new Map<string, number>();
+        snapshots.forEach((snapshot) => {
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as DailyStudentStat;
+            const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
+            const minutes = Number(data.totalStudyMinutes || 0);
+            if (!studentId || minutes <= 0) return;
+            totals.set(studentId, (totals.get(studentId) || 0) + minutes);
+          });
+        });
+
+        if (!cancelled) {
+          setWeeklyRankRows(
+            Array.from(totals.entries()).map(([studentId, totalStudyMinutes]) => ({ studentId, totalStudyMinutes }))
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('[student-dashboard] weekly rank load failed', error);
+          setWeeklyRankRows([]);
+        }
+      } finally {
+        if (!cancelled) setWeeklyRankLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [firestore, activeMembership?.id, isActive, weekDateKeys]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -1978,6 +2047,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       .sort((a, b) => Number(b.totalStudyMinutes || 0) - Number(a.totalStudyMinutes || 0));
   }, [activeStudentIds, dailyRankEntriesRaw]);
 
+  const validWeeklyRankEntries = useMemo(() => {
+    return [...weeklyRankRows]
+      .filter((entry) => !isSyntheticStudentId(entry.studentId))
+      .filter((entry) => !activeStudentIds || activeStudentIds.has(entry.studentId))
+      .sort((a, b) => Number(b.totalStudyMinutes || 0) - Number(a.totalStudyMinutes || 0));
+  }, [activeStudentIds, weeklyRankRows]);
+
   const dailyStudyRank = useMemo(() => {
     if (!user || validDailyRankEntries.length === 0) return 0;
     const ownIndex = validDailyRankEntries.findIndex((entry) => entry.studentId === user.uid);
@@ -1991,6 +2067,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
     return Number(todayStudyLog?.totalMinutes || 0);
   }, [dailyStudyRank, todayStudyLog?.totalMinutes, user?.uid, validDailyRankEntries]);
+
+  const weeklyStudyRank = useMemo(() => {
+    if (!user || validWeeklyRankEntries.length === 0) return 0;
+    const ownIndex = validWeeklyRankEntries.findIndex((entry) => entry.studentId === user.uid);
+    return ownIndex >= 0 ? ownIndex + 1 : 0;
+  }, [user?.uid, validWeeklyRankEntries]);
+
+  const weeklyStudyRankMinutes = useMemo(() => {
+    if (weeklyStudyRank > 0) {
+      const ownEntry = validWeeklyRankEntries.find((entry) => entry.studentId === user?.uid);
+      return Number(ownEntry?.totalStudyMinutes || 0);
+    }
+    return Number(weeklyStudyMinutes || 0);
+  }, [weeklyStudyMinutes, weeklyStudyRank, user?.uid, validWeeklyRankEntries]);
 
   const monthlyStudyRank = useMemo(() => {
     const snapshotRank = leaderboardEntry?.rank || 0;
@@ -2013,6 +2103,86 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const safeRank = Math.min(monthlyStudyRank, studyRankParticipantCount);
     return Math.max(1, Math.ceil((safeRank / studyRankParticipantCount) * 100));
   }, [isRankContextLoading, monthlyStudyRank, studyRankParticipantCount]);
+
+  const monthlyStudyRankMinutes = useMemo(() => {
+    const ownEntry = validRankEntries.find((entry) => entry.studentId === user?.uid);
+    if (ownEntry) return Number(ownEntry.value || 0);
+    return Number(leaderboardEntry?.value || 0);
+  }, [leaderboardEntry?.value, user?.uid, validRankEntries]);
+
+  const homeRankMap = useMemo(() => {
+    const dailyTop = validDailyRankEntries.slice(0, 3).map((entry, index) => ({
+      rank: index + 1,
+      name: memberProfileMap.get(entry.studentId)?.displayName || '학생',
+      minutes: Number(entry.totalStudyMinutes || 0),
+    }));
+    const weeklyTop = validWeeklyRankEntries.slice(0, 3).map((entry, index) => ({
+      rank: index + 1,
+      name: memberProfileMap.get(entry.studentId)?.displayName || '학생',
+      minutes: Number(entry.totalStudyMinutes || 0),
+    }));
+    const monthlyTop = [...validRankEntries]
+      .sort((a, b) => Number(b.value || 0) - Number(a.value || 0))
+      .slice(0, 3)
+      .map((entry, index) => ({
+        rank: index + 1,
+        name: entry.displayNameSnapshot || memberProfileMap.get(entry.studentId)?.displayName || '학생',
+        minutes: Number(entry.value || 0),
+      }));
+
+    return {
+      daily: {
+        title: '일간 랭킹',
+        rank: dailyStudyRank,
+        minutes: dailyStudyRankMinutes,
+        badge: dailyRankLoading ? '집계 중' : dailyStudyRank > 0 ? `오늘 ${dailyStudyRank}위` : '집계 준비중',
+        caption: dailyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, dailyStudyRankMinutes))} 누적` : '오늘 기록이 쌓이면 바로 보여요',
+        preview: dailyTop,
+        isLoading: dailyRankLoading,
+      },
+      weekly: {
+        title: '주간 랭킹',
+        rank: weeklyStudyRank,
+        minutes: weeklyStudyRankMinutes,
+        badge: weeklyRankLoading ? '집계 중' : weeklyStudyRank > 0 ? `이번 주 ${weeklyStudyRank}위` : '집계 준비중',
+        caption: weeklyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, weeklyStudyRankMinutes))} 누적` : '이번 주 기록이 쌓이면 보여요',
+        preview: weeklyTop,
+        isLoading: weeklyRankLoading,
+      },
+      monthly: {
+        title: '월간 랭킹',
+        rank: monthlyStudyRank,
+        minutes: monthlyStudyRankMinutes,
+        badge: isRankContextLoading ? '집계 중' : monthlyStudyRank > 0 ? `이번 달 ${monthlyStudyRank}위` : '집계 준비중',
+        caption: monthlyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, monthlyStudyRankMinutes))} 누적` : '이번 달 공부시간이 쌓이면 순위가 보여요',
+        preview: monthlyTop,
+        isLoading: isRankContextLoading,
+      },
+    } satisfies Record<RankRange, {
+      title: string;
+      rank: number;
+      minutes: number;
+      badge: string;
+      caption: string;
+      preview: Array<{ rank: number; name: string; minutes: number }>;
+      isLoading: boolean;
+    }>;
+  }, [
+    dailyRankLoading,
+    dailyStudyRank,
+    dailyStudyRankMinutes,
+    isRankContextLoading,
+    memberProfileMap,
+    monthlyStudyRank,
+    monthlyStudyRankMinutes,
+    validDailyRankEntries,
+    validRankEntries,
+    validWeeklyRankEntries,
+    weeklyRankLoading,
+    weeklyStudyRank,
+    weeklyStudyRankMinutes,
+  ]);
+  const selectedHomeRank = homeRankMap[selectedRankRange];
   useEffect(() => {
     if (!isActive || isTimerActive || !progressRef || !todayKey || !todayStudyLog) return;
 
@@ -2232,37 +2402,92 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
 
         <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-1" : "col-span-5 grid-cols-1")}>
-          <Link href="/dashboard/leaderboards?range=daily" className="block touch-manipulation">
-            <Card className="h-full overflow-hidden rounded-[1.5rem] border border-[#274A9B] bg-[linear-gradient(180deg,#173A82_0%,#234A99_100%)] shadow-[0_24px_54px_-34px_rgba(23,58,130,0.52)] transition-transform duration-200 hover:-translate-y-0.5">
-              <CardContent className={cn("p-4", !isMobile && "p-5")}>
-                <div className="flex items-center justify-between">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => router.push(`/dashboard/leaderboards?range=${selectedRankRange}`)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                router.push(`/dashboard/leaderboards?range=${selectedRankRange}`);
+              }
+            }}
+            className="h-full cursor-pointer overflow-hidden rounded-[1.5rem] border border-[#274A9B] bg-[linear-gradient(180deg,#173A82_0%,#234A99_100%)] shadow-[0_24px_54px_-34px_rgba(23,58,130,0.52)] transition-transform duration-200 hover:-translate-y-0.5"
+          >
+            <CardContent className={cn("p-4", !isMobile && "p-5")}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/14 text-[#FFD9B4] ring-1 ring-white/12">
                       <Trophy className="h-3.5 w-3.5" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#D9E1F2]">일간 랭킹</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#D9E1F2]">{selectedHomeRank.title}</span>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-white/50" />
-                </div>
-                <div className="mt-3 min-w-0">
-                  <p className={cn("font-black tracking-tight text-white break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
-                    {dailyRankLoading ? '집계 중...' : dailyStudyRank > 0 ? `오늘 ${dailyStudyRank}위` : '집계 준비중'}
-                  </p>
-                  <p className="mt-1 text-[11px] font-semibold leading-5 text-white/72 break-keep">
-                    {dailyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, dailyStudyRankMinutes))} 누적` : '오늘 공부시간이 쌓이면 순위가 보여요'}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]">
-                      현재 {dailyStudyRank > 0 ? `${dailyStudyRank}위` : '집계중'}
-                    </span>
-                    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-[#D9E1F2] ring-1 ring-white/10">
-                      오늘 공부시간
-                    </span>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {(['daily', 'weekly', 'monthly'] as RankRange[]).map((range) => (
+                      <button
+                        key={range}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedRankRange(range);
+                        }}
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-[10px] font-black transition-all",
+                          selectedRankRange === range
+                            ? "bg-[#FF7A16] text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]"
+                            : "bg-white/10 text-[#D9E1F2] ring-1 ring-white/10"
+                        )}
+                      >
+                        {range === 'daily' ? '일간' : range === 'weekly' ? '주간' : '월간'}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-white/50" />
+              </div>
+
+              <div className="mt-4 min-w-0">
+                <p className={cn("font-black tracking-tight text-white break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
+                  {selectedHomeRank.isLoading ? '집계 중...' : selectedHomeRank.rank > 0 ? `${selectedHomeRank.rank}위` : '집계 준비중'}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold leading-5 text-white/72 break-keep">
+                  {selectedHomeRank.caption}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]">
+                    {selectedHomeRank.badge}
+                  </span>
+                  <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-[#D9E1F2] ring-1 ring-white/10">
+                    {selectedRankRange === 'daily' ? '오늘 공부시간' : selectedRankRange === 'weekly' ? '이번 주 누적' : '이번 달 누적'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-[1.2rem] border border-white/10 bg-white/[0.08] px-3 py-3">
+                <div className="space-y-2">
+                  {selectedHomeRank.preview.length > 0 ? (
+                    selectedHomeRank.preview.map((entry) => (
+                      <div key={`${selectedRankRange}-${entry.rank}-${entry.name}`} className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className={cn(
+                            "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black",
+                            entry.rank === 1 ? "bg-[#FFB357]/20 text-[#FFD9B4]" : "bg-white/10 text-white/75"
+                          )}>
+                            {entry.rank}
+                          </span>
+                          <span className="truncate text-sm font-black text-white/92">{entry.name}</span>
+                        </div>
+                        <span className="shrink-0 text-[11px] font-black text-[#FFD089]">{formatMinutesMini(entry.minutes)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-[11px] font-semibold text-white/58">아직 집계된 순위가 없어요.</div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
