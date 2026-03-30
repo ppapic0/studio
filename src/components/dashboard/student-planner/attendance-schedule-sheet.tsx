@@ -291,7 +291,7 @@ export function AttendanceScheduleSheet({
           </div>
 
           <Tabs defaultValue="today" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3 rounded-2xl bg-slate-100 p-1">
+            <TabsList className={cn('grid w-full rounded-2xl bg-slate-100 p-1', isMobile ? 'grid-cols-1 gap-1' : 'grid-cols-3')}>
               <TabsTrigger value="today" className="rounded-xl text-[11px] font-black">특정 날짜</TabsTrigger>
               <TabsTrigger value="weekday" className="rounded-xl text-[11px] font-black">매주 반복</TabsTrigger>
               <TabsTrigger value="saved" className="rounded-xl text-[11px] font-black">저장한 루틴</TabsTrigger>
@@ -403,7 +403,7 @@ export function AttendanceScheduleSheet({
                   </Badge>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 rounded-[1.1rem] border border-amber-100 bg-white/92 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                <div className={cn('mt-4 rounded-[1.1rem] border border-amber-100 bg-white/92 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]', isMobile ? 'flex flex-col items-stretch gap-2' : 'flex items-center gap-2')}>
                   <Input
                     placeholder="예: 병원, 상담, 준비물 챙기기"
                     value={personalTaskDraft}
@@ -416,7 +416,7 @@ export function AttendanceScheduleSheet({
                     type="button"
                     onClick={onAddPersonalTask}
                     disabled={isSubmitting || !personalTaskDraft.trim()}
-                    className="h-10 rounded-xl bg-amber-500 px-4 text-xs font-black text-white hover:bg-amber-600"
+                    className={cn('h-10 rounded-xl bg-amber-500 px-4 text-xs font-black text-white hover:bg-amber-600', isMobile && 'w-full')}
                   >
                     <Plus className="mr-1.5 h-3.5 w-3.5" />
                     추가

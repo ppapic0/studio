@@ -43,19 +43,19 @@ export function RoutineComposerCard({
 }: RoutineComposerCardProps) {
   return (
     <Card className={cn(
-      "overflow-hidden border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_100%)] ring-1 ring-black/[0.04] shadow-[0_18px_44px_-34px_rgba(20,41,95,0.35)]",
+      "overflow-hidden border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,255,0.96)_55%,rgba(255,247,236,0.92)_100%)] ring-1 ring-[#173A82]/8 shadow-[0_18px_44px_-34px_rgba(20,41,95,0.35)]",
       compact ? "rounded-[1.35rem]" : "rounded-[1.85rem]"
     )}>
       <CardHeader className={cn(compact ? "p-4 pb-3" : isMobile ? "p-5 pb-4" : "p-6 pb-4")}>
         <div className="flex items-center gap-2">
-          <div className={cn("rounded-2xl bg-primary/8 text-primary", compact ? "p-2" : "p-2.5")}>
+          <div className={cn("rounded-2xl bg-[#FFF7EC] text-[#FF7A16]", compact ? "p-2" : "p-2.5")}>
             <Sparkles className={compact ? "h-4 w-4" : "h-4 w-4"} />
           </div>
           <div className="min-w-0">
-            <CardTitle className={cn("font-black tracking-tight text-primary break-keep", compact ? "text-sm" : isMobile ? "text-base leading-6" : "text-lg")}>
+            <CardTitle className={cn("font-black tracking-tight text-[#173A82] break-keep", compact ? "text-sm" : isMobile ? "text-base leading-6" : "text-lg")}>
               {title}
             </CardTitle>
-            <CardDescription className={cn("break-keep text-slate-500", compact ? "mt-0.5 text-[10px] leading-4" : isMobile ? "mt-0.5 text-[11px] leading-5" : "mt-0.5 text-[11px] leading-5")}>
+            <CardDescription className={cn("break-keep text-[#173A82]/58", compact ? "mt-0.5 text-[10px] leading-4" : isMobile ? "mt-0.5 text-[11px] leading-5" : "mt-0.5 text-[11px] leading-5")}>
               {description}
             </CardDescription>
           </div>
@@ -93,7 +93,7 @@ export function RoutineComposerCard({
             onClick={onSubmit}
             disabled={disabled || isSubmitting || !value.trim()}
             className={cn(
-              "shrink-0 rounded-xl bg-primary font-black text-white shadow-[0_14px_26px_-18px_rgba(20,41,95,0.55)] hover:bg-primary/90",
+              "shrink-0 rounded-xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_58%,#FF7A16_160%)] font-black text-white shadow-[0_14px_26px_-18px_rgba(20,41,95,0.55)] hover:brightness-105",
               compact ? "h-9 px-3 text-[11px]" : isMobile ? "h-10 w-full px-4 text-xs" : "h-10 px-4 text-sm"
             )}
           >

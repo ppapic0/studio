@@ -164,7 +164,8 @@ export function ScheduleItemCard({
 
   const TimePicker = ({ type, h, m, p }: { type: 's' | 'e'; h: string; m: string; p: '오전' | '오후' }) => (
     <div className={cn(
-      "flex items-center rounded-xl border border-slate-200 bg-slate-50/90 p-0.5",
+      "flex items-center rounded-xl border border-[#D9E1F2] bg-[#F7FAFF] p-0.5",
+      isMobile && "w-full justify-start",
       (disabled || isPast) && "pointer-events-none opacity-60"
     )}>
       <Select value={p} onValueChange={(value) => handleValueChange(type, 'p', value)} disabled={disabled || isPast}>
@@ -204,15 +205,15 @@ export function ScheduleItemCard({
     )}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <div className={cn("flex shrink-0 items-center justify-center rounded-xl bg-primary/7 text-primary", isMobile ? "p-2" : "p-2.5")}>
+          <div className={cn("flex shrink-0 items-center justify-center rounded-xl bg-[#FFF7EC] text-[#FF7A16]", isMobile ? "p-2" : "p-2.5")}>
             <Icon className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </div>
           <div className="min-w-0">
-            <Label className={cn("block truncate font-black tracking-tight text-slate-900", isMobile ? "text-sm" : "text-sm")}>
+            <Label className={cn("block truncate font-black tracking-tight text-[#173A82]", isMobile ? "text-sm" : "text-sm")}>
               {titlePart}
             </Label>
             {isToday ? (
-              <p className="mt-0.5 text-[10px] font-bold text-amber-600">오늘 수정 시 벌점 규칙 적용</p>
+              <p className="mt-0.5 text-[10px] font-bold text-[#FF7A16]">오늘 수정 시 벌점 규칙 적용</p>
             ) : null}
           </div>
         </div>
@@ -231,9 +232,9 @@ export function ScheduleItemCard({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'flex-col sm:flex-row sm:items-center sm:justify-between')}>
         <TimePicker type="s" h={sHour} m={sMin} p={sPer} />
-        <span className="mx-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">to</span>
+        <span className="mx-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-[#173A82]/26">to</span>
         <TimePicker type="e" h={eHour} m={eMin} p={ePer} />
       </div>
 

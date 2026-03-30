@@ -99,11 +99,11 @@ export function StudyComposerCard({
   submitLabel = '계획 추가',
 }: StudyComposerCardProps) {
   const isVolumeMode = studyModeValue === 'volume';
-  const visibleRecentOptions = recentOptions.slice(0, isMobile ? 3 : 5);
+  const visibleRecentOptions = recentOptions.slice(0, isMobile ? 2 : 5);
 
   return (
     <Card className={cn(
-      "overflow-hidden border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(244,253,248,0.96)_100%)] ring-1 ring-emerald-100/80 shadow-[0_18px_44px_-34px_rgba(16,185,129,0.28)]",
+      "overflow-hidden border-none bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(244,253,248,0.96)_62%,rgba(255,247,236,0.94)_100%)] ring-1 ring-emerald-100/80 shadow-[0_18px_44px_-34px_rgba(16,185,129,0.28)]",
       compact ? "rounded-[1.35rem]" : "rounded-[1.85rem]"
     )}>
       <CardHeader className={cn(compact ? "p-4 pb-3" : isMobile ? "p-5 pb-4" : "p-6 pb-4")}>
@@ -131,8 +131,8 @@ export function StudyComposerCard({
                     <History className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black tracking-tight text-slate-900">최근 불러오기</p>
-                    <p className="mt-0.5 break-keep text-[10px] font-semibold leading-4 text-slate-500">
+                    <p className="text-[11px] font-black tracking-tight text-[#173A82]">최근 불러오기</p>
+                    <p className="mt-0.5 break-keep text-[10px] font-semibold leading-4 text-[#173A82]/55">
                       전에 쓰던 계획을 불러와서 말만 조금 바꿔도 돼요.
                     </p>
                   </div>
@@ -150,7 +150,7 @@ export function StudyComposerCard({
                 </Button>
               ) : null}
             </div>
-            <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
+            <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
               {isRecentLoading ? (
                 <div className="flex h-[6.5rem] min-w-full items-center justify-center rounded-[1.15rem] border border-dashed border-slate-200 bg-white/80">
                   <span className="text-[11px] font-semibold text-slate-400">최근 계획을 불러오는 중이에요.</span>
@@ -162,7 +162,10 @@ export function StudyComposerCard({
                   type="button"
                   disabled={disabled || isSubmitting}
                   onClick={() => onPrefillRecent?.(option)}
-                  className="min-w-[11rem] shrink-0 rounded-[1.15rem] border border-slate-200 bg-white/94 p-3 text-left shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50/45"
+                  className={cn(
+                    'shrink-0 rounded-[1.15rem] border border-slate-200 bg-white/94 p-3 text-left shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50/45 snap-start',
+                    isMobile ? 'min-w-[9.25rem]' : 'min-w-[11rem]'
+                  )}
                 >
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">
@@ -232,7 +235,7 @@ export function StudyComposerCard({
           })}
         </div>
 
-        <div className={cn("grid gap-2", isVolumeMode ? "grid-cols-1" : compact ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_7.2rem]")}>
+        <div className={cn("grid gap-2", isVolumeMode ? "grid-cols-1" : isMobile ? "grid-cols-1" : compact ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_7.2rem]")}>
           <Select value={subjectValue} onValueChange={onSubjectChange} disabled={disabled || isSubmitting}>
             <SelectTrigger className={cn("rounded-xl border-slate-200 bg-white/92 font-black shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}>
               <SelectValue />
@@ -283,7 +286,7 @@ export function StudyComposerCard({
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-2">
+            <div className={cn('grid gap-2', isMobile ? 'grid-cols-[minmax(0,0.92fr)_minmax(0,0.78fr)]' : 'grid-cols-[minmax(0,1fr)_8rem]')}>
               <Input
                 type="number"
                 min={1}
@@ -317,7 +320,7 @@ export function StudyComposerCard({
               />
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-2 rounded-[1.15rem] border border-emerald-100 bg-white/92 p-2">
+            <div className={cn('rounded-[1.15rem] border border-emerald-100 bg-white/92 p-2', isMobile ? 'flex flex-col items-start gap-2' : 'flex flex-wrap items-center gap-2')}>
               <Button
                 type="button"
                 variant="outline"
@@ -352,8 +355,9 @@ export function StudyComposerCard({
         )}
 
         <div className={cn(
-          "flex items-center gap-2 rounded-[1.15rem] border border-emerald-100 bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]",
-          compact ? "p-1.5" : "p-2"
+          "rounded-[1.15rem] border border-emerald-100 bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]",
+          compact ? "p-1.5" : "p-2",
+          isMobile ? 'flex flex-col items-stretch gap-2' : 'flex items-center gap-2'
         )}>
           <Input
             value={taskValue}
@@ -376,7 +380,7 @@ export function StudyComposerCard({
             }
             className={cn(
               "rounded-xl bg-emerald-500 font-black text-white shadow-[0_14px_26px_-18px_rgba(16,185,129,0.55)] hover:bg-emerald-600",
-              compact ? "h-9 px-3 text-[11px]" : isMobile ? "h-10 px-4 text-xs" : "h-10 px-4 text-sm"
+              compact ? "h-9 px-3 text-[11px]" : isMobile ? "h-10 w-full px-4 text-xs" : "h-10 px-4 text-sm"
             )}
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : submitLabel}
