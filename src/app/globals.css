@@ -1379,17 +1379,18 @@ select {
 
 .student-night-main {
   background: transparent;
-  color: var(--student-night-text);
+  color: #17326b;
 }
 
 .student-night-page {
   min-height: 100%;
-  color: var(--student-night-text);
+  color: #17326b;
 }
 
 .student-night-panel {
   border: 1px solid var(--student-night-border);
   background: linear-gradient(180deg, rgba(22, 40, 79, 0.96) 0%, rgba(12, 27, 63, 0.92) 100%);
+  color: var(--student-night-text);
   box-shadow:
     0 20px 48px -34px rgba(0, 0, 0, 0.62),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -1401,6 +1402,7 @@ select {
   background:
     radial-gradient(circle at top, rgba(255, 165, 60, 0.12), transparent 48%),
     linear-gradient(180deg, rgba(29, 53, 101, 0.96) 0%, rgba(18, 34, 70, 0.92) 100%);
+  color: var(--student-night-text);
   box-shadow:
     0 22px 52px -36px rgba(0, 0, 0, 0.68),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
