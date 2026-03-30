@@ -967,7 +967,7 @@ export default function AnalysisTrackPage() {
                       <div className="grid gap-3 md:grid-cols-3">
                         <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-white/74">{minutesToLabel(bestDay.totalMinutes)}</p></div>
                         <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">위험 구간</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백일 존재' : '안정 흐름'}</p><p className="mt-1 text-sm font-semibold text-white/74">{insight.improve}</p></div>
-                        <div className="rounded-[1.2rem] border border-[#FFB347]/18 bg-[#FF9626]/10 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD79F]">추천 전략</p><p className="mt-2 text-lg font-black text-white">오전 루틴 강화</p><p className="mt-1 text-sm font-semibold text-white/82">계획트랙으로 연결</p></div>
+                        <div className="rounded-[1.2rem] border border-[#FFD7B4] bg-[#FFF1DE] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 전략</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 루틴 강화</p><p className="mt-1 text-sm font-semibold text-[#28478F]">계획트랙으로 연결</p></div>
                       </div>
                     )}
                     <Button type="button" onClick={() => handleApplyStrategy('집중 시간 추이 적용', 10)} className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-5 font-black text-white">이 전략 적용하기</Button>
@@ -991,12 +991,12 @@ export default function AnalysisTrackPage() {
                       <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} />
                     </div>
                     {isMobile ? (
-                      <div className="rounded-[1.2rem] border border-emerald-400/18 bg-emerald-500/10 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200">추천 액션</p><p className="mt-2 text-lg font-black text-white">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-white/82">3일 연속 도전</p></div>
+                      <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
                     ) : (
                       <div className="grid gap-3 md:grid-cols-3">
                         <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">연속 유지</p><p className="mt-2 text-lg font-black text-white">{kpi.maxStreak}일</p><p className="mt-1 text-sm font-semibold text-white/74">루틴 최고 기록</p></div>
                         <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">코치 해석</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구 필요' : '리듬 안정화'}</p><p className="mt-1 text-sm font-semibold text-white/74">{insight.improve}</p></div>
-                        <div className="rounded-[1.2rem] border border-emerald-400/18 bg-emerald-500/10 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200">추천 액션</p><p className="mt-2 text-lg font-black text-white">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-white/82">3일 연속 도전</p></div>
+                        <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
                       </div>
                     )}
                     <Button type="button" onClick={() => handleApplyStrategy('리듬 패턴 전략 적용', 20)} className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-5 font-black text-white">리듬 복구 전략 적용</Button>

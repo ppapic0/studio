@@ -925,7 +925,7 @@ function StudySessionHistoryDialog({
           <button
             type="button"
             className={cn(
-              "student-cta inline-flex items-center justify-center gap-2 rounded-full border border-white/18 bg-white/12 font-black text-white backdrop-blur-sm",
+              "student-cta inline-flex items-center justify-center gap-2 rounded-full border border-[#D8E3F7] bg-[#F3F6FB] font-black text-[#17326B] backdrop-blur-sm",
               isMobile ? "h-9 px-3 text-[11px] shadow-[0_14px_30px_-22px_rgba(15,23,42,0.5)]" : "h-10 px-4 text-xs"
             )}
           >

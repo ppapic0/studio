@@ -877,7 +877,7 @@ export default function StudyHistoryPage() {
                     "px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-none",
                     isMobile
                       ? "border border-[#FFD6A3]/35 bg-[#FFF3E0] text-[#173A82]"
-                      : "border border-white/18 bg-white/12 text-white"
+                      : "border border-[#D8E3F7] bg-[#F3F6FB] text-[#17326B]"
                   )}
                 >
                   기록 요약
@@ -886,8 +886,8 @@ export default function StudyHistoryPage() {
                   className={cn(
                     "px-3 py-1 text-[10px] font-black shadow-none",
                     isMobile
-                      ? "border border-[#FFB357]/30 bg-[#FFB357]/14 text-[#FFE0B3]"
-                      : "border border-orange-200/18 bg-orange-200/12 text-[#FFE0B3]"
+                      ? "border border-[#FFB357]/30 bg-[#FFF1DE] text-[#C86A10]"
+                      : "border border-[#FFD7B4] bg-[#FFF1DE] text-[#C86A10]"
                   )}
                 >
                   {isParent ? '자녀 학습 흐름' : '포인트로 이어지는 공부 기록'}
@@ -920,7 +920,7 @@ export default function StudyHistoryPage() {
                   className={cn(
                     isMobile
                       ? "mt-0 shrink-0 rounded-[1.2rem] border border-[#FFD6A3]/45 bg-[linear-gradient(180deg,#FFF7EC_0%,#FFE5BD_100%)] px-3.5 py-2 text-[11px] font-black text-[#173A82] shadow-[0_16px_32px_-22px_rgba(5,15,40,0.5)] hover:bg-[#FFF4E6]"
-                      : "shrink-0 rounded-2xl border border-orange-200/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.08))] font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15 h-12 px-5 text-xs"
+                      : "shrink-0 rounded-2xl border border-[#FFD7B4] bg-[linear-gradient(180deg,#FFF7EC_0%,#FFE5BD_100%)] font-black text-[#17326B] shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-[#FFF4E6] h-12 px-5 text-xs"
                   )}
                 >
                   <Link href="/dashboard/growth">
