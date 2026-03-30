@@ -1,13 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
   BookCopy,
-  BookOpen,
   CalendarCheck2,
-  CalendarDays,
-  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -17,11 +15,8 @@ import {
   Layers3,
   ListTodo,
   Plus,
-  Star,
   StickyNote,
-  Target,
-  Trophy,
-  Zap,
+  Sparkles,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -116,79 +111,40 @@ function extractRoutineItems(scheduleItems: any[]) {
   });
 }
 
-function SummaryMetric({
+function ActionChipButton({
   icon: Icon,
   label,
-  value,
-  accent = 'navy',
-  valueClassName,
+  onClick,
+  disabled,
+  tone = 'navy',
 }: {
   icon: any;
   label: string;
-  value: string;
-  accent?: 'navy' | 'orange' | 'blue';
-  valueClassName?: string;
-}) {
-  const accentClass =
-    accent === 'orange'
-      ? 'bg-[#FFF1E1] text-[#FF7A16]'
-      : accent === 'blue'
-        ? 'bg-[#EFF5FF] text-[#173A82]'
-        : 'bg-[#173A82] text-white';
-
-  return (
-    <div className="rounded-[1.35rem] border border-[#D9E1F2] bg-white/90 p-3 shadow-[0_18px_30px_-28px_rgba(23,58,130,0.18)]">
-      <div className="flex items-center gap-2 text-[11px] font-black text-[#173A82]/72">
-        <span className={cn('flex h-8 w-8 items-center justify-center rounded-2xl', accentClass)}>
-          <Icon className="h-4 w-4" />
-        </span>
-        {label}
-      </div>
-      <p className={cn('mt-3 text-2xl font-black tracking-tight text-[#173A82]', valueClassName)}>{value}</p>
-    </div>
-  );
-}
-
-function QuickStartButton({
-  icon: Icon,
-  title,
-  hint,
-  onClick,
-  disabled,
-  accent = 'navy',
-}: {
-  icon: any;
-  title: string;
-  hint: string;
   onClick: () => void;
   disabled?: boolean;
-  accent?: 'navy' | 'orange' | 'mint';
+  tone?: 'navy' | 'orange' | 'white';
 }) {
-  const accentClass =
-    accent === 'orange'
-      ? 'bg-[#FFF1E1] text-[#FF7A16]'
-      : accent === 'mint'
-        ? 'bg-[#ECFDF5] text-[#0F766E]'
-        : 'bg-[#EFF5FF] text-[#173A82]';
+  const toneClass =
+    tone === 'orange'
+      ? 'border-[#FF7A16]/14 bg-[#FFF7EC] text-[#FF7A16] hover:bg-[#FFF1E1]'
+      : tone === 'white'
+        ? 'border-[#D9E1F2] bg-white text-[#173A82] hover:bg-[#F7FAFF]'
+        : 'border-[#D9E1F2] bg-[#173A82] text-white hover:bg-[#143272]';
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'group flex min-h-[6.2rem] flex-col items-start rounded-[1.35rem] border border-[#D9E1F2] bg-white/90 p-3 text-left shadow-[0_18px_30px_-28px_rgba(23,58,130,0.16)] transition-all',
-        disabled
-          ? 'cursor-not-allowed opacity-55'
-          : 'hover:-translate-y-0.5 hover:border-[#173A82]/20 hover:shadow-[0_20px_40px_-30px_rgba(23,58,130,0.24)]'
+        'h-10 rounded-full px-4 text-xs font-black shadow-none',
+        toneClass
       )}
     >
-      <span className={cn('flex h-9 w-9 items-center justify-center rounded-2xl', accentClass)}>
-        <Icon className="h-4 w-4" />
-      </span>
-      <p className="mt-3 text-sm font-black tracking-tight text-[#173A82]">{title}</p>
-      <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#173A82]/58">{hint}</p>
-    </button>
+      <Icon className="mr-2 h-3.5 w-3.5" />
+      {label}
+    </Button>
   );
 }
 
@@ -223,7 +179,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     remainingStudyTasks,
     remainingPersonalTasks,
     completedStudyCount,
-    completedPersonalCount,
     routineCountLabel,
     studyGoalSummaryLabel,
     subjectOptions,
@@ -259,7 +214,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     setIsTemplateSheetOpen,
     customTemplates,
     recentTemplates,
-    latestRecentTemplate,
     templateNameDraft,
     setTemplateNameDraft,
     editingTemplateId,
@@ -332,45 +286,80 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
   const selectedDateLabel = format(selectedDate, 'M월 d일 EEEE', { locale: ko });
   const routineItems = extractRoutineItems(scheduleItems);
-  const checklistRemainingCount = checklistTasks.length - completedChecklistCount;
   const completionPercent = Math.round(completionRate * 100);
   const pointPercent = Math.min(100, Math.max(0, planTrackPointTotal));
   const quickRecentItems = recentStudyOptions.slice(0, isMobile ? 2 : 3);
-
-  const heroStatus = checklistTasks.length === 0
-    ? '빠른 시작'
-    : completionPercent >= 100
-      ? '오늘 계획 완료'
-      : completedChecklistCount > 0
-        ? '진행 중'
-        : '시작 전';
+  const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
 
   return (
     <>
       <div className={cn('mx-auto flex w-full max-w-5xl flex-col pb-24', isMobile ? 'gap-4 px-3' : 'gap-8 px-4')}>
         <header className="space-y-4 pt-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <Badge className="rounded-full border border-[#D9E1F2] bg-white px-3 py-1 text-[10px] font-black text-[#173A82] shadow-none">
-                오늘 해야 할 것
-              </Badge>
-              <h1 className={cn('mt-3 font-black tracking-tight text-[#173A82]', isMobile ? 'text-[1.95rem]' : 'text-[2.8rem]')}>
-                {selectedDateLabel}
-              </h1>
-              <p className="mt-2 break-keep text-sm font-semibold leading-6 text-[#173A82]/66">
-                폼을 길게 채우지 않아도 돼요. 복사하고, 고르고, 체크하면서 오늘 계획을 가볍게 완성해요.
-              </p>
+          <div className="relative overflow-hidden rounded-[2rem] border border-[#D9E1F2] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_55%,#fff8f0_100%)] p-5 shadow-[0_24px_44px_-34px_rgba(23,58,130,0.24)]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.14),transparent_34%)]" />
+            <div className="relative">
+              {floatingPointBursts.map((burst: { id: number; label: string }, index: number) => (
+                <div
+                  key={burst.id}
+                  className="absolute right-0 top-0 rounded-full bg-[#173A82] px-3 py-1 text-xs font-black text-white shadow-[0_14px_28px_-20px_rgba(23,58,130,0.35)] animate-[planner-point-burst_0.95s_ease-out_forwards]"
+                  style={{ marginTop: `${index * 8}px` }}
+                >
+                  +{burst.label}P
+                </div>
+              ))}
+
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black tracking-[0.2em] text-[#173A82]/42">PLAN TRACK</p>
+                  <h1 className={cn('mt-2 font-black tracking-tight text-[#173A82]', isMobile ? 'text-[1.95rem]' : 'text-[2.8rem]')}>
+                    {selectedDateLabel}
+                  </h1>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm font-black text-[#173A82]">
+                    <span>🔥 {todayPointGaugeLabel} pt</span>
+                    <span className="text-[#173A82]/35">|</span>
+                    <span>{completionPercent}% 완료</span>
+                    {todayStreakDays > 0 ? (
+                      <Badge className="rounded-full border border-[#FF7A16]/14 bg-[#FFF7EC] px-2.5 py-1 text-[10px] font-black text-[#FF7A16] shadow-none">
+                        <Flame className="mr-1 h-3 w-3" />
+                        {todayStreakDays}일 연속
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="rounded-[1rem] bg-[#173A82] px-3 py-2 text-right text-white shadow-[0_16px_28px_-22px_rgba(23,58,130,0.55)]">
+                  <p className="text-[10px] font-black tracking-[0.16em] text-white/62">TODAY</p>
+                  <p className="mt-1 text-lg font-black">{todayCompletionLabel}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-black text-[#173A82]/55">
+                  <span>오늘 포인트</span>
+                  <span>{Math.min(planTrackPointTotal, 100)} / 100</span>
+                </div>
+                <div className="rounded-full bg-[#D9E1F2]/70 p-1">
+                  <Progress value={pointPercent} className="h-2.5 bg-transparent [&>div]:bg-[linear-gradient(90deg,#FFD089_0%,#FFB357_45%,#FF7A16_100%)]" />
+                </div>
+              </div>
+
+              {!isPast ? (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <ActionChipButton icon={Copy} label="어제 복사" onClick={handleCopyYesterdayPlan} disabled={isSubmitting} />
+                  <ActionChipButton icon={Layers3} label="템플릿" onClick={() => setIsTemplateSheetOpen(true)} disabled={isSubmitting} tone="white" />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await clearTodayPlans();
+                      setShowQuickAddCard(true);
+                    }}
+                    disabled={isSubmitting}
+                    className="rounded-full px-1.5 py-2 text-xs font-black text-[#173A82]/58 transition hover:text-[#173A82] disabled:opacity-45"
+                  >
+                    빈 상태로 시작
+                  </button>
+                </div>
+              ) : null}
             </div>
-            {!isPast ? (
-              <Button
-                type="button"
-                onClick={() => setIsTemplateSheetOpen(true)}
-                className="h-11 rounded-2xl bg-[#173A82] px-4 text-sm font-black text-white shadow-[0_18px_32px_-22px_rgba(23,58,130,0.55)] hover:bg-[#173A82]/95"
-              >
-                <BookCopy className="mr-2 h-4 w-4" />
-                템플릿
-              </Button>
-            ) : null}
           </div>
 
           <div className="rounded-[1.7rem] border border-[#D9E1F2] bg-white/92 p-3 shadow-[0_24px_48px_-36px_rgba(23,58,130,0.24)]">
@@ -420,204 +409,60 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           </div>
         </header>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-[#D9E1F2] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_60%,#fff7ec_100%)] p-5 shadow-[0_28px_60px_-44px_rgba(23,58,130,0.35)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.16),transparent_34%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(217,225,242,0.46),transparent_36%)]" />
-          <div className="relative flex flex-col gap-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+        <section className="overflow-hidden rounded-[2rem] border border-[#D9E1F2] bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] shadow-[0_28px_50px_-38px_rgba(23,58,130,0.22)]">
+          <div className="border-b border-[#E3EAF4] px-4 py-4 md:px-5">
+            <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <Badge className="rounded-full border border-[#FF7A16]/15 bg-[#FFF7EC] px-3 py-1 text-[10px] font-black text-[#FF7A16] shadow-none">
-                    {heroStatus}
-                  </Badge>
-                  {todayStreakDays > 0 ? (
-                    <Badge className="rounded-full border border-[#D9E1F2] bg-white px-3 py-1 text-[10px] font-black text-[#173A82] shadow-none">
-                      <Flame className="mr-1 h-3 w-3 text-[#FF7A16]" />
-                      {todayStreakDays}일 연속
-                    </Badge>
-                  ) : null}
-                </div>
-                <h2 className={cn('mt-3 font-black tracking-tight text-[#173A82]', isMobile ? 'text-2xl' : 'text-[2.2rem]')}>
-                  {checklistTasks.length === 0 ? '빠르게 오늘 계획 시작하기' : '종이 플래너처럼 가볍게 체크해요'}
-                </h2>
-                <p className="mt-2 max-w-2xl break-keep text-sm font-semibold leading-6 text-[#173A82]/62">
-                  오늘 해야 할 것만 먼저 보여주고, 완료할 때마다 포인트와 게이지가 바로 반응하도록 정리했어요.
+                <p className="text-[11px] font-black tracking-[0.18em] text-[#173A82]/42">TODAY LIST</p>
+                <h3 className="mt-1 text-[1.7rem] font-black tracking-tight text-[#173A82]">한눈에 봐요</h3>
+                <p className="mt-2 break-keep text-sm font-semibold leading-6 text-[#173A82]/60">
+                  {orderedChecklistTasks.length === 0
+                    ? '어제 계획이나 템플릿을 불러오면 오늘 할 일이 바로 채워져요.'
+                    : '오늘 할 일만 먼저 체크하고, 자세한 설정은 눌렀을 때만 펼쳐서 보세요.'}
                 </p>
               </div>
-
-              <div className={cn('grid gap-3', isMobile ? 'w-full grid-cols-3' : 'min-w-[18rem] grid-cols-3')}>
-                <SummaryMetric icon={Zap} label="오늘 포인트" value={todayPointGaugeLabel} accent="orange" />
-                <SummaryMetric icon={Target} label="완료율" value={todayCompletionLabel} accent="navy" />
-                <SummaryMetric icon={CalendarCheck2} label="연속 달성" value={`${todayStreakDays}일`} accent="blue" />
-              </div>
-            </div>
-
-            <div className="relative overflow-hidden rounded-[1.7rem] bg-[#173A82] px-4 py-4 text-white shadow-[0_22px_40px_-30px_rgba(23,58,130,0.68)]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.22),transparent_35%)]" />
-              <div className="relative space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-black tracking-[0.18em] text-white/62">TODAY SCORE</p>
-                    <p className="mt-1 text-2xl font-black tracking-tight">{Math.min(planTrackPointTotal, 100)} / 100</p>
-                  </div>
-                  <div className="rounded-[1rem] bg-white/10 px-3 py-2 text-right">
-                    <p className="text-[10px] font-black tracking-[0.18em] text-white/55">남은 체크</p>
-                    <p className="mt-1 text-lg font-black">{checklistRemainingCount}개</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <div className="mb-2 flex items-center justify-between text-[11px] font-black text-white/70">
-                      <span>오늘 포인트 게이지</span>
-                      <span>{Math.min(planTrackPointTotal, 100)} / 100</span>
-                    </div>
-                    <div className="rounded-full bg-white/12 p-1">
-                      <Progress value={pointPercent} className="h-3 bg-transparent [&>div]:bg-[linear-gradient(90deg,#FFD089_0%,#FFB357_45%,#FF7A16_100%)]" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="mb-2 flex items-center justify-between text-[11px] font-black text-white/70">
-                      <span>오늘 계획 완료율</span>
-                      <span>{completionPercent}%</span>
-                    </div>
-                    <div className="rounded-full bg-white/12 p-1">
-                      <Progress value={completionPercent} className="h-3 bg-transparent [&>div]:bg-[linear-gradient(90deg,#D9E1F2_0%,#9EB4E8_100%)]" />
-                    </div>
-                  </div>
-                </div>
-
-                {floatingPointBursts.map((burst: { id: number; label: string }, index: number) => (
-                  <div
-                    key={burst.id}
-                    className="absolute right-4 top-4 rounded-full bg-[#FFF7EC] px-3 py-1 text-xs font-black text-[#FF7A16] shadow-[0_12px_24px_-18px_rgba(255,122,22,0.85)] animate-[planner-point-burst_0.95s_ease-out_forwards]"
-                    style={{ marginTop: `${index * 6}px` }}
-                  >
-                    {burst.label}P
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {!isPast ? (
-          <section className="rounded-[1.85rem] border border-[#D9E1F2] bg-white/92 p-5 shadow-[0_22px_40px_-34px_rgba(23,58,130,0.2)]">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <Badge className="rounded-full border border-[#D9E1F2] bg-[#F5F8FF] px-3 py-1 text-[10px] font-black text-[#173A82] shadow-none">
-                  빠른 시작
-                </Badge>
-                <h3 className="mt-3 text-xl font-black tracking-tight text-[#173A82]">입력보다 복사와 선택</h3>
-                <p className="mt-2 break-keep text-[13px] font-semibold leading-6 text-[#173A82]/60">
-                  어제 계획, 자주 쓰는 루틴, 최근 템플릿을 눌러 오늘 계획을 바로 채워보세요.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsTemplateSheetOpen(true)}
-                className="h-11 rounded-2xl border-[#D9E1F2] bg-white px-4 font-black text-[#173A82] hover:bg-[#F7FAFF]"
-              >
-                <Layers3 className="mr-2 h-4 w-4" />
-                템플릿 보관함
-              </Button>
-            </div>
-
-            <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-5')}>
-              <QuickStartButton
-                icon={Copy}
-                title="어제 복사"
-                hint="전날 계획 그대로 시작"
-                onClick={handleCopyYesterdayPlan}
-                disabled={isSubmitting}
-              />
-              <QuickStartButton
-                icon={CalendarDays}
-                title="평일 루틴"
-                hint="학교 끝난 뒤 기본 흐름"
-                onClick={() => applyTemplateToToday(weekdayTemplate)}
-                disabled={isSubmitting}
-                accent="mint"
-              />
-              <QuickStartButton
-                icon={Flame}
-                title="시험기간"
-                hint="짧고 밀도 높은 플랜"
-                onClick={() => applyTemplateToToday(examTemplate)}
-                disabled={isSubmitting}
-                accent="orange"
-              />
-              <QuickStartButton
-                icon={Star}
-                title="최근 템플릿"
-                hint={latestRecentTemplate ? latestRecentTemplate.name : '최근 사용 템플릿 보기'}
-                onClick={() => latestRecentTemplate ? applyTemplateToToday(latestRecentTemplate) : setIsTemplateSheetOpen(true)}
-                disabled={isSubmitting}
-              />
-              <QuickStartButton
-                icon={Plus}
-                title="새로 만들기"
-                hint="비워두고 오늘만 직접 구성"
-                onClick={async () => {
-                  await clearTodayPlans();
-                  setShowQuickAddCard(true);
-                }}
-                disabled={isSubmitting}
-                accent="orange"
-              />
-            </div>
-          </section>
-        ) : null}
-
-        <section className="rounded-[2rem] border border-[#D9E1F2] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,247,236,0.74)_100%)] p-5 shadow-[0_28px_50px_-38px_rgba(23,58,130,0.24)]">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <Badge className="rounded-full border border-[#D9E1F2] bg-white px-3 py-1 text-[10px] font-black text-[#173A82] shadow-none">
-                오늘 계획
-              </Badge>
-              <h3 className="mt-3 text-[1.6rem] font-black tracking-tight text-[#173A82]">종이 투두리스트처럼 체크해요</h3>
-              <p className="mt-2 break-keep text-sm font-semibold leading-6 text-[#173A82]/62">
-                처음에는 단순하게 보이고, 필요한 항목만 눌러서 자세히 열리도록 정리했어요.
-              </p>
-            </div>
-            <div className={cn('grid gap-2', isMobile ? 'w-full grid-cols-2' : 'grid-cols-4')}>
-              <SummaryMetric icon={CheckCircle2} label="완료" value={`${completedChecklistCount}개`} accent="orange" />
-              <SummaryMetric icon={BookOpen} label="학습" value={`${completedStudyCount}/${studyTasks.length}`} accent="navy" />
-              <SummaryMetric icon={StickyNote} label="기타" value={`${completedPersonalCount}/${personalTasks.length}`} accent="blue" />
-              <SummaryMetric icon={Clock3} label="예상" value={studyGoalSummaryLabel} accent="orange" valueClassName="text-base leading-6 break-keep" />
+              {!isPast ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsStudyPlanSheetOpen(true)}
+                  className="h-10 rounded-full bg-[#F5F8FF] px-4 text-[11px] font-black text-[#173A82] hover:bg-[#EAF0FF]"
+                >
+                  전체 편집
+                </Button>
+              ) : null}
             </div>
           </div>
 
           {!isPast ? (
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() => setShowQuickAddCard((prev: boolean) => !prev)}
-                className="h-11 rounded-2xl bg-[#173A82] px-4 font-black text-white shadow-[0_18px_32px_-22px_rgba(23,58,130,0.46)] hover:bg-[#173A82]/95"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                + 할 일 추가
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsStudyPlanSheetOpen(true)}
-                className="h-11 rounded-2xl border-[#D9E1F2] bg-white px-4 font-black text-[#173A82] hover:bg-[#F7FAFF]"
-              >
-                <BookOpen className="mr-2 h-4 w-4" />
-                학습 계획 수정
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsTemplateSheetOpen(true)}
-                className="h-11 rounded-2xl border-[#D9E1F2] bg-white px-4 font-black text-[#173A82] hover:bg-[#F7FAFF]"
-              >
-                <Layers3 className="mr-2 h-4 w-4" />
-                템플릿 저장/불러오기
-              </Button>
+            <div className="px-4 pt-4 md:px-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickAddCard((prev: boolean) => !prev)}
+                  className="rounded-full bg-[#173A82] px-4 py-2.5 text-sm font-black text-white shadow-[0_18px_26px_-20px_rgba(23,58,130,0.45)] transition hover:bg-[#143272]"
+                >
+                  <Plus className="mr-2 inline h-4 w-4" />
+                  + 할 일 추가
+                </button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsRecentStudySheetOpen(true)}
+                  className="h-10 rounded-full bg-[#F5F8FF] px-4 text-[11px] font-black text-[#173A82] hover:bg-[#EAF0FF]"
+                >
+                  최근 불러오기
+                </Button>
+                {activeRecentStudyOption ? (
+                  <button
+                    type="button"
+                    onClick={resetStudyComposerPrefill}
+                    className="rounded-full px-2 py-2 text-[11px] font-black text-[#FF7A16]"
+                  >
+                    불러온 계획 해제
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -864,38 +709,29 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
             </div>
           ) : null}
 
-          <div className="mt-5 space-y-3">
+          <div className="relative mt-4 px-4 pb-4 md:px-5 md:pb-5">
+            <div className="pointer-events-none absolute inset-0 opacity-45 [background-image:repeating-linear-gradient(180deg,transparent_0,transparent_67px,rgba(217,225,242,0.62)_68px)]" />
+            <div className="relative space-y-3">
             {orderedChecklistTasks.length === 0 ? (
-              <div className="rounded-[1.8rem] border border-dashed border-[#D9E1F2] bg-white/80 p-7 text-center">
+              <div className="rounded-[1.45rem] border border-dashed border-[#D9E1F2] bg-white/84 px-5 py-7 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#EFF5FF] text-[#173A82]">
                   <ListTodo className="h-6 w-6" />
                 </div>
-                <p className="mt-4 text-lg font-black text-[#173A82]">오늘 계획이 비어 있어요</p>
+                <p className="mt-4 text-lg font-black text-[#173A82]">오늘 할 일을 비워뒀어요</p>
                 <p className="mt-2 break-keep text-sm font-semibold leading-6 text-[#173A82]/58">
-                  위 빠른 시작 버튼으로 어제 계획을 복사하거나, 템플릿을 불러와서 바로 시작해보세요.
+                  복사하거나 템플릿을 고르면 오늘 체크리스트가 바로 채워져요.
                 </p>
                 {!isPast ? (
                   <div className="mt-5 flex flex-wrap justify-center gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => applyTemplateToToday(weekdayTemplate)}
-                      className="h-11 rounded-2xl bg-[#173A82] px-4 font-black text-white"
-                    >
-                      평일 루틴 적용
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowQuickAddCard(true)}
-                      className="h-11 rounded-2xl border-[#D9E1F2] bg-white px-4 font-black text-[#173A82]"
-                    >
-                      직접 한 개 추가
-                    </Button>
+                    <ActionChipButton icon={Copy} label="어제 복사" onClick={handleCopyYesterdayPlan} disabled={isSubmitting} />
+                    <ActionChipButton icon={Sparkles} label="평일 루틴" onClick={() => applyTemplateToToday(weekdayTemplate)} disabled={isSubmitting} tone="orange" />
+                    <ActionChipButton icon={Flame} label="시험기간" onClick={() => applyTemplateToToday(examTemplate)} disabled={isSubmitting} tone="orange" />
+                    <ActionChipButton icon={Plus} label="직접 추가" onClick={() => setShowQuickAddCard(true)} disabled={isSubmitting} tone="white" />
                   </div>
                 ) : null}
               </div>
-            ) : (
-              orderedChecklistTasks.map((task: any) => {
+              ) : (
+                orderedChecklistTasks.map((task: any) => {
                 const badge = getChecklistBadge(task, subjectOptions);
                 const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
                 const durationLabel = task.startTime && task.endTime
@@ -928,21 +764,13 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 );
               })
             )}
+            </div>
           </div>
 
           {completionPercent >= 100 && checklistTasks.length > 0 ? (
-            <div className="mt-5 rounded-[1.6rem] border border-[#FF7A16]/18 bg-[linear-gradient(135deg,#FFF7EC_0%,#FFFFFF_100%)] p-4 animate-[planner-fade-rise_0.24s_ease-out]">
-              <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#173A82] text-white">
-                  <Trophy className="h-5 w-5 text-[#FFD089]" />
-                </div>
-                <div>
-                  <p className="text-lg font-black tracking-tight text-[#173A82]">오늘 계획을 모두 끝냈어요</p>
-                  <p className="mt-1 break-keep text-[13px] font-semibold leading-6 text-[#173A82]/62">
-                    오늘 포인트와 연속 달성이 반영됐어요. 필요하면 내일용 템플릿으로 바로 저장할 수 있어요.
-                  </p>
-                </div>
-              </div>
+            <div className="mx-4 mb-4 rounded-[1.35rem] border border-[#FF7A16]/18 bg-[#FFF7EC] px-4 py-4 text-[#173A82] animate-[planner-fade-rise_0.24s_ease-out] md:mx-5 md:mb-5">
+              <p className="text-lg font-black tracking-tight">오늘 계획을 다 끝냈어요</p>
+              <p className="mt-1 text-sm font-semibold text-[#173A82]/60">포인트와 연속 달성이 바로 반영됐어요.</p>
             </div>
           ) : null}
         </section>
@@ -951,13 +779,11 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           <section className="rounded-[1.9rem] border border-[#D9E1F2] bg-white/92 shadow-[0_24px_48px_-38px_rgba(23,58,130,0.22)]">
             <CollapsibleTrigger asChild>
               <button type="button" className="flex w-full items-center justify-between gap-3 p-5 text-left">
-                <div>
-                  <Badge className="rounded-full border border-[#D9E1F2] bg-[#F5F8FF] px-3 py-1 text-[10px] font-black text-[#173A82] shadow-none">
-                    루틴 관리
-                  </Badge>
-                  <h3 className="mt-3 text-xl font-black tracking-tight text-[#173A82]">출석과 반복 루틴은 접어두기</h3>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-[#173A82]/42">ROUTINE</p>
+                  <h3 className="mt-1 text-xl font-black tracking-tight text-[#173A82]">루틴 관리</h3>
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#173A82]/58">
-                    기본 화면은 오늘 계획만 보고, 루틴은 필요할 때만 펼쳐서 정리해요.
+                    등원, 학원, 식사처럼 반복되는 흐름은 필요할 때만 펼쳐서 정리해요.
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1095,13 +921,11 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           <section className="rounded-[1.9rem] border border-[#D9E1F2] bg-white/92 shadow-[0_24px_48px_-38px_rgba(23,58,130,0.2)]">
             <CollapsibleTrigger asChild>
               <button type="button" className="flex w-full items-center justify-between gap-3 p-5 text-left">
-                <div>
-                  <Badge className="rounded-full border border-[#FF7A16]/15 bg-[#FFF7EC] px-3 py-1 text-[10px] font-black text-[#FF7A16] shadow-none">
-                    기타 계획 / 메모
-                  </Badge>
-                  <h3 className="mt-3 text-xl font-black tracking-tight text-[#173A82]">보조 일정은 접어서 관리하기</h3>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-[#173A82]/42">EXTRA</p>
+                  <h3 className="mt-1 text-xl font-black tracking-tight text-[#173A82]">기타 계획</h3>
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#173A82]/58">
-                    메모, 준비물, 상담 같은 보조 일정은 필요할 때만 펼쳐서 정리해요.
+                    메모, 준비물, 상담 같은 보조 일정만 따로 모아두고 필요할 때 펼쳐보세요.
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1197,29 +1021,44 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           </section>
         </Collapsible>
 
-        {!isPast && (remainingStudyTasks.length + remainingPersonalTasks.length > 0) ? (
-          <section className="rounded-[1.85rem] border border-[#FF7A16]/16 bg-[linear-gradient(180deg,#FFF7EC_0%,#FFFFFF_100%)] p-5 shadow-[0_18px_36px_-32px_rgba(255,122,22,0.18)]">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <Badge className="rounded-full border border-[#FF7A16]/15 bg-white px-3 py-1 text-[10px] font-black text-[#FF7A16] shadow-none">
-                  하루 정리
-                </Badge>
-                <h3 className="mt-3 text-xl font-black tracking-tight text-[#173A82]">남은 할 일 정리하기</h3>
-                <p className="mt-2 break-keep text-sm font-semibold leading-6 text-[#173A82]/58">
-                  미완료 항목은 내일로 미루거나, 템플릿으로 저장하거나, 오늘 계획에서 바로 정리할 수 있어요.
-                </p>
-              </div>
-              <Badge className="rounded-full border border-[#D9E1F2] bg-white px-3 py-1 text-[10px] font-black text-[#173A82] shadow-none">
-                {remainingStudyTasks.length + remainingPersonalTasks.length}개 남음
-              </Badge>
-            </div>
-
-            <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-              <QuickStartButton icon={ChevronRight} title="내일로 미루기" hint="남은 계획을 그대로 이어서" onClick={handleMoveUnfinishedToTomorrow} disabled={isSubmitting} accent="navy" />
-              <QuickStartButton icon={BookCopy} title="템플릿 반영" hint="이번 주 기본 템플릿으로 저장" onClick={handleSaveUnfinishedAsTemplate} disabled={isSubmitting} accent="mint" />
-              <QuickStartButton icon={StickyNote} title="삭제하기" hint="오늘 계획에서 깔끔하게 정리" onClick={handleDeleteUnfinished} disabled={isSubmitting} accent="orange" />
-            </div>
-          </section>
+        {!isPast ? (
+          <Collapsible open={isWrapUpOpen} onOpenChange={setIsWrapUpOpen}>
+            <section className="rounded-[1.9rem] border border-[#D9E1F2] bg-white/92 shadow-[0_24px_48px_-38px_rgba(23,58,130,0.18)]">
+              <CollapsibleTrigger asChild>
+                <button type="button" className="flex w-full items-center justify-between gap-3 p-5 text-left">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black tracking-[0.18em] text-[#173A82]/42">WRAP UP</p>
+                    <h3 className="mt-1 text-xl font-black tracking-tight text-[#173A82]">하루 정리</h3>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-[#173A82]/58">
+                      남은 할 일은 내일로 미루거나, 템플릿에 반영하거나, 오늘 안에서 정리할 수 있어요.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge className="rounded-full border border-[#D9E1F2] bg-white px-3 py-1 text-[10px] font-black text-[#173A82] shadow-none">
+                      {remainingStudyTasks.length + remainingPersonalTasks.length}개
+                    </Badge>
+                    <ChevronDown className={cn('h-5 w-5 text-[#173A82] transition-transform', isWrapUpOpen && 'rotate-180')} />
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-t border-[#E3EAF4] px-5 pb-5">
+                {remainingStudyTasks.length + remainingPersonalTasks.length > 0 ? (
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <ActionChipButton icon={ChevronRight} label="내일로 미루기" onClick={handleMoveUnfinishedToTomorrow} disabled={isSubmitting} />
+                    <ActionChipButton icon={BookCopy} label="템플릿 반영" onClick={handleSaveUnfinishedAsTemplate} disabled={isSubmitting} tone="white" />
+                    <ActionChipButton icon={StickyNote} label="삭제하기" onClick={handleDeleteUnfinished} disabled={isSubmitting} tone="orange" />
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-[1.35rem] border border-dashed border-[#D9E1F2] bg-[#F7FAFF] p-5 text-center">
+                    <p className="text-sm font-black text-[#173A82]">오늘 정리할 남은 항목이 없어요</p>
+                    <p className="mt-2 text-[12px] font-semibold leading-5 text-[#173A82]/55">
+                      체크리스트가 깔끔하게 정리되면 내일 계획도 훨씬 가벼워져요.
+                    </p>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </section>
+          </Collapsible>
         ) : null}
       </div>
 

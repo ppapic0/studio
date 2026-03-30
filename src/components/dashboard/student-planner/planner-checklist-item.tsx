@@ -62,8 +62,8 @@ export function PlannerChecklistItem({
 
   return (
     <div className={cn(
-      'rounded-[1.5rem] border border-[#D9E1F2] bg-white/95 shadow-[0_18px_34px_-32px_rgba(20,41,95,0.18)] transition-all',
-      task.done && 'bg-[#F7FBFF]'
+      'rounded-[1.35rem] border border-[#E3EAF4] bg-white/88 transition-all',
+      task.done ? 'bg-[#F8FBFF]' : 'hover:border-[#D1DAE9] hover:bg-white/96'
     )}>
       <div
         role="button"
@@ -77,14 +77,14 @@ export function PlannerChecklistItem({
         }}
         className={cn(
           'flex items-start gap-3 px-4 py-4 outline-none',
-          isMobile ? 'min-h-[4.5rem]' : 'min-h-[5rem]'
+          isMobile ? 'min-h-[4.85rem]' : 'min-h-[5.2rem]'
         )}
       >
-        <div className="pt-0.5">
+        <div className="pt-1">
           {isVolumeTask ? (
             <div className={cn(
-              'flex h-6 min-w-[2.4rem] items-center justify-center rounded-full px-2 text-[10px] font-black',
-              task.done ? 'bg-emerald-500 text-white' : 'bg-[#D9E1F2] text-[#173A82]'
+              'flex h-7 min-w-[2.85rem] items-center justify-center rounded-full px-2.5 text-[10px] font-black',
+              task.done ? 'bg-emerald-500 text-white' : 'bg-[#EFF5FF] text-[#173A82]'
             )}>
               {safeProgress}%
             </div>
@@ -94,7 +94,7 @@ export function PlannerChecklistItem({
               onClick={(event) => event.stopPropagation()}
               onCheckedChange={onToggle}
               disabled={disabled}
-              className="mt-0.5 h-5 w-5 rounded-lg border-[#173A82]/30 data-[state=checked]:border-[#173A82] data-[state=checked]:bg-[#173A82]"
+              className="mt-0.5 h-6 w-6 rounded-xl border-[#173A82]/28 bg-white data-[state=checked]:border-[#173A82] data-[state=checked]:bg-[#173A82]"
             />
           )}
         </div>
@@ -105,7 +105,7 @@ export function PlannerChecklistItem({
               {badgeLabel}
             </Badge>
             {task.priority ? (
-              <Badge className="rounded-full border border-[#FF7A16]/20 bg-[#FFF7EC] px-2 py-0.5 text-[9px] font-black text-[#FF7A16] shadow-none">
+              <Badge className="rounded-full border border-[#FF7A16]/15 bg-[#FFF7EC] px-2 py-0.5 text-[9px] font-black text-[#FF7A16] shadow-none">
                 {task.priority === 'high' ? '중요' : task.priority === 'medium' ? '보통' : '가볍게'}
               </Badge>
             ) : null}
@@ -113,14 +113,14 @@ export function PlannerChecklistItem({
 
           <p className={cn(
             'mt-2 break-keep font-black leading-snug tracking-tight text-[#173A82]',
-            isMobile ? 'text-sm' : 'text-base',
-            task.done && 'text-[#173A82]/45 line-through'
+            isMobile ? 'text-[1rem]' : 'text-[1.05rem]',
+            task.done && 'text-[#173A82]/42 line-through'
           )}>
             {task.title}
           </p>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#173A82]/70">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F7FF] px-2.5 py-1">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#173A82]/72">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#F5F8FF] px-2.5 py-1">
               <Clock3 className="h-3.5 w-3.5 text-[#FF7A16]" />
               {task.startTime && task.endTime ? `${task.startTime} - ${task.endTime}` : durationLabel}
             </span>
@@ -130,7 +130,7 @@ export function PlannerChecklistItem({
           </div>
 
           {detailLabel ? (
-            <p className="mt-2 line-clamp-1 text-[10px] font-semibold text-[#173A82]/55">{detailLabel}</p>
+            <p className="mt-2 line-clamp-1 text-[11px] font-semibold leading-5 text-[#173A82]/56">{detailLabel}</p>
           ) : null}
         </div>
 
@@ -141,7 +141,7 @@ export function PlannerChecklistItem({
               event.stopPropagation();
               onExpandedChange(!expanded);
             }}
-            className="rounded-full bg-[#F3F7FF] p-2 text-[#173A82]/70 transition hover:bg-[#E8F0FF]"
+            className="rounded-full bg-[#F5F8FF] p-2 text-[#173A82]/70 transition hover:bg-[#E8F0FF]"
           >
             <ChevronDown className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')} />
           </button>
@@ -154,7 +154,7 @@ export function PlannerChecklistItem({
                 event.stopPropagation();
                 onDelete();
               }}
-              className="h-8 w-8 rounded-full text-[#173A82]/35 hover:text-destructive"
+              className="h-8 w-8 rounded-full text-[#173A82]/30 hover:text-destructive"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -165,11 +165,11 @@ export function PlannerChecklistItem({
       </div>
 
       {expanded ? (
-        <div className="space-y-3 border-t border-[#D9E1F2] px-4 py-4">
+        <div className="space-y-3 border-t border-[#E3EAF4] px-4 py-4">
           {isVolumeTask ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-[#173A82]/75">
-                <span className="rounded-full bg-[#F3F7FF] px-2.5 py-1">
+                <span className="rounded-full bg-[#F5F8FF] px-2.5 py-1">
                   목표 {Math.max(0, task.targetAmount || 0)}{task.amountUnit === '직접입력' ? task.amountUnitLabel || '단위' : task.amountUnit || '문제'}
                 </span>
                 <span className={cn(
