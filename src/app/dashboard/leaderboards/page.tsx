@@ -1,21 +1,27 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import {
+  ChevronRight,
+  Crown,
+  Flame,
+  ShieldAlert,
+  Sparkles,
+  TimerReset,
+  Trophy,
+  Users,
+  Zap,
+  Loader2,
+} from 'lucide-react';
+
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
-import { eachDayOfInterval, format, startOfMonth, startOfWeek } from 'date-fns';
-import { ko } from 'date-fns/locale';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { CenterMembership, DailyStudentStat, LeaderboardEntry } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Trophy, Medal, Crown, ChevronRight, Clock3, Sparkles, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatStudyMinutes } from '@/lib/student-rewards';
 
 const PAGE_SIZE = 50;
 
@@ -33,17 +39,17 @@ type RankEntryView = {
 const RANGE_META: Record<RankRange, { label: string; title: string; hint: string; }> = {
   daily: {
     label: '일간',
-    title: '오늘 공부 랭킹',
+    title: '오늘 경쟁 랭킹',
     hint: '오늘 누적 공부시간 기준',
   },
   weekly: {
     label: '주간',
-    title: '이번 주 공부 랭킹',
+    title: '이번 주 경쟁 랭킹',
     hint: '이번 주 누적 공부시간 기준',
   },
   monthly: {
     label: '월간',
-    title: '이번 달 공부 랭킹',
+    title: '이번 달 경쟁 랭킹',
     hint: '이번 달 누적 공부시간 기준',
   },
 };
@@ -79,17 +85,43 @@ function applyCompetitionRanks(entries: Omit<RankEntryView, 'rank'>[]) {
   });
 }
 
-function SummaryRankCard({
+function formatHourValue(minutes: number) {
+  if (minutes <= 0) return '0.0h';
+  return `${(minutes / 60).toFixed(1)}h`;
+}
+
+function Panel({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <section
+      className={cn(
+        'rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] shadow-[0_24px_80px_rgba(2,6,23,0.35)] backdrop-blur-xl',
+        className
+      )}
+    >
+      {children}
+    </section>
+  );
+}
+
+function LiveBadge() {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/25 bg-orange-400/10 px-3 py-1.5 text-[11px] font-black tracking-[0.18em] text-orange-200">
+      <span className="relative flex h-2.5 w-2.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-65" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-400" />
+      </span>
+      LIVE RANKING
+    </div>
+  );
+}
+
+function RankPill({
   label,
-  rank,
-  value,
   active,
   onClick,
 }: {
   label: string;
-  rank: number;
-  value: number;
-  active?: boolean;
+  active: boolean;
   onClick: () => void;
 }) {
   return (
@@ -97,23 +129,206 @@ function SummaryRankCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-[1.45rem] border p-4 text-left transition-all',
+        'rounded-full px-4 py-2.5 text-sm font-black transition-all duration-200',
         active
-          ? 'border-[#FFB357]/45 bg-[linear-gradient(135deg,#173A82_0%,#234B9A_100%)] text-white shadow-[0_22px_44px_-30px_rgba(23,58,130,0.55)]'
-          : 'border-slate-100 bg-white text-[#173A82] shadow-[0_16px_38px_-32px_rgba(15,23,42,0.26)] hover:-translate-y-0.5'
+          ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 shadow-[0_8px_24px_rgba(251,146,60,0.35)]'
+          : 'bg-white/6 text-white/72 hover:bg-white/10 hover:text-white'
       )}
     >
-      <div className="flex items-center justify-between">
-        <span className={cn('text-[10px] font-black tracking-[0.18em]', active ? 'text-white/62' : 'text-[#173A82]/45')}>
-          {label}
-        </span>
-        <Clock3 className={cn('h-4 w-4', active ? 'text-[#FFD089]' : 'text-[#173A82]/45')} />
-      </div>
-      <p className="mt-3 text-2xl font-black tracking-tight">{rank > 0 ? `#${rank}` : '집계중'}</p>
-      <p className={cn('mt-1 text-xs font-semibold', active ? 'text-white/72' : 'text-[#173A82]/58')}>
-        {value > 0 ? formatStudyMinutes(value) : '아직 기록이 없어요'}
-      </p>
+      {label}
     </button>
+  );
+}
+
+function TopSummaryCard({
+  label,
+  value,
+  sub,
+  tone = 'default',
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tone?: 'default' | 'orange' | 'blue';
+  icon: typeof Trophy;
+}) {
+  const toneClass = tone === 'orange'
+    ? 'from-orange-500/18 via-orange-500/10 to-white/[0.04]'
+    : tone === 'blue'
+      ? 'from-blue-500/18 via-cyan-400/10 to-white/[0.04]'
+      : 'from-white/[0.07] to-white/[0.03]';
+
+  return (
+    <Panel className={cn('bg-gradient-to-br', toneClass)}>
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-black tracking-[0.18em] text-white/48">{label}</p>
+            <p className="mt-3 text-3xl font-black tracking-tight text-white">{value}</p>
+            <p className="mt-2 text-sm font-semibold text-white/68">{sub}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/6 p-3 text-white/82">
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function RewardGoalCard() {
+  return (
+    <Panel className="bg-gradient-to-br from-orange-500/16 via-amber-400/10 to-white/[0.03]">
+      <div className="p-5 sm:p-6">
+        <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-orange-400/10 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-orange-200">
+          <Sparkles className="h-3.5 w-3.5" />
+          RANK GOAL
+        </div>
+        <h3 className="mt-4 text-xl font-black text-white">1위 달성 시 +1000P</h3>
+        <p className="mt-2 text-sm leading-6 text-white/72">
+          일간 1등은 즉시 포인트를 받고, 월말 1~3등은 추가 보상으로 크게 앞서갈 수 있어요.
+        </p>
+
+        <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+          {[
+            ['1위', '20,000P'],
+            ['2위', '10,000P'],
+            ['3위', '5,000P'],
+          ].map(([place, reward]) => (
+            <div key={place} className="rounded-2xl border border-white/10 bg-white/6 p-3">
+              <p className="text-[11px] font-black tracking-[0.18em] text-white/45">{place}</p>
+              <p className="mt-1 text-sm font-black text-white">{reward}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function CompetitionMessage({
+  diffAbove,
+  diffBelow,
+  rank,
+}: {
+  diffAbove: number;
+  diffBelow: number;
+  rank: number;
+}) {
+  const canOvertakeSoon = rank > 1 && diffAbove <= 180;
+  const underThreat = rank > 0 && diffBelow > 0 && diffBelow <= 120;
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <Panel className="border-orange-400/15 bg-[linear-gradient(180deg,rgba(251,146,60,0.11),rgba(255,255,255,0.02))]">
+        <div className="p-5">
+          <div className="flex items-center gap-2 text-orange-300">
+            <Flame className="h-4 w-4" />
+            <p className="text-[11px] font-black tracking-[0.18em]">추월 상태</p>
+          </div>
+          <p className="mt-3 text-lg font-black text-white">{rank === 1 ? '현재 선두 유지 중' : canOvertakeSoon ? '곧 1위 추월 가능' : '상위권 추격 중'}</p>
+          <p className="mt-2 text-sm leading-6 text-white/72">
+            {rank === 1 ? '지금 페이스만 유지해도 선두를 지킬 수 있어요.' : `1위까지 ${formatHourValue(diffAbove)} 차이. 오늘 한 세션만 더 집중하면 격차를 크게 줄일 수 있어요.`}
+          </p>
+        </div>
+      </Panel>
+
+      <Panel className="border-blue-400/15 bg-[linear-gradient(180deg,rgba(59,130,246,0.10),rgba(255,255,255,0.02))]">
+        <div className="p-5">
+          <div className="flex items-center gap-2 text-blue-300">
+            <ShieldAlert className="h-4 w-4" />
+            <p className="text-[11px] font-black tracking-[0.18em]">방어 상태</p>
+          </div>
+          <p className="mt-3 text-lg font-black text-white">{underThreat ? '뒤에서 바짝 추격 중' : '현재 순위 안정권'}</p>
+          <p className="mt-2 text-sm leading-6 text-white/72">
+            {diffBelow > 0 ? `${formatHourValue(diffBelow)} 차이로 뒤 순위를 앞서고 있어요. 오늘 기록을 멈추면 금방 좁혀질 수 있어요.` : '아직 아래 경쟁자가 보이지 않아요. 먼저 기록을 쌓아 우위를 만들어요.'}
+          </p>
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function LeaderboardRow({
+  player,
+  maxMinutes,
+  index,
+}: {
+  player: RankEntryView & { isMe: boolean };
+  maxMinutes: number;
+  index: number;
+}) {
+  const [fillReady, setFillReady] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setFillReady(true), 40 + index * 35);
+    return () => window.clearTimeout(timer);
+  }, [index, player.id]);
+
+  const progress = maxMinutes > 0 ? Math.max(12, Math.round((player.value / maxMinutes) * 100)) : 0;
+
+  return (
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-[24px] border p-4 transition-transform duration-200 hover:-translate-y-0.5 sm:p-5',
+        player.isMe
+          ? 'border-orange-400/25 bg-[linear-gradient(90deg,rgba(251,146,60,0.12),rgba(255,255,255,0.04))] shadow-[0_0_0_1px_rgba(251,146,60,0.08),0_0_32px_rgba(251,146,60,0.10)]'
+          : 'border-white/10 bg-white/[0.03]'
+      )}
+    >
+      {player.isMe ? (
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_right,rgba(251,146,60,0.16),transparent_38%)] opacity-70" />
+      ) : null}
+
+      <div className="relative flex items-center gap-4">
+        <div
+          className={cn(
+            'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg font-black',
+            index === 0
+              ? 'border-orange-300/40 bg-orange-400/16 text-orange-200'
+              : index === 1
+                ? 'border-slate-300/20 bg-slate-300/10 text-slate-100'
+                : index === 2
+                  ? 'border-amber-500/30 bg-amber-400/10 text-amber-200'
+                  : 'border-white/10 bg-white/5 text-white/78'
+          )}
+        >
+          {player.rank}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-base font-black text-white">{player.isMe ? '나' : formatMaskedName(player.displayNameSnapshot)}</p>
+            {player.isMe ? (
+              <span className="rounded-full border border-orange-400/20 bg-orange-400/10 px-2 py-1 text-[10px] font-black tracking-[0.18em] text-orange-200">
+                YOU
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 truncate text-xs font-semibold text-white/45">{player.classNameSnapshot || '반 미지정'}</p>
+          <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/8">
+            <div
+              className={cn(
+                'h-full rounded-full transition-[width] duration-700 ease-out',
+                index === 0
+                  ? 'bg-gradient-to-r from-[#FFD36D] to-[#FF9626]'
+                  : player.isMe
+                    ? 'bg-gradient-to-r from-[#FF9626] to-[#FFB347]'
+                    : 'bg-gradient-to-r from-[#4E7BFF] to-[#7AD4FF]'
+              )}
+              style={{ width: fillReady ? `${progress}%` : '0%' }}
+            />
+          </div>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-black text-white">
+            {formatHourValue(player.value)}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -121,11 +336,12 @@ export default function LeaderboardsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { activeMembership, viewMode } = useAppContext();
-  const isMobile = viewMode === 'mobile';
   const router = useRouter();
   const searchParams = useSearchParams();
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const activeRange = (searchParams.get('range') as RankRange) || 'daily';
+  const isMobile = viewMode === 'mobile';
+
   const today = useMemo(() => new Date(), []);
   const todayKey = useMemo(() => format(today, 'yyyy-MM-dd'), [today]);
   const monthKey = useMemo(() => format(today, 'yyyy-MM'), [today]);
@@ -256,7 +472,7 @@ export default function LeaderboardsPage() {
 
     const monthlyEntries = applyCompetitionRanks(
       (monthEntriesRaw || [])
-        .map((entry: any) => {
+        .map((entry) => {
           const studentId = entry.studentId;
           const profile = memberMap.get(studentId);
           return {
@@ -278,8 +494,6 @@ export default function LeaderboardsPage() {
   }, [activeStudentIds, dailyStatsRaw, memberMap, monthEntriesRaw, weeklyRows]);
 
   const currentEntries = normalizeEntries[activeRange];
-  const topThree = currentEntries.slice(0, 3);
-  const restEntries = currentEntries.slice(3, visibleCount);
   const hasMore = currentEntries.length > visibleCount;
 
   const myRanks = useMemo(() => {
@@ -304,151 +518,150 @@ export default function LeaderboardsPage() {
   if (!activeMembership) return null;
 
   const rangeMeta = RANGE_META[activeRange];
+  const meIndex = currentEntries.findIndex((entry) => entry.studentId === user?.uid);
+  const myEntry = meIndex >= 0 ? currentEntries[meIndex] : null;
+  const aboveEntry = meIndex > 0 ? currentEntries[meIndex - 1] : null;
+  const belowEntry = meIndex >= 0 && meIndex < currentEntries.length - 1 ? currentEntries[meIndex + 1] : null;
+  const maxMinutes = currentEntries[0]?.value || 0;
+  const diffAbove = aboveEntry && myEntry ? aboveEntry.value - myEntry.value : 0;
+  const diffBelow = belowEntry && myEntry ? myEntry.value - belowEntry.value : 0;
+  const hoursNeededToLead = Math.max(0, Math.ceil(((diffAbove || 0) + 180) / 30) / 2);
+  const visibleEntries = currentEntries
+    .slice(0, visibleCount)
+    .map((entry) => ({ ...entry, isMe: entry.studentId === user?.uid }));
 
   return (
-    <div className={cn('mx-auto flex w-full max-w-6xl flex-col pb-20', isMobile ? 'gap-5 px-1' : 'gap-8 px-4')}>
-      <header className="space-y-4 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#14295F]/10 bg-[#14295F]/5 px-4 py-1.5 shadow-sm">
-          <Sparkles className="h-3.5 w-3.5 text-[#14295F]" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#14295F]/70">study time leaderboard</span>
-        </div>
-        <div className="space-y-2">
-          <h1 className={cn('font-black tracking-tighter text-primary', isMobile ? 'text-3xl' : 'text-5xl')}>공부시간 랭킹</h1>
-          <p className={cn('mx-auto font-semibold text-slate-600', isMobile ? 'max-w-xs text-sm leading-6' : 'max-w-3xl text-lg leading-8')}>
-            일간, 주간, 월간 공부시간 순위를 한 번에 확인해요. 일간 1등은 +1000P, 월말 1~3등은 추가 포인트 보상을 받아요.
-          </p>
-        </div>
-      </header>
-
-      <section className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-[1.15fr_0.85fr]')}>
-        <Card className="rounded-[2rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#1B326D_55%,#234A99_100%)] text-white shadow-[0_36px_80px_-42px_rgba(20,41,95,0.92)]">
-          <CardContent className={cn(isMobile ? 'p-5' : 'p-7')}>
-            <Badge className="border-none bg-white/15 text-white">내 랭킹</Badge>
-            <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-              <SummaryRankCard label="일간" rank={myRanks.daily?.rank || 0} value={Number(myRanks.daily?.value || 0)} active={activeRange === 'daily'} onClick={() => router.replace('/dashboard/leaderboards?range=daily')} />
-              <SummaryRankCard label="주간" rank={myRanks.weekly?.rank || 0} value={Number(myRanks.weekly?.value || 0)} active={activeRange === 'weekly'} onClick={() => router.replace('/dashboard/leaderboards?range=weekly')} />
-              <SummaryRankCard label="월간" rank={myRanks.monthly?.rank || 0} value={Number(myRanks.monthly?.value || 0)} active={activeRange === 'monthly'} onClick={() => router.replace('/dashboard/leaderboards?range=monthly')} />
+    <div className={cn('mx-auto w-full pb-20', isMobile ? 'max-w-none px-1.5' : 'max-w-7xl px-4')}>
+      <div className="rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.10),transparent_26%),radial-gradient(circle_at_top_left,rgba(56,189,248,0.10),transparent_24%),linear-gradient(180deg,#10285d_0%,#081838_100%)] p-4 shadow-[0_34px_100px_rgba(2,6,23,0.48)] sm:p-6 lg:p-8">
+        <div className="flex flex-col gap-5 sm:gap-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <LiveBadge />
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-5xl">공부시간 랭킹</h1>
+              <p className="mt-3 text-sm leading-6 text-white/72 sm:text-base">
+                일간, 주간, 월간 랭킹을 한 화면에서 경쟁처럼 확인하고, 지금 몇 시간 더 하면 추월 가능한지도 바로 볼 수 있어요.
+              </p>
             </div>
-          </CardContent>
-        </Card>
 
-        <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-2')}>
-          <Card className="rounded-[1.6rem] border border-slate-100 bg-white shadow-[0_18px_54px_-38px_rgba(15,23,42,0.32)]">
-            <CardContent className="p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">일간 보너스</p>
-              <p className="mt-3 text-2xl font-black tracking-tight text-primary">+1000P</p>
-              <p className="mt-2 text-sm font-semibold text-slate-600">전날 공부시간 1등, 동점 모두 지급</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-[1.6rem] border border-slate-100 bg-white shadow-[0_18px_54px_-38px_rgba(15,23,42,0.32)]">
-            <CardContent className="p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">월말 보상</p>
-              <div className="mt-3 space-y-1 text-sm font-black text-primary">
-                <div className="flex items-center justify-between"><span>1위</span><span>20,000P</span></div>
-                <div className="flex items-center justify-between"><span>2위</span><span>10,000P</span></div>
-                <div className="flex items-center justify-between"><span>3위</span><span>5,000P</span></div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      <section className="flex flex-wrap items-center gap-2">
-        {(['daily', 'weekly', 'monthly'] as RankRange[]).map((range) => (
-          <Button
-            key={range}
-            onClick={() => router.replace(`/dashboard/leaderboards?range=${range}`)}
-            className={cn(
-              'h-11 rounded-2xl px-4 font-black',
-              activeRange === range
-                ? 'bg-[#14295F] text-white hover:bg-[#1B326D]'
-                : 'border border-slate-200 bg-white text-slate-500 shadow-none hover:bg-slate-50'
-            )}
-          >
-            {RANGE_META[range].label}
-          </Button>
-        ))}
-      </section>
-
-      <Card className="overflow-hidden rounded-[2rem] border-none bg-white shadow-[0_32px_70px_-44px_rgba(15,23,42,0.35)] ring-1 ring-black/[0.04]">
-        <CardHeader className={cn(isMobile ? 'p-5' : 'p-7')}>
-          <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-primary">
-            {activeRange === 'monthly' ? <Trophy className="h-5 w-5 text-[#14295F]" /> : <CalendarDays className="h-5 w-5 text-[#14295F]" />}
-            {rangeMeta.title}
-          </CardTitle>
-          <CardDescription className="font-semibold text-slate-500">
-            {rangeMeta.hint}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 p-0 pb-6">
-          {isLoading ? (
-            <div className="flex h-64 items-center justify-center">
-              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+            <div className="flex flex-wrap gap-2">
+              {(['daily', 'weekly', 'monthly'] as RankRange[]).map((range) => (
+                <RankPill
+                  key={range}
+                  label={RANGE_META[range].label}
+                  active={activeRange === range}
+                  onClick={() => router.replace(`/dashboard/leaderboards?range=${range}`)}
+                />
+              ))}
             </div>
-          ) : currentEntries.length === 0 ? (
-            <div className="px-6 py-20 text-center text-sm font-bold text-slate-400">아직 집계된 공부시간 랭킹이 없습니다.</div>
-          ) : (
-            <>
-              <div className={cn('grid gap-3 px-5', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-                {topThree.map((entry) => {
-                  const rank = entry.rank;
-                  const RankIcon = rank === 1 ? Crown : rank === 2 ? Medal : Trophy;
-                  const glow = rank === 1 ? 'from-amber-100 to-orange-50' : rank === 2 ? 'from-slate-100 to-white' : 'from-orange-100 to-white';
-                  return (
-                    <div key={entry.id} className={cn('rounded-[1.6rem] border border-slate-100 bg-gradient-to-br p-5 shadow-[0_18px_54px_-38px_rgba(15,23,42,0.32)]', glow)}>
-                      <div className="flex items-center justify-between">
-                        <Badge className="border-none bg-[#14295F] text-white">#{rank}</Badge>
-                        <RankIcon className="h-5 w-5 text-[#14295F]" />
-                      </div>
-                      <div className="mt-5 flex items-center gap-3">
-                        <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
-                          <AvatarFallback className="bg-[#14295F]/7 font-black text-[#14295F]">
-                            {(entry.displayNameSnapshot || 'S').charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="truncate text-lg font-black tracking-tight text-slate-900">{formatMaskedName(entry.displayNameSnapshot)}</p>
-                          <p className="truncate text-xs font-semibold text-slate-500">{entry.classNameSnapshot || '반 미지정'}</p>
-                        </div>
-                      </div>
-                      <p className="mt-5 text-2xl font-black tracking-tight text-primary">{formatStudyMinutes(entry.value)}</p>
-                    </div>
-                  );
-                })}
-              </div>
+          </div>
 
-              <div className="space-y-2 px-5">
-                {restEntries.map((entry) => (
-                  <div key={entry.id} className={cn('flex items-center justify-between rounded-[1.4rem] border px-4 py-3 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.2)]', entry.studentId === user?.uid ? 'border-[#FFB357]/35 bg-[#FFF7EC]' : 'border-slate-100 bg-white')}>
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="w-8 text-center text-sm font-black text-slate-400">{entry.rank}</span>
-                      <Avatar className="h-10 w-10 border border-slate-100">
-                        <AvatarFallback className="bg-[#14295F]/6 font-black text-[#14295F]">
-                          {(entry.displayNameSnapshot || 'S').charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-slate-900">{formatMaskedName(entry.displayNameSnapshot)}</p>
-                        <p className="truncate text-[11px] font-semibold text-slate-500">{entry.classNameSnapshot || '반 미지정'}</p>
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-sm font-black text-primary">{formatStudyMinutes(entry.value)}</p>
-                    </div>
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="grid gap-4 md:grid-cols-3">
+              <TopSummaryCard
+                label="내 현재 순위"
+                value={myEntry ? `#${myEntry.rank}` : '집계중'}
+                sub={myEntry ? `${rangeMeta.label} 누적 ${formatHourValue(myEntry.value)}` : '아직 기록이 없어요'}
+                tone="orange"
+                icon={Trophy}
+              />
+              <TopSummaryCard
+                label="1위와의 차이"
+                value={myEntry?.rank === 1 ? '선두' : formatHourValue(diffAbove)}
+                sub={myEntry?.rank === 1 ? '현재 선두 유지 중' : '지금 집중하면 추월 가능'}
+                tone="blue"
+                icon={Zap}
+              />
+              <TopSummaryCard
+                label="업데이트 상태"
+                value="LIVE"
+                sub="마지막 업데이트: 방금 전"
+                icon={TimerReset}
+              />
+            </div>
+
+            <RewardGoalCard />
+          </div>
+
+          <CompetitionMessage diffAbove={diffAbove} diffBelow={diffBelow} rank={myEntry?.rank || 0} />
+
+          <Panel className="overflow-hidden">
+            <div className="border-b border-white/10 px-5 py-4 sm:px-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-white/70">
+                    <Crown className="h-3.5 w-3.5" />
+                    LEADERBOARD
                   </div>
-                ))}
-                {hasMore && (
-                  <div className="flex justify-center pt-4">
-                    <Button variant="outline" className="h-11 rounded-2xl font-black" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}>
-                      더 보기 <ChevronRight className="ml-1 h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+                  <h2 className="mt-3 text-2xl font-black text-white">{rangeMeta.title}</h2>
+                  <p className="mt-1 text-sm text-white/62">{rangeMeta.hint}</p>
+                </div>
+
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/62">
+                  <Users className="h-4 w-4" />
+                  총 {currentEntries.length}명 참여 중
+                </div>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              {isLoading ? (
+                <div className="flex h-64 items-center justify-center">
+                  <Loader2 className="h-10 w-10 animate-spin text-white/30" />
+                </div>
+              ) : currentEntries.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-white/15 bg-white/[0.02] px-6 py-16 text-center text-sm font-semibold text-white/58">
+                  아직 표시할 랭킹이 없어요.
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {visibleEntries.map((player, index) => (
+                      <LeaderboardRow
+                        key={`${activeRange}-${player.id}`}
+                        player={player}
+                        maxMinutes={maxMinutes}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+
+                  {hasMore ? (
+                    <div className="mt-5 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
+                      >
+                        더 보기
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-5 flex flex-col gap-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-white">지금 목표</p>
+                      <p className="mt-1 text-sm leading-6 text-white/70">
+                        {myEntry?.rank === 1
+                          ? '지금 페이스를 유지하면 선두를 지킬 수 있어요.'
+                          : `오늘 ${hoursNeededToLead.toFixed(1)}시간만 더 공부하면 1위를 노릴 수 있어요.`}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:scale-[1.01]"
+                    >
+                      추월 전략 보기
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </Panel>
+        </div>
+      </div>
     </div>
   );
 }
