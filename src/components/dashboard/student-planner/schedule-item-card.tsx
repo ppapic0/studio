@@ -164,12 +164,12 @@ export function ScheduleItemCard({
 
   const TimePicker = ({ type, h, m, p }: { type: 's' | 'e'; h: string; m: string; p: '오전' | '오후' }) => (
     <div className={cn(
-      "flex items-center rounded-xl border border-[#D9E1F2] bg-[#F7FAFF] p-0.5",
+      "flex items-center rounded-xl border border-white/10 bg-white/8 p-0.5",
       isMobile && "w-full justify-start",
       (disabled || isPast) && "pointer-events-none opacity-60"
     )}>
       <Select value={p} onValueChange={(value) => handleValueChange(type, 'p', value)} disabled={disabled || isPast}>
-        <SelectTrigger className={cn("h-7 border-none bg-transparent px-1 font-black shadow-none focus:ring-0", isMobile ? "w-[48px] text-[10px]" : "w-[56px] text-xs")}>
+        <SelectTrigger className={cn("h-7 border-none bg-transparent px-1 font-black text-white shadow-none focus:ring-0", isMobile ? "w-[48px] text-[10px]" : "w-[56px] text-xs")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -177,18 +177,18 @@ export function ScheduleItemCard({
           <SelectItem value="오후">오후</SelectItem>
         </SelectContent>
       </Select>
-      <div className="mx-0.5 h-2 w-px bg-slate-300" />
+      <div className="mx-0.5 h-2 w-px bg-white/12" />
       <Select value={h} onValueChange={(value) => handleValueChange(type, 'h', value)} disabled={disabled || isPast}>
-        <SelectTrigger className={cn("h-7 border-none bg-transparent px-1 font-mono font-black shadow-none focus:ring-0", isMobile ? "w-[36px] text-[11px]" : "w-[44px] text-sm")}>
+        <SelectTrigger className={cn("h-7 border-none bg-transparent px-1 font-mono font-black text-white shadow-none focus:ring-0", isMobile ? "w-[36px] text-[11px]" : "w-[44px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">
           {HOURS.map((hour) => <SelectItem key={hour} value={hour}>{hour}</SelectItem>)}
         </SelectContent>
       </Select>
-      <span className="px-0.5 text-[9px] font-black opacity-30">:</span>
+      <span className="px-0.5 text-[9px] font-black text-white/30">:</span>
       <Select value={m} onValueChange={(value) => handleValueChange(type, 'm', value)} disabled={disabled || isPast}>
-        <SelectTrigger className={cn("h-7 border-none bg-transparent px-1 font-mono font-black shadow-none focus:ring-0", isMobile ? "w-[36px] text-[11px]" : "w-[44px] text-sm")}>
+        <SelectTrigger className={cn("h-7 border-none bg-transparent px-1 font-mono font-black text-white shadow-none focus:ring-0", isMobile ? "w-[36px] text-[11px]" : "w-[44px] text-sm")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[200px]">
@@ -200,20 +200,20 @@ export function ScheduleItemCard({
 
   return (
     <div className={cn(
-      "group relative flex flex-col rounded-[1.45rem] border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md",
+      "group relative flex flex-col rounded-[1.45rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.94)_0%,rgba(12,27,63,0.9)_100%)] shadow-[0_20px_40px_-30px_rgba(0,0,0,0.48)] transition-all hover:border-white/16 hover:shadow-[0_24px_46px_-30px_rgba(0,0,0,0.56)]",
       isMobile ? "p-4" : "p-5"
     )}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <div className={cn("flex shrink-0 items-center justify-center rounded-xl bg-[#FFF7EC] text-[#FF7A16]", isMobile ? "p-2" : "p-2.5")}>
+          <div className={cn("flex shrink-0 items-center justify-center rounded-xl bg-[#FF9626]/14 text-[#FFD79F]", isMobile ? "p-2" : "p-2.5")}>
             <Icon className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </div>
           <div className="min-w-0">
-            <Label className={cn("block truncate font-black tracking-tight text-[#173A82]", isMobile ? "text-sm" : "text-sm")}>
+            <Label className={cn("block truncate font-black tracking-tight text-white", isMobile ? "text-sm" : "text-sm")}>
               {titlePart}
             </Label>
             {isToday ? (
-              <p className="mt-0.5 text-[10px] font-bold text-[#FF7A16]">오늘 수정 시 벌점 규칙 적용</p>
+              <p className="mt-0.5 text-[10px] font-bold text-[#FFD79F]">오늘 수정 시 벌점 규칙 적용</p>
             ) : null}
           </div>
         </div>
@@ -234,30 +234,30 @@ export function ScheduleItemCard({
 
       <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'flex-col sm:flex-row sm:items-center sm:justify-between')}>
         <TimePicker type="s" h={sHour} m={sMin} p={sPer} />
-        <span className="mx-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-[#173A82]/26">to</span>
+        <span className="mx-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-white/26">to</span>
         <TimePicker type="e" h={eHour} m={eMin} p={ePer} />
       </div>
 
       <AlertDialog open={isPenaltyConfirmOpen} onOpenChange={setIsPenaltyConfirmOpen}>
-        <AlertDialogContent className="max-w-[22rem] rounded-[1.5rem] border-slate-200 bg-white p-6">
+        <AlertDialogContent className="max-w-[22rem] rounded-[1.5rem] border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#0F2149_100%)] p-6 text-white">
           <AlertDialogHeader className="gap-2 text-left">
-            <AlertDialogTitle className="text-lg font-black tracking-tight text-slate-900">
+            <AlertDialogTitle className="text-lg font-black tracking-tight text-white">
               오늘 루틴 수정 시 벌점이 부여돼요
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-slate-600">
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-white/62">
               오늘 날짜의 루틴을 수정하면 하루 최대 1점 벌점이 자동 반영됩니다. 계속 수정할까요?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-2 flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-0">
             <AlertDialogCancel
               onClick={handleCancelTodayEdit}
-              className="mt-0 rounded-2xl border-slate-200 font-bold text-slate-600"
+              className="mt-0 rounded-2xl border-white/10 bg-white/8 font-bold text-white hover:bg-white/12"
             >
               취소
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmTodayEdit}
-              className="rounded-2xl bg-slate-900 font-bold text-white hover:bg-slate-800"
+              className="rounded-2xl bg-[linear-gradient(180deg,#ffb347_0%,#ff9626_100%)] font-bold text-white hover:brightness-105"
             >
               수정 계속
             </AlertDialogAction>

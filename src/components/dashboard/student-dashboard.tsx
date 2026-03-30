@@ -2817,7 +2817,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         ) : (
             <Link href="/dashboard/student-reports" className="group h-full touch-manipulation">
             <Card className={cn(
-              "student-cta student-cta-card h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4 rounded-[2rem] p-6",
+              "student-cta student-cta-card student-utility-card h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4 rounded-[2rem] p-6",
               unreadReportCount > 0 ? "border-[#FF7A16] ring-1 ring-[#FF7A16]/30" : "border border-slate-200/80"
             )}>
               <div className="rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 h-16 w-16">
@@ -2843,7 +2843,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           <DialogTrigger asChild>
               <button className="group text-left h-full w-full touch-manipulation">
               <Card className={cn(
-                "student-cta student-cta-card h-full border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
+                "student-cta student-cta-card student-utility-card h-full border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
                 isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6"
               )}>
                 <div className={cn("rounded-2xl border border-[#FFE0B7] bg-[linear-gradient(180deg,#FFF3E2_0%,#FFE6C7_100%)] flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]", isMobile ? "h-12 w-12" : "h-16 w-16")}>

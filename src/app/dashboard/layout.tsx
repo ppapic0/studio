@@ -70,24 +70,32 @@ export default function DashboardLayout({
           isMobileView
             ? isParentMode
               ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eef4ff_48%,#e6efff_100%)] px-1.5 pb-4 sm:px-3 sm:pb-5 md:px-4'
-              : 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eff4ff_52%,#e8efff_100%)] px-2.5 pb-5 sm:px-3 sm:pb-6'
-            : 'bg-[#f2f4f8] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]'
+              : 'bg-[radial-gradient(circle_at_top,rgba(255,165,60,0.16),transparent_24%),linear-gradient(180deg,#13285A_0%,#0E1B3D_100%)] px-2.5 pb-5 sm:px-3 sm:pb-6'
+            : isStudentMode
+              ? 'bg-[radial-gradient(circle_at_top,rgba(255,165,60,0.08),transparent_18%),linear-gradient(180deg,#13285A_0%,#0E1B3D_100%)] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]'
+              : 'bg-[#f2f4f8] md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]'
         )}
       >
         <div className="fixed inset-0 pointer-events-none z-0">
           <div
             className={cn(
               'absolute inset-0',
-              isMobileView
-                ? 'bg-[radial-gradient(#14295F_1px,transparent_1px)] [background-size:30px_30px] opacity-[0.05]'
+              isStudentMode && !isParentMode
+                ? isMobileView
+                  ? 'bg-[radial-gradient(rgba(255,255,255,0.9)_1px,transparent_1px)] [background-size:30px_30px] opacity-[0.06]'
+                  : 'bg-[radial-gradient(rgba(255,255,255,0.9)_1.3px,transparent_1.3px)] [background-size:42px_42px] opacity-[0.05]'
+                : isMobileView
+                  ? 'bg-[radial-gradient(#14295F_1px,transparent_1px)] [background-size:30px_30px] opacity-[0.05]'
                 : 'bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:40px_40px] opacity-[0.04]'
             )}
           />
           <div
             className={cn(
               'absolute inset-0',
-              isMobileView
-                ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(255,122,22,0.35),transparent_42%),radial-gradient(circle_at_85%_90%,rgba(20,41,95,0.26),transparent_45%)]'
+              isStudentMode && !isParentMode
+                ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(255,122,22,0.24),transparent_36%),radial-gradient(circle_at_78%_85%,rgba(36,73,151,0.22),transparent_40%)]'
+                : isMobileView
+                  ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(255,122,22,0.35),transparent_42%),radial-gradient(circle_at_85%_90%,rgba(20,41,95,0.26),transparent_45%)]'
                 : 'bg-[radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.08),transparent_60%)]'
             )}
           />
@@ -107,8 +115,10 @@ export default function DashboardLayout({
             isParentMode
               ? 'parent-app-shell overflow-hidden rounded-[3rem] border-[8px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f4f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.52)] ring-2 ring-[#ffb985]/40 relative mt-2 sm:mt-3'
               : isMobileView
-                ? 'dashboard-mobile-shell overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f5f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.55)] ring-2 ring-[#ff7a16]/45 relative mt-3 sm:mt-4'
-                : 'w-full min-h-screen',
+                ? 'student-night-shell dashboard-mobile-shell overflow-hidden rounded-[3.25rem] border-[10px] border-[#10295f] bg-[radial-gradient(circle_at_top,rgba(255,165,60,0.07),transparent_18%),radial-gradient(circle_at_78%_14%,rgba(82,118,208,0.08),transparent_22%),linear-gradient(180deg,#13285A_0%,#0E1B3D_100%)] shadow-[0_42px_95px_-28px_rgba(4,10,32,0.76)] ring-1 ring-[#ff9626]/18 relative mt-3 sm:mt-4'
+                : isStudentMode
+                  ? 'student-night-shell w-full min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,165,60,0.07),transparent_16%),linear-gradient(180deg,#13285A_0%,#0E1B3D_100%)]'
+                  : 'w-full min-h-screen',
             playStudentEntry && isStudentMode && 'student-shell-glow'
           )}
         >
@@ -129,7 +139,7 @@ export default function DashboardLayout({
               isParentMode
                 ? 'parent-app-main p-4 px-4 pb-24 pt-4 md:px-5 md:pt-5'
                 : isMobileView
-                  ? 'dashboard-mobile-main p-4 px-4 pb-24 pt-5'
+                  ? 'student-night-main dashboard-mobile-main p-4 px-4 pb-24 pt-5'
                   : 'p-4 sm:p-6 md:p-8 lg:p-12 max-w-[1500px] pb-12'
             )}
           >

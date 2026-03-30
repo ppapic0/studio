@@ -117,7 +117,7 @@ function getChecklistBadge(task: any, subjectOptions: any[]) {
   const subject = subjectOptions.find((item) => item.id === (task.subject || 'etc'));
   return {
     label: `${subject?.label || '기타'} · ${resolveStudyPlanMode(task) === 'volume' ? '분량형' : '시간형'}`,
-    className: 'border border-[#DDE7F6] bg-[#F6F8FC] text-[#17326B]',
+    className: 'border border-white/10 bg-white/10 text-[#FFD79F]',
   };
 }
 
@@ -146,10 +146,10 @@ function ActionChipButton({
 }) {
   const toneClass =
     tone === 'orange'
-      ? 'border-[#FF9626]/18 bg-[#FFF4E8] text-[#FF9626] hover:bg-[#FFE9CF]'
+      ? 'border-[#FF9626]/22 bg-[#FF9626]/14 text-[#FFD79F] hover:bg-[#FF9626]/18'
       : tone === 'white'
-        ? 'border-[#DDE7F6] bg-white text-[#17326B] hover:bg-[#F8FBFF]'
-        : 'border-[#17326B]/10 bg-[#17326B] text-white hover:bg-[#1E4087]';
+        ? 'border-white/10 bg-white/8 text-white hover:bg-white/12'
+        : 'border-white/10 bg-[#17326B] text-white hover:bg-[#1E4087]';
 
   return (
     <Button
@@ -500,36 +500,36 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
   return (
     <>
-      <div className={cn('mx-auto flex w-full max-w-5xl flex-col pb-24', isMobile ? 'gap-4 px-3 pt-3' : 'gap-6 px-4 pt-4')}>
+      <div className={cn('planner-main-view student-night-page mx-auto flex w-full max-w-5xl flex-col pb-24', isMobile ? 'gap-4 px-3 pt-3' : 'gap-6 px-4 pt-4')}>
         <header className="space-y-4">
           <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-end justify-between')}>
             <div className="min-w-0">
-              <p className="text-[11px] font-black tracking-[0.24em] text-[#17326B]/45">PLAN</p>
-              <h1 className="mt-2 text-[2rem] font-black tracking-tight text-[#17326B] md:text-[2.7rem]">계획</h1>
-              <p className="mt-1 text-sm font-semibold text-[#17326B]/62">오늘의 퀘스트 보드</p>
+              <p className="text-[11px] font-black tracking-[0.24em] text-white/45">PLAN</p>
+              <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white md:text-[2.7rem]">계획</h1>
+              <p className="mt-1 text-sm font-semibold text-white/62">오늘의 퀘스트 보드</p>
             </div>
-            <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-[#DDE7F6] bg-white/92 px-4 py-2 text-sm font-black text-[#17326B] shadow-[0_18px_36px_-30px_rgba(23,50,107,0.24)]">
+            <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] px-4 py-2 text-sm font-black text-white shadow-[0_20px_40px_-30px_rgba(0,0,0,0.42)]">
               <span>🔥 {todayPointTotal} / {dailyPointCap} pt</span>
-              <span className="text-[#17326B]/25">|</span>
+              <span className="text-white/25">|</span>
               <span>{completionPercent}% 완료</span>
               {todayStreakDays > 0 ? (
                 <>
-                  <span className="text-[#17326B]/25">|</span>
+                  <span className="text-white/25">|</span>
                   <span>{todayStreakDays}일 연속</span>
                 </>
               ) : null}
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] border border-[#DDE7F6] bg-white/92 p-3 shadow-[0_22px_44px_-36px_rgba(23,50,107,0.18)]">
+          <div className="rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(13,28,69,0.92)_100%)] p-3 shadow-[0_22px_44px_-36px_rgba(0,0,0,0.52)]">
             <div className="flex items-center justify-between gap-2">
-              <Button type="button" variant="ghost" onClick={() => moveWeek(-1)} className="h-10 w-10 rounded-full bg-[#F5F8FF] p-0 text-[#17326B] hover:bg-[#EAF0FF]">
+              <Button type="button" variant="ghost" onClick={() => moveWeek(-1)} className="h-10 w-10 rounded-full bg-white/8 p-0 text-white hover:bg-white/12">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="rounded-full bg-[#FFF4E8] px-4 py-2 text-xs font-black tracking-[0.18em] text-[#FF9626]">
+              <div className="rounded-full border border-[#FFB347]/25 bg-[#FF9626]/12 px-4 py-2 text-xs font-black tracking-[0.18em] text-[#FFD79F]">
                 {weekRangeLabel}
               </div>
-              <Button type="button" variant="ghost" onClick={() => moveWeek(1)} className="h-10 w-10 rounded-full bg-[#F5F8FF] p-0 text-[#17326B] hover:bg-[#EAF0FF]">
+              <Button type="button" variant="ghost" onClick={() => moveWeek(1)} className="h-10 w-10 rounded-full bg-white/8 p-0 text-white hover:bg-white/12">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -545,8 +545,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     className={cn(
                       'rounded-[1rem] border px-1 py-2 text-center transition-all',
                       selected
-                        ? 'border-[#17326B] bg-[#17326B] text-white shadow-[0_14px_28px_-18px_rgba(23,50,107,0.45)]'
-                        : 'border-[#DDE7F6] bg-white text-[#17326B] hover:border-[#17326B]/30 hover:bg-[#F8FBFF]'
+                        ? 'border-[#FFB347]/28 bg-[linear-gradient(180deg,#17326B_0%,#28478F_100%)] text-white shadow-[0_14px_28px_-18px_rgba(0,0,0,0.45)]'
+                        : 'border-white/10 bg-white/8 text-white/82 hover:border-white/16 hover:bg-white/12'
                     )}
                   >
                     <p className="text-[10px] font-black text-current/68">{format(day, 'EEE', { locale: ko })}</p>
@@ -679,7 +679,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           className={cn(
                             'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                             questEndTimeChoice === clock
-                              ? 'border-[#FFD79F] bg-[#FFF4E8] text-[#17326B]'
+                              ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
                               : 'border-white/12 bg-white/10 text-white'
                           )}
                         >
@@ -705,7 +705,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                             className={cn(
                               'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                               selected
-                                ? 'border-[#FFD79F] bg-[#FFF4E8] text-[#17326B]'
+                                ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
                                 : 'border-white/12 bg-white/10 text-white'
                             )}
                           >
@@ -727,14 +727,14 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           className={cn(
                             'rounded-[1.1rem] border px-3 py-3 text-left transition-all',
                             questMissionId === item.id
-                              ? 'border-[#FFD79F] bg-[#FFF4E8] text-[#17326B]'
+                              ? 'border-[#FFB347]/24 bg-[#FF9626]/14 text-white'
                               : 'border-white/12 bg-white/10 text-white'
                           )}
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="text-sm font-black">{item.title}</p>
-                              <p className={cn('mt-1 text-[11px] font-semibold', questMissionId === item.id ? 'text-[#17326B]/62' : 'text-white/64')}>
+                              <p className={cn('mt-1 text-[11px] font-semibold', questMissionId === item.id ? 'text-white/72' : 'text-white/64')}>
                                 {item.tag} · {item.targetMinutes}분
                               </p>
                             </div>
@@ -780,26 +780,26 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     setShowQuickAddCard(true);
                   }}
                   disabled={isSubmitting}
-                  className="rounded-full px-3 py-2 text-[11px] font-black text-[#17326B]/55 transition hover:text-[#17326B] disabled:opacity-45"
+                  className="rounded-full px-3 py-2 text-[11px] font-black text-white/55 transition hover:text-white disabled:opacity-45"
                 >
                   빈 상태에서 새로 만들기
                 </button>
               </>
             ) : (
-              <div className="rounded-full border border-[#DDE7F6] bg-white/88 px-4 py-2 text-xs font-black text-[#17326B]/65">
+              <div className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-black text-white/65">
                 지난 날짜는 기록 확인 중심으로 보여드릴게요.
               </div>
             )}
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-[2rem] border border-[#DDE7F6] bg-[linear-gradient(180deg,#FFFDF9_0%,#FFFFFF_100%)] shadow-[0_28px_50px_-38px_rgba(23,50,107,0.2)]">
-          <div className="border-b border-[#E7EDF8] px-5 py-5">
+        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] shadow-[0_28px_50px_-38px_rgba(0,0,0,0.48)]">
+          <div className="border-b border-white/10 px-5 py-5">
             <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-end justify-between')}>
               <div className="min-w-0">
-                <p className="text-[11px] font-black tracking-[0.18em] text-[#17326B]/42">TODAY QUEST</p>
-                <h3 className="mt-1 text-[1.7rem] font-black tracking-tight text-[#17326B]">오늘 해야 할 것</h3>
-                <p className="mt-2 max-w-2xl break-keep text-sm font-semibold leading-6 text-[#17326B]/58">
+                <p className="text-[11px] font-black tracking-[0.18em] text-white/42">TODAY QUEST</p>
+                <h3 className="mt-1 text-[1.7rem] font-black tracking-tight text-white">오늘 해야 할 것</h3>
+                <p className="mt-2 max-w-2xl break-keep text-sm font-semibold leading-6 text-white/58">
                   긴 설명 대신 오늘 블록만 먼저 체크하세요. 필요한 설정은 눌렀을 때만 펼쳐집니다.
                 </p>
               </div>
@@ -817,7 +817,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     type="button"
                     variant="ghost"
                     onClick={() => setIsStudyPlanSheetOpen(true)}
-                    className="h-10 rounded-full bg-[#F6F8FC] px-4 text-[11px] font-black text-[#17326B] hover:bg-[#ECF2FF]"
+                    className="h-10 rounded-full border border-white/10 bg-white/8 px-4 text-[11px] font-black text-white hover:bg-white/12"
                   >
                     전체 편집
                   </Button>
@@ -827,12 +827,12 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           </div>
 
           {showQuickAddCard && !isPast ? (
-            <div className="mx-4 mt-4 overflow-hidden rounded-[1.7rem] border border-[#DDE7F6] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_58%,#FFF7EC_100%)] p-4 shadow-[0_20px_40px_-34px_rgba(23,50,107,0.18)] animate-[planner-fade-rise_0.22s_ease-out] md:mx-5">
+            <div className="mx-4 mt-4 overflow-hidden rounded-[1.7rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.12),transparent_24%),linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(18,34,70,0.92)_100%)] p-4 shadow-[0_20px_40px_-34px_rgba(0,0,0,0.44)] animate-[planner-fade-rise_0.22s_ease-out] md:mx-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[#17326B]/42">QUICK CREATE</p>
-                  <p className="mt-1 text-lg font-black tracking-tight text-[#17326B]">다음 공부 추가</p>
-                  <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#17326B]/55">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-white/42">QUICK CREATE</p>
+                  <p className="mt-1 text-lg font-black tracking-tight text-white">다음 공부 추가</p>
+                  <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-white/55">
                     직접 길게 쓰지 않아도 과목, 유형, 시간만 고르면 자동으로 오늘 루트에 붙어요.
                   </p>
                 </div>
@@ -840,7 +840,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                   <button
                     type="button"
                     onClick={resetStudyComposerPrefill}
-                    className="rounded-full bg-[#FFF4E8] px-3 py-1 text-[10px] font-black text-[#FF9626]"
+                    className="rounded-full border border-[#FFB347]/22 bg-[#FF9626]/12 px-3 py-1 text-[10px] font-black text-[#FFD79F]"
                   >
                     불러온 계획 해제
                   </button>
@@ -849,7 +849,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
               <div className="mt-4 space-y-4">
                 <div>
-                  <p className="text-[11px] font-black text-[#17326B]/55">과목 선택</p>
+                  <p className="text-[11px] font-black text-white/62">과목 선택</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {subjectOptions.map((subject: any) => (
                       <button
@@ -859,8 +859,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                         className={cn(
                           'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                           resolvedSubjectValue === subject.id
-                            ? 'border-[#17326B] bg-[#17326B] text-white'
-                            : 'border-[#DDE7F6] bg-white text-[#17326B] hover:bg-[#F8FBFF]'
+                            ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
+                            : 'border-white/10 bg-white/8 text-white hover:bg-white/12'
                         )}
                       >
                         {subject.label}
@@ -870,7 +870,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-black text-[#17326B]/55">공부 유형 선택</p>
+                  <p className="text-[11px] font-black text-white/62">공부 유형 선택</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {QUICK_STUDY_TYPES.map((type) => (
                       <button
@@ -883,8 +883,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                         className={cn(
                           'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                           quickStudyType === type
-                            ? 'border-[#FF9626] bg-[#FFF4E8] text-[#FF9626]'
-                            : 'border-[#DDE7F6] bg-white text-[#17326B] hover:bg-[#F8FBFF]'
+                            ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
+                            : 'border-white/10 bg-white/8 text-white hover:bg-white/12'
                         )}
                       >
                         {type}
@@ -894,7 +894,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-black text-[#17326B]/55">예상 시간 선택</p>
+                  <p className="text-[11px] font-black text-white/62">예상 시간 선택</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {QUICK_TIME_PRESETS.map((minute) => (
                       <button
@@ -904,8 +904,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                         className={cn(
                           'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                           Number(newStudyMinutes || missionSuggestion?.targetMinutes || 0) === minute
-                            ? 'border-[#17326B] bg-[#17326B] text-white'
-                            : 'border-[#DDE7F6] bg-white text-[#17326B] hover:bg-[#F8FBFF]'
+                            ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
+                            : 'border-white/10 bg-white/8 text-white hover:bg-white/12'
                         )}
                       >
                         {minute}분
@@ -916,17 +916,17 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
                 <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]')}>
                   <div className="space-y-2">
-                    <p className="text-[11px] font-black text-[#17326B]/55">할 일 제목</p>
+                    <p className="text-[11px] font-black text-white/62">할 일 제목</p>
                     <Input
                       value={newStudyTask}
                       onChange={(event) => setNewStudyTask(event.target.value)}
                       placeholder={`예: ${resolvedSubjectLabel} ${quickStudyType}`}
-                      className="h-12 rounded-2xl border-[#DDE7F6] bg-white font-bold text-[#17326B] placeholder:text-[#17326B]/35"
+                      className="h-12 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
                     />
                   </div>
                   {newStudyMode === 'volume' ? (
                     <div className="space-y-2">
-                      <p className="text-[11px] font-black text-[#17326B]/55">목표 분량</p>
+                      <p className="text-[11px] font-black text-white/62">목표 분량</p>
                       <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,0.75fr)] gap-2">
                         <Input
                           type="number"
@@ -934,10 +934,10 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           value={newStudyTargetAmount}
                           onChange={(event) => setNewStudyTargetAmount(event.target.value)}
                           placeholder="수치"
-                          className="h-12 rounded-2xl border-[#DDE7F6] bg-white font-bold text-[#17326B] placeholder:text-[#17326B]/35"
+                          className="h-12 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
                         />
                         <Select value={newStudyAmountUnit} onValueChange={setNewStudyAmountUnit}>
-                          <SelectTrigger className="h-12 rounded-2xl border-[#DDE7F6] bg-white font-bold text-[#17326B]">
+                          <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/8 font-bold text-white">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -952,17 +952,17 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           value={newStudyCustomAmountUnit}
                           onChange={(event) => setNewStudyCustomAmountUnit(event.target.value)}
                           placeholder="예: 세트, 회차"
-                          className="h-11 rounded-2xl border-[#DDE7F6] bg-white font-bold text-[#17326B] placeholder:text-[#17326B]/35"
+                          className="h-11 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
                         />
                       ) : null}
                     </div>
                   ) : null}
                 </div>
 
-                <div className={cn('rounded-[1.2rem] bg-[#FFF7EC] px-4 py-3', isMobile ? 'space-y-3' : 'flex items-center justify-between gap-3')}>
+                <div className={cn('rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-3', isMobile ? 'space-y-3' : 'flex items-center justify-between gap-3')}>
                   <div className="min-w-0">
                     <p className="text-[10px] font-black tracking-[0.18em] text-[#FF9626]">AUTO SCHEDULE</p>
-                    <p className="mt-1 break-keep text-[12px] font-bold text-[#17326B]">
+                    <p className="mt-1 break-keep text-[12px] font-bold text-white">
                       {resolvedWindowPreview ? `${resolvedWindowPreview.startTime} - ${resolvedWindowPreview.endTime}` : '시간은 필요할 때만 적어도 괜찮아요'}
                     </p>
                   </div>
@@ -983,7 +983,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       key={item.key}
                       onClick={() => handlePrefillRecentStudy(item)}
                       className={cn(
-                        'rounded-full border border-[#DDE7F6] bg-[#F6F8FC] px-3 py-1.5 text-[11px] font-black text-[#17326B]',
+                        'rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] font-black text-white',
                         isMobile && 'w-full text-left'
                       )}
                     >
@@ -994,7 +994,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     type="button"
                     variant="ghost"
                     onClick={() => setIsRecentStudySheetOpen(true)}
-                    className={cn('h-9 rounded-full px-3 text-[11px] font-black text-[#17326B]/70 hover:bg-[#F3F7FF]', isMobile && 'w-full justify-center')}
+                    className={cn('h-9 rounded-full border border-white/10 bg-white/8 px-3 text-[11px] font-black text-white/72 hover:bg-white/12', isMobile && 'w-full justify-center')}
                   >
                     {isRecentStudyLoading ? '불러오는 중...' : '최근 더보기'}
                   </Button>
@@ -1007,12 +1007,12 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
             <div className="pointer-events-none absolute inset-0 opacity-45 [background-image:repeating-linear-gradient(180deg,transparent_0,transparent_67px,rgba(217,225,242,0.62)_68px)]" />
             <div className="relative space-y-3">
               {orderedChecklistTasks.length === 0 ? (
-                <div className="rounded-[1.45rem] border border-dashed border-[#DDE7F6] bg-white/84 px-5 py-7 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#EFF5FF] text-[#17326B]">
+                <div className="rounded-[1.45rem] border border-dashed border-white/10 bg-white/6 px-5 py-7 text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-[#FFD79F]">
                     <ListTodo className="h-6 w-6" />
                   </div>
-                  <p className="mt-4 text-lg font-black text-[#17326B]">오늘 할 일을 비워뒀어요</p>
-                  <p className="mt-2 break-keep text-sm font-semibold leading-6 text-[#17326B]/58">
+                  <p className="mt-4 text-lg font-black text-white">오늘 할 일을 비워뒀어요</p>
+                  <p className="mt-2 break-keep text-sm font-semibold leading-6 text-white/55">
                     어제 계획이나 템플릿을 고르면 오늘 체크리스트가 바로 채워져요.
                   </p>
                   {!isPast ? (
@@ -1074,38 +1074,38 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           </div>
 
           {completionPercent >= 100 && checklistTasks.length > 0 ? (
-            <div className="mx-4 mb-4 rounded-[1.35rem] border border-[#FF9626]/18 bg-[#FFF7EC] px-4 py-4 text-[#17326B] animate-[planner-fade-rise_0.24s_ease-out] md:mx-5 md:mb-5">
+            <div className="mx-4 mb-4 rounded-[1.35rem] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(47,170,125,0.18)_0%,rgba(13,28,69,0.9)_100%)] px-4 py-4 text-white animate-[planner-fade-rise_0.24s_ease-out] md:mx-5 md:mb-5">
               <p className="text-lg font-black tracking-tight">오늘 계획을 다 끝냈어요</p>
-              <p className="mt-1 text-sm font-semibold text-[#17326B]/60">포인트와 연속 달성이 바로 반영됐어요.</p>
+              <p className="mt-1 text-sm font-semibold text-white/62">포인트와 연속 달성이 바로 반영됐어요.</p>
             </div>
           ) : null}
         </section>
 
         <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]')}>
-          <section className="rounded-[1.9rem] border border-[#DDE7F6] bg-white/92 p-5 shadow-[0_24px_48px_-38px_rgba(23,50,107,0.2)]">
+          <section className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] p-5 shadow-[0_24px_48px_-38px_rgba(0,0,0,0.52)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-black tracking-[0.18em] text-[#17326B]/42">SUBJECT FLOW</p>
-                <h3 className="mt-1 text-xl font-black tracking-tight text-[#17326B]">과목 밸런스</h3>
+                <p className="text-[11px] font-black tracking-[0.18em] text-white/42">SUBJECT FLOW</p>
+                <h3 className="mt-1 text-xl font-black tracking-tight text-white">과목 밸런스</h3>
               </div>
-              <Badge className="rounded-full border border-[#DDE7F6] bg-[#F6F8FC] px-3 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+              <Badge className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
                 {subjectBalance.length}과목
               </Badge>
             </div>
 
             <div className="mt-4 space-y-3">
               {subjectBalance.length === 0 ? (
-                <div className="rounded-[1.3rem] border border-dashed border-[#DDE7F6] bg-[#F8FBFF] px-4 py-5 text-sm font-semibold text-[#17326B]/58">
+                <div className="rounded-[1.3rem] border border-dashed border-white/10 bg-white/6 px-4 py-5 text-sm font-semibold text-white/55">
                   오늘 공부 블록을 추가하면 과목 밸런스가 여기에 바로 보입니다.
                 </div>
               ) : (
                 subjectBalance.map((entry) => (
                   <div key={entry.key} className="space-y-2">
-                    <div className="flex items-center justify-between gap-3 text-sm font-black text-[#17326B]">
+                    <div className="flex items-center justify-between gap-3 text-sm font-black text-white">
                       <span>{entry.label}</span>
                       <span>{entry.percent}% · {formatMinutesShort(entry.minutes)}</span>
                     </div>
-                    <div className="rounded-full bg-[#EEF3FB] p-1">
+                    <div className="rounded-full bg-white/10 p-1">
                       <div
                         className="h-3 rounded-full bg-[linear-gradient(90deg,#17326B_0%,#28478F_55%,#FFB347_100%)] transition-[width] duration-300"
                         style={{ width: `${Math.max(12, entry.percent)}%` }}
@@ -1116,38 +1116,38 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
               )}
             </div>
 
-            <div className="mt-4 rounded-[1.35rem] bg-[#FFF7EC] px-4 py-3 text-sm font-semibold leading-6 text-[#17326B]">
+            <div className="mt-4 rounded-[1.35rem] border border-[#FFB347]/18 bg-[#FF9626]/10 px-4 py-3 text-sm font-semibold leading-6 text-[#FFE6BF]">
               {subjectBalanceFeedback}
             </div>
           </section>
 
-          <section className="rounded-[1.9rem] border border-[#DDE7F6] bg-white/92 p-5 shadow-[0_24px_48px_-38px_rgba(23,50,107,0.2)]">
+          <section className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] p-5 shadow-[0_24px_48px_-38px_rgba(0,0,0,0.52)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-black tracking-[0.18em] text-[#17326B]/42">DAY SUMMARY</p>
-                <h3 className="mt-1 text-xl font-black tracking-tight text-[#17326B]">오늘 요약</h3>
+                <p className="text-[11px] font-black tracking-[0.18em] text-white/42">DAY SUMMARY</p>
+                <h3 className="mt-1 text-xl font-black tracking-tight text-white">오늘 요약</h3>
               </div>
-              <Badge className="rounded-full border border-[#FF9626]/16 bg-[#FFF4E8] px-3 py-1 text-[10px] font-black text-[#FF9626] shadow-none">
+              <Badge className="rounded-full border border-[#FFB347]/18 bg-[#FF9626]/10 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
                 {todayCompletionLabel}
               </Badge>
             </div>
 
             <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-2')}>
-              <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.18em] text-[#17326B]/42">계획 시간</p>
-                <p className="mt-2 text-xl font-black text-[#17326B]">{formatMinutesShort(plannedStudyMinutes)}</p>
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.18em] text-white/42">계획 시간</p>
+                <p className="mt-2 text-xl font-black text-white">{formatMinutesShort(plannedStudyMinutes)}</p>
               </div>
-              <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.18em] text-[#17326B]/42">실제 공부</p>
-                <p className="mt-2 text-xl font-black text-[#17326B]">{formatMinutesShort(actualStudyMinutes)}</p>
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.18em] text-white/42">실제 공부</p>
+                <p className="mt-2 text-xl font-black text-white">{formatMinutesShort(actualStudyMinutes)}</p>
               </div>
-              <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.18em] text-[#17326B]/42">완료율</p>
-                <p className="mt-2 text-xl font-black text-[#17326B]">{completionPercent}%</p>
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.18em] text-white/42">완료율</p>
+                <p className="mt-2 text-xl font-black text-white">{completionPercent}%</p>
               </div>
-              <div className="rounded-[1.25rem] bg-[#F6F8FC] px-4 py-4">
-                <p className="text-[10px] font-black tracking-[0.18em] text-[#17326B]/42">외출 횟수</p>
-                <p className="mt-2 text-xl font-black text-[#17326B]">{outingCount}회</p>
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
+                <p className="text-[10px] font-black tracking-[0.18em] text-white/42">외출 횟수</p>
+                <p className="mt-2 text-xl font-black text-white">{outingCount}회</p>
               </div>
             </div>
 
@@ -1166,47 +1166,47 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         </div>
 
         <Collapsible open={isRoutineSectionOpen} onOpenChange={setIsRoutineSectionOpen}>
-          <section className="rounded-[1.9rem] border border-[#DDE7F6] bg-white/92 shadow-[0_24px_48px_-38px_rgba(23,50,107,0.22)]">
+          <section className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] shadow-[0_24px_48px_-38px_rgba(0,0,0,0.52)]">
             <CollapsibleTrigger asChild>
               <button type="button" className={cn('flex w-full gap-3 p-5 text-left', isMobile ? 'flex-col items-start' : 'items-center justify-between')}>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[#17326B]/42">ROUTINE</p>
-                  <h3 className="mt-1 text-xl font-black tracking-tight text-[#17326B]">루틴 관리</h3>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[#17326B]/58">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-white/42">ROUTINE</p>
+                  <h3 className="mt-1 text-xl font-black tracking-tight text-white">루틴 관리</h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-white/58">
                     입실, 외출, 생활 루틴은 필요한 순간에만 펼쳐서 관리하세요.
                   </p>
                 </div>
                 <div className={cn('flex items-center gap-3', isMobile && 'w-full justify-between')}>
-                  <Badge className="rounded-full border border-[#DDE7F6] bg-white px-3 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+                  <Badge className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-white shadow-none">
                     {routineCountLabel}
                   </Badge>
-                  <ChevronDown className={cn('h-5 w-5 text-[#17326B] transition-transform', isRoutineSectionOpen && 'rotate-180')} />
+                  <ChevronDown className={cn('h-5 w-5 text-white transition-transform', isRoutineSectionOpen && 'rotate-180')} />
                 </div>
               </button>
             </CollapsibleTrigger>
-            <CollapsibleContent className={cn('border-t border-[#DDE7F6] px-4 pb-4', !isMobile && 'px-5 pb-5')}>
+            <CollapsibleContent className={cn('border-t border-white/10 px-4 pb-4', !isMobile && 'px-5 pb-5')}>
               <div className={cn('mt-5 grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]')}>
-                <div className="rounded-[1.6rem] border border-[#DDE7F6] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-4">
+                <div className="rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(15,33,73,0.9)_100%)] p-4 shadow-[0_18px_38px_-32px_rgba(0,0,0,0.55)]">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-lg font-black text-[#17326B]">오늘 출석 정보</p>
-                      <p className="mt-1 text-[12px] font-semibold leading-5 text-[#17326B]/55">
+                      <p className="text-lg font-black text-white">오늘 출석 정보</p>
+                      <p className="mt-1 text-[12px] font-semibold leading-5 text-white/58">
                         등원, 하원, 외출 흐름을 기록해두면 원장도 실제 학습 흐름을 더 정확히 볼 수 있어요.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {isAbsentMode ? (
-                        <Badge className="rounded-full border-none bg-[#FFF1E1] px-3 py-1 text-[10px] font-black text-[#FF9626] shadow-none">
+                        <Badge className="rounded-full border border-[#FFB347]/18 bg-[#FF9626]/12 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
                           오늘 미등원
                         </Badge>
                       ) : null}
                       {hasInPlan && hasOutPlan ? (
-                        <Badge className="rounded-full border-none bg-[#ECFDF5] px-3 py-1 text-[10px] font-black text-[#0F766E] shadow-none">
+                        <Badge className="rounded-full border border-emerald-400/18 bg-emerald-500/12 px-3 py-1 text-[10px] font-black text-emerald-200 shadow-none">
                           출석 계획 저장됨
                         </Badge>
                       ) : null}
                       {hasAwayPlan ? (
-                        <Badge className="rounded-full border-none bg-[#FFF7EC] px-3 py-1 text-[10px] font-black text-[#FF9626] shadow-none">
+                        <Badge className="rounded-full border border-[#FFB347]/18 bg-[#FF9626]/10 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
                           외출 포함
                         </Badge>
                       ) : null}
@@ -1215,47 +1215,47 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
                   <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
                     <div className="space-y-1.5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B]/40">등원 예정</p>
-                      <Input type="time" value={inTime} onChange={(e) => setInTime(e.target.value)} disabled={isPast || isSubmitting} className="h-11 rounded-2xl border-[#DDE7F6] font-black text-[#17326B]" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">등원 예정</p>
+                      <Input type="time" value={inTime} onChange={(e) => setInTime(e.target.value)} disabled={isPast || isSubmitting} className="h-11 rounded-2xl border-white/10 bg-white/8 font-black text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B]/40">하원 예정</p>
-                      <Input type="time" value={outTime} onChange={(e) => setOutTime(e.target.value)} disabled={isPast || isSubmitting} className="h-11 rounded-2xl border-[#DDE7F6] font-black text-[#17326B]" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">하원 예정</p>
+                      <Input type="time" value={outTime} onChange={(e) => setOutTime(e.target.value)} disabled={isPast || isSubmitting} className="h-11 rounded-2xl border-white/10 bg-white/8 font-black text-white" />
                     </div>
                   </div>
 
                   <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
                     <div className="space-y-1.5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B]/40">외출 시작</p>
-                      <Input type="time" value={awayStartTime} onChange={(e) => setAwayStartTime(e.target.value)} disabled={isPast || isSubmitting} className="h-11 rounded-2xl border-[#DDE7F6] font-black text-[#17326B]" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">외출 시작</p>
+                      <Input type="time" value={awayStartTime} onChange={(e) => setAwayStartTime(e.target.value)} disabled={isPast || isSubmitting} className="h-11 rounded-2xl border-white/10 bg-white/8 font-black text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B]/40">복귀 예정</p>
-                      <Input type="time" value={awayEndTime} onChange={(e) => setAwayEndTime(e.target.value)} disabled={isPast || isSubmitting} className="h-11 rounded-2xl border-[#DDE7F6] font-black text-[#17326B]" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">복귀 예정</p>
+                      <Input type="time" value={awayEndTime} onChange={(e) => setAwayEndTime(e.target.value)} disabled={isPast || isSubmitting} className="h-11 rounded-2xl border-white/10 bg-white/8 font-black text-white" />
                     </div>
                   </div>
 
                   <div className="mt-4 space-y-1.5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B]/40">사유</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">사유</p>
                     <Input
                       value={awayReason}
                       onChange={(e) => setAwayReason(e.target.value)}
                       placeholder="예: 학원, 병원, 저녁 식사"
                       disabled={isPast || isSubmitting}
-                      className="h-11 rounded-2xl border-[#DDE7F6] font-bold text-[#17326B] placeholder:text-[#17326B]/35"
+                      className="h-11 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
                     />
                   </div>
 
                   {!isPast ? (
                     <div className={cn('mt-4 gap-2', isMobile ? 'grid grid-cols-1' : 'flex flex-wrap')}>
-                      <Button type="button" onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className="h-11 rounded-2xl bg-[#17326B] px-4 font-black text-white">
+                      <Button type="button" onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_60%,#FF7A16_170%)] px-4 font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.35)]">
                         <CalendarCheck2 className="mr-2 h-4 w-4" />
                         오늘 출석 저장
                       </Button>
-                      <Button type="button" variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className="h-11 rounded-2xl border-[#DDE7F6] bg-white px-4 font-black text-[#17326B]">
+                      <Button type="button" variant="outline" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className="h-11 rounded-2xl border-white/10 bg-white/8 px-4 font-black text-white">
                         오늘 미등원
                       </Button>
-                      <Button type="button" variant="outline" onClick={() => setIsRoutineCopyDialogOpen(true)} disabled={isSubmitting || !hasCopyableRoutines} className="h-11 rounded-2xl border-[#DDE7F6] bg-white px-4 font-black text-[#17326B]">
+                      <Button type="button" variant="outline" onClick={() => setIsRoutineCopyDialogOpen(true)} disabled={isSubmitting || !hasCopyableRoutines} className="h-11 rounded-2xl border-white/10 bg-white/8 px-4 font-black text-white">
                         <Copy className="mr-2 h-4 w-4" />
                         루틴 반복 복사
                       </Button>
@@ -1280,9 +1280,9 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                   ) : null}
 
                   {routineItems.length === 0 ? (
-                    <div className="rounded-[1.5rem] border border-dashed border-[#DDE7F6] bg-[#F7FAFF] p-5 text-center">
-                      <p className="text-sm font-black text-[#17326B]">저장된 루틴이 아직 없어요</p>
-                      <p className="mt-2 text-[12px] font-semibold leading-5 text-[#17326B]/55">
+                    <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/6 p-5 text-center">
+                      <p className="text-sm font-black text-white">저장된 루틴이 아직 없어요</p>
+                      <p className="mt-2 text-[12px] font-semibold leading-5 text-white/55">
                         자주 반복되는 흐름은 한 번만 적어두면 다음부터 훨씬 빨라져요.
                       </p>
                     </div>
@@ -1308,30 +1308,30 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         </Collapsible>
 
         <Collapsible open={isMemoSectionOpen} onOpenChange={setIsMemoSectionOpen}>
-          <section className="rounded-[1.9rem] border border-[#DDE7F6] bg-white/92 shadow-[0_24px_48px_-38px_rgba(23,50,107,0.2)]">
+          <section className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] shadow-[0_24px_48px_-38px_rgba(0,0,0,0.5)]">
             <CollapsibleTrigger asChild>
               <button type="button" className={cn('flex w-full gap-3 p-5 text-left', isMobile ? 'flex-col items-start' : 'items-center justify-between')}>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[#17326B]/42">EXTRA</p>
-                  <h3 className="mt-1 text-xl font-black tracking-tight text-[#17326B]">기타 계획</h3>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[#17326B]/58">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-white/42">EXTRA</p>
+                  <h3 className="mt-1 text-xl font-black tracking-tight text-white">기타 계획</h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-white/58">
                     메모, 준비물, 상담 같은 보조 일정만 따로 모아두고 필요할 때 펼쳐보세요.
                   </p>
                 </div>
                 <div className={cn('flex items-center gap-3', isMobile && 'w-full justify-between')}>
-                  <Badge className="rounded-full border border-[#DDE7F6] bg-white px-3 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+                  <Badge className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-white shadow-none">
                     {personalTasks.length}개
                   </Badge>
-                  <ChevronDown className={cn('h-5 w-5 text-[#17326B] transition-transform', isMemoSectionOpen && 'rotate-180')} />
+                  <ChevronDown className={cn('h-5 w-5 text-white transition-transform', isMemoSectionOpen && 'rotate-180')} />
                 </div>
               </button>
             </CollapsibleTrigger>
-            <CollapsibleContent className={cn('border-t border-[#DDE7F6] px-4 pb-4', !isMobile && 'px-5 pb-5')}>
-              <div className="mt-5 rounded-[1.5rem] border border-[#DDE7F6] bg-[linear-gradient(180deg,#ffffff_0%,#fff7ec_100%)] p-4">
+            <CollapsibleContent className={cn('border-t border-white/10 px-4 pb-4', !isMobile && 'px-5 pb-5')}>
+              <div className="mt-5 rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(18,36,79,0.9)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.46)]">
                 <div className={cn('flex flex-col gap-3', !isMobile && 'md:flex-row md:items-center')}>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-[#17326B]">짧은 메모나 일정 추가</p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#17326B]/55">
+                    <p className="text-sm font-black text-white">짧은 메모나 일정 추가</p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-white/58">
                       병원, 상담, 준비물처럼 보조 일정만 짧게 적어도 오늘 리스트에 바로 들어가요.
                     </p>
                   </div>
@@ -1347,13 +1347,13 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                         }}
                         placeholder="예: 상담, 준비물 챙기기"
                         disabled={isSubmitting}
-                        className="h-11 flex-1 rounded-2xl border-[#DDE7F6] bg-white font-bold text-[#17326B] placeholder:text-[#17326B]/35"
+                        className="h-11 flex-1 rounded-2xl border-white/10 bg-white/8 font-bold text-white placeholder:text-white/35"
                       />
                       <Button
                         type="button"
                         onClick={() => handleAddTask(newPersonalTask, 'personal')}
                         disabled={isSubmitting || !newPersonalTask.trim()}
-                        className="h-11 rounded-2xl bg-[#FF9626] px-4 font-black text-white hover:bg-[#FF9626]/92"
+                        className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-4 font-black text-white shadow-[0_18px_30px_-22px_rgba(255,122,22,0.35)]"
                       >
                         추가
                       </Button>
@@ -1368,7 +1368,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       variant="outline"
                       onClick={() => setIsTaskCopyDialogOpen(true)}
                       disabled={isSubmitting || !hasCopyableTasks}
-                      className="h-10 rounded-2xl border-[#DDE7F6] bg-white px-4 text-[11px] font-black text-[#17326B]"
+                      className="h-10 rounded-2xl border-white/10 bg-white/8 px-4 text-[11px] font-black text-white"
                     >
                       <Copy className="mr-2 h-3.5 w-3.5" />
                       학습/기타 반복 복사
@@ -1379,9 +1379,9 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
               <div className="mt-4 space-y-3">
                 {personalTasks.length === 0 ? (
-                  <div className="rounded-[1.5rem] border border-dashed border-[#DDE7F6] bg-[#F7FAFF] p-5 text-center">
-                    <p className="text-sm font-black text-[#17326B]">기타 일정은 필요할 때만 적어도 충분해요</p>
-                    <p className="mt-2 text-[12px] font-semibold leading-5 text-[#17326B]/55">
+                  <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/6 p-5 text-center">
+                    <p className="text-sm font-black text-white">기타 일정은 필요할 때만 적어도 충분해요</p>
+                    <p className="mt-2 text-[12px] font-semibold leading-5 text-white/55">
                       공부 흐름을 방해하지 않도록, 보조 일정은 간단하게 남기는 구조로 두었어요.
                     </p>
                   </div>
@@ -1391,7 +1391,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       key={task.id}
                       task={task}
                       badgeLabel={task.tag || '메모'}
-                      badgeClassName="border border-[#FF9626]/15 bg-[#FFF7EC] text-[#FF9626]"
+                      badgeClassName="border border-white/10 bg-white/10 text-[#FFD79F]"
                       durationLabel={task.startTime && task.endTime ? formatClockRange(task.startTime, task.endTime) : '오늘 안에'}
                       detailLabel={task.tag || null}
                       isVolumeTask={false}
@@ -1416,25 +1416,25 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
         {!isPast ? (
           <Collapsible open={isWrapUpOpen} onOpenChange={setIsWrapUpOpen}>
-            <section className="rounded-[1.9rem] border border-[#DDE7F6] bg-white/92 shadow-[0_24px_48px_-38px_rgba(23,50,107,0.18)]">
+            <section className="rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] shadow-[0_24px_48px_-38px_rgba(0,0,0,0.5)]">
               <CollapsibleTrigger asChild>
                 <button type="button" className={cn('flex w-full gap-3 p-5 text-left', isMobile ? 'flex-col items-start' : 'items-center justify-between')}>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black tracking-[0.18em] text-[#17326B]/42">WRAP UP</p>
-                    <h3 className="mt-1 text-xl font-black tracking-tight text-[#17326B]">하루 정리</h3>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-[#17326B]/58">
+                    <p className="text-[11px] font-black tracking-[0.18em] text-white/42">WRAP UP</p>
+                    <h3 className="mt-1 text-xl font-black tracking-tight text-white">하루 정리</h3>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-white/58">
                       남은 할 일은 내일로 미루거나, 템플릿에 반영하거나, 오늘 안에서 정리할 수 있어요.
                     </p>
                   </div>
                   <div className={cn('flex items-center gap-3', isMobile && 'w-full justify-between')}>
-                    <Badge className="rounded-full border border-[#DDE7F6] bg-white px-3 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+                    <Badge className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-white shadow-none">
                       {remainingStudyTasks.length + remainingPersonalTasks.length}개
                     </Badge>
-                    <ChevronDown className={cn('h-5 w-5 text-[#17326B] transition-transform', isWrapUpOpen && 'rotate-180')} />
+                    <ChevronDown className={cn('h-5 w-5 text-white transition-transform', isWrapUpOpen && 'rotate-180')} />
                   </div>
                 </button>
               </CollapsibleTrigger>
-              <CollapsibleContent className={cn('border-t border-[#E7EDF8] px-4 pb-4', !isMobile && 'px-5 pb-5')}>
+              <CollapsibleContent className={cn('border-t border-white/10 px-4 pb-4', !isMobile && 'px-5 pb-5')}>
                 {remainingStudyTasks.length + remainingPersonalTasks.length > 0 ? (
                   <div className="mt-5 flex flex-wrap gap-2">
                     <ActionChipButton icon={ChevronRight} label="내일로 미루기" onClick={handleMoveUnfinishedToTomorrow} disabled={isSubmitting} />
@@ -1442,9 +1442,9 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     <ActionChipButton icon={StickyNote} label="삭제하기" onClick={handleDeleteUnfinished} disabled={isSubmitting} tone="orange" />
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-[1.35rem] border border-dashed border-[#DDE7F6] bg-[#F7FAFF] p-5 text-center">
-                    <p className="text-sm font-black text-[#17326B]">오늘 정리할 남은 항목이 없어요</p>
-                    <p className="mt-2 text-[12px] font-semibold leading-5 text-[#17326B]/55">
+                  <div className="mt-5 rounded-[1.35rem] border border-dashed border-white/10 bg-white/6 p-5 text-center">
+                    <p className="text-sm font-black text-white">오늘 정리할 남은 항목이 없어요</p>
+                    <p className="mt-2 text-[12px] font-semibold leading-5 text-white/55">
                       체크리스트가 깔끔하게 정리되면 내일 계획도 훨씬 가벼워져요.
                     </p>
                   </div>
@@ -1456,18 +1456,18 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
       </div>
 
       <Dialog open={isOutingModalOpen} onOpenChange={setIsOutingModalOpen}>
-        <DialogContent className="max-w-[26rem] rounded-[2rem] border-[#DDE7F6] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] p-0 shadow-[0_28px_60px_-30px_rgba(23,50,107,0.32)]">
+        <DialogContent className="max-w-[26rem] rounded-[2rem] border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.12),transparent_24%),linear-gradient(180deg,#16284F_0%,#0F2149_100%)] p-0 text-white shadow-[0_28px_60px_-30px_rgba(0,0,0,0.58)]">
           <div className="p-5">
             <DialogHeader className="text-left">
-              <DialogTitle className="text-[1.4rem] font-black tracking-tight text-[#17326B]">외출 체크포인트</DialogTitle>
-              <DialogDescription className="text-sm font-semibold leading-6 text-[#17326B]/58">
+              <DialogTitle className="text-[1.4rem] font-black tracking-tight text-white">외출 체크포인트</DialogTitle>
+              <DialogDescription className="text-sm font-semibold leading-6 text-white/58">
                 어디 다녀오는지와 예상 복귀 시간만 고르면 바로 외출 루트가 저장돼요.
               </DialogDescription>
             </DialogHeader>
 
             <div className="mt-5 space-y-4">
               <div>
-                <p className="text-[11px] font-black text-[#17326B]/55">어디 다녀오나요?</p>
+                <p className="text-[11px] font-black text-white/55">어디 다녀오나요?</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {OUTING_REASON_OPTIONS.map((reason) => (
                     <button
@@ -1477,8 +1477,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       className={cn(
                         'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                         awayReason === reason
-                          ? 'border-[#FF9626] bg-[#FFF4E8] text-[#FF9626]'
-                          : 'border-[#DDE7F6] bg-white text-[#17326B]'
+                          ? 'border-[#FFB347]/18 bg-[#FF9626]/14 text-[#FFD79F]'
+                          : 'border-white/10 bg-white/8 text-white'
                       )}
                     >
                       {reason}
@@ -1488,7 +1488,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
               </div>
 
               <div>
-                <p className="text-[11px] font-black text-[#17326B]/55">언제쯤 돌아오나요?</p>
+                <p className="text-[11px] font-black text-white/55">언제쯤 돌아오나요?</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {OUTING_DURATION_OPTIONS.map((duration) => (
                     <button
@@ -1498,8 +1498,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       className={cn(
                         'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                         outingDuration === duration
-                          ? 'border-[#17326B] bg-[#17326B] text-white'
-                          : 'border-[#DDE7F6] bg-white text-[#17326B]'
+                          ? 'border-[#FFB347]/18 bg-[#FF9626]/14 text-[#FFD79F]'
+                          : 'border-white/10 bg-white/8 text-white'
                       )}
                     >
                       {duration}분
@@ -1508,13 +1508,13 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 </div>
               </div>
 
-              <div className="rounded-[1.2rem] bg-[#F6F8FC] px-4 py-3 text-sm font-semibold text-[#17326B]/68">
+              <div className="rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-3 text-sm font-semibold text-white/62">
                 외출 시작 시각은 현재 시각으로 자동 기록되고, 복귀 예정 시간도 함께 저장돼요.
               </div>
             </div>
 
             <div className="mt-5 flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsOutingModalOpen(false)} className="h-11 flex-1 rounded-2xl border-[#DDE7F6] bg-white font-black text-[#17326B]">
+              <Button type="button" variant="outline" onClick={() => setIsOutingModalOpen(false)} className="h-11 flex-1 rounded-2xl border-white/10 bg-white/8 font-black text-white">
                 취소
               </Button>
               <Button type="button" onClick={handleStartOutingPlan} className={cn('h-11 flex-1 rounded-2xl font-black text-white', rewardGradient)}>

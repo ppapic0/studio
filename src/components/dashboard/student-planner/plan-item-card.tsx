@@ -32,16 +32,16 @@ type PlanItemCardProps = {
 
 const toneMap = {
   emerald: {
-    done: 'bg-emerald-50/60 border-emerald-100/70',
-    idle: 'bg-white border-emerald-100/40 shadow-sm hover:shadow-md',
+    done: 'border border-emerald-400/24 bg-[linear-gradient(180deg,rgba(47,170,125,0.2)_0%,rgba(14,27,61,0.9)_100%)]',
+    idle: 'border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
   },
   amber: {
-    done: 'bg-amber-50/55 border-amber-100/70',
-    idle: 'bg-white border-amber-100/40 shadow-sm hover:shadow-md',
+    done: 'border border-[#FFB347]/24 bg-[linear-gradient(180deg,rgba(255,150,38,0.18)_0%,rgba(14,27,61,0.9)_100%)]',
+    idle: 'border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
   },
   slate: {
-    done: 'bg-slate-50 border-slate-200/80',
-    idle: 'bg-white border-slate-200/80 shadow-sm hover:shadow-md',
+    done: 'border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(14,27,61,0.92)_100%)]',
+    idle: 'border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
   },
 } as const;
 
@@ -88,7 +88,7 @@ export function PlanItemCard({
       {volumeMeta ? (
         <div className={cn(
           "mt-1 flex h-6 min-w-[2.25rem] items-center justify-center rounded-full px-2 text-[10px] font-black",
-          checked ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500"
+          checked ? "bg-emerald-500 text-white" : "bg-white/10 text-white/62"
         )}>
           {progressRate}%
         </div>
@@ -104,20 +104,20 @@ export function PlanItemCard({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {badgeLabel ? (
-            <Badge className="rounded-full border-none bg-slate-900 px-2.5 py-0.5 text-[9px] font-black text-white shadow-sm">
+            <Badge className="rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-[9px] font-black text-[#FFD79F] shadow-none">
               {badgeLabel}
             </Badge>
           ) : null}
           {metaLabel ? (
-            <span className="text-[10px] font-black text-slate-400">{metaLabel}</span>
+            <span className="text-[10px] font-black text-white/42">{metaLabel}</span>
           ) : null}
         </div>
         <Label
           htmlFor={id}
           className={cn(
-            "mt-1 block break-keep font-black leading-snug tracking-tight text-slate-900 transition-all",
+            "mt-1 block break-keep font-black leading-snug tracking-tight text-white transition-all",
             compact ? "text-sm" : isMobile ? "text-sm" : "text-base",
-            checked && "text-slate-400 line-through italic"
+            checked && "text-white/42 line-through italic"
           )}
         >
           {title}
@@ -126,16 +126,16 @@ export function PlanItemCard({
         {volumeMeta ? (
           <div className="mt-3 space-y-2">
             <div className="flex flex-wrap items-center gap-2 text-[10px] font-black">
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-500">
+              <span className="rounded-full bg-white/8 px-2.5 py-1 text-white/62">
                 목표 {volumeMeta.targetAmount}{volumeMeta.unitLabel}
               </span>
               <span className={cn(
                 "rounded-full px-2.5 py-1",
-                checked ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-700"
+                checked ? "bg-emerald-500 text-white" : "bg-emerald-500/18 text-emerald-200"
               )}>
                 실제 {volumeMeta.actualAmount}{volumeMeta.unitLabel}
               </span>
-              <span className="rounded-full bg-white px-2.5 py-1 text-slate-500 ring-1 ring-slate-200">
+              <span className="rounded-full bg-white/8 px-2.5 py-1 text-white/62 ring-1 ring-white/10">
                 달성률 {progressRate}%
               </span>
             </div>
@@ -146,7 +146,7 @@ export function PlanItemCard({
                     type="button"
                     variant="outline"
                     onClick={() => commitAmount(0)}
-                    className="h-7 rounded-full px-3 text-[10px] font-black"
+                    className="h-7 rounded-full border-white/10 bg-white/8 px-3 text-[10px] font-black text-white hover:bg-white/12"
                   >
                     0
                   </Button>
@@ -154,7 +154,7 @@ export function PlanItemCard({
                     type="button"
                     variant="outline"
                     onClick={() => commitAmount(Math.max(1, Math.round(volumeMeta.targetAmount / 2)))}
-                    className="h-7 rounded-full px-3 text-[10px] font-black"
+                    className="h-7 rounded-full border-white/10 bg-white/8 px-3 text-[10px] font-black text-white hover:bg-white/12"
                   >
                     절반
                   </Button>
@@ -162,7 +162,7 @@ export function PlanItemCard({
                     type="button"
                     variant="outline"
                     onClick={() => commitAmount(volumeMeta.targetAmount)}
-                    className="h-7 rounded-full px-3 text-[10px] font-black"
+                    className="h-7 rounded-full border-white/10 bg-white/8 px-3 text-[10px] font-black text-white hover:bg-white/12"
                   >
                     완료
                   </Button>
@@ -179,9 +179,9 @@ export function PlanItemCard({
                         commitAmount(Number(draftAmount));
                       }
                     }}
-                    className="h-9 max-w-[7rem] rounded-xl border-slate-200 text-center text-xs font-black"
+                    className="h-9 max-w-[7rem] rounded-xl border-white/10 bg-white/8 text-center text-xs font-black text-white"
                   />
-                  <span className="text-[10px] font-semibold text-slate-400">직접입력</span>
+                  <span className="text-[10px] font-semibold text-white/42">직접입력</span>
                 </div>
               </div>
             ) : null}
@@ -193,7 +193,7 @@ export function PlanItemCard({
           variant="ghost"
           size="icon"
           className={cn(
-            "h-8 w-8 shrink-0 rounded-full text-slate-400 transition-all hover:text-destructive",
+            "h-8 w-8 shrink-0 rounded-full text-white/35 transition-all hover:text-rose-300",
             isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           )}
           onClick={onDelete}

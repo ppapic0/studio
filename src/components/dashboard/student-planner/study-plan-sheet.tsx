@@ -137,13 +137,13 @@ export function StudyPlanSheet({
       <DialogContent
         motionPreset="dashboard-premium"
         className={cn(
-          'overflow-hidden border-none bg-white p-0 shadow-2xl',
+          'overflow-hidden border-none bg-[linear-gradient(180deg,#13285A_0%,#0E1B3D_100%)] p-0 shadow-2xl',
           isMobile
             ? 'w-[min(94vw,35rem)] max-h-[90dvh] rounded-[2rem]'
             : 'w-[min(92vw,56rem)] max-w-[56rem] max-h-[88dvh] rounded-[2rem]'
         )}
       >
-        <div className="bg-[linear-gradient(135deg,#0f766e_0%,#10b981_48%,#34d399_100%)] p-6 text-white">
+        <div className="bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.16),transparent_28%),linear-gradient(135deg,#10295f_0%,#17326B_46%,#0f2149_100%)] p-6 text-white">
           <DialogHeader className="text-left">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-white/12 p-2.5">
@@ -161,33 +161,33 @@ export function StudyPlanSheet({
           </DialogHeader>
         </div>
 
-        <div className={cn('overflow-y-auto bg-white', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'max-h-[calc(88dvh-9rem)] p-5')}>
-          <div className="rounded-[1.45rem] border border-emerald-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(244,253,248,0.94)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(16,185,129,0.18)]">
+        <div className={cn('overflow-y-auto bg-[linear-gradient(180deg,#13285A_0%,#0E1B3D_100%)]', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'max-h-[calc(88dvh-9rem)] p-5')}>
+          <div className="rounded-[1.45rem] border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(13,28,69,0.92)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.42)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-black text-slate-900">이 날짜 학습 계획 관리</p>
-                <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+                <p className="text-[11px] font-black text-white">이 날짜 학습 계획 관리</p>
+                <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-white/55">
                   추가와 수정은 여기서 하고, 메인 화면에서는 요약만 빠르게 확인해요.
                 </p>
               </div>
-              <Badge className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[10px] font-black text-emerald-700 shadow-none">
+              <Badge className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
                 {selectedDateLabel}
               </Badge>
             </div>
             <div className={cn('mt-4 grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-              <div className="rounded-[1rem] border border-emerald-100 bg-white/90 px-3 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">완료 흐름</p>
-                <p className="mt-2 text-lg font-black tracking-tight text-slate-900">
+              <div className="rounded-[1rem] border border-white/10 bg-white/8 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">완료 흐름</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-white">
                   {completedCount}/{totalCount}
                 </p>
               </div>
-              <div className="rounded-[1rem] border border-emerald-100 bg-white/90 px-3 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">남은 계획</p>
-                <p className="mt-2 text-lg font-black tracking-tight text-slate-900">{remainingCount}개</p>
+              <div className="rounded-[1rem] border border-white/10 bg-white/8 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">남은 계획</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-white">{remainingCount}개</p>
               </div>
-              <div className="rounded-[1rem] border border-emerald-100 bg-white/90 px-3 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">오늘 목표</p>
-                <p className="mt-2 break-keep text-sm font-black text-slate-900">{goalSummaryLabel}</p>
+              <div className="rounded-[1rem] border border-white/10 bg-white/8 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">오늘 목표</p>
+                <p className="mt-2 break-keep text-sm font-black text-white">{goalSummaryLabel}</p>
               </div>
             </div>
           </div>
@@ -229,9 +229,9 @@ export function StudyPlanSheet({
 
           <div className="mt-4">
             {studyTasks.length === 0 ? (
-              <div className="rounded-[1.45rem] border border-dashed border-emerald-200 bg-white/80 p-6 text-center">
-                <p className="text-sm font-black text-emerald-700">첫 학습 계획을 추가해보세요</p>
-                <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
+              <div className="rounded-[1.45rem] border border-dashed border-white/10 bg-white/6 p-6 text-center">
+                <p className="text-sm font-black text-white">첫 학습 계획을 추가해보세요</p>
+                <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-white/52">
                   시간을 먼저 정하지 않아도 괜찮아요. 오늘 끝낼 분량부터 적어도 바로 시작할 수 있어요.
                 </p>
               </div>
@@ -267,7 +267,7 @@ export function StudyPlanSheet({
             )}
           </div>
 
-          <div className="mt-4 rounded-[1.1rem] border border-slate-200 bg-slate-50/70 px-4 py-3 text-[11px] font-semibold leading-5 text-slate-500">
+          <div className="mt-4 rounded-[1.1rem] border border-white/10 bg-white/6 px-4 py-3 text-[11px] font-semibold leading-5 text-white/55">
             최근 계획을 불러와서 살짝 수정하거나, 분량형/시간형 중 편한 방식으로 새 계획을 짧게 추가해보세요.
           </div>
         </div>

@@ -771,7 +771,7 @@ export default function GrowthPage() {
   }
 
   return (
-    <div className="point-track-game-screen pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-[max(0.35rem,env(safe-area-inset-top))]">
+    <div className="student-night-page pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-[max(0.35rem,env(safe-area-inset-top))]">
       <div className={cn('mx-auto flex w-full max-w-md flex-col gap-4', isMobile ? 'px-3' : 'px-1')}>
         <section className={cn('point-track-hero-stage', arrivalEvent && 'point-track-hero-stage--arrival')}>
           {arrivalEvent ? (

@@ -484,12 +484,20 @@ export default function StudyHistoryPage() {
   };
 
   const getHeatmapColor = (minutes: number) => {
-    if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
-    if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,246,0.98)_60%,rgba(225,248,238,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.18)]';
-    if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(229,252,242,0.98)_56%,rgba(214,247,233,0.98)_100%)] ring-1 ring-inset ring-emerald-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_34px_-28px_rgba(13,148,136,0.22)]';
-    if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(223,250,246,0.98)_52%,rgba(210,243,246,0.98)_100%)] ring-1 ring-inset ring-teal-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(14,165,233,0.22)]';
-    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,244,255,0.98)_50%,rgba(213,231,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
-    return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(220,236,255,0.98)_46%,rgba(205,221,255,0.98)_100%)] ring-1 ring-inset ring-blue-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.24)]';
+    if (isParent) {
+      if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
+      if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,246,0.98)_60%,rgba(225,248,238,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.18)]';
+      if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(229,252,242,0.98)_56%,rgba(214,247,233,0.98)_100%)] ring-1 ring-inset ring-emerald-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_34px_-28px_rgba(13,148,136,0.22)]';
+      if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(223,250,246,0.98)_52%,rgba(210,243,246,0.98)_100%)] ring-1 ring-inset ring-teal-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(14,165,233,0.22)]';
+      if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,244,255,0.98)_50%,rgba(213,231,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
+      return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(220,236,255,0.98)_46%,rgba(205,221,255,0.98)_100%)] ring-1 ring-inset ring-blue-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.24)]';
+    }
+    if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(13,28,69,0.96)_0%,rgba(17,34,79,0.92)_100%)] ring-1 ring-inset ring-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_16px_30px_-28px_rgba(0,0,0,0.42)]';
+    if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(12,36,72,0.98)_0%,rgba(20,58,88,0.94)_100%)] ring-1 ring-inset ring-emerald-300/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_32px_-28px_rgba(16,185,129,0.22)]';
+    if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(13,42,79,0.98)_0%,rgba(18,78,96,0.94)_100%)] ring-1 ring-inset ring-emerald-300/36 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_34px_-28px_rgba(13,148,136,0.26)]';
+    if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(14,46,88,0.98)_0%,rgba(18,85,116,0.94)_100%)] ring-1 ring-inset ring-teal-300/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_36px_-28px_rgba(14,165,233,0.28)]';
+    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(18,49,101,0.98)_0%,rgba(28,73,151,0.94)_100%)] ring-1 ring-inset ring-sky-300/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_22px_38px_-28px_rgba(37,99,235,0.3)]';
+    return 'bg-[linear-gradient(180deg,rgba(26,57,122,0.98)_0%,rgba(40,71,143,0.94)_100%)] ring-1 ring-inset ring-[#FFD089]/34 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_24px_42px_-28px_rgba(20,41,95,0.34)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
@@ -502,13 +510,22 @@ export default function StudyHistoryPage() {
   };
 
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
-    if (!isCurrentMonth) return 'border-slate-200 text-slate-400';
-    if (minutes === 0) return 'border-slate-200 text-slate-500';
-    if (minutes < 60) return 'border-emerald-300/95 text-slate-900';
-    if (minutes < 180) return 'border-emerald-400/95 text-slate-950';
-    if (minutes < 300) return 'border-teal-400/95 text-slate-950';
-    if (minutes < 480) return 'border-sky-400/95 text-slate-950';
-    return 'border-indigo-400/95 text-slate-950';
+    if (isParent) {
+      if (!isCurrentMonth) return 'border-slate-200 text-slate-400';
+      if (minutes === 0) return 'border-slate-200 text-slate-500';
+      if (minutes < 60) return 'border-emerald-300/95 text-slate-900';
+      if (minutes < 180) return 'border-emerald-400/95 text-slate-950';
+      if (minutes < 300) return 'border-teal-400/95 text-slate-950';
+      if (minutes < 480) return 'border-sky-400/95 text-slate-950';
+      return 'border-indigo-400/95 text-slate-950';
+    }
+    if (!isCurrentMonth) return 'border-white/10 text-white/30';
+    if (minutes === 0) return 'border-white/12 text-white/55';
+    if (minutes < 60) return 'border-emerald-300/45 text-white';
+    if (minutes < 180) return 'border-emerald-300/55 text-white';
+    if (minutes < 300) return 'border-teal-300/55 text-white';
+    if (minutes < 480) return 'border-sky-300/55 text-white';
+    return 'border-[#FFD089]/55 text-white';
   };
 
   const monthTotalMinutes = useMemo(() => {
@@ -825,13 +842,18 @@ export default function StudyHistoryPage() {
             </div>
           )}
         </div>
-        <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-primary/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbff_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(37,99,235,0.35)] ring-1 ring-white/70">
-           <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
-           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
-           <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-white/80 bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_30px_-24px_rgba(37,99,235,0.32)]">
-             <span className="font-black text-sm tracking-tight text-primary">{format(currentDate, 'yyyy년 M월')}</span>
+        <div className={cn(
+          "relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] p-1.5",
+          isParent
+            ? "border border-primary/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbff_100%)] shadow-[0_20px_40px_-30px_rgba(37,99,235,0.35)] ring-1 ring-white/70"
+            : "border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_20px_40px_-30px_rgba(0,0,0,0.48)]"
+        )}>
+           <div className={cn("pointer-events-none absolute inset-x-5 top-0 h-px", isParent ? "bg-white/90" : "bg-white/10")} />
+           <Button variant="ghost" size="icon" className={cn("h-9 w-9 rounded-[1rem] transition-all", isParent ? "bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:bg-primary/5 hover:text-primary" : "bg-white/8 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/12 hover:text-white")} onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
+           <div className={cn("flex min-w-[120px] items-center justify-center rounded-[1rem] px-4 py-2", isParent ? "border border-white/80 bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_30px_-24px_rgba(37,99,235,0.32)]" : "border border-white/10 bg-[#1D3565] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_14px_30px_-24px_rgba(0,0,0,0.42)]")}>
+             <span className={cn("font-black text-sm tracking-tight", isParent ? "text-primary" : "text-white")}>{format(currentDate, 'yyyy년 M월')}</span>
            </div>
-           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
+           <Button variant="ghost" size="icon" className={cn("h-9 w-9 rounded-[1rem] transition-all", isParent ? "bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:bg-primary/5 hover:text-primary" : "bg-white/8 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/12 hover:text-white")} onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
         </div>
       </header>
 
@@ -967,10 +989,10 @@ export default function StudyHistoryPage() {
       </Card>
 
       <Card className={cn(
-        "relative mx-auto w-full overflow-hidden rounded-[3rem] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)]",
-        isMobile
-          ? "border border-[#D9E1F2] bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.08),transparent_22%),linear-gradient(180deg,#ffffff_0%,#fffaf3_15%,#f8fcff_100%)] ring-1 ring-white/70"
-          : "border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] ring-1 ring-white/70"
+        "relative mx-auto w-full overflow-hidden rounded-[3rem]",
+        isParent
+          ? "border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] ring-1 ring-white/70 shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)]"
+          : "border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.08),transparent_22%),linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_30px_70px_-48px_rgba(0,0,0,0.56)]"
       )}>
         <CardContent className="relative p-0">
           <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
@@ -979,9 +1001,11 @@ export default function StudyHistoryPage() {
               {STUDY_HISTORY_CALENDAR_LEGEND.map((item) => (
                 <span key={item.label} className={cn(
                   "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-black shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)]",
-                  isMobile
-                    ? "border border-[#D9E1F2] bg-white text-[#173A82]/65 text-[8px]"
-                    : "border border-slate-200/75 bg-white/92 text-slate-500 text-[8px] sm:text-[9px]"
+                  isParent
+                    ? isMobile
+                      ? "border border-[#D9E1F2] bg-white text-[#173A82]/65 text-[8px]"
+                      : "border border-slate-200/75 bg-white/92 text-slate-500 text-[8px] sm:text-[9px]"
+                    : "border border-white/10 bg-white/8 text-white/72 text-[8px] sm:text-[9px]"
                 )}>
                   <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
                   {item.label}
@@ -994,10 +1018,14 @@ export default function StudyHistoryPage() {
               <div
                 key={day}
                 className={cn(
-                  isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
-                  "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
-                  i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
-                )}
+                    isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
+                    isParent
+                      ? "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
+                      : "rounded-2xl border border-white/8 bg-white/6 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+                    isParent
+                      ? i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
+                      : i === 5 ? "text-sky-300" : i === 6 ? "text-rose-300" : "text-white/58"
+                  )}
               >
                 {day}
               </div>
@@ -1029,7 +1057,11 @@ export default function StudyHistoryPage() {
                   className={cn(
                     "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                     isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
-                    !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
+                    !isCurrentMonth
+                      ? isParent
+                        ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75"
+                        : "bg-[linear-gradient(180deg,rgba(17,34,79,0.72)_0%,rgba(13,28,69,0.76)_100%)] opacity-[0.55] ring-1 ring-white/8"
+                      : getHeatmapColor(minutes),
                     isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
                     isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
                   )}
@@ -1048,8 +1080,10 @@ export default function StudyHistoryPage() {
                         className={cn(
                           "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
                           "min-w-[2rem] px-2 py-1 text-xs",
-                          idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                          isTodayCalendar && "border-primary/20 text-primary"
+                          isParent
+                            ? idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700"
+                            : idx % 7 === 5 && isCurrentMonth ? "border-sky-300/32 bg-sky-400/12 text-sky-100" : idx % 7 === 6 && isCurrentMonth ? "border-rose-300/32 bg-rose-400/12 text-rose-100" : "border-white/10 bg-white/10 text-white/82",
+                          isTodayCalendar && (isParent ? "border-primary/20 text-primary" : "border-[#FFD089]/35 text-[#FFD089]")
                         )}
                       >
                         {format(day, 'd')}

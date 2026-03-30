@@ -486,7 +486,7 @@ export function StudentHomeGamePanel({
 
   return (
     <>
-      <div className={cn("point-track-game-screen rounded-[2.25rem]", isMobile ? "p-3" : "p-4")}>
+      <div className={cn("student-night-page", isMobile ? "space-y-3" : "space-y-4")}>
       <section
         className={cn(
           "point-track-hero-stage relative overflow-hidden",
