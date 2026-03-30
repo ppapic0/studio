@@ -837,15 +837,15 @@ export default function StudyHistoryPage() {
 
       {isMobile && <StudentTrackSubnav className="mx-1" />}
 
-      <Card className="overflow-hidden rounded-[2.5rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#1B326D_55%,#233E86_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]">
+      <Card className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.22),transparent_22%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]">
         <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
           <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-start justify-between")}>
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-none">
+                <Badge className="border border-white/18 bg-white/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-none">
                   기록 요약
                 </Badge>
-                <Badge className="border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black text-white/85 shadow-none">
+                <Badge className="border border-orange-200/18 bg-orange-200/12 px-3 py-1 text-[10px] font-black text-[#FFE0B3] shadow-none">
                   {isParent ? '자녀 학습 흐름' : '포인트로 이어지는 공부 기록'}
                 </Badge>
               </div>
@@ -853,7 +853,7 @@ export default function StudyHistoryPage() {
                 <h2 className={cn("font-black tracking-tight text-white", isMobile ? "text-[1.45rem] leading-[1.15]" : "text-[2.1rem] leading-[1.1]")}>
                   {isParent ? '이번 달 학습 기록을 빠르게 확인해요' : '이번 달 기록과 포인트 흐름을 한눈에 봐요'}
                 </h2>
-                <p className="max-w-2xl break-keep text-sm font-semibold leading-6 text-white/78">
+                <p className="max-w-2xl break-keep text-sm font-semibold leading-6 text-white/86">
                   {isParent
                     ? '자녀의 오늘 공부시간, 최근 7일 누적, 이번 달 총 학습 시간을 먼저 보고 날짜별 기록을 자세히 확인해보세요.'
                     : '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록과 포인트 상자 흐름까지 이어서 확인할 수 있어요.'}
@@ -864,7 +864,7 @@ export default function StudyHistoryPage() {
               <Button
                 asChild
                 className={cn(
-                  "shrink-0 rounded-2xl border border-white/15 bg-white/10 font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15",
+                  "shrink-0 rounded-2xl border border-orange-200/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.08))] font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15",
                   isMobile ? "h-11 w-full text-xs" : "h-12 px-5 text-xs"
                 )}
               >
@@ -898,9 +898,9 @@ export default function StudyHistoryPage() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-[1.8rem] border border-white/14 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                className="rounded-[1.8rem] border border-white/14 bg-[linear-gradient(180deg,rgba(11,30,82,0.34),rgba(255,255,255,0.08))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.4)] backdrop-blur-xl"
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">
                   {item.label}
                 </p>
                 <div className="mt-3 flex items-end gap-2">
@@ -908,7 +908,7 @@ export default function StudyHistoryPage() {
                     {item.value}
                   </span>
                 </div>
-                <p className="mt-2 break-keep text-xs font-semibold text-white/72">
+                <p className="mt-2 break-keep text-xs font-semibold text-white/80">
                   {item.note}
                 </p>
               </div>
