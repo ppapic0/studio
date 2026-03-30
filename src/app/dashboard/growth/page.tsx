@@ -264,20 +264,20 @@ function HeroMetricChip({
   floatingGain?: FloatingGain | null;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[1.35rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.08))] px-3.5 py-3 shadow-[0_18px_30px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
+    <div className="relative min-w-0 overflow-hidden rounded-[1.35rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.2),rgba(255,255,255,0.08))] px-3 py-3 shadow-[0_18px_30px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
       {floatingGain ? (
         <div key={floatingGain.key} className="point-track-floating-gain">
           +{floatingGain.amount}P
         </div>
       ) : null}
-      <div className="flex items-center gap-3">
-        <span className={cn('inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/12 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
+      <div className="flex items-center gap-2.5">
+        <span className={cn('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/12 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
           <Icon className="h-4 w-4" />
         </span>
-        <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/52">{label}</div>
-          <div className="mt-1 text-[1.12rem] font-black tracking-[-0.04em] text-white sm:text-[1.2rem]">{value}</div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/60">{label}</div>
+          <div className="mt-1 truncate text-[0.98rem] font-black tracking-[-0.04em] text-white sm:text-[1.2rem]">{value}</div>
         </div>
       </div>
     </div>
@@ -778,8 +778,8 @@ export default function GrowthPage() {
             </div>
           ) : null}
 
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-center justify-between gap-3")}>
+            <div className={cn(isMobile ? "w-full" : "")}>
               <p className="text-[11px] font-black uppercase tracking-[0.24em] text-white/45">POINT TRACK</p>
               <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
               <div className="mt-3 grid grid-cols-2 gap-2.5">
@@ -801,6 +801,7 @@ export default function GrowthPage() {
             <div
               className={cn(
                 'rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em]',
+                isMobile ? "self-start" : "",
                 totalAvailableBoxes > 0
                   ? 'border border-orange-300/25 bg-orange-300/12 text-[#FFD089]'
                   : isTimerActive

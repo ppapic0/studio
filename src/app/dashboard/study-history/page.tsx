@@ -841,19 +841,19 @@ export default function StudyHistoryPage() {
         className={cn(
           "overflow-hidden rounded-[2.5rem]",
           isMobile
-            ? "border border-[#D9E1F2] bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_26%),linear-gradient(180deg,#ffffff_0%,#fff7ec_22%,#f6f9ff_100%)] text-[#173A82] shadow-[0_26px_56px_-42px_rgba(20,41,95,0.28)]"
+            ? "border border-[#D9E1F2] bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.18),transparent_24%),linear-gradient(180deg,#173A82_0%,#1E3D8E_26%,#fff7ec_26.5%,#f6f9ff_100%)] text-[#173A82] shadow-[0_26px_56px_-42px_rgba(20,41,95,0.28)]"
             : "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_20%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.12),transparent_24%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]"
         )}
       >
         <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
-          <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-start justify-between")}>
+          <div className={cn("gap-4", isMobile ? "flex flex-col rounded-[1.75rem] bg-[linear-gradient(180deg,rgba(23,58,130,0.98),rgba(30,61,142,0.94))] px-4 py-4 shadow-[0_18px_40px_-28px_rgba(8,17,48,0.65)]" : "flex items-start justify-between")}>
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   className={cn(
                     "px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-none",
                     isMobile
-                      ? "border border-[#D9E1F2] bg-white text-[#173A82]"
+                      ? "border border-white/18 bg-white/10 text-white"
                       : "border border-white/18 bg-white/12 text-white"
                   )}
                 >
@@ -863,7 +863,7 @@ export default function StudyHistoryPage() {
                   className={cn(
                     "px-3 py-1 text-[10px] font-black shadow-none",
                     isMobile
-                      ? "border border-[#FFB357]/35 bg-[#FFF7EC] text-[#FF7A16]"
+                      ? "border border-[#FFB357]/30 bg-[#FFB357]/14 text-[#FFE0B3]"
                       : "border border-orange-200/18 bg-orange-200/12 text-[#FFE0B3]"
                   )}
                 >
@@ -874,7 +874,7 @@ export default function StudyHistoryPage() {
                 <h2
                   className={cn(
                     "font-black tracking-tight",
-                    isMobile ? "text-[1.52rem] leading-[1.18] text-[#173A82]" : "text-[2.1rem] leading-[1.1] text-white"
+                    isMobile ? "text-[1.52rem] leading-[1.18] text-white" : "text-[2.1rem] leading-[1.1] text-white"
                   )}
                 >
                   {isParent ? '이번 달 학습 기록을 빠르게 확인해요' : '이번 달 기록과 포인트 흐름을 한눈에 봐요'}
@@ -882,7 +882,7 @@ export default function StudyHistoryPage() {
                 <p
                   className={cn(
                     "max-w-2xl break-keep font-semibold",
-                    isMobile ? "text-[13px] leading-6 text-[#173A82]/68" : "text-sm leading-6 text-white/86"
+                    isMobile ? "text-[13px] leading-6 text-white/78" : "text-sm leading-6 text-white/86"
                   )}
                 >
                   {isParent
@@ -940,7 +940,7 @@ export default function StudyHistoryPage() {
                 key={item.label}
                 className={cn(
                   isMobile
-                    ? "min-w-0 overflow-hidden rounded-[1.4rem] border border-[#173A82]/10 bg-[linear-gradient(180deg,#35549E_0%,#173A82_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(20,41,95,0.42)]"
+                    ? "min-w-0 overflow-hidden rounded-[1.4rem] border border-[#173A82]/10 bg-[radial-gradient(circle_at_top,rgba(255,186,118,0.2),transparent_48%),linear-gradient(180deg,#35549E_0%,#173A82_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(20,41,95,0.42)]"
                     : "min-w-0 overflow-hidden rounded-[1.8rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,25,69,0.72),rgba(28,59,131,0.86))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.4)] backdrop-blur-xl"
                 )}
               >
@@ -950,12 +950,12 @@ export default function StudyHistoryPage() {
                 <div className={cn("flex items-end gap-2", isMobile ? "mt-2" : "mt-3")}>
                   <span className={cn(
                     "dashboard-number min-w-0 font-black leading-none tracking-[-0.06em] text-white",
-                    isMobile ? "text-[1.05rem]" : "text-[1.9rem] sm:text-[2.35rem]"
+                    isMobile ? "text-[1.28rem]" : "text-[1.9rem] sm:text-[2.35rem]"
                   )}>
                     {item.value}
                   </span>
                 </div>
-                <p className={cn("break-keep font-semibold text-white/78", isMobile ? "mt-1 text-[9px] leading-4" : "mt-2 text-xs")}>
+                <p className={cn("break-keep font-semibold text-white/92", isMobile ? "mt-1 text-[9px] leading-4" : "mt-2 text-xs")}>
                   {isMobile ? item.mobileNote : item.note}
                 </p>
               </div>
