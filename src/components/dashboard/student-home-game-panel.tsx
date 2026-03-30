@@ -536,7 +536,6 @@ export function StudentHomeGamePanel({
                   {sessionTimerLabel ? (
                     <div className="mt-2">
                       <div className="text-[1.1rem] font-black tracking-tight text-white">집중 중</div>
-                      <div className="mt-1 text-sm font-semibold text-white/68">실시간 세션은 LIVE 카드에서 확인해요</div>
                     </div>
                   ) : (
                     <div className={cn("mt-2 font-black tracking-tight text-white", isMobile ? "text-[2.4rem]" : "text-[3rem]")}>
