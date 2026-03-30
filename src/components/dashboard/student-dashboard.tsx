@@ -1982,28 +1982,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => todayRemainingTasks.slice(0, 3),
     [todayRemainingTasks]
   );
-  const todayRemainingStudyMinutesToNextBox = useMemo(() => {
-    const totalTodayMinutes = Number(todayStudyLog?.totalMinutes || 0);
-    const nextMilestoneMinutes = (Math.floor(totalTodayMinutes / 60) + 1) * 60;
-    return Math.max(0, nextMilestoneMinutes - totalTodayMinutes);
-  }, [todayStudyLog?.totalMinutes]);
-  const todayPointStatusSummary = useMemo(() => {
-    return (progress?.dailyPointStatus?.[todayKey] || {}) as Record<string, any>;
-  }, [progress?.dailyPointStatus, todayKey]);
-  const todayStoredStudyBoxRewards = useMemo(() => {
-    const raw = todayPointStatusSummary.studyBoxRewards;
-    return Array.isArray(raw) ? raw : [];
-  }, [todayPointStatusSummary.studyBoxRewards]);
-  const todayOpenedStudyBoxCount = useMemo(() => {
-    const raw = todayPointStatusSummary.openedStudyBoxes;
-    if (!Array.isArray(raw)) return 0;
-    return raw
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value) && value >= 1)
-      .length;
-  }, [todayPointStatusSummary.openedStudyBoxes]);
-  const pendingStudyBoxCount = Math.max(0, todayStoredStudyBoxRewards.length - todayOpenedStudyBoxCount);
-
   const activeStudentIds = useMemo(() => {
     if (!activeStudentMembers) return null;
     return new Set(
@@ -2332,76 +2310,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </section>
 
       <section className={cn("grid gap-3 [&>*]:min-w-0", isMobile ? "grid-cols-2" : "grid-cols-12")}>
-        <div className={cn(isMobile ? "col-span-2" : "col-span-7")}>
-          <Link href="/dashboard/growth" className="block h-full touch-manipulation">
-            <Card className={cn(
-              "student-cta student-cta-card group relative h-full min-w-0 overflow-hidden border border-amber-200/80 bg-[radial-gradient(circle_at_top_right,#ffe7a8_0%,#fffdf5_40%,#fff8e1_100%)] shadow-[0_26px_70px_-42px_rgba(245,158,11,0.6)] ring-1 ring-amber-100/80",
-              isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]"
-            )}>
-              <div className={cn("pointer-events-none absolute rounded-full bg-amber-200/60 blur-2xl", isMobile ? "-right-6 -top-8 h-24 w-24" : "-right-10 -top-10 h-36 w-36")} />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0)_42%)]" />
-              <CardHeader className={cn(isMobile ? "px-5 pt-5 pb-2" : "px-8 pt-8 pb-2")}>
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className={cn("font-aggro-display font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap", isMobile ? "text-[9px]" : "text-[10px]")}>
-                    포인트 상자 보관함
-                  </CardTitle>
-                  <div className={cn("rounded-xl bg-white/80 text-amber-600 shadow-[0_14px_32px_-24px_rgba(245,158,11,0.8)]", isMobile ? "p-2" : "p-2.5")}>
-                    <Gift className={cn(isMobile ? "h-4 w-4" : "h-6 w-6")} />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className={cn("relative z-10", isMobile ? "px-5 pb-5 pt-1" : "px-8 pb-8 pt-1")}>
-                <div className={cn("grid items-end gap-3", isMobile ? "grid-cols-[minmax(0,1fr)_7.2rem]" : "grid-cols-[minmax(0,1fr)_10rem] gap-5")}>
-                  <div className="min-w-0">
-                    <div className={cn("dashboard-number text-amber-600 leading-none tracking-tight", isMobile ? "text-[clamp(2.35rem,12vw,3rem)]" : "text-[clamp(3.2rem,5vw,4.8rem)]")}>
-                      {Number(progress?.pointsBalance || 0).toLocaleString()}
-                      <span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>P</span>
-                    </div>
-                    <p className="mt-3 text-sm font-black leading-6 text-slate-900 break-keep">
-                      {pendingStudyBoxCount > 0
-                        ? `${pendingStudyBoxCount}개의 상자가 도착했어요`
-                        : '포인트트랙에서 상자를 모아보세요'}
-                    </p>
-                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
-                      {pendingStudyBoxCount > 0
-                        ? '홈에서는 도착 알림만 보여주고, 실제 오픈은 포인트트랙에서 한 개씩 진행돼요.'
-                        : todayRemainingStudyMinutesToNextBox > 0
-                          ? `다음 상자까지 ${formatStudyMinutes(todayRemainingStudyMinutesToNextBox)} 남았어요.`
-                          : '공부가 쌓이면 포인트트랙 보관함에 상자가 저장됩니다.'}
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-full bg-[#14295F] px-2 py-1 text-[10px] font-black text-white ring-1 ring-[#14295F]/10">
-                        오늘 {Number(todayPointStatusSummary.dailyPointAmount || 0).toLocaleString()}P
-                      </span>
-                      <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500 ring-1 ring-amber-100">
-                        포인트트랙으로 이동
-                      </span>
-                    </div>
-                  </div>
-                  <div className="self-stretch flex items-end justify-end">
-                    <MiniLpTrendSparkline
-                      data={Object.entries(progress?.dailyPointStatus || {})
-                        .sort((a, b) => a[0].localeCompare(b[0]))
-                        .map(([date, data]) => ({
-                          date,
-                          total: Number((data as any)?.dailyPointAmount || 0),
-                        }))
-                        .slice(-8)
-                        .reduce<Array<{ date: string; total: number }>>((acc, item) => {
-                          const previous = acc[acc.length - 1]?.total || 0;
-                          acc.push({ date: item.date, total: previous + item.total });
-                          return acc;
-                        }, [])}
-                      isMobile={isMobile}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-1" : "col-span-5 grid-cols-1")}>
+        <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-1" : "col-span-12 grid-cols-1")}>
           <Card
             role="button"
             tabIndex={0}
