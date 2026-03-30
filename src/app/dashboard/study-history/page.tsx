@@ -837,26 +837,57 @@ export default function StudyHistoryPage() {
 
       {isMobile && <StudentTrackSubnav className="mx-1" />}
 
-      <Card className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_20%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.12),transparent_24%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]">
+      <Card
+        className={cn(
+          "overflow-hidden rounded-[2.5rem]",
+          isMobile
+            ? "border border-[#D9E1F2] bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_26%),linear-gradient(180deg,#ffffff_0%,#fff7ec_22%,#f6f9ff_100%)] text-[#173A82] shadow-[0_26px_56px_-42px_rgba(20,41,95,0.28)]"
+            : "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_20%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.12),transparent_24%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]"
+        )}
+      >
         <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
           <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-start justify-between")}>
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="border border-white/18 bg-white/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-none">
+                <Badge
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-none",
+                    isMobile
+                      ? "border border-[#D9E1F2] bg-white text-[#173A82]"
+                      : "border border-white/18 bg-white/12 text-white"
+                  )}
+                >
                   기록 요약
                 </Badge>
-                <Badge className="border border-orange-200/18 bg-orange-200/12 px-3 py-1 text-[10px] font-black text-[#FFE0B3] shadow-none">
+                <Badge
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-black shadow-none",
+                    isMobile
+                      ? "border border-[#FFB357]/35 bg-[#FFF7EC] text-[#FF7A16]"
+                      : "border border-orange-200/18 bg-orange-200/12 text-[#FFE0B3]"
+                  )}
+                >
                   {isParent ? '자녀 학습 흐름' : '포인트로 이어지는 공부 기록'}
                 </Badge>
               </div>
               <div className="space-y-2">
-                <h2 className={cn("font-black tracking-tight text-white", isMobile ? "text-[1.45rem] leading-[1.15]" : "text-[2.1rem] leading-[1.1]")}>
+                <h2
+                  className={cn(
+                    "font-black tracking-tight",
+                    isMobile ? "text-[1.52rem] leading-[1.18] text-[#173A82]" : "text-[2.1rem] leading-[1.1] text-white"
+                  )}
+                >
                   {isParent ? '이번 달 학습 기록을 빠르게 확인해요' : '이번 달 기록과 포인트 흐름을 한눈에 봐요'}
                 </h2>
-                <p className="max-w-2xl break-keep text-sm font-semibold leading-6 text-white/86">
+                <p
+                  className={cn(
+                    "max-w-2xl break-keep font-semibold",
+                    isMobile ? "text-[13px] leading-6 text-[#173A82]/68" : "text-sm leading-6 text-white/86"
+                  )}
+                >
                   {isParent
-                    ? '자녀의 오늘 공부시간, 최근 7일 누적, 이번 달 총 학습 시간을 먼저 보고 날짜별 기록을 자세히 확인해보세요.'
-                    : '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록과 포인트 상자 흐름까지 이어서 확인할 수 있어요.'}
+                    ? (isMobile ? '오늘과 7일 누적, 이번 달 학습 흐름부터 바로 확인해요.' : '자녀의 오늘 공부시간, 최근 7일 누적, 이번 달 총 학습 시간을 먼저 보고 날짜별 기록을 자세히 확인해보세요.')
+                    : (isMobile ? '오늘, 7일, 이번 달 기록을 빠르게 보고 날짜별 흐름으로 이어서 보세요.' : '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록과 포인트 상자 흐름까지 이어서 확인할 수 있어요.')}
                 </p>
               </div>
             </div>
@@ -864,8 +895,9 @@ export default function StudyHistoryPage() {
               <Button
                 asChild
                 className={cn(
-                  "shrink-0 rounded-2xl border border-orange-200/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.08))] font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15",
-                  isMobile ? "h-11 w-full text-xs" : "h-12 px-5 text-xs"
+                  isMobile
+                    ? "h-11 w-full rounded-2xl border border-[#FFB357]/40 bg-[linear-gradient(180deg,#FFD89D_0%,#FFB357_50%,#FF7A16_100%)] font-black text-[#173A82] shadow-[0_18px_36px_-24px_rgba(255,122,22,0.45)] hover:brightness-105"
+                    : "shrink-0 rounded-2xl border border-orange-200/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.08))] font-black text-white shadow-[0_18px_36px_-24px_rgba(5,15,40,0.45)] hover:bg-white/15 h-12 px-5 text-xs"
                 )}
               >
                 <Link href="/dashboard/growth">
@@ -876,7 +908,7 @@ export default function StudyHistoryPage() {
             ) : null}
           </div>
 
-          <div className={cn("mt-5 grid", isMobile ? "grid-cols-3 gap-2" : "md:grid-cols-3 gap-3")}>
+          <div className={cn("mt-5 grid", isMobile ? "grid-cols-3 gap-2.5" : "md:grid-cols-3 gap-3")}>
             {[
               {
                 label: '이번 달 총 공부시간',
@@ -907,22 +939,23 @@ export default function StudyHistoryPage() {
               <div
                 key={item.label}
                 className={cn(
-                  "min-w-0 overflow-hidden border border-white/14 bg-[linear-gradient(180deg,rgba(9,25,69,0.72),rgba(28,59,131,0.86))] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.4)] backdrop-blur-xl",
-                  isMobile ? "rounded-[1.35rem] p-3" : "rounded-[1.8rem] p-4"
+                  isMobile
+                    ? "min-w-0 overflow-hidden rounded-[1.4rem] border border-[#173A82]/10 bg-[linear-gradient(180deg,#35549E_0%,#173A82_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(20,41,95,0.42)]"
+                    : "min-w-0 overflow-hidden rounded-[1.8rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,25,69,0.72),rgba(28,59,131,0.86))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.4)] backdrop-blur-xl"
                 )}
               >
-                <p className={cn("font-black uppercase tracking-[0.18em] text-[#FFD089]", isMobile ? "text-[9px]" : "text-[10px]")}>
+                <p className={cn("font-black uppercase tracking-[0.18em] text-[#FFD089]", isMobile ? "text-[8px]" : "text-[10px]")}>
                   {isMobile ? item.mobileLabel : item.label}
                 </p>
                 <div className={cn("flex items-end gap-2", isMobile ? "mt-2" : "mt-3")}>
                   <span className={cn(
                     "dashboard-number min-w-0 font-black leading-none tracking-[-0.06em] text-white",
-                    isMobile ? "text-[1.2rem]" : "text-[1.9rem] sm:text-[2.35rem]"
+                    isMobile ? "text-[1.05rem]" : "text-[1.9rem] sm:text-[2.35rem]"
                   )}>
                     {item.value}
                   </span>
                 </div>
-                <p className={cn("break-keep font-semibold text-white/78", isMobile ? "mt-1 text-[10px] leading-4" : "mt-2 text-xs")}>
+                <p className={cn("break-keep font-semibold text-white/78", isMobile ? "mt-1 text-[9px] leading-4" : "mt-2 text-xs")}>
                   {isMobile ? item.mobileNote : item.note}
                 </p>
               </div>
@@ -931,13 +964,23 @@ export default function StudyHistoryPage() {
         </CardContent>
       </Card>
 
-      <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
+      <Card className={cn(
+        "relative mx-auto w-full overflow-hidden rounded-[3rem] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)]",
+        isMobile
+          ? "border border-[#D9E1F2] bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.08),transparent_22%),linear-gradient(180deg,#ffffff_0%,#fffaf3_15%,#f8fcff_100%)] ring-1 ring-white/70"
+          : "border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] ring-1 ring-white/70"
+      )}>
         <CardContent className="relative p-0">
           <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
-            <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/50">학습 흐름</span>
+            <span className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isMobile ? "text-[#173A82]/62" : "text-primary/50")}>학습 흐름</span>
             <div className="flex flex-wrap gap-1.5">
               {STUDY_HISTORY_CALENDAR_LEGEND.map((item) => (
-                <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)] sm:text-[9px]">
+                <span key={item.label} className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-black shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)]",
+                  isMobile
+                    ? "border border-[#D9E1F2] bg-white text-[#173A82]/65 text-[8px]"
+                    : "border border-slate-200/75 bg-white/92 text-slate-500 text-[8px] sm:text-[9px]"
+                )}>
                   <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
                   {item.label}
                 </span>
