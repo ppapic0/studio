@@ -1,0 +1,828 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  CalendarDays,
+  Check,
+  ChevronRight,
+  Clock3,
+  Crown,
+  Flame,
+  Gift,
+  Lock,
+  Play,
+  Sparkles,
+  Swords,
+  Target,
+  Timer,
+  Wallet,
+} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+
+type RankRange = "daily" | "weekly" | "monthly";
+type BoxState = "locked" | "charging" | "ready" | "opened";
+type BoxRarity = "common" | "rare" | "epic";
+type BoxStage = "idle" | "shake" | "burst" | "revealed";
+
+export type StudentHomeQuest = {
+  id: string;
+  title: string;
+  reward: number;
+  done: boolean;
+  subjectLabel?: string;
+  timeLabel?: string;
+};
+
+export type StudentHomeRewardBox = {
+  id: string;
+  hour: number;
+  state: BoxState;
+  rarity: BoxRarity;
+  reward?: number;
+};
+
+export type StudentHomeRankState = {
+  title: string;
+  rank: number;
+  minutes: number;
+  badge: string;
+  caption: string;
+  preview: Array<{ rank: number; name: string; minutes: number }>;
+  isLoading: boolean;
+};
+
+function formatMini(minutes: number) {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const mins = safeMinutes % 60;
+  if (hours <= 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}.${Math.round((mins / 60) * 10)}h`;
+}
+
+function RewardCountUp({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let frameId = 0;
+    const startedAt = performance.now();
+    const duration = 720;
+
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(Math.round(value * eased));
+      if (progress < 1) frameId = requestAnimationFrame(animate);
+    };
+
+    setDisplayValue(0);
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, [value]);
+
+  return <>{displayValue.toLocaleString()}</>;
+}
+
+function RewardHeroChest({
+  state,
+  stage,
+  intense,
+  label,
+  onClick,
+}: {
+  state: "ready" | "charging";
+  stage?: BoxStage;
+  intense?: boolean;
+  label: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        "point-track-hero-box",
+        state === "ready" ? "point-track-hero-box--ready" : "point-track-hero-box--charging",
+        intense && "point-track-hero-box--intense",
+        stage === "shake" && "point-track-hero-box--shake",
+        stage === "burst" && "point-track-hero-box--burst",
+        stage === "revealed" && "point-track-hero-box--revealed",
+      )}
+    >
+      <div className="point-track-hero-box__glow" />
+      <div className="point-track-hero-box__shadow" />
+      <div className="point-track-hero-box__body">
+        <div className="point-track-hero-box__lid" />
+        <div className="point-track-hero-box__lock" />
+        <div className="point-track-hero-box__shine" />
+        <div className="point-track-hero-box__spark point-track-hero-box__spark--left" />
+        <div className="point-track-hero-box__spark point-track-hero-box__spark--right" />
+      </div>
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
+function QuestRow({
+  quest,
+  onToggle,
+  gainKey,
+}: {
+  quest: StudentHomeQuest;
+  onToggle: (id: string) => void;
+  gainKey?: number | null;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(quest.id)}
+      className={cn(
+        "relative flex w-full items-center gap-3 rounded-[1.25rem] border px-4 py-3 text-left transition-all duration-200",
+        quest.done
+          ? "border-emerald-300/30 bg-emerald-300/10"
+          : "border-white/10 bg-white/[0.06] hover:border-white/16 hover:bg-white/[0.1]",
+      )}
+    >
+      {gainKey ? (
+        <span
+          key={gainKey}
+          className="pointer-events-none absolute right-3 top-2 rounded-full bg-[#FFB357]/16 px-2 py-1 text-[11px] font-black text-[#FFD089]"
+          style={{ animation: "planner-fade-rise 900ms ease-out both" }}
+        >
+          +{quest.reward}P
+        </span>
+      ) : null}
+      <span
+        className={cn(
+          "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all",
+          quest.done
+            ? "border-emerald-300/40 bg-emerald-300/18 text-emerald-100"
+            : "border-white/18 bg-white/6 text-white/75",
+        )}
+      >
+        {quest.done ? <Check className="h-4 w-4" /> : <Target className="h-4 w-4" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          {quest.subjectLabel ? (
+            <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/60">
+              {quest.subjectLabel}
+            </span>
+          ) : null}
+          {quest.timeLabel ? (
+            <span className="text-[11px] font-black text-[#FFD089]">{quest.timeLabel}</span>
+          ) : null}
+        </div>
+        <div
+          className={cn(
+            "mt-1 text-sm font-black tracking-tight",
+            quest.done ? "text-white/72 line-through decoration-white/35" : "text-white",
+          )}
+        >
+          {quest.title}
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">reward</div>
+        <div className="mt-1 text-sm font-black text-[#FFD089]">+{quest.reward}</div>
+      </div>
+    </button>
+  );
+}
+
+function InventorySlot({
+  box,
+  chargingLabel,
+  chargingPercent,
+  onSelect,
+  isFresh,
+}: {
+  box: StudentHomeRewardBox;
+  chargingLabel?: string;
+  chargingPercent?: number;
+  onSelect: (hour: number) => void;
+  isFresh?: boolean;
+}) {
+  const rarityClass =
+    box.rarity === "epic"
+      ? "point-track-slot--epic"
+      : box.rarity === "rare"
+        ? "point-track-slot--rare"
+        : "point-track-slot--common";
+
+  return (
+    <button
+      type="button"
+      disabled={box.state !== "ready"}
+      onClick={() => onSelect(box.hour)}
+      className={cn(
+        "point-track-slot",
+        rarityClass,
+        box.state === "ready" && "point-track-slot--ready",
+        box.state === "charging" && "point-track-slot--charging",
+        box.state === "opened" && "point-track-slot--opened",
+        box.state === "locked" && "point-track-slot--locked",
+        isFresh && "point-track-slot--fresh",
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]",
+            box.rarity === "epic"
+              ? "bg-violet-300/18 text-violet-100"
+              : box.rarity === "rare"
+                ? "bg-orange-300/18 text-orange-100"
+                : "bg-sky-200/14 text-sky-100",
+          )}
+        >
+          {box.rarity}
+        </span>
+        {box.state === "ready" ? (
+          <Sparkles className="h-3.5 w-3.5 text-orange-100" />
+        ) : box.state === "locked" ? (
+          <Lock className="h-3.5 w-3.5 text-white/35" />
+        ) : null}
+      </div>
+      <div className="point-track-slot__box">
+        <div className="point-track-slot__lid" />
+        <div className="point-track-slot__lock" />
+      </div>
+      <div className="mt-3">
+        <div className="text-[11px] font-black tracking-tight text-white">{box.hour}시간 상자</div>
+        {box.state === "charging" ? (
+          <>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="point-track-slot__meter-fill"
+                style={{ width: `${Math.max(4, Math.min(100, chargingPercent || 0))}%` }}
+              />
+            </div>
+            <div className="mt-1 text-[10px] font-black text-white/55">{chargingLabel}</div>
+          </>
+        ) : (
+          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+            <span>
+              {box.state === "opened"
+                ? `+${box.reward || 0}P`
+                : box.state === "ready"
+                  ? "READY"
+                  : "LOCK"}
+            </span>
+            <span>{box.state === "opened" ? "완료" : box.state === "ready" ? "열기" : "잠김"}</span>
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function RewardModal({
+  open,
+  onOpenChange,
+  selectedBox,
+  boxStage,
+  onReveal,
+  revealedReward,
+  onNextBox,
+  pointBalance,
+  todayPointGain,
+  nextCountdownLabel,
+  hasMoreBoxes,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedBox: StudentHomeRewardBox | null;
+  boxStage: BoxStage;
+  onReveal: () => void;
+  revealedReward: number | null;
+  onNextBox: () => void;
+  pointBalance: number;
+  todayPointGain: number;
+  nextCountdownLabel: string;
+  hasMoreBoxes: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="point-track-modal-shell w-[min(92vw,26rem)] overflow-hidden rounded-[2rem] border border-white/10 p-0 text-white">
+        <div className="p-5">
+          <DialogHeader>
+            <DialogTitle className="text-left text-xl font-black tracking-tight">
+              {revealedReward !== null ? "보상 획득" : "상자 열기"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="point-track-modal-stage mt-4 text-center">
+            <div className="point-track-modal-particles">
+              {Array.from({ length: 7 }).map((_, index) => (
+                <span
+                  key={index}
+                  className={cn(
+                    "point-track-modal-particle",
+                    boxStage === "burst" || boxStage === "revealed"
+                      ? "point-track-modal-particle--visible"
+                      : "",
+                  )}
+                />
+              ))}
+            </div>
+            <RewardHeroChest
+              state="ready"
+              intense={boxStage === "shake" || boxStage === "burst" || boxStage === "revealed"}
+              stage={boxStage}
+              label={`${selectedBox?.hour || 0}시간 상자`}
+              onClick={revealedReward === null ? onReveal : undefined}
+            />
+            {revealedReward === null ? (
+              <div className="mt-4">
+                <div className="text-sm font-black text-[#FFD089]">
+                  {selectedBox ? `${selectedBox.hour}시간 상자` : "포인트 상자"}
+                </div>
+                <div className="mt-2 text-xl font-black tracking-tight text-white">터치해서 열기</div>
+              </div>
+            ) : (
+              <div className="point-track-reward-burst mt-5 rounded-[1.35rem] border border-white/10 bg-white/[0.08] px-4 py-5">
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-[#FFD089]">reward</div>
+                <div className="mt-2 text-[2rem] font-black tracking-tight text-white">
+                  +<RewardCountUp value={revealedReward} />P
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white/68">
+                  오늘 +{todayPointGain.toLocaleString()}P · 총 {pointBalance.toLocaleString()}P
+                </div>
+                <div className="mt-3 rounded-full bg-white/8 px-3 py-2 text-[11px] font-black text-white/55">
+                  다음 상자까지 {nextCountdownLabel}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-12 flex-1 rounded-[1rem] border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
+              onClick={() => onOpenChange(false)}
+            >
+              닫기
+            </Button>
+            {revealedReward !== null ? (
+              <Button
+                type="button"
+                className="point-track-hero-cta h-12 flex-1 rounded-[1rem] border-0 bg-[linear-gradient(180deg,#FFD089_0%,#FF8A1F_100%)] text-[#14295F] hover:opacity-95"
+                onClick={hasMoreBoxes ? onNextBox : () => onOpenChange(false)}
+              >
+                {hasMoreBoxes ? "다음 상자" : "확인"}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function StudentHomeGamePanel({
+  isMobile,
+  dateLabel,
+  todayPointLabel,
+  completionLabel,
+  streakLabel,
+  heroMessage,
+  totalMinutesLabel,
+  growthLabel,
+  growthPercent,
+  growthDeltaLabel,
+  primaryActionLabel,
+  onPrimaryAction,
+  primaryActionActive,
+  sessionTimerLabel,
+  totalAvailableBoxes,
+  boxStatusLabel,
+  boxSubLabel,
+  onOpenMainBox,
+  nextBoxCounter,
+  nextBoxCaption,
+  isNearNextBox,
+  arrivalCount,
+  todayStudyLabel,
+  pointBalance,
+  todayPointGain,
+  quests,
+  questGain,
+  onToggleQuest,
+  onOpenPlan,
+  weeklyTrend,
+  bestDayLabel,
+  selectedRankRange,
+  onSelectRankRange,
+  selectedHomeRank,
+  onOpenLeaderboard,
+  boxes,
+  chargingLabel,
+  chargingPercent,
+  freshReadyHours,
+  isVaultOpen,
+  onVaultChange,
+  selectedBox,
+  boxStage,
+  onRevealBox,
+  revealedReward,
+  onNextBox,
+  nextCountdownLabel,
+}: {
+  isMobile: boolean;
+  dateLabel: string;
+  todayPointLabel: string;
+  completionLabel: string;
+  streakLabel: string;
+  heroMessage: string;
+  totalMinutesLabel: string;
+  growthLabel: string;
+  growthPercent: number;
+  growthDeltaLabel: string;
+  primaryActionLabel: string;
+  onPrimaryAction: () => void;
+  primaryActionActive: boolean;
+  sessionTimerLabel: string | null;
+  totalAvailableBoxes: number;
+  boxStatusLabel: string;
+  boxSubLabel: string;
+  onOpenMainBox: (hour?: number) => void;
+  nextBoxCounter: string;
+  nextBoxCaption: string;
+  isNearNextBox: boolean;
+  arrivalCount: number;
+  todayStudyLabel: string;
+  pointBalance: number;
+  todayPointGain: number;
+  quests: StudentHomeQuest[];
+  questGain: { id: string; key: number; amount: number } | null;
+  onToggleQuest: (id: string) => void;
+  onOpenPlan: () => void;
+  weeklyTrend: Array<{ date: string; minutes: number }>;
+  bestDayLabel: string;
+  selectedRankRange: RankRange;
+  onSelectRankRange: (range: RankRange) => void;
+  selectedHomeRank: StudentHomeRankState;
+  onOpenLeaderboard: () => void;
+  boxes: StudentHomeRewardBox[];
+  chargingLabel: string;
+  chargingPercent: number;
+  freshReadyHours: number[];
+  isVaultOpen: boolean;
+  onVaultChange: (open: boolean) => void;
+  selectedBox: StudentHomeRewardBox | null;
+  boxStage: BoxStage;
+  onRevealBox: () => void;
+  revealedReward: number | null;
+  onNextBox: () => void;
+  nextCountdownLabel: string;
+}) {
+  const maxTrend = weeklyTrend.reduce((max, item) => Math.max(max, item.minutes), 1);
+  const hasMoreReadyBoxes = boxes.filter((box) => box.state === "ready").length > 1;
+
+  return (
+    <>
+      <section
+        className={cn(
+          "point-track-hero-stage relative overflow-hidden",
+          arrivalCount > 0 && "point-track-hero-stage--arrival",
+        )}
+      >
+        {arrivalCount > 0 ? (
+          <div key={arrivalCount} className="point-track-arrival-banner">
+            +{arrivalCount} BOX
+          </div>
+        ) : null}
+        <div className={cn("relative z-10", isMobile ? "space-y-4" : "space-y-5")}>
+          <div className={cn("flex items-start justify-between gap-3", isMobile ? "flex-col" : "items-center")}>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="border-white/16 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/78"
+                >
+                  Home Lobby
+                </Badge>
+                <span className="text-[11px] font-black text-[#FFD089]">{dateLabel}</span>
+              </div>
+              <h2 className={cn("break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
+                오늘도 성장한 하루
+              </h2>
+              <p className="text-sm font-semibold text-white/68">{heroMessage}</p>
+            </div>
+
+            <div className={cn("rounded-full border border-white/12 bg-white/8 px-3 py-2", isMobile ? "self-start" : "")}>
+              <div className="flex items-center gap-2 text-[11px] font-black text-white/72">
+                <CalendarDays className="h-3.5 w-3.5 text-[#FFD089]" />
+                <span>{todayPointLabel}</span>
+                <span className="text-white/35">|</span>
+                <span>{completionLabel}</span>
+                <span className="text-white/35">|</span>
+                <span>{streakLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-[1.35fr_0.95fr]")}>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">growth</div>
+                  <div className={cn("mt-2 font-black tracking-tight text-white", isMobile ? "text-[2.4rem]" : "text-[3rem]")}>
+                    {totalMinutesLabel}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-white/62">
+                      {growthLabel}
+                    </span>
+                    <span className="rounded-full bg-[#FF8A1F]/14 px-2.5 py-1 text-[10px] font-black text-[#FFD089]">
+                      {growthDeltaLabel}
+                    </span>
+                  </div>
+                </div>
+                {sessionTimerLabel ? (
+                  <div className="rounded-[1.1rem] border border-white/12 bg-[#0F204F]/75 px-3 py-2 text-right shadow-[0_18px_34px_-24px_rgba(0,0,0,0.58)]">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">live</div>
+                    <div className="mt-1 text-lg font-black text-[#FFD089]">{sessionTimerLabel}</div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-[#0B1738]/48 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-white/55">
+                    <Flame className="h-3.5 w-3.5 text-[#FFD089]" />
+                    성장 게이지
+                  </span>
+                  <span className="text-[11px] font-black text-white/72">{growthLabel}</span>
+                </div>
+                <div className={cn("point-track-progress-track", growthPercent >= 100 && "point-track-progress-track--charged")}>
+                  <div className="point-track-progress-fill" style={{ width: `${Math.max(6, Math.min(100, growthPercent))}%` }} />
+                  <div className="point-track-progress-node point-track-progress-node--one" />
+                  <div className="point-track-progress-node point-track-progress-node--two" />
+                  <div className="point-track-progress-node point-track-progress-node--three" />
+                  <div
+                    className="point-track-progress-orb"
+                    style={{ left: `calc(${Math.max(6, Math.min(100, growthPercent))}% - 0.65rem)` }}
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={onPrimaryAction}
+                className={cn(
+                  "point-track-hero-cta mt-4 h-12 w-full rounded-[1.1rem] border-0 text-base font-black",
+                  primaryActionActive
+                    ? "bg-[linear-gradient(180deg,#FFA33B_0%,#FF7A16_100%)] text-white"
+                    : "bg-white text-[#14295F]",
+                )}
+              >
+                {primaryActionActive ? <Timer className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4 fill-current" />}
+                {primaryActionLabel}
+              </Button>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">reward</div>
+                  <div className="mt-2 text-[1.65rem] font-black tracking-tight text-white">
+                    {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 대기` : "채워지는 중"}
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white/65">{boxSubLabel}</div>
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#FFD089]">
+                  {boxStatusLabel}
+                </div>
+              </div>
+
+              <div className="mt-3 flex justify-center">
+                <RewardHeroChest
+                  state={totalAvailableBoxes > 0 ? "ready" : "charging"}
+                  intense={totalAvailableBoxes > 0 || isNearNextBox}
+                  label={boxStatusLabel}
+                  onClick={onOpenMainBox}
+                />
+              </div>
+
+              <div className="mt-2 text-center">
+                <div className="text-sm font-black text-white">{totalAvailableBoxes > 0 ? "지금 열기" : nextBoxCounter}</div>
+                <div className="mt-1 text-[11px] font-semibold text-white/55">{nextBoxCaption}</div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => onOpenMainBox()}
+                disabled={totalAvailableBoxes <= 0}
+                className="point-track-hero-cta mt-4 h-11 w-full rounded-[1.1rem] border-0 bg-[linear-gradient(180deg,#FFD089_0%,#FF8A1F_100%)] text-[#14295F] disabled:cursor-default disabled:opacity-55"
+              >
+                <Gift className="mr-2 h-4 w-4" />
+                {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 열기` : "곧 도착"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[1.2fr_0.8fr]")}>
+        <div className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,rgba(20,41,95,0.94),rgba(14,28,66,0.94))] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.72)]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/42">quest board</div>
+              <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">오늘의 퀘스트</h3>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-9 rounded-full px-3 text-[11px] font-black text-white/72 hover:bg-white/8 hover:text-white"
+              onClick={onOpenPlan}
+            >
+              더보기 <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+          <div className="mt-4 space-y-3">
+            {quests.length > 0 ? (
+              quests.map((quest) => (
+                <QuestRow
+                  key={quest.id}
+                  quest={quest}
+                  onToggle={onToggleQuest}
+                  gainKey={questGain?.id === quest.id ? questGain.key : null}
+                />
+              ))
+            ) : (
+              <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-white/[0.04] px-4 py-6 text-center">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/8 text-[#FFD089]">
+                  <Swords className="h-5 w-5" />
+                </div>
+                <div className="mt-3 text-base font-black text-white">아직 오늘 퀘스트가 없어요</div>
+                <div className="mt-1 text-sm font-semibold text-white/55">계획트랙에서 오늘 할 일을 추가해 보세요.</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)] backdrop-blur-xl">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-[1.15rem] bg-white/8 px-3 py-3">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+                  <Clock3 className="h-3.5 w-3.5 text-[#FFD089]" />
+                  오늘
+                </div>
+                <div className="mt-2 text-xl font-black text-white">{todayStudyLabel}</div>
+              </div>
+              <div className="rounded-[1.15rem] bg-white/8 px-3 py-3">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+                  <Wallet className="h-3.5 w-3.5 text-[#FFD089]" />
+                  포인트
+                </div>
+                <div className="mt-2 text-xl font-black text-white">{pointBalance.toLocaleString()}P</div>
+                <div className="mt-1 text-[11px] font-black text-[#FFD089]">오늘 +{todayPointGain}P</div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/42">growth log</div>
+                <div className="text-[11px] font-black text-[#FFD089]">최고 {bestDayLabel}</div>
+              </div>
+              <div className="mt-4 flex items-end gap-2">
+                {weeklyTrend.map((item) => {
+                  const height = Math.max(0.5, item.minutes / maxTrend);
+                  return (
+                    <div key={item.date} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                      <div className="flex h-24 w-full items-end rounded-full bg-white/[0.05] px-1.5 py-1.5">
+                        <div
+                          className={cn(
+                            "w-full rounded-full bg-[linear-gradient(180deg,#FFD089_0%,#FF8A1F_100%)] shadow-[0_10px_20px_-14px_rgba(255,138,31,0.7)]",
+                            item.date === bestDayLabel && "bg-[linear-gradient(180deg,#FFE6AB_0%,#FF9E2C_100%)]",
+                          )}
+                          style={{ height: `${height * 100}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] font-black text-white/42">{item.date}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenLeaderboard}
+            className="w-full rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] p-4 text-left text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)] backdrop-blur-xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/42">{selectedHomeRank.title}</div>
+                <div className="mt-1 text-[1.35rem] font-black tracking-tight">
+                  {selectedHomeRank.isLoading
+                    ? "집계 중..."
+                    : selectedHomeRank.rank > 0
+                      ? `${selectedHomeRank.rank}위`
+                      : "집계 준비중"}
+                </div>
+                <div className="mt-1 text-[11px] font-semibold text-white/60">{selectedHomeRank.caption}</div>
+              </div>
+              <ChevronRight className="mt-1 h-4 w-4 text-white/42" />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {(["daily", "weekly", "monthly"] as RankRange[]).map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectRankRange(range);
+                  }}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[10px] font-black transition-all",
+                    selectedRankRange === range
+                      ? "bg-[#FF7A16] text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]"
+                      : "bg-white/10 text-[#D9E1F2] ring-1 ring-white/10",
+                  )}
+                >
+                  {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {selectedHomeRank.preview.length > 0 ? (
+                selectedHomeRank.preview.slice(0, 3).map((entry) => (
+                  <div
+                    key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
+                    className={cn(
+                      "rounded-[1.15rem] border px-2.5 py-3 text-center shadow-[0_18px_34px_-28px_rgba(0,0,0,0.42)]",
+                      entry.rank === 1
+                        ? "border-orange-300/35 bg-[linear-gradient(180deg,rgba(255,176,76,0.18),rgba(255,176,76,0.08))]"
+                        : "border-white/10 bg-white/[0.05]",
+                    )}
+                  >
+                    <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[11px] font-black text-white/80">
+                      {entry.rank === 1 ? <Crown className="h-4 w-4 text-[#FFD089]" /> : `#${entry.rank}`}
+                    </div>
+                    <div className="mt-2 truncate text-sm font-black text-white">{entry.name}</div>
+                    <div className="mt-1 text-[11px] font-black text-[#FFD089]">{formatMini(entry.minutes)}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-3 rounded-[1.15rem] border border-dashed border-white/12 px-3 py-4 text-center text-[11px] font-semibold text-white/52">
+                  아직 표시할 랭킹이 없어요.
+                </div>
+              )}
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)] backdrop-blur-xl">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/42">reward vault</div>
+            <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">상자 보관함</h3>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-9 rounded-full px-3 text-[11px] font-black text-white/72 hover:bg-white/8 hover:text-white"
+            onClick={() => onOpenMainBox()}
+          >
+            모두 보기 <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
+        <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+          {boxes.map((box) => (
+            <InventorySlot
+              key={box.id}
+              box={box}
+              chargingLabel={chargingLabel}
+              chargingPercent={chargingPercent}
+              onSelect={onOpenMainBox}
+              isFresh={freshReadyHours.includes(box.hour)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <RewardModal
+        open={isVaultOpen}
+        onOpenChange={onVaultChange}
+        selectedBox={selectedBox}
+        boxStage={boxStage}
+        onReveal={onRevealBox}
+        revealedReward={revealedReward}
+        onNextBox={onNextBox}
+        pointBalance={pointBalance}
+        todayPointGain={todayPointGain}
+        nextCountdownLabel={nextCountdownLabel}
+        hasMoreBoxes={hasMoreReadyBoxes}
+      />
+    </>
+  );
+}
