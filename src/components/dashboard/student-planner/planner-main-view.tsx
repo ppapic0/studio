@@ -16,6 +16,7 @@ import {
   Flame,
   Layers3,
   ListTodo,
+  Pencil,
   Plus,
   Sparkles,
   StickyNote,
@@ -81,10 +82,27 @@ const LOCAL_WEEKDAY_OPTIONS = [
 ];
 
 const QUEST_END_OPTIONS = ['21:00', '22:00', '23:00'];
-const QUICK_STUDY_TYPES = ['문제풀이', '인강', '복습', '오답', '암기', '테스트'];
-const QUICK_TIME_PRESETS = [30, 50, 80, 100];
+const QUICK_PRESET_STORAGE_KEY = 'planner:quick-preset-custom:v1';
+const DEFAULT_CUSTOM_SUBJECT_LABEL = '기타';
+const DEFAULT_CUSTOM_TIME_PRESET = 100;
+const DEFAULT_CUSTOM_STUDY_TYPE = '오답';
+const QUICK_BASE_TIME_PRESETS = [30, 50, 80];
+const QUICK_BASE_STUDY_TYPES = ['문제풀이', '인강', '복습'];
 const OUTING_REASON_OPTIONS = ['식사', '학원', '화장실', '기타'];
 const OUTING_DURATION_OPTIONS = ['10', '20', '30', '45'];
+
+type QuickPresetEditorKind = 'subject' | 'minute' | 'studyType' | null;
+
+function sanitizePresetLabel(value: string, fallback: string) {
+  const trimmed = value.trim().replace(/\s+/g, ' ');
+  return trimmed.length > 0 ? trimmed.slice(0, 12) : fallback;
+}
+
+function sanitizeMinutePreset(value: string | number) {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_CUSTOM_TIME_PRESET;
+  return Math.max(10, Math.min(300, Math.round(parsed)));
+}
 
 function resolveStudyPlanMode(task: any): StudyPlanMode {
   if (task.studyPlanMode) return task.studyPlanMode;
@@ -361,12 +379,12 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     const totalMinutes = Object.values(totals).reduce((sum, value) => sum + value, 0);
     return Object.entries(totals)
       .map(([subjectKey, minutes]) => {
-        const subject = subjectOptions.find((item: any) => item.id === subjectKey);
+        const subject = quickSubjectOptions.find((item: any) => item.id === subjectKey);
         const percent = totalMinutes > 0 ? Math.round((minutes / totalMinutes) * 100) : 0;
         return { key: subjectKey, label: subject?.label || '기타', minutes, percent };
       })
       .sort((left, right) => right.minutes - left.minutes);
-  }, [studyTasks, subjectOptions]);
+  }, [quickSubjectOptions, studyTasks]);
 
   const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
   const [isOutingModalOpen, setIsOutingModalOpen] = useState(false);
@@ -376,8 +394,63 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
   const [questEndTimeChoice, setQuestEndTimeChoice] = useState(outTime || '22:00');
   const [questFocusSubjects, setQuestFocusSubjects] = useState<string[]>(newStudySubject ? [newStudySubject] : []);
   const [questMissionId, setQuestMissionId] = useState(PLANNER_QUICK_TASK_SUGGESTIONS[0]?.id || 'math-problem');
-  const [quickStudyType, setQuickStudyType] = useState(QUICK_STUDY_TYPES[0]);
+  const [quickStudyType, setQuickStudyType] = useState(QUICK_BASE_STUDY_TYPES[0]);
   const [outingDuration, setOutingDuration] = useState('20');
+  const [customSubjectLabel, setCustomSubjectLabel] = useState(DEFAULT_CUSTOM_SUBJECT_LABEL);
+  const [customMinutePreset, setCustomMinutePreset] = useState(DEFAULT_CUSTOM_TIME_PRESET);
+  const [customStudyTypeLabel, setCustomStudyTypeLabel] = useState(DEFAULT_CUSTOM_STUDY_TYPE);
+  const [presetEditorKind, setPresetEditorKind] = useState<QuickPresetEditorKind>(null);
+  const [presetEditorDraft, setPresetEditorDraft] = useState('');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(QUICK_PRESET_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<{
+        subjectLabel: string;
+        minutePreset: number;
+        studyTypeLabel: string;
+      }>;
+      if (typeof parsed.subjectLabel === 'string') {
+        setCustomSubjectLabel(sanitizePresetLabel(parsed.subjectLabel, DEFAULT_CUSTOM_SUBJECT_LABEL));
+      }
+      if (typeof parsed.minutePreset === 'number') {
+        setCustomMinutePreset(sanitizeMinutePreset(parsed.minutePreset));
+      }
+      if (typeof parsed.studyTypeLabel === 'string') {
+        setCustomStudyTypeLabel(sanitizePresetLabel(parsed.studyTypeLabel, DEFAULT_CUSTOM_STUDY_TYPE));
+      }
+    } catch {
+      // ignore malformed local preset data
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        QUICK_PRESET_STORAGE_KEY,
+        JSON.stringify({
+          subjectLabel: customSubjectLabel,
+          minutePreset: customMinutePreset,
+          studyTypeLabel: customStudyTypeLabel,
+        })
+      );
+    } catch {
+      // ignore local preset persistence errors
+    }
+  }, [customMinutePreset, customStudyTypeLabel, customSubjectLabel]);
+
+  const quickSubjectOptions = useMemo(
+    () =>
+      subjectOptions.map((subject: any) =>
+        subject.id === 'etc' ? { ...subject, label: customSubjectLabel } : subject
+      ),
+    [customSubjectLabel, subjectOptions]
+  );
+  const quickTimePresets = useMemo(() => [...QUICK_BASE_TIME_PRESETS, customMinutePreset], [customMinutePreset]);
+  const quickStudyTypes = useMemo(() => [...QUICK_BASE_STUDY_TYPES, customStudyTypeLabel], [customStudyTypeLabel]);
 
   useEffect(() => {
     setQuestEndTimeChoice(outTime || '22:00');
@@ -401,7 +474,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
   const recentTemplateCandidate = latestRecentTemplate || recentTemplates[0] || null;
   const resolvedSubjectValue = newStudySubject || questFocusSubjects[0] || missionSuggestion?.subject || 'etc';
-  const resolvedSubjectLabel = subjectOptions.find((item: any) => item.id === resolvedSubjectValue)?.label || '기타';
+  const resolvedSubjectLabel = quickSubjectOptions.find((item: any) => item.id === resolvedSubjectValue)?.label || customSubjectLabel;
   const resolvedTargetMinutes = Math.max(0, Number(newStudyMinutes) || missionSuggestion?.targetMinutes || 50);
   const resolvedWindowPreview = useMemo(() => {
     if (!(newStudyMode === 'time' || enableVolumeStudyMinutes) || resolvedTargetMinutes <= 0) return null;
@@ -410,7 +483,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
   const questFocusSummary = questFocusSubjects.length > 0
     ? questFocusSubjects
-      .map((subjectId) => subjectOptions.find((item: any) => item.id === subjectId)?.label || '기타')
+      .map((subjectId) => quickSubjectOptions.find((item: any) => item.id === subjectId)?.label || '기타')
       .join(' · ')
     : '메인 과목 2개를 골라주세요';
 
@@ -454,6 +527,52 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     : taskCount === 0
       ? '미션을 추가해주세요'
       : '시작하기 ▶';
+
+  const openPresetEditor = (kind: Exclude<QuickPresetEditorKind, null>) => {
+    setPresetEditorKind(kind);
+    setPresetEditorDraft(
+      kind === 'subject'
+        ? customSubjectLabel
+        : kind === 'minute'
+          ? String(customMinutePreset)
+          : customStudyTypeLabel
+    );
+  };
+
+  const closePresetEditor = () => {
+    setPresetEditorKind(null);
+    setPresetEditorDraft('');
+  };
+
+  const savePresetEditor = () => {
+    if (presetEditorKind === 'subject') {
+      const nextLabel = sanitizePresetLabel(presetEditorDraft, DEFAULT_CUSTOM_SUBJECT_LABEL);
+      setCustomSubjectLabel(nextLabel);
+      if ((newStudySubject || 'etc') === 'etc' && !newStudyTask.trim()) {
+        setNewStudyTask(`${nextLabel} ${quickStudyType}`);
+      }
+    }
+    if (presetEditorKind === 'minute') {
+      const previousMinute = customMinutePreset;
+      const nextMinute = sanitizeMinutePreset(presetEditorDraft);
+      setCustomMinutePreset(nextMinute);
+      if (Number(newStudyMinutes || 0) === previousMinute) {
+        setNewStudyMinutes(String(nextMinute));
+      }
+    }
+    if (presetEditorKind === 'studyType') {
+      const previousType = customStudyTypeLabel;
+      const nextType = sanitizePresetLabel(presetEditorDraft, DEFAULT_CUSTOM_STUDY_TYPE);
+      setCustomStudyTypeLabel(nextType);
+      if (quickStudyType === previousType) {
+        setQuickStudyType(nextType);
+      }
+      if (!newStudyTask.trim() || newStudyTask.trim() === `${resolvedSubjectLabel} ${previousType}`) {
+        setNewStudyTask(`${resolvedSubjectLabel} ${nextType}`);
+      }
+    }
+    closePresetEditor();
+  };
 
   const handleApplyRoutineEdit = async () => {
     flushSync(() => {
@@ -564,6 +683,15 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     if (added) {
       setShowQuickAddCard(false);
     }
+  };
+
+  const handleStartCustomQuest = () => {
+    setShowQuickAddCard(true);
+    setNewStudySubject('etc');
+    setNewStudyMode('time');
+    setNewStudyMinutes(String(customMinutePreset));
+    setQuickStudyType(customStudyTypeLabel);
+    setNewStudyTask('');
   };
 
   const handleStartOutingPlan = () => {
@@ -759,7 +887,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     const detailLabel = isStudyTask ? buildStudyTaskMeta(task) : (task.tag || '보조 일정');
                     const rewardLabel = `+${estimateTaskReward(task)}P`;
                     const progressPercent = isVolumeTask ? 0 : computeTimeProgressPercent(task, isToday);
-                    const badge = getChecklistBadge(task, subjectOptions);
+                    const badge = getChecklistBadge(task, quickSubjectOptions);
 
                     return (
                       <div
@@ -889,6 +1017,13 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 </button>
                 <button
                   type="button"
+                  onClick={handleStartCustomQuest}
+                  className="rounded-full border border-[#FFB347]/22 bg-[#FF9626]/12 px-4 py-2 text-[12px] font-black text-[#FFD79F]"
+                >
+                  오늘만 직접 쓰기
+                </button>
+                <button
+                  type="button"
                   onClick={handleCopyYesterdayPlan}
                   className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[12px] font-black text-white/72"
                 >
@@ -907,7 +1042,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     />
 
                     <div className="flex flex-wrap gap-2">
-                      {subjectOptions.map((subject: any) => (
+                      {quickSubjectOptions.filter((subject: any) => subject.id !== 'etc').map((subject: any) => (
                         <button
                           key={subject.id}
                           type="button"
@@ -922,12 +1057,32 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           {subject.label}
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        onClick={() => setNewStudySubject('etc')}
+                        className={cn(
+                          'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
+                          resolvedSubjectValue === 'etc'
+                            ? 'border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F]'
+                            : 'border-white/10 bg-white/8 text-white'
+                        )}
+                      >
+                        {customSubjectLabel}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openPresetEditor('subject')}
+                        className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/8 px-3 py-2 text-[10px] font-black text-white/82 transition-all hover:bg-white/12"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        수정
+                      </button>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {QUICK_TIME_PRESETS.map((minute) => (
+                      {quickTimePresets.map((minute, index) => (
                         <button
-                          key={minute}
+                          key={`${minute}-${index}`}
                           type="button"
                           onClick={() => setNewStudyMinutes(String(minute))}
                           className={cn(
@@ -940,10 +1095,18 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           {minute}분
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        onClick={() => openPresetEditor('minute')}
+                        className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/8 px-3 py-2 text-[10px] font-black text-white/82 transition-all hover:bg-white/12"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        수정
+                      </button>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {QUICK_STUDY_TYPES.slice(0, 4).map((type) => (
+                      {quickStudyTypes.map((type) => (
                         <button
                           key={type}
                           type="button"
@@ -961,12 +1124,21 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           {type}
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        onClick={() => openPresetEditor('studyType')}
+                        className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/8 px-3 py-2 text-[10px] font-black text-white/82 transition-all hover:bg-white/12"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        수정
+                      </button>
                     </div>
 
                     <div className={cn('rounded-[1.1rem] border border-white/10 bg-white/6 px-4 py-3', isMobile ? 'space-y-3' : 'flex items-center justify-between gap-3')}>
                       <div>
                         <p className="text-[10px] font-black tracking-[0.18em] text-[#FF9626]">AUTO SCHEDULE</p>
                         <p className="mt-1 text-[12px] font-bold text-white">{resolvedWindowPreview ? `${resolvedWindowPreview.startTime} → ${resolvedWindowPreview.endTime}` : '시간은 자동으로 이어 붙어요'}</p>
+                        <p className="mt-2 text-[11px] font-semibold text-white/58">그날만 필요한 미션은 위에 직접 적고 바로 퀘스트로 넣어도 돼요.</p>
                       </div>
                       <Button
                         type="button"
@@ -974,7 +1146,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                         disabled={isSubmitting || !resolvedSubjectValue}
                         className={cn('h-11 rounded-2xl px-5 font-black text-white shadow-[0_18px_30px_-20px_rgba(23,58,130,0.45)]', rewardGradient, isMobile && 'w-full')}
                       >
-                        블록 추가
+                        퀘스트로 넣기
                       </Button>
                     </div>
                   </div>
@@ -1473,7 +1645,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         completedCount={completedStudyCount}
         remainingCount={Math.max(0, studyTasks.length - completedStudyCount)}
         goalSummaryLabel={studyGoalSummaryLabel}
-        subjectOptions={subjectOptions}
+        subjectOptions={quickSubjectOptions}
         subjectValue={newStudySubject}
         onSubjectChange={setNewStudySubject}
         minuteValue={newStudyMinutes}
@@ -1576,6 +1748,84 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         isMobile={isMobile}
         weekdayOptions={LOCAL_WEEKDAY_OPTIONS}
       />
+
+      <Dialog open={presetEditorKind !== null} onOpenChange={(open) => !open && closePresetEditor()}>
+        <DialogContent
+          motionPreset="dashboard-premium"
+          className={cn(
+            'overflow-hidden border-none bg-[linear-gradient(180deg,#13285A_0%,#0E1B3D_100%)] p-0 shadow-2xl',
+            isMobile ? 'w-[min(92vw,24rem)] rounded-[1.6rem]' : 'w-[min(28rem,92vw)] rounded-[1.8rem]'
+          )}
+        >
+          <div className="bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.18),transparent_30%),linear-gradient(135deg,#10295f_0%,#17326B_46%,#0f2149_100%)] p-5 text-white">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-xl font-black tracking-tight">
+                {presetEditorKind === 'subject'
+                  ? '과목 버튼 수정'
+                  : presetEditorKind === 'minute'
+                    ? '시간 버튼 수정'
+                    : '유형 버튼 수정'}
+              </DialogTitle>
+              <DialogDescription className="mt-1 text-[11px] font-semibold text-white/72">
+                자주 쓰는 마지막 버튼을 내 스타일로 바꿔둘 수 있어요.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-4 p-5 text-white">
+            {presetEditorKind === 'minute' ? (
+              <Input
+                type="number"
+                min={10}
+                max={300}
+                step={5}
+                value={presetEditorDraft}
+                onChange={(event) => setPresetEditorDraft(event.target.value)}
+                className="h-12 rounded-2xl border-white/10 bg-white/8 text-center font-black text-white"
+                placeholder="예: 100"
+              />
+            ) : (
+              <Input
+                value={presetEditorDraft}
+                onChange={(event) => setPresetEditorDraft(event.target.value)}
+                className="h-12 rounded-2xl border-white/10 bg-white/8 font-black text-white placeholder:text-white/35"
+                placeholder={presetEditorKind === 'subject' ? '예: 생명과학' : '예: 오답정리'}
+                maxLength={12}
+              />
+            )}
+
+            <div className="rounded-[1.15rem] border border-white/10 bg-white/6 px-4 py-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">preview</div>
+              <div className="mt-2 inline-flex items-center rounded-full border border-[#FFB347]/24 bg-[#FF9626]/16 px-3 py-2 text-[11px] font-black text-[#FFD79F]">
+                {presetEditorKind === 'minute'
+                  ? `${sanitizeMinutePreset(presetEditorDraft || customMinutePreset)}분`
+                  : sanitizePresetLabel(
+                      presetEditorDraft || (presetEditorKind === 'subject' ? customSubjectLabel : customStudyTypeLabel),
+                      presetEditorKind === 'subject' ? DEFAULT_CUSTOM_SUBJECT_LABEL : DEFAULT_CUSTOM_STUDY_TYPE
+                    )}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={closePresetEditor}
+                className="h-11 flex-1 rounded-2xl border border-white/10 bg-white/8 text-white hover:bg-white/12"
+              >
+                취소
+              </Button>
+              <Button
+                type="button"
+                onClick={savePresetEditor}
+                className="h-11 flex-1 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_58%,#FF7A16_170%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(23,58,130,0.45)]"
+              >
+                저장
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
