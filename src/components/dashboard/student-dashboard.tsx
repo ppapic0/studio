@@ -1070,6 +1070,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership?.id, periodKey]);
   const { data: totalRankEntries } = useCollection<LeaderboardEntry>(totalEntriesQuery, { enabled: isActive });
 
+  const dailyRankEntriesQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !todayKey) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students');
+  }, [firestore, activeMembership?.id, todayKey]);
+  const { data: dailyRankEntriesRaw, isLoading: dailyRankLoading } = useCollection<DailyStudentStat>(dailyRankEntriesQuery, { enabled: isActive });
+
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return query(
@@ -2008,6 +2014,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyRankParticipantCount = validRankEntries.length;
   const isRankContextLoading = activeMembersLoading || attendanceLoading;
 
+  const validDailyRankEntries = useMemo(() => {
+    if (!dailyRankEntriesRaw) return [];
+    return dailyRankEntriesRaw
+      .filter((entry) => !isSyntheticStudentId(entry.studentId))
+      .filter((entry) => !activeStudentIds || activeStudentIds.has(entry.studentId))
+      .sort((a, b) => Number(b.totalStudyMinutes || 0) - Number(a.totalStudyMinutes || 0));
+  }, [activeStudentIds, dailyRankEntriesRaw]);
+
+  const dailyStudyRank = useMemo(() => {
+    if (!user || validDailyRankEntries.length === 0) return 0;
+    const ownIndex = validDailyRankEntries.findIndex((entry) => entry.studentId === user.uid);
+    return ownIndex >= 0 ? ownIndex + 1 : 0;
+  }, [user?.uid, validDailyRankEntries]);
+
+  const dailyStudyRankMinutes = useMemo(() => {
+    if (dailyStudyRank > 0) {
+      const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === user?.uid);
+      return Number(ownEntry?.totalStudyMinutes || 0);
+    }
+    return Number(todayStudyLog?.totalMinutes || 0);
+  }, [dailyStudyRank, todayStudyLog?.totalMinutes, user?.uid, validDailyRankEntries]);
+
   const monthlyStudyRank = useMemo(() => {
     const snapshotRank = leaderboardEntry?.rank || 0;
     if (!user || validRankEntries.length === 0) return snapshotRank;
@@ -2286,7 +2314,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </CardContent>
           </Card>
 
-          <Link href="/dashboard/leaderboards" className="block touch-manipulation">
+          <Link href="/dashboard/leaderboards?range=daily" className="block touch-manipulation">
             <Card className="h-full overflow-hidden rounded-[1.5rem] border border-[#274A9B] bg-[linear-gradient(180deg,#173A82_0%,#234A99_100%)] shadow-[0_24px_54px_-34px_rgba(23,58,130,0.52)] transition-transform duration-200 hover:-translate-y-0.5">
               <CardContent className={cn("p-4", !isMobile && "p-5")}>
                 <div className="flex items-center justify-between">
@@ -2294,23 +2322,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/14 text-[#FFD9B4] ring-1 ring-white/12">
                       <Trophy className="h-3.5 w-3.5" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#D9E1F2]">월간 랭킹</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#D9E1F2]">일간 랭킹</span>
                   </div>
                   <ChevronRight className="h-4 w-4 text-white/50" />
                 </div>
                 <div className="mt-3 min-w-0">
                   <p className={cn("font-black tracking-tight text-white break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
-                    {monthlyStudyPercentile ? `상위 ${monthlyStudyPercentile}%` : '집계 준비중'}
+                    {dailyRankLoading ? '집계 중...' : dailyStudyRank > 0 ? `오늘 ${dailyStudyRank}위` : '집계 준비중'}
                   </p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 text-white/72 break-keep">
-                    {monthlyStudyRank > 0 ? `${formatStudyMinutes(Math.max(0, Number(leaderboardEntry?.value || 0)))} 누적` : '이번 달 공부시간이 모이면 순위가 보여요'}
+                    {dailyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, dailyStudyRankMinutes))} 누적` : '오늘 공부시간이 쌓이면 순위가 보여요'}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
                     <span className="rounded-full bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]">
-                      현재 {monthlyStudyRank > 0 ? `${monthlyStudyRank}위` : '집계중'}
+                      현재 {dailyStudyRank > 0 ? `${dailyStudyRank}위` : '집계중'}
                     </span>
                     <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-[#D9E1F2] ring-1 ring-white/10">
-                      월간 공부시간
+                      오늘 공부시간
                     </span>
                   </div>
                 </div>
