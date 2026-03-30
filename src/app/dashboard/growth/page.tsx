@@ -32,7 +32,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
-import { getAvailableStudyBoxMilestones, getClaimedStudyBoxes, getDailyFortuneMessage, rollStudyBoxReward, type StudyBoxReward } from '@/lib/student-rewards';
+import { getAvailableStudyBoxMilestones, getClaimedStudyBoxes, rollStudyBoxReward, type StudyBoxReward } from '@/lib/student-rewards';
 import { GrowthProgress, LeaderboardEntry, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -555,7 +555,6 @@ export default function GrowthPage() {
   const totalAvailableBoxes = readyBoxes.length;
   const todayPointGain = rewardEntries.reduce((sum, reward) => sum + Number(reward.awardedPoints || 0), 0);
   const todayOpenedCount = openedBoxes.length;
-  const fortuneMessage = (todayStatus.fortuneMessage as string | undefined) || getDailyFortuneMessage(user?.uid || 'student', todayKey);
 
   const topEntries = useMemo(() => {
     return (leaderboardTopRaw || [])
@@ -981,13 +980,6 @@ export default function GrowthPage() {
               </div>
             </div>
           </div>
-        </section>
-
-        <section className="rounded-[1.35rem] border border-orange-200/18 bg-[linear-gradient(180deg,rgba(255,240,220,0.16),rgba(255,255,255,0.08))] px-4 py-3 text-sm font-black text-white shadow-[0_16px_40px_-30px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-orange-300/20 text-[#FFD089] shadow-[0_0_20px_rgba(255,176,76,0.25)]">
-            <Star className="h-3.5 w-3.5" />
-          </span>
-          {fortuneMessage}
         </section>
 
         <section className="grid grid-cols-2 gap-3">
