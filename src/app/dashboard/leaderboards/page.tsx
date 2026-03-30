@@ -146,12 +146,14 @@ function TopSummaryCard({
   sub,
   tone = 'default',
   icon: Icon,
+  compact = false,
 }: {
   label: string;
   value: string;
   sub: string;
   tone?: 'default' | 'orange' | 'blue';
   icon: typeof Trophy;
+  compact?: boolean;
 }) {
   const toneClass = tone === 'orange'
     ? 'from-orange-500/18 via-orange-500/10 to-white/[0.04]'
@@ -161,15 +163,15 @@ function TopSummaryCard({
 
   return (
     <Panel className={cn('bg-gradient-to-br', toneClass)}>
-      <div className="p-5">
+      <div className={cn(compact ? 'p-4' : 'p-5')}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-black tracking-[0.18em] text-white/68">{label}</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-white">{value}</p>
-            <p className="mt-2 text-sm font-semibold text-white/68">{sub}</p>
+            <p className={cn('mt-3 font-black tracking-tight text-white', compact ? 'text-[1.7rem] leading-none' : 'text-3xl')}>{value}</p>
+            <p className={cn('mt-2 font-semibold text-white/68', compact ? 'text-[12px] leading-5' : 'text-sm')}>{sub}</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/6 p-3 text-white/82">
-            <Icon className="h-5 w-5" />
+          <div className={cn('rounded-2xl border border-white/10 bg-white/6 text-white/82', compact ? 'p-2.5' : 'p-3')}>
+            <Icon className={cn(compact ? 'h-4 w-4' : 'h-5 w-5')} />
           </div>
         </div>
       </div>
@@ -177,28 +179,28 @@ function TopSummaryCard({
   );
 }
 
-function RewardGoalCard() {
+function RewardGoalCard({ compact = false }: { compact?: boolean }) {
   return (
     <Panel className="bg-gradient-to-br from-orange-500/16 via-amber-400/10 to-white/[0.03]">
-      <div className="p-5 sm:p-6">
+      <div className={cn(compact ? 'p-4' : 'p-5 sm:p-6')}>
         <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-orange-400/10 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-orange-200">
           <Sparkles className="h-3.5 w-3.5" />
           RANK GOAL
         </div>
-        <h3 className="mt-4 text-xl font-black text-white">1위 달성 시 +1000P</h3>
-        <p className="mt-2 text-sm leading-6 text-white/72">
+        <h3 className={cn('mt-4 font-black text-white', compact ? 'text-lg' : 'text-xl')}>1위 달성 시 +1000P</h3>
+        <p className={cn('mt-2 leading-6 text-white/72', compact ? 'text-[13px]' : 'text-sm')}>
           일간 1등은 즉시 포인트를 받고, 월말 1~3등은 추가 보상으로 크게 앞서갈 수 있어요.
         </p>
 
-        <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+        <div className={cn('mt-5 grid grid-cols-3 gap-2 text-center', compact && 'gap-1.5')}>
           {[
             ['1위', '20,000P'],
             ['2위', '10,000P'],
             ['3위', '5,000P'],
           ].map(([place, reward]) => (
-            <div key={place} className="rounded-2xl border border-white/10 bg-white/6 p-3">
+            <div key={place} className={cn('rounded-2xl border border-white/10 bg-white/6', compact ? 'p-2.5' : 'p-3')}>
               <p className="text-[11px] font-black tracking-[0.18em] text-white/68">{place}</p>
-              <p className="mt-1 text-sm font-black text-white">{reward}</p>
+              <p className={cn('mt-1 font-black text-white', compact ? 'text-[13px] leading-5' : 'text-sm')}>{reward}</p>
             </div>
           ))}
         </div>
@@ -211,16 +213,18 @@ function CompetitionMessage({
   diffAbove,
   diffBelow,
   rank,
+  compact = false,
 }: {
   diffAbove: number;
   diffBelow: number;
   rank: number;
+  compact?: boolean;
 }) {
   const canOvertakeSoon = rank > 1 && diffAbove <= 180;
   const underThreat = rank > 0 && diffBelow > 0 && diffBelow <= 120;
 
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className={cn('grid gap-3', compact ? 'grid-cols-1' : 'md:grid-cols-2')}>
       <Panel className="border-orange-400/15 bg-[linear-gradient(180deg,rgba(251,146,60,0.11),rgba(255,255,255,0.02))]">
         <div className="p-5">
           <div className="flex items-center gap-2 text-orange-300">
@@ -254,10 +258,12 @@ function LeaderboardRow({
   player,
   maxMinutes,
   index,
+  compact = false,
 }: {
   player: RankEntryView & { isMe: boolean };
   maxMinutes: number;
   index: number;
+  compact?: boolean;
 }) {
   const [fillReady, setFillReady] = useState(false);
 
@@ -271,7 +277,8 @@ function LeaderboardRow({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[24px] border p-4 transition-transform duration-200 hover:-translate-y-0.5 sm:p-5',
+        'relative overflow-hidden rounded-[24px] border transition-transform duration-200 hover:-translate-y-0.5',
+        compact ? 'p-3.5' : 'p-4 sm:p-5',
         player.isMe
           ? 'border-orange-400/25 bg-[linear-gradient(90deg,rgba(251,146,60,0.12),rgba(255,255,255,0.04))] shadow-[0_0_0_1px_rgba(251,146,60,0.08),0_0_32px_rgba(251,146,60,0.10)]'
           : 'border-white/10 bg-white/[0.03]'
@@ -281,10 +288,11 @@ function LeaderboardRow({
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_right,rgba(251,146,60,0.16),transparent_38%)] opacity-70" />
       ) : null}
 
-      <div className="relative flex items-center gap-4">
+      <div className={cn('relative flex items-center', compact ? 'gap-3' : 'gap-4')}>
         <div
           className={cn(
-            'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg font-black',
+            'flex shrink-0 items-center justify-center rounded-2xl border font-black',
+            compact ? 'h-10 w-10 text-base' : 'h-12 w-12 text-lg',
             index === 0
               ? 'border-orange-300/40 bg-orange-400/16 text-orange-200'
               : index === 1
@@ -299,7 +307,7 @@ function LeaderboardRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-base font-black text-white">{player.isMe ? '나' : formatMaskedName(player.displayNameSnapshot)}</p>
+            <p className={cn('truncate font-black text-white', compact ? 'text-[15px]' : 'text-base')}>{player.isMe ? '나' : formatMaskedName(player.displayNameSnapshot)}</p>
             {player.isMe ? (
               <span className="rounded-full border border-orange-400/20 bg-orange-400/10 px-2 py-1 text-[10px] font-black tracking-[0.18em] text-orange-200">
                 YOU
@@ -323,7 +331,7 @@ function LeaderboardRow({
         </div>
 
         <div className="shrink-0 text-right">
-          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-black text-white">
+          <div className={cn('rounded-full border border-white/10 bg-white/5 font-black text-white', compact ? 'px-2.5 py-1.5 text-[12px]' : 'px-3 py-2 text-sm')}>
             {formatHourValue(player.value)}
           </div>
         </div>
@@ -532,18 +540,18 @@ export default function LeaderboardsPage() {
 
   return (
     <div className={cn('mx-auto w-full pb-20', isMobile ? 'max-w-none px-1.5' : 'max-w-7xl px-4')}>
-      <div className="rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.10),transparent_26%),radial-gradient(circle_at_top_left,rgba(56,189,248,0.10),transparent_24%),linear-gradient(180deg,#10285d_0%,#081838_100%)] p-4 shadow-[0_34px_100px_rgba(2,6,23,0.48)] sm:p-6 lg:p-8">
+      <div className={cn('rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.10),transparent_26%),radial-gradient(circle_at_top_left,rgba(56,189,248,0.10),transparent_24%),linear-gradient(180deg,#10285d_0%,#081838_100%)] shadow-[0_34px_100px_rgba(2,6,23,0.48)]', isMobile ? 'p-3.5' : 'p-4 sm:p-6 lg:p-8')}>
         <div className="flex flex-col gap-5 sm:gap-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
+          <div className={cn('flex flex-col gap-4', !isMobile && 'lg:flex-row lg:items-end lg:justify-between')}>
+            <div className={cn('max-w-3xl', isMobile && 'max-w-none')}>
               <LiveBadge />
-              <h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-5xl">공부시간 랭킹</h1>
-              <p className="mt-3 text-sm leading-6 text-white/72 sm:text-base">
+              <h1 className={cn('mt-4 font-black tracking-tight text-white', isMobile ? 'text-[2.4rem] leading-[0.95]' : 'text-3xl sm:text-5xl')}>공부시간 랭킹</h1>
+              <p className={cn('mt-3 leading-6 text-white/72', isMobile ? 'max-w-[17rem] text-[14px]' : 'text-sm sm:text-base')}>
                 일간, 주간, 월간 랭킹을 한 화면에서 경쟁처럼 확인하고, 지금 몇 시간 더 하면 추월 가능한지도 바로 볼 수 있어요.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className={cn(isMobile ? 'grid w-full grid-cols-3 gap-2' : 'flex flex-wrap gap-2')}>
               {(['daily', 'weekly', 'monthly'] as RankRange[]).map((range) => (
                 <RankPill
                   key={range}
@@ -555,14 +563,15 @@ export default function LeaderboardsPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-            <div className="grid gap-4 md:grid-cols-3">
+          <div className={cn('grid gap-4', !isMobile && 'xl:grid-cols-[1.15fr_0.85fr]')}>
+            <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3 gap-4')}>
               <TopSummaryCard
                 label="내 현재 순위"
                 value={myEntry ? `#${myEntry.rank}` : '집계중'}
                 sub={myEntry ? `${rangeMeta.label} 누적 ${formatHourValue(myEntry.value)}` : '아직 기록이 없어요'}
                 tone="orange"
                 icon={Trophy}
+                compact={isMobile}
               />
               <TopSummaryCard
                 label="1위와의 차이"
@@ -570,23 +579,27 @@ export default function LeaderboardsPage() {
                 sub={myEntry?.rank === 1 ? '현재 선두 유지 중' : '지금 집중하면 추월 가능'}
                 tone="blue"
                 icon={Zap}
+                compact={isMobile}
               />
               <TopSummaryCard
                 label="업데이트 상태"
                 value="LIVE"
                 sub="마지막 업데이트: 방금 전"
                 icon={TimerReset}
+                compact={isMobile}
               />
             </div>
 
-            <RewardGoalCard />
+            <div className={cn(isMobile && 'col-span-full')}>
+              <RewardGoalCard compact={isMobile} />
+            </div>
           </div>
 
-          <CompetitionMessage diffAbove={diffAbove} diffBelow={diffBelow} rank={myEntry?.rank || 0} />
+          <CompetitionMessage diffAbove={diffAbove} diffBelow={diffBelow} rank={myEntry?.rank || 0} compact={isMobile} />
 
           <Panel className="overflow-hidden">
-            <div className="border-b border-white/10 px-5 py-4 sm:px-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className={cn('border-b border-white/10', isMobile ? 'px-4 py-4' : 'px-5 py-4 sm:px-6')}>
+              <div className={cn('flex flex-col gap-3', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-white/70">
                     <Crown className="h-3.5 w-3.5" />
@@ -603,7 +616,7 @@ export default function LeaderboardsPage() {
               </div>
             </div>
 
-            <div className="p-4 sm:p-6">
+            <div className={cn(isMobile ? 'p-4' : 'p-4 sm:p-6')}>
               {isLoading ? (
                 <div className="flex h-64 items-center justify-center">
                   <Loader2 className="h-10 w-10 animate-spin text-white/30" />
@@ -621,6 +634,7 @@ export default function LeaderboardsPage() {
                         player={player}
                         maxMinutes={maxMinutes}
                         index={index}
+                        compact={isMobile}
                       />
                     ))}
                   </div>
@@ -638,7 +652,7 @@ export default function LeaderboardsPage() {
                     </div>
                   ) : null}
 
-                  <div className="mt-5 flex flex-col gap-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className={cn('mt-5 flex flex-col gap-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-4', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
                     <div>
                       <p className="text-sm font-black text-white">지금 목표</p>
                       <p className="mt-1 text-sm leading-6 text-white/70">
