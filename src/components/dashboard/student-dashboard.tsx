@@ -20,7 +20,6 @@ import {
   CircleDot,
   Sparkles,
   Target,
-  RefreshCw,
   CheckCircle2,
   ShieldCheck,
   Trophy,
@@ -95,16 +94,6 @@ import {
 } from '@/lib/student-rewards';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
-
-function summarizeReportLine(content?: string | null) {
-  if (!content) return '오늘의 코칭이 도착하면 이곳에서 바로 확인할 수 있어요.';
-  return content
-    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 84);
-}
-
 
 function isActiveStudentStatus(status: unknown): boolean {
   if (typeof status !== 'string') return true;
@@ -729,11 +718,13 @@ function MiniBestStudySparkline({
   isMobile,
   modeLabel,
   peakMinutes,
+  valueLabel,
 }: {
   data: Array<{ date: string; minutes: number }>;
   isMobile: boolean;
   modeLabel: string;
   peakMinutes: number;
+  valueLabel?: string;
 }) {
   const width = isMobile ? 104 : 124;
   const height = isMobile ? 66 : 76;
@@ -783,8 +774,8 @@ function MiniBestStudySparkline({
       isMobile ? "min-h-[4.35rem]" : "min-h-[4.9rem]"
     )}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[8px] font-black uppercase tracking-[0.24em] text-sky-600/60">{modeLabel}</span>
-        <span className="text-[9px] font-black text-sky-700">{formatMinutesMini(peakMinutes)}</span>
+        <span className="text-[8px] font-black uppercase tracking-[0.24em] text-[#173A82]/55">{modeLabel}</span>
+        <span className="text-[9px] font-black text-[#173A82]">{valueLabel || formatMinutesMini(peakMinutes)}</span>
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
@@ -793,14 +784,14 @@ function MiniBestStudySparkline({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.32" />
-            <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.03" />
+            <stop offset="0%" stopColor="#173A82" stopOpacity="0.24" />
+            <stop offset="100%" stopColor="#173A82" stopOpacity="0.03" />
           </linearGradient>
         </defs>
         <path d={areaPath} fill={`url(#${gradientId})`} />
-        <path d={linePath} fill="none" stroke="#0EA5E9" strokeWidth={isMobile ? 2.4 : 2.6} strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={peakPointX} cy={peakPointY} r={isMobile ? 3.1 : 3.5} fill="#0EA5E9" />
-        <circle cx={peakPointX} cy={peakPointY} r={isMobile ? 1.35 : 1.6} fill="#EFF6FF" />
+        <path d={linePath} fill="none" stroke="#173A82" strokeWidth={isMobile ? 2.4 : 2.6} strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={peakPointX} cy={peakPointY} r={isMobile ? 3.1 : 3.5} fill="#FF7A16" />
+        <circle cx={peakPointX} cy={peakPointY} r={isMobile ? 1.35 : 1.6} fill="#FFFFFF" />
       </svg>
     </div>
   );
@@ -1094,16 +1085,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent');
   }, [firestore, activeMembership?.id]);
   const { data: attendanceCurrent, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive });
-
-  const centerAnnouncementsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'centerAnnouncements'),
-      orderBy('createdAt', 'desc'),
-      limit(12)
-    );
-  }, [firestore, activeMembership?.id]);
-  const { data: centerAnnouncements } = useCollection<any>(centerAnnouncementsQuery, { enabled: isActive });
 
   useEffect(() => {
     if (!isActive || typeof window === 'undefined') return;
@@ -1914,8 +1895,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   // unread teacher reports
   const unreadReportCount = teacherReports.filter(r => !r.viewedAt).length;
-  const latestUnreadReport = teacherReports.find((report) => !report.viewedAt) || null;
-  const latestCoachReport = teacherReports[0] || null;
 
   const weeklyStudyMinutes = useMemo(
     () => studyTimeTrend.reduce((sum, item) => sum + item.minutes, 0),
@@ -1930,16 +1909,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }).reduce((sum, minutes) => sum + minutes, 0);
   }, [today, logMinutesByDateKey]);
   const weeklyStudyDelta = weeklyStudyMinutes - previousWeekStudyMinutes;
-  const weeklyBestMinutes = useMemo(
-    () => studyTimeTrend.reduce((max, item) => Math.max(max, item.minutes), 0),
-    [studyTimeTrend]
+  const sevenDayAverageMinutes = useMemo(
+    () => {
+      if (!studyTimeTrend.length) return 0;
+      return Math.round(weeklyStudyMinutes / studyTimeTrend.length);
+    },
+    [studyTimeTrend, weeklyStudyMinutes]
   );
-  const monthlyBestMinutes = useMemo(
-    () => (recentLogs || []).reduce((max, item) => Math.max(max, Math.max(0, Number(item.totalMinutes || 0))), 0),
-    [recentLogs]
-  );
-  const personalBestMinutes = weeklyBestMinutes || monthlyBestMinutes;
-  const personalBestTrend = useMemo(() => {
+  const sevenDayAverageTrend = useMemo(() => {
     const hasWeeklyFlow = studyTimeTrend.some((item) => item.minutes > 0);
     if (hasWeeklyFlow) {
       return {
@@ -1961,27 +1938,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       data: recentLoggedDays,
     };
   }, [studyTimeTrend, recentLogs]);
-  const currentStreakDays = useMemo(() => {
-    if (!today) return 0;
-    let streak = 0;
-    for (let offset = 0; offset < 30; offset += 1) {
-      const dateKey = format(subDays(today, offset), 'yyyy-MM-dd');
-      const minutes = logMinutesByDateKey.get(dateKey) || 0;
-      if (minutes > 0) {
-        streak += 1;
-      } else {
-        break;
-      }
-    }
-    return streak;
-  }, [today, logMinutesByDateKey]);
-  const recentFivePlanWins = useMemo(() => {
-    if (!today) return 0;
-    return Array.from({ length: 5 }, (_, index) => {
-      const dateKey = format(subDays(today, 4 - index), 'yyyy-MM-dd');
-      return progress?.dailyPointStatus?.[dateKey]?.plan ? 1 : 0;
-    }).reduce<number>((sum, count) => sum + count, 0);
-  }, [today, progress?.dailyPointStatus]);
+  const weeklyStudyDeltaLabel = useMemo(() => {
+    if (weeklyStudyDelta === 0) return '지난주와 같은 흐름';
+    const diffLabel = formatMinutesToKorean(Math.abs(weeklyStudyDelta));
+    return weeklyStudyDelta > 0 ? `지난주 대비 +${diffLabel}` : `지난주 대비 -${diffLabel}`;
+  }, [weeklyStudyDelta]);
   const todayRemainingTasks = useMemo(
     () => todayStudyTasks.filter((item) => !item.done),
     [todayStudyTasks]
@@ -2068,18 +2029,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const safeRank = Math.min(monthlyStudyRank, studyRankParticipantCount);
     return Math.max(1, Math.ceil((safeRank / studyRankParticipantCount) * 100));
   }, [isRankContextLoading, monthlyStudyRank, studyRankParticipantCount]);
-  const latestAnnouncement = useMemo(() => {
-    return (centerAnnouncements || []).find((item) => {
-      const normalizedStatus = item?.status?.trim?.().toLowerCase?.();
-      const isPublished = normalizedStatus
-        ? normalizedStatus === 'published'
-        : typeof item?.isPublished === 'boolean'
-          ? item.isPublished
-          : true;
-      const audience = item?.audience || 'student';
-      return isPublished && (audience === 'student' || audience === 'all' || !item?.audience);
-    }) || null;
-  }, [centerAnnouncements]);
   useEffect(() => {
     if (!isActive || isTimerActive || !progressRef || !todayKey || !todayStudyLog) return;
 
@@ -2123,9 +2072,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       console.warn('[student-track] study box claim skipped', error?.message || error);
     });
   }, [isActive, isTimerActive, progressRef, todayKey, todayStudyLog, progress?.dailyPointStatus, stats]);
-  const coachSummary = latestCoachReport?.aiMeta?.teacherOneLiner?.trim()
-    || latestCoachReport?.nextAction?.trim()
-    || summarizeReportLine(latestCoachReport?.content);
   return (
     <div
       className={cn(
@@ -2302,42 +2248,38 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         </div>
 
         <div className={cn("grid gap-3", isMobile ? "col-span-2 grid-cols-2" : "col-span-5 grid-cols-2")}>
-          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
+          <Card className="overflow-hidden rounded-[1.5rem] border border-[#D9E1F2] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] shadow-[0_22px_52px_-34px_rgba(23,58,130,0.26)]">
             <CardContent className={cn("p-4", !isMobile && "p-5")}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">연속 성장</span>
-                <RefreshCw className="h-4 w-4 text-rose-400" />
-              </div>
-              <div className="mt-3">
-                <p className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-2xl" : "text-3xl")}>
-                  {currentStreakDays}<span className="ml-1 text-xs font-bold text-slate-400">일</span>
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">최근 5일 목표 달성 {recentFivePlanWins}/5일</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
-            <CardContent className={cn("p-4", !isMobile && "p-5")}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">개인 최고</span>
-                <Trophy className="h-4 w-4 text-sky-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#173A82]/72">7일 평균</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#173A82] text-white shadow-[0_10px_24px_-16px_rgba(23,58,130,0.7)]">
+                  <CalendarClock className="h-4 w-4" />
+                </div>
               </div>
               <div className={cn("mt-3 gap-3", isMobile ? "flex flex-col" : "flex items-end justify-between")}>
                 <div className="min-w-0 flex-1">
-                  <p className={cn("font-black tracking-tight text-slate-900 whitespace-normal break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
-                    {formatMinutesToKorean(personalBestMinutes)}
+                  <p className={cn("font-black tracking-tight text-[#173A82] whitespace-normal break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
+                    {formatMinutesToKorean(sevenDayAverageMinutes)}
                   </p>
-                  <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                    {weeklyBestMinutes > 0 ? '최근 7일 최고 몰입' : monthlyBestMinutes > 0 ? '이번 달 최근 기록 기준' : '이번 달 최고 기록 준비 중'}
+                  <p className="mt-1 text-[11px] font-semibold text-[#173A82]/58">
+                    최근 7일 누적 기준
                   </p>
+                  <span className={cn(
+                    "mt-2 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black",
+                    weeklyStudyDelta >= 0
+                      ? "border-[#FF7A16]/18 bg-[#FF7A16]/10 text-[#FF7A16]"
+                      : "border-[#173A82]/12 bg-[#173A82]/[0.06] text-[#173A82]/70"
+                  )}>
+                    {weeklyStudyDeltaLabel}
+                  </span>
                 </div>
                 <div className={cn("shrink-0", isMobile ? "w-full max-w-[6.2rem] self-end" : "w-[7rem]")}>
                   <MiniBestStudySparkline
-                    data={personalBestTrend.data}
+                    data={sevenDayAverageTrend.data}
                     isMobile={isMobile}
-                    modeLabel={personalBestTrend.modeLabel}
-                    peakMinutes={personalBestMinutes}
+                    modeLabel={sevenDayAverageTrend.modeLabel}
+                    peakMinutes={sevenDayAverageMinutes}
+                    valueLabel={formatMinutesMini(sevenDayAverageMinutes)}
                   />
                 </div>
               </div>
@@ -2345,29 +2287,29 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           </Card>
 
           <Link href="/dashboard/leaderboards" className="block touch-manipulation">
-            <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
+            <Card className="h-full overflow-hidden rounded-[1.5rem] border border-[#274A9B] bg-[linear-gradient(180deg,#173A82_0%,#234A99_100%)] shadow-[0_24px_54px_-34px_rgba(23,58,130,0.52)] transition-transform duration-200 hover:-translate-y-0.5">
               <CardContent className={cn("p-4", !isMobile && "p-5")}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 ring-1 ring-amber-100">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/14 text-[#FFD9B4] ring-1 ring-white/12">
                       <Trophy className="h-3.5 w-3.5" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">월간 랭킹</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#D9E1F2]">월간 랭킹</span>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-slate-300" />
+                  <ChevronRight className="h-4 w-4 text-white/50" />
                 </div>
                 <div className="mt-3 min-w-0">
-                  <p className={cn("font-black tracking-tight text-slate-900 break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
+                  <p className={cn("font-black tracking-tight text-white break-keep", isMobile ? "text-xl leading-7" : "text-2xl leading-8")}>
                     {monthlyStudyPercentile ? `상위 ${monthlyStudyPercentile}%` : '집계 준비중'}
                   </p>
-                  <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 break-keep">
+                  <p className="mt-1 text-[11px] font-semibold leading-5 text-white/72 break-keep">
                     {monthlyStudyRank > 0 ? `${formatStudyMinutes(Math.max(0, Number(leaderboardEntry?.value || 0)))} 누적` : '이번 달 공부시간이 모이면 순위가 보여요'}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700 ring-1 ring-amber-100">
+                    <span className="rounded-full bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]">
                       현재 {monthlyStudyRank > 0 ? `${monthlyStudyRank}위` : '집계중'}
                     </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-[#D9E1F2] ring-1 ring-white/10">
                       월간 공부시간
                     </span>
                   </div>
@@ -2375,72 +2317,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </CardContent>
             </Card>
           </Link>
-
-          {latestUnreadReport ? (
-            <Link href="/dashboard/student-reports" className="block touch-manipulation">
-              <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
-                <CardContent className={cn("p-4", !isMobile && "p-5")}>
-                  <div className={cn("flex justify-between gap-2", isMobile ? "flex-col items-start" : "items-center")}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
-                        <FileText className="h-3.5 w-3.5" />
-                      </div>
-                      <span className="min-w-0 text-[10px] font-black uppercase tracking-widest text-primary break-keep">놓치면 아쉬운 것</span>
-                    </div>
-                    <Badge className="h-5 shrink-0 border-none bg-[#FF7A16] px-2 text-[9px] font-black text-white">리포트</Badge>
-                  </div>
-                  <div className="mt-3 min-w-0">
-                    <p className="text-sm font-black leading-6 text-slate-900 break-keep line-clamp-2">{latestUnreadReport.dateKey} 코칭 도착</p>
-                    <div className="mt-2 rounded-[1rem] bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-primary ring-1 ring-slate-200">
-                          코칭 한마디
-                        </span>
-                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200">
-                          미확인
-                        </span>
-                      </div>
-                      <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-600 line-clamp-3 break-keep">{coachSummary}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ) : latestAnnouncement ? (
-            <Link href="/dashboard/appointments/inquiries" className="block touch-manipulation">
-              <Card className="h-full border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem] transition-transform duration-200 hover:-translate-y-0.5">
-                <CardContent className={cn("p-4", !isMobile && "p-5")}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">센터 공지</span>
-                    <BellRing className="h-4 w-4 text-emerald-500" />
-                  </div>
-                  <div className="mt-3">
-                    <p className="text-sm font-black leading-6 text-slate-900 line-clamp-2">{latestAnnouncement.title || '센터 공지사항'}</p>
-                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500 line-clamp-3">
-                      {summarizeReportLine(latestAnnouncement.body)}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ) : (
-            <Card className="border-none bg-white shadow-lg ring-1 ring-black/[0.04] rounded-[1.5rem]">
-              <CardContent className={cn("p-4", !isMobile && "p-5")}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-violet-600">시험 디데이</span>
-                  <Calendar className="h-4 w-4 text-violet-500" />
-                </div>
-                <div className="mt-3">
-                  <p className="text-sm font-black leading-6 text-slate-900">
-                    {examCountdowns[0]?.title || '시험 일정 준비'}
-                  </p>
-                  <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                    {examCountdowns[0]?.dLabel || '날짜를 등록하면 홈에서 바로 보여드릴게요.'}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </section>
 
