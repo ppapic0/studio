@@ -34,7 +34,15 @@ export type AttendanceScheduleDraft = {
   awayStartTime: string;
   awayEndTime: string;
   awayReason: string;
+  awaySlots?: AttendanceAwaySlot[];
   isAbsent?: boolean;
+};
+
+export type AttendanceAwaySlot = {
+  id: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
 };
 
 export type SavedAttendanceRoutine = AttendanceScheduleDraft & {
@@ -48,6 +56,7 @@ export const EMPTY_ATTENDANCE_SCHEDULE_DRAFT: AttendanceScheduleDraft = {
   awayStartTime: '',
   awayEndTime: '',
   awayReason: '',
+  awaySlots: [],
   isAbsent: false,
 };
 

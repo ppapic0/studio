@@ -101,6 +101,7 @@ import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   ROUTINE_TEMPLATE_OPTIONS,
+  type AttendanceAwaySlot,
   type RecentStudyOption,
   type StudyAmountUnit,
   type StudyPlanMode,
@@ -144,6 +145,26 @@ const WEEKDAY_OPTIONS = [
   { value: 6, label: '토' },
   { value: 0, label: '일' },
 ];
+
+function createAwaySlot(overrides?: Partial<AttendanceAwaySlot>): AttendanceAwaySlot {
+  return {
+    id: `away-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    startTime: '',
+    endTime: '',
+    reason: '',
+    ...overrides,
+  };
+}
+
+function parseAwayScheduleTitle(title: string): AttendanceAwaySlot | null {
+  const matched = title.match(/^외출 예정(?: · (.*?))?: (\d{2}:\d{2}) ~ (\d{2}:\d{2})$/);
+  if (!matched) return null;
+  return createAwaySlot({
+    reason: matched[1]?.trim() || '',
+    startTime: matched[2] || '',
+    endTime: matched[3] || '',
+  });
+}
 
 const SUBJECTS = [
   { id: 'kor', label: '국어', color: 'bg-red-500', light: 'bg-red-50', text: 'text-red-600' },
@@ -392,6 +413,7 @@ export default function StudyPlanPage() {
   const [awayStartTime, setAwayStartTime] = useState('');
   const [awayEndTime, setAwayEndTime] = useState('');
   const [awayReason, setAwayReason] = useState('');
+  const [extraAwayPlans, setExtraAwayPlans] = useState<AttendanceAwaySlot[]>([]);
 
   useEffect(() => {
     const requestedDate = searchParams.get('date');
@@ -656,28 +678,32 @@ export default function StudyPlanPage() {
 
   const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원 예정')), [scheduleItems]);
   const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원 예정')), [scheduleItems]);
-  const awayScheduleItem = useMemo(() => scheduleItems.find((item) => item.title.includes('외출 예정')), [scheduleItems]);
-  const hasAwayPlan = Boolean(awayScheduleItem);
+  const hasAwayPlan = Boolean(awayStartTime && awayEndTime) || extraAwayPlans.some((slot) => Boolean(slot.startTime && slot.endTime));
   const isAbsentMode = useMemo(() => scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [scheduleItems]);
 
   useEffect(() => {
     const arrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
     const dismissal = scheduleItems.find((item) => item.title.startsWith('하원 예정: '));
-    const awayItem = scheduleItems.find((item) => item.title.startsWith('외출 예정'));
+    const awayItems = scheduleItems
+      .filter((item) => item.title.startsWith('외출 예정'))
+      .map((item) => parseAwayScheduleTitle(item.title))
+      .filter((item): item is AttendanceAwaySlot => Boolean(item))
+      .sort((left, right) => left.startTime.localeCompare(right.startTime));
 
     setInTime(arrival?.title.split(': ')[1] || '09:00');
     setOutTime(dismissal?.title.split(': ')[1] || '22:00');
 
-    if (awayItem) {
-      const [baseTitle, rangeText = ''] = awayItem.title.split(': ');
-      const [startText = '', endText = ''] = rangeText.split(' ~ ');
-      setAwayStartTime(startText);
-      setAwayEndTime(endText);
-      setAwayReason(baseTitle.replace('외출 예정', '').replace(/^ · /, '').trim());
+    if (awayItems.length > 0) {
+      const [firstAway, ...restAway] = awayItems;
+      setAwayStartTime(firstAway.startTime);
+      setAwayEndTime(firstAway.endTime);
+      setAwayReason(firstAway.reason);
+      setExtraAwayPlans(restAway);
     } else {
       setAwayStartTime('');
       setAwayEndTime('');
       setAwayReason('');
+      setExtraAwayPlans([]);
     }
   }, [scheduleItems]);
 
@@ -1580,8 +1606,22 @@ export default function StudyPlanPage() {
       });
 
       if (type === 'attend') {
-        const trimmedAwayReason = awayReason.trim();
-        const shouldSaveAwayPlan = trimmedAwayReason.length > 0 && awayStartTime && awayEndTime;
+        const normalizedAwayPlans = [
+          createAwaySlot({
+            id: 'away-primary',
+            startTime: awayStartTime,
+            endTime: awayEndTime,
+            reason: awayReason.trim(),
+          }),
+          ...extraAwayPlans.map((slot) =>
+            createAwaySlot({
+              id: slot.id,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              reason: slot.reason.trim(),
+            })
+          ),
+        ].filter((slot) => slot.startTime && slot.endTime);
 
         batch.set(doc(colRef), {
           title: `등원 예정: ${inTime}`,
@@ -1595,14 +1635,15 @@ export default function StudyPlanPage() {
           studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
-        if (shouldSaveAwayPlan) {
+        normalizedAwayPlans.forEach((slot) => {
+          const awayLabel = slot.reason ? `외출 예정 · ${slot.reason}: ${slot.startTime} ~ ${slot.endTime}` : `외출 예정: ${slot.startTime} ~ ${slot.endTime}`;
           batch.set(doc(colRef), {
-            title: `외출 예정 · ${trimmedAwayReason}: ${awayStartTime} ~ ${awayEndTime}`,
+            title: awayLabel,
             done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
             studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
             createdAt: serverTimestamp(), updatedAt: serverTimestamp()
           });
-        }
+        });
       } else {
         batch.set(doc(colRef), {
           title: `이날 등원하지 않습니다`,
@@ -2058,6 +2099,8 @@ export default function StudyPlanPage() {
           setAwayEndTime,
           awayReason,
           setAwayReason,
+          extraAwayPlans,
+          setExtraAwayPlans,
           isAbsentMode,
           hasAwayPlan,
           hasInPlan,

@@ -52,6 +52,7 @@ import { StudyPlanSheet } from './study-plan-sheet';
 import {
   ROUTINE_TEMPLATE_OPTIONS,
   STUDY_AMOUNT_UNIT_OPTIONS,
+  type AttendanceAwaySlot,
   type StudyPlanMode,
 } from './planner-constants';
 import {
@@ -303,6 +304,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     setAwayEndTime,
     awayReason,
     setAwayReason,
+    extraAwayPlans,
+    setExtraAwayPlans,
     isAbsentMode,
     hasAwayPlan,
     hasInPlan,
@@ -394,6 +397,19 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
   const [questMissionId, setQuestMissionId] = useState(PLANNER_QUICK_TASK_SUGGESTIONS[0]?.id || 'math-problem');
   const [quickStudyType, setQuickStudyType] = useState(QUICK_BASE_STUDY_TYPES[0]);
   const [outingDuration, setOutingDuration] = useState('20');
+  const selectedDateKey = format(selectedDate, 'M/d');
+  const isFutureSelectedDate = useMemo(() => {
+    const selectedDay = new Date(selectedDate);
+    selectedDay.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDay.getTime() > today.getTime();
+  }, [selectedDate]);
+  const selectedDateModeLabel = isToday ? '오늘 퀘스트' : isFutureSelectedDate ? '미리 작성 중' : '기록 확인';
+  const selectedAttendanceSaveLabel = isToday ? '오늘 출석 저장' : `${selectedDateKey} 일정 저장`;
+  const selectedAbsentSaveLabel = isToday ? '오늘 미등원' : `${selectedDateKey} 미등원`;
+  const selectedRoutineLabel = isToday ? '오늘 루틴' : isFutureSelectedDate ? '요일별 미리 작성' : '지난 루틴 기록';
+  const routineEditLabel = isToday ? '⚡ 오늘만 수정' : '⚡ 선택 날짜 수정';
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -664,12 +680,59 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     setNewStudyTask('');
   };
 
+  const awayPlanEntries = useMemo(
+    () => [
+      { id: 'away-primary', startTime: awayStartTime, endTime: awayEndTime, reason: awayReason, isPrimary: true },
+      ...(extraAwayPlans as AttendanceAwaySlot[]).map((slot) => ({ ...slot, isPrimary: false })),
+    ],
+    [awayEndTime, awayReason, awayStartTime, extraAwayPlans]
+  );
+
+  const editableAwayPlanCount = awayPlanEntries.filter(
+    (slot) => slot.startTime || slot.endTime || slot.reason.trim()
+  ).length;
+
+  const appendAwayPlan = () => {
+    setExtraAwayPlans((current: AttendanceAwaySlot[]) => [
+      ...current,
+      {
+        id: `away-${Date.now()}-${current.length}`,
+        startTime: '',
+        endTime: '',
+        reason: '',
+      },
+    ]);
+  };
+
+  const updateExtraAwayPlan = (awayId: string, patch: Partial<AttendanceAwaySlot>) => {
+    setExtraAwayPlans((current: AttendanceAwaySlot[]) =>
+      current.map((slot) => (slot.id === awayId ? { ...slot, ...patch } : slot))
+    );
+  };
+
+  const removeExtraAwayPlan = (awayId: string) => {
+    setExtraAwayPlans((current: AttendanceAwaySlot[]) => current.filter((slot) => slot.id !== awayId));
+  };
+
   const handleStartOutingPlan = () => {
     const startClock = createClockFromNow();
-    setAwayStartTime(startClock);
-    setAwayEndTime(addMinutesToClock(startClock, Number(outingDuration) || 20));
-    if (!awayReason.trim()) {
-      setAwayReason('식사');
+    const nextEndClock = addMinutesToClock(startClock, Number(outingDuration) || 20);
+    const nextReason = awayReason.trim() || '식사';
+
+    if (!awayStartTime && !awayEndTime && !awayReason.trim()) {
+      setAwayStartTime(startClock);
+      setAwayEndTime(nextEndClock);
+      setAwayReason(nextReason);
+    } else {
+      setExtraAwayPlans((current: AttendanceAwaySlot[]) => [
+        ...current,
+        {
+          id: `away-${Date.now()}-${current.length}`,
+          startTime: startClock,
+          endTime: nextEndClock,
+          reason: nextReason,
+        },
+      ]);
     }
     setIsOutingModalOpen(false);
   };
@@ -678,12 +741,21 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     setAwayStartTime('');
     setAwayEndTime('');
     setAwayReason('');
+    setExtraAwayPlans([]);
   };
 
   const heroStatus = isAbsentMode
     ? { label: '미등원 모드', summary: '오늘은 미등원으로 정리돼 있어요.' }
     : hasAwayPlan
-      ? { label: '외출 중', summary: awayReason ? `${awayReason} 다녀오는 중이에요. 돌아오면 바로 이어서 시작할 수 있어요.` : '외출 루트를 기록 중이에요.' }
+      ? {
+          label: '외출 중',
+          summary:
+            editableAwayPlanCount > 1
+              ? `외출 루트 ${editableAwayPlanCount}개가 잡혀 있어요. 돌아오면 바로 이어서 시작할 수 있어요.`
+              : awayReason
+                ? `${awayReason} 다녀오는 중이에요. 돌아오면 바로 이어서 시작할 수 있어요.`
+                : '외출 루트를 기록 중이에요.',
+        }
       : hasInPlan && hasOutPlan
         ? { label: '입실 완료', summary: '입실부터 퇴실까지 오늘의 흐름이 준비됐어요.' }
         : { label: '퀘스트 준비 전', summary: '메인 과목 두 개와 핵심 미션 하나만 고르면 바로 시작할 수 있어요.' };
@@ -713,7 +785,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
             </Button>
             <div className="text-center">
               <p className="text-xs font-black text-[#17326B]">{selectedDateLabel}</p>
-              <p className="mt-0.5 text-[11px] font-semibold text-[#6C7FA6]">{isToday ? '오늘 퀘스트' : '다른 날짜 보기'}</p>
+              <p className="mt-0.5 text-[11px] font-semibold text-[#6C7FA6]">{selectedDateModeLabel}</p>
             </div>
             <Button
               type="button"
@@ -723,6 +795,62 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
+          </div>
+
+          <div className="rounded-[1.35rem] border border-[#DCE5F4] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] px-3 py-3 shadow-[0_16px_30px_-26px_rgba(10,28,72,0.14)]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => moveWeek(-1)}
+                className="h-8 rounded-full border border-[#DCE5F4] bg-white px-3 text-[11px] font-black text-[#17326B] hover:bg-[#F5F8FF]"
+              >
+                이전 주
+              </Button>
+              <p className="text-[11px] font-black text-[#6C7FA6]">{weekRangeLabel}</p>
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => moveWeek(1)}
+                className="h-8 rounded-full border border-[#DCE5F4] bg-white px-3 text-[11px] font-black text-[#17326B] hover:bg-[#F5F8FF]"
+              >
+                다음 주
+              </Button>
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {weekDays.map((day: Date) => {
+                const isSelected = isSameDay(day, selectedDate);
+                const isTodayCell = isSameDay(day, new Date());
+                const dayTime = new Date(day);
+                dayTime.setHours(0, 0, 0, 0);
+                const todayTime = new Date();
+                todayTime.setHours(0, 0, 0, 0);
+                const dayModeLabel = isTodayCell ? '오늘' : dayTime.getTime() > todayTime.getTime() ? '미리' : '기록';
+                return (
+                  <button
+                    key={day.toISOString()}
+                    type="button"
+                    onClick={() => setSelectedDate(day)}
+                    className={cn(
+                      'rounded-[1rem] border px-2 py-2 text-center transition-all',
+                      isSelected
+                        ? 'border-[#FFB347] bg-[#FFF2E3] shadow-[0_18px_28px_-24px_rgba(255,150,38,0.45)]'
+                        : 'border-[#DCE5F4] bg-white hover:border-[#AFC3E8] hover:bg-[#F7FAFF]'
+                    )}
+                  >
+                    <p className={cn('text-[10px] font-black', isSelected ? 'text-[#D96E12]' : isTodayCell ? 'text-[#17326B]' : 'text-[#6C7FA6]')}>
+                      {format(day, 'EEE', { locale: ko })}
+                    </p>
+                    <p className={cn('mt-1 text-sm font-black', isSelected ? 'text-[#17326B]' : 'text-[#17326B]')}>
+                      {format(day, 'd')}
+                    </p>
+                    <p className={cn('mt-1 text-[9px] font-semibold', isSelected ? 'text-[#D96E12]' : isTodayCell ? 'text-[#17326B]' : 'text-[#8AA0CC]')}>
+                      {dayModeLabel}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </header>
 
@@ -742,10 +870,10 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="surface-chip surface-chip--dark gap-2 px-3 py-1 text-[11px]">
-                  오늘 루틴
+                  {selectedRoutineLabel}
                 </div>
                 <p className="surface-caption mt-2 text-sm font-semibold">
-                  {format(selectedDate, 'EEEE', { locale: ko })} · 자동 적용됨
+                  {format(selectedDate, 'EEEE', { locale: ko })} · {isFutureSelectedDate ? '전날에도 미리 작성 가능' : isToday ? '자동 적용됨' : '기록 확인 중'}
                 </p>
               </div>
               {!isPast ? (
@@ -754,7 +882,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                   onClick={() => setIsRoutineEditOpen(true)}
                   className="surface-chip surface-chip--accent px-3 py-2 text-xs"
                 >
-                  ⚡ 오늘만 수정
+                  {routineEditLabel}
                 </button>
               ) : null}
             </div>
@@ -1143,11 +1271,11 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         <Collapsible open={isRoutineSectionOpen} onOpenChange={setIsRoutineSectionOpen}>
           <section className="surface-card surface-card--secondary on-dark rounded-[1.9rem] shadow-[0_24px_48px_-38px_rgba(0,0,0,0.52)]">
             <CollapsibleTrigger asChild>
-              <button type="button" className={cn('flex w-full gap-3 p-5 text-left', isMobile ? 'flex-col items-start' : 'items-center justify-between')}>
-                <div className="min-w-0">
+              <button type="button" className={cn('flex w-full gap-3 p-5 text-left !whitespace-normal', isMobile ? 'flex-col items-start' : 'items-center justify-between')}>
+                <div className="min-w-0 whitespace-normal">
                   <p className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">ROUTINE</p>
                   <h3 className="mt-1 text-xl font-black tracking-tight text-white">루틴 관리</h3>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
+                  <p className="mt-2 whitespace-normal break-words text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
                     입실, 외출, 생활 루틴은 필요한 순간에만 펼쳐서 관리하세요.
                   </p>
                 </div>
@@ -1164,15 +1292,15 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 <div className="surface-card surface-card--ghost on-dark rounded-[1.6rem] p-4 shadow-[0_18px_38px_-32px_rgba(0,0,0,0.55)]">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-lg font-black text-white">오늘 출석 정보</p>
+                      <p className="text-lg font-black text-white">{isToday ? '오늘 출석 정보' : `${selectedDateLabel} 출석 정보`}</p>
                       <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-                        등원, 하원, 외출 흐름을 기록해두면 원장도 실제 학습 흐름을 더 정확히 볼 수 있어요.
+                        전날에도 다음 날 루틴을 미리 적어둘 수 있고, 월요일부터 일요일까지 요일별로 바로 이동하며 저장할 수 있어요.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {isAbsentMode ? (
                         <Badge className="rounded-full border border-[#FFB347]/24 bg-[#FF9626]/16 px-3 py-1 text-[10px] font-black text-[var(--accent-orange-soft)] shadow-none">
-                          오늘 미등원
+                          {selectedAbsentSaveLabel}
                         </Badge>
                       ) : null}
                       {hasInPlan && hasOutPlan ? (
@@ -1182,7 +1310,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       ) : null}
                       {hasAwayPlan ? (
                         <Badge className="rounded-full border border-[#FFB347]/24 bg-[#FF9626]/16 px-3 py-1 text-[10px] font-black text-[var(--accent-orange-soft)] shadow-none">
-                          외출 포함
+                          외출 {Math.max(1, editableAwayPlanCount)}건
                         </Badge>
                       ) : null}
                     </div>
@@ -1221,14 +1349,82 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     />
                   </div>
 
+                  {extraAwayPlans.length > 0 ? (
+                    <div className="mt-3 space-y-3">
+                      {extraAwayPlans.map((slot: AttendanceAwaySlot, index: number) => (
+                        <div key={slot.id} className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-3">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-orange-soft)]">
+                              추가 외출 {index + 2}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="dark"
+                              onClick={() => removeExtraAwayPlan(slot.id)}
+                              disabled={isPast || isSubmitting}
+                              className="h-8 rounded-full px-3 text-[10px] font-black"
+                            >
+                              삭제
+                            </Button>
+                          </div>
+                          <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">외출 시작</p>
+                              <Input
+                                type="time"
+                                value={slot.startTime}
+                                onChange={(event) => updateExtraAwayPlan(slot.id, { startTime: event.target.value })}
+                                disabled={isPast || isSubmitting}
+                                className="h-11 rounded-2xl border-white/12 bg-white/[0.1] font-black text-white"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">복귀 예정</p>
+                              <Input
+                                type="time"
+                                value={slot.endTime}
+                                onChange={(event) => updateExtraAwayPlan(slot.id, { endTime: event.target.value })}
+                                disabled={isPast || isSubmitting}
+                                className="h-11 rounded-2xl border-white/12 bg-white/[0.1] font-black text-white"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3 space-y-1.5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">사유</p>
+                            <Input
+                              value={slot.reason}
+                              onChange={(event) => updateExtraAwayPlan(slot.id, { reason: event.target.value })}
+                              placeholder="예: 학원, 병원, 저녁 식사"
+                              disabled={isPast || isSubmitting}
+                              className="h-11 rounded-2xl border-white/12 bg-white/[0.1] font-bold text-white placeholder:text-white/55"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {!isPast ? (
+                    <Button
+                      type="button"
+                      variant="dark"
+                      onClick={appendAwayPlan}
+                      disabled={isSubmitting}
+                      className="mt-3 h-10 rounded-2xl px-4 font-black"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      외출/복귀 더 추가
+                    </Button>
+                  ) : null}
+
                   {!isPast ? (
                     <div className={cn('mt-4 gap-2', isMobile ? 'grid grid-cols-1' : 'flex flex-wrap')}>
                       <Button type="button" onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_60%,#FF7A16_170%)] px-4 font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.35)]">
                         <CalendarCheck2 className="mr-2 h-4 w-4" />
-                        오늘 출석 저장
+                        {selectedAttendanceSaveLabel}
                       </Button>
                       <Button type="button" variant="dark" onClick={() => handleSetAttendance('absent')} disabled={isSubmitting} className="h-11 rounded-2xl px-4 font-black">
-                        오늘 미등원
+                        {selectedAbsentSaveLabel}
                       </Button>
                       <Button type="button" variant="dark" onClick={() => setIsRoutineCopyDialogOpen(true)} disabled={isSubmitting || !hasCopyableRoutines} className="h-11 rounded-2xl px-4 font-black">
                         <Copy className="mr-2 h-4 w-4" />
@@ -1336,18 +1532,18 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
       </Dialog>
 
       <Dialog open={isOutingModalOpen} onOpenChange={setIsOutingModalOpen}>
-        <DialogContent className="max-w-[26rem] rounded-[2rem] border-white/12 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.12),transparent_24%),linear-gradient(180deg,#16284F_0%,#0F2149_100%)] p-0 text-white shadow-[0_28px_60px_-30px_rgba(0,0,0,0.58)]">
+        <DialogContent className="max-w-[26rem] rounded-[2rem] border-[#DCE5F8] bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.18),transparent_26%),linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-0 text-[#17326B] shadow-[0_28px_60px_-30px_rgba(19,50,107,0.24)]">
           <div className="p-5">
             <DialogHeader className="text-left">
-              <DialogTitle className="text-[1.4rem] font-black tracking-tight text-white">외출 체크포인트</DialogTitle>
-              <DialogDescription className="text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
+              <DialogTitle className="text-[1.4rem] font-black tracking-tight text-[#17326B]">외출 체크포인트</DialogTitle>
+              <DialogDescription className="text-sm font-semibold leading-6 text-[#6B7EA8]">
                 어디 다녀오는지와 예상 복귀 시간만 고르면 바로 외출 루트가 저장돼요.
               </DialogDescription>
             </DialogHeader>
 
             <div className="mt-5 space-y-4">
               <div>
-                <p className="text-[11px] font-black text-[var(--text-on-dark-soft)]">어디 다녀오나요?</p>
+                <p className="text-[11px] font-black text-[#6B7EA8]">어디 다녀오나요?</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {OUTING_REASON_OPTIONS.map((reason) => (
                     <button
@@ -1357,8 +1553,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       className={cn(
                         'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                         awayReason === reason
-                          ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)]'
-                          : 'border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.14]'
+                          ? 'border-[#FFB347] bg-[#FFF2E3] text-[#D96E12] shadow-[0_12px_24px_-20px_rgba(255,150,38,0.4)]'
+                          : 'border-[#D7E1F2] bg-white text-[#17326B] hover:border-[#AFC3E8] hover:bg-[#F6F9FF]'
                       )}
                     >
                       {reason}
@@ -1368,7 +1564,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
               </div>
 
               <div>
-                <p className="text-[11px] font-black text-[var(--text-on-dark-soft)]">언제쯤 돌아오나요?</p>
+                <p className="text-[11px] font-black text-[#6B7EA8]">언제쯤 돌아오나요?</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {OUTING_DURATION_OPTIONS.map((duration) => (
                     <button
@@ -1378,8 +1574,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       className={cn(
                         'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                         outingDuration === duration
-                          ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)]'
-                          : 'border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.14]'
+                          ? 'border-[#FFB347] bg-[#FFF2E3] text-[#D96E12] shadow-[0_12px_24px_-20px_rgba(255,150,38,0.4)]'
+                          : 'border-[#D7E1F2] bg-white text-[#17326B] hover:border-[#AFC3E8] hover:bg-[#F6F9FF]'
                       )}
                     >
                       {duration}분
@@ -1388,16 +1584,16 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 </div>
               </div>
 
-              <div className="rounded-[1.2rem] border border-white/12 bg-white/[0.08] px-4 py-3 text-sm font-semibold text-[var(--text-on-dark-soft)]">
+              <div className="rounded-[1.2rem] border border-[#D7E7FF] bg-[#F5F9FF] px-4 py-3 text-sm font-semibold text-[#6B7EA8]">
                 외출 시작 시각은 현재 시각으로 자동 기록되고, 복귀 예정 시간도 함께 저장돼요.
               </div>
             </div>
 
             <div className="mt-5 flex gap-2">
-              <Button type="button" variant="dark" onClick={() => setIsOutingModalOpen(false)} className="h-11 flex-1 rounded-2xl font-black">
+              <Button type="button" variant="dark" onClick={() => setIsOutingModalOpen(false)} className="h-11 flex-1 rounded-2xl border-[#D7E1F2] bg-white font-black text-[#17326B] hover:bg-[#F6F9FF]">
                 취소
               </Button>
-              <Button type="button" onClick={handleStartOutingPlan} className={cn('h-11 flex-1 rounded-2xl font-black text-white', rewardGradient)}>
+              <Button type="button" onClick={handleStartOutingPlan} className={cn('h-11 flex-1 rounded-2xl font-black text-white shadow-[0_18px_32px_-22px_rgba(255,150,38,0.5)]', rewardGradient)}>
                 외출 시작
               </Button>
             </div>

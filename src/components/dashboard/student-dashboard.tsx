@@ -2790,7 +2790,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <DialogTrigger asChild>
               <button className="group text-left h-full w-full touch-manipulation">
                 <Card className={cn(
-                  "student-cta student-cta-card h-full border border-[#DCE5F5] bg-white shadow-[0_18px_40px_-30px_rgba(10,28,72,0.18)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_22px_46px_-30px_rgba(10,28,72,0.24)]",
+                  "student-cta student-cta-card student-utility-card h-full border border-[#DCE5F5] bg-white shadow-[0_18px_40px_-30px_rgba(10,28,72,0.18)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_22px_46px_-30px_rgba(10,28,72,0.24)]",
                   "rounded-2xl p-4",
                   unreadReportCount > 0 && "ring-1 ring-[#FF7A16]/30 border-[#FFBE73]"
                 )}>

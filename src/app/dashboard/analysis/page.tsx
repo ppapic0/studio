@@ -339,29 +339,43 @@ function MiniGrowthBars({
   data: Array<{ label: string; totalMinutes: number }>;
 }) {
   const max = Math.max(...data.map((item) => item.totalMinutes), 1);
+  const yTicks = Array.from(new Set([max, Math.round(max / 2), 0])).sort((a, b) => b - a);
 
   return (
-    <div className="grid grid-cols-7 gap-2">
-      {data.map((day, index) => (
-        <div
-          key={day.label}
-          className="flex flex-col items-center gap-2 transition-all duration-300"
-          style={{ transitionDelay: `${index * 50}ms` }}
-        >
-          <div className="flex h-[5.8rem] items-end">
+    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3">
+      <div className="flex h-[7.85rem] flex-col justify-between pb-[2rem] pt-1 text-right">
+        {yTicks.map((tick) => (
+          <span key={tick} className="text-[10px] font-black text-[var(--text-on-dark-soft)]">
+            {compactSessionLabel(tick)}
+          </span>
+        ))}
+      </div>
+
+      <div className="relative">
+        <div className="pointer-events-none absolute bottom-[2rem] top-1 left-0 w-px rounded-full bg-white/20" />
+        <div className="grid grid-cols-7 gap-2 pl-3">
+          {data.map((day, index) => (
             <div
-              className="w-9 rounded-t-[1rem] rounded-b-[0.95rem] bg-[linear-gradient(180deg,#FFD36D_0%,#FFB347_45%,#FF7A00_100%)] shadow-[0_14px_24px_-18px_rgba(255,122,0,0.38)]"
-              style={{ height: `${Math.max(24, (day.totalMinutes / max) * 78)}px` }}
-            />
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
-            <p className="mt-1 text-[11px] font-black text-[var(--text-on-dark)]">
-              {day.totalMinutes > 0 ? `${Math.round(day.totalMinutes / 60)}h` : '--'}
-            </p>
-          </div>
+              key={day.label}
+              className="flex flex-col items-center gap-2 transition-all duration-300"
+              style={{ transitionDelay: `${index * 50}ms` }}
+            >
+              <div className="flex h-[5.8rem] items-end">
+                <div
+                  className="w-9 rounded-t-[1rem] rounded-b-[0.95rem] bg-[linear-gradient(180deg,#FFD36D_0%,#FFB347_45%,#FF7A00_100%)] shadow-[0_14px_24px_-18px_rgba(255,122,0,0.38)]"
+                  style={{ height: `${Math.max(24, (day.totalMinutes / max) * 78)}px` }}
+                />
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
+                <p className="mt-1 text-[11px] font-black text-[var(--text-on-dark)]">
+                  {day.totalMinutes > 0 ? `${Math.round(day.totalMinutes / 60)}h` : '--'}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   );
 }
@@ -655,7 +669,6 @@ export default function AnalysisTrackPage() {
     [chartData]
   );
 
-  const level = Math.max(1, Math.round(kpi.thisWeekMin / 180) + 8);
   const focusHp = clampPercent((kpi.avgMin14 / 240) * 100);
   const consistencyHp = clampPercent(kpi.consistencyScore);
   const completionHp = clampPercent(sessionMetrics.completionRate);
@@ -777,7 +790,7 @@ export default function AnalysisTrackPage() {
             <div className={cn('mt-5 grid gap-5', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]')}>
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight text-white">{displayName} Lv.{level}</p>
+                  <p className="text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight text-white">{displayName}</p>
                   <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">🔥 {playerTitle}</Badge>
                 </div>
                 <p className="surface-caption mt-2 text-sm font-semibold">오늘도 성장한 하루를 만드는 중이에요.</p>
@@ -918,7 +931,15 @@ export default function AnalysisTrackPage() {
                 preview={
                   card.id === 'density' ? (
                     <ResponsiveContainer width="100%" height={88}>
-                      <BarChart data={densityData}>
+                      <BarChart data={densityData} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
+                        <YAxis
+                          width={30}
+                          tick={{ fontSize: 9, fontWeight: 800, fill: 'var(--chart-axis)' }}
+                          tickLine={{ stroke: 'var(--chart-grid)' }}
+                          axisLine={{ stroke: 'var(--chart-grid)' }}
+                          tickFormatter={(value) => `${Number(value)}%`}
+                        />
                         <Bar dataKey="value" radius={[8, 8, 4, 4]} fill="#FF9626" />
                       </BarChart>
                     </ResponsiveContainer>
@@ -932,7 +953,15 @@ export default function AnalysisTrackPage() {
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={88}>
-                      <ComposedChart data={weeklyData}>
+                      <ComposedChart data={weeklyData} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
+                        <YAxis
+                          width={30}
+                          tick={{ fontSize: 9, fontWeight: 800, fill: 'var(--chart-axis)' }}
+                          tickLine={{ stroke: 'var(--chart-grid)' }}
+                          axisLine={{ stroke: 'var(--chart-grid)' }}
+                          tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`}
+                        />
                         <Bar dataKey={card.id === 'rhythm' ? 'avgMinutes' : 'totalMinutes'} radius={[8, 8, 4, 4]} fill={card.id === 'rhythm' ? '#18B67A' : '#2E6BFF'} />
                         <Line type="monotone" dataKey="avgMinutes" stroke={card.id === 'rhythm' ? '#8EF0C9' : '#FFB347'} strokeWidth={2.2} dot={false} />
                       </ComposedChart>
@@ -944,7 +973,7 @@ export default function AnalysisTrackPage() {
                   <div className="space-y-4">
                     <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <ResponsiveContainer width="100%" height={isMobile ? 180 : 260}>
-                        <ComposedChart data={chartData} margin={{ top: 12, right: 8, left: isMobile ? -28 : -18, bottom: 0 }}>
+                        <ComposedChart data={chartData} margin={{ top: 12, right: 8, left: isMobile ? 6 : 12, bottom: 0 }}>
                           <defs>
                             <linearGradient id="analysis-focus-gradient" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#2E6BFF" />
@@ -953,7 +982,13 @@ export default function AnalysisTrackPage() {
                           </defs>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
                           <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }} tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`} />
+                          <YAxis
+                            width={isMobile ? 32 : 40}
+                            tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }}
+                            tickLine={{ stroke: 'var(--chart-grid)' }}
+                            axisLine={{ stroke: 'var(--chart-grid)' }}
+                            tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`}
+                          />
                           <Tooltip content={<AnalysisTooltip />} />
                           <Bar dataKey="totalMinutes" name="집중 시간" radius={[10, 10, 4, 4]} fill="url(#analysis-focus-gradient)" />
                           <Line type="monotone" dataKey="avgMinutes" name="리듬선" stroke="#FFB347" strokeWidth={2.6} dot={false} />
