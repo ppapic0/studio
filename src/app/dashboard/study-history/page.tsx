@@ -861,7 +861,7 @@ export default function StudyHistoryPage() {
 
       <Card
         className={cn(
-          "overflow-hidden rounded-[2.5rem]",
+          "student-utility-card overflow-hidden rounded-[2.5rem]",
           isMobile
             ? "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1B3878_0%,#2B54A8_54%,#3D68BF_100%)] text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.42)]"
             : "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1D3D80_0%,#2C53A5_54%,#4068BC_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.46)]"
@@ -989,7 +989,7 @@ export default function StudyHistoryPage() {
       </Card>
 
       <Card className={cn(
-        "relative mx-auto w-full overflow-hidden rounded-[3rem]",
+        "student-utility-card relative mx-auto w-full overflow-hidden rounded-[3rem]",
         isParent
           ? "border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] ring-1 ring-white/70 shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)]"
           : "border border-[#D9E4F5] bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.1),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] ring-1 ring-white/75 shadow-[0_28px_70px_-52px_rgba(15,23,42,0.3)]"

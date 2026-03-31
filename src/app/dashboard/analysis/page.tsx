@@ -1067,7 +1067,7 @@ export default function AnalysisTrackPage() {
         </TabsContent>
 
         <TabsContent value="full" className="mt-0">
-          <div className="analysis-shell">
+          <div className="analysis-shell surface-card surface-card--primary on-dark overflow-hidden rounded-[2.2rem] border border-white/10 px-2 py-3 sm:px-3 sm:py-4">
             <StudentDetailPresentationProvider value="student-analysis">
               <StudentDetailPage params={selfParams} />
             </StudentDetailPresentationProvider>

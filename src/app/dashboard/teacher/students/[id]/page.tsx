@@ -371,24 +371,24 @@ function StatAnalysisCard({
     return (
       <Card
         className={cn(
-          'analysis-kpi-card min-w-0 overflow-hidden rounded-[1.5rem] border-none bg-white transition-all',
+          'analysis-premium-card surface-card surface-card--secondary on-dark min-w-0 overflow-hidden rounded-[1.5rem] border-none transition-all',
           onClick && 'cursor-pointer active:scale-[0.985]'
         )}
         onClick={onClick}
       >
         <CardHeader className={cn('pb-2 flex flex-row items-start justify-between', isMobile ? 'px-4 pt-4' : 'px-5 pt-5')}>
           <div className="min-w-0">
-            <CardTitle className={cn('min-w-0 font-black uppercase break-keep text-[#64789f]', isMobile ? 'text-[9px] leading-tight tracking-[0.2em]' : 'text-[10px] tracking-[0.22em]')}>
+            <CardTitle className={cn('min-w-0 font-black uppercase break-keep text-[var(--text-on-dark-muted)]', isMobile ? 'text-[9px] leading-tight tracking-[0.2em]' : 'text-[10px] tracking-[0.22em]')}>
               {title}
             </CardTitle>
-            <div className={cn('mt-3 font-black tracking-tight break-keep text-[#14295F]', isMobile ? 'text-[1.3rem] leading-tight' : 'text-[1.7rem]')}>
+            <div className={cn('mt-3 font-black tracking-tight break-keep text-[var(--text-on-dark)]', isMobile ? 'text-[1.3rem] leading-tight' : 'text-[1.7rem]')}>
               {value}
             </div>
-            <p className={cn('font-semibold mt-1 break-keep text-[#5c6f96]', isMobile ? 'text-[10px] leading-5' : 'text-[11px] leading-5')}>
+            <p className={cn('font-semibold mt-1 break-keep text-[var(--text-on-dark-soft)]', isMobile ? 'text-[10px] leading-5' : 'text-[11px] leading-5')}>
               {subValue}
             </p>
           </div>
-          <div className={cn('rounded-[1rem] border px-3 py-2 shadow-[0_16px_26px_-22px_rgba(20,41,95,0.32)]', tone.chip)}>
+          <div className="surface-chip surface-chip--dark rounded-[1rem] px-3 py-2 shadow-none">
             <Icon className={cn(isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4', tone.text)} />
           </div>
         </CardHeader>
@@ -397,7 +397,7 @@ function StatAnalysisCard({
             <span className={cn('bg-gradient-to-r', tone.bar)} style={{ width: `${Math.max(0, Math.min(100, Math.round(progress)))}%` }} />
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8290b0]">Insight Rail</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-on-dark-muted)]">Insight Rail</span>
             <span className={cn('text-[10px] font-black', tone.text)}>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
           </div>
         </CardContent>
@@ -1862,6 +1862,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     'mt-3 rounded-[1.15rem] px-3.5 py-3',
     isAnalysisPresentation ? 'analysis-signal-band' : 'border border-slate-200 bg-slate-50/85'
   );
+  const detailPrimaryTextClass = isAnalysisPresentation ? 'text-[var(--text-on-dark)]' : 'text-[#14295F]';
+  const detailSecondaryTextClass = isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : 'text-[#5c6e97]';
   const focusKpiCards = [
     {
       key: 'growth',
@@ -1974,22 +1976,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       )}>
         <div className="flex items-start gap-4 min-w-0">
           {!isStudentSelfView && (
-            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 shrink-0 mt-1" asChild>
+            <Button variant={isAnalysisPresentation ? 'dark' : 'ghost'} size="icon" className={cn("rounded-full h-10 w-10 shrink-0 mt-1", isAnalysisPresentation && "border-white/12 bg-white/8 hover:bg-white/12")} asChild>
               <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
             </Button>
           )}
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-black tracking-tighter truncate text-3xl sm:text-4xl">{student?.name || '학생'}</h1>
-              <Badge className="bg-primary text-white px-2 py-0.5 rounded-full font-black text-[10px]">{formatSeatLabel(student)}</Badge>
+              <h1 className={cn("font-black tracking-tighter truncate text-3xl sm:text-4xl", isAnalysisPresentation && "text-[var(--text-on-dark)]")}>{student?.name || '학생'}</h1>
+              <Badge variant={isAnalysisPresentation ? 'secondary' : 'default'} className={cn("px-2 py-0.5 rounded-full font-black text-[10px]", !isAnalysisPresentation && "bg-primary text-white")}>{formatSeatLabel(student)}</Badge>
               {!isStudentSelfView && (
-                <Badge variant="outline" className="font-black text-[10px] rounded-full"><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
+                <Badge variant={isAnalysisPresentation ? 'dark' : 'outline'} className="font-black text-[10px] rounded-full"><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-bold">
-              <span className="flex items-center gap-1 text-primary"><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
+            <div className={cn("flex flex-wrap items-center gap-2 text-xs font-bold", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-muted-foreground")}>
+              <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-[var(--accent-orange-soft)]" : "text-primary")}><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
               <span className="opacity-30">|</span><span>{student?.grade}</span><span className="opacity-30">|</span>
-              <span className="flex items-center gap-1 text-emerald-600"><LayoutGrid className="h-3 w-3" /> {student?.className || '반 미지정'}</span>
+              <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-emerald-300" : "text-emerald-600")}><LayoutGrid className="h-3 w-3" /> {student?.className || '반 미지정'}</span>
               <span className="opacity-30">|</span><span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> 연속 공부 {studyStreakDays}일</span>
             </div>
           </div>
@@ -2078,39 +2080,52 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       {!isStudentSelfView ? (
         <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1.15fr_0.95fr]')}>
-          <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-chart-stage')}>
+          <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-premium-card surface-card surface-card--secondary on-dark rounded-[2rem] shadow-none')}>
             <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-xl font-black tracking-tight text-[#14295F]">오늘 액션 체크리스트</CardTitle>
-                  <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                  <CardTitle className={cn("text-xl font-black tracking-tight", detailPrimaryTextClass)}>오늘 액션 체크리스트</CardTitle>
+                  <CardDescription className={cn("mt-1 text-[11px] font-semibold leading-5", detailSecondaryTextClass)}>
                     COO 관점에서 지금 바로 처리할 행동만 먼저 모았습니다.
                   </CardDescription>
                 </div>
-                <Badge className="rounded-full bg-[#14295F] px-3 py-1 text-[10px] font-black text-white">
+                <Badge variant={isAnalysisPresentation ? 'secondary' : 'default'} className={cn("rounded-full px-3 py-1 text-[10px] font-black", !isAnalysisPresentation && "bg-[#14295F] text-white")}>
                   {todayActionChecklist.length}개 액션
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className={cn('space-y-3', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
               {todayActionChecklist.length === 0 ? (
-                <div className="rounded-[1.2rem] border border-emerald-100 bg-emerald-50/70 px-4 py-4 text-sm font-bold text-emerald-700">
+                <div className={cn(
+                  "rounded-[1.2rem] border px-4 py-4 text-sm font-bold",
+                  isAnalysisPresentation
+                    ? "surface-card surface-card--ghost on-dark border-emerald-400/18 text-emerald-200 shadow-none"
+                    : "border-emerald-100 bg-emerald-50/70 text-emerald-700"
+                )}>
                   오늘 바로 처리해야 할 주요 액션은 없습니다. 유지 전략 중심으로 운영해도 좋습니다.
                 </div>
               ) : (
                 todayActionChecklist.map((item, index) => (
-                  <div key={item.key} className="rounded-[1.25rem] border border-slate-100 bg-slate-50/70 px-4 py-4">
+                  <div
+                    key={item.key}
+                    className={cn(
+                      "rounded-[1.25rem] border px-4 py-4",
+                      isAnalysisPresentation
+                        ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none"
+                        : "border-slate-100 bg-slate-50/70"
+                    )}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <Badge className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', item.accent)}>
+                          <Badge className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', isAnalysisPresentation ? 'border-[rgba(255,138,31,0.28)] bg-[rgba(255,138,31,0.18)] text-[#ffd7b4]' : item.accent)}>
                             액션 {index + 1}
                           </Badge>
-                          <p className="text-sm font-black text-[#14295F]">{item.title}</p>
+                          <p className={cn("text-sm font-black", detailPrimaryTextClass)}>{item.title}</p>
                         </div>
-                        <p className="mt-2 text-[12px] font-semibold leading-5 text-slate-600">{item.detail}</p>
+                        <p className={cn("mt-2 text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-slate-600")}>{item.detail}</p>
                       </div>
-                      <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-3 text-[11px] font-black">
+                      <Button asChild size="sm" variant={isAnalysisPresentation ? 'secondary' : 'outline'} className="h-8 rounded-lg px-3 text-[11px] font-black">
                         <Link href={item.href}>바로 이동</Link>
                       </Button>
                     </div>
@@ -2121,28 +2136,47 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </Card>
 
           {isAdmin ? (
-            <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-chart-stage')}>
+            <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-premium-card surface-card surface-card--secondary on-dark rounded-[2rem] shadow-none')}>
               <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <CardTitle className="text-xl font-black tracking-tight text-[#14295F]">운영 비용 신호</CardTitle>
-                    <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                    <CardTitle className={cn("text-xl font-black tracking-tight", detailPrimaryTextClass)}>운영 비용 신호</CardTitle>
+                    <CardDescription className={cn("mt-1 text-[11px] font-semibold leading-5", detailSecondaryTextClass)}>
                       문자, 상담, 리포트, 출결, 수납까지 운영 투입 신호를 한 번에 봅니다.
                     </CardDescription>
                   </div>
-                  <Badge className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-700">
+                  <Badge variant={isAnalysisPresentation ? 'dark' : 'outline'} className="rounded-full px-3 py-1 text-[10px] font-black">
                     최근 30일
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className={cn('grid gap-3', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
                 {operatingCostSignals.map((signal) => (
-                  <div key={signal.key} className={cn('rounded-[1.2rem] border px-4 py-3', signal.tone)}>
+                  <div
+                    key={signal.key}
+                    className={cn(
+                      'rounded-[1.2rem] border px-4 py-3',
+                      isAnalysisPresentation
+                        ? 'surface-card surface-card--ghost on-dark border-white/10 shadow-none'
+                        : signal.tone
+                    )}
+                  >
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-[11px] font-black tracking-[0.12em] uppercase">{signal.title}</p>
-                      <p className="text-lg font-black tracking-tight">{signal.value}</p>
+                      <p className={cn("text-[11px] font-black tracking-[0.12em] uppercase", isAnalysisPresentation && "text-[var(--text-on-dark-muted)]")}>{signal.title}</p>
+                      <p className={cn(
+                        "text-lg font-black tracking-tight",
+                        isAnalysisPresentation && (signal.key === 'sms'
+                          ? 'text-sky-300'
+                          : signal.key === 'counseling'
+                            ? 'text-[#ffd7b4]'
+                            : signal.key === 'report'
+                              ? 'text-violet-300'
+                              : signal.key === 'attendance'
+                                ? 'text-rose-300'
+                                : 'text-emerald-300')
+                      )}>{signal.value}</p>
                     </div>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-slate-600">{signal.helper}</p>
+                    <p className={cn("mt-1 text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-slate-600")}>{signal.helper}</p>
                   </div>
                 ))}
               </CardContent>
@@ -2161,44 +2195,44 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <TabsContent value="overview" className="space-y-6 mt-0">
           {isAnalysisPresentation ? (
             <>
-              <Card className="analysis-chart-stage overflow-hidden border-none rounded-[1.85rem] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] shadow-[0_24px_60px_-44px_rgba(20,41,95,0.42)]">
+              <Card className="analysis-premium-card surface-card surface-card--secondary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none">
                 <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <Badge className="rounded-full border-[#dbe7ff] bg-white/88 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">
+                      <Badge variant="dark" className="px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shadow-none">
                         Focus Board
                       </Badge>
-                      <CardTitle className="mt-3 break-keep text-[clamp(1rem,1.5vw,1.18rem)] font-black tracking-tight text-[#14295F]">개인 집중도 KPI</CardTitle>
-                      <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                      <CardTitle className="mt-3 break-keep text-[clamp(1rem,1.5vw,1.18rem)] font-black tracking-tight text-[var(--text-on-dark)]">개인 집중도 KPI</CardTitle>
+                      <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
                         학생 분석트랙에서 개인 집중 지표를 빠르게 확인합니다.
                       </CardDescription>
                     </div>
-                    <div className="rounded-[1.15rem] border border-[#e6eeff] bg-white/86 px-3 py-2 text-right shadow-[0_18px_40px_-32px_rgba(20,41,95,0.45)]">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6a7da6]">오늘 포커스</p>
-                      <p className="mt-1 text-sm font-black text-[#14295F]">{focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}</p>
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 px-3 py-2 text-right shadow-none">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-on-dark-muted)]">오늘 포커스</p>
+                      <p className="mt-1 text-sm font-black text-[var(--accent-orange-soft)]">{focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}</p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className={cn("relative z-10 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
                   <div className={cn("grid gap-3", isMobile ? "grid-cols-1 min-[360px]:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4")}>
                     {focusKpiCards.map(({ key, label, value, helper, note, Icon, iconClass, panelClass, chipClass, meterClass, meterValue }) => (
-                      <div key={key} className={cn("min-w-0 overflow-hidden rounded-[1.35rem] border px-3.5 py-3.5 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.34)]", panelClass)}>
+                      <div key={key} className={cn("min-w-0 overflow-hidden rounded-[1.35rem] border px-3.5 py-3.5", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : panelClass)}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", chipClass)}>
+                            <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", isAnalysisPresentation ? "border border-white/12 bg-white/10 text-[var(--text-on-dark-soft)]" : chipClass)}>
                               {label}
                             </span>
-                            <p className="mt-3 break-keep text-[clamp(1.25rem,3.2vw,1.8rem)] font-black tracking-tight text-[#14295F]">
+                            <p className="mt-3 break-keep text-[clamp(1.25rem,3.2vw,1.8rem)] font-black tracking-tight text-[var(--text-on-dark)]">
                               {value}
                             </p>
                           </div>
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-white/70 bg-white/88 shadow-[0_16px_34px_-28px_rgba(20,41,95,0.4)]">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-white/12 bg-white/10 shadow-none">
                             <Icon className={cn("h-5 w-5", iconClass)} />
                           </div>
                         </div>
-                        <p className="mt-2 text-[11px] font-semibold leading-5 text-[#52678f]">{helper}</p>
-                        <p className="mt-1 text-[11px] font-black text-[#14295F]">{note}</p>
-                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/70">
+                        <p className="mt-2 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">{helper}</p>
+                        <p className="mt-1 text-[11px] font-black text-[var(--accent-orange-soft)]">{note}</p>
+                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/12">
                           <div className={cn("h-full rounded-full bg-gradient-to-r", meterClass)} style={{ width: `${meterValue}%` }} />
                         </div>
                       </div>
@@ -2207,23 +2241,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </CardContent>
               </Card>
 
-              <Card className="analysis-signal-band overflow-hidden border-none rounded-[1.85rem]">
+              <Card className="analysis-premium-card surface-card surface-card--primary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none">
                 <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-[#1f4fbf]" />
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">AI 그래프 인사이트 요약</p>
+                      <Sparkles className="h-4 w-4 text-[var(--accent-orange)]" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-orange-soft)]">AI 그래프 인사이트 요약</p>
                     </div>
                     <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.25fr)_auto] items-start")}>
                       <div className="min-w-0">
-                        <CardTitle className="break-keep text-[clamp(1rem,1.5vw,1.2rem)] font-black tracking-tight text-[#14295F]">
+                        <CardTitle className="break-keep text-[clamp(1rem,1.5vw,1.2rem)] font-black tracking-tight text-[var(--text-on-dark)]">
                           {chartInsightHeadline}
                         </CardTitle>
-                        <CardDescription className="mt-2 text-[11px] font-semibold leading-5 text-[#51678f]">
+                        <CardDescription className="mt-2 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
                           {chartInsightSummary}
                         </CardDescription>
                       </div>
-                      <Badge className="w-fit rounded-full border-[#dbe7ff] bg-white/90 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">
+                      <Badge variant="secondary" className="w-fit px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] shadow-none">
                         Coach Board
                       </Badge>
                     </div>
@@ -2231,24 +2265,24 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </CardHeader>
                 <CardContent className={cn("relative z-10 space-y-3 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
                   <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "lg:grid-cols-2")}>
-                    {insightHighlights.map(({ key, label, badge, value, detail, accentClass, badgeClass }) => (
-                      <div key={key} className="overflow-hidden rounded-[1.35rem] border border-[#dbe7ff]/85 bg-white/88 p-4 shadow-[0_18px_40px_-34px_rgba(20,41,95,0.34)]">
+                    {insightHighlights.map(({ key, label, badge, value, detail, accentClass }) => (
+                      <div key={key} className="surface-card surface-card--ghost on-dark overflow-hidden rounded-[1.35rem] border border-white/10 p-4 shadow-none">
                         <div className="flex items-center justify-between gap-3">
-                          <Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", badgeClass)}>
+                          <Badge variant={key === 'daily' ? 'secondary' : 'dark'} className="px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] shadow-none">
                             {badge}
                           </Badge>
                           <div className={cn("h-2 w-14 rounded-full bg-gradient-to-r", accentClass)} />
                         </div>
-                        <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">{label}</p>
-                        <p className="mt-2 break-keep text-sm font-black leading-6 text-[#14295F]">{value}</p>
-                        <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5c6e97]">{detail}</p>
+                        <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">{label}</p>
+                        <p className="mt-2 break-keep text-sm font-black leading-6 text-[var(--text-on-dark)]">{value}</p>
+                        <p className="mt-2 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">{detail}</p>
                       </div>
                     ))}
                   </div>
                   <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-                    {insightSupportCards.map(({ key, label, value, toneClass, bgClass }) => (
-                      <div key={key} className={cn("rounded-[1.2rem] border px-3.5 py-3 shadow-[0_16px_34px_-34px_rgba(20,41,95,0.3)]", bgClass)}>
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">{label}</p>
+                    {insightSupportCards.map(({ key, label, value, toneClass }) => (
+                      <div key={key} className="surface-card surface-card--ghost on-dark rounded-[1.2rem] border border-white/10 px-3.5 py-3 shadow-none">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">{label}</p>
                         <p className={cn("mt-2 break-keep text-[12px] font-black leading-5", toneClass)}>{value}</p>
                       </div>
                     ))}
@@ -2334,38 +2368,41 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
           {isAdmin ? (
             <>
-              <Card className="rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] shadow-lg">
+              <Card className={cn(
+                "rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] shadow-lg",
+                isAnalysisPresentation && "analysis-premium-card surface-card surface-card--secondary on-dark border-none shadow-none"
+              )}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base font-black tracking-tight text-[#14295F]">
-                    <ClipboardList className="h-4 w-4 text-[#2554d4]" />
+                  <CardTitle className={cn("flex items-center gap-2 text-base font-black tracking-tight", detailPrimaryTextClass)}>
+                    <ClipboardList className={cn("h-4 w-4", isAnalysisPresentation ? "text-[var(--accent-orange)]" : "text-[#2554d4]")} />
                     관리 증빙 요약
                   </CardTitle>
-                  <CardDescription className="font-bold text-[11px] text-[#5c6e97]">
+                  <CardDescription className={cn("font-bold text-[11px]", detailSecondaryTextClass)}>
                     보호자 상담 시 바로 보여줄 수 있도록, 최근 30일 관리 흐름을 한 문장과 핵심 수치로 먼저 정리했습니다.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-0">
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-                    <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">학습 관리</p>
-                      <p className="mt-2 text-lg font-black text-[#14295F]">{minutesToLabel(todayStudyMinutes)}</p>
-                      <p className="mt-1 text-xs font-bold text-[#5c6e97]">최근 7일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}%</p>
+                    <div className={cn("rounded-xl border p-4", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
+                      <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isAnalysisPresentation ? "text-[var(--text-on-dark-muted)]" : "text-[#2554d4]")}>학습 관리</p>
+                      <p className={cn("mt-2 text-lg font-black", detailPrimaryTextClass)}>{minutesToLabel(todayStudyMinutes)}</p>
+                      <p className={cn("mt-1 text-xs font-bold", detailSecondaryTextClass)}>최근 7일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}%</p>
                     </div>
-                    <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">출결 관리</p>
-                      <p className="mt-2 text-lg font-black text-[#14295F]">{attendanceRate30d}%</p>
-                      <p className="mt-1 text-xs font-bold text-[#5c6e97]">
+                    <div className={cn("rounded-xl border p-4", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
+                      <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isAnalysisPresentation ? "text-[var(--text-on-dark-muted)]" : "text-[#2554d4]")}>출결 관리</p>
+                      <p className={cn("mt-2 text-lg font-black", detailPrimaryTextClass)}>{attendanceRate30d}%</p>
+                      <p className={cn("mt-1 text-xs font-bold", detailSecondaryTextClass)}>
                         최근 30일 출석률 · 벌점 {Math.max(0, Math.round(Number(progress?.penaltyPoints || 0)))}점 · 외출 {awayTimeData.filter((item) => item.awayMinutes > 0).length}회
                       </p>
                     </div>
-                    <div className="rounded-xl border border-[#dbe7ff] bg-white/90 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#2554d4]">소통 관리</p>
-                      <p className="mt-2 text-lg font-black text-[#14295F]">{counselingCount30d + reportSentCount30d + smsAcceptedCount30d}회</p>
-                      <p className="mt-1 text-xs font-bold text-[#5c6e97]">상담 {counselingCount30d} · 리포트 {reportSentCount30d} · 문자 {smsAcceptedCount30d}</p>
+                    <div className={cn("rounded-xl border p-4", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
+                      <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isAnalysisPresentation ? "text-[var(--text-on-dark-muted)]" : "text-[#2554d4]")}>소통 관리</p>
+                      <p className={cn("mt-2 text-lg font-black", detailPrimaryTextClass)}>{counselingCount30d + reportSentCount30d + smsAcceptedCount30d}회</p>
+                      <p className={cn("mt-1 text-xs font-bold", detailSecondaryTextClass)}>상담 {counselingCount30d} · 리포트 {reportSentCount30d} · 문자 {smsAcceptedCount30d}</p>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-[#dbe7ff] bg-[#eef4ff] px-4 py-3">
-                    <p className="text-sm font-black leading-6 text-[#14295F]">
+                  <div className={cn("rounded-xl border px-4 py-3", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-[#eef4ff]")}>
+                    <p className={cn("text-sm font-black leading-6", detailPrimaryTextClass)}>
                       최근 30일 동안 학습, 출결, 상담/문자/리포트 기록을 함께 관리하고 있으며, 보호자 반응은 앱 방문 {parentVisitCount30d}회 · 리포트 열람 {reportReadCount30d}회로 추적 중입니다.
                     </p>
                   </div>
