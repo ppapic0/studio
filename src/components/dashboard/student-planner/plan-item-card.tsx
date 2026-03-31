@@ -88,7 +88,7 @@ export function PlanItemCard({
       {volumeMeta ? (
         <div className={cn(
           "mt-1 flex h-6 min-w-[2.25rem] items-center justify-center rounded-full px-2 text-[10px] font-black",
-          checked ? "bg-emerald-500 text-white" : "bg-white/10 text-white/62"
+          checked ? "bg-emerald-500 text-white" : "bg-white/[0.12] text-[var(--text-on-dark-soft)]"
         )}>
           {progressRate}%
         </div>

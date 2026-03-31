@@ -95,7 +95,7 @@ const SheetContent = React.forwardRef<
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-[var(--surface-primary-gradient)] text-[var(--text-on-dark)] opacity-95 shadow-[var(--shadow-card-strong)] ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent-orange)] focus:ring-offset-2 disabled:pointer-events-none">
+        <SheetPrimitive.Close className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-white/14 bg-[linear-gradient(180deg,#17326B_0%,#10214A_100%)] text-white opacity-100 shadow-[0_16px_30px_-20px_rgba(2,6,23,0.48)] ring-offset-background transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-white/20 hover:bg-[linear-gradient(180deg,#22479B_0%,#17326B_100%)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-orange)] focus:ring-offset-2 disabled:pointer-events-none">
           <X className="h-4 w-4 text-white" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>
@@ -151,7 +151,7 @@ const SheetDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-sm text-[var(--text-secondary)]", className)}
     {...props}
   />
 ))

@@ -385,7 +385,7 @@ function PodiumCard({
         'flex flex-col items-center justify-end rounded-[1.55rem] border px-3 pb-4 pt-3 text-center shadow-[0_20px_42px_-28px_rgba(0,0,0,0.48)]',
         highlight
           ? 'border-[rgba(255,138,31,0.28)] bg-[linear-gradient(180deg,rgba(255,247,236,0.94),rgba(255,232,204,0.82))]'
-          : 'border-white/10 bg-[linear-gradient(180deg,rgba(12,27,63,0.9),rgba(20,41,95,0.82))]'
+          : 'border-white/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.9),rgba(20,41,95,0.82))]'
       )}
     >
       <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-[rgba(255,138,31,0.16)] text-[var(--accent-orange)]' : 'bg-white/10 text-white/88')}>
@@ -901,11 +901,11 @@ export default function GrowthPage() {
 
         <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
           <div className="surface-card surface-card--light rounded-[1.2rem] px-3 py-3 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">오늘 획득</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">오늘 획득</p>
             <p className="mt-2 text-base font-black text-[var(--text-primary)]">+{todayPointGain}P</p>
           </div>
           <div className="surface-card surface-card--ivory rounded-[1.2rem] px-3 py-3 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">연 상자</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">연 상자</p>
             <p className="mt-2 text-base font-black text-[var(--text-primary)]">{todayOpenedCount}개</p>
           </div>
           <div className="surface-card surface-card--highlight rounded-[1.2rem] px-3 py-3 text-center">
@@ -988,11 +988,11 @@ export default function GrowthPage() {
 
         <section className="grid grid-cols-2 gap-3">
           <div className="surface-card surface-card--light rounded-[1.5rem] px-4 py-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-muted)]">이번 주</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)]">이번 주</p>
             <p className="mt-2 text-[1.2rem] font-black tracking-tight text-[var(--text-primary)]">{formatStudyMinutes(weeklyMinutes)}</p>
           </div>
           <div className="surface-card surface-card--ivory rounded-[1.5rem] px-4 py-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-muted)]">오늘 총합</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)]">오늘 총합</p>
             <p className="mt-2 text-[1.2rem] font-black tracking-tight text-[var(--text-primary)]">{formatStudyMinutes(liveTodayMinutes)}</p>
           </div>
         </section>

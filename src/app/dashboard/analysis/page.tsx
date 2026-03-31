@@ -321,11 +321,11 @@ function RewardToast({
   return (
     <div className="fixed inset-x-4 top-20 z-50 mx-auto max-w-sm rounded-[1.4rem] border border-[#FFB347]/18 bg-[linear-gradient(135deg,#173A82_0%,#22479B_58%,#FF7A16_170%)] px-4 py-3 text-white shadow-[0_22px_42px_-26px_rgba(255,122,22,0.46)] transition-all duration-300">
       <div className="flex items-center gap-3">
-        <div className="rounded-full bg-white/14 p-2">
+        <div className="rounded-full bg-white/18 p-2">
           <Sparkles className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">{reward.title}</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">{reward.title}</p>
           <p className="mt-1 text-lg font-black">+{reward.points}P 획득</p>
         </div>
       </div>
@@ -355,8 +355,8 @@ function MiniGrowthBars({
             />
           </div>
           <div className="text-center">
-            <p className="text-[10px] font-black text-white/62">{day.label}</p>
-            <p className="mt-1 text-[11px] font-black text-white/82">
+            <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
+            <p className="mt-1 text-[11px] font-black text-[var(--text-on-dark)]">
               {day.totalMinutes > 0 ? `${Math.round(day.totalMinutes / 60)}h` : '--'}
             </p>
           </div>
@@ -388,36 +388,38 @@ function GraphDungeonCard({
   return (
     <section
       className={cn(
-        'rounded-[1.85rem] border p-4 shadow-[0_24px_46px_-34px_rgba(0,0,0,0.52)] transition-transform duration-200',
+        'surface-card on-dark rounded-[1.85rem] border p-4 shadow-[0_24px_46px_-34px_rgba(0,0,0,0.52)] transition-transform duration-200',
         unlocked && 'hover:-translate-y-0.5 hover:scale-[1.01]',
-        unlocked ? 'border-white/10 bg-[#13285A]/82' : 'border-white/6 bg-[#10224D]/72'
+        unlocked
+          ? 'surface-card--secondary border-[color:var(--border-subtle)]'
+          : 'surface-card--ghost border-dashed border-white/12 opacity-90'
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="border-[#FFB347]/18 bg-[#FF9626]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">
+            <Badge variant="secondary" className="px-2.5 py-1 text-[10px] shadow-none">
               {eyebrow}
             </Badge>
-            <span className={cn('text-[10px] font-black uppercase tracking-[0.18em]', unlocked ? 'text-white/68' : 'inline-flex items-center gap-1 text-white/55')}>
+            <span className={cn('text-[10px] font-black uppercase tracking-[0.18em]', unlocked ? 'text-[var(--text-on-dark-soft)]' : 'inline-flex items-center gap-1 text-[var(--text-on-dark-muted)]')}>
               {unlocked ? '🔓 unlocked' : <><Lock className="h-3 w-3" /> locked</>}
             </span>
           </div>
           <h3 className="mt-3 text-lg font-black tracking-tight text-white">{title}</h3>
-          <p className="mt-1 text-sm font-semibold text-white/74">{insight}</p>
+          <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight}</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">Reward</p>
-          <p className="mt-1 text-lg font-black text-[#FFD79F]">+{reward}P</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">Reward</p>
+          <p className="mt-1 text-lg font-black text-[var(--accent-orange-soft)]">+{reward}P</p>
         </div>
       </div>
 
-      <div className="mt-4 rounded-[1.35rem] border border-white/8 bg-white/5 px-3 py-3">
+      <div className="mt-4 rounded-[1.35rem] border border-white/12 bg-white/[0.08] px-3 py-3">
         {preview}
-        <p className="mt-3 text-right text-[11px] font-semibold text-white/74">{previewHint}</p>
+        <p className="mt-3 text-right text-[11px] font-semibold text-[var(--text-on-dark-soft)]">{previewHint}</p>
       </div>
 
-      <div className="mt-4 border-t border-white/10 pt-4">{children}</div>
+      <div className="mt-4 border-t border-white/12 pt-4">{children}</div>
     </section>
   );
 }
@@ -753,11 +755,11 @@ export default function AnalysisTrackPage() {
       <RewardToast reward={rewardBurst} />
 
       <Tabs defaultValue="growth" className="space-y-4">
-        <TabsList className={cn('grid w-full grid-cols-2 rounded-[1.5rem] border border-white/10 bg-white/6 p-1.5', isMobile ? 'gap-1.5' : 'gap-2')}>
-          <TabsTrigger value="growth" className="rounded-[1.1rem] px-3 py-2.5 text-xs font-black text-white data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">
+        <TabsList className={cn('grid w-full grid-cols-2 rounded-[1.5rem] border border-white/12 bg-white/[0.08] p-1.5 shadow-[0_18px_42px_-32px_rgba(0,0,0,0.42)]', isMobile ? 'gap-1.5' : 'gap-2')}>
+          <TabsTrigger value="growth" className="rounded-[1.1rem] px-3 py-2.5 text-xs font-black text-[var(--text-on-dark-soft)] hover:text-white data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">
             <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> 성장 맵
           </TabsTrigger>
-          <TabsTrigger value="full" className="rounded-[1.1rem] px-3 py-2.5 text-xs font-black text-white data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">
+          <TabsTrigger value="full" className="rounded-[1.1rem] px-3 py-2.5 text-xs font-black text-[var(--text-on-dark-soft)] hover:text-white data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">
             <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> 전체 분석
           </TabsTrigger>
         </TabsList>
@@ -782,12 +784,12 @@ export default function AnalysisTrackPage() {
 
                 <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-3')}>
                   <div className="surface-card surface-card--light rounded-[1.2rem] px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">오늘 상태</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">오늘 상태</p>
                     <p className="mt-2 text-2xl font-black text-[var(--text-primary)]">{minutesToCompactLabel(todayMinutes)}</p>
                     <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">{minutesToCompactLabel(heroGoalMinutes)} 목표</p>
                   </div>
                   <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">상승 폭</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">상승 폭</p>
                     <p className="mt-2 text-2xl font-black text-[var(--accent-orange)]">{signedPercent(kpi.weekDiffPct)}</p>
                     <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">지난 주 대비</p>
                   </div>
@@ -885,7 +887,7 @@ export default function AnalysisTrackPage() {
                 <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">이번 주 성장 맵</h2>
               </div>
               <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-3 text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">최고 성장</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">최고 성장</p>
                 <p className="mt-1 text-lg font-black text-[var(--text-primary)]">{shortDateLabel(bestDay.dateKey)}</p>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">{minutesToLabel(bestDay.totalMinutes)}</p>
               </div>
@@ -898,10 +900,10 @@ export default function AnalysisTrackPage() {
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <Badge className="border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-white/72 shadow-none">GRAPH DUNGEON</Badge>
+                <Badge variant="dark" className="px-3 py-1 text-[10px] shadow-none">GRAPH DUNGEON</Badge>
                 <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">그래프 던전들</h2>
               </div>
-              {!isMobile ? <p className="text-sm font-semibold text-white/74">핵심 그래프를 한 번에 보고, 해석하고, 전략으로 연결하세요.</p> : null}
+              {!isMobile ? <p className="text-sm font-semibold text-[var(--text-on-dark-soft)]">핵심 그래프를 한 번에 보고, 해석하고, 전략으로 연결하세요.</p> : null}
             </div>
 
             {visibleDungeonCards.map((card) => (
@@ -940,7 +942,7 @@ export default function AnalysisTrackPage() {
               >
                 {card.id === 'focus' ? (
                   <div className="space-y-4">
-                    <div className="rounded-[1.35rem] border border-white/10 bg-white/6 p-4">
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <ResponsiveContainer width="100%" height={isMobile ? 180 : 260}>
                         <ComposedChart data={chartData} margin={{ top: 12, right: 8, left: isMobile ? -28 : -18, bottom: 0 }}>
                           <defs>
@@ -949,9 +951,9 @@ export default function AnalysisTrackPage() {
                               <stop offset="100%" stopColor="#7AB6FF" />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(255,255,255,0.08)" />
-                          <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: 'rgba(255,255,255,0.45)' }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: 'rgba(255,255,255,0.45)' }} tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`} />
+                          <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
+                          <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }} tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`} />
                           <Tooltip content={<AnalysisTooltip />} />
                           <Bar dataKey="totalMinutes" name="집중 시간" radius={[10, 10, 4, 4]} fill="url(#analysis-focus-gradient)" />
                           <Line type="monotone" dataKey="avgMinutes" name="리듬선" stroke="#FFB347" strokeWidth={2.6} dot={false} />
@@ -961,51 +963,51 @@ export default function AnalysisTrackPage() {
                     </div>
                     {isMobile ? (
                       <div className="grid gap-3">
-                        <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-white/74">{minutesToLabel(bestDay.totalMinutes)}</p></div>
+                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{minutesToLabel(bestDay.totalMinutes)}</p></div>
                       </div>
                     ) : (
                       <div className="grid gap-3 md:grid-cols-3">
-                        <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-white/74">{minutesToLabel(bestDay.totalMinutes)}</p></div>
-                        <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">위험 구간</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백일 존재' : '안정 흐름'}</p><p className="mt-1 text-sm font-semibold text-white/74">{insight.improve}</p></div>
+                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{minutesToLabel(bestDay.totalMinutes)}</p></div>
+                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">위험 구간</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백일 존재' : '안정 흐름'}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight.improve}</p></div>
                         <div className="rounded-[1.2rem] border border-[#FFD7B4] bg-[#FFF1DE] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 전략</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 루틴 강화</p><p className="mt-1 text-sm font-semibold text-[#28478F]">계획트랙으로 연결</p></div>
                       </div>
                     )}
-                    <Button type="button" onClick={() => handleApplyStrategy('집중 시간 추이 적용', 10)} className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-5 font-black text-white">이 전략 적용하기</Button>
+                    <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('집중 시간 추이 적용', 10)} className="h-11 rounded-2xl px-5 font-black">이 전략 적용하기</Button>
                   </div>
                 ) : card.id === 'density' ? (
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3')}>
                     {sessionCards.map((item) => (
-                      <div key={item.label} className={cn('rounded-[1.2rem] border border-white/10 bg-white/6 p-4', isMobile && item.label === '평균 길이' && 'col-span-2')}>
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">{item.label}</p>
+                      <div key={item.label} className={cn('surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && item.label === '평균 길이' && 'col-span-2')}>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">{item.label}</p>
                         <p className="mt-2 text-lg font-black text-white">{item.value}</p>
-                        <p className="mt-1 text-sm font-semibold text-white/74">{item.meta}</p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{item.meta}</p>
                       </div>
                     ))}
                     <div className={cn(!isMobile && 'md:col-span-3', isMobile && 'col-span-2')}>
-                      <Button type="button" onClick={() => handleApplyStrategy('공부 밀도 전략 적용', 15)} className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-5 font-black text-white">밀도 회복 전략 적용</Button>
+                      <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('공부 밀도 전략 적용', 15)} className="h-11 rounded-2xl px-5 font-black">밀도 회복 전략 적용</Button>
                     </div>
                   </div>
                 ) : card.id === 'rhythm' ? (
                   <div className="space-y-4">
-                    <div className="rounded-[1.35rem] border border-white/10 bg-white/6 p-4">
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} />
                     </div>
                     {isMobile ? (
                       <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
                     ) : (
                       <div className="grid gap-3 md:grid-cols-3">
-                        <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">연속 유지</p><p className="mt-2 text-lg font-black text-white">{kpi.maxStreak}일</p><p className="mt-1 text-sm font-semibold text-white/74">루틴 최고 기록</p></div>
-                        <div className="rounded-[1.2rem] border border-white/10 bg-white/6 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">코치 해석</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구 필요' : '리듬 안정화'}</p><p className="mt-1 text-sm font-semibold text-white/74">{insight.improve}</p></div>
+                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">연속 유지</p><p className="mt-2 text-lg font-black text-white">{kpi.maxStreak}일</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">루틴 최고 기록</p></div>
+                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">코치 해석</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구 필요' : '리듬 안정화'}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight.improve}</p></div>
                         <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
                       </div>
                     )}
-                    <Button type="button" onClick={() => handleApplyStrategy('리듬 패턴 전략 적용', 20)} className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-5 font-black text-white">리듬 복구 전략 적용</Button>
+                    <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('리듬 패턴 전략 적용', 20)} className="h-11 rounded-2xl px-5 font-black">리듬 복구 전략 적용</Button>
                   </div>
                 ) : (
-                  <div className="rounded-[1.35rem] border border-dashed border-white/10 bg-white/5 px-4 py-5 text-center">
-                    <Lock className="mx-auto h-8 w-8 text-white/35" />
+                  <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] border-dashed px-4 py-5 text-center">
+                    <Lock className="mx-auto h-8 w-8 text-[var(--text-on-dark-muted)]" />
                     <p className="mt-3 text-lg font-black text-white">시간대 효율은 아직 잠겨 있어요</p>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-white/74">세션 {Math.max(0, 10 - sessionMetrics.total)}회만 더 쌓이면 오전/오후 효율 카드가 열립니다.</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">세션 {Math.max(0, 10 - sessionMetrics.total)}회만 더 쌓이면 오전/오후 효율 카드가 열립니다.</p>
                   </div>
                 )}
               </GraphDungeonCard>
@@ -1013,14 +1015,14 @@ export default function AnalysisTrackPage() {
           </section>
 
           {!isMobile ? (
-          <section className="student-night-panel rounded-[2rem] p-5 shadow-[0_24px_52px_-34px_rgba(0,0,0,0.56)]">
+          <section className="surface-card surface-card--secondary on-dark rounded-[2rem] p-5 shadow-[0_24px_52px_-34px_rgba(0,0,0,0.56)]">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <Badge className="border-emerald-400/18 bg-emerald-500/10 px-3 py-1 text-[10px] font-black text-emerald-200 shadow-none">NEXT ACTION</Badge>
+                <Badge className="border-emerald-400/22 bg-emerald-500/16 px-3 py-1 text-[10px] font-black text-emerald-100 shadow-none">NEXT ACTION</Badge>
                 <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">분석 결과를 바로 행동으로 연결</h2>
-                <p className="mt-1 text-sm font-semibold text-white/74">보고 끝나는 것이 아니라, 지금 바로 계획트랙에 이어 붙이도록 설계했어요.</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">보고 끝나는 것이 아니라, 지금 바로 계획트랙에 이어 붙이도록 설계했어요.</p>
               </div>
-              <Button type="button" onClick={() => handleApplyStrategy('다음 목표 연결', 20)} className="h-12 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-5 font-black text-white shadow-[0_20px_38px_-26px_rgba(255,122,22,0.44)]">
+              <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('다음 목표 연결', 20)} className="h-12 rounded-2xl px-5 font-black">
                 오늘 전략 자동 적용
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

@@ -714,14 +714,14 @@ export function StudentHomeGamePanel({
           <div className="surface-card surface-card--secondary on-dark rounded-[1.65rem] p-4 text-white">
             <div className="grid grid-cols-2 gap-3">
               <div className="surface-card surface-card--light rounded-[1.15rem] px-3 py-3">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                   <Clock3 className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
                   오늘
                 </div>
                 <div className="mt-2 text-xl font-black text-[var(--text-primary)]">{todayStudyLabel}</div>
               </div>
               <div className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                   <Wallet className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
                   포인트
                 </div>
@@ -780,10 +780,17 @@ export function StudentHomeGamePanel({
               </div>
             </div>
 
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             onClick={onOpenLeaderboard}
-            className="surface-card surface-card--highlight w-full rounded-[1.65rem] p-4 text-left"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpenLeaderboard();
+              }
+            }}
+            className="surface-card surface-card--highlight w-full rounded-[1.65rem] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(14,28,56,0.18)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -844,7 +851,7 @@ export function StudentHomeGamePanel({
                 </div>
               )}
             </div>
-          </button>
+          </div>
         </div>
       </section>
 

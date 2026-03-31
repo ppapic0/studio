@@ -239,7 +239,7 @@ export function ScheduleItemCard({
       </div>
 
       <AlertDialog open={isPenaltyConfirmOpen} onOpenChange={setIsPenaltyConfirmOpen}>
-        <AlertDialogContent className="max-w-[22rem] rounded-[1.5rem] border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#0F2149_100%)] p-6 text-white">
+        <AlertDialogContent className="max-w-[22rem] rounded-[1.5rem] border-white/12 bg-[linear-gradient(180deg,#16284F_0%,#0F2149_100%)] p-6 text-white">
           <AlertDialogHeader className="gap-2 text-left">
             <AlertDialogTitle className="text-lg font-black tracking-tight text-white">
               오늘 루틴 수정 시 벌점이 부여돼요
@@ -251,7 +251,7 @@ export function ScheduleItemCard({
           <AlertDialogFooter className="mt-2 flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-0">
             <AlertDialogCancel
               onClick={handleCancelTodayEdit}
-              className="mt-0 rounded-2xl border-white/10 bg-white/8 font-bold text-white hover:bg-white/12"
+              className="mt-0 rounded-2xl border-white/12 bg-white/[0.1] font-bold text-white hover:bg-white/[0.14]"
             >
               취소
             </AlertDialogCancel>

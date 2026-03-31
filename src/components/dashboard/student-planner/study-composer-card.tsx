@@ -102,20 +102,20 @@ export function StudyComposerCard({
   const visibleRecentOptions = recentOptions.slice(0, isMobile ? 2 : 5);
 
   return (
-    <Card className={cn(
-      "overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.12),transparent_24%),linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(18,34,70,0.92)_100%)] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.5)]",
+    <Card variant="secondary" className={cn(
+      "overflow-hidden shadow-[0_18px_44px_-34px_rgba(0,0,0,0.5)]",
       compact ? "rounded-[1.35rem]" : "rounded-[1.85rem]"
     )}>
       <CardHeader className={cn(compact ? "p-4 pb-3" : isMobile ? "p-5 pb-4" : "p-6 pb-4")}>
         <div className="flex items-center gap-2">
-          <div className={cn("rounded-2xl bg-[#FF9626]/14 text-[#FFD79F]", compact ? "p-2" : "p-2.5")}>
+          <div className={cn("surface-chip surface-chip--accent", compact ? "p-2" : "p-2.5")}>
             <Target className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <CardTitle className={cn("font-black tracking-tight text-white", compact ? "text-sm" : isMobile ? "text-base" : "text-lg")}>
               {title}
             </CardTitle>
-            <CardDescription className={cn("break-keep text-white/58", compact ? "mt-0.5 text-[10px] leading-4" : "mt-0.5 text-[11px] leading-5")}>
+            <CardDescription className={cn("break-keep text-[var(--text-on-dark-soft)]", compact ? "mt-0.5 text-[10px] leading-4" : "mt-0.5 text-[11px] leading-5")}>
               {description}
             </CardDescription>
           </div>
@@ -123,16 +123,16 @@ export function StudyComposerCard({
       </CardHeader>
       <CardContent className={cn(compact ? "space-y-3 p-4 pt-0" : isMobile ? "space-y-3 p-5 pt-0" : "space-y-4 p-6 pt-0")}>
         {recentOptions.length > 0 || isRecentLoading ? (
-          <div className="rounded-[1.3rem] border border-white/10 bg-[#102049]/92 p-3 shadow-[0_18px_40px_-36px_rgba(0,0,0,0.42)]">
+          <div className="surface-card surface-card--ghost on-dark rounded-[1.3rem] p-3 shadow-[0_18px_40px_-36px_rgba(0,0,0,0.42)]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <div className="rounded-2xl bg-white/8 p-2 text-[#FFD79F]">
+                  <div className="rounded-2xl bg-white/[0.1] p-2 text-[var(--accent-orange-soft)]">
                     <History className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[11px] font-black tracking-tight text-white">최근 불러오기</p>
-                    <p className="mt-0.5 break-keep text-[10px] font-semibold leading-4 text-white/55">
+                    <p className="mt-0.5 break-keep text-[10px] font-semibold leading-4 text-[var(--text-on-dark-soft)]">
                       전에 쓰던 계획을 불러와서 말만 조금 바꿔도 돼요.
                     </p>
                   </div>
@@ -144,7 +144,7 @@ export function StudyComposerCard({
                   variant="ghost"
                   disabled={disabled || isSubmitting || isRecentLoading}
                   onClick={onOpenRecentSheet}
-                  className="h-8 rounded-full border border-white/10 bg-white/8 px-3 text-[10px] font-black text-white"
+                  className="h-8 rounded-full border border-white/12 bg-white/[0.1] px-3 text-[10px] font-black text-white hover:bg-white/[0.14]"
                 >
                   {isRecentLoading ? '불러오는 중' : '더 보기'}
                 </Button>
@@ -152,8 +152,8 @@ export function StudyComposerCard({
             </div>
             <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
               {isRecentLoading ? (
-                <div className="flex h-[6.5rem] min-w-full items-center justify-center rounded-[1.15rem] border border-dashed border-white/10 bg-white/6">
-                  <span className="text-[11px] font-semibold text-white/45">최근 계획을 불러오는 중이에요.</span>
+                <div className="flex h-[6.5rem] min-w-full items-center justify-center rounded-[1.15rem] border border-dashed border-white/12 bg-white/[0.08]">
+                  <span className="text-[11px] font-semibold text-[var(--text-on-dark-soft)]">최근 계획을 불러오는 중이에요.</span>
                 </div>
               ) : null}
               {visibleRecentOptions.map((option) => (
@@ -163,20 +163,20 @@ export function StudyComposerCard({
                   disabled={disabled || isSubmitting}
                   onClick={() => onPrefillRecent?.(option)}
                   className={cn(
-                    'shrink-0 rounded-[1.15rem] border border-white/10 bg-white/8 p-3 text-left shadow-[0_18px_32px_-26px_rgba(0,0,0,0.38)] transition-all hover:border-[#FFB347]/25 hover:bg-white/12 snap-start',
+                    'shrink-0 rounded-[1.15rem] border border-white/12 bg-white/[0.08] p-3 text-left shadow-[0_18px_32px_-26px_rgba(0,0,0,0.38)] transition-all hover:border-[#FFB347]/25 hover:bg-white/[0.14] snap-start',
                     isMobile ? 'min-w-[9.25rem]' : 'min-w-[11rem]'
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-[#FF9626]/14 px-2 py-0.5 text-[9px] font-black text-[#FFD79F]">
+                    <span className="rounded-full bg-[#FF9626]/18 px-2 py-0.5 text-[9px] font-black text-[var(--accent-orange-soft)]">
                       {option.subjectLabel}
                     </span>
-                    <span className="text-[9px] font-black text-white/45">{option.studyModeLabel}</span>
+                    <span className="text-[9px] font-black text-[var(--text-on-dark-muted)]">{option.studyModeLabel}</span>
                   </div>
                   <p className="mt-2 line-clamp-1 break-keep text-[11px] font-black tracking-tight text-white">
                     {option.title}
                   </p>
-                  <p className="mt-1 line-clamp-2 break-keep text-[10px] font-semibold leading-4 text-white/55">
+                  <p className="mt-1 line-clamp-2 break-keep text-[10px] font-semibold leading-4 text-[var(--text-on-dark-soft)]">
                     {option.metaLabel}
                   </p>
                 </button>
@@ -186,9 +186,9 @@ export function StudyComposerCard({
         ) : null}
 
         {activeRecentTitle ? (
-          <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-[#FFB347]/22 bg-[#FF9626]/12 p-3">
+          <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-[#FFB347]/28 bg-[#FF9626]/16 p-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD79F]">불러온 계획 수정 중</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-orange-soft)]">불러온 계획 수정 중</p>
               <p className="mt-1 line-clamp-1 break-keep text-xs font-black text-white">{activeRecentTitle}</p>
             </div>
             {onResetRecentPrefill ? (
@@ -197,7 +197,7 @@ export function StudyComposerCard({
                 variant="ghost"
                 disabled={disabled || isSubmitting}
                 onClick={onResetRecentPrefill}
-                className="h-8 shrink-0 rounded-full border border-white/10 bg-white/8 px-3 text-[10px] font-black text-white"
+                className="h-8 shrink-0 rounded-full border border-white/12 bg-white/[0.1] px-3 text-[10px] font-black text-white hover:bg-white/[0.14]"
               >
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                 초기화
@@ -221,12 +221,12 @@ export function StudyComposerCard({
                   isMobile ? "flex items-center justify-center" : "flex-col items-start",
                   isActive
                     ? "border-[#FFB347]/24 bg-[linear-gradient(180deg,#17326B_0%,#28478F_100%)] text-white hover:bg-[#28478F]"
-                    : "border-white/10 bg-white/8 text-white hover:bg-white/12"
+                    : "border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.14]"
                 )}
               >
                 <span className="text-xs font-black">{option.label}</span>
                 {!isMobile ? (
-                  <span className={cn("mt-1 text-[10px] leading-4", isActive ? "text-white/82" : "text-white/58")}>
+                  <span className={cn("mt-1 text-[10px] leading-4", isActive ? "text-white" : "text-[var(--text-on-dark-soft)]")}>
                     {option.description}
                   </span>
                 ) : null}
@@ -237,7 +237,7 @@ export function StudyComposerCard({
 
         <div className={cn("grid gap-2", isVolumeMode ? "grid-cols-1" : isMobile ? "grid-cols-1" : compact ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_7.2rem]")}>
           <Select value={subjectValue} onValueChange={onSubjectChange} disabled={disabled || isSubmitting}>
-            <SelectTrigger className={cn("rounded-xl border-white/10 bg-white/8 font-black text-white shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}>
+            <SelectTrigger className={cn("rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-none shadow-2xl">
@@ -255,7 +255,7 @@ export function StudyComposerCard({
               value={minuteValue}
               onChange={(event) => onMinuteChange(event.target.value)}
               disabled={disabled || isSubmitting}
-              className={cn("rounded-xl border-white/10 bg-white/8 text-center font-black text-white shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}
+              className={cn("rounded-xl border-white/12 bg-white/[0.1] text-center font-black text-white shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}
             />
           ) : null}
         </div>
@@ -275,8 +275,8 @@ export function StudyComposerCard({
                     "rounded-full border transition-all active:scale-[0.98]",
                     compact ? "h-7 px-3 text-[10px]" : "h-8 px-3.5 text-[10px]",
                     isActive
-                      ? "border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F] hover:bg-[#FF9626]/18"
-                      : "border-white/10 bg-white/8 text-white hover:bg-white/12"
+                      ? "border-[#FFB347]/24 bg-[#FF9626]/16 text-[var(--accent-orange-soft)] hover:bg-[#FF9626]/18"
+                    : "border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.14]"
                   )}
                 >
                   <span className="font-black">{preset}분</span>
@@ -294,10 +294,10 @@ export function StudyComposerCard({
                 onChange={(event) => onAmountChange(event.target.value)}
                 disabled={disabled || isSubmitting}
                 placeholder="목표 수치"
-                className={cn("rounded-xl border-white/10 bg-white/8 text-center font-black text-white shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}
+                className={cn("rounded-xl border-white/12 bg-white/[0.1] text-center font-black text-white shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}
               />
               <Select value={amountUnitValue} onValueChange={(value) => onAmountUnitChange(value as StudyAmountUnit)} disabled={disabled || isSubmitting}>
-                <SelectTrigger className={cn("rounded-xl border-white/10 bg-white/8 font-black text-white shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}>
+                <SelectTrigger className={cn("rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none", compact ? "h-10 text-[11px]" : "h-11 text-xs")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-2xl">
@@ -316,11 +316,11 @@ export function StudyComposerCard({
                 onChange={(event) => onCustomAmountUnitChange(event.target.value)}
                 disabled={disabled || isSubmitting}
                 placeholder="예: 강, 주제, 단원"
-                className={cn("rounded-xl border-white/10 bg-white/8 font-bold text-white shadow-none placeholder:text-white/35", compact ? "h-10 text-[11px]" : "h-11 text-xs")}
+                className={cn("rounded-xl border-white/12 bg-white/[0.1] font-bold text-white shadow-none placeholder:text-white/55", compact ? "h-10 text-[11px]" : "h-11 text-xs")}
               />
             ) : null}
 
-            <div className={cn('rounded-[1.15rem] border border-white/10 bg-white/8 p-2', isMobile ? 'flex flex-col items-start gap-2' : 'flex flex-wrap items-center gap-2')}>
+            <div className={cn('rounded-[1.15rem] border border-white/12 bg-white/[0.08] p-2', isMobile ? 'flex flex-col items-start gap-2' : 'flex flex-wrap items-center gap-2')}>
               <Button
                 type="button"
                 variant="outline"
@@ -329,8 +329,8 @@ export function StudyComposerCard({
                 className={cn(
                   "h-8 rounded-full border px-3 text-[10px] font-black",
                   enableVolumeMinutes
-                    ? "border-[#FFB347]/24 bg-[#FF9626]/16 text-[#FFD79F] hover:bg-[#FF9626]/18"
-                    : "border-white/10 bg-white/8 text-white hover:bg-white/12"
+                    ? "border-[#FFB347]/24 bg-[#FF9626]/16 text-[var(--accent-orange-soft)] hover:bg-[#FF9626]/18"
+                    : "border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.14]"
                 )}
               >
                 예상 시간(선택)
@@ -343,19 +343,19 @@ export function StudyComposerCard({
                     value={minuteValue}
                     onChange={(event) => onMinuteChange(event.target.value)}
                     disabled={disabled || isSubmitting}
-                    className="h-8 w-[5.5rem] rounded-full border-white/10 bg-white/8 text-center text-[11px] font-black text-white shadow-none"
+                    className="h-8 w-[5.5rem] rounded-full border-white/12 bg-white/[0.1] text-center text-[11px] font-black text-white shadow-none"
                   />
-                  <span className="text-[10px] font-black text-white/42">분 예상</span>
+                  <span className="text-[10px] font-black text-[var(--text-on-dark-soft)]">분 예상</span>
                 </>
               ) : (
-                <span className="text-[10px] font-semibold text-white/42">시간은 나중에 대략 적어도 돼요.</span>
+                <span className="text-[10px] font-semibold text-[var(--text-on-dark-soft)]">시간은 나중에 대략 적어도 돼요.</span>
               )}
             </div>
           </div>
         )}
 
         <div className={cn(
-          "rounded-[1.15rem] border border-white/10 bg-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+          "rounded-[1.15rem] border border-white/12 bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
           compact ? "p-1.5" : "p-2",
           isMobile ? 'flex flex-col items-stretch gap-2' : 'flex items-center gap-2'
         )}>
@@ -365,7 +365,7 @@ export function StudyComposerCard({
             placeholder={isVolumeMode ? "예: 수학 3점 문항 30문제" : "예: 수학 오답 정리"}
             disabled={disabled || isSubmitting}
             className={cn(
-              "border-none bg-transparent text-white shadow-none focus-visible:ring-0 placeholder:text-white/35",
+              "border-none bg-transparent text-white shadow-none focus-visible:ring-0 placeholder:text-white/55",
               compact ? "h-9 text-sm font-bold" : "h-10 text-sm font-bold"
             )}
           />

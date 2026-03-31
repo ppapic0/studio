@@ -48,7 +48,7 @@ export function RoutineTemplateStrip({
               compact ? "h-8 px-3 text-[10px]" : isMobile ? "h-9 px-3.5 text-[10px]" : "h-10 px-4 text-xs",
               isActive
                 ? "border-[#FFB347]/24 bg-[linear-gradient(135deg,#173A82_0%,#22479B_58%,#FF7A16_160%)] text-white shadow-[0_14px_28px_-18px_rgba(20,41,95,0.55)] hover:brightness-105"
-                : "border-white/10 bg-white/8 text-white/78 hover:border-white/16 hover:bg-white/12 hover:text-white"
+                : "border-white/12 bg-white/[0.08] text-white hover:border-white/18 hover:bg-white/[0.14] hover:text-white"
             )}
           >
             <Icon className={cn("mr-1.5 shrink-0", compact ? "h-3.5 w-3.5" : "h-3.5 w-3.5")} />

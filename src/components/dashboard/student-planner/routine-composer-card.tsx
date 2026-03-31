@@ -42,20 +42,20 @@ export function RoutineComposerCard({
   disabled = false,
 }: RoutineComposerCardProps) {
   return (
-    <Card className={cn(
-      "overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.12),transparent_24%),linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(18,34,70,0.92)_100%)] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.5)]",
+    <Card variant="secondary" className={cn(
+      "overflow-hidden shadow-[0_18px_44px_-34px_rgba(0,0,0,0.5)]",
       compact ? "rounded-[1.35rem]" : "rounded-[1.85rem]"
     )}>
       <CardHeader className={cn(compact ? "p-4 pb-3" : isMobile ? "p-5 pb-4" : "p-6 pb-4")}>
         <div className="flex items-center gap-2">
-          <div className={cn("rounded-2xl bg-[#FF9626]/14 text-[#FFD79F]", compact ? "p-2" : "p-2.5")}>
+          <div className={cn("surface-chip surface-chip--accent", compact ? "p-2" : "p-2.5")}>
             <Sparkles className={compact ? "h-4 w-4" : "h-4 w-4"} />
           </div>
           <div className="min-w-0">
             <CardTitle className={cn("font-black tracking-tight text-white break-keep", compact ? "text-sm" : isMobile ? "text-base leading-6" : "text-lg")}>
               {title}
             </CardTitle>
-            <CardDescription className={cn("break-keep text-white/58", compact ? "mt-0.5 text-[10px] leading-4" : isMobile ? "mt-0.5 text-[11px] leading-5" : "mt-0.5 text-[11px] leading-5")}>
+            <CardDescription className={cn("break-keep text-[var(--text-on-dark-soft)]", compact ? "mt-0.5 text-[10px] leading-4" : isMobile ? "mt-0.5 text-[11px] leading-5" : "mt-0.5 text-[11px] leading-5")}>
               {description}
             </CardDescription>
           </div>
@@ -71,19 +71,19 @@ export function RoutineComposerCard({
         />
 
         <div className={cn(
-          "rounded-[1.15rem] border border-white/10 bg-[#102049]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+          "rounded-[1.15rem] border border-white/12 bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
           compact ? "flex items-center gap-2" : isMobile ? "flex flex-col gap-2.5" : "flex items-center gap-2",
           compact ? "p-1.5" : "p-2"
         )}>
           <div className={cn("flex min-w-0 items-center gap-2", compact ? "flex-1" : "w-full flex-1")}>
-            <PenLine className={cn("shrink-0 text-white/35", compact ? "ml-1 h-3.5 w-3.5" : "ml-1 h-4 w-4")} />
+            <PenLine className={cn("shrink-0 text-[var(--text-on-dark-muted)]", compact ? "ml-1 h-3.5 w-3.5" : "ml-1 h-4 w-4")} />
             <Input
               value={value}
               onChange={(event) => onValueChange(event.target.value)}
               placeholder="예: 영어 학원, 저녁 시간"
               disabled={disabled || isSubmitting}
               className={cn(
-                "border-none bg-transparent px-0 text-white shadow-none focus-visible:ring-0 placeholder:text-white/35",
+                "border-none bg-transparent px-0 text-white shadow-none focus-visible:ring-0 placeholder:text-white/55",
                 compact ? "h-9 text-sm font-bold" : "h-10 text-sm font-bold"
               )}
             />

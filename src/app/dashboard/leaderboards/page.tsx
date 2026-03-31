@@ -233,7 +233,7 @@ function Panel({ className, children }: { className?: string; children: ReactNod
   return (
     <section
       className={cn(
-        'rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] shadow-[0_24px_80px_rgba(2,6,23,0.35)] backdrop-blur-xl',
+        'surface-card surface-card--secondary on-dark rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] shadow-[0_24px_80px_rgba(2,6,23,0.35)] backdrop-blur-xl',
         className
       )}
     >
@@ -265,10 +265,10 @@ function RankPill({
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-full px-4 py-2.5 text-sm font-black transition-all duration-200',
+        'rounded-full border px-4 py-2.5 text-sm font-black transition-all duration-200',
         active
-          ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 shadow-[0_8px_24px_rgba(251,146,60,0.35)]'
-          : 'bg-white/6 text-white/72 hover:bg-white/10 hover:text-white'
+          ? 'border-orange-300/28 bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 shadow-[0_8px_24px_rgba(251,146,60,0.35)]'
+          : 'border-white/12 bg-white/[0.09] text-[var(--text-on-dark-soft)] hover:bg-white/[0.14] hover:text-white'
       )}
     >
       {label}
@@ -302,11 +302,11 @@ function TopSummaryCard({
       <div className={cn(compact ? 'p-4' : 'p-5')}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black tracking-[0.18em] text-white/68">{label}</p>
+            <p className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-soft)]">{label}</p>
             <p className={cn('mt-3 font-black tracking-tight text-white', compact ? 'text-[1.7rem] leading-none' : 'text-3xl')}>{value}</p>
-            <p className={cn('mt-2 font-semibold text-white/70', compact ? 'text-[12px] leading-5' : 'text-sm')}>{sub}</p>
+            <p className={cn('mt-2 font-semibold text-[var(--text-on-dark-soft)]', compact ? 'text-[12px] leading-5' : 'text-sm')}>{sub}</p>
           </div>
-          <div className={cn('rounded-2xl border border-white/10 bg-white/6 text-white/82', compact ? 'p-2.5' : 'p-3')}>
+          <div className={cn('rounded-2xl border border-white/12 bg-white/[0.1] text-white', compact ? 'p-2.5' : 'p-3')}>
             <Icon className={cn(compact ? 'h-4 w-4' : 'h-5 w-5')} />
           </div>
         </div>
@@ -340,12 +340,12 @@ function HeroBattleCard({
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-white/72">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-soft)]">
                 <Swords className="h-3.5 w-3.5 text-orange-200" />
                 MY BATTLE STATUS
               </div>
               <div>
-                <p className="text-[11px] font-black tracking-[0.2em] text-white/58">{rangeLabel} LIVE TRACK</p>
+                <p className="text-[11px] font-black tracking-[0.2em] text-[var(--text-on-dark-muted)]">{rangeLabel} LIVE TRACK</p>
                 <div className={cn('mt-3 flex items-end gap-3', compact ? 'flex-wrap' : 'flex-nowrap')}>
                   <span className={cn('font-black tracking-tight text-white', compact ? 'text-[3rem] leading-[0.9]' : 'text-[4rem] leading-[0.86]')}>
                     {rankLabel}
@@ -354,16 +354,16 @@ function HeroBattleCard({
                     {hoursLabel}
                   </span>
                 </div>
-                <p className={cn('mt-3 max-w-xl font-semibold text-white/78', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
+                <p className={cn('mt-3 max-w-xl font-semibold text-[var(--text-on-dark-soft)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
                   {isLeader ? '현재 선두 유지 중이에요. 지금 페이스를 유지하면 방어 성공 확률이 높아요.' : `1위까지 ${gapLabel}. 오늘 한 세션만 더 밀어붙이면 추월권이에요.`}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-white/12 bg-white/[0.05] px-4 py-3 text-right shadow-[0_18px_38px_-28px_rgba(2,6,23,0.62)]">
+            <div className="rounded-[22px] border border-white/12 bg-white/[0.08] px-4 py-3 text-right shadow-[0_18px_38px_-28px_rgba(2,6,23,0.62)]">
               <div className="mb-1 flex items-center justify-end gap-2">
                 <span className="leaderboard-live-dot relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-400" />
-                <span className="text-[11px] font-black tracking-[0.18em] text-white/62">LIVE PUSH</span>
+                <span className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">LIVE PUSH</span>
               </div>
               <p className={cn('font-black text-white', compact ? 'text-sm' : 'text-base')}>{isLeader ? '선두 방어 중' : `공부중 +${liveMinutes}분`}</p>
             </div>
@@ -375,16 +375,16 @@ function HeroBattleCard({
               ['1위와 차이', isLeader ? 'LEAD' : gapLabel],
               ['보상 진행', `${progressPercent}%`],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-[22px] border border-white/10 bg-white/[0.045] px-3.5 py-3">
-                <p className="text-[10px] font-black tracking-[0.18em] text-white/54">{label}</p>
+              <div key={label} className="rounded-[22px] border border-white/12 bg-white/[0.08] px-3.5 py-3">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">{label}</p>
                 <p className={cn('mt-2 font-black text-white', compact ? 'text-lg' : 'text-xl')}>{value}</p>
               </div>
             ))}
           </div>
 
-          <div className="space-y-2.5 rounded-[24px] border border-white/10 bg-[#0b1738]/38 px-4 py-3">
+          <div className="space-y-2.5 rounded-[24px] border border-white/12 bg-[#0b1738]/46 px-4 py-3">
             <div className="flex items-center justify-between text-[11px] font-black tracking-[0.18em]">
-              <span className="text-white/56">OVERTAKE METER</span>
+              <span className="text-[var(--text-on-dark-muted)]">OVERTAKE METER</span>
               <span className="text-orange-200">{progressPercent}% READY</span>
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-white/8">
@@ -409,12 +409,12 @@ function LiveTickerBar({ event }: { event: RankLiveEvent }) {
         <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r', tone.line)} />
         <div key={event.id} className="leaderboard-ticker-item relative flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.1] text-lg">
               {event.emoji}
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-black text-white">{event.title}</p>
-              <p className="truncate text-xs font-semibold text-white/66">{event.detail}</p>
+              <p className="truncate text-xs font-semibold text-[var(--text-on-dark-soft)]">{event.detail}</p>
             </div>
           </div>
           <div className={cn('inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', tone.chip)}>
@@ -445,7 +445,7 @@ function ZoneCard({ zone, compact = false }: { zone: ZoneCardConfig; compact?: b
           {zone.kicker}
         </div>
         <p className="mt-4 text-lg font-black text-white">{zone.title}</p>
-        <p className={cn('mt-2 font-semibold text-white/72', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>{zone.body}</p>
+        <p className={cn('mt-2 font-semibold text-[var(--text-on-dark-soft)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>{zone.body}</p>
       </div>
     </Panel>
   );
@@ -477,18 +477,18 @@ function RewardGoalCard({
               NEXT REWARD
             </div>
             <h3 className={cn('mt-4 font-black text-white', compact ? 'text-lg' : 'text-xl')}>1위 달성 시 +1000P</h3>
-            <p className={cn('mt-2 text-white/72', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
+            <p className={cn('mt-2 text-[var(--text-on-dark-soft)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
               {isLeader ? '보상 해금권에 도달했어요. 지금 선두를 지키면 즉시 포인트를 받을 수 있어요.' : `보상 상자까지 ${gapLabel} 남음. 지금 밀어붙이면 보상 해금이 가까워져요.`}
             </p>
           </div>
-          <div className="leaderboard-reward-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-white/12 bg-white/8 text-orange-100 shadow-[0_18px_42px_-24px_rgba(251,146,60,0.65)]">
+          <div className="leaderboard-reward-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-white/12 bg-white/[0.1] text-orange-100 shadow-[0_18px_42px_-24px_rgba(251,146,60,0.65)]">
             <Gift className="h-6 w-6" />
           </div>
         </div>
 
-        <div className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+        <div className="mt-5 rounded-[22px] border border-white/12 bg-white/[0.08] p-4">
           <div className="mb-2 flex items-center justify-between text-sm font-black">
-            <span className="text-white/66">보상 진행도</span>
+            <span className="text-[var(--text-on-dark-soft)]">보상 진행도</span>
             <span className="text-orange-200">{progressPercent}%</span>
           </div>
           <div className="leaderboard-reward-progress h-3 overflow-hidden rounded-full bg-white/8">
@@ -505,8 +505,8 @@ function RewardGoalCard({
             ['2위', '10,000P'],
             ['3위', '5,000P'],
           ].map(([place, reward]) => (
-            <div key={place} className={cn('rounded-2xl border border-white/10 bg-white/6', compact ? 'p-2.5' : 'p-3')}>
-              <p className="text-[11px] font-black tracking-[0.18em] text-white/62">{place}</p>
+            <div key={place} className={cn('rounded-2xl border border-white/12 bg-white/[0.1]', compact ? 'p-2.5' : 'p-3')}>
+              <p className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">{place}</p>
               <p className={cn('mt-1 font-black text-white', compact ? 'text-[13px] leading-5' : 'text-sm')}>{reward}</p>
             </div>
           ))}
@@ -562,7 +562,7 @@ function LeaderboardRow({
               ? 'border-rose-300/16 bg-[linear-gradient(90deg,rgba(251,113,133,0.08),rgba(255,255,255,0.03))]'
               : rowTone === 'blue'
                 ? 'border-cyan-300/14 bg-[linear-gradient(90deg,rgba(122,212,255,0.08),rgba(255,255,255,0.03))]'
-                : 'border-white/10 bg-white/[0.03]'
+                : 'border-white/12 bg-white/[0.06]'
       )}
     >
       {player.isMe ? <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_right,rgba(251,146,60,0.16),transparent_38%)] opacity-70" /> : null}
@@ -578,7 +578,7 @@ function LeaderboardRow({
                 ? 'border-slate-300/20 bg-slate-300/10 text-slate-100'
                 : index === 2
                   ? 'border-amber-500/30 bg-amber-400/10 text-amber-200'
-                  : 'border-white/10 bg-white/5 text-white/78'
+                : 'border-white/12 bg-white/[0.08] text-white'
           )}
         >
           {player.rank}
@@ -598,7 +598,7 @@ function LeaderboardRow({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 truncate text-xs font-semibold text-white/66">{player.classNameSnapshot || '반 미지정'}</p>
+          <p className="mt-1 truncate text-xs font-semibold text-[var(--text-on-dark-soft)]">{player.classNameSnapshot || '반 미지정'}</p>
           <div className="mt-3 leaderboard-race-track h-3 overflow-hidden rounded-full bg-white/8">
             <div
               className={cn(
@@ -628,7 +628,7 @@ function LeaderboardRow({
         </div>
 
         <div className="shrink-0 text-right">
-          <div className={cn('rounded-full border border-white/10 bg-white/5 font-black text-white', compact ? 'px-2.5 py-1.5 text-[12px]' : 'px-3 py-2 text-sm')}>
+          <div className={cn('rounded-full border border-white/12 bg-white/[0.1] font-black text-white', compact ? 'px-2.5 py-1.5 text-[12px]' : 'px-3 py-2 text-sm')}>
             {formatHourValue(player.value)}
           </div>
         </div>
@@ -649,24 +649,24 @@ function RecentRankEventsPanel({
       <div className={cn(compact ? 'p-4' : 'p-5')}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-white/68">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-soft)]">
               <Clock3 className="h-3.5 w-3.5 text-cyan-200" />
               RECENT RANK EVENTS
             </div>
             <h3 className="mt-4 text-xl font-black text-white">최근 변동</h3>
           </div>
-          <span className="text-xs font-black tracking-[0.18em] text-white/48">LIVE LOG</span>
+          <span className="text-xs font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">LIVE LOG</span>
         </div>
 
         <div className="mt-5 space-y-3">
           {events.map((event) => {
             const tone = getToneClasses(event.tone);
             return (
-              <div key={event.id} className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+              <div key={event.id} className="rounded-[22px] border border-white/12 bg-white/[0.08] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black text-white">{event.emoji} {event.title}</p>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-white/64">{event.detail}</p>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-on-dark-soft)]">{event.detail}</p>
                   </div>
                   <span className={cn('shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.18em]', tone.chip)}>
                     {event.timestampLabel}
@@ -706,7 +706,7 @@ function RankEventToast({
         </span>
         <div className="min-w-0">
           <p className="text-sm font-black text-white">{event.title}</p>
-          <p className="mt-1 text-xs font-semibold text-white/78">{event.detail}</p>
+          <p className="mt-1 text-xs font-semibold text-[var(--text-on-dark-soft)]">{event.detail}</p>
         </div>
       </div>
     </div>
@@ -1068,13 +1068,13 @@ export default function LeaderboardsPage() {
     <div className={cn('mx-auto w-full pb-20', isMobile ? 'max-w-none px-1.5' : 'max-w-7xl px-4')}>
       {activeToastEvent ? <RankEventToast event={activeToastEvent} compact={isMobile} /> : null}
 
-      <div className={cn('rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.10),transparent_26%),radial-gradient(circle_at_top_left,rgba(56,189,248,0.10),transparent_24%),linear-gradient(180deg,#10285d_0%,#081838_100%)] shadow-[0_34px_100px_rgba(2,6,23,0.48)]', isMobile ? 'p-3.5' : 'p-4 sm:p-6 lg:p-8')}>
+      <div className={cn('rounded-[34px] border border-white/12 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.10),transparent_26%),radial-gradient(circle_at_top_left,rgba(56,189,248,0.10),transparent_24%),linear-gradient(180deg,#10285d_0%,#081838_100%)] shadow-[0_34px_100px_rgba(2,6,23,0.48)]', isMobile ? 'p-3.5' : 'p-4 sm:p-6 lg:p-8')}>
         <div className="flex flex-col gap-5 sm:gap-6">
           <div className={cn('flex flex-col gap-4', !isMobile && 'lg:flex-row lg:items-end lg:justify-between')}>
             <div className={cn('max-w-3xl', isMobile && 'max-w-none')}>
               <LiveBadge />
               <h1 className={cn('mt-4 font-black tracking-tight text-white', isMobile ? 'text-[2.4rem] leading-[0.95]' : 'text-3xl sm:text-5xl')}>공부시간 랭킹</h1>
-              <p className={cn('mt-3 leading-6 text-white/72', isMobile ? 'max-w-[17rem] text-[14px]' : 'text-sm sm:text-base')}>
+              <p className={cn('mt-3 leading-6 text-[var(--text-on-dark-soft)]', isMobile ? 'max-w-[17rem] text-[14px]' : 'text-sm sm:text-base')}>
                 일간, 주간, 월간 랭킹을 한 화면에서 경쟁처럼 확인하고, 지금 몇 시간 더 하면 추월 가능한지도 바로 볼 수 있어요.
               </p>
             </div>
@@ -1140,18 +1140,18 @@ export default function LeaderboardsPage() {
           </div>
 
           <Panel className="overflow-hidden">
-            <div className={cn('border-b border-white/10', isMobile ? 'px-4 py-4' : 'px-5 py-4 sm:px-6')}>
+            <div className={cn('border-b border-white/12', isMobile ? 'px-4 py-4' : 'px-5 py-4 sm:px-6')}>
               <div className={cn('flex flex-col gap-3', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
                 <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-white/70">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-soft)]">
                     <Crown className="h-3.5 w-3.5 text-orange-200" />
                     LEADERBOARD
                   </div>
                   <h2 className="mt-3 text-2xl font-black text-white">{rangeMeta.title}</h2>
-                  <p className="mt-1 text-sm text-white/62">{rangeMeta.hint}</p>
+                  <p className="mt-1 text-sm text-[var(--text-on-dark-soft)]">{rangeMeta.hint}</p>
                 </div>
 
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/62">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-[var(--text-on-dark-soft)]">
                   <Users className="h-4 w-4" />
                   총 {currentEntries.length}명 참여 중
                 </div>
@@ -1161,10 +1161,10 @@ export default function LeaderboardsPage() {
             <div className={cn(isMobile ? 'p-4' : 'p-4 sm:p-6')}>
               {isLoading ? (
                 <div className="flex h-64 items-center justify-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-white/30" />
+                  <Loader2 className="h-10 w-10 animate-spin text-[var(--text-on-dark-muted)]" />
                 </div>
               ) : currentEntries.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-white/15 bg-white/[0.02] px-6 py-16 text-center text-sm font-semibold text-white/58">
+                <div className="rounded-[24px] border border-dashed border-white/15 bg-white/[0.05] px-6 py-16 text-center text-sm font-semibold text-[var(--text-on-dark-soft)]">
                   아직 표시할 랭킹이 없어요.
                 </div>
               ) : (
@@ -1188,7 +1188,7 @@ export default function LeaderboardsPage() {
                       <button
                         type="button"
                         onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-5 py-3 text-sm font-black text-white transition hover:bg-white/[0.14]"
                       >
                         더 보기
                         <ChevronRight className="h-4 w-4" />
@@ -1196,10 +1196,10 @@ export default function LeaderboardsPage() {
                     </div>
                   ) : null}
 
-                  <div className={cn('mt-5 flex flex-col gap-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-4', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
+                  <div className={cn('mt-5 flex flex-col gap-3 rounded-[24px] border border-white/12 bg-white/[0.06] p-4', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
                     <div>
                       <p className="text-sm font-black text-white">지금 목표</p>
-                      <p className="mt-1 text-sm leading-6 text-white/70">
+                      <p className="mt-1 text-sm leading-6 text-[var(--text-on-dark-soft)]">
                         {myEntry?.rank === 1
                           ? '지금 페이스를 유지하면 선두를 지킬 수 있어요.'
                           : `오늘 ${hoursNeededToLead.toFixed(1)}시간만 더 공부하면 1위를 노릴 수 있어요.`}
@@ -1231,13 +1231,13 @@ export default function LeaderboardsPage() {
                       OVERTAKE CTA
                     </div>
                     <h3 className="mt-4 text-xl font-black text-white">지금 전략을 적용할 시간</h3>
-                    <p className="mt-2 text-sm leading-6 text-white/72">
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-on-dark-soft)]">
                       {myEntry?.rank === 1
                         ? '방어 전략을 유지하면 선두를 끝까지 지킬 수 있어요.'
                         : `현재 ${formatGapLabel(rewardGapMinutes)} 차이예요. 저녁 1세션만 더 집중하면 전세를 뒤집을 수 있어요.`}
                     </p>
                   </div>
-                  <div className="hidden h-14 w-14 items-center justify-center rounded-[20px] border border-white/10 bg-white/[0.05] text-orange-100 sm:flex">
+                  <div className="hidden h-14 w-14 items-center justify-center rounded-[20px] border border-white/12 bg-white/[0.1] text-orange-100 sm:flex">
                     <Flame className="h-6 w-6" />
                   </div>
                 </div>
@@ -1248,8 +1248,8 @@ export default function LeaderboardsPage() {
                     ['방어 간격', diffBelow > 0 ? formatGapLabel(diffBelow) : '신규'],
                     ['보상 진행', `${rewardProgress}%`],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-[20px] border border-white/10 bg-white/[0.04] px-3.5 py-3">
-                      <p className="text-[10px] font-black tracking-[0.18em] text-white/54">{label}</p>
+                    <div key={label} className="rounded-[20px] border border-white/12 bg-white/[0.08] px-3.5 py-3">
+                      <p className="text-[10px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">{label}</p>
                       <p className="mt-2 text-lg font-black text-white">{value}</p>
                     </div>
                   ))}
