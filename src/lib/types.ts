@@ -120,6 +120,269 @@ export interface StudentProfile {
     title: string;
     date: string; // yyyy-MM-dd
   }>;
+  studyRoutineProfile?: UserStudyProfile;
+  studyRoutineWorkspace?: RoutineWorkspaceState;
+  routineSocialProfile?: RoutineSocialProfile;
+  savedRoutineTemplates?: RoutineTemplateSave[];
+}
+
+export type RoutineVisibility = 'private' | 'friends' | 'group' | 'anonymous' | 'profile';
+
+export type SharingPreference = RoutineVisibility;
+
+export type RoutineReactionType = 'cheer' | 'save' | 'reference';
+
+export type PeerSimilarityTag =
+  | 'same-grade'
+  | 'same-goal'
+  | 'same-weak-subject'
+  | 'same-session'
+  | 'same-focus-time'
+  | 'same-plan-style';
+
+export interface RoutineReaction {
+  type: RoutineReactionType;
+  label: string;
+  count: number;
+  viewerReacted?: boolean;
+}
+
+export interface RoutineTemplateSave {
+  routineId: string;
+  routineName: string;
+  authorAlias: string;
+  source: 'explore-home' | 'routine-detail' | 'friend-routine' | 'group-routine' | 'recommended';
+  savedAtISO: string;
+}
+
+export interface StudyGroup {
+  id: string;
+  name: string;
+  description: string;
+  focusLabel: string;
+  memberCount: number;
+  accentLabel: string;
+}
+
+export interface RoutineSocialProfile {
+  visibility: RoutineVisibility;
+  previewAlias: string;
+  selectedGroupIds: string[];
+  allowCheer: boolean;
+  allowTemplateSave: boolean;
+  updatedAt?: Timestamp;
+}
+
+export type StudyAvailabilitySlot =
+  | 'weekday-morning'
+  | 'weekday-after-school'
+  | 'weekday-evening'
+  | 'weekday-night'
+  | 'weekend-morning'
+  | 'weekend-afternoon'
+  | 'weekend-evening';
+
+export type RoutineDifficulty = 'easy' | 'balanced' | 'stretch';
+
+export interface OnboardingAnswer {
+  gradeBand: 'middle' | 'high' | 'repeat';
+  examGoal: 'school-rank' | 'mock-improvement' | 'college-sprint' | 'balance-recovery' | 'habit-reset' | 'specific-test' | 'undecided';
+  weekdayAvailability: StudyAvailabilitySlot[];
+  weekendAvailability: StudyAvailabilitySlot[];
+  difficultSubjects: string[];
+  laggingStudyTypes: Array<'concept' | 'problem-solving' | 'memorization' | 'review' | 'assignment'>;
+  derailReason: 'slow-start' | 'phone' | 'too-hard' | 'subject-switch' | 'fatigue' | 'unclear-priority' | 'execution-gap';
+  preferredSessionLength: '25-30' | '45-50' | '70-80' | 'flexible';
+  preferredBreakStyle: 'short-often' | 'one-long' | 'subject-switch' | 'fixed' | 'unsure';
+  preferredPlanStyle: 'time-table' | 'block' | 'todo' | 'guided' | 'searching';
+  supportMode: 'solo' | 'remind' | 'peers' | 'teacher' | 'adaptive';
+  bestFocusTime: 'morning' | 'afternoon' | 'evening' | 'late-night' | 'variable';
+  sharingPreference: SharingPreference;
+  reflectionStyle: 'daily-brief' | 'weekly-deep' | 'auto-summary' | 'not-yet';
+}
+
+export interface RoutineArchetype {
+  id:
+    | 'exam-sprint'
+    | 'school-balance'
+    | 'weak-subject-recovery'
+    | 'concept-rebuild'
+    | 'problem-solving-focus'
+    | 'memory-review-boost'
+    | 'evening-focus'
+    | 'routine-reset';
+  name: string;
+  shortLabel: string;
+  summary: string;
+  fitDescription: string;
+  strategyHeadline: string;
+}
+
+export interface StudyBlock {
+  id: string;
+  title: string;
+  subjectId?: string;
+  subjectLabel?: string;
+  kind: 'warmup' | 'focus' | 'problem' | 'concept' | 'review' | 'memorization' | 'recovery';
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  instruction: string;
+  fallbackInstruction?: string;
+}
+
+export interface ReviewRule {
+  id: string;
+  title: string;
+  timing: string;
+  description: string;
+}
+
+export interface DistractionRule {
+  id: string;
+  trigger: string;
+  response: string;
+  fallback: string;
+}
+
+export interface RecommendedRoutine {
+  id: string;
+  archetypeId: RoutineArchetype['id'];
+  priority: 1 | 2 | 3;
+  name: string;
+  oneLineDescription: string;
+  fitStudent: string;
+  difficulty: RoutineDifficulty;
+  difficultyLabel: string;
+  recommendationReasons: string[];
+  coreStrategies: string[];
+  dayStructureSummary: string;
+  subjectPlacement: string;
+  sessionRule: string;
+  breakRule: string;
+  studyBlocks: StudyBlock[];
+  reviewRules: ReviewRule[];
+  distractionRules: DistractionRule[];
+  downgradeVersion: string[];
+  upgradeVersion: string[];
+  weekendExtension: string;
+}
+
+export interface SharedRoutine {
+  id: string;
+  source: 'similar' | 'goal' | 'group' | 'popular' | 'friend';
+  title: string;
+  summary: string;
+  authorAlias: string;
+  authorName?: string;
+  authorMode: 'anonymous' | 'profile';
+  authorSchoolLabel?: string;
+  gradeLabel: string;
+  goalLabel: string;
+  styleTags: string[];
+  weakSubjectTags: string[];
+  similarityTags: PeerSimilarityTag[];
+  fitSummary: string;
+  authorNote: string;
+  reflectionTip: string;
+  dayStructureLabel: string;
+  subjectBalanceLabel: string;
+  breakRuleLabel: string;
+  reviewRuleLabel: string;
+  reactions: RoutineReaction[];
+  visibility: RoutineVisibility;
+  groupId?: string;
+  groupName?: string;
+  sourceAnswers: Pick<
+    OnboardingAnswer,
+    'gradeBand' | 'examGoal' | 'difficultSubjects' | 'preferredSessionLength' | 'bestFocusTime' | 'preferredPlanStyle'
+  >;
+  routine: RecommendedRoutine;
+}
+
+export interface UserStudyProfile {
+  version: number;
+  answers: OnboardingAnswer;
+  archetypeId: RoutineArchetype['id'];
+  archetypeName: string;
+  recommendedRoutines: RecommendedRoutine[];
+  selectedRoutineId: string;
+  selectedRoutine: RecommendedRoutine;
+  sharingPreference: SharingPreference;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface DailyRoutineBlock {
+  id: string;
+  title: string;
+  subjectId?: string;
+  subjectLabel?: string;
+  studyType: 'concept' | 'problem-solving' | 'memorization' | 'review' | 'warmup' | 'recovery';
+  studyTypeLabel: string;
+  startTime?: string;
+  sequence: number;
+  durationMinutes: number;
+  done: boolean;
+  rewardLabel: string;
+  feedbackMessage: string;
+  instruction: string;
+  fallbackInstruction?: string;
+}
+
+export interface DailyRoutinePlan {
+  dateKey: string;
+  routineId: string;
+  routineName: string;
+  routineSummary: string;
+  archetypeName: string;
+  totalMinutes: number;
+  targetFocus: string;
+  reminderMessage: string;
+  tags: string[];
+  blocks: DailyRoutineBlock[];
+  executionRules: DistractionRule[];
+  reviewRules: ReviewRule[];
+  recommendedAdjustments: string[];
+  startedAt?: string | null;
+}
+
+export interface RoutineReflectionEntry {
+  dateKey: string;
+  goodPoint: string;
+  derailReason: string;
+  keepOneThing: string;
+  changeOneThing: string;
+  mood: 'low' | 'steady' | 'good' | 'great';
+  energy: 'low' | 'medium' | 'high';
+  completedBlockCount: number;
+  totalBlockCount: number;
+  createdAt?: Timestamp;
+}
+
+export interface WeeklyRoutineSummary {
+  weekKey: string;
+  completionRate: number;
+  consistencyLabel: string;
+  topSubject: string;
+  balanceStatus: 'balanced' | 'skewed' | 'recovery';
+  reflectionHeadline: string;
+  coachingTip: string;
+}
+
+export interface RoutineWorkspaceState {
+  version: number;
+  activeDateKey: string;
+  activeRoutine: DailyRoutinePlan;
+  recentHistory: Array<{
+    dateKey: string;
+    subjectMinutes: Record<string, number>;
+    completedMinutes: number;
+  }>;
+  reflections: RoutineReflectionEntry[];
+  weeklySummary: WeeklyRoutineSummary;
+  lastOpenedAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface LayoutRoomConfig {

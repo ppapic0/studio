@@ -93,7 +93,17 @@ import {
   startOfDay
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { type StudyPlanItem, type WithId, type GrowthProgress } from '@/lib/types';
+import {
+  type DailyRoutineBlock,
+  type DailyRoutinePlan,
+  type RoutineWorkspaceState,
+  type StudyPlanItem,
+  type WithId,
+  type GrowthProgress,
+  type RecommendedRoutine,
+  type StudentProfile,
+  type UserStudyProfile,
+} from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -115,7 +125,25 @@ import { RepeatCopySheet } from '@/components/dashboard/student-planner/repeat-c
 import { StudyPlanSheet } from '@/components/dashboard/student-planner/study-plan-sheet';
 import { PlannerTemplateSheet } from '@/components/dashboard/student-planner/planner-template-sheet';
 import { PlannerChecklistItem } from '@/components/dashboard/student-planner/planner-checklist-item';
-import { PlannerMainView } from '@/components/dashboard/student-planner/planner-main-view';
+import { RoutineOnboardingFlow } from '@/components/dashboard/student-planner/routine-onboarding-flow';
+import { RoutineHome } from '@/components/dashboard/student-planner/routine-home';
+import { RoutineEditor } from '@/components/dashboard/student-planner/routine-editor';
+import { ReflectionSheet } from '@/components/dashboard/student-planner/reflection-sheet';
+import { RoutineBlockSheet } from '@/components/dashboard/student-planner/routine-block-sheet';
+import { RoutinePrivacySheet } from '@/components/dashboard/student-planner/routine-privacy-sheet';
+import {
+  addReflectionEntry,
+  addRoutineBlock,
+  applyRoutineBlockToggle,
+  buildInitialRoutineWorkspace,
+  refreshRoutineWorkspaceForToday,
+  removeRoutineBlock,
+  updateRoutineBlock,
+} from '@/lib/routine-workspace';
+import {
+  buildInitialRoutineSocialProfile,
+  getVisibilityLabel,
+} from '@/lib/routine-social';
 import {
   BUILTIN_PLANNER_TEMPLATES,
   PLAN_DEFAULT_START_TIME,
@@ -369,7 +397,15 @@ export default function StudyPlanPage() {
   const searchParams = useSearchParams();
 
   const isMobile = viewMode === 'mobile';
+  const shouldRenderLegacyPlanner = process.env.NEXT_PUBLIC_PLAN_TRACK_LEGACY === '1';
   const rewardGradient = 'from-[#14295F] via-[#1B326D] to-[#233E86]';
+  const [planTrackEntryMode, setPlanTrackEntryMode] = useState<'auto' | 'onboarding' | 'planner'>('auto');
+  const [routineSurfaceMode, setRoutineSurfaceMode] = useState<'home' | 'editor'>('home');
+  const [routineWorkspace, setRoutineWorkspace] = useState<RoutineWorkspaceState | null>(null);
+  const [isReflectionSheetOpen, setIsReflectionSheetOpen] = useState(false);
+  const [isRoutineBlockSheetOpen, setIsRoutineBlockSheetOpen] = useState(false);
+  const [isRoutinePrivacySheetOpen, setIsRoutinePrivacySheetOpen] = useState(false);
+  const [selectedRoutineBlock, setSelectedRoutineBlock] = useState<DailyRoutineBlock | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [newStudyTask, setNewStudyTask] = useState('');
   const [newStudySubject, setNewStudySubject] = useState('math');
@@ -435,6 +471,11 @@ export default function StudyPlanPage() {
     }
 
     setSelectedDate(nextDate);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!searchParams.get('privacy')) return;
+    setIsRoutinePrivacySheetOpen(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -607,6 +648,54 @@ export default function StudyPlanPage() {
   }, [firestore, activeMembership, user]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isStudent });
 
+  const studentProfileRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
+  }, [firestore, activeMembership, user]);
+  const { data: studentProfile, isLoading: isStudentProfileLoading } = useDoc<StudentProfile>(studentProfileRef, {
+    enabled: isStudent,
+  });
+  const routineSocialProfile = useMemo(
+    () =>
+      buildInitialRoutineSocialProfile({
+        studyProfile: studentProfile?.studyRoutineProfile,
+        socialProfile: studentProfile?.routineSocialProfile,
+        studentName: studentProfile?.name || activeMembership?.displayName || user?.displayName,
+        gradeLabel: studentProfile?.grade,
+      }),
+    [
+      activeMembership?.displayName,
+      studentProfile?.grade,
+      studentProfile?.name,
+      studentProfile?.routineSocialProfile,
+      studentProfile?.studyRoutineProfile,
+      user?.displayName,
+    ]
+  );
+
+  useEffect(() => {
+    if (shouldRenderLegacyPlanner || !isStudent || planTrackEntryMode !== 'auto' || isStudentProfileLoading) return;
+    if (studentProfile?.studyRoutineProfile?.selectedRoutineId) {
+      setPlanTrackEntryMode('planner');
+      return;
+    }
+    setPlanTrackEntryMode('onboarding');
+  }, [
+    isStudent,
+    isStudentProfileLoading,
+    planTrackEntryMode,
+    shouldRenderLegacyPlanner,
+    studentProfile?.studyRoutineProfile?.selectedRoutineId,
+  ]);
+
+  useEffect(() => {
+    if (shouldRenderLegacyPlanner || !isStudent || !studentProfile?.studyRoutineProfile) return;
+    setRoutineWorkspace((previous) => {
+      const baseWorkspace = previous || studentProfile.studyRoutineWorkspace;
+      return refreshRoutineWorkspaceForToday(studentProfile.studyRoutineProfile!, baseWorkspace);
+    });
+  }, [isStudent, shouldRenderLegacyPlanner, studentProfile?.studyRoutineProfile, studentProfile?.studyRoutineWorkspace]);
+
   const fetchRecentStudyOptions = useCallback(async () => {
     if (!firestore || !user || !activeMembership || !isStudent || recentStudyWeekKeys.length === 0) {
       setRecentStudyOptions([]);
@@ -679,6 +768,177 @@ export default function StudyPlanPage() {
   const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원 예정')), [scheduleItems]);
   const hasAwayPlan = Boolean(awayStartTime && awayEndTime) || extraAwayPlans.some((slot) => Boolean(slot.startTime && slot.endTime));
   const isAbsentMode = useMemo(() => scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [scheduleItems]);
+
+  const seedRecommendedRoutineToPlanner = useCallback(async (routine: RecommendedRoutine) => {
+    if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
+    if ((dailyPlans?.length || 0) > 0) return;
+
+    const itemsCollectionRef = collection(
+      firestore,
+      'centers',
+      activeMembership.id,
+      'plans',
+      user.uid,
+      'weeks',
+      weekKey,
+      'items'
+    );
+
+    const batch = writeBatch(firestore);
+    routine.studyBlocks.forEach((block, index) => {
+      batch.set(doc(itemsCollectionRef), {
+        title: block.title,
+        done: false,
+        weight: Math.max(1, routine.studyBlocks.length - index),
+        dateKey: selectedDateKey,
+        category: 'study',
+        subject: block.subjectId || null,
+        studyPlanMode: 'time',
+        targetMinutes: block.durationMinutes,
+        startTime: block.startTime,
+        endTime: block.endTime,
+        priority: index <= 1 ? 'high' : 'medium',
+        tag: block.kind === 'review' ? '복습' : block.kind === 'memorization' ? '암기' : undefined,
+        studyPlanWeekId: weekKey,
+        centerId: activeMembership.id,
+        studentId: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    await batch.commit();
+  }, [activeMembership, dailyPlans?.length, firestore, isPast, selectedDateKey, user, weekKey]);
+
+  const handleSaveRoutineProfile = useCallback(async (profile: UserStudyProfile, selectedRoutine: RecommendedRoutine) => {
+    if (!firestore || !user || !activeMembership || !studentProfileRef) return;
+
+    const fallbackDisplayName =
+      studentProfile?.name ||
+      activeMembership.displayName ||
+      user.displayName ||
+      '학생';
+    const nextSocialProfile = buildInitialRoutineSocialProfile({
+      studyProfile: profile,
+      socialProfile: studentProfile?.routineSocialProfile,
+      studentName: fallbackDisplayName,
+      gradeLabel: studentProfile?.grade,
+    });
+
+    await setDoc(
+      studentProfileRef,
+      {
+        id: user.uid,
+        name: fallbackDisplayName,
+        schoolName: studentProfile?.schoolName || '학교 미정',
+        grade: studentProfile?.grade || '학년 미정',
+        seatNo: studentProfile?.seatNo || 0,
+        targetDailyMinutes: studentProfile?.targetDailyMinutes || 240,
+        parentUids: studentProfile?.parentUids || [],
+        createdAt: studentProfile?.createdAt || serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        studyRoutineProfile: {
+          ...profile,
+          createdAt: studentProfile?.studyRoutineProfile?.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        studyRoutineWorkspace: {
+          ...buildInitialRoutineWorkspace(profile),
+          updatedAt: serverTimestamp(),
+          lastOpenedAt: serverTimestamp(),
+        },
+        routineSocialProfile: {
+          ...nextSocialProfile,
+          updatedAt: serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+
+    await seedRecommendedRoutineToPlanner(selectedRoutine);
+    setRoutineWorkspace(buildInitialRoutineWorkspace(profile));
+    toast({
+      title: '추천 루틴 저장 완료',
+      description: '오늘부터 바로 쓸 수 있는 루틴이 계획트랙에 반영됐어요.',
+    });
+  }, [activeMembership, firestore, seedRecommendedRoutineToPlanner, studentProfile, studentProfileRef, toast, user]);
+
+  const persistRoutineWorkspace = useCallback(async (nextWorkspace: RoutineWorkspaceState) => {
+    if (!studentProfileRef) return;
+    setRoutineWorkspace(nextWorkspace);
+    await setDoc(
+      studentProfileRef,
+      {
+        studyRoutineWorkspace: {
+          ...nextWorkspace,
+          updatedAt: serverTimestamp(),
+          lastOpenedAt: serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+  }, [studentProfileRef]);
+
+  const handleToggleRoutineBlock = useCallback(async (blockId: string) => {
+    if (!routineWorkspace) return;
+    await persistRoutineWorkspace(applyRoutineBlockToggle(routineWorkspace, blockId));
+  }, [persistRoutineWorkspace, routineWorkspace]);
+
+  const handleSaveRoutineBlock = useCallback(async (
+    blockDraft: Omit<DailyRoutineBlock, 'id' | 'sequence' | 'done'>,
+    blockId?: string
+  ) => {
+    if (!routineWorkspace) return;
+    const nextWorkspace = blockId
+      ? updateRoutineBlock(routineWorkspace, blockId, blockDraft)
+      : addRoutineBlock(routineWorkspace, blockDraft);
+    await persistRoutineWorkspace(nextWorkspace);
+  }, [persistRoutineWorkspace, routineWorkspace]);
+
+  const handleDeleteRoutineBlock = useCallback(async (blockId: string) => {
+    if (!routineWorkspace) return;
+    await persistRoutineWorkspace(removeRoutineBlock(routineWorkspace, blockId));
+  }, [persistRoutineWorkspace, routineWorkspace]);
+
+  const handleSubmitReflection = useCallback(async (
+    reflection: Parameters<typeof addReflectionEntry>[1]
+  ) => {
+    if (!routineWorkspace) return;
+    await persistRoutineWorkspace(addReflectionEntry(routineWorkspace, reflection));
+    toast({
+      title: '하루 회고 저장 완료',
+      description: '내일 이어갈 포인트까지 같이 남겨뒀어요.',
+    });
+  }, [persistRoutineWorkspace, routineWorkspace, toast]);
+
+  const handleSaveRoutineSocialProfile = useCallback(async (nextSocialProfile: typeof routineSocialProfile) => {
+    if (!studentProfileRef) return;
+
+    const patch: Record<string, unknown> = {
+      routineSocialProfile: {
+        ...nextSocialProfile,
+        updatedAt: serverTimestamp(),
+      },
+    };
+    if (studentProfile?.studyRoutineProfile) {
+      patch.studyRoutineProfile = {
+        sharingPreference: nextSocialProfile.visibility,
+        updatedAt: serverTimestamp(),
+      };
+    }
+
+    await setDoc(
+      studentProfileRef,
+      patch,
+      { merge: true }
+    );
+
+    toast({
+      title: '공유 설정 저장 완료',
+      description: '기본값은 여전히 조용한 참고형 공개로 유지됩니다.',
+    });
+    setIsRoutinePrivacySheetOpen(false);
+  }, [routineSocialProfile, studentProfile?.studyRoutineProfile, studentProfileRef, toast]);
 
   useEffect(() => {
     const arrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
@@ -1988,150 +2248,78 @@ export default function StudyPlanPage() {
 
   if (!selectedDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
-  const shouldRenderLegacyPlanner = process.env.NEXT_PUBLIC_PLAN_TRACK_LEGACY === '1';
-  if (!shouldRenderLegacyPlanner) {
+  if (!shouldRenderLegacyPlanner && (planTrackEntryMode === 'auto' || isStudentProfileLoading)) {
+    return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
+  }
+
+  if (!shouldRenderLegacyPlanner && planTrackEntryMode === 'onboarding') {
     return (
-      <PlannerMainView
-        model={{
-          isMobile,
-          isPast,
-          isToday,
-          isSubmitting,
-          selectedDate,
-          setSelectedDate,
-          weekDays,
-          moveWeek,
-          weekRangeLabel,
-          checklistTasks,
-          orderedChecklistTasks,
-          completedChecklistCount,
-          completionRate,
-          todayPointGaugeLabel,
-          todayCompletionLabel,
-          todayStreakDays,
-          planTrackPointTotal,
-          rewardGradient,
-          floatingPointBursts,
-          showQuickAddCard,
-          setShowQuickAddCard,
-          expandedTaskId,
-          setExpandedTaskId,
-          studyTasks,
-          personalTasks,
-          scheduleItems,
-          remainingStudyTasks,
-          remainingPersonalTasks,
-          completedStudyCount,
-          completedPersonalCount,
-          routineCountLabel,
-          studyGoalSummaryLabel,
-          subjectOptions: SUBJECTS,
-          newStudyTask,
-          setNewStudyTask,
-          newStudySubject,
-          setNewStudySubject,
-          newStudyMode,
-          setNewStudyMode,
-          newStudyMinutes,
-          setNewStudyMinutes,
-          newStudyTargetAmount,
-          setNewStudyTargetAmount,
-          newStudyAmountUnit,
-          setNewStudyAmountUnit,
-          newStudyCustomAmountUnit,
-          setNewStudyCustomAmountUnit,
-          enableVolumeStudyMinutes,
-          setEnableVolumeStudyMinutes,
-          handleSubmitInlineStudyTask,
-          handleQuickAddSuggestion,
-          recentStudyOptions,
-          activeRecentStudyOption,
-          handlePrefillRecentStudy,
-          handleQuickAddRecentStudy,
-          resetStudyComposerPrefill,
-          isRecentStudyLoading,
-          isRecentStudySheetOpen,
-          setIsRecentStudySheetOpen,
-          isStudyPlanSheetOpen,
-          setIsStudyPlanSheetOpen,
-          isTemplateSheetOpen,
-          setIsTemplateSheetOpen,
-          customTemplates,
-          recentTemplates,
-          latestRecentTemplate,
-          templateNameDraft,
-          setTemplateNameDraft,
-          editingTemplateId,
-          setEditingTemplateId,
-          saveCurrentPlanTemplate,
-          startEditingTemplate,
-          deleteTemplate,
-          applyTemplateToToday,
-          weekdayTemplate,
-          examTemplate,
-          handleCopyYesterdayPlan,
-          clearTodayPlans,
-          handleMoveUnfinishedToTomorrow,
-          handleSaveUnfinishedAsTemplate,
-          handleDeleteUnfinished,
-          handleToggleTask,
-          handleDeleteTask,
-          handleCommitStudyActualAmount,
-          handleUpdateStudyWindow,
-          isRoutineSectionOpen,
-          setIsRoutineSectionOpen,
-          isMemoSectionOpen,
-          setIsMemoSectionOpen,
-          inTime,
-          setInTime,
-          outTime,
-          setOutTime,
-          awayStartTime,
-          setAwayStartTime,
-          awayEndTime,
-          setAwayEndTime,
-          awayReason,
-          setAwayReason,
-          extraAwayPlans,
-          setExtraAwayPlans,
-          isAbsentMode,
-          hasAwayPlan,
-          hasInPlan,
-          hasOutPlan,
-          handleSetAttendance,
-          newRoutineTitle,
-          setNewRoutineTitle,
-          selectedRoutineTemplateKey,
-          handleRoutineTemplateSelect,
-          newPersonalTask,
-          setNewPersonalTask,
-          handleAddTask,
-          handleUpdateScheduleRange,
-          routineCopyWeeks,
-          setRoutineCopyWeeks,
-          routineCopyDays,
-          routineCopyOptions,
-          routineCopyItemIds,
-          setRoutineCopyItemIds,
-          handleApplyRoutineToAllWeekdays,
-          isRoutineCopyDialogOpen,
-          setIsRoutineCopyDialogOpen,
-          hasCopyableRoutines,
-          taskCopyWeeks,
-          setTaskCopyWeeks,
-          taskCopyDays,
-          taskCopyOptions,
-          taskCopyItemIds,
-          setTaskCopyItemIds,
-          handleApplyTasksToAllWeekdays,
-          isTaskCopyDialogOpen,
-          setIsTaskCopyDialogOpen,
-          hasCopyableTasks,
-          toggleCopyDay,
-          toggleCopyItem,
-          autoSchedulePreview,
-        }}
+      <RoutineOnboardingFlow
+        studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
+        onSaveRoutineProfile={handleSaveRoutineProfile}
+        onContinueToPlanner={() => setPlanTrackEntryMode('planner')}
       />
+    );
+  }
+
+  if (!shouldRenderLegacyPlanner) {
+    if (!routineWorkspace) {
+      return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
+    }
+
+    return (
+      <>
+        {routineSurfaceMode === 'editor' ? (
+          <RoutineEditor
+            routine={routineWorkspace.activeRoutine}
+            onBack={() => setRoutineSurfaceMode('home')}
+            onSaveBlock={handleSaveRoutineBlock}
+            onDeleteBlock={handleDeleteRoutineBlock}
+          />
+        ) : (
+          <RoutineHome
+            studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
+            workspace={routineWorkspace}
+            sharingLabel={getVisibilityLabel(routineSocialProfile.visibility)}
+            onToggleBlock={handleToggleRoutineBlock}
+            onOpenEditor={() => setRoutineSurfaceMode('editor')}
+            onOpenPrivacy={() => setIsRoutinePrivacySheetOpen(true)}
+            onOpenReflection={() => setIsReflectionSheetOpen(true)}
+            onEditBlock={(block) => {
+              setSelectedRoutineBlock(block);
+              setIsRoutineBlockSheetOpen(true);
+            }}
+          />
+        )}
+
+        <RoutineBlockSheet
+          open={isRoutineBlockSheetOpen}
+          onOpenChange={(open) => {
+            setIsRoutineBlockSheetOpen(open);
+            if (!open) setSelectedRoutineBlock(null);
+          }}
+          block={selectedRoutineBlock}
+          onSave={(blockDraft) => void handleSaveRoutineBlock(blockDraft, selectedRoutineBlock?.id)}
+          onDelete={selectedRoutineBlock ? (blockId) => void handleDeleteRoutineBlock(blockId) : undefined}
+        />
+
+        <ReflectionSheet
+          open={isReflectionSheetOpen}
+          onOpenChange={setIsReflectionSheetOpen}
+          onSubmit={(reflection) => void handleSubmitReflection(reflection)}
+        />
+
+        <RoutinePrivacySheet
+          open={isRoutinePrivacySheetOpen}
+          onOpenChange={setIsRoutinePrivacySheetOpen}
+          socialProfile={routineSocialProfile}
+          studyProfile={studentProfile?.studyRoutineProfile}
+          studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
+          schoolName={studentProfile?.schoolName}
+          gradeLabel={studentProfile?.grade}
+          onSave={(nextProfile) => void handleSaveRoutineSocialProfile(nextProfile)}
+        />
+      </>
     );
   }
 
