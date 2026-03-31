@@ -661,6 +661,15 @@ export function AppointmentsPageContent({
   };
 
   const getStatusBadge = (status: string) => {
+    if (isStudentTrackTheme) {
+      switch (status) {
+        case 'requested': return <Badge variant="secondary" className="font-black text-[10px] shadow-none">승인 대기</Badge>;
+        case 'confirmed': return <Badge variant="dark" className="border-emerald-300/20 bg-emerald-400/15 text-emerald-100 font-black text-[10px] shadow-none">예약 확정</Badge>;
+        case 'done': return <Badge variant="dark" className="border-white/10 bg-white/8 text-[var(--text-on-dark-soft)] font-black text-[10px] shadow-none">상담 완료</Badge>;
+        case 'canceled': return <Badge variant="dark" className="border-rose-300/20 bg-rose-400/15 text-rose-100 font-black text-[10px] shadow-none">취소됨</Badge>;
+        default: return <Badge variant="dark" className="font-black text-[10px] shadow-none">{status}</Badge>;
+      }
+    }
     switch (status) {
       case 'requested': return <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-amber-100 font-black text-[10px]">승인 대기</Badge>;
       case 'confirmed': return <Badge variant="outline" className="bg-emerald-500 text-white border-none font-black text-[10px] shadow-sm">예약 확정</Badge>;
@@ -670,8 +679,146 @@ export function AppointmentsPageContent({
     }
   };
 
+  const isStudentTrackTheme = isStudent;
+  const counselingCtaClass =
+    'border border-[rgba(255,215,180,0.32)] bg-[linear-gradient(180deg,#FFB24C_0%,#FF8A1F_100%)] text-[var(--text-on-accent)] shadow-[0_18px_34px_-24px_rgba(255,138,31,0.55)] hover:brightness-[1.04]';
+  const studentSectionCardClass = cn(
+    'w-full overflow-hidden border-none',
+    isMobile ? 'rounded-[1.5rem]' : 'rounded-[2.5rem]',
+    isStudentTrackTheme ? 'student-utility-card shadow-none' : 'shadow-xl bg-white ring-1 ring-border/50'
+  );
+  const studentSectionHeaderClass = cn(
+    isMobile ? 'p-5' : 'p-6 sm:p-8',
+    isStudentTrackTheme ? 'border-b border-white/10 bg-transparent' : 'bg-muted/5 border-b'
+  );
+  const studentSectionTitleClass = cn(
+    'font-black flex items-center gap-3 break-keep',
+    isMobile ? 'text-lg' : 'text-xl',
+    isStudentTrackTheme ? 'text-[var(--text-on-dark)]' : 'text-primary'
+  );
+  const studentSectionDescriptionClass = cn(
+    'font-bold text-xs mt-1',
+    isStudentTrackTheme ? 'text-[var(--text-on-dark-soft)]' : ''
+  );
+  const studentTabRailClass = cn(
+    'grid w-full rounded-full p-1.5 mb-8',
+    isStaff ? 'grid-cols-4' : isStudent ? 'grid-cols-3' : 'grid-cols-2',
+    isMobile ? 'h-auto max-w-full gap-1.5' : isStaff ? 'h-16 max-w-3xl mx-auto gap-2' : isStudent ? 'h-16 max-w-2xl mx-auto gap-2' : 'h-16 max-w-sm mx-auto gap-2',
+    isStudentTrackTheme
+      ? 'surface-card surface-card--ghost on-dark border border-white/10 shadow-none'
+      : 'bg-muted/30 border shadow-inner'
+  );
+  const studentTabTriggerClass = cn(
+    'rounded-full font-black gap-2 transition-all',
+    isMobile ? 'min-h-[3.25rem] px-2' : '',
+    isStudentTrackTheme
+      ? 'text-[var(--text-on-dark-soft)] data-[state=active]:bg-[var(--accent-orange)] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_-16px_rgba(255,138,31,0.48)]'
+      : 'data-[state=active]:bg-white data-[state=active]:shadow-lg'
+  );
+  const studentEmptyStateClass = cn(
+    'text-center font-black italic flex flex-col items-center gap-4',
+    isStudentTrackTheme ? 'text-[var(--text-on-dark-muted)]/80' : 'text-muted-foreground/30'
+  );
+  const studentMoreWrapClass = cn(
+    'p-5 sm:p-6 flex justify-center',
+    isStudentTrackTheme ? 'border-t border-white/10 bg-white/[0.03]' : 'border-t border-muted/10 bg-muted/5'
+  );
+  const studentGhostPanelClass = isStudentTrackTheme
+    ? 'surface-card surface-card--ghost on-dark rounded-[1.25rem] border-white/10 shadow-none'
+    : 'rounded-[1.25rem] border bg-slate-50/40';
+  const studentTitleTextClass = isStudentTrackTheme ? 'text-[var(--text-on-dark)]' : 'text-primary';
+  const studentMetaTextClass = isStudentTrackTheme ? 'text-[var(--text-on-dark-muted)]' : 'text-muted-foreground';
+  const studentBodyTextClass = isStudentTrackTheme ? 'text-[var(--text-on-dark-soft)]' : 'text-slate-700';
+
   return (
     <div className={cn("flex flex-col gap-6 max-w-4xl mx-auto pb-20", isMobile ? "px-1 items-center" : "px-4")}>
+      {isStudentTrackTheme && !showAll ? (
+        <header className="w-full">
+          <section className={cn("surface-card surface-card--primary on-dark student-utility-card overflow-hidden border-none", isMobile ? "rounded-[1.5rem] px-5 py-5" : "rounded-[2.5rem] px-7 py-7")}>
+            <div className="flex flex-col gap-5">
+              <div className={cn("flex justify-between gap-4", isMobile ? "flex-col" : "items-start")}>
+                <div className="min-w-0">
+                  <Badge variant="dark" className="px-3 py-1 text-[10px] shadow-none">COUNSEL TRACK</Badge>
+                  <h1 className={cn("mt-3 font-black tracking-tighter leading-none text-[var(--text-on-dark)]", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
+                  <p className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-orange-soft)]">
+                    상담 예약 · 피드백 센터
+                  </p>
+                  <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
+                    예약 신청부터 상담 결과 확인, 질문과 건의까지 한 흐름으로 이어지는 학생용 상담 라운지예요.
+                  </p>
+                </div>
+                <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] border-white/10 px-3.5 py-3 shadow-none">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">Today</p>
+                  <p className="mt-1 text-sm font-black text-[var(--text-on-dark)]">예약 · 질문 · 피드백</p>
+                  <p className="mt-1 text-[11px] font-semibold text-[var(--text-on-dark-soft)]">중요한 흐름만 빠르게 확인해요.</p>
+                </div>
+              </div>
+              <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
+                <DialogTrigger asChild>
+                  <Button size="lg" className={cn("student-cta rounded-2xl font-black gap-2 interactive-button border-none", isMobile ? "w-full max-w-full min-h-[3.75rem]" : "h-14 w-fit px-8", counselingCtaClass)}>
+                    <CalendarPlus className="h-5 w-5" /> 새 상담 신청
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "w-[min(94vw,25rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
+                  <div className={cn("text-white relative bg-[linear-gradient(180deg,#FFB24C_0%,#FF8A1F_100%)]", isMobile ? "p-6" : "p-10")}>
+                    <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
+                    <DialogHeader>
+                      <DialogTitle className={cn("font-black tracking-tighter text-left break-keep", isMobile ? "text-[1.7rem]" : "text-3xl")}>상담 신청</DialogTitle>
+                      <DialogDescription className="text-white/80 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
+                    </DialogHeader>
+                  </div>
+                  <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-8 max-h-[60vh]")}>
+                    <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 날짜</label>
+                        <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12 border-2" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 시간</label>
+                        <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12 border-2" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-1.5">
+                        <UserCheck className="h-3 w-3" /> 상담 희망 선생님
+                      </label>
+                      <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
+                        <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                          <SelectValue placeholder="선생님을 선택하세요" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                          {filteredTeachers.map((t) => (
+                            <SelectItem key={t.id} value={t.id} className="font-bold py-2.5">
+                              {t.displayName} (선생님)
+                            </SelectItem>
+                          ))}
+                          {!filteredTeachers.length && <p className="p-4 text-center text-xs font-bold opacity-40">선택 가능한 선생님이 없습니다.</p>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 요청 내용 (선택)</label>
+                      <Textarea 
+                        placeholder="고민이나 질문하고 싶은 내용을 자유롭게 적어주세요." 
+                        value={studentNote}
+                        onChange={(e) => setStudentNote(e.target.value)}
+                        className="rounded-xl min-h-[100px] resize-none text-sm font-bold border-2"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter className={cn("bg-muted/30", isMobile ? "p-5" : "p-8")}>
+                    <Button onClick={handleRequestAppointment} disabled={isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg", counselingCtaClass)}>
+                      {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 신청 완료'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </section>
+        </header>
+      ) : (
       <header className={cn("flex justify-between items-center w-full", isMobile ? "flex-col gap-4 items-center text-center" : "flex-row")}>
         <div className="space-y-1">
           <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
@@ -692,16 +839,16 @@ export function AppointmentsPageContent({
         ) : isStudent && (
           <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
             <DialogTrigger asChild>
-              <Button size="lg" className={cn("student-cta rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full max-w-full min-h-[3.75rem]" : "h-14 px-8", `bg-gradient-to-br ${currentTier.gradient}`)}>
+              <Button size="lg" className={cn("student-cta rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full max-w-full min-h-[3.75rem]" : "h-14 px-8", counselingCtaClass)}>
                 <CalendarPlus className="h-5 w-5" /> 새 상담 신청
               </Button>
             </DialogTrigger>
             <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "w-[min(94vw,25rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
-              <div className={cn("text-white relative", isMobile ? "p-6" : "p-10", `bg-gradient-to-br ${currentTier.gradient}`)}>
+              <div className={cn("text-white relative bg-[linear-gradient(180deg,#FFB24C_0%,#FF8A1F_100%)]", isMobile ? "p-6" : "p-10")}>
                 <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
                 <DialogHeader>
                   <DialogTitle className={cn("font-black tracking-tighter text-left break-keep", isMobile ? "text-[1.7rem]" : "text-3xl")}>상담 신청</DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
+                  <DialogDescription className="text-white/80 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
                 </DialogHeader>
               </div>
               <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-8 max-h-[60vh]")}>
@@ -746,7 +893,7 @@ export function AppointmentsPageContent({
                 </div>
               </div>
               <DialogFooter className={cn("bg-muted/30", isMobile ? "p-5" : "p-8")}>
-                <Button onClick={handleRequestAppointment} disabled={isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg shadow-xl text-white", `bg-gradient-to-br ${currentTier.gradient}`)}>
+                <Button onClick={handleRequestAppointment} disabled={isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg", counselingCtaClass)}>
                   {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 신청 완료'}
                 </Button>
               </DialogFooter>
@@ -754,6 +901,7 @@ export function AppointmentsPageContent({
           </Dialog>
         )}
       </header>
+      )}
 
       {isStaff && (
         <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
@@ -830,30 +978,30 @@ export function AppointmentsPageContent({
       )}
 
       {isStudent && (
-        <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem] mb-4" : "rounded-[2.5rem] mb-6")}>
-          <CardHeader className={cn("bg-amber-50/30 border-b", isMobile ? "p-5" : "p-6 sm:p-8")}>
-            <CardTitle className={cn("font-black text-amber-700 flex items-center gap-3", isMobile ? "text-lg" : "text-xl")}>
-              <Megaphone className="h-6 w-6 opacity-70" /> 공지사항
+        <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={cn(studentSectionCardClass, isMobile ? "mb-4" : "mb-6")}>
+          <CardHeader className={studentSectionHeaderClass}>
+            <CardTitle className={studentSectionTitleClass}>
+              <Megaphone className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : "opacity-70 text-amber-700")} /> 공지사항
             </CardTitle>
-            <CardDescription className="font-bold text-xs mt-1">학생 대상 공지를 상담트랙에서 바로 확인할 수 있습니다.</CardDescription>
+            <CardDescription className={studentSectionDescriptionClass}>학생 대상 공지를 상담트랙에서 바로 확인할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {announcementsLoading ? (
-              <div className="py-12 flex justify-center"><Loader2 className="animate-spin h-7 w-7 text-primary opacity-20" /></div>
+              <div className="py-12 flex justify-center"><Loader2 className={cn("animate-spin h-7 w-7", isStudentTrackTheme ? "text-white/30" : "text-primary opacity-20")} /></div>
             ) : visibleStudentAnnouncements.length === 0 ? (
-              <div className="py-14 text-center text-muted-foreground/40 font-black">등록된 공지사항이 없습니다.</div>
+              <div className={cn("py-14 text-center font-black", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]/80" : "text-muted-foreground/40")}>등록된 공지사항이 없습니다.</div>
             ) : (
-              <div className="divide-y divide-muted/10">
+              <div className={cn(isStudentTrackTheme ? "space-y-3 p-4" : "divide-y divide-muted/10")}>
                 {visibleStudentAnnouncements.map((item: any) => {
                   const createdAt = item?.createdAt?.toDate?.();
                   const createdAtLabel = createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '-';
                   return (
-                    <div key={item.id} className={cn("space-y-2", isMobile ? "p-4" : "p-5 sm:p-6")}>
+                    <div key={item.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.25rem] border-white/10 p-4 shadow-none" : "space-y-2", !isStudentTrackTheme && (isMobile ? "p-4" : "p-5 sm:p-6"))}>
                       <div className="flex items-center justify-between gap-3">
-                        <h3 className={cn("font-black text-primary break-keep", isMobile ? "text-sm" : "text-base")}>{item?.title || '공지사항'}</h3>
-                        <span className="text-[10px] font-bold text-muted-foreground shrink-0">{createdAtLabel}</span>
+                        <h3 className={cn("font-black break-keep", isMobile ? "text-sm" : "text-base", studentTitleTextClass)}>{item?.title || '공지사항'}</h3>
+                        <span className={cn("text-[10px] font-bold shrink-0", studentMetaTextClass)}>{createdAtLabel}</span>
                       </div>
-                      <p className="text-sm font-semibold text-slate-700 whitespace-pre-wrap leading-relaxed">
+                      <p className={cn("text-sm font-semibold whitespace-pre-wrap leading-relaxed", studentBodyTextClass)}>
                         {item?.body || '내용이 없습니다.'}
                       </p>
                     </div>
@@ -867,20 +1015,20 @@ export function AppointmentsPageContent({
 
       <Tabs value={activeTab} onValueChange={(value) => !showAll && setActiveTab(value as AppointmentTab)} className="w-full flex flex-col items-center">
         {!showAll && (
-          <TabsList className={cn("grid w-full rounded-full p-1 bg-muted/30 border shadow-inner mb-8", isStaff ? "grid-cols-4" : isStudent ? "grid-cols-3" : "grid-cols-2", isMobile ? "h-auto max-w-full gap-1" : isStaff ? "h-16 max-w-3xl mx-auto" : isStudent ? "h-16 max-w-2xl mx-auto" : "h-16 max-w-sm mx-auto")}>
-            <TabsTrigger value="reservations" className={cn("rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all", isMobile ? "min-h-[3.25rem] px-2" : "")}>
+          <TabsList className={studentTabRailClass}>
+            <TabsTrigger value="reservations" className={studentTabTriggerClass}>
               <Calendar className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 예약</span>
             </TabsTrigger>
-            <TabsTrigger value="logs" className={cn("rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all", isMobile ? "min-h-[3.25rem] px-2" : "")}>
+            <TabsTrigger value="logs" className={studentTabTriggerClass}>
               <FileText className="h-4 w-4" /> <span className="text-xs sm:text-sm">상담 일지</span>
             </TabsTrigger>
             {(isStudent || isStaff) && (
-              <TabsTrigger value="inquiries" className={cn("rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all", isMobile ? "min-h-[3.25rem] px-2" : "")}>
+              <TabsTrigger value="inquiries" className={studentTabTriggerClass}>
                 <MessageSquare className="h-4 w-4" /> <span className="text-xs sm:text-sm">질문/건의</span>
               </TabsTrigger>
             )}
             {isStaff && (
-              <TabsTrigger value="parent" className={cn("rounded-full font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg transition-all", isMobile ? "min-h-[3.25rem] px-2" : "")}>
+              <TabsTrigger value="parent" className={studentTabTriggerClass}>
                 <ClipboardCheck className="h-4 w-4" /> <span className="text-xs sm:text-sm">학부모 요청</span>
               </TabsTrigger>
             )}
@@ -888,35 +1036,35 @@ export function AppointmentsPageContent({
         )}
 
         <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
-          <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
-            <CardHeader className={cn("bg-muted/5 border-b", isMobile ? "p-5" : "p-6 sm:p-8")}>
-              <CardTitle className="text-xl font-black text-primary flex items-center gap-3">
-                <History className="h-6 w-6 opacity-40" /> 예약 및 신청 내역
+          <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={studentSectionCardClass}>
+            <CardHeader className={studentSectionHeaderClass}>
+              <CardTitle className={studentSectionTitleClass}>
+                <History className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : "opacity-40")} /> 예약 및 신청 내역
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {resLoading ? (
-                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                <div className="py-20 flex justify-center"><Loader2 className={cn("animate-spin h-8 w-8", isStudentTrackTheme ? "text-white/30" : "text-primary opacity-20")} /></div>
               ) : reservations.length === 0 ? (
-                <div className="py-32 text-center text-muted-foreground/30 font-black italic flex flex-col items-center gap-4">
-                  <Calendar className="h-16 w-16 opacity-10" />
+                <div className={cn("py-32", studentEmptyStateClass)}>
+                  <Calendar className={cn("h-16 w-16", isStudentTrackTheme ? "opacity-30" : "opacity-10")} />
                   예약 내역이 없습니다.
                 </div>
               ) : (
-                <div className="divide-y divide-muted/10">
+                <div className={cn(isStudentTrackTheme ? "space-y-3 p-4" : "divide-y divide-muted/10")}>
                   {visibleReservations.map((res) => (
-                    <div key={res.id} className={cn("flex flex-col sm:flex-row sm:items-center justify-between group hover:bg-muted/5 transition-colors gap-4", isMobile ? "p-5" : "p-6 sm:p-8")}>
+                    <div key={res.id} className={cn("flex flex-col sm:flex-row sm:items-center justify-between group transition-colors gap-4", isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : "hover:bg-muted/5", isMobile ? "p-5" : "p-6 sm:p-8")}>
                       <div className="flex items-center gap-4 sm:gap-6 min-w-0">
-                        <div className={cn("rounded-2xl bg-primary/5 border-2 border-primary/10 flex flex-col items-center justify-center shrink-0 group-hover:border-transparent transition-all duration-500 shadow-inner", isMobile ? "h-14 w-14" : "h-16 w-16", isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary")}>
-                          <span className={cn("font-black text-primary/60 group-hover:text-white/60 tracking-tighter", isMobile ? "text-[8px]" : "text-[10px]")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'M월') : ''}</span>
-                          <span className={cn("font-black text-primary group-hover:text-white leading-none mt-0.5", isMobile ? "text-lg" : "text-xl sm:text-2xl")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
+                        <div className={cn("rounded-2xl flex flex-col items-center justify-center shrink-0 transition-all duration-500", isStudentTrackTheme ? "border border-white/12 bg-white/[0.08] shadow-none" : "bg-primary/5 border-2 border-primary/10 shadow-inner", isMobile ? "h-14 w-14" : "h-16 w-16", !isStudentTrackTheme && (isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary"))}>
+                          <span className={cn("font-black tracking-tighter", isMobile ? "text-[8px]" : "text-[10px]", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]" : "text-primary/60 group-hover:text-white/60")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'M월') : ''}</span>
+                          <span className={cn("font-black leading-none mt-0.5", isMobile ? "text-lg" : "text-xl sm:text-2xl", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : "text-primary group-hover:text-white")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
                         </div>
                         <div className="grid gap-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className={cn("font-black tracking-tight break-keep", isMobile ? "text-sm" : "text-base sm:text-lg")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'HH:mm') : ''} 상담</h3>
+                            <h3 className={cn("font-black tracking-tight break-keep", isMobile ? "text-sm" : "text-base sm:text-lg", studentTitleTextClass)}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'HH:mm') : ''} 상담</h3>
                             {getStatusBadge(res.status)}
                           </div>
-                          <p className={cn("font-bold text-muted-foreground flex items-center gap-1.5 truncate", isMobile ? "text-[9px]" : "text-[10px] sm:text-xs")}>
+                          <p className={cn("font-bold flex items-center gap-1.5 truncate", isMobile ? "text-[9px]" : "text-[10px] sm:text-xs", studentMetaTextClass)}>
                             <User className="h-3.5 w-3.5 opacity-40 shrink-0" /> 
                             {isStudent ? (res.teacherName || '담당 교사 배정 중') : `${res.studentName} 학생 (담당: ${res.teacherName})`}
                           </p>
@@ -944,7 +1092,7 @@ export function AppointmentsPageContent({
                             size="sm" 
                             variant="outline" 
                             onClick={() => handleUpdateStatus(res.id, 'canceled')} 
-                            className="rounded-xl font-black border-rose-200 text-rose-600 hover:bg-rose-50 h-10 px-4 transition-all"
+                            className={cn("rounded-xl font-black h-10 px-4 transition-all", isStudentTrackTheme ? "border-rose-300/30 bg-rose-400/10 text-rose-100 hover:bg-rose-400/18" : "border-rose-200 text-rose-600 hover:bg-rose-50")}
                           >
                             <X className="h-4 w-4" /> 신청 취소
                           </Button>
@@ -958,8 +1106,8 @@ export function AppointmentsPageContent({
                 </div>
               )}
               {!showAll && reservations.length > PREVIEW_LIMIT && (
-                <div className="border-t border-muted/10 p-5 sm:p-6 flex justify-center bg-muted/5">
-                  <Button asChild variant="outline" className="rounded-xl font-black">
+                <div className={studentMoreWrapClass}>
+                  <Button asChild variant={isStudentTrackTheme ? 'dark' : 'outline'} className="rounded-xl font-black">
                     <Link href="/dashboard/appointments/reservations">
                       상담예약 더보기 <ArrowRight className="ml-1 h-4 w-4" />
                     </Link>
@@ -971,17 +1119,17 @@ export function AppointmentsPageContent({
         </TabsContent>
 
         <TabsContent value="logs" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
-          <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
-            <CardHeader className={cn("bg-emerald-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
+          <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={studentSectionCardClass}>
+            <CardHeader className={studentSectionHeaderClass}>
               <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col" : "flex-row")}>
-                <CardTitle className={cn("font-black text-emerald-700 flex items-center gap-3 break-keep", isMobile ? "text-lg" : "text-xl")}>
-                  <CheckCircle2 className="h-6 w-6 opacity-60" /> 피드백 및 결과 일지
+                <CardTitle className={studentSectionTitleClass}>
+                  <CheckCircle2 className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : "opacity-60 text-emerald-700")} /> 피드백 및 결과 일지
                 </CardTitle>
                 
-                <div className={cn("flex items-center gap-2 bg-white/50 p-1.5 rounded-2xl border shadow-sm", isMobile ? "w-full" : "w-auto")}>
-                  <Filter className="h-3.5 w-3.5 text-emerald-600 ml-2" />
+                <div className={cn("flex items-center gap-2 p-1.5 rounded-2xl border", isMobile ? "w-full" : "w-auto", isStudentTrackTheme ? "border-white/10 bg-white/[0.06] shadow-none" : "bg-white/50 shadow-sm")}>
+                  <Filter className={cn("h-3.5 w-3.5 ml-2", isStudentTrackTheme ? "text-[var(--accent-orange-soft)]" : "text-emerald-600")} />
                   <Select value={selectedSeason} onValueChange={setSelectedSeason}>
-                    <SelectTrigger className="h-9 w-full sm:w-[180px] border-none bg-transparent font-black text-xs shadow-none focus:ring-0">
+                    <SelectTrigger className={cn("h-9 w-full sm:w-[180px] border-none bg-transparent font-black text-xs shadow-none focus:ring-0", isStudentTrackTheme && "text-[var(--text-on-dark)]")}>
                       <SelectValue placeholder="시즌 선택" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -998,21 +1146,21 @@ export function AppointmentsPageContent({
             </CardHeader>
             <CardContent className="p-0">
               {logsLoading ? (
-                <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                <div className="py-20 flex justify-center"><Loader2 className={cn("animate-spin h-8 w-8", isStudentTrackTheme ? "text-white/30" : "text-primary opacity-20")} /></div>
               ) : filteredLogs.length === 0 ? (
-                <div className="py-32 text-center text-muted-foreground/30 font-black italic flex flex-col items-center gap-4">
-                  <FileText className="h-16 w-16 opacity-10" />
+                <div className={cn("py-32", studentEmptyStateClass)}>
+                  <FileText className={cn("h-16 w-16", isStudentTrackTheme ? "opacity-30" : "opacity-10")} />
                   해당 시즌의 기록이 없습니다.
                 </div>
               ) : (
-                <div className="divide-y divide-muted/10">
+                <div className={cn(isStudentTrackTheme ? "space-y-3 p-4" : "divide-y divide-muted/10")}>
                   {visibleLogs.map((log) => {
                     const studentQuestion =
                       log.studentQuestion?.trim() ||
                       (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
                       '';
                     return (
-                    <div key={log.id} className={cn("hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
+                    <div key={log.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : "hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex flex-wrap items-center gap-2">
@@ -1045,27 +1193,27 @@ export function AppointmentsPageContent({
                               </Badge>
                             )}
                           </div>
-                          {!isMobile && <span className="text-[8px] font-black text-primary/30 tracking-[0.3em]">상담 로그</span>}
+                          {!isMobile && <span className={cn("text-[8px] font-black tracking-[0.3em]", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]/70" : "text-primary/30")}>상담 로그</span>}
                         </div>
                         
                         <div className="space-y-3">
                           {studentQuestion && (
-                            <div className={cn("rounded-[1.25rem] border border-sky-200 bg-sky-50/60", isMobile ? "p-4" : "p-5")}>
-                              <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-700">학생 질문</p>
-                              <p className={cn("font-bold leading-relaxed text-sky-900 whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base")}>
+                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-[#66b9ff]/20" : "rounded-[1.25rem] border border-sky-200 bg-sky-50/60", isMobile ? "p-4" : "p-5")}>
+                              <p className={cn("mb-1 text-[10px] font-black uppercase tracking-widest", isStudentTrackTheme ? "text-[#9fd6ff]" : "text-sky-700")}>학생 질문</p>
+                              <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : "text-sky-900")}>
                                 {studentQuestion}
                               </p>
                             </div>
                           )}
-                          <div className={cn("rounded-[1.25rem] bg-[#fafafa] border shadow-inner", isMobile ? "p-4" : "p-5")}>
-                            <p className={cn("font-bold leading-relaxed text-foreground/80 whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base")}>{log.content}</p>
+                          <div className={cn(studentGhostPanelClass, isMobile ? "p-4" : "p-5")}>
+                            <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base", studentBodyTextClass)}>{log.content}</p>
                           </div>
                           {log.improvement && (
-                            <div className={cn("rounded-[1.25rem] bg-emerald-50 border border-emerald-100 flex items-start gap-3", isMobile ? "p-4" : "p-5")}>
-                              <div className="p-1.5 rounded-lg bg-white shadow-sm shrink-0"><AlertCircle className="h-3.5 w-3.5 text-emerald-600" /></div>
+                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-emerald-300/18 flex items-start gap-3" : "rounded-[1.25rem] bg-emerald-50 border border-emerald-100 flex items-start gap-3", isMobile ? "p-4" : "p-5")}>
+                              <div className={cn("p-1.5 rounded-lg shrink-0", isStudentTrackTheme ? "bg-emerald-400/12" : "bg-white shadow-sm")}><AlertCircle className={cn("h-3.5 w-3.5", isStudentTrackTheme ? "text-emerald-300" : "text-emerald-600")} /></div>
                               <div className="space-y-0.5">
-                                <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest leading-none">실천 권고</p>
-                                <p className={cn("font-bold text-emerald-900 leading-relaxed", isMobile ? "text-xs" : "text-sm")}>{log.improvement}</p>
+                                <p className={cn("text-[9px] font-black uppercase tracking-widest leading-none", isStudentTrackTheme ? "text-emerald-300" : "text-emerald-700")}>실천 권고</p>
+                                <p className={cn("font-bold leading-relaxed", isMobile ? "text-xs" : "text-sm", isStudentTrackTheme ? "text-emerald-100" : "text-emerald-900")}>{log.improvement}</p>
                               </div>
                             </div>
                           )}
@@ -1077,8 +1225,8 @@ export function AppointmentsPageContent({
                 </div>
               )}
               {!showAll && filteredLogs.length > PREVIEW_LIMIT && (
-                <div className="border-t border-muted/10 p-5 sm:p-6 flex justify-center bg-muted/5">
-                  <Button asChild variant="outline" className="rounded-xl font-black">
+                <div className={studentMoreWrapClass}>
+                  <Button asChild variant={isStudentTrackTheme ? 'dark' : 'outline'} className="rounded-xl font-black">
                     <Link href="/dashboard/appointments/logs">
                       상담일지 더보기 <ArrowRight className="ml-1 h-4 w-4" />
                     </Link>
@@ -1091,19 +1239,19 @@ export function AppointmentsPageContent({
 
         {(isStudent || isStaff) && (
           <TabsContent value="inquiries" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
-            <Card className={cn("border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50 w-full", isMobile ? "rounded-[1.5rem]" : "rounded-[2.5rem]")}>
-              <CardHeader className={cn("bg-sky-50/30 border-b", isMobile ? "p-6" : "p-6 sm:p-8")}>
-                <CardTitle className={cn("font-black text-sky-700 flex items-center gap-3 break-keep", isMobile ? "text-lg" : "text-xl")}>
-                  <MessageSquare className="h-6 w-6 opacity-60" /> 질문/건의함
+            <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={studentSectionCardClass}>
+              <CardHeader className={studentSectionHeaderClass}>
+                <CardTitle className={studentSectionTitleClass}>
+                  <MessageSquare className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : "opacity-60 text-sky-700")} /> 질문/건의함
                 </CardTitle>
-                <CardDescription className="font-bold text-xs mt-1">궁금한 점이나 건의사항을 남기면 선생님 또는 센터관리자가 확인 후 답변합니다.</CardDescription>
+                <CardDescription className={studentSectionDescriptionClass}>궁금한 점이나 건의사항을 남기면 선생님 또는 센터관리자가 확인 후 답변합니다.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 {isStudent && (
-                <div className={cn("space-y-4 border-b bg-sky-50/20", isMobile ? "p-5" : "p-6 sm:p-8")}>
+                <div className={cn("space-y-4 border-b", isMobile ? "p-5" : "p-6 sm:p-8", isStudentTrackTheme ? "border-white/10 bg-white/[0.03]" : "bg-sky-50/20")}>
                   <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[150px_1fr]")}>
                     <Select value={inquiryType} onValueChange={(value: 'question' | 'suggestion') => setInquiryType(value)}>
-                      <SelectTrigger className="h-11 rounded-xl border-2 font-bold text-xs">
+                      <SelectTrigger className={cn("h-11 rounded-xl border-2 font-bold text-xs", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)]")}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1115,20 +1263,20 @@ export function AppointmentsPageContent({
                       value={inquiryTitle}
                       onChange={(e) => setInquiryTitle(e.target.value)}
                       placeholder={inquiryType === 'question' ? '질문 제목 (선택)' : '건의 제목 (선택)'}
-                      className="h-11 rounded-xl border-2 font-bold"
+                      className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]")}
                     />
                   </div>
                   <Textarea
                     value={inquiryBody}
                     onChange={(e) => setInquiryBody(e.target.value)}
                     placeholder={inquiryType === 'question' ? '질문 내용을 입력해 주세요.' : '건의사항 내용을 입력해 주세요.'}
-                    className="rounded-xl min-h-[120px] resize-none text-sm font-bold border-2"
+                    className={cn("rounded-xl min-h-[120px] resize-none text-sm font-bold border-2", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]")}
                   />
                   <div className="flex justify-end">
                     <Button
                       onClick={handleSubmitInquiry}
                       disabled={isSubmitting || !inquiryBody.trim()}
-                      className={cn("rounded-xl font-black h-11 px-6 text-white", `bg-gradient-to-br ${currentTier.gradient}`)}
+                      className={cn("rounded-xl font-black h-11 px-6", counselingCtaClass)}
                     >
                       {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : '등록하기'}
                     </Button>
@@ -1136,34 +1284,34 @@ export function AppointmentsPageContent({
                 </div>
                 )}
                 {parentCommsLoading ? (
-                  <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
+                  <div className="py-20 flex justify-center"><Loader2 className={cn("animate-spin h-8 w-8", isStudentTrackTheme ? "text-white/30" : "text-primary opacity-20")} /></div>
                 ) : studentInquiries.length === 0 ? (
-                  <div className="py-24 text-center text-muted-foreground/30 font-black italic flex flex-col items-center gap-4">
-                    <MessageSquare className="h-16 w-16 opacity-10" />
+                  <div className={cn("py-24", studentEmptyStateClass)}>
+                    <MessageSquare className={cn("h-16 w-16", isStudentTrackTheme ? "opacity-30" : "opacity-10")} />
                     등록된 질문/건의가 없습니다.
                   </div>
                 ) : (
-                  <div className="divide-y divide-muted/10">
+                  <div className={cn(isStudentTrackTheme ? "space-y-3 p-4" : "divide-y divide-muted/10")}>
                     {visibleStudentInquiries.map((item) => {
                       const createdAtDate = item.createdAt?.toDate?.() || item.updatedAt?.toDate?.();
                       const createdAtLabel = createdAtDate ? format(createdAtDate, 'yyyy.MM.dd HH:mm') : '-';
                       const repliedAtDate = item.repliedAt?.toDate?.();
                       const repliedAtLabel = repliedAtDate ? format(repliedAtDate, 'yyyy.MM.dd HH:mm') : '';
                       return (
-                        <div key={item.id} className={cn("space-y-3 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-8")}>
+                        <div key={item.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : "space-y-3 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-8")}>
                           <div className="flex items-center gap-2 flex-wrap">
                             {getCommunicationTypeBadge(item)}
                             {getParentStatusBadge(item.status)}
                           </div>
-                          <h3 className={cn("font-black text-primary break-keep", isMobile ? "text-sm" : "text-base")}>{item.title || '질문/건의'}</h3>
-                          <p className="text-[10px] font-bold text-muted-foreground">{createdAtLabel}</p>
-                          <div className="rounded-2xl border bg-slate-50/40 p-4">
-                            <p className="whitespace-pre-wrap text-sm font-bold text-slate-700 leading-relaxed">{item.body?.trim() || '내용이 없습니다.'}</p>
+                          <h3 className={cn("font-black break-keep", isMobile ? "text-sm" : "text-base", studentTitleTextClass)}>{item.title || '질문/건의'}</h3>
+                          <p className={cn("text-[10px] font-bold", studentMetaTextClass)}>{createdAtLabel}</p>
+                          <div className={cn(studentGhostPanelClass, "p-4")}>
+                            <p className={cn("whitespace-pre-wrap text-sm font-bold leading-relaxed", studentBodyTextClass)}>{item.body?.trim() || '내용이 없습니다.'}</p>
                           </div>
                           {item.replyBody && (
-                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-                              <p className="text-[10px] font-black text-emerald-700 mb-1">답변 {item.repliedByName ? `· ${item.repliedByName}` : ''} {repliedAtLabel ? `· ${repliedAtLabel}` : ''}</p>
-                              <p className="whitespace-pre-wrap text-sm font-bold text-emerald-900 leading-relaxed">{item.replyBody}</p>
+                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-emerald-300/18" : "rounded-2xl border border-emerald-200 bg-emerald-50/70", "p-4")}>
+                              <p className={cn("text-[10px] font-black mb-1", isStudentTrackTheme ? "text-emerald-300" : "text-emerald-700")}>답변 {item.repliedByName ? `· ${item.repliedByName}` : ''} {repliedAtLabel ? `· ${repliedAtLabel}` : ''}</p>
+                              <p className={cn("whitespace-pre-wrap text-sm font-bold leading-relaxed", isStudentTrackTheme ? "text-emerald-100" : "text-emerald-900")}>{item.replyBody}</p>
                             </div>
                           )}
                         </div>
@@ -1172,8 +1320,8 @@ export function AppointmentsPageContent({
                   </div>
                 )}
                 {!showAll && studentInquiries.length > PREVIEW_LIMIT && (
-                  <div className="border-t border-muted/10 p-5 sm:p-6 flex justify-center bg-muted/5">
-                    <Button asChild variant="outline" className="rounded-xl font-black">
+                  <div className={studentMoreWrapClass}>
+                    <Button asChild variant={isStudentTrackTheme ? 'dark' : 'outline'} className="rounded-xl font-black">
                       <Link href="/dashboard/appointments/inquiries">
                         질문/건의 더보기<ArrowRight className="ml-1 h-4 w-4" />
                       </Link>

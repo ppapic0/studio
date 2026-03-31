@@ -5,12 +5,10 @@ import { flushSync } from 'react-dom';
 import { format, isSameDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
-  ArrowRight,
   CalendarCheck2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Copy,
   Flame,
   Layers3,
@@ -569,24 +567,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     setIsRoutineEditOpen(false);
   };
 
-  const handleExtendRoutine = async () => {
-    const nextOutTime = addMinutesToClock(outTime || routineDraftOutTime || '22:30', 30);
-    flushSync(() => {
-      setOutTime(nextOutTime);
-      setRoutineDraftOutTime(nextOutTime);
-    });
-    await handleSetAttendance('attend');
-  };
-
-  const handleFinishRoutineNow = async () => {
-    const currentClock = createClockFromNow();
-    flushSync(() => {
-      setOutTime(currentClock);
-      setRoutineDraftOutTime(currentClock);
-    });
-    await handleSetAttendance('attend');
-  };
-
   const handleAddSuggestedTask = async (item: any) => {
     setNewStudySubject(item.subject || 'etc');
     setNewStudyMode('time');
@@ -735,13 +715,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
       ]);
     }
     setIsOutingModalOpen(false);
-  };
-
-  const clearAwayPlan = () => {
-    setAwayStartTime('');
-    setAwayEndTime('');
-    setAwayReason('');
-    setExtraAwayPlans([]);
   };
 
   const heroStatus = isAbsentMode
@@ -908,31 +881,17 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
               </div>
             </div>
 
-            {!isPast ? (
+            {!isPast && !isRoutineActive ? (
               <div className="mt-5 flex flex-wrap gap-2">
-                {!isRoutineActive ? (
-                  <Button
-                    type="button"
-                    onClick={() => handleSetAttendance('attend')}
-                    disabled={isSubmitting}
-                    className={cn('h-12 rounded-full px-5 font-black text-white shadow-[0_18px_34px_-24px_rgba(255,150,38,0.6)] animate-[planner-cta-breathe_2.8s_ease-in-out_infinite]', rewardGradient)}
-                  >
-                    <CalendarCheck2 className="mr-2 h-4 w-4" />
-                    등원 시작
-                  </Button>
-                ) : null}
-                {hasAwayPlan ? (
-                  <ActionChipButton icon={ArrowRight} label="복귀하기" onClick={clearAwayPlan} disabled={isSubmitting} tone="white" />
-                ) : null}
-                {isRoutineActive && !hasAwayPlan ? (
-                  <>
-                    <ActionChipButton icon={Clock3} label="+30분 연장" onClick={handleExtendRoutine} disabled={isSubmitting} tone="white" />
-                    <ActionChipButton icon={CalendarCheck2} label="하원 완료" onClick={handleFinishRoutineNow} disabled={isSubmitting} tone="orange" />
-                  </>
-                ) : null}
-                {!hasAwayPlan ? (
-                  <ActionChipButton icon={Clock3} label="외출하기" onClick={() => setIsOutingModalOpen(true)} disabled={isSubmitting} tone="white" />
-                ) : null}
+                <Button
+                  type="button"
+                  onClick={() => handleSetAttendance('attend')}
+                  disabled={isSubmitting}
+                  className={cn('h-12 rounded-full px-5 font-black text-white shadow-[0_18px_34px_-24px_rgba(255,150,38,0.6)] animate-[planner-cta-breathe_2.8s_ease-in-out_infinite]', rewardGradient)}
+                >
+                  <CalendarCheck2 className="mr-2 h-4 w-4" />
+                  등원 시작
+                </Button>
               </div>
             ) : null}
           </div>

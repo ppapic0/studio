@@ -23,7 +23,7 @@ import {
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { CenterMembership, DailyStudentStat, LeaderboardEntry } from '@/lib/types';
+import { CenterMembership, DailyStudentStat, LeaderboardEntry, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 50;
@@ -132,27 +132,27 @@ function getToneClasses(tone: RankEventTone) {
   switch (tone) {
     case 'gold':
       return {
-        chip: 'border-amber-300/22 bg-amber-300/10 text-amber-100',
-        line: 'from-amber-300/85 via-orange-400/68 to-transparent',
-        text: 'text-amber-100',
+        chip: 'border-[#F0C86E] bg-[#FFF4D5] text-[#9B5A0A]',
+        line: 'from-[#FFD36D]/85 via-[#FFB347]/60 to-transparent',
+        text: 'text-[#9B5A0A]',
       };
     case 'blue':
       return {
-        chip: 'border-cyan-300/22 bg-cyan-300/10 text-cyan-100',
-        line: 'from-cyan-300/85 via-blue-400/65 to-transparent',
-        text: 'text-cyan-100',
+        chip: 'border-[#F0D8BF] bg-[#FFF7ED] text-[#A05E17]',
+        line: 'from-[#FFD4A6]/85 via-[#FFF1DE]/70 to-transparent',
+        text: 'text-[#A05E17]',
       };
     case 'danger':
       return {
-        chip: 'border-rose-300/20 bg-rose-400/10 text-rose-100',
-        line: 'from-rose-300/85 via-orange-400/62 to-transparent',
-        text: 'text-rose-100',
+        chip: 'border-[#F6B4B4] bg-[#FFF1F1] text-[#B45353]',
+        line: 'from-[#FFC4AE]/85 via-[#FFD5C7]/62 to-transparent',
+        text: 'text-[#B45353]',
       };
     default:
       return {
-        chip: 'border-orange-300/20 bg-orange-400/10 text-orange-100',
-        line: 'from-orange-300/85 via-orange-400/65 to-transparent',
-        text: 'text-orange-100',
+        chip: 'border-[#FFCC9A] bg-[#FFF1E0] text-[#C86A10]',
+        line: 'from-[#FFB761]/85 via-[#FFD29A]/70 to-transparent',
+        text: 'text-[#C86A10]',
       };
   }
 }
@@ -233,7 +233,7 @@ function Panel({ className, children }: { className?: string; children: ReactNod
   return (
     <section
       className={cn(
-        'surface-card surface-card--secondary on-dark rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] shadow-[0_24px_80px_rgba(2,6,23,0.35)] backdrop-blur-xl',
+        'rounded-[28px] border border-[#F1D8BF] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF8F1_100%)] shadow-[0_22px_60px_rgba(196,99,16,0.12)] backdrop-blur-xl',
         className
       )}
     >
@@ -244,7 +244,7 @@ function Panel({ className, children }: { className?: string; children: ReactNod
 
 function LiveBadge() {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/25 bg-orange-400/10 px-3 py-1.5 text-[11px] font-black tracking-[0.18em] text-orange-200">
+    <div className="inline-flex items-center gap-2 rounded-full border border-[#FFCC9A] bg-[#FFF1E0] px-3 py-1.5 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
       <span className="leaderboard-live-dot relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-400" />
       LIVE RANKING
     </div>
@@ -267,8 +267,8 @@ function RankPill({
       className={cn(
         'rounded-full border px-4 py-2.5 text-sm font-black transition-all duration-200',
         active
-          ? 'border-orange-300/28 bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 shadow-[0_8px_24px_rgba(251,146,60,0.35)]'
-          : 'border-white/12 bg-white/[0.09] text-[var(--text-on-dark-soft)] hover:bg-white/[0.14] hover:text-white'
+          ? 'border-[#FF9A3D] bg-gradient-to-r from-[#FF9626] to-[#FFB347] text-white shadow-[0_10px_26px_rgba(251,146,60,0.28)]'
+          : 'border-[#F1D4B4] bg-white text-[#A8651B] hover:bg-[#FFF6EC] hover:text-[#8C4F11]'
       )}
     >
       {label}
@@ -292,21 +292,21 @@ function TopSummaryCard({
   compact?: boolean;
 }) {
   const toneClass = tone === 'orange'
-    ? 'from-orange-500/18 via-orange-500/10 to-white/[0.04]'
+    ? 'from-[#FFF0DE] via-[#FFF7ED] to-white'
     : tone === 'blue'
-      ? 'from-blue-500/18 via-cyan-400/10 to-white/[0.04]'
-      : 'from-white/[0.07] to-white/[0.03]';
+      ? 'from-[#FFF6EC] via-[#FFF9F2] to-white'
+      : 'from-white to-[#FFF9F4]';
 
   return (
     <Panel className={cn('bg-gradient-to-br', toneClass)}>
       <div className={cn(compact ? 'p-4' : 'p-5')}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-soft)]">{label}</p>
-            <p className={cn('mt-3 font-black tracking-tight text-white', compact ? 'text-[1.7rem] leading-none' : 'text-3xl')}>{value}</p>
-            <p className={cn('mt-2 font-semibold text-[var(--text-on-dark-soft)]', compact ? 'text-[12px] leading-5' : 'text-sm')}>{sub}</p>
+            <p className="text-[11px] font-black tracking-[0.18em] text-[#A3641B]">{label}</p>
+            <p className={cn('mt-3 font-black tracking-tight text-[var(--text-primary)]', compact ? 'text-[1.7rem] leading-none' : 'text-3xl')}>{value}</p>
+            <p className={cn('mt-2 font-semibold text-[var(--text-secondary)]', compact ? 'text-[12px] leading-5' : 'text-sm')}>{sub}</p>
           </div>
-          <div className={cn('rounded-2xl border border-white/12 bg-white/[0.1] text-white', compact ? 'p-2.5' : 'p-3')}>
+          <div className={cn('rounded-2xl border border-[#F2D7BF] bg-[#FFF5EA] text-[#C86A10]', compact ? 'p-2.5' : 'p-3')}>
             <Icon className={cn(compact ? 'h-4 w-4' : 'h-5 w-5')} />
           </div>
         </div>
@@ -335,37 +335,37 @@ function HeroBattleCard({
   compact?: boolean;
 }) {
   return (
-    <Panel className="leaderboard-live-glow overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.18),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.12),transparent_22%),linear-gradient(135deg,#17326B_0%,#22478C_62%,#10285d_100%)]">
+    <Panel className="leaderboard-live-glow overflow-hidden border-[#FFD2A8] bg-[radial-gradient(circle_at_top_right,rgba(255,150,38,0.24),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(255,211,109,0.18),transparent_22%),linear-gradient(180deg,#FFF8F1_0%,#FFFFFF_72%)]">
       <div className={cn(compact ? 'p-4' : 'p-6 sm:p-7')}>
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-soft)]">
-                <Swords className="h-3.5 w-3.5 text-orange-200" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#F2D7BF] bg-white/90 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#A76A25]">
+                <Swords className="h-3.5 w-3.5 text-[#FF9626]" />
                 MY BATTLE STATUS
               </div>
               <div>
-                <p className="text-[11px] font-black tracking-[0.2em] text-[var(--text-on-dark-muted)]">{rangeLabel} LIVE TRACK</p>
+                <p className="text-[11px] font-black tracking-[0.2em] text-[#B57633]">{rangeLabel} LIVE TRACK</p>
                 <div className={cn('mt-3 flex items-end gap-3', compact ? 'flex-wrap' : 'flex-nowrap')}>
-                  <span className={cn('font-black tracking-tight text-white', compact ? 'text-[3rem] leading-[0.9]' : 'text-[4rem] leading-[0.86]')}>
+                  <span className={cn('font-black tracking-tight text-[var(--text-primary)]', compact ? 'text-[3rem] leading-[0.9]' : 'text-[4rem] leading-[0.86]')}>
                     {rankLabel}
                   </span>
-                  <span className={cn('font-black text-white/88', compact ? 'pb-1 text-lg' : 'pb-2 text-2xl')}>
+                  <span className={cn('font-black text-[#A8651B]', compact ? 'pb-1 text-lg' : 'pb-2 text-2xl')}>
                     {hoursLabel}
                   </span>
                 </div>
-                <p className={cn('mt-3 max-w-xl font-semibold text-[var(--text-on-dark-soft)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
+                <p className={cn('mt-3 max-w-xl font-semibold text-[var(--text-secondary)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
                   {isLeader ? '현재 선두 유지 중이에요. 지금 페이스를 유지하면 방어 성공 확률이 높아요.' : `1위까지 ${gapLabel}. 오늘 한 세션만 더 밀어붙이면 추월권이에요.`}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-white/12 bg-white/[0.08] px-4 py-3 text-right shadow-[0_18px_38px_-28px_rgba(2,6,23,0.62)]">
+            <div className="rounded-[22px] border border-[#F2D7BF] bg-white/82 px-4 py-3 text-right shadow-[0_18px_38px_-28px_rgba(196,99,16,0.22)]">
               <div className="mb-1 flex items-center justify-end gap-2">
                 <span className="leaderboard-live-dot relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-400" />
-                <span className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">LIVE PUSH</span>
+                <span className="text-[11px] font-black tracking-[0.18em] text-[#B57633]">LIVE PUSH</span>
               </div>
-              <p className={cn('font-black text-white', compact ? 'text-sm' : 'text-base')}>{isLeader ? '선두 방어 중' : `공부중 +${liveMinutes}분`}</p>
+              <p className={cn('font-black text-[var(--text-primary)]', compact ? 'text-sm' : 'text-base')}>{isLeader ? '선두 방어 중' : `공부중 +${liveMinutes}분`}</p>
             </div>
           </div>
 
@@ -375,21 +375,21 @@ function HeroBattleCard({
               ['1위와 차이', isLeader ? 'LEAD' : gapLabel],
               ['보상 진행', `${progressPercent}%`],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-[22px] border border-white/12 bg-white/[0.08] px-3.5 py-3">
-                <p className="text-[10px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">{label}</p>
-                <p className={cn('mt-2 font-black text-white', compact ? 'text-lg' : 'text-xl')}>{value}</p>
+              <div key={label} className="rounded-[22px] border border-[#F2D7BF] bg-white/82 px-3.5 py-3">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[#B57633]">{label}</p>
+                <p className={cn('mt-2 font-black text-[var(--text-primary)]', compact ? 'text-lg' : 'text-xl')}>{value}</p>
               </div>
             ))}
           </div>
 
-          <div className="space-y-2.5 rounded-[24px] border border-white/12 bg-[#0b1738]/46 px-4 py-3">
+          <div className="space-y-2.5 rounded-[24px] border border-[#F2D7BF] bg-[#FFF5EA] px-4 py-3">
             <div className="flex items-center justify-between text-[11px] font-black tracking-[0.18em]">
-              <span className="text-[var(--text-on-dark-muted)]">OVERTAKE METER</span>
-              <span className="text-orange-200">{progressPercent}% READY</span>
+              <span className="text-[#A76A25]">OVERTAKE METER</span>
+              <span className="text-[#C86A10]">{progressPercent}% READY</span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-white/8">
+            <div className="h-3 overflow-hidden rounded-full bg-[#FFE6CF]">
               <div
-                className="leaderboard-race-fill relative h-full rounded-full bg-gradient-to-r from-[#FF9626] via-[#FFD36D] to-[#7AD4FF]"
+                className="leaderboard-race-fill relative h-full rounded-full bg-gradient-to-r from-[#FF9626] via-[#FFB347] to-[#FFD36D]"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -409,12 +409,12 @@ function LiveTickerBar({ event }: { event: RankLiveEvent }) {
         <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r', tone.line)} />
         <div key={event.id} className="leaderboard-ticker-item relative flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.1] text-lg">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F2D7BF] bg-[#FFF7ED] text-lg">
               {event.emoji}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-black text-white">{event.title}</p>
-              <p className="truncate text-xs font-semibold text-[var(--text-on-dark-soft)]">{event.detail}</p>
+              <p className="truncate text-sm font-black text-[var(--text-primary)]">{event.title}</p>
+              <p className="truncate text-xs font-semibold text-[var(--text-secondary)]">{event.detail}</p>
             </div>
           </div>
           <div className={cn('inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', tone.chip)}>
@@ -434,18 +434,18 @@ function ZoneCard({ zone, compact = false }: { zone: ZoneCardConfig; compact?: b
   return (
     <Panel className={cn(
       'relative overflow-hidden',
-      zone.tone === 'danger' && 'border-rose-300/16 bg-[linear-gradient(180deg,rgba(251,113,133,0.10),rgba(255,255,255,0.02))]',
-      zone.tone === 'gold' && 'border-amber-300/18 bg-[linear-gradient(180deg,rgba(255,211,109,0.12),rgba(255,255,255,0.02))]',
-      zone.tone === 'orange' && 'border-orange-300/18 bg-[linear-gradient(180deg,rgba(255,150,38,0.12),rgba(255,255,255,0.02))]',
-      zone.tone === 'blue' && 'border-cyan-300/18 bg-[linear-gradient(180deg,rgba(122,212,255,0.12),rgba(255,255,255,0.02))]'
+      zone.tone === 'danger' && 'border-[#F6B4B4] bg-[linear-gradient(180deg,#FFF4F4,#FFFFFF)]',
+      zone.tone === 'gold' && 'border-[#F0C86E] bg-[linear-gradient(180deg,#FFF7E3,#FFFFFF)]',
+      zone.tone === 'orange' && 'border-[#FFCC9A] bg-[linear-gradient(180deg,#FFF2E3,#FFFFFF)]',
+      zone.tone === 'blue' && 'border-[#F0D8BF] bg-[linear-gradient(180deg,#FFF8EF,#FFFFFF)]'
     )}>
       <div className={cn(compact ? 'p-4' : 'p-5')}>
         <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', tone.chip)}>
           <Icon className="h-3.5 w-3.5" />
           {zone.kicker}
         </div>
-        <p className="mt-4 text-lg font-black text-white">{zone.title}</p>
-        <p className={cn('mt-2 font-semibold text-[var(--text-on-dark-soft)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>{zone.body}</p>
+        <p className="mt-4 text-lg font-black text-[var(--text-primary)]">{zone.title}</p>
+        <p className={cn('mt-2 font-semibold text-[var(--text-secondary)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>{zone.body}</p>
       </div>
     </Panel>
   );
@@ -466,32 +466,32 @@ function RewardGoalCard({
 
   return (
     <Panel className={cn(
-      'leaderboard-reward-card bg-gradient-to-br from-orange-500/16 via-amber-400/10 to-white/[0.03]',
+      'leaderboard-reward-card border-[#FFD2A8] bg-gradient-to-br from-[#FFF0DE] via-[#FFF7ED] to-white',
       nearUnlock && 'leaderboard-reward-card--near'
     )}>
       <div className={cn(compact ? 'p-4' : 'p-5 sm:p-6')}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-orange-400/10 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-orange-200">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#FFCC9A] bg-[#FFF1E0] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
               <Sparkles className="h-3.5 w-3.5" />
               NEXT REWARD
             </div>
-            <h3 className={cn('mt-4 font-black text-white', compact ? 'text-lg' : 'text-xl')}>1위 달성 시 +1000P</h3>
-            <p className={cn('mt-2 text-[var(--text-on-dark-soft)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
+            <h3 className={cn('mt-4 font-black text-[var(--text-primary)]', compact ? 'text-lg' : 'text-xl')}>1위 달성 시 +1000P</h3>
+            <p className={cn('mt-2 text-[var(--text-secondary)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
               {isLeader ? '보상 해금권에 도달했어요. 지금 선두를 지키면 즉시 포인트를 받을 수 있어요.' : `보상 상자까지 ${gapLabel} 남음. 지금 밀어붙이면 보상 해금이 가까워져요.`}
             </p>
           </div>
-          <div className="leaderboard-reward-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-white/12 bg-white/[0.1] text-orange-100 shadow-[0_18px_42px_-24px_rgba(251,146,60,0.65)]">
+          <div className="leaderboard-reward-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-[#FFD3A8] bg-white text-[#FF9626] shadow-[0_18px_42px_-24px_rgba(251,146,60,0.38)]">
             <Gift className="h-6 w-6" />
           </div>
         </div>
 
-        <div className="mt-5 rounded-[22px] border border-white/12 bg-white/[0.08] p-4">
+        <div className="mt-5 rounded-[22px] border border-[#F2D7BF] bg-white p-4">
           <div className="mb-2 flex items-center justify-between text-sm font-black">
-            <span className="text-[var(--text-on-dark-soft)]">보상 진행도</span>
-            <span className="text-orange-200">{progressPercent}%</span>
+            <span className="text-[var(--text-secondary)]">보상 진행도</span>
+            <span className="text-[#C86A10]">{progressPercent}%</span>
           </div>
-          <div className="leaderboard-reward-progress h-3 overflow-hidden rounded-full bg-white/8">
+          <div className="leaderboard-reward-progress h-3 overflow-hidden rounded-full bg-[#FFE6CF]">
             <div
               className="leaderboard-reward-progress__fill h-full rounded-full bg-gradient-to-r from-[#FF9626] via-[#FFD36D] to-[#FFF1C1]"
               style={{ width: `${progressPercent}%` }}
@@ -505,9 +505,9 @@ function RewardGoalCard({
             ['2위', '10,000P'],
             ['3위', '5,000P'],
           ].map(([place, reward]) => (
-            <div key={place} className={cn('rounded-2xl border border-white/12 bg-white/[0.1]', compact ? 'p-2.5' : 'p-3')}>
-              <p className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">{place}</p>
-              <p className={cn('mt-1 font-black text-white', compact ? 'text-[13px] leading-5' : 'text-sm')}>{reward}</p>
+            <div key={place} className={cn('rounded-2xl border border-[#F2D7BF] bg-white', compact ? 'p-2.5' : 'p-3')}>
+              <p className="text-[11px] font-black tracking-[0.18em] text-[#A76A25]">{place}</p>
+              <p className={cn('mt-1 font-black text-[var(--text-primary)]', compact ? 'text-[13px] leading-5' : 'text-sm')}>{reward}</p>
             </div>
           ))}
         </div>
@@ -555,14 +555,14 @@ function LeaderboardRow({
         'relative overflow-hidden rounded-[24px] border transition-transform duration-200 hover:-translate-y-0.5',
         compact ? 'p-3.5' : 'p-4 sm:p-5',
         player.isMe
-          ? 'leaderboard-my-row border-orange-400/25 bg-[linear-gradient(90deg,rgba(251,146,60,0.12),rgba(255,255,255,0.04))] shadow-[0_0_0_1px_rgba(251,146,60,0.08),0_0_32px_rgba(251,146,60,0.10)]'
+          ? 'leaderboard-my-row border-[#FFB768] bg-[linear-gradient(90deg,#FFF2E1,white)] shadow-[0_0_0_1px_rgba(251,146,60,0.08),0_0_32px_rgba(251,146,60,0.10)]'
           : rowTone === 'gold'
-            ? 'border-amber-300/16 bg-[linear-gradient(90deg,rgba(255,211,109,0.10),rgba(255,255,255,0.03))]'
+            ? 'border-[#F0C86E] bg-[linear-gradient(90deg,#FFF7E3,white)]'
             : rowTone === 'danger'
-              ? 'border-rose-300/16 bg-[linear-gradient(90deg,rgba(251,113,133,0.08),rgba(255,255,255,0.03))]'
+              ? 'border-[#F6B4B4] bg-[linear-gradient(90deg,#FFF4F4,white)]'
               : rowTone === 'blue'
-                ? 'border-cyan-300/14 bg-[linear-gradient(90deg,rgba(122,212,255,0.08),rgba(255,255,255,0.03))]'
-                : 'border-white/12 bg-white/[0.06]'
+                ? 'border-[#F0D8BF] bg-[linear-gradient(90deg,#FFF8EF,white)]'
+                : 'border-[#EED8C3] bg-white'
       )}
     >
       {player.isMe ? <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_right,rgba(251,146,60,0.16),transparent_38%)] opacity-70" /> : null}
@@ -573,12 +573,12 @@ function LeaderboardRow({
             'flex shrink-0 items-center justify-center rounded-2xl border font-black',
             compact ? 'h-10 w-10 text-base' : 'h-12 w-12 text-lg',
             index === 0
-              ? 'border-orange-300/40 bg-orange-400/16 text-orange-200'
+              ? 'border-[#FFB768] bg-[#FFF1E0] text-[#C86A10]'
               : index === 1
-                ? 'border-slate-300/20 bg-slate-300/10 text-slate-100'
+                ? 'border-[#E9D8C3] bg-[#FFF8F1] text-[#9B6A36]'
                 : index === 2
-                  ? 'border-amber-500/30 bg-amber-400/10 text-amber-200'
-                : 'border-white/12 bg-white/[0.08] text-white'
+                  ? 'border-[#F0C86E] bg-[#FFF6DA] text-[#A05B0F]'
+                : 'border-[#EED8C3] bg-[#FFF9F4] text-[var(--text-primary)]'
           )}
         >
           {player.rank}
@@ -586,20 +586,20 @@ function LeaderboardRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className={cn('truncate font-black text-white', compact ? 'text-[15px]' : 'text-base')}>{player.isMe ? '나' : formatMaskedName(player.displayNameSnapshot)}</p>
+            <p className={cn('truncate font-black text-[var(--text-primary)]', compact ? 'text-[15px]' : 'text-base')}>{player.isMe ? '나' : formatMaskedName(player.displayNameSnapshot)}</p>
             {player.isMe ? (
-              <span className="rounded-full border border-orange-400/20 bg-orange-400/10 px-2 py-1 text-[10px] font-black tracking-[0.18em] text-orange-200">
+              <span className="rounded-full border border-[#FFCC9A] bg-[#FFF1E0] px-2 py-1 text-[10px] font-black tracking-[0.18em] text-[#C86A10]">
                 YOU
               </span>
             ) : null}
             {index === 0 ? (
-              <span className="leaderboard-crown-float inline-flex h-6 w-6 items-center justify-center rounded-full border border-amber-300/18 bg-amber-300/10 text-amber-100">
+              <span className="leaderboard-crown-float inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#F0C86E] bg-[#FFF6DA] text-[#A05B0F]">
                 <Crown className="h-3.5 w-3.5" />
               </span>
             ) : null}
           </div>
-          <p className="mt-1 truncate text-xs font-semibold text-[var(--text-on-dark-soft)]">{player.classNameSnapshot || '반 미지정'}</p>
-          <div className="mt-3 leaderboard-race-track h-3 overflow-hidden rounded-full bg-white/8">
+          <p className="mt-1 truncate text-xs font-semibold text-[var(--text-secondary)]">{player.classNameSnapshot || '반 미지정'}</p>
+          <div className="mt-3 leaderboard-race-track h-3 overflow-hidden rounded-full bg-[#FFE8D0]">
             <div
               className={cn(
                 'leaderboard-race-fill relative h-full rounded-full transition-[width] ease-out',
@@ -609,7 +609,7 @@ function LeaderboardRow({
                     ? 'bg-gradient-to-r from-[#FF9626] to-[#FFB347]'
                     : isThreatBelow
                       ? 'bg-gradient-to-r from-[#FB7185] to-[#FB923C]'
-                      : 'bg-gradient-to-r from-[#4E7BFF] to-[#7AD4FF]'
+                      : 'bg-gradient-to-r from-[#FFB761] to-[#FFD7A8]'
               )}
               style={{ width: fillReady ? `${progress}%` : '0%', transitionDuration: '850ms' }}
             >
@@ -628,7 +628,7 @@ function LeaderboardRow({
         </div>
 
         <div className="shrink-0 text-right">
-          <div className={cn('rounded-full border border-white/12 bg-white/[0.1] font-black text-white', compact ? 'px-2.5 py-1.5 text-[12px]' : 'px-3 py-2 text-sm')}>
+          <div className={cn('rounded-full border border-[#F0D8BF] bg-[#FFF6EC] font-black text-[var(--text-primary)]', compact ? 'px-2.5 py-1.5 text-[12px]' : 'px-3 py-2 text-sm')}>
             {formatHourValue(player.value)}
           </div>
         </div>
@@ -649,24 +649,24 @@ function RecentRankEventsPanel({
       <div className={cn(compact ? 'p-4' : 'p-5')}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-soft)]">
-              <Clock3 className="h-3.5 w-3.5 text-cyan-200" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F2D7BF] bg-[#FFF5EA] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#A76A25]">
+              <Clock3 className="h-3.5 w-3.5 text-[#FF9626]" />
               RECENT RANK EVENTS
             </div>
-            <h3 className="mt-4 text-xl font-black text-white">최근 변동</h3>
+            <h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">최근 변동</h3>
           </div>
-          <span className="text-xs font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">LIVE LOG</span>
+          <span className="text-xs font-black tracking-[0.18em] text-[#B57633]">LIVE LOG</span>
         </div>
 
         <div className="mt-5 space-y-3">
           {events.map((event) => {
             const tone = getToneClasses(event.tone);
             return (
-              <div key={event.id} className="rounded-[22px] border border-white/12 bg-white/[0.08] p-4">
+              <div key={event.id} className="rounded-[22px] border border-[#F1D8BF] bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-white">{event.emoji} {event.title}</p>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-on-dark-soft)]">{event.detail}</p>
+                    <p className="truncate text-sm font-black text-[var(--text-primary)]">{event.emoji} {event.title}</p>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{event.detail}</p>
                   </div>
                   <span className={cn('shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.18em]', tone.chip)}>
                     {event.timestampLabel}
@@ -694,19 +694,19 @@ function RankEventToast({
     <div
       key={event.id}
       className={cn(
-        'leaderboard-toast pointer-events-none fixed z-[60] min-w-[16rem] max-w-[20rem] rounded-[24px] border px-4 py-3 shadow-[0_24px_60px_-24px_rgba(2,6,23,0.7)] backdrop-blur-xl',
+        'leaderboard-toast pointer-events-none fixed z-[60] min-w-[16rem] max-w-[20rem] rounded-[24px] border bg-white/96 px-4 py-3 shadow-[0_24px_60px_-24px_rgba(196,99,16,0.22)] backdrop-blur-xl',
         tone.chip,
         event.tone === 'danger' ? 'leaderboard-toast--danger' : 'leaderboard-toast--positive',
         compact ? 'bottom-24 left-1/2 w-[calc(100%-2rem)] max-w-[21rem] -translate-x-1/2' : 'right-6 top-24'
       )}
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-current/20 bg-white/8 text-base">
+        <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-current/20 bg-[#FFF6EC] text-base">
           {event.emoji}
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-black text-white">{event.title}</p>
-          <p className="mt-1 text-xs font-semibold text-[var(--text-on-dark-soft)]">{event.detail}</p>
+          <p className="text-sm font-black text-[var(--text-primary)]">{event.title}</p>
+          <p className="mt-1 text-xs font-semibold text-[var(--text-secondary)]">{event.detail}</p>
         </div>
       </div>
     </div>
@@ -724,6 +724,11 @@ export default function LeaderboardsPage() {
   const [toastIndex, setToastIndex] = useState(0);
   const activeRange = (searchParams.get('range') as RankRange) || 'daily';
   const isMobile = viewMode === 'mobile';
+  const emptyFallbackRanks = useMemo<Record<RankRange, Array<{ studentId: string; value: number }>>>(() => ({
+    daily: [],
+    weekly: [],
+    monthly: [],
+  }), []);
 
   const today = useMemo(() => new Date(), []);
   const todayKey = useMemo(() => format(today, 'yyyy-MM-dd'), [today]);
@@ -741,12 +746,13 @@ export default function LeaderboardsPage() {
       where('status', '==', 'active')
     );
   }, [firestore, activeMembership?.id]);
-  const { data: activeStudentMembers } = useCollection<CenterMembership>(membersQuery, { enabled: !!activeMembership });
+  const { data: activeStudentMembers, isLoading: isMembersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: !!activeMembership });
 
   const activeStudentIds = useMemo(() => {
     if (!activeStudentMembers) return null;
     return new Set(activeStudentMembers.map((member) => member.id));
   }, [activeStudentMembers]);
+  const hasActiveStudentFilter = Boolean(activeStudentIds && activeStudentIds.size > 0);
 
   const memberMap = useMemo(() => {
     const map = new Map<string, { displayNameSnapshot: string; classNameSnapshot: string | null }>();
@@ -777,6 +783,8 @@ export default function LeaderboardsPage() {
 
   const [weeklyRows, setWeeklyRows] = useState<Array<{ studentId: string; value: number }>>([]);
   const [isWeeklyLoading, setIsWeeklyLoading] = useState(false);
+  const [fallbackRankRows, setFallbackRankRows] = useState<Record<RankRange, Array<{ studentId: string; value: number }>>>(emptyFallbackRanks);
+  const [isFallbackLoading, setIsFallbackLoading] = useState(false);
 
   useEffect(() => {
     if (!firestore || !activeMembership) {
@@ -819,13 +827,129 @@ export default function LeaderboardsPage() {
     };
   }, [firestore, activeMembership?.id, weekDateKeys]);
 
-  const normalizeEntries = useMemo(() => {
-    const shouldInclude = (studentId: string) => !isSyntheticStudentId(studentId) && (!activeStudentIds || activeStudentIds.has(studentId));
+  const hasPrimaryDailyData = useMemo(
+    () => (dailyStatsRaw || []).some((entry) => Number(entry.totalStudyMinutes || 0) > 0),
+    [dailyStatsRaw]
+  );
+  const hasPrimaryWeeklyData = useMemo(
+    () => weeklyRows.some((entry) => Number(entry.value || 0) > 0),
+    [weeklyRows]
+  );
+  const hasPrimaryMonthlyData = useMemo(
+    () => (monthEntriesRaw || []).some((entry) => Number(entry.value || 0) > 0),
+    [monthEntriesRaw]
+  );
 
-    const dailyEntries = applyCompetitionRanks(
-      (dailyStatsRaw || [])
-        .map((entry, index) => {
-          const studentId = entry.studentId || `daily-${index}`;
+  useEffect(() => {
+    if (!firestore || !activeMembership || isMembersLoading || !activeStudentMembers) {
+      setFallbackRankRows(emptyFallbackRanks);
+      return;
+    }
+
+    const activeStudentList = activeStudentMembers.filter((member) => !isSyntheticStudentId(member.id));
+    if (activeStudentList.length === 0) {
+      setFallbackRankRows(emptyFallbackRanks);
+      return;
+    }
+
+    const needsFallback = !hasPrimaryDailyData || !hasPrimaryWeeklyData || !hasPrimaryMonthlyData;
+
+    if (!needsFallback || isDailyLoading || isWeeklyLoading || isMonthLoading) {
+      setFallbackRankRows(emptyFallbackRanks);
+      return;
+    }
+
+    let cancelled = false;
+    const monthStartKey = `${monthKey}-01`;
+    const weekDateKeySet = new Set(weekDateKeys);
+
+    const run = async () => {
+      setIsFallbackLoading(true);
+      try {
+        const daySnapshots = await Promise.all(
+          activeStudentList.map(async (member) => {
+            const daysQuery = query(
+              collection(firestore, 'centers', activeMembership.id, 'studyLogs', member.id, 'days'),
+              where('dateKey', '>=', monthStartKey),
+              where('dateKey', '<=', todayKey),
+              orderBy('dateKey', 'asc')
+            );
+            const snapshot = await getDocs(daysQuery);
+            return {
+              studentId: member.id,
+              days: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as StudyLogDay) })),
+            };
+          })
+        );
+
+        if (cancelled) return;
+
+        const nextFallback: Record<RankRange, Array<{ studentId: string; value: number }>> = {
+          daily: [],
+          weekly: [],
+          monthly: [],
+        };
+
+        daySnapshots.forEach(({ studentId, days }) => {
+          let dailyMinutes = 0;
+          let weeklyMinutes = 0;
+          let monthlyMinutes = 0;
+
+          days.forEach((day) => {
+            const minutes = Math.max(0, Number((day as any).totalMinutes ?? (day as any).totalStudyMinutes ?? 0));
+            if (minutes <= 0) return;
+            monthlyMinutes += minutes;
+            if ((day as any).dateKey === todayKey) dailyMinutes += minutes;
+            if (weekDateKeySet.has((day as any).dateKey)) weeklyMinutes += minutes;
+          });
+
+          if (dailyMinutes > 0) nextFallback.daily.push({ studentId, value: dailyMinutes });
+          if (weeklyMinutes > 0) nextFallback.weekly.push({ studentId, value: weeklyMinutes });
+          if (monthlyMinutes > 0) nextFallback.monthly.push({ studentId, value: monthlyMinutes });
+        });
+
+        setFallbackRankRows(nextFallback);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('[leaderboards] fallback rank load failed', error);
+          setFallbackRankRows(emptyFallbackRanks);
+        }
+      } finally {
+        if (!cancelled) setIsFallbackLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeMembership,
+    activeStudentMembers,
+    emptyFallbackRanks,
+    firestore,
+    hasPrimaryDailyData,
+    hasPrimaryMonthlyData,
+    hasPrimaryWeeklyData,
+    isDailyLoading,
+    isMembersLoading,
+    isMonthLoading,
+    isWeeklyLoading,
+    monthKey,
+    todayKey,
+    weekDateKeys,
+  ]);
+
+  const normalizeEntries = useMemo(() => {
+    const shouldInclude = (studentId: string) => {
+      if (!studentId || isSyntheticStudentId(studentId)) return false;
+      if (!hasActiveStudentFilter) return true;
+      return activeStudentIds!.has(studentId);
+    };
+
+    const dailySourceRows = hasPrimaryDailyData
+      ? (dailyStatsRaw || []).map((entry, index) => {
+          const studentId = entry.studentId || entry.id || `daily-${index}`;
           const profile = memberMap.get(studentId);
           return {
             id: studentId,
@@ -835,12 +959,24 @@ export default function LeaderboardsPage() {
             value: Number(entry.totalStudyMinutes || 0),
           };
         })
+      : fallbackRankRows.daily.map((entry) => {
+          const profile = memberMap.get(entry.studentId);
+          return {
+            id: entry.studentId,
+            studentId: entry.studentId,
+            displayNameSnapshot: profile?.displayNameSnapshot || '학생',
+            classNameSnapshot: profile?.classNameSnapshot || null,
+            value: Number(entry.value || 0),
+          };
+        });
+
+    const dailyEntries = applyCompetitionRanks(
+      dailySourceRows
         .filter((entry) => shouldInclude(entry.studentId) && entry.value > 0)
     );
 
-    const weeklyEntries = applyCompetitionRanks(
-      weeklyRows
-        .map((entry) => {
+    const weeklySourceRows = hasPrimaryWeeklyData
+      ? weeklyRows.map((entry) => {
           const profile = memberMap.get(entry.studentId);
           return {
             id: `weekly-${entry.studentId}`,
@@ -850,13 +986,25 @@ export default function LeaderboardsPage() {
             value: entry.value,
           };
         })
+      : fallbackRankRows.weekly.map((entry) => {
+          const profile = memberMap.get(entry.studentId);
+          return {
+            id: `weekly-${entry.studentId}`,
+            studentId: entry.studentId,
+            displayNameSnapshot: profile?.displayNameSnapshot || '학생',
+            classNameSnapshot: profile?.classNameSnapshot || null,
+            value: Number(entry.value || 0),
+          };
+        });
+
+    const weeklyEntries = applyCompetitionRanks(
+      weeklySourceRows
         .filter((entry) => shouldInclude(entry.studentId) && entry.value > 0)
     );
 
-    const monthlyEntries = applyCompetitionRanks(
-      (monthEntriesRaw || [])
-        .map((entry) => {
-          const studentId = entry.studentId;
+    const monthlySourceRows = hasPrimaryMonthlyData
+      ? (monthEntriesRaw || []).map((entry) => {
+          const studentId = entry.studentId || entry.id;
           const profile = memberMap.get(studentId);
           return {
             id: entry.id || `monthly-${studentId}`,
@@ -866,6 +1014,19 @@ export default function LeaderboardsPage() {
             value: Number(entry.value || 0),
           };
         })
+      : fallbackRankRows.monthly.map((entry) => {
+          const profile = memberMap.get(entry.studentId);
+          return {
+            id: `monthly-${entry.studentId}`,
+            studentId: entry.studentId,
+            displayNameSnapshot: profile?.displayNameSnapshot || '학생',
+            classNameSnapshot: profile?.classNameSnapshot || null,
+            value: Number(entry.value || 0),
+          };
+        });
+
+    const monthlyEntries = applyCompetitionRanks(
+      monthlySourceRows
         .filter((entry) => shouldInclude(entry.studentId) && entry.value > 0)
     );
 
@@ -874,15 +1035,15 @@ export default function LeaderboardsPage() {
       weekly: weeklyEntries,
       monthly: monthlyEntries,
     } as Record<RankRange, RankEntryView[]>;
-  }, [activeStudentIds, dailyStatsRaw, memberMap, monthEntriesRaw, weeklyRows]);
+  }, [activeStudentIds, dailyStatsRaw, fallbackRankRows, hasActiveStudentFilter, hasPrimaryDailyData, hasPrimaryMonthlyData, hasPrimaryWeeklyData, memberMap, monthEntriesRaw, weeklyRows]);
 
   const currentEntries = normalizeEntries[activeRange];
   const hasMore = currentEntries.length > visibleCount;
   const isLoading = activeRange === 'daily'
-    ? isDailyLoading
+    ? (isDailyLoading || isMembersLoading || (currentEntries.length === 0 && isFallbackLoading))
     : activeRange === 'weekly'
-      ? isWeeklyLoading
-      : isMonthLoading;
+      ? (isWeeklyLoading || isMembersLoading || (currentEntries.length === 0 && isFallbackLoading))
+      : (isMonthLoading || isMembersLoading || (currentEntries.length === 0 && isFallbackLoading));
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -1068,13 +1229,13 @@ export default function LeaderboardsPage() {
     <div className={cn('mx-auto w-full pb-20', isMobile ? 'max-w-none px-1.5' : 'max-w-7xl px-4')}>
       {activeToastEvent ? <RankEventToast event={activeToastEvent} compact={isMobile} /> : null}
 
-      <div className={cn('rounded-[34px] border border-white/12 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.10),transparent_26%),radial-gradient(circle_at_top_left,rgba(56,189,248,0.10),transparent_24%),linear-gradient(180deg,#10285d_0%,#081838_100%)] shadow-[0_34px_100px_rgba(2,6,23,0.48)]', isMobile ? 'p-3.5' : 'p-4 sm:p-6 lg:p-8')}>
+      <div className={cn('rounded-[34px] border border-[#F1D8BF] bg-[radial-gradient(circle_at_top_right,rgba(255,150,38,0.18),transparent_26%),radial-gradient(circle_at_top_left,rgba(255,211,109,0.16),transparent_24%),linear-gradient(180deg,#FFFFFF_0%,#FFF8F1_100%)] shadow-[0_34px_100px_rgba(196,99,16,0.12)]', isMobile ? 'p-3.5' : 'p-4 sm:p-6 lg:p-8')}>
         <div className="flex flex-col gap-5 sm:gap-6">
           <div className={cn('flex flex-col gap-4', !isMobile && 'lg:flex-row lg:items-end lg:justify-between')}>
             <div className={cn('max-w-3xl', isMobile && 'max-w-none')}>
               <LiveBadge />
-              <h1 className={cn('mt-4 font-black tracking-tight text-white', isMobile ? 'text-[2.4rem] leading-[0.95]' : 'text-3xl sm:text-5xl')}>공부시간 랭킹</h1>
-              <p className={cn('mt-3 leading-6 text-[var(--text-on-dark-soft)]', isMobile ? 'max-w-[17rem] text-[14px]' : 'text-sm sm:text-base')}>
+              <h1 className={cn('mt-4 font-black tracking-tight text-[var(--text-primary)]', isMobile ? 'text-[2.4rem] leading-[0.95]' : 'text-3xl sm:text-5xl')}>공부시간 랭킹</h1>
+              <p className={cn('mt-3 leading-6 text-[var(--text-secondary)]', isMobile ? 'max-w-[17rem] text-[14px]' : 'text-sm sm:text-base')}>
                 일간, 주간, 월간 랭킹을 한 화면에서 경쟁처럼 확인하고, 지금 몇 시간 더 하면 추월 가능한지도 바로 볼 수 있어요.
               </p>
             </div>
@@ -1140,18 +1301,18 @@ export default function LeaderboardsPage() {
           </div>
 
           <Panel className="overflow-hidden">
-            <div className={cn('border-b border-white/12', isMobile ? 'px-4 py-4' : 'px-5 py-4 sm:px-6')}>
+            <div className={cn('border-b border-[#F1D8BF]', isMobile ? 'px-4 py-4' : 'px-5 py-4 sm:px-6')}>
               <div className={cn('flex flex-col gap-3', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
                 <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-soft)]">
-                    <Crown className="h-3.5 w-3.5 text-orange-200" />
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#F2D7BF] bg-[#FFF5EA] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#A76A25]">
+                    <Crown className="h-3.5 w-3.5 text-[#FF9626]" />
                     LEADERBOARD
                   </div>
-                  <h2 className="mt-3 text-2xl font-black text-white">{rangeMeta.title}</h2>
-                  <p className="mt-1 text-sm text-[var(--text-on-dark-soft)]">{rangeMeta.hint}</p>
+                  <h2 className="mt-3 text-2xl font-black text-[var(--text-primary)]">{rangeMeta.title}</h2>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">{rangeMeta.hint}</p>
                 </div>
 
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-[var(--text-on-dark-soft)]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#F2D7BF] bg-white px-4 py-2 text-sm font-semibold text-[var(--text-secondary)]">
                   <Users className="h-4 w-4" />
                   총 {currentEntries.length}명 참여 중
                 </div>
@@ -1161,10 +1322,10 @@ export default function LeaderboardsPage() {
             <div className={cn(isMobile ? 'p-4' : 'p-4 sm:p-6')}>
               {isLoading ? (
                 <div className="flex h-64 items-center justify-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-[var(--text-on-dark-muted)]" />
+                  <Loader2 className="h-10 w-10 animate-spin text-[#C86A10]" />
                 </div>
               ) : currentEntries.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-white/15 bg-white/[0.05] px-6 py-16 text-center text-sm font-semibold text-[var(--text-on-dark-soft)]">
+                <div className="rounded-[24px] border border-dashed border-[#F1D8BF] bg-[#FFF9F4] px-6 py-16 text-center text-sm font-semibold text-[var(--text-secondary)]">
                   아직 표시할 랭킹이 없어요.
                 </div>
               ) : (
@@ -1188,7 +1349,7 @@ export default function LeaderboardsPage() {
                       <button
                         type="button"
                         onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-5 py-3 text-sm font-black text-white transition hover:bg-white/[0.14]"
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-[#F2D7BF] bg-white px-5 py-3 text-sm font-black text-[var(--text-primary)] transition hover:bg-[#FFF6EC]"
                       >
                         더 보기
                         <ChevronRight className="h-4 w-4" />
@@ -1196,10 +1357,10 @@ export default function LeaderboardsPage() {
                     </div>
                   ) : null}
 
-                  <div className={cn('mt-5 flex flex-col gap-3 rounded-[24px] border border-white/12 bg-white/[0.06] p-4', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
+                  <div className={cn('mt-5 flex flex-col gap-3 rounded-[24px] border border-[#FFD2A8] bg-[linear-gradient(180deg,#FFF4E7_0%,#FFFFFF_100%)] p-4', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
                     <div>
-                      <p className="text-sm font-black text-white">지금 목표</p>
-                      <p className="mt-1 text-sm leading-6 text-[var(--text-on-dark-soft)]">
+                      <p className="text-sm font-black text-[var(--text-primary)]">지금 목표</p>
+                      <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
                         {myEntry?.rank === 1
                           ? '지금 페이스를 유지하면 선두를 지킬 수 있어요.'
                           : `오늘 ${hoursNeededToLead.toFixed(1)}시간만 더 공부하면 1위를 노릴 수 있어요.`}
@@ -1222,22 +1383,22 @@ export default function LeaderboardsPage() {
           <div className={cn('grid gap-4', !isMobile && 'xl:grid-cols-[0.94fr_1.06fr]')}>
             <RecentRankEventsPanel events={recentEvents} compact={isMobile} />
 
-            <Panel className="bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))]">
+            <Panel className="border-[#FFD2A8] bg-[linear-gradient(180deg,#FFF2E3_0%,#FFFFFF_100%)]">
               <div className={cn(isMobile ? 'p-4' : 'p-5')}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-orange-400/10 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-orange-200">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#FFCC9A] bg-[#FFF1E0] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
                       <Swords className="h-3.5 w-3.5" />
                       OVERTAKE CTA
                     </div>
-                    <h3 className="mt-4 text-xl font-black text-white">지금 전략을 적용할 시간</h3>
-                    <p className="mt-2 text-sm leading-6 text-[var(--text-on-dark-soft)]">
+                    <h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">지금 전략을 적용할 시간</h3>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                       {myEntry?.rank === 1
                         ? '방어 전략을 유지하면 선두를 끝까지 지킬 수 있어요.'
                         : `현재 ${formatGapLabel(rewardGapMinutes)} 차이예요. 저녁 1세션만 더 집중하면 전세를 뒤집을 수 있어요.`}
                     </p>
                   </div>
-                  <div className="hidden h-14 w-14 items-center justify-center rounded-[20px] border border-white/12 bg-white/[0.1] text-orange-100 sm:flex">
+                  <div className="hidden h-14 w-14 items-center justify-center rounded-[20px] border border-[#FFD3A8] bg-white text-[#FF9626] sm:flex">
                     <Flame className="h-6 w-6" />
                   </div>
                 </div>
@@ -1248,9 +1409,9 @@ export default function LeaderboardsPage() {
                     ['방어 간격', diffBelow > 0 ? formatGapLabel(diffBelow) : '신규'],
                     ['보상 진행', `${rewardProgress}%`],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-[20px] border border-white/12 bg-white/[0.08] px-3.5 py-3">
-                      <p className="text-[10px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">{label}</p>
-                      <p className="mt-2 text-lg font-black text-white">{value}</p>
+                    <div key={label} className="rounded-[20px] border border-[#F2D7BF] bg-white px-3.5 py-3">
+                      <p className="text-[10px] font-black tracking-[0.18em] text-[#A76A25]">{label}</p>
+                      <p className="mt-2 text-lg font-black text-[var(--text-primary)]">{value}</p>
                     </div>
                   ))}
                 </div>

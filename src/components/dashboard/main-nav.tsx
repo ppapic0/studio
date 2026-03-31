@@ -108,7 +108,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
 };
 
 export function MainNav({ isMobile = false }: MainNavProps) {
-  const { activeMembership, currentTier } = useAppContext();
+  const { activeMembership } = useAppContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -149,7 +149,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
           linkClass,
           isActive && (
             isStudent
-              ? `bg-gradient-to-r ${currentTier.gradient} text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.14)] hover:text-white hover:bg-transparent`
+              ? 'bg-[linear-gradient(135deg,#315AAE,#14295F)] text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.18)] hover:text-white hover:bg-transparent'
               : 'bg-[linear-gradient(135deg,#1e4898,#14295f)] text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.14)] hover:text-white hover:bg-transparent'
           )
         )}

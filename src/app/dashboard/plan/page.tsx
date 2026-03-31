@@ -854,12 +854,6 @@ export default function StudyPlanPage() {
   }, [activeRecentStudyKey, recentStudyOptions]);
 
   useEffect(() => {
-    if (checklistTasks.length === 0) {
-      setShowQuickAddCard(true);
-    }
-  }, [checklistTasks.length]);
-
-  useEffect(() => {
     if (!isTaskCopyDialogOpen) return;
     setTaskCopyItemIds((prev) => {
       const validIds = prev.filter((id) => copyableTaskItems.some((item) => item.id === id));
@@ -1039,7 +1033,7 @@ export default function StudyPlanPage() {
 
       await batch.commit();
       setExpandedTaskId(null);
-      setShowQuickAddCard(normalizedDrafts.length === 0);
+      setShowQuickAddCard(false);
       toast({
         title: '오늘 계획을 준비했어요',
         description: sourceLabel,
