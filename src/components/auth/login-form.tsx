@@ -26,7 +26,7 @@ import {
   setDashboardEntryMotionKeys,
 } from '@/lib/dashboard-motion';
 import { Loader2, Mail } from 'lucide-react';
-import { collection, collectionGroup, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import {
   Dialog,
@@ -70,20 +70,7 @@ export function LoginForm() {
     if (!firestore) return [] as { role?: string; status?: string }[];
 
     const centersSnap = await getDocs(collection(firestore, 'userCenters', uid, 'centers'));
-    if (!centersSnap.empty) {
-      return centersSnap.docs.map((docSnap) => docSnap.data() as { role?: string; status?: string });
-    }
-
-    const fallbackByFieldSnap = await getDocs(query(collectionGroup(firestore, 'members'), where('id', '==', uid)));
-    const dedupedDocs = Array.from(new Map(fallbackByFieldSnap.docs.map((docSnap) => [docSnap.ref.path, docSnap])).values());
-
-    return dedupedDocs.map((docSnap) => {
-      const data = docSnap.data() as Record<string, unknown>;
-      return {
-        role: typeof data.role === 'string' ? data.role : undefined,
-        status: typeof data.status === 'string' ? data.status : undefined,
-      };
-    });
+    return centersSnap.docs.map((docSnap) => docSnap.data() as { role?: string; status?: string });
   };
 
   const validateStudentMembershipStatus = (memberships: { role?: string; status?: string }[]) => {
@@ -159,8 +146,8 @@ export function LoginForm() {
         try {
           const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
           await ensureMemberships({});
-        } catch (error) {
-          console.warn('Membership bootstrap warning:', error);
+        } catch {
+          // userCenters-backed membership lookup below remains the login gate.
         }
       }
       const memberships = await fetchMembershipRecords(userCredential.user.uid);

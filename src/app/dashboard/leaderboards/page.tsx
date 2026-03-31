@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import {
   ChevronRight,
   Clock3,
@@ -20,10 +18,13 @@ import {
   Zap,
 } from 'lucide-react';
 
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { CenterMembership, DailyStudentStat, LeaderboardEntry, StudyLogDay } from '@/lib/types';
+import {
+  EMPTY_STUDENT_RANKING_SNAPSHOT,
+  fetchStudentRankingSnapshot,
+  type StudentRankingSnapshot,
+} from '@/lib/student-ranking-client';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 50;
@@ -81,32 +82,6 @@ const RANGE_META: Record<RankRange, { label: string; title: string; hint: string
 function formatMaskedName(name?: string | null) {
   if (!name) return '익명 학생';
   return name.length > 1 ? `${name.charAt(0)}*${name.slice(-1)}` : name;
-}
-
-function isSyntheticStudentId(studentId: unknown): boolean {
-  if (typeof studentId !== 'string') return true;
-  const normalized = studentId.trim().toLowerCase();
-  if (!normalized) return true;
-  return (
-    normalized.startsWith('test-')
-    || normalized.startsWith('seed-')
-    || normalized.startsWith('mock-')
-    || normalized.includes('dummy')
-  );
-}
-
-function applyCompetitionRanks(entries: Omit<RankEntryView, 'rank'>[]) {
-  const sorted = [...entries].sort((a, b) => b.value - a.value);
-  let lastValue: number | null = null;
-  let currentRank = 0;
-
-  return sorted.map((entry, index) => {
-    if (lastValue === null || entry.value < lastValue) {
-      currentRank = index + 1;
-      lastValue = entry.value;
-    }
-    return { ...entry, rank: currentRank };
-  });
 }
 
 function formatHourValue(minutes: number) {
@@ -714,7 +689,6 @@ function RankEventToast({
 }
 
 export default function LeaderboardsPage() {
-  const firestore = useFirestore();
   const { user } = useUser();
   const { activeMembership, viewMode } = useAppContext();
   const router = useRouter();
@@ -722,200 +696,34 @@ export default function LeaderboardsPage() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [tickerIndex, setTickerIndex] = useState(0);
   const [toastIndex, setToastIndex] = useState(0);
+  const [rankSnapshot, setRankSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
+  const [rankSnapshotLoading, setRankSnapshotLoading] = useState(false);
   const activeRange = (searchParams.get('range') as RankRange) || 'daily';
   const isMobile = viewMode === 'mobile';
-  const emptyFallbackRanks = useMemo<Record<RankRange, Array<{ studentId: string; value: number }>>>(() => ({
-    daily: [],
-    weekly: [],
-    monthly: [],
-  }), []);
-
-  const today = useMemo(() => new Date(), []);
-  const todayKey = useMemo(() => format(today, 'yyyy-MM-dd'), [today]);
-  const monthKey = useMemo(() => format(today, 'yyyy-MM'), [today]);
-  const weekDateKeys = useMemo(
-    () => eachDayOfInterval({ start: startOfWeek(today, { weekStartsOn: 1 }), end: today }).map((date) => format(date, 'yyyy-MM-dd')),
-    [today]
-  );
-
-  const membersQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'members'),
-      where('role', '==', 'student'),
-      where('status', '==', 'active')
-    );
-  }, [firestore, activeMembership?.id]);
-  const { data: activeStudentMembers, isLoading: isMembersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: !!activeMembership });
-
-  const activeStudentIds = useMemo(() => {
-    if (!activeStudentMembers) return null;
-    return new Set(activeStudentMembers.map((member) => member.id));
-  }, [activeStudentMembers]);
-  const hasActiveStudentFilter = Boolean(activeStudentIds && activeStudentIds.size > 0);
-
-  const memberMap = useMemo(() => {
-    const map = new Map<string, { displayNameSnapshot: string; classNameSnapshot: string | null }>();
-    activeStudentMembers?.forEach((member) => {
-      map.set(member.id, {
-        displayNameSnapshot: member.displayName || '학생',
-        classNameSnapshot: member.className || null,
-      });
-    });
-    return map;
-  }, [activeStudentMembers]);
-
-  const monthRankQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${monthKey}_study-time`, 'entries'),
-      orderBy('value', 'desc'),
-      limit(120)
-    );
-  }, [firestore, activeMembership?.id, monthKey]);
-  const { data: monthEntriesRaw, isLoading: isMonthLoading } = useCollection<LeaderboardEntry>(monthRankQuery, { enabled: !!activeMembership });
-
-  const dailyStatsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return collection(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students');
-  }, [firestore, activeMembership?.id, todayKey]);
-  const { data: dailyStatsRaw, isLoading: isDailyLoading } = useCollection<DailyStudentStat>(dailyStatsQuery, { enabled: !!activeMembership });
-
-  const [weeklyRows, setWeeklyRows] = useState<Array<{ studentId: string; value: number }>>([]);
-  const [isWeeklyLoading, setIsWeeklyLoading] = useState(false);
-  const [fallbackRankRows, setFallbackRankRows] = useState<Record<RankRange, Array<{ studentId: string; value: number }>>>(emptyFallbackRanks);
-  const [isFallbackLoading, setIsFallbackLoading] = useState(false);
 
   useEffect(() => {
-    if (!firestore || !activeMembership) {
-      setWeeklyRows([]);
+    if (!user || !activeMembership) {
+      setRankSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
       return;
     }
 
     let cancelled = false;
     const run = async () => {
-      setIsWeeklyLoading(true);
+      setRankSnapshotLoading(true);
       try {
-        const snapshots = await Promise.all(
-          weekDateKeys.map((dateKey) =>
-            getDocs(collection(firestore, 'centers', activeMembership.id, 'dailyStudentStats', dateKey, 'students'))
-          )
-        );
-
-        const totals = new Map<string, number>();
-        snapshots.forEach((snapshot) => {
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data() as DailyStudentStat;
-            const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
-            const minutes = Number(data.totalStudyMinutes || 0);
-            if (!studentId || minutes <= 0) return;
-            totals.set(studentId, (totals.get(studentId) || 0) + minutes);
-          });
+        const nextSnapshot = await fetchStudentRankingSnapshot({
+          centerId: activeMembership.id,
+          user,
         });
-
         if (!cancelled) {
-          setWeeklyRows(Array.from(totals.entries()).map(([studentId, value]) => ({ studentId, value })));
+          setRankSnapshot(nextSnapshot);
+        }
+      } catch {
+        if (!cancelled) {
+          setRankSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
         }
       } finally {
-        if (!cancelled) setIsWeeklyLoading(false);
-      }
-    };
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [firestore, activeMembership?.id, weekDateKeys]);
-
-  const hasPrimaryDailyData = useMemo(
-    () => (dailyStatsRaw || []).some((entry) => Number(entry.totalStudyMinutes || 0) > 0),
-    [dailyStatsRaw]
-  );
-  const hasPrimaryWeeklyData = useMemo(
-    () => weeklyRows.some((entry) => Number(entry.value || 0) > 0),
-    [weeklyRows]
-  );
-  const hasPrimaryMonthlyData = useMemo(
-    () => (monthEntriesRaw || []).some((entry) => Number(entry.value || 0) > 0),
-    [monthEntriesRaw]
-  );
-
-  useEffect(() => {
-    if (!firestore || !activeMembership || isMembersLoading || !activeStudentMembers) {
-      setFallbackRankRows(emptyFallbackRanks);
-      return;
-    }
-
-    const activeStudentList = activeStudentMembers.filter((member) => !isSyntheticStudentId(member.id));
-    if (activeStudentList.length === 0) {
-      setFallbackRankRows(emptyFallbackRanks);
-      return;
-    }
-
-    const needsFallback = !hasPrimaryDailyData || !hasPrimaryWeeklyData || !hasPrimaryMonthlyData;
-
-    if (!needsFallback || isDailyLoading || isWeeklyLoading || isMonthLoading) {
-      setFallbackRankRows(emptyFallbackRanks);
-      return;
-    }
-
-    let cancelled = false;
-    const monthStartKey = `${monthKey}-01`;
-    const weekDateKeySet = new Set(weekDateKeys);
-
-    const run = async () => {
-      setIsFallbackLoading(true);
-      try {
-        const daySnapshots = await Promise.all(
-          activeStudentList.map(async (member) => {
-            const daysQuery = query(
-              collection(firestore, 'centers', activeMembership.id, 'studyLogs', member.id, 'days'),
-              where('dateKey', '>=', monthStartKey),
-              where('dateKey', '<=', todayKey),
-              orderBy('dateKey', 'asc')
-            );
-            const snapshot = await getDocs(daysQuery);
-            return {
-              studentId: member.id,
-              days: snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as StudyLogDay) })),
-            };
-          })
-        );
-
-        if (cancelled) return;
-
-        const nextFallback: Record<RankRange, Array<{ studentId: string; value: number }>> = {
-          daily: [],
-          weekly: [],
-          monthly: [],
-        };
-
-        daySnapshots.forEach(({ studentId, days }) => {
-          let dailyMinutes = 0;
-          let weeklyMinutes = 0;
-          let monthlyMinutes = 0;
-
-          days.forEach((day) => {
-            const minutes = Math.max(0, Number((day as any).totalMinutes ?? (day as any).totalStudyMinutes ?? 0));
-            if (minutes <= 0) return;
-            monthlyMinutes += minutes;
-            if ((day as any).dateKey === todayKey) dailyMinutes += minutes;
-            if (weekDateKeySet.has((day as any).dateKey)) weeklyMinutes += minutes;
-          });
-
-          if (dailyMinutes > 0) nextFallback.daily.push({ studentId, value: dailyMinutes });
-          if (weeklyMinutes > 0) nextFallback.weekly.push({ studentId, value: weeklyMinutes });
-          if (monthlyMinutes > 0) nextFallback.monthly.push({ studentId, value: monthlyMinutes });
-        });
-
-        setFallbackRankRows(nextFallback);
-      } catch (error) {
-        if (!cancelled) {
-          console.warn('[leaderboards] fallback rank load failed', error);
-          setFallbackRankRows(emptyFallbackRanks);
-        }
-      } finally {
-        if (!cancelled) setIsFallbackLoading(false);
+        if (!cancelled) setRankSnapshotLoading(false);
       }
     };
 
@@ -923,127 +731,11 @@ export default function LeaderboardsPage() {
     return () => {
       cancelled = true;
     };
-  }, [
-    activeMembership,
-    activeStudentMembers,
-    emptyFallbackRanks,
-    firestore,
-    hasPrimaryDailyData,
-    hasPrimaryMonthlyData,
-    hasPrimaryWeeklyData,
-    isDailyLoading,
-    isMembersLoading,
-    isMonthLoading,
-    isWeeklyLoading,
-    monthKey,
-    todayKey,
-    weekDateKeys,
-  ]);
+  }, [activeMembership?.id, user]);
 
-  const normalizeEntries = useMemo(() => {
-    const shouldInclude = (studentId: string) => {
-      if (!studentId || isSyntheticStudentId(studentId)) return false;
-      if (!hasActiveStudentFilter) return true;
-      return activeStudentIds!.has(studentId);
-    };
-
-    const dailySourceRows = hasPrimaryDailyData
-      ? (dailyStatsRaw || []).map((entry, index) => {
-          const studentId = entry.studentId || entry.id || `daily-${index}`;
-          const profile = memberMap.get(studentId);
-          return {
-            id: studentId,
-            studentId,
-            displayNameSnapshot: profile?.displayNameSnapshot || '학생',
-            classNameSnapshot: profile?.classNameSnapshot || null,
-            value: Number(entry.totalStudyMinutes || 0),
-          };
-        })
-      : fallbackRankRows.daily.map((entry) => {
-          const profile = memberMap.get(entry.studentId);
-          return {
-            id: entry.studentId,
-            studentId: entry.studentId,
-            displayNameSnapshot: profile?.displayNameSnapshot || '학생',
-            classNameSnapshot: profile?.classNameSnapshot || null,
-            value: Number(entry.value || 0),
-          };
-        });
-
-    const dailyEntries = applyCompetitionRanks(
-      dailySourceRows
-        .filter((entry) => shouldInclude(entry.studentId) && entry.value > 0)
-    );
-
-    const weeklySourceRows = hasPrimaryWeeklyData
-      ? weeklyRows.map((entry) => {
-          const profile = memberMap.get(entry.studentId);
-          return {
-            id: `weekly-${entry.studentId}`,
-            studentId: entry.studentId,
-            displayNameSnapshot: profile?.displayNameSnapshot || '학생',
-            classNameSnapshot: profile?.classNameSnapshot || null,
-            value: entry.value,
-          };
-        })
-      : fallbackRankRows.weekly.map((entry) => {
-          const profile = memberMap.get(entry.studentId);
-          return {
-            id: `weekly-${entry.studentId}`,
-            studentId: entry.studentId,
-            displayNameSnapshot: profile?.displayNameSnapshot || '학생',
-            classNameSnapshot: profile?.classNameSnapshot || null,
-            value: Number(entry.value || 0),
-          };
-        });
-
-    const weeklyEntries = applyCompetitionRanks(
-      weeklySourceRows
-        .filter((entry) => shouldInclude(entry.studentId) && entry.value > 0)
-    );
-
-    const monthlySourceRows = hasPrimaryMonthlyData
-      ? (monthEntriesRaw || []).map((entry) => {
-          const studentId = entry.studentId || entry.id;
-          const profile = memberMap.get(studentId);
-          return {
-            id: entry.id || `monthly-${studentId}`,
-            studentId,
-            displayNameSnapshot: entry.displayNameSnapshot || profile?.displayNameSnapshot || '학생',
-            classNameSnapshot: entry.classNameSnapshot || profile?.classNameSnapshot || null,
-            value: Number(entry.value || 0),
-          };
-        })
-      : fallbackRankRows.monthly.map((entry) => {
-          const profile = memberMap.get(entry.studentId);
-          return {
-            id: `monthly-${entry.studentId}`,
-            studentId: entry.studentId,
-            displayNameSnapshot: profile?.displayNameSnapshot || '학생',
-            classNameSnapshot: profile?.classNameSnapshot || null,
-            value: Number(entry.value || 0),
-          };
-        });
-
-    const monthlyEntries = applyCompetitionRanks(
-      monthlySourceRows
-        .filter((entry) => shouldInclude(entry.studentId) && entry.value > 0)
-    );
-
-    return {
-      daily: dailyEntries,
-      weekly: weeklyEntries,
-      monthly: monthlyEntries,
-    } as Record<RankRange, RankEntryView[]>;
-  }, [activeStudentIds, dailyStatsRaw, fallbackRankRows, hasActiveStudentFilter, hasPrimaryDailyData, hasPrimaryMonthlyData, hasPrimaryWeeklyData, memberMap, monthEntriesRaw, weeklyRows]);
-
-  const currentEntries = normalizeEntries[activeRange];
+  const currentEntries = rankSnapshot[activeRange];
   const hasMore = currentEntries.length > visibleCount;
-  const isLoading = activeRange === 'daily'
-    ? (isDailyLoading || isMembersLoading || (currentEntries.length === 0 && isFallbackLoading))
-    : activeRange === 'weekly'
-      ? (isWeeklyLoading || isMembersLoading || (currentEntries.length === 0 && isFallbackLoading))
-      : (isMonthLoading || isMembersLoading || (currentEntries.length === 0 && isFallbackLoading));
+  const isLoading = rankSnapshotLoading;
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);

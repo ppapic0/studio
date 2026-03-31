@@ -491,8 +491,8 @@ export default function StudyPlanPage() {
       }
       const parsed = JSON.parse(raw) as PlannerTemplateRecord[];
       setCustomTemplates(Array.isArray(parsed) ? parsed : []);
-    } catch (error) {
-      console.error('저장된 계획 템플릿을 읽지 못했습니다.', error);
+    } catch {
+      window.localStorage.removeItem(templateStorageKey);
       setCustomTemplates([]);
     }
   }, [templateStorageKey]);
@@ -511,8 +511,8 @@ export default function StudyPlanPage() {
       }
       const parsed = JSON.parse(raw) as string[];
       setRecentTemplateIds(Array.isArray(parsed) ? parsed : []);
-    } catch (error) {
-      console.error('최근 템플릿 기록을 읽지 못했습니다.', error);
+    } catch {
+      window.localStorage.removeItem(templateRecentStorageKey);
       setRecentTemplateIds([]);
     }
   }, [templateRecentStorageKey]);
@@ -656,8 +656,7 @@ export default function StudyPlanPage() {
       }
 
       setRecentStudyOptions(Array.from(uniqueItems.values()));
-    } catch (error) {
-      console.error('최근 학습 계획을 불러오지 못했습니다.', error);
+    } catch {
       setRecentStudyOptions([]);
     } finally {
       setIsRecentStudyLoading(false);

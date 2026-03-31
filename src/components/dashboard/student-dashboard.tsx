@@ -73,7 +73,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { DailyStudentStat, StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, LeaderboardEntry, StudySession, AttendanceRequest, CenterMembership, AttendanceCurrent, DailyReport, PenaltyLog } from '@/lib/types';
+import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
@@ -99,15 +99,13 @@ import {
   rollStudyBoxReward,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
+import {
+  EMPTY_STUDENT_RANKING_SNAPSHOT,
+  fetchStudentRankingSnapshot,
+  type StudentRankingSnapshot,
+} from '@/lib/student-ranking-client';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
-
-function isActiveStudentStatus(status: unknown): boolean {
-  if (typeof status !== 'string') return true;
-  const normalized = status.trim().toLowerCase();
-  if (!normalized) return true;
-  return normalized === 'active';
-}
 
 function isSyntheticStudentId(studentId: unknown): boolean {
   if (typeof studentId !== 'string') return true;
@@ -1040,8 +1038,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isExamSaving, setIsExamSaving] = useState(false);
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
   const [selectedRankRange, setSelectedRankRange] = useState<RankRange>('daily');
-  const [weeklyRankRows, setWeeklyRankRows] = useState<Array<{ studentId: string; totalStudyMinutes: number }>>([]);
-  const [weeklyRankLoading, setWeeklyRankLoading] = useState(false);
+  const [rankSnapshot, setRankSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
+  const [rankSnapshotLoading, setRankSnapshotLoading] = useState(false);
   const studyBoxClaimKeyRef = useRef<string | null>(null);
   const homeBoxTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const homeLiveClaimKeyRef = useRef<string | null>(null);
@@ -1179,44 +1177,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return [...teacherReportsRaw].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
   }, [teacherReportsRaw]);
 
-  const leaderboardEntryRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !periodKey) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_study-time`, 'entries', user.uid);
-  }, [firestore, activeMembership?.id, periodKey, user?.uid]);
-  const { data: leaderboardEntry } = useDoc<LeaderboardEntry>(leaderboardEntryRef, { enabled: isActive });
-
-  const totalEntriesQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !periodKey) return null;
-    return collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_study-time`, 'entries');
-  }, [firestore, activeMembership?.id, periodKey]);
-  const { data: totalRankEntries } = useCollection<LeaderboardEntry>(totalEntriesQuery, { enabled: isActive });
-
-  const dailyRankEntriesQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !todayKey) return null;
-    return collection(firestore, 'centers', activeMembership.id, 'dailyStudentStats', todayKey, 'students');
-  }, [firestore, activeMembership?.id, todayKey]);
-  const { data: dailyRankEntriesRaw, isLoading: dailyRankLoading } = useCollection<DailyStudentStat>(dailyRankEntriesQuery, { enabled: isActive });
-
-  const membersQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'members'),
-      where('role', '==', 'student'),
-      where('status', '==', 'active')
-    );
-  }, [firestore, activeMembership?.id]);
-  const { data: activeStudentMembers, isLoading: activeMembersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
-  const memberProfileMap = useMemo(() => {
-    const map = new Map<string, { displayName: string; className: string | null }>();
-    (activeStudentMembers || []).forEach((member) => {
-      map.set(member.id, {
-        displayName: member.displayName || '학생',
-        className: member.className || null,
-      });
-    });
-    return map;
-  }, [activeStudentMembers]);
-
   const attendanceCurrentQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership) return null;
     return collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent');
@@ -1243,44 +1203,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [isActive, router]);
 
   useEffect(() => {
-    if (!firestore || !activeMembership || !isActive || weekDateKeys.length === 0) {
-      setWeeklyRankRows([]);
+    if (!user || !activeMembership || !isActive) {
+      setRankSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
       return;
     }
 
     let cancelled = false;
     const run = async () => {
-      setWeeklyRankLoading(true);
+      setRankSnapshotLoading(true);
       try {
-        const snapshots = await Promise.all(
-          weekDateKeys.map((dateKey) =>
-            getDocs(collection(firestore, 'centers', activeMembership.id, 'dailyStudentStats', dateKey, 'students'))
-          )
-        );
-
-        const totals = new Map<string, number>();
-        snapshots.forEach((snapshot) => {
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data() as DailyStudentStat;
-            const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
-            const minutes = Number(data.totalStudyMinutes || 0);
-            if (!studentId || minutes <= 0) return;
-            totals.set(studentId, (totals.get(studentId) || 0) + minutes);
-          });
+        const nextSnapshot = await fetchStudentRankingSnapshot({
+          centerId: activeMembership.id,
+          user,
         });
-
         if (!cancelled) {
-          setWeeklyRankRows(
-            Array.from(totals.entries()).map(([studentId, totalStudyMinutes]) => ({ studentId, totalStudyMinutes }))
-          );
+          setRankSnapshot(nextSnapshot);
         }
-      } catch (error) {
+      } catch {
         if (!cancelled) {
-          console.warn('[student-dashboard] weekly rank load failed', error);
-          setWeeklyRankRows([]);
+          setRankSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
         }
       } finally {
-        if (!cancelled) setWeeklyRankLoading(false);
+        if (!cancelled) setRankSnapshotLoading(false);
       }
     };
 
@@ -1288,7 +1232,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [firestore, activeMembership?.id, isActive, weekDateKeys]);
+  }, [activeMembership?.id, isActive, user]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -2084,98 +2028,46 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => todayRemainingTasks.slice(0, 3),
     [todayRemainingTasks]
   );
-  const activeStudentIds = useMemo(() => {
-    if (!activeStudentMembers) return null;
-    return new Set(
-      activeStudentMembers
-        .filter((member) => isActiveStudentStatus(member.status))
-        .map((member) => member.id)
-    );
-  }, [activeStudentMembers]);
-
-  const assignedStudentIds = useMemo(() => {
-    if (!attendanceCurrent) return null;
-    return new Set(
-      attendanceCurrent
-        .map((seat) => (typeof seat.studentId === 'string' ? seat.studentId.trim() : ''))
-        .filter((studentId) => studentId.length > 0 && !isSyntheticStudentId(studentId))
-    );
-  }, [attendanceCurrent]);
-
-  const validRankEntries = useMemo(() => {
-    if (!totalRankEntries) return [];
-    let filtered = totalRankEntries.filter((entry) => !isSyntheticStudentId(entry.studentId));
-
-    if (assignedStudentIds && assignedStudentIds.size > 0) {
-      filtered = filtered.filter((entry) => assignedStudentIds.has(entry.studentId));
-    }
-    if (activeStudentIds && activeStudentIds.size > 0) {
-      filtered = filtered.filter((entry) => activeStudentIds.has(entry.studentId));
-    }
-
-    return filtered;
-  }, [totalRankEntries, assignedStudentIds, activeStudentIds]);
-
+  const validRankEntries = rankSnapshot.monthly;
   const studyRankParticipantCount = validRankEntries.length;
-  const isRankContextLoading = activeMembersLoading || attendanceLoading;
+  const isRankContextLoading = rankSnapshotLoading || attendanceLoading;
 
-  const validDailyRankEntries = useMemo(() => {
-    if (!dailyRankEntriesRaw) return [];
-    return dailyRankEntriesRaw
-      .filter((entry) => !isSyntheticStudentId(entry.studentId))
-      .filter((entry) => !activeStudentIds || activeStudentIds.has(entry.studentId))
-      .sort((a, b) => Number(b.totalStudyMinutes || 0) - Number(a.totalStudyMinutes || 0));
-  }, [activeStudentIds, dailyRankEntriesRaw]);
-
-  const validWeeklyRankEntries = useMemo(() => {
-    return [...weeklyRankRows]
-      .filter((entry) => !isSyntheticStudentId(entry.studentId))
-      .filter((entry) => !activeStudentIds || activeStudentIds.has(entry.studentId))
-      .sort((a, b) => Number(b.totalStudyMinutes || 0) - Number(a.totalStudyMinutes || 0));
-  }, [activeStudentIds, weeklyRankRows]);
+  const validDailyRankEntries = rankSnapshot.daily;
+  const validWeeklyRankEntries = rankSnapshot.weekly;
 
   const dailyStudyRank = useMemo(() => {
     if (!user || validDailyRankEntries.length === 0) return 0;
-    const ownIndex = validDailyRankEntries.findIndex((entry) => entry.studentId === user.uid);
-    return ownIndex >= 0 ? ownIndex + 1 : 0;
+    const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === user.uid);
+    return ownEntry?.rank || 0;
   }, [user?.uid, validDailyRankEntries]);
 
   const dailyStudyRankMinutes = useMemo(() => {
     if (dailyStudyRank > 0) {
       const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === user?.uid);
-      return Number(ownEntry?.totalStudyMinutes || 0);
+      return Number(ownEntry?.value || 0);
     }
     return Number(todayStudyLog?.totalMinutes || 0);
   }, [dailyStudyRank, todayStudyLog?.totalMinutes, user?.uid, validDailyRankEntries]);
 
   const weeklyStudyRank = useMemo(() => {
     if (!user || validWeeklyRankEntries.length === 0) return 0;
-    const ownIndex = validWeeklyRankEntries.findIndex((entry) => entry.studentId === user.uid);
-    return ownIndex >= 0 ? ownIndex + 1 : 0;
+    const ownEntry = validWeeklyRankEntries.find((entry) => entry.studentId === user.uid);
+    return ownEntry?.rank || 0;
   }, [user?.uid, validWeeklyRankEntries]);
 
   const weeklyStudyRankMinutes = useMemo(() => {
     if (weeklyStudyRank > 0) {
       const ownEntry = validWeeklyRankEntries.find((entry) => entry.studentId === user?.uid);
-      return Number(ownEntry?.totalStudyMinutes || 0);
+      return Number(ownEntry?.value || 0);
     }
     return Number(weeklyStudyMinutes || 0);
   }, [weeklyStudyMinutes, weeklyStudyRank, user?.uid, validWeeklyRankEntries]);
 
   const monthlyStudyRank = useMemo(() => {
-    const snapshotRank = leaderboardEntry?.rank || 0;
-    if (!user || validRankEntries.length === 0) return snapshotRank;
-
-    const sorted = [...validRankEntries].sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
-    const ownIndex = sorted.findIndex((entry) => entry.studentId === user.uid);
-    if (ownIndex >= 0) return ownIndex + 1;
-
-    const snapshotValue = Number(leaderboardEntry?.value);
-    if (!Number.isFinite(snapshotValue)) return snapshotRank;
-
-    const higherCount = sorted.filter((entry) => (Number(entry.value) || 0) > snapshotValue).length;
-    return Math.min(sorted.length, higherCount + 1);
-  }, [leaderboardEntry?.rank, leaderboardEntry?.value, validRankEntries, user?.uid]);
+    if (!user || validRankEntries.length === 0) return 0;
+    const ownEntry = validRankEntries.find((entry) => entry.studentId === user.uid);
+    return ownEntry?.rank || 0;
+  }, [user?.uid, validRankEntries]);
 
   const monthlyStudyPercentile = useMemo(() => {
     if (isRankContextLoading) return null;
@@ -2186,27 +2078,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const monthlyStudyRankMinutes = useMemo(() => {
     const ownEntry = validRankEntries.find((entry) => entry.studentId === user?.uid);
-    if (ownEntry) return Number(ownEntry.value || 0);
-    return Number(leaderboardEntry?.value || 0);
-  }, [leaderboardEntry?.value, user?.uid, validRankEntries]);
+    return Number(ownEntry?.value || 0);
+  }, [user?.uid, validRankEntries]);
 
   const homeRankMap = useMemo(() => {
     const dailyTop = validDailyRankEntries.slice(0, 3).map((entry, index) => ({
       rank: index + 1,
-      name: memberProfileMap.get(entry.studentId)?.displayName || '학생',
-      minutes: Number(entry.totalStudyMinutes || 0),
+      name: entry.displayNameSnapshot || '학생',
+      minutes: Number(entry.value || 0),
     }));
     const weeklyTop = validWeeklyRankEntries.slice(0, 3).map((entry, index) => ({
       rank: index + 1,
-      name: memberProfileMap.get(entry.studentId)?.displayName || '학생',
-      minutes: Number(entry.totalStudyMinutes || 0),
+      name: entry.displayNameSnapshot || '학생',
+      minutes: Number(entry.value || 0),
     }));
     const monthlyTop = [...validRankEntries]
       .sort((a, b) => Number(b.value || 0) - Number(a.value || 0))
       .slice(0, 3)
       .map((entry, index) => ({
         rank: index + 1,
-        name: entry.displayNameSnapshot || memberProfileMap.get(entry.studentId)?.displayName || '학생',
+        name: entry.displayNameSnapshot || '학생',
         minutes: Number(entry.value || 0),
       }));
 
@@ -2215,19 +2106,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         title: '일간 랭킹',
         rank: dailyStudyRank,
         minutes: dailyStudyRankMinutes,
-        badge: dailyRankLoading ? '집계 중' : dailyStudyRank > 0 ? `오늘 ${dailyStudyRank}위` : '집계 준비중',
+        badge: rankSnapshotLoading ? '집계 중' : dailyStudyRank > 0 ? `오늘 ${dailyStudyRank}위` : '집계 준비중',
         caption: dailyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, dailyStudyRankMinutes))} 누적` : '오늘 기록이 쌓이면 바로 보여요',
         preview: dailyTop,
-        isLoading: dailyRankLoading,
+        isLoading: rankSnapshotLoading,
       },
       weekly: {
         title: '주간 랭킹',
         rank: weeklyStudyRank,
         minutes: weeklyStudyRankMinutes,
-        badge: weeklyRankLoading ? '집계 중' : weeklyStudyRank > 0 ? `이번 주 ${weeklyStudyRank}위` : '집계 준비중',
+        badge: rankSnapshotLoading ? '집계 중' : weeklyStudyRank > 0 ? `이번 주 ${weeklyStudyRank}위` : '집계 준비중',
         caption: weeklyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, weeklyStudyRankMinutes))} 누적` : '이번 주 기록이 쌓이면 보여요',
         preview: weeklyTop,
-        isLoading: weeklyRankLoading,
+        isLoading: rankSnapshotLoading,
       },
       monthly: {
         title: '월간 랭킹',
@@ -2248,17 +2139,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       isLoading: boolean;
     }>;
   }, [
-    dailyRankLoading,
     dailyStudyRank,
     dailyStudyRankMinutes,
     isRankContextLoading,
-    memberProfileMap,
     monthlyStudyRank,
     monthlyStudyRankMinutes,
+    rankSnapshotLoading,
     validDailyRankEntries,
     validRankEntries,
     validWeeklyRankEntries,
-    weeklyRankLoading,
     weeklyStudyRank,
     weeklyStudyRankMinutes,
   ]);

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useFunctions } from '@/firebase';
-import { collection, collectionGroup, getDocs, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { httpsCallable } from 'firebase/functions';
 
@@ -107,36 +107,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setMembershipsLoading(true);
 
     let userCenterMemberships: CenterMembership[] = [];
-    let memberFallbackMemberships: CenterMembership[] = [];
     let userCentersResolved = false;
-    let fallbackResolved = false;
     let bootstrapResolved = !functions;
     let disposed = false;
-    const normalizeLinkedStudentIds = (value: unknown): string[] => {
-      if (!Array.isArray(value)) return [];
-      return value
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
-    };
-    const mergeMembership = (primary: CenterMembership, secondary: CenterMembership): CenterMembership => {
-      const primaryLinkedIds = normalizeLinkedStudentIds(primary.linkedStudentIds);
-      const secondaryLinkedIds = normalizeLinkedStudentIds(secondary.linkedStudentIds);
-      const mergedLinkedIds = Array.from(new Set(primaryLinkedIds.length > 0 ? primaryLinkedIds : secondaryLinkedIds));
-        return {
-          ...secondary,
-          ...primary,
-          role: normalizeRole(primary.role || secondary.role),
-          status: normalizeStatus(primary.status || secondary.status || 'active'),
-          joinedAt: primary.joinedAt || secondary.joinedAt,
-          displayName: primary.displayName || secondary.displayName,
-          className: primary.className ?? secondary.className,
-          linkedStudentIds: mergedLinkedIds.length > 0 ? mergedLinkedIds : undefined,
-          phoneNumber: primary.phoneNumber || secondary.phoneNumber,
-        };
-      };
-
-      const getNormalizedStatus = (value: unknown) =>
+    const getNormalizedStatus = (value: unknown) =>
       typeof value === 'string' ? value.trim().toLowerCase().replace(/[\s_-]+/g, '') : '';
 
     const hasLinkedStudents = (membership: CenterMembership) =>
@@ -177,22 +151,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const applyMembershipState = () => {
       if (disposed) return;
-      if (!userCentersResolved || !fallbackResolved || !bootstrapResolved) return;
+      if (!userCentersResolved || !bootstrapResolved) return;
 
       const map = new Map<string, CenterMembership>();
 
       userCenterMemberships.forEach((membership) => {
         map.set(membership.id, membership);
-      });
-
-      memberFallbackMemberships.forEach((membership) => {
-        const existing = map.get(membership.id);
-        if (!existing) {
-          map.set(membership.id, membership);
-          return;
-        }
-
-        map.set(membership.id, mergeMembership(existing, membership));
       });
 
       const mergedMemberships = Array.from(map.values());
@@ -213,10 +177,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const userCentersRef = collection(firestore, 'userCenters', user.uid, 'centers');
-    const fallbackMembersQuery = query(collectionGroup(firestore, 'members'), where('id', '==', user.uid));
-
-    // Track whether the one-time fallback has already been fetched
-    let fallbackFetched = false;
 
     const ensureMembershipBootstrap = async () => {
       if (!functions) {
@@ -228,47 +188,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
         await ensureMemberships({});
-      } catch (error) {
-        console.warn('Membership bootstrap warning:', error);
+      } catch {
+        // userCenters snapshot is the source of truth for client navigation,
+        // so callable bootstrap failures should not surface noisy console errors here.
       } finally {
         bootstrapResolved = true;
         applyMembershipState();
       }
     };
 
-    const fetchFallbackOnce = async () => {
-      if (fallbackFetched) return;
-      fallbackFetched = true;
-      try {
-        const snapshotByField = await getDocs(fallbackMembersQuery);
-        memberFallbackMemberships = snapshotByField.docs
-          .map((docSnap) => {
-            const raw = docSnap.data() as any;
-            const centerId = docSnap.ref.parent.parent?.id;
-            if (!centerId) return null;
-            return {
-              id: centerId,
-              role: normalizeRole(raw.role),
-              status: normalizeStatus(raw.status || 'active'),
-              joinedAt: raw.joinedAt,
-              displayName: raw.displayName,
-              linkedStudentIds: raw.linkedStudentIds,
-              className: raw.className,
-              phoneNumber: raw.phoneNumber,
-            } as CenterMembership;
-          })
-          .filter((membership): membership is CenterMembership => !!membership);
-      } catch (error) {
-        memberFallbackMemberships = [];
-        console.warn('Membership fallback fetch warning:', error);
-      } finally {
-        fallbackResolved = true;
-        applyMembershipState();
-      }
-    };
-
     void ensureMembershipBootstrap();
-    void fetchFallbackOnce();
 
     const unsubscribeUserCenters = onSnapshot(
       userCentersRef,
@@ -290,8 +219,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         userCentersResolved = true;
         applyMembershipState();
       },
-      (error) => {
-        console.error('Membership sync error:', error);
+      () => {
         userCentersResolved = true;
         applyMembershipState();
       }
