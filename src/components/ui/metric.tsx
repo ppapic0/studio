@@ -26,8 +26,8 @@ const toneStyles: Record<MetricTone, string> = {
   positive: 'metric-positive',
   negative: 'metric-negative',
   muted:    'metric-muted',
-  orange:   'text-[#FF7A16]',
-  navy:     'text-[#14295F]',
+  orange:   'text-[var(--accent-orange)]',
+  navy:     'text-[var(--text-primary)]',
 };
 
 // ─── MetricValue ──────────────────────────────────────────────────────────────

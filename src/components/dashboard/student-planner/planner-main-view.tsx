@@ -727,35 +727,35 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         <header className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black tracking-[0.22em] text-white/42">PLAN</p>
+              <p className="surface-kicker text-[11px]">PLAN</p>
               <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">계획</h1>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-[13px] font-black text-white/88">
+            <div className="surface-chip surface-chip--dark px-4 py-2 text-[13px]">
               {todayHeaderSummary}
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-[1.3rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.9)_0%,rgba(13,28,69,0.84)_100%)] px-3 py-2">
-            <Button type="button" variant="ghost" onClick={() => moveSelectedDate(-1)} className="h-9 w-9 rounded-full bg-white/8 p-0 text-white hover:bg-white/12">
+          <div className="surface-card surface-card--ghost on-dark flex items-center justify-between rounded-[1.3rem] px-3 py-2">
+            <Button type="button" variant="dark" onClick={() => moveSelectedDate(-1)} className="h-9 w-9 rounded-full p-0">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="text-center">
               <p className="text-xs font-black text-white">{selectedDateLabel}</p>
-              <p className="mt-0.5 text-[11px] font-semibold text-white/55">{isToday ? '오늘 퀘스트' : '다른 날짜 보기'}</p>
+              <p className="surface-caption mt-0.5 text-[11px] font-semibold">{isToday ? '오늘 퀘스트' : '다른 날짜 보기'}</p>
             </div>
-            <Button type="button" variant="ghost" onClick={() => moveSelectedDate(1)} className="h-9 w-9 rounded-full bg-white/8 p-0 text-white hover:bg-white/12">
+            <Button type="button" variant="dark" onClick={() => moveSelectedDate(1)} className="h-9 w-9 rounded-full p-0">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </header>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,#17326B_0%,#244991_62%,#1A356A_100%)] px-5 py-5 text-white shadow-[0_28px_50px_-36px_rgba(0,0,0,0.55)] animate-[planner-fade-rise_0.22s_ease-out]">
+        <section className="surface-card surface-card--primary on-dark relative rounded-[2rem] px-5 py-5 text-white animate-[planner-fade-rise_0.22s_ease-out]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.22),transparent_34%)]" />
           <div className="relative">
             {floatingPointBursts.map((burst: { id: number; label: string }, index: number) => (
               <div
                 key={burst.id}
-                className="absolute right-0 top-0 rounded-full bg-[#FFF4E8] px-3 py-1 text-xs font-black text-[#17326B] shadow-[0_18px_30px_-24px_rgba(6,12,34,0.4)] animate-[planner-point-burst_0.95s_ease-out_forwards]"
+                className="absolute right-0 top-0 rounded-full border border-[rgba(255,138,31,0.16)] bg-[rgba(255,248,238,0.95)] px-3 py-1 text-xs font-black text-[var(--text-primary)] shadow-[0_18px_30px_-24px_rgba(6,12,34,0.4)] animate-[planner-point-burst_0.95s_ease-out_forwards]"
                 style={{ marginTop: `${index * 8}px` }}
               >
                 +{burst.label}P
@@ -764,10 +764,10 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3 py-1 text-[11px] font-black text-white/82">
+                <div className="surface-chip surface-chip--dark gap-2 px-3 py-1 text-[11px]">
                   오늘 루틴
                 </div>
-                <p className="mt-2 text-sm font-semibold text-white/68">
+                <p className="surface-caption mt-2 text-sm font-semibold">
                   {format(selectedDate, 'EEEE', { locale: ko })} · 자동 적용됨
                 </p>
               </div>
@@ -775,7 +775,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 <button
                   type="button"
                   onClick={() => setIsRoutineEditOpen(true)}
-                  className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-[#FFD79F]"
+                  className="surface-chip surface-chip--accent px-3 py-2 text-xs"
                 >
                   ⚡ 오늘만 수정
                 </button>
@@ -785,11 +785,11 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
             <div className="mt-5 flex items-end justify-between gap-4">
               <div>
                 <p className="text-[2.2rem] font-black tracking-tight text-white md:text-[2.8rem]">{routineWindowLabel}</p>
-                <p className="mt-2 text-sm font-semibold text-white/72">{routineStateLabel}</p>
+                <p className="surface-caption mt-2 text-sm font-semibold">{routineStateLabel}</p>
               </div>
-              <div className="rounded-2xl border border-white/12 bg-white/[0.08] px-4 py-3 text-right">
-                <p className="text-[10px] font-black tracking-[0.18em] text-white/45">오늘 목표</p>
-                <p className="mt-2 text-lg font-black text-[#FFD79F]">{plannedStudyMinutes > 0 ? formatMinutesShort(plannedStudyMinutes) : studyGoalSummaryLabel}</p>
+              <div className="surface-card surface-card--ghost on-dark rounded-2xl px-4 py-3 text-right">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">오늘 목표</p>
+                <p className="mt-2 text-lg font-black text-[var(--accent-orange-soft)]">{plannedStudyMinutes > 0 ? formatMinutesShort(plannedStudyMinutes) : studyGoalSummaryLabel}</p>
               </div>
             </div>
 
@@ -833,10 +833,10 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           </div>
         </section>
 
-        <section className="rounded-[1.8rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(12,27,63,0.92)_100%)] px-4 py-4 shadow-[0_22px_46px_-34px_rgba(0,0,0,0.48)]">
+        <section className="surface-card surface-card--secondary on-dark rounded-[1.8rem] px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black tracking-[0.18em] text-white/42">TODAY MISSION</p>
+              <p className="surface-kicker text-[11px]">TODAY MISSION</p>
               <h2 className="mt-1 text-xl font-black tracking-tight text-white">오늘 미션</h2>
             </div>
             {!isPast ? (
@@ -864,7 +864,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     type="button"
                     onClick={() => handleAddSuggestedTask(item)}
                     disabled={isSubmitting}
-                    className="rounded-full border border-white/10 bg-white/8 px-3 py-2 text-[12px] font-black text-white transition hover:bg-white/12 disabled:opacity-45"
+                    className="surface-chip surface-chip--dark px-3 py-2 text-[12px] transition hover:bg-white/12 disabled:opacity-45"
                   >
                     {item.title}
                   </button>
@@ -873,9 +873,9 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
               <div className="mt-4 space-y-2.5">
                 {taskCount === 0 ? (
-                  <div className="rounded-[1.3rem] border border-dashed border-white/10 bg-white/6 px-4 py-5 text-center">
+                  <div className="surface-card surface-card--ghost on-dark rounded-[1.3rem] border-dashed px-4 py-5 text-center">
                     <p className="text-sm font-black text-white">아직 미션이 없어요</p>
-                    <p className="mt-2 text-[12px] font-semibold text-white/58">추천을 누르거나 어제 계획을 바로 불러오세요.</p>
+                    <p className="surface-caption mt-2 text-[12px] font-semibold">추천을 누르거나 어제 계획을 바로 불러오세요.</p>
                   </div>
                 ) : (
                   orderedChecklistTasks.map((task: any) => {
@@ -917,21 +917,21 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           </button>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <p className={cn('truncate text-[15px] font-black', isDone ? 'text-white/88 line-through decoration-white/30' : 'text-white')}>
+                            <p className={cn('truncate text-[15px] font-black', isDone ? 'text-white/88 line-through decoration-white/30' : 'text-white')}>
                                 {task.title}
                               </p>
                               <Badge className={cn('rounded-full px-2 py-0.5 text-[10px] font-black shadow-none', badge.className)}>
                                 {badge.label}
                               </Badge>
                             </div>
-                            <p className="mt-1 text-[12px] font-semibold text-white/58">{durationLabel} · {detailLabel}</p>
+                            <p className="surface-caption mt-1 text-[12px] font-semibold">{durationLabel} · {detailLabel}</p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <p className="text-[11px] font-black text-[#FFD79F]">{rewardLabel}</p>
+                            <p className="text-[11px] font-black text-[var(--accent-orange-soft)]">{rewardLabel}</p>
                             <button
                               type="button"
                               onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-                              className="mt-1 text-[11px] font-black text-white/62"
+                              className="mt-1 text-[11px] font-black text-[var(--text-on-dark-soft)]"
                             >
                               {isDone ? '완료됨' : progressPercent > 0 ? '진행 중' : '시작 ▶'}
                             </button>
@@ -1014,28 +1014,28 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 <button
                   type="button"
                   onClick={() => setShowQuickAddCard((prev: boolean) => !prev)}
-                  className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[12px] font-black text-white"
+                  className="surface-chip surface-chip--dark px-4 py-2 text-[12px]"
                 >
                   + 추가
                 </button>
                 <button
                   type="button"
                   onClick={handleStartCustomQuest}
-                  className="rounded-full border border-[#FFB347]/22 bg-[#FF9626]/12 px-4 py-2 text-[12px] font-black text-[#FFD79F]"
+                  className="surface-chip surface-chip--accent px-4 py-2 text-[12px]"
                 >
                   오늘만 직접 쓰기
                 </button>
                 <button
                   type="button"
                   onClick={handleCopyYesterdayPlan}
-                  className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[12px] font-black text-white/72"
+                  className="surface-chip surface-chip--dark px-4 py-2 text-[12px] text-[var(--text-on-dark-soft)]"
                 >
                   어제 불러오기
                 </button>
               </div>
 
               {showQuickAddCard ? (
-                <div className="mt-4 rounded-[1.45rem] border border-white/10 bg-[#0F2149]/82 p-4 animate-[planner-fade-rise_0.22s_ease-out]">
+                <div className="surface-card surface-card--ghost on-dark mt-4 rounded-[1.45rem] p-4 animate-[planner-fade-rise_0.22s_ease-out]">
                   <div className="space-y-3">
                     <Input
                       value={newStudyTask}

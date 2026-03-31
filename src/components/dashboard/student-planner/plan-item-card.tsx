@@ -33,15 +33,15 @@ type PlanItemCardProps = {
 const toneMap = {
   emerald: {
     done: 'border border-emerald-400/24 bg-[linear-gradient(180deg,rgba(47,170,125,0.2)_0%,rgba(14,27,61,0.9)_100%)]',
-    idle: 'border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
+    idle: 'surface-card surface-card--primary on-dark shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
   },
   amber: {
     done: 'border border-[#FFB347]/24 bg-[linear-gradient(180deg,rgba(255,150,38,0.18)_0%,rgba(14,27,61,0.9)_100%)]',
-    idle: 'border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
+    idle: 'surface-card surface-card--secondary on-dark shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
   },
   slate: {
-    done: 'border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(14,27,61,0.92)_100%)]',
-    idle: 'border border-white/10 bg-[linear-gradient(180deg,rgba(29,53,101,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
+    done: 'border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(14,27,61,0.92)_100%)]',
+    idle: 'surface-card surface-card--ghost on-dark shadow-[0_18px_34px_-26px_rgba(0,0,0,0.48)]',
   },
 } as const;
 
@@ -81,7 +81,7 @@ export function PlanItemCard({
 
   return (
     <div className={cn(
-      "group flex items-start gap-3 rounded-[1.45rem] border transition-all",
+      "group flex items-start gap-3 rounded-[1.45rem] transition-all",
       checked ? toneValue.done : toneValue.idle,
       compact ? "p-4" : isMobile ? "p-4" : "p-5"
     )}>
@@ -104,12 +104,12 @@ export function PlanItemCard({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {badgeLabel ? (
-            <Badge className="rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-[9px] font-black text-[#FFD79F] shadow-none">
+            <Badge variant="dark" className="rounded-full px-2.5 py-0.5 text-[9px] font-black shadow-none">
               {badgeLabel}
             </Badge>
           ) : null}
           {metaLabel ? (
-            <span className="text-[10px] font-black text-white/42">{metaLabel}</span>
+            <span className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{metaLabel}</span>
           ) : null}
         </div>
         <Label
@@ -117,7 +117,7 @@ export function PlanItemCard({
           className={cn(
             "mt-1 block break-keep font-black leading-snug tracking-tight text-white transition-all",
             compact ? "text-sm" : isMobile ? "text-sm" : "text-base",
-            checked && "text-white/42 line-through italic"
+            checked && "text-[var(--text-on-dark-soft)] line-through italic"
           )}
         >
           {title}
@@ -126,7 +126,7 @@ export function PlanItemCard({
         {volumeMeta ? (
           <div className="mt-3 space-y-2">
             <div className="flex flex-wrap items-center gap-2 text-[10px] font-black">
-              <span className="rounded-full bg-white/8 px-2.5 py-1 text-white/62">
+              <span className="surface-chip surface-chip--dark px-2.5 py-1 text-[var(--text-on-dark-soft)]">
                 목표 {volumeMeta.targetAmount}{volumeMeta.unitLabel}
               </span>
               <span className={cn(
@@ -135,7 +135,7 @@ export function PlanItemCard({
               )}>
                 실제 {volumeMeta.actualAmount}{volumeMeta.unitLabel}
               </span>
-              <span className="rounded-full bg-white/8 px-2.5 py-1 text-white/62 ring-1 ring-white/10">
+              <span className="surface-chip surface-chip--dark px-2.5 py-1 text-[var(--text-on-dark-soft)]">
                 달성률 {progressRate}%
               </span>
             </div>
@@ -144,25 +144,25 @@ export function PlanItemCard({
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="dark"
                     onClick={() => commitAmount(0)}
-                    className="h-7 rounded-full border-white/10 bg-white/8 px-3 text-[10px] font-black text-white hover:bg-white/12"
+                    className="h-7 rounded-full px-3 text-[10px] font-black"
                   >
                     0
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="dark"
                     onClick={() => commitAmount(Math.max(1, Math.round(volumeMeta.targetAmount / 2)))}
-                    className="h-7 rounded-full border-white/10 bg-white/8 px-3 text-[10px] font-black text-white hover:bg-white/12"
+                    className="h-7 rounded-full px-3 text-[10px] font-black"
                   >
                     절반
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     onClick={() => commitAmount(volumeMeta.targetAmount)}
-                    className="h-7 rounded-full border-white/10 bg-white/8 px-3 text-[10px] font-black text-white hover:bg-white/12"
+                    className="h-7 rounded-full px-3 text-[10px] font-black"
                   >
                     완료
                   </Button>
@@ -179,9 +179,9 @@ export function PlanItemCard({
                         commitAmount(Number(draftAmount));
                       }
                     }}
-                    className="h-9 max-w-[7rem] rounded-xl border-white/10 bg-white/8 text-center text-xs font-black text-white"
+                    className="h-9 max-w-[7rem] rounded-xl text-center text-xs font-black"
                   />
-                  <span className="text-[10px] font-semibold text-white/42">직접입력</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-on-dark-soft)]">직접입력</span>
                 </div>
               </div>
             ) : null}
@@ -193,7 +193,7 @@ export function PlanItemCard({
           variant="ghost"
           size="icon"
           className={cn(
-            "h-8 w-8 shrink-0 rounded-full text-white/35 transition-all hover:text-rose-300",
+            "h-8 w-8 shrink-0 rounded-full text-[var(--text-on-dark-soft)] transition-all hover:text-rose-300",
             isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           )}
           onClick={onDelete}

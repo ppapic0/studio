@@ -164,7 +164,7 @@ export function ScheduleItemCard({
 
   const TimePicker = ({ type, h, m, p }: { type: 's' | 'e'; h: string; m: string; p: '오전' | '오후' }) => (
     <div className={cn(
-      "flex items-center rounded-xl border border-white/10 bg-white/8 p-0.5",
+      "surface-card surface-card--ghost on-dark flex items-center rounded-xl p-0.5",
       isMobile && "w-full justify-start",
       (disabled || isPast) && "pointer-events-none opacity-60"
     )}>
@@ -186,7 +186,7 @@ export function ScheduleItemCard({
           {HOURS.map((hour) => <SelectItem key={hour} value={hour}>{hour}</SelectItem>)}
         </SelectContent>
       </Select>
-      <span className="px-0.5 text-[9px] font-black text-white/30">:</span>
+      <span className="px-0.5 text-[9px] font-black text-[var(--text-on-dark-muted)]">:</span>
       <Select value={m} onValueChange={(value) => handleValueChange(type, 'm', value)} disabled={disabled || isPast}>
         <SelectTrigger className={cn("h-7 border-none bg-transparent px-1 font-mono font-black text-white shadow-none focus:ring-0", isMobile ? "w-[36px] text-[11px]" : "w-[44px] text-sm")}>
           <SelectValue />
@@ -200,12 +200,12 @@ export function ScheduleItemCard({
 
   return (
     <div className={cn(
-      "group relative flex flex-col rounded-[1.45rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,40,79,0.94)_0%,rgba(12,27,63,0.9)_100%)] shadow-[0_20px_40px_-30px_rgba(0,0,0,0.48)] transition-all hover:border-white/16 hover:shadow-[0_24px_46px_-30px_rgba(0,0,0,0.56)]",
+      "surface-card surface-card--secondary on-dark group relative flex flex-col rounded-[1.45rem] transition-all hover:border-[rgba(255,138,31,0.24)] hover:shadow-[0_24px_46px_-30px_rgba(0,0,0,0.56)]",
       isMobile ? "p-4" : "p-5"
     )}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <div className={cn("flex shrink-0 items-center justify-center rounded-xl bg-[#FF9626]/14 text-[#FFD79F]", isMobile ? "p-2" : "p-2.5")}>
+          <div className={cn("flex shrink-0 items-center justify-center rounded-xl border border-[rgba(255,138,31,0.2)] bg-[rgba(255,138,31,0.14)] text-[var(--accent-orange-soft)]", isMobile ? "p-2" : "p-2.5")}>
             <Icon className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </div>
           <div className="min-w-0">
@@ -213,7 +213,7 @@ export function ScheduleItemCard({
               {titlePart}
             </Label>
             {isToday ? (
-              <p className="mt-0.5 text-[10px] font-bold text-[#FFD79F]">오늘 수정 시 벌점 규칙 적용</p>
+              <p className="mt-0.5 text-[10px] font-bold text-[var(--accent-orange-soft)]">오늘 수정 시 벌점 규칙 적용</p>
             ) : null}
           </div>
         </div>
@@ -222,7 +222,7 @@ export function ScheduleItemCard({
             variant="ghost"
             size="icon"
             className={cn(
-              "h-8 w-8 rounded-full text-slate-400 transition-all hover:text-destructive",
+              "h-8 w-8 rounded-full text-[var(--text-on-dark-soft)] transition-all hover:text-destructive",
               isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}
             onClick={() => onDelete(item)}
@@ -234,7 +234,7 @@ export function ScheduleItemCard({
 
       <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'flex-col sm:flex-row sm:items-center sm:justify-between')}>
         <TimePicker type="s" h={sHour} m={sMin} p={sPer} />
-        <span className="mx-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-white/26">to</span>
+        <span className="mx-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-on-dark-muted)]">to</span>
         <TimePicker type="e" h={eHour} m={eMin} p={ePer} />
       </div>
 
@@ -244,7 +244,7 @@ export function ScheduleItemCard({
             <AlertDialogTitle className="text-lg font-black tracking-tight text-white">
               오늘 루틴 수정 시 벌점이 부여돼요
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-white/62">
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-[var(--text-on-dark-soft)]">
               오늘 날짜의 루틴을 수정하면 하루 최대 1점 벌점이 자동 반영됩니다. 계속 수정할까요?
             </AlertDialogDescription>
           </AlertDialogHeader>

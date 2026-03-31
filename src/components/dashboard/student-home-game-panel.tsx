@@ -142,16 +142,16 @@ function QuestRow({
       type="button"
       onClick={() => onToggle(quest.id)}
       className={cn(
-        "relative flex w-full items-center gap-3 rounded-[1.25rem] border px-4 py-3 text-left transition-all duration-200",
+        "relative flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left transition-all duration-200",
         quest.done
-          ? "border-emerald-300/30 bg-emerald-300/10"
-          : "border-[#32579C] bg-[#1B3466] hover:border-[#4A76C6] hover:bg-[#224078]",
+          ? "border border-emerald-300/32 bg-[linear-gradient(180deg,rgba(47,170,125,0.2),rgba(13,28,69,0.92))]"
+          : "surface-card surface-card--secondary on-dark hover:-translate-y-0.5 hover:border-[rgba(255,138,31,0.3)]",
       )}
     >
       {gainKey ? (
         <span
           key={gainKey}
-          className="pointer-events-none absolute right-3 top-2 rounded-full bg-[#FFB357]/16 px-2 py-1 text-[11px] font-black text-[#FFD089]"
+          className="pointer-events-none absolute right-3 top-2 rounded-full border border-[rgba(255,138,31,0.26)] bg-[rgba(255,138,31,0.16)] px-2 py-1 text-[11px] font-black text-[var(--accent-orange-soft)]"
           style={{ animation: "planner-fade-rise 900ms ease-out both" }}
         >
           +{quest.reward}P
@@ -162,7 +162,7 @@ function QuestRow({
           "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all",
           quest.done
             ? "border-emerald-300/40 bg-emerald-300/18 text-emerald-100"
-            : "border-[#7EA7FF]/24 bg-[#10224B] text-white/82",
+            : "border-white/14 bg-white/12 text-[var(--text-on-dark)]",
         )}
       >
         {quest.done ? <Check className="h-4 w-4" /> : <Target className="h-4 w-4" />}
@@ -170,26 +170,26 @@ function QuestRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {quest.subjectLabel ? (
-            <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/60">
+            <span className="surface-chip surface-chip--dark px-2 py-1 text-[10px] uppercase tracking-[0.16em]">
               {quest.subjectLabel}
             </span>
           ) : null}
           {quest.timeLabel ? (
-            <span className="text-[11px] font-black text-[#FFD089]">{quest.timeLabel}</span>
+            <span className="text-[11px] font-black text-[var(--accent-orange-soft)]">{quest.timeLabel}</span>
           ) : null}
         </div>
         <div
           className={cn(
             "mt-1 text-sm font-black tracking-tight",
-            quest.done ? "text-white/72 line-through decoration-white/35" : "text-white",
+            quest.done ? "text-[var(--text-on-dark-soft)] line-through decoration-white/35" : "text-[var(--text-on-dark)]",
           )}
         >
           {quest.title}
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">reward</div>
-        <div className="mt-1 text-sm font-black text-[#FFD089]">+{quest.reward}</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">reward</div>
+        <div className="mt-1 text-sm font-black text-[var(--accent-orange-soft)]">+{quest.reward}</div>
       </div>
     </button>
   );
@@ -233,12 +233,12 @@ function InventorySlot({
       <div className="mb-2 flex items-center justify-between gap-2">
         <span
           className={cn(
-            "rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]",
+            "rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]",
             box.rarity === "epic"
-              ? "bg-violet-300/18 text-violet-100"
+              ? "border-violet-300/30 bg-violet-300/18 text-violet-100"
               : box.rarity === "rare"
-                ? "bg-orange-300/18 text-orange-100"
-                : "bg-sky-200/14 text-sky-100",
+                ? "border-orange-300/30 bg-orange-300/18 text-orange-100"
+                : "border-sky-200/24 bg-sky-200/14 text-sky-100",
           )}
         >
           {box.rarity}
@@ -246,7 +246,7 @@ function InventorySlot({
         {box.state === "ready" ? (
           <Sparkles className="h-3.5 w-3.5 text-orange-100" />
         ) : box.state === "locked" ? (
-          <Lock className="h-3.5 w-3.5 text-white/35" />
+          <Lock className="h-3.5 w-3.5 text-[var(--text-on-dark-soft)]" />
         ) : null}
       </div>
       <div className="point-track-slot__box">
@@ -263,10 +263,10 @@ function InventorySlot({
                 style={{ width: `${Math.max(4, Math.min(100, chargingPercent || 0))}%` }}
               />
             </div>
-            <div className="mt-1 text-[10px] font-black text-white/55">{chargingLabel}</div>
+            <div className="mt-1 text-[10px] font-black text-[var(--text-on-dark-soft)]">{chargingLabel}</div>
           </>
         ) : (
-          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-on-dark-soft)]">
             <span>
               {box.state === "opened"
                 ? `+${box.reward || 0}P`
@@ -309,7 +309,7 @@ function RewardModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="point-track-modal-shell w-[min(92vw,26rem)] overflow-hidden rounded-[2rem] border border-white/10 p-0 text-white">
+      <DialogContent className="point-track-modal-shell w-[min(92vw,26rem)] overflow-hidden rounded-[2rem] border-none bg-transparent p-0 text-white shadow-none">
         <div className="p-5">
           <DialogHeader>
             <DialogTitle className="text-left text-xl font-black tracking-tight">
@@ -339,21 +339,21 @@ function RewardModal({
             />
             {revealedReward === null ? (
               <div className="mt-4">
-                <div className="text-sm font-black text-[#FFD089]">
+                <div className="text-sm font-black text-[var(--accent-orange-soft)]">
                   {selectedBox ? `${selectedBox.hour}시간 상자` : "포인트 상자"}
                 </div>
                 <div className="mt-2 text-xl font-black tracking-tight text-white">터치해서 열기</div>
               </div>
             ) : (
-              <div className="point-track-reward-burst mt-5 rounded-[1.35rem] border border-white/10 bg-white/[0.08] px-4 py-5">
-                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-[#FFD089]">reward</div>
-                <div className="mt-2 text-[2rem] font-black tracking-tight text-white">
+              <div className="point-track-reward-burst surface-card surface-card--highlight mt-5 rounded-[1.35rem] px-4 py-5">
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--text-on-accent)]">reward</div>
+                <div className="mt-2 text-[2rem] font-black tracking-tight text-[var(--text-on-accent)]">
                   +<RewardCountUp value={revealedReward} />P
                 </div>
-                <div className="mt-2 text-sm font-semibold text-white/68">
+                <div className="mt-2 text-sm font-semibold text-[rgba(14,28,56,0.76)]">
                   오늘 +{todayPointGain.toLocaleString()}P · 총 {pointBalance.toLocaleString()}P
                 </div>
-                <div className="mt-3 rounded-full bg-white/8 px-3 py-2 text-[11px] font-black text-white/55">
+                <div className="mt-3 rounded-full border border-[rgba(14,28,56,0.12)] bg-[rgba(255,255,255,0.56)] px-3 py-2 text-[11px] font-black text-[rgba(14,28,56,0.72)]">
                   다음 상자까지 {nextCountdownLabel}
                 </div>
               </div>
@@ -362,8 +362,8 @@ function RewardModal({
           <div className="mt-4 flex gap-3">
             <Button
               type="button"
-              variant="ghost"
-              className="h-12 flex-1 rounded-[1rem] border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
+              variant="dark"
+              className="h-12 flex-1 rounded-[1rem]"
               onClick={() => onOpenChange(false)}
             >
               닫기
@@ -371,7 +371,8 @@ function RewardModal({
             {revealedReward !== null ? (
               <Button
                 type="button"
-                className="point-track-hero-cta h-12 flex-1 rounded-[1rem] border-0 bg-[linear-gradient(180deg,#FFD089_0%,#FF8A1F_100%)] text-[#14295F] hover:opacity-95"
+                variant="secondary"
+                className="point-track-hero-cta h-12 flex-1 rounded-[1rem]"
                 onClick={hasMoreBoxes ? onNextBox : () => onOpenChange(false)}
               >
                 {hasMoreBoxes ? "다음 상자" : "확인"}
@@ -391,6 +392,9 @@ export function StudentHomeGamePanel({
   completionLabel,
   streakLabel,
   heroMessage,
+  examCardTitle,
+  examCardDLabel,
+  onOpenExamDialog,
   totalMinutesLabel,
   growthLabel,
   growthPercent,
@@ -439,6 +443,9 @@ export function StudentHomeGamePanel({
   completionLabel: string;
   streakLabel: string;
   heroMessage: string;
+  examCardTitle: string;
+  examCardDLabel: string;
+  onOpenExamDialog: () => void;
   totalMinutesLabel: string;
   growthLabel: string;
   growthPercent: number;
@@ -507,37 +514,61 @@ export function StudentHomeGamePanel({
           <div className={cn("flex items-start justify-between gap-3", isMobile ? "flex-col" : "items-center")}>
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="border-white/12 bg-[#0D1D44]/84 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/78"
-                >
+                <Badge variant="dark" className="px-3 py-1 text-[10px] uppercase tracking-[0.22em]">
                   Home Lobby
                 </Badge>
-                <span className="text-[11px] font-black text-[#FFB347]">{dateLabel}</span>
+                <span className="text-[11px] font-black text-white">{dateLabel}</span>
               </div>
-              <h2 className={cn("break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
-                오늘도 성장한 하루
-              </h2>
-              <p className="text-sm font-semibold text-white/82">{heroMessage}</p>
+              <div className={cn("flex gap-3", isMobile ? "flex-col items-start" : "items-start")}>
+                <h2 className={cn("break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
+                  오늘도 성장한 하루
+                </h2>
+                <button
+                  type="button"
+                  onClick={onOpenExamDialog}
+                  className={cn(
+                    "surface-card surface-card--secondary on-dark group min-w-[180px] max-w-full rounded-[1.15rem] px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-[rgba(255,138,31,0.25)]",
+                    isMobile ? "w-auto" : "mt-1"
+                  )}
+                  aria-label="모의고사 일정 수정"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-[0.9rem] border border-[rgba(255,138,31,0.22)] bg-[rgba(255,138,31,0.14)] p-2">
+                      <CalendarDays className="h-4 w-4 text-[var(--accent-orange-soft)]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="surface-kicker text-[10px]">모의고사</p>
+                      <p className="truncate text-sm font-black text-white">{examCardTitle}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="surface-chip surface-chip--light px-2 py-1 text-[10px]">
+                        {examCardDLabel}
+                      </span>
+                      <p className="mt-1 text-[10px] font-bold text-[var(--text-on-dark-soft)]">수정</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+              <p className="surface-caption text-sm font-semibold">{heroMessage}</p>
             </div>
 
-            <div className={cn("rounded-full border border-white/10 bg-[#0F2149]/92 px-3 py-2 shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)]", isMobile ? "self-start" : "")}>
-              <div className="flex items-center gap-2 text-[11px] font-black text-white/82">
-                <CalendarDays className="h-3.5 w-3.5 text-[#FFD089]" />
+            <div className={cn("surface-chip surface-chip--dark px-3 py-2 shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)]", isMobile ? "self-start" : "")}>
+              <div className="flex items-center gap-2 text-[11px] font-black text-white">
+                <CalendarDays className="h-3.5 w-3.5 text-white" />
                 <span>{todayPointLabel}</span>
-                <span className="text-white/35">|</span>
+                <span className="text-[var(--text-on-dark-soft)]">|</span>
                 <span>{completionLabel}</span>
-                <span className="text-white/35">|</span>
+                <span className="text-[var(--text-on-dark-soft)]">|</span>
                 <span>{streakLabel}</span>
               </div>
             </div>
           </div>
 
           <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-[1.35fr_0.95fr]")}>
-            <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,#17326B_0%,#142650_100%)] p-4 shadow-[0_24px_54px_-32px_rgba(3,8,24,0.65)]">
+            <div className="surface-card surface-card--primary on-dark rounded-[1.5rem] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">growth</div>
+                  <div className="surface-kicker text-[10px] text-white">growth</div>
                   {sessionTimerLabel ? (
                     <div className="mt-2">
                       <div className="text-[1.1rem] font-black tracking-tight text-white">집중 중</div>
@@ -548,29 +579,29 @@ export function StudentHomeGamePanel({
                     </div>
                   )}
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-white/72">
+                    <span className="surface-chip surface-chip--dark px-2.5 py-1 text-[10px]">
                       {growthLabel}
                     </span>
-                    <span className="rounded-full bg-[#FF8A1F]/18 px-2.5 py-1 text-[10px] font-black text-[#FFD089]">
+                    <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">
                       {growthDeltaLabel}
                     </span>
                   </div>
                 </div>
                 {sessionTimerLabel ? (
-                  <div className="rounded-[1.1rem] border border-[#FFB357]/18 bg-[#0F204F]/88 px-3 py-2 text-right shadow-[0_18px_34px_-24px_rgba(0,0,0,0.58)]">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/45">live</div>
-                    <div className="mt-1 text-lg font-black text-[#FFD089]">{sessionTimerLabel}</div>
+                  <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-2 text-right">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-on-dark-muted)]">live</div>
+                    <div className="mt-1 text-lg font-black text-white">{sessionTimerLabel}</div>
                   </div>
                 ) : null}
               </div>
 
-              <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-[#0E1B3D]/82 p-3">
+              <div className="surface-card surface-card--ghost on-dark mt-4 rounded-[1.25rem] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-white/58">
-                    <Flame className="h-3.5 w-3.5 text-[#FFD089]" />
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-white">
+                    <Flame className="h-3.5 w-3.5 text-[var(--accent-orange-soft)]" />
                     성장 게이지
                   </span>
-                  <span className="text-[11px] font-black text-white/78">{growthLabel}</span>
+                  <span className="text-[11px] font-black text-white">{growthLabel}</span>
                 </div>
                 <div className={cn("point-track-progress-track", growthPercent >= 100 && "point-track-progress-track--charged")}>
                   <div className="point-track-progress-fill" style={{ width: `${Math.max(6, Math.min(100, growthPercent))}%` }} />
@@ -587,11 +618,10 @@ export function StudentHomeGamePanel({
               <Button
                 type="button"
                 onClick={onPrimaryAction}
+                variant={primaryActionActive ? "secondary" : "dark"}
                 className={cn(
-                  "point-track-hero-cta mt-4 h-12 w-full rounded-[1.1rem] border-0 text-base font-black",
-                  primaryActionActive
-                    ? "bg-[linear-gradient(180deg,#FFA33B_0%,#FF7A16_100%)] text-white"
-                    : "bg-[#F3F6FB] text-[#17326B]",
+                  "point-track-hero-cta mt-4 h-12 w-full rounded-[1.1rem] text-base font-black",
+                  !primaryActionActive && "border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.94)] text-[var(--text-on-light)]",
                 )}
               >
                 {primaryActionActive ? <Timer className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4 fill-current" />}
@@ -599,16 +629,16 @@ export function StudentHomeGamePanel({
               </Button>
             </div>
 
-            <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,#142650_0%,#101F45_100%)] p-4 shadow-[0_24px_54px_-32px_rgba(3,8,24,0.65)]">
+            <div className="surface-card surface-card--secondary on-dark rounded-[1.5rem] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">reward</div>
+                  <div className="surface-kicker text-[10px]">reward</div>
                   <div className="mt-2 text-[1.65rem] font-black tracking-tight text-white">
                     {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 대기` : "상자 생성중"}
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-white/82">{boxSubLabel}</div>
+                  <div className="surface-caption mt-1 text-sm font-semibold">{boxSubLabel}</div>
                 </div>
-                <div className="rounded-full border border-[#FFB357]/20 bg-[#FFF4E8] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#17326B]">
+                <div className="surface-chip surface-chip--light px-2.5 py-1 text-[10px] uppercase tracking-[0.2em]">
                   {boxStatusLabel}
                 </div>
               </div>
@@ -624,14 +654,15 @@ export function StudentHomeGamePanel({
 
               <div className="mt-2 text-center">
                 <div className="text-sm font-black text-white">{totalAvailableBoxes > 0 ? "지금 열기" : nextBoxCounter}</div>
-                <div className="mt-1 text-[11px] font-semibold text-white/58">{nextBoxCaption}</div>
+                <div className="surface-caption mt-1 text-[11px] font-semibold">{nextBoxCaption}</div>
               </div>
 
               <Button
                 type="button"
                 onClick={() => onOpenMainBox()}
                 disabled={totalAvailableBoxes <= 0}
-                className="point-track-hero-cta mt-4 h-11 w-full rounded-[1.1rem] border-0 bg-[linear-gradient(180deg,#FFD089_0%,#FF8A1F_100%)] text-[#14295F] disabled:cursor-default disabled:opacity-55"
+                variant="secondary"
+                className="point-track-hero-cta mt-4 h-11 w-full rounded-[1.1rem] disabled:cursor-default disabled:opacity-55"
               >
                 <Gift className="mr-2 h-4 w-4" />
                 {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 열기` : "곧 도착"}
@@ -642,16 +673,16 @@ export function StudentHomeGamePanel({
       </section>
 
       <section className={cn("mt-3 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[1.2fr_0.8fr]")}>
-        <div className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,#17326B_0%,#142650_100%)] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.72)]">
+        <div className="surface-card surface-card--primary on-dark rounded-[1.65rem] p-4 text-white">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">quest board</div>
+              <div className="surface-kicker text-[10px]">quest board</div>
               <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">오늘의 퀘스트</h3>
             </div>
             <Button
               type="button"
               variant="ghost"
-              className="h-9 rounded-full px-3 text-[11px] font-black text-white/78 hover:bg-white/8 hover:text-white"
+              className="h-9 rounded-full px-3 text-[11px] font-black text-[var(--text-on-dark-soft)] hover:bg-white/8 hover:text-white"
               onClick={onOpenPlan}
             >
               더보기 <ChevronRight className="ml-1 h-4 w-4" />
@@ -668,45 +699,45 @@ export function StudentHomeGamePanel({
                 />
               ))
             ) : (
-              <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-[#11214A] px-4 py-6 text-center">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/8 text-[#FFD089]">
+              <div className="surface-card surface-card--ghost on-dark rounded-[1.25rem] border-dashed px-4 py-6 text-center">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,138,31,0.2)] bg-[rgba(255,138,31,0.12)] text-[var(--accent-orange-soft)]">
                   <Swords className="h-5 w-5" />
                 </div>
                 <div className="mt-3 text-base font-black text-white">아직 오늘 퀘스트가 없어요</div>
-                <div className="mt-1 text-sm font-semibold text-white/58">계획트랙에서 오늘 할 일을 추가해 보세요.</div>
+                <div className="surface-caption mt-1 text-sm font-semibold">계획트랙에서 오늘 할 일을 추가해 보세요.</div>
               </div>
             )}
           </div>
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#122246_100%)] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)]">
+          <div className="surface-card surface-card--secondary on-dark rounded-[1.65rem] p-4 text-white">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-[1.15rem] border border-white/8 bg-[#1D3565] px-3 py-3">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/58">
-                  <Clock3 className="h-3.5 w-3.5 text-[#FFD089]" />
+              <div className="surface-card surface-card--light rounded-[1.15rem] px-3 py-3">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                  <Clock3 className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
                   오늘
                 </div>
-                <div className="mt-2 text-xl font-black text-white">{todayStudyLabel}</div>
+                <div className="mt-2 text-xl font-black text-[var(--text-primary)]">{todayStudyLabel}</div>
               </div>
-              <div className="rounded-[1.15rem] border border-white/8 bg-[#1D3565] px-3 py-3">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/58">
-                  <Wallet className="h-3.5 w-3.5 text-[#FFD089]" />
+              <div className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                  <Wallet className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
                   포인트
                 </div>
-                <div className="mt-2 text-xl font-black text-white">{pointBalance.toLocaleString()}P</div>
-                <div className="mt-1 text-[11px] font-black text-[#FFD089]">오늘 +{todayPointGain}P</div>
+                <div className="mt-2 text-xl font-black text-[var(--text-primary)]">{pointBalance.toLocaleString()}P</div>
+                <div className="mt-1 text-[11px] font-black text-[var(--accent-orange)]">오늘 +{todayPointGain}P</div>
               </div>
             </div>
               <div className="mt-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">growth log</div>
-                  <div className="text-[11px] font-black text-[#FFD089]">최고 {bestDayLabel}</div>
+                  <div className="surface-kicker text-[10px]">growth log</div>
+                  <div className="text-[11px] font-black text-[var(--accent-orange-soft)]">최고 {bestDayLabel}</div>
                 </div>
                 <div className="mt-4 grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
                   <div className="flex h-24 flex-col justify-between pt-1">
                     {trendAxisMarks.map((mark) => (
-                      <div key={mark.id} className="text-right text-[10px] font-black text-white/42">
+                      <div key={mark.id} className="text-right text-[10px] font-black text-[var(--text-on-dark-soft)]">
                         {mark.label}
                       </div>
                     ))}
@@ -715,7 +746,7 @@ export function StudentHomeGamePanel({
                     <div className="relative h-24">
                       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
                         {trendAxisMarks.map((mark) => (
-                          <div key={`${mark.id}-line`} className="border-t border-dashed border-white/8" />
+                          <div key={`${mark.id}-line`} className="border-t border-dashed border-white/12" />
                         ))}
                       </div>
                       <div className="relative flex h-24 items-end gap-2">
@@ -723,7 +754,7 @@ export function StudentHomeGamePanel({
                           const height = Math.max(0.5, item.minutes / maxTrend);
                           return (
                             <div key={item.date} className="flex min-w-0 flex-1 items-end">
-                              <div className="flex h-24 w-full items-end rounded-full bg-[#102049] px-1.5 py-1.5">
+                              <div className="flex h-24 w-full items-end rounded-full bg-[rgba(5,16,43,0.44)] px-1.5 py-1.5 ring-1 ring-white/8">
                                 <div
                                   className={cn(
                                     "w-full rounded-full bg-[linear-gradient(180deg,#FFB347_0%,#FF8A1F_100%)] shadow-[0_10px_20px_-14px_rgba(255,138,31,0.7)]",
@@ -739,7 +770,7 @@ export function StudentHomeGamePanel({
                     </div>
                     <div className="flex gap-2">
                       {weeklyTrend.map((item) => (
-                        <div key={`${item.date}-label`} className="min-w-0 flex-1 text-center text-[10px] font-black text-white/58">
+                        <div key={`${item.date}-label`} className="min-w-0 flex-1 text-center text-[10px] font-black text-[var(--text-on-dark-soft)]">
                           {item.date}
                         </div>
                       ))}
@@ -752,11 +783,11 @@ export function StudentHomeGamePanel({
           <button
             type="button"
             onClick={onOpenLeaderboard}
-            className="w-full rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#122246_100%)] p-4 text-left text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)]"
+            className="surface-card surface-card--highlight w-full rounded-[1.65rem] p-4 text-left"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">{selectedHomeRank.title}</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[rgba(14,28,56,0.58)]">{selectedHomeRank.title}</div>
                 <div className="mt-1 text-[1.35rem] font-black tracking-tight">
                   {selectedHomeRank.isLoading
                     ? "집계 중..."
@@ -764,9 +795,9 @@ export function StudentHomeGamePanel({
                       ? `${selectedHomeRank.rank}위`
                       : "집계 준비중"}
                 </div>
-                <div className="mt-1 text-[11px] font-semibold text-white/72">{selectedHomeRank.caption}</div>
+                <div className="mt-1 text-[11px] font-semibold text-[rgba(14,28,56,0.76)]">{selectedHomeRank.caption}</div>
               </div>
-              <ChevronRight className="mt-1 h-4 w-4 text-white/58" />
+              <ChevronRight className="mt-1 h-4 w-4 text-[rgba(14,28,56,0.58)]" />
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {(["daily", "weekly", "monthly"] as RankRange[]).map((range) => (
@@ -780,8 +811,8 @@ export function StudentHomeGamePanel({
                   className={cn(
                     "rounded-full px-2.5 py-1 text-[10px] font-black transition-all",
                     selectedRankRange === range
-                      ? "bg-[#FF7A16] text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]"
-                      : "bg-[#1D3565] text-[#D9E1F2] ring-1 ring-white/10",
+                      ? "bg-[var(--accent-orange)] text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]"
+                      : "bg-[rgba(14,28,56,0.14)] text-[var(--text-on-accent)] ring-1 ring-[rgba(14,28,56,0.08)]",
                   )}
                 >
                   {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
@@ -796,19 +827,19 @@ export function StudentHomeGamePanel({
                     className={cn(
                       "rounded-[1.15rem] border px-2.5 py-3 text-center shadow-[0_18px_34px_-28px_rgba(0,0,0,0.42)]",
                       entry.rank === 1
-                        ? "border-orange-300/35 bg-[linear-gradient(180deg,rgba(255,176,76,0.18),rgba(255,176,76,0.08))]"
-                        : "border-white/10 bg-[#1D3565]",
+                        ? "border-[rgba(255,138,31,0.26)] bg-[rgba(255,255,255,0.68)]"
+                        : "border-[rgba(14,28,56,0.1)] bg-[rgba(255,255,255,0.5)]",
                     )}
                   >
-                    <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[11px] font-black text-white/80">
-                      {entry.rank === 1 ? <Crown className="h-4 w-4 text-[#FFD089]" /> : `#${entry.rank}`}
+                    <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(14,28,56,0.1)] text-[11px] font-black text-[var(--text-on-accent)]">
+                      {entry.rank === 1 ? <Crown className="h-4 w-4 text-[var(--accent-orange)]" /> : `#${entry.rank}`}
                     </div>
-                    <div className="mt-2 truncate text-sm font-black text-white">{entry.name}</div>
-                    <div className="mt-1 text-[11px] font-black text-[#FFD089]">{formatMini(entry.minutes)}</div>
+                    <div className="mt-2 truncate text-sm font-black text-[var(--text-on-accent)]">{entry.name}</div>
+                    <div className="mt-1 text-[11px] font-black text-[var(--accent-orange)]">{formatMini(entry.minutes)}</div>
                   </div>
                 ))
               ) : (
-                <div className="col-span-3 rounded-[1.15rem] border border-dashed border-white/12 px-3 py-4 text-center text-[11px] font-semibold text-white/58">
+                <div className="col-span-3 rounded-[1.15rem] border border-dashed border-[rgba(14,28,56,0.14)] px-3 py-4 text-center text-[11px] font-semibold text-[rgba(14,28,56,0.72)]">
                   아직 표시할 랭킹이 없어요.
                 </div>
               )}
@@ -817,16 +848,16 @@ export function StudentHomeGamePanel({
         </div>
       </section>
 
-      <section className="mt-3 rounded-[1.65rem] border border-white/10 bg-[linear-gradient(180deg,#16284F_0%,#122246_100%)] p-4 text-white shadow-[0_24px_54px_-38px_rgba(8,17,48,0.66)]">
+      <section className="surface-card surface-card--secondary on-dark mt-3 rounded-[1.65rem] p-4 text-white">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">reward vault</div>
+            <div className="surface-kicker text-[10px]">reward vault</div>
             <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">상자 보관함</h3>
           </div>
           <Button
             type="button"
             variant="ghost"
-            className="h-9 rounded-full px-3 text-[11px] font-black text-white/78 hover:bg-white/8 hover:text-white"
+            className="h-9 rounded-full px-3 text-[11px] font-black text-[var(--text-on-dark-soft)] hover:bg-white/8 hover:text-white"
             onClick={() => onOpenMainBox()}
           >
             모두 보기 <ChevronRight className="ml-1 h-4 w-4" />

@@ -62,14 +62,14 @@ const DialogContent = React.forwardRef<
         ref={ref}
         className={cn(
           resolvedMotionPreset === "dashboard-premium"
-            ? "dashboard-premium-dialog fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain border bg-background p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-lg sm:w-full sm:rounded-[1.5rem]"
-            : "fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain border bg-background p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:w-full sm:rounded-lg",
+            ? "dashboard-premium-dialog fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain border border-[color:var(--border-subtle)] bg-[var(--bg-surface-1)] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-[var(--text-primary)] shadow-[var(--shadow-card-strong)] sm:w-full sm:rounded-[1.5rem]"
+            : "fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain border border-[color:var(--border-subtle)] bg-[var(--bg-surface-1)] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-[var(--text-primary)] shadow-[var(--shadow-card-strong)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:w-full sm:rounded-[1.25rem]",
           className
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-[#FF7A16]/90 bg-[#14295F] text-white opacity-95 shadow-[0_2px_8px_rgba(20,41,95,0.25)] ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#FF7A16] focus:ring-offset-2 disabled:pointer-events-none">
+        <DialogPrimitive.Close className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-[var(--surface-primary-gradient)] text-[var(--text-on-dark)] opacity-95 shadow-[var(--shadow-card-strong)] ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent-orange)] focus:ring-offset-2 disabled:pointer-events-none">
           <X className="h-4 w-4 text-white" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>

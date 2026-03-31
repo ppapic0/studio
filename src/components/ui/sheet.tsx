@@ -46,7 +46,7 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+  "fixed z-50 gap-4 border border-[color:var(--border-subtle)] bg-[var(--bg-surface-1)] p-6 text-[var(--text-primary)] shadow-[var(--shadow-card-strong)] transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
   {
     variants: {
       side: {
@@ -95,7 +95,7 @@ const SheetContent = React.forwardRef<
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-[#FF7A16]/90 bg-[#14295F] text-white opacity-95 shadow-[0_2px_8px_rgba(20,41,95,0.25)] ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#FF7A16] focus:ring-offset-2 disabled:pointer-events-none">
+        <SheetPrimitive.Close className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-[var(--surface-primary-gradient)] text-[var(--text-on-dark)] opacity-95 shadow-[var(--shadow-card-strong)] ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent-orange)] focus:ring-offset-2 disabled:pointer-events-none">
           <X className="h-4 w-4 text-white" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>

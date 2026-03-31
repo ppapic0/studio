@@ -1,21 +1,39 @@
-﻿import * as React from "react"
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    data-slot="card"
-    className={cn(
-      "relative overflow-hidden rounded-[1.5rem] border border-[rgba(20,41,95,0.09)] bg-[linear-gradient(180deg,rgba(255,255,255,1)_0%,rgba(249,251,255,0.98)_100%)] text-card-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.96)_inset,0_-1px_0_0_rgba(20,41,95,0.04)_inset,0_2px_6px_rgba(20,41,95,0.04),0_10px_24px_-4px_rgba(20,41,95,0.08)] transition-[transform,box-shadow,border-color] duration-150 ease-out hover:border-[rgba(20,41,95,0.13)] hover:shadow-[0_1px_0_0_rgba(255,255,255,0.97)_inset,0_-1px_0_0_rgba(20,41,95,0.05)_inset,0_4px_10px_rgba(20,41,95,0.07),0_16px_32px_-4px_rgba(20,41,95,0.11)] hover:-translate-y-[1px]",
-      className
-    )}
-    {...props}
-  />
-))
+const cardVariants = cva("surface-card", {
+  variants: {
+    variant: {
+      default: "surface-card--light",
+      light: "surface-card--light",
+      ivory: "surface-card--ivory",
+      primary: "surface-card--primary on-dark",
+      secondary: "surface-card--secondary on-dark",
+      highlight: "surface-card--highlight",
+      ghost: "surface-card--ghost on-dark",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+  },
+})
+
+export interface CardProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof cardVariants> {}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, variant, ...props }, ref) => (
+    <div
+      ref={ref}
+      data-slot="card"
+      className={cn(cardVariants({ variant }), className)}
+      {...props}
+    />
+  )
+)
 Card.displayName = "Card"
 
 const CardHeader = React.forwardRef<
@@ -39,7 +57,7 @@ const CardTitle = React.forwardRef<
     ref={ref}
     data-slot="card-title"
     className={cn(
-      "text-[1.1rem] font-extrabold leading-[1.3] tracking-[-0.025em] text-[#14295f]",
+      "text-[1.1rem] font-extrabold leading-[1.3] tracking-[-0.025em] text-[var(--text-primary)]",
       className
     )}
     {...props}
@@ -54,7 +72,7 @@ const CardDescription = React.forwardRef<
   <p
     ref={ref}
     data-slot="card-description"
-    className={cn("text-[13px] font-medium leading-[1.7] text-[#5c6e88]", className)}
+    className={cn("text-[13px] font-medium leading-[1.7] text-[var(--text-secondary)]", className)}
     {...props}
   />
 ))
@@ -81,4 +99,4 @@ const CardFooter = React.forwardRef<
 ))
 CardFooter.displayName = "CardFooter"
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent, cardVariants }

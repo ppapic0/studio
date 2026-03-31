@@ -29,6 +29,7 @@ import {
   Wand2,
   History,
   Calendar,
+  CalendarClock,
   FileText,
   ClipboardPen,
   AlertOctagon,
@@ -1350,6 +1351,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         return aSort - bSort;
       });
   }, [studentProfile?.examCountdowns]);
+  const heroExam = examCountdowns.find((item) => item.id === 'mock') ?? examCountdowns[0] ?? null;
 
   const subjectProgress = useMemo(() => {
     const bucket = new Map<string, { total: number; done: number }>();
@@ -2032,6 +2034,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setIsExamSaving(false);
     }
   };
+  const handleOpenExamDialog = useCallback(() => {
+    setIsExamDialogOpen(true);
+  }, []);
 
   const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
 
@@ -2678,6 +2683,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         completionLabel={`${todayPlanRate}% 완료`}
         streakLabel={`${plannerStreakDays}일 연속`}
         heroMessage={heroMessage}
+        examCardTitle={heroExam?.title?.trim() ? heroExam.title : '날짜 설정하기'}
+        examCardDLabel={heroExam?.dLabel ?? '미설정'}
+        onOpenExamDialog={handleOpenExamDialog}
         totalMinutesLabel={formatMinutesToKorean(totalMinutesCount)}
         growthLabel={`${formatMinutesMini(totalMinutesCount)} / 10h`}
         growthPercent={growthPercent}
@@ -2720,6 +2728,63 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         onNextBox={handleNextHomeBox}
         nextCountdownLabel={formatTimer(nextBoxSecondsLeft)}
       />
+
+      <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
+        <DialogContent className={cn("flex max-h-[85vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0", isMobile ? "" : "sm:w-full sm:max-w-lg")}>
+          <div className="bg-primary p-5 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black tracking-tight">시험 디데이 설정</DialogTitle>
+              <DialogDescription className="text-white/80">모의고사와 내신 일정을 여기서 바로 수정할 수 있어요.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-3 overflow-y-auto bg-white p-4 sm:p-5">
+            {examDrafts.map((item, index) => (
+              <div key={item.id} className={cn("grid items-center gap-2", isMobile ? "grid-cols-1" : "grid-cols-[1fr_132px_auto]")}>
+                <Input
+                  value={item.title}
+                  onChange={(event) => handleExamDraftChange(item.id, "title", event.target.value)}
+                  placeholder={`시험명 ${index + 1}`}
+                  className="h-10 rounded-xl border-primary/15 font-bold"
+                />
+                <Input
+                  type="date"
+                  value={item.date}
+                  onChange={(event) => handleExamDraftChange(item.id, "date", event.target.value)}
+                  className="h-10 rounded-xl border-primary/15 font-bold"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn("h-10 w-10 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700", isMobile ? "justify-self-end" : "")}
+                  onClick={() => handleRemoveExamDraft(item.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full rounded-xl border-dashed font-black"
+              onClick={handleAddExamDraft}
+              disabled={examDrafts.length >= 6}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              시험 추가
+            </Button>
+          </div>
+          <DialogFooter className="border-t bg-white p-4 sm:p-5">
+            <Button type="button" variant="ghost" className="h-10 rounded-xl font-bold" onClick={() => setIsExamDialogOpen(false)}>
+              닫기
+            </Button>
+            <Button type="button" className="h-10 rounded-xl font-black" onClick={handleSaveExamCountdowns} disabled={isExamSaving}>
+              {isExamSaving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-1.5 h-4 w-4" />}
+              저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <section className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
         {isMobile ? (

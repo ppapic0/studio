@@ -264,7 +264,7 @@ function HeroMetricChip({
   floatingGain?: FloatingGain | null;
 }) {
   return (
-    <div className="relative min-w-0 overflow-hidden rounded-[1.35rem] border border-[#FFE0B7]/14 bg-[linear-gradient(180deg,rgba(11,24,58,0.95),rgba(23,58,130,0.84))] px-3 py-3 shadow-[0_18px_30px_-24px_rgba(0,0,0,0.58)] backdrop-blur-xl">
+    <div className="surface-card surface-card--secondary on-dark relative min-w-0 rounded-[1.35rem] px-3 py-3">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
       {floatingGain ? (
         <div key={floatingGain.key} className="point-track-floating-gain">
@@ -272,11 +272,11 @@ function HeroMetricChip({
         </div>
       ) : null}
       <div className="flex items-center gap-2.5">
-        <span className={cn('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
+        <span className={cn('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/10 shadow-[0_10px_20px_-14px_rgba(0,0,0,0.45)]', accentClass)}>
           <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/72">{label}</div>
+          <div className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-on-dark-soft)]">{label}</div>
           <div className="mt-1 truncate text-[0.98rem] font-black tracking-[-0.04em] text-white sm:text-[1.2rem]">{value}</div>
         </div>
       </div>
@@ -322,12 +322,12 @@ function InventorySlot({
       <div className="mb-2 flex items-center justify-between gap-2">
         <span
           className={cn(
-            'rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]',
+            'rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]',
             box.rarity === 'epic'
-              ? 'bg-violet-300/18 text-violet-100'
+              ? 'border-violet-300/30 bg-violet-300/18 text-violet-100'
               : box.rarity === 'rare'
-                ? 'bg-orange-300/18 text-orange-100'
-                : 'bg-sky-200/14 text-sky-100'
+                ? 'border-orange-300/30 bg-orange-300/18 text-orange-100'
+                : 'border-sky-200/24 bg-sky-200/14 text-sky-100'
           )}
         >
           {RARITY_LABELS[box.rarity]}
@@ -335,7 +335,7 @@ function InventorySlot({
         {box.state === 'ready' ? (
           <Star className="h-3.5 w-3.5 text-orange-100" />
         ) : box.state === 'locked' ? (
-          <Lock className="h-3.5 w-3.5 text-white/35" />
+          <Lock className="h-3.5 w-3.5 text-[var(--text-on-dark-soft)]" />
         ) : null}
       </div>
       <div className="point-track-slot__box">
@@ -349,10 +349,10 @@ function InventorySlot({
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
               <div className="point-track-slot__meter-fill" style={{ width: `${Math.max(4, Math.min(100, chargingPercent || 0))}%` }} />
             </div>
-          <div className="mt-1 text-[10px] font-black text-white/74">{chargingLabel}</div>
+          <div className="mt-1 text-[10px] font-black text-[var(--text-on-dark-soft)]">{chargingLabel}</div>
           </>
         ) : (
-          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/74">
+          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-on-dark-soft)]">
             <span>
               {box.state === 'opened'
                 ? `+${box.reward || 0}P`
@@ -384,15 +384,15 @@ function PodiumCard({
       className={cn(
         'flex flex-col items-center justify-end rounded-[1.55rem] border px-3 pb-4 pt-3 text-center shadow-[0_20px_42px_-28px_rgba(0,0,0,0.48)]',
         highlight
-          ? 'border-orange-300/45 bg-[linear-gradient(180deg,rgba(255,176,76,0.2),rgba(255,176,76,0.08))]'
-          : 'border-white/10 bg-[linear-gradient(180deg,rgba(12,27,63,0.88),rgba(20,41,95,0.78))]'
+          ? 'border-[rgba(255,138,31,0.28)] bg-[linear-gradient(180deg,rgba(255,247,236,0.94),rgba(255,232,204,0.82))]'
+          : 'border-white/10 bg-[linear-gradient(180deg,rgba(12,27,63,0.9),rgba(20,41,95,0.82))]'
       )}
     >
-      <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-orange-300/20 text-orange-100' : 'bg-white/10 text-white/88')}>
+      <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-[rgba(255,138,31,0.16)] text-[var(--accent-orange)]' : 'bg-white/10 text-white/88')}>
         {highlight ? <Crown className="h-4 w-4" /> : `#${rank}`}
       </div>
-      <div className={cn('text-sm font-black tracking-tight text-white', highlight && 'text-orange-100')}>{name}</div>
-      <div className={cn('mt-1 text-sm font-black', highlight ? 'text-[#FFE2B6]' : 'text-white/82')}>{value}</div>
+      <div className={cn('text-sm font-black tracking-tight text-white', highlight && 'text-[var(--text-primary)]')}>{name}</div>
+      <div className={cn('mt-1 text-sm font-black', highlight ? 'text-[var(--accent-orange)]' : 'text-white')}>{value}</div>
     </div>
   );
 }
@@ -782,7 +782,7 @@ export default function GrowthPage() {
 
           <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-center justify-between gap-3")}>
             <div className={cn(isMobile ? "w-full" : "")}>
-              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-white/45">POINT TRACK</p>
+              <p className="surface-kicker text-[11px]">POINT TRACK</p>
               <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
               <div className="mt-3 grid grid-cols-2 gap-2.5">
                 <HeroMetricChip
@@ -802,13 +802,13 @@ export default function GrowthPage() {
             </div>
             <div
               className={cn(
-                'rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em]',
+                'surface-chip px-3 py-1 text-[10px] uppercase tracking-[0.22em]',
                 isMobile ? "self-start" : "",
                 totalAvailableBoxes > 0
-                  ? 'border border-orange-300/25 bg-orange-300/12 text-[#FFD089]'
+                  ? 'surface-chip--accent'
                   : isTimerActive
-                    ? 'border border-sky-200/20 bg-sky-200/10 text-white/80'
-                    : 'border border-white/10 bg-white/8 text-white/78'
+                    ? 'border border-sky-200/20 bg-sky-200/10 text-white'
+                    : 'surface-chip--dark text-[var(--text-on-dark-soft)]'
               )}
             >
               {totalAvailableBoxes > 0 ? 'BOX READY' : heroMode === 'studying' ? '집중 중' : '대기'}
@@ -825,26 +825,26 @@ export default function GrowthPage() {
             />
 
             <div className="text-center">
-              <p className="text-sm font-black text-[#FFD089]">
+              <p className="text-sm font-black text-[var(--accent-orange-soft)]">
                 {totalAvailableBoxes > 0 ? '상자 도착' : heroMode === 'studying' ? '집중 중' : '다음 상자'}
               </p>
               <div className="mt-1 text-[2rem] font-black tracking-tight text-white">{heroPrimaryLabel}</div>
-              <p className="mt-1 text-sm font-bold text-white/82">{heroSecondaryLabel}</p>
+              <p className="mt-1 text-sm font-bold text-white">{heroSecondaryLabel}</p>
             </div>
 
             {isTimerActive ? (
               <div className="grid w-full grid-cols-3 gap-2">
-                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/74">상태</p>
+                <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-3 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">상태</p>
                   <p className="mt-2 text-sm font-black text-white">집중 중</p>
                 </div>
-                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/74">세션</p>
+                <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-3 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">세션</p>
                   <p className="mt-2 text-sm font-black text-white">{formatHeroTimer(liveSessionSeconds)}</p>
                 </div>
-                <div className="rounded-[1.1rem] border border-white/10 bg-white/8 px-3 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/74">도착</p>
-                  <p className="mt-2 text-sm font-black text-[#FFD089]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
+                <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-3 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">도착</p>
+                  <p className="mt-2 text-sm font-black text-[var(--accent-orange-soft)]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
                 </div>
               </div>
             ) : null}
@@ -852,11 +852,12 @@ export default function GrowthPage() {
             <Button
               type="button"
               onClick={handleHeroCta}
+              variant={totalAvailableBoxes > 0 ? 'secondary' : 'dark'}
               className={cn(
                 'point-track-hero-cta mt-2 h-14 w-full rounded-[1.4rem] text-base font-black',
                 totalAvailableBoxes > 0
-                  ? 'bg-[linear-gradient(180deg,#ffd089_0%,#ffb357_35%,#ff8a1f_100%)] text-[#173A82]'
-                  : 'bg-[linear-gradient(180deg,#ffffff_0%,#eef4ff_100%)] text-[#173A82]'
+                  ? ''
+                  : 'border border-white/12 bg-[rgba(255,255,255,0.94)] text-[var(--text-on-light)]'
               )}
             >
               {heroCtaLabel}
@@ -864,17 +865,17 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <section className="rounded-[1.7rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(11,24,58,0.92),rgba(23,58,130,0.84))] px-4 py-4 shadow-[0_18px_44px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+        <section className="surface-card surface-card--secondary on-dark rounded-[1.7rem] px-4 py-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Timer className="h-4 w-4 text-[#FFD089]" />
+              <Timer className="h-4 w-4 text-[var(--accent-orange-soft)]" />
               <span className="text-sm font-black text-white">다음 상자</span>
             </div>
             <div className="flex items-center gap-2">
               {isNearNextBox && totalAvailableBoxes === 0 ? (
-                <span className="rounded-full bg-orange-300/14 px-2 py-1 text-[10px] font-black text-[#FFD089]">곧 도착</span>
+                <span className="surface-chip surface-chip--accent px-2 py-1 text-[10px]">곧 도착</span>
               ) : null}
-              <span className="text-sm font-black text-white/70">{formatProgressCounter(currentCycleSeconds)}</span>
+              <span className="text-sm font-black text-[var(--text-on-dark-soft)]">{formatProgressCounter(currentCycleSeconds)}</span>
             </div>
           </div>
           <div className="rounded-full bg-[#091633]/68 p-1 ring-1 ring-white/10">
@@ -892,34 +893,34 @@ export default function GrowthPage() {
               <div className="point-track-progress-node point-track-progress-node--three" />
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between text-[11px] font-black text-white/60">
+          <div className="mt-3 flex items-center justify-between text-[11px] font-black text-[var(--text-on-dark-soft)]">
             <span>0분</span>
             <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : `${formatCountdown(nextBoxSecondsLeft)} 남음`}</span>
           </div>
         </section>
 
         <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
-          <div className="rounded-[1.2rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.92),rgba(26,52,117,0.84))] px-3 py-3 text-center backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">오늘 획득</p>
-            <p className="mt-2 text-base font-black text-white">+{todayPointGain}P</p>
+          <div className="surface-card surface-card--light rounded-[1.2rem] px-3 py-3 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">오늘 획득</p>
+            <p className="mt-2 text-base font-black text-[var(--text-primary)]">+{todayPointGain}P</p>
           </div>
-          <div className="rounded-[1.2rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.92),rgba(26,52,117,0.84))] px-3 py-3 text-center backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">연 상자</p>
-            <p className="mt-2 text-base font-black text-white">{todayOpenedCount}개</p>
+          <div className="surface-card surface-card--ivory rounded-[1.2rem] px-3 py-3 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">연 상자</p>
+            <p className="mt-2 text-base font-black text-[var(--text-primary)]">{todayOpenedCount}개</p>
           </div>
-          <div className="rounded-[1.2rem] border border-[#FFBE73]/24 bg-[radial-gradient(circle_at_top,rgba(255,176,76,0.2),transparent_62%),linear-gradient(180deg,rgba(18,43,103,0.96),rgba(39,73,151,0.92))] px-3 py-3 text-center backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFE1B7]">이번 달</p>
-            <p className="mt-2 text-base font-black text-[#FFD089]">{formatStudyMinutesShort(monthlyMinutes)}</p>
+          <div className="surface-card surface-card--highlight rounded-[1.2rem] px-3 py-3 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-accent)]">이번 달</p>
+            <p className="mt-2 text-base font-black text-[var(--text-on-accent)]">{formatStudyMinutesShort(monthlyMinutes)}</p>
           </div>
         </section>
 
-        <section className="rounded-[1.8rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.93),rgba(20,41,95,0.84))] px-4 py-4 shadow-[0_20px_52px_-34px_rgba(0,0,0,0.54)] backdrop-blur-xl">
+        <section className="surface-card surface-card--secondary on-dark rounded-[1.8rem] px-4 py-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/58">VAULT</p>
+              <p className="surface-kicker text-[11px]">VAULT</p>
               <h2 className="mt-1 text-lg font-black tracking-tight text-white">보관함</h2>
             </div>
-            <div className="rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1 text-[11px] font-black text-[#FFD089]">
+            <div className="surface-chip surface-chip--accent px-3 py-1 text-[11px]">
               READY {totalAvailableBoxes}
             </div>
           </div>
@@ -937,15 +938,15 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <section className="rounded-[1.8rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.93),rgba(20,41,95,0.84))] px-4 py-4 shadow-[0_20px_52px_-34px_rgba(0,0,0,0.54)] backdrop-blur-xl">
+        <section className="surface-card surface-card--primary on-dark rounded-[1.8rem] px-4 py-4">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/58">LEADERBOARD</p>
+              <p className="surface-kicker text-[11px]">LEADERBOARD</p>
               <h2 className="mt-1 text-lg font-black tracking-tight text-white">이번 달 TOP</h2>
             </div>
             <Link
               href="/dashboard/leaderboards"
-              className="inline-flex items-center rounded-full border border-[#FFBE73]/28 bg-orange-300/12 px-3 py-1 text-[11px] font-black text-[#FFE1B7] shadow-[0_10px_24px_-18px_rgba(0,0,0,0.55)]"
+              className="surface-chip surface-chip--accent inline-flex px-3 py-1 text-[11px] shadow-[0_10px_24px_-18px_rgba(0,0,0,0.55)]"
             >
               더 보기
             </Link>
@@ -971,28 +972,28 @@ export default function GrowthPage() {
             )}
           </div>
 
-          <div className="mt-4 rounded-[1.55rem] border border-orange-300/18 bg-[radial-gradient(circle_at_top,rgba(255,176,76,0.16),transparent_62%),linear-gradient(180deg,rgba(18,43,103,0.96),rgba(34,62,132,0.88))] px-4 py-4 shadow-[0_16px_34px_-26px_rgba(255,138,31,0.38)]">
+          <div className="surface-card surface-card--highlight mt-4 rounded-[1.55rem] px-4 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">MY RANK</p>
-                <p className="mt-1 text-[1.45rem] font-black tracking-tight text-white">{myRankLabel}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[rgba(14,28,56,0.58)]">MY RANK</p>
+                <p className="mt-1 text-[1.45rem] font-black tracking-tight text-[var(--text-on-accent)]">{myRankLabel}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">MONTH</p>
-                <p className="mt-1 text-sm font-black text-[#FFD089]">{formatRankTime(monthlyMinutes)}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[rgba(14,28,56,0.58)]">MONTH</p>
+                <p className="mt-1 text-sm font-black text-[var(--accent-orange)]">{formatRankTime(monthlyMinutes)}</p>
               </div>
             </div>
           </div>
         </section>
 
         <section className="grid grid-cols-2 gap-3">
-          <div className="rounded-[1.5rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.92),rgba(20,41,95,0.8))] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">이번 주</p>
-            <p className="mt-2 text-[1.2rem] font-black tracking-tight text-white">{formatStudyMinutes(weeklyMinutes)}</p>
+          <div className="surface-card surface-card--light rounded-[1.5rem] px-4 py-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-muted)]">이번 주</p>
+            <p className="mt-2 text-[1.2rem] font-black tracking-tight text-[var(--text-primary)]">{formatStudyMinutes(weeklyMinutes)}</p>
           </div>
-          <div className="rounded-[1.5rem] border border-[#FFE0B7]/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.92),rgba(20,41,95,0.8))] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">오늘 총합</p>
-            <p className="mt-2 text-[1.2rem] font-black tracking-tight text-white">{formatStudyMinutes(liveTodayMinutes)}</p>
+          <div className="surface-card surface-card--ivory rounded-[1.5rem] px-4 py-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-muted)]">오늘 총합</p>
+            <p className="mt-2 text-[1.2rem] font-black tracking-tight text-[var(--text-primary)]">{formatStudyMinutes(liveTodayMinutes)}</p>
           </div>
         </section>
 
@@ -1018,7 +1019,7 @@ export default function GrowthPage() {
           <div className="point-track-modal-shell">
             <DialogHeader className="px-5 pb-0 pt-5">
               <DialogTitle className="text-left text-xl font-black tracking-tight text-white">포인트 상자 오픈</DialogTitle>
-              <DialogDescription className="text-left text-sm font-bold text-white/55">
+              <DialogDescription className="text-left text-sm font-bold text-[var(--text-on-dark-soft)]">
                 한 개씩 눌러서 열어보세요.
               </DialogDescription>
             </DialogHeader>
@@ -1040,7 +1041,7 @@ export default function GrowthPage() {
                 </div>
 
                 <div className="mt-4 text-center">
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/45">
+                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[var(--text-on-dark-muted)]">
                     {selectedBox ? `${selectedBox.hour}시간 상자` : '상자'}
                   </p>
                   {boxStage === 'revealed' && revealedReward !== null ? (
@@ -1048,22 +1049,22 @@ export default function GrowthPage() {
                       <p className="text-[2.6rem] font-black tracking-tight text-orange-100">
                         +<RewardCountUp value={revealedReward} />P
                       </p>
-                      <p className="mt-1 text-xs font-black text-white/55">현재 포인트 {pointBalance.toLocaleString()}</p>
+                      <p className="mt-1 text-xs font-black text-[var(--text-on-dark-soft)]">현재 포인트 {pointBalance.toLocaleString()}</p>
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm font-black text-white/78">
+                    <p className="mt-2 text-sm font-black text-[var(--text-on-dark)]">
                       {selectedBox?.state === 'ready' ? '터치해서 열기' : '다음 상자를 준비 중이에요'}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="mt-4 rounded-[1.4rem] border border-white/10 bg-white/[0.05] px-4 py-4">
-                <div className="flex items-center justify-between text-sm font-black text-white/78">
+              <div className="surface-card surface-card--ghost on-dark mt-4 rounded-[1.4rem] px-4 py-4">
+                <div className="flex items-center justify-between text-sm font-black text-[var(--text-on-dark)]">
                   <span>오늘 획득</span>
                   <span>{todayPointGain.toLocaleString()}P</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs font-bold text-white/68">
+                <div className="mt-2 flex items-center justify-between text-xs font-bold text-[var(--text-on-dark-soft)]">
                   <span>다음 상자까지</span>
                   <span>{earnedBoxes >= 8 ? '오늘 상자 완료' : formatCountdown(nextBoxSecondsLeft)}</span>
                 </div>
