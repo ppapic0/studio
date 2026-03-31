@@ -64,6 +64,12 @@ import { CenterMembership, StudentProfile, User as UserType } from '@/lib/types'
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
+function extractPhoneNumber(source: unknown): string {
+  if (!source || typeof source !== 'object') return '';
+  const candidate = (source as { phoneNumber?: unknown }).phoneNumber;
+  return typeof candidate === 'string' ? candidate : '';
+}
+
 function resolveCallableErrorMessage(error: any): string {
   const errorCode = String(error?.code || '').toLowerCase();
   const detailMessage =
@@ -185,7 +191,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
       setSchoolName(studentProfile.schoolName || '');
       setGrade(studentProfile.grade || '');
       setParentLinkCode(normalizeParentLinkCode(studentProfile.parentLinkCode));
-      setPhoneNumber(normalizePhone(studentProfile.phoneNumber || userProfile?.phoneNumber || activeMembership?.phoneNumber || ''));
+      setPhoneNumber(normalizePhone(extractPhoneNumber(studentProfile) || userProfile?.phoneNumber || activeMembership?.phoneNumber || ''));
       setIsSettingsFormInitialized(true);
       return;
     }

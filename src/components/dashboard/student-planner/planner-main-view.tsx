@@ -389,13 +389,17 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
       const minutes = Math.max(0, Number(task.targetMinutes || 0)) || (resolveStudyPlanMode(task) === 'volume' ? 30 : 0);
       acc[key] = (acc[key] || 0) + minutes;
       return acc;
-    }, {});
-    const totalMinutes = Object.values(totals).reduce((sum, value) => sum + value, 0);
-    return Object.entries(totals)
+    }, {} as Record<string, number>);
+    const totalMinutes = Object.values(totals as Record<string, number>).reduce(
+      (sum: number, value) => sum + (Number(value) || 0),
+      0
+    );
+    return Object.entries(totals as Record<string, number>)
       .map(([subjectKey, minutes]) => {
         const subject = quickSubjectOptions.find((item: any) => item.id === subjectKey);
-        const percent = totalMinutes > 0 ? Math.round((minutes / totalMinutes) * 100) : 0;
-        return { key: subjectKey, label: subject?.label || '기타', minutes, percent };
+        const safeMinutes = Number(minutes) || 0;
+        const percent = totalMinutes > 0 ? Math.round((safeMinutes / totalMinutes) * 100) : 0;
+        return { key: subjectKey, label: subject?.label || '기타', minutes: safeMinutes, percent };
       })
       .sort((left, right) => right.minutes - left.minutes);
   }, [quickSubjectOptions, studyTasks]);

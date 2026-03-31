@@ -1065,7 +1065,7 @@ export default function StudyPlanPage() {
       );
 
       const drafts = snapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as StudyPlanItem) }))
+        .map((docSnap) => ({ ...(docSnap.data() as StudyPlanItem), id: docSnap.id }))
         .filter((item) => item.category !== 'schedule')
         .map((item) => buildTemplateDraftFromTask(item as WithId<StudyPlanItem>));
 

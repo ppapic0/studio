@@ -71,6 +71,12 @@ function normalizePhone(raw: string): string {
   return raw.replace(/\D/g, '');
 }
 
+function extractPhoneNumber(source: unknown): string {
+  if (!source || typeof source !== 'object') return '';
+  const candidate = (source as { phoneNumber?: unknown }).phoneNumber;
+  return typeof candidate === 'string' ? candidate : '';
+}
+
 function isValidKoreanMobilePhone(raw: string): boolean {
   return /^01\d{8,9}$/.test(raw);
 }
@@ -203,14 +209,15 @@ export default function DashboardPage() {
 
   const resolvedSelfPhone = useMemo(() => {
     if (!activeMembership) return '';
+    const studentPhone = extractPhoneNumber(studentProfile);
     if (activeMembership.role === 'student') {
-      return normalizePhone(studentProfile?.phoneNumber || userProfile?.phoneNumber || activeMembership.phoneNumber || '');
+      return normalizePhone(studentPhone || userProfile?.phoneNumber || activeMembership.phoneNumber || '');
     }
     if (activeMembership.role === 'parent') {
       return normalizePhone(userProfile?.phoneNumber || activeMembership.phoneNumber || '');
     }
     return '';
-  }, [activeMembership, studentProfile?.phoneNumber, userProfile?.phoneNumber]);
+  }, [activeMembership, studentProfile, userProfile?.phoneNumber]);
 
   const effectiveSelfPhone = savedPhoneFallback || resolvedSelfPhone;
   const isPhoneLookupReady = useMemo(() => {

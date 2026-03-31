@@ -96,6 +96,7 @@ import {
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
   rollStudyBoxReward,
+  type StudyBoxReward,
 } from '@/lib/student-rewards';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
@@ -2350,7 +2351,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [studyTimeTrend]);
 
   useEffect(() => {
-    if (!isActive || !isTimerActive || !progressRef || !todayKey) return;
+    if (!isActive || !isTimerActive || !progressRef || !todayKey || !activeMembership?.id || !user?.uid) return;
 
     const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, syncedClaimedBoxes);
     if (availableMilestones.length === 0) return;
@@ -2363,6 +2364,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const awardedPoints = rewards.reduce((sum, reward) => sum + reward.awardedPoints, 0);
     const nextClaimedBoxes = Array.from(new Set([...syncedClaimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
     const nextRewardEntries = [...syncedRewardEntries, ...rewards].sort((a, b) => a.milestone - b.milestone);
+    const membershipId = activeMembership.id;
+    const userId = user.uid;
     const nextDayStatus = {
       ...todayPointStatus,
       claimedStudyBoxes: nextClaimedBoxes,
@@ -2390,7 +2393,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       },
       updatedAt: serverTimestamp(),
     }, { merge: true }).then(() => {
-      if (shouldShowStudyBoxArrivalToast(activeMembership.id, user.uid, todayKey, availableMilestones)) {
+      if (shouldShowStudyBoxArrivalToast(membershipId, userId, todayKey, availableMilestones)) {
         toast({
           title: availableMilestones.length > 1 ? `상자 ${availableMilestones.length}개 도착!` : '상자 도착!',
           description: `+${availableMilestones.length} BOX · 홈에서 바로 열어보세요.`,
