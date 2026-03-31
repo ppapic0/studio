@@ -167,10 +167,10 @@ const STUDY_HISTORY_CALENDAR_LEGEND: Array<{
   swatch: string;
 }> = [
   { level: 'none', label: '기록 없음', rangeLabel: '0시간', swatch: 'bg-white ring-[#D7E1F0]' },
-  { level: 'warmup', label: '몰입 준비', rangeLabel: '1시간 미만', swatch: 'bg-[#E7EEFF] ring-[#C6D4F2]' },
-  { level: 'short', label: '짧은 몰입', rangeLabel: '1~3시간', swatch: 'bg-[#BFD0F5] ring-[#9DB5E8]' },
-  { level: 'steady', label: '집중 흐름', rangeLabel: '3~5시간', swatch: 'bg-[#5B7DC3] ring-[#3F5F9E]' },
-  { level: 'deep', label: '깊은 몰입', rangeLabel: '5시간 이상', swatch: 'bg-[#173A82] ring-[#0E285D]' },
+  { level: 'warmup', label: '몰입 준비', rangeLabel: '1시간 미만', swatch: 'bg-[#FFF0DA] ring-[#FFD4A0]' },
+  { level: 'short', label: '짧은 몰입', rangeLabel: '1~3시간', swatch: 'bg-[#FFD7A6] ring-[#FFB969]' },
+  { level: 'steady', label: '집중 흐름', rangeLabel: '3~5시간', swatch: 'bg-[#FFBF71] ring-[#FF9626]' },
+  { level: 'deep', label: '깊은 몰입', rangeLabel: '5시간 이상', swatch: 'bg-[#FFA23D] ring-[#E57C11]' },
 ] as const;
 
 function getStudyHistoryFlowLevel(minutes: number): StudyHistoryFlowLevel {
@@ -508,48 +508,48 @@ export default function StudyHistoryPage() {
   const getHeatmapColor = (minutes: number) => {
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(247,249,253,0.98)_100%)] ring-1 ring-inset ring-[#DCE5F4]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_30px_-28px_rgba(15,23,42,0.1)]';
-    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(248,251,255,0.99)_0%,rgba(234,241,255,0.98)_58%,rgba(220,230,249,0.98)_100%)] ring-1 ring-inset ring-[#C9D7F3]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_32px_-28px_rgba(34,61,117,0.14)]';
-    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(235,241,255,0.99)_0%,rgba(205,220,249,0.98)_56%,rgba(176,197,239,0.98)_100%)] ring-1 ring-inset ring-[#9DB5E8]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_34px_-28px_rgba(32,63,122,0.18)]';
-    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(183,201,238,0.99)_0%,rgba(106,133,194,0.98)_54%,rgba(53,84,148,0.98)_100%)] ring-1 ring-inset ring-[#4565A7]/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_22px_38px_-26px_rgba(23,50,107,0.32)]';
-    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(102,129,190,0.99)_0%,rgba(44,75,140,0.98)_54%,rgba(23,50,107,0.98)_100%)] ring-1 ring-inset ring-[#1F4387]/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_24px_42px_-24px_rgba(23,50,107,0.36)]';
-    return 'bg-[linear-gradient(180deg,rgba(72,101,165,0.99)_0%,rgba(29,58,123,0.98)_50%,rgba(16,39,88,0.99)_100%)] ring-1 ring-inset ring-[#173A82]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_26px_44px_-24px_rgba(13,31,70,0.4)]';
+    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(255,249,239,0.99)_0%,rgba(255,240,218,0.98)_58%,rgba(255,228,192,0.98)_100%)] ring-1 ring-inset ring-[#FFD4A0]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_32px_-28px_rgba(206,108,20,0.12)]';
+    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(255,239,214,0.99)_0%,rgba(255,215,166,0.98)_56%,rgba(255,196,122,0.98)_100%)] ring-1 ring-inset ring-[#FFB969]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_34px_-28px_rgba(214,118,20,0.18)]';
+    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(255,220,174,0.99)_0%,rgba(255,191,113,0.98)_54%,rgba(255,164,61,0.98)_100%)] ring-1 ring-inset ring-[#FF9626]/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_22px_38px_-26px_rgba(222,116,16,0.24)]';
+    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,205,139,0.99)_0%,rgba(255,166,61,0.98)_54%,rgba(247,140,31,0.98)_100%)] ring-1 ring-inset ring-[#F18A18]/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_24px_42px_-24px_rgba(226,122,19,0.28)]';
+    return 'bg-[linear-gradient(180deg,rgba(255,192,111,0.99)_0%,rgba(255,154,50,0.98)_50%,rgba(236,126,20,0.99)_100%)] ring-1 ring-inset ring-[#DF7A12]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_26px_44px_-24px_rgba(214,110,16,0.34)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'from-slate-200 via-slate-300 to-slate-200';
-    if (level === 'warmup') return 'from-[#E6EEFF] via-[#C7D6F6] to-[#96ADE1]';
-    if (level === 'short') return 'from-[#D2DEFA] via-[#97B0E6] to-[#6486C9]';
-    if (level === 'steady') return 'from-[#B4C8F1] via-[#6987C8] to-[#27498A]';
-    return 'from-[#9CB4E8] via-[#4C70BC] to-[#17326B]';
+    if (level === 'warmup') return 'from-[#FFEFD6] via-[#FFD8A7] to-[#FFB865]';
+    if (level === 'short') return 'from-[#FFE1B9] via-[#FFBF71] to-[#FF9626]';
+    if (level === 'steady') return 'from-[#FFD092] via-[#FFA23D] to-[#F08516]';
+    return 'from-[#FFC777] via-[#FF9828] to-[#DC7411]';
   };
 
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200 text-slate-400';
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'border-slate-200 text-slate-500';
-    if (level === 'warmup') return 'border-[#B8CBF0]/95 text-[#274884]';
-    if (level === 'short') return 'border-[#7F99D3]/95 text-[#173A82]';
-    if (level === 'steady') return 'border-[#5B7DC3]/95 text-[#173A82]';
-    return 'border-[#254887]/95 text-[#112E68]';
+    if (level === 'warmup') return 'border-[#FFD2A2]/95 bg-[rgba(255,247,235,0.74)] text-[#191919]';
+    if (level === 'short') return 'border-[#FFB969]/95 bg-[rgba(255,244,228,0.58)] text-[#171717]';
+    if (level === 'steady') return 'border-[#FF9626]/95 bg-[rgba(255,239,215,0.46)] text-[#111111]';
+    return 'border-[#E67D11]/95 bg-[rgba(255,234,205,0.34)] text-[#0F0F0F]';
   };
 
   const getCalendarValueTextClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'text-slate-400';
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'text-[#93A4C2]';
-    if (level === 'warmup') return 'text-[#274884]';
-    if (level === 'short') return 'text-[#173A82]';
-    return 'text-white drop-shadow-[0_1px_1px_rgba(10,24,56,0.2)]';
+    if (level === 'none') return 'text-[#8C97AA]';
+    if (level === 'warmup') return 'text-[#191919]';
+    if (level === 'short') return 'text-[#171717]';
+    return 'text-[#101010]';
   };
 
   const getCalendarStatusTextClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'text-slate-300';
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'text-slate-400';
-    if (level === 'warmup') return 'text-[#6A7EA8]';
-    if (level === 'short') return 'text-[#4E6899]';
-    return 'text-white/78';
+    if (level === 'warmup') return 'text-[#9A5B16]';
+    if (level === 'short') return 'text-[#8D4C10]';
+    return 'text-[#6E3407]';
   };
 
   const monthTotalMinutes = useMemo(() => {
@@ -1150,7 +1150,10 @@ export default function StudyHistoryPage() {
                           <span className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
                             공부시간
                           </span>
-                          <span className="dashboard-number ml-auto shrink-0 tabular-nums text-[1rem] leading-none tracking-[-0.05em]">
+                          <span className={cn(
+                            "dashboard-number ml-auto shrink-0 tabular-nums text-[1rem] leading-none tracking-[-0.05em]",
+                            getCalendarValueTextClass(minutes, isCurrentMonth)
+                          )}>
                             {timeLabel}
                           </span>
                         </div>

@@ -5,6 +5,7 @@ export type StudentRankEntry = {
   studentId: string;
   displayNameSnapshot: string;
   classNameSnapshot: string | null;
+  schoolNameSnapshot?: string | null;
   value: number;
   rank: number;
 };

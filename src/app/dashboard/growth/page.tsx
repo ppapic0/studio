@@ -16,7 +16,6 @@ import {
 } from 'firebase/firestore';
 import {
   ChevronRight,
-  Crown,
   Flame,
   Gift,
   Lock,
@@ -33,7 +32,7 @@ import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getAvailableStudyBoxMilestones, getClaimedStudyBoxes, rollStudyBoxReward, type StudyBoxReward } from '@/lib/student-rewards';
-import { GrowthProgress, LeaderboardEntry, StudyLogDay } from '@/lib/types';
+import { GrowthProgress, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type BoxState = 'locked' | 'charging' | 'ready' | 'opened';
@@ -153,13 +152,6 @@ function formatProgressCounter(seconds: number) {
   const mins = Math.floor(safeSeconds / 60);
   const secs = safeSeconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')} / 60:00`;
-}
-
-function formatRankTime(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours <= 0) return `${mins}분`;
-  return `${hours}시간 ${mins}분`;
 }
 
 function getTodayKey() {
@@ -428,35 +420,6 @@ function InventorySlot({
   );
 }
 
-function PodiumCard({
-  rank,
-  name,
-  value,
-  highlight = false,
-}: {
-  rank: number;
-  name: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-end rounded-[1.55rem] border px-3 pb-4 pt-3 text-center shadow-[0_20px_42px_-28px_rgba(0,0,0,0.48)]',
-        highlight
-          ? 'border-[rgba(255,138,31,0.28)] bg-[linear-gradient(180deg,rgba(255,247,236,0.94),rgba(255,232,204,0.82))]'
-          : 'border-white/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.9),rgba(20,41,95,0.82))]'
-      )}
-    >
-      <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-[rgba(14,28,56,0.12)] text-[var(--text-on-accent)]' : 'bg-white/10 text-white/88')}>
-        {highlight ? <Crown className="h-4 w-4" /> : `#${rank}`}
-      </div>
-      <div className={cn('text-sm font-black tracking-tight text-white', highlight && 'text-[var(--text-primary)]')}>{name}</div>
-      <div className={cn('mt-1 text-sm font-black', highlight ? 'text-[var(--text-on-accent)]' : 'text-white')}>{value}</div>
-    </div>
-  );
-}
-
 export default function GrowthPage() {
   const { user } = useUser();
   const router = useRouter();
@@ -498,22 +461,6 @@ export default function GrowthPage() {
     );
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: seasonStudyLogs } = useCollection<StudyLogDay>(seasonStudyLogsQuery);
-
-  const leaderboardEntryRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_study-time`, 'entries', user.uid);
-  }, [firestore, activeMembership?.id, periodKey, user?.uid]);
-  const { data: ownRankEntry } = useDoc<LeaderboardEntry>(leaderboardEntryRef);
-
-  const leaderboardTopQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return query(
-      collection(firestore, 'centers', activeMembership.id, 'leaderboards', `${periodKey}_study-time`, 'entries'),
-      orderBy('value', 'desc'),
-      limit(12)
-    );
-  }, [firestore, activeMembership?.id, periodKey]);
-  const { data: leaderboardTopRaw } = useCollection<LeaderboardEntry>(leaderboardTopQuery);
 
   const todayLog = useMemo(() => {
     return (seasonStudyLogs || []).find((log) => log.dateKey === todayKey) || null;
@@ -629,13 +576,6 @@ export default function GrowthPage() {
   const todayPointGain = rewardEntries.reduce((sum, reward) => sum + Number(reward.awardedPoints || 0), 0);
   const todayOpenedCount = openedBoxes.length;
 
-  const topEntries = useMemo(() => {
-    return (leaderboardTopRaw || [])
-      .filter((entry) => typeof entry.studentId === 'string' && !entry.studentId.toLowerCase().startsWith('test-'))
-      .slice(0, 3);
-  }, [leaderboardTopRaw]);
-
-  const myRankLabel = ownRankEntry?.rank ? `#${ownRankEntry.rank}` : '집계중';
   const heroMode = totalAvailableBoxes > 0 ? 'ready' : isTimerActive ? 'studying' : 'idle';
   const heroPrimaryLabel =
     totalAvailableBoxes > 1
@@ -1021,54 +961,6 @@ export default function GrowthPage() {
                 isFresh={freshReadyHours.includes(box.hour)}
               />
             ))}
-          </div>
-        </section>
-
-        <section className="surface-card surface-card--primary on-dark rounded-[1.8rem] px-4 py-4">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="surface-kicker text-[11px]">LEADERBOARD</p>
-              <h2 className="mt-1 text-lg font-black tracking-tight text-white">이번 달 TOP</h2>
-            </div>
-            <Link
-              href="/dashboard/leaderboards"
-              className="surface-chip surface-chip--accent inline-flex px-3 py-1 text-[11px] shadow-[0_10px_24px_-18px_rgba(0,0,0,0.55)]"
-            >
-              더 보기
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-3 items-end gap-3">
-            {topEntries.length > 0 ? (
-              topEntries.map((entry, index) => (
-                <PodiumCard
-                  key={entry.id}
-                  rank={index + 1}
-                  name={entry.displayNameSnapshot || '학생'}
-                  value={formatRankTime(Number(entry.value || 0))}
-                  highlight={index === 0}
-                />
-              ))
-            ) : (
-              <>
-                <PodiumCard rank={2} name="준비중" value="--" />
-                <PodiumCard rank={1} name="랭킹" value="--" highlight />
-                <PodiumCard rank={3} name="준비중" value="--" />
-              </>
-            )}
-          </div>
-
-          <div className="surface-card surface-card--highlight mt-4 rounded-[1.55rem] px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[rgba(14,28,56,0.58)]">MY RANK</p>
-                <p className="mt-1 text-[1.45rem] font-black tracking-tight text-[var(--text-on-accent)]">{myRankLabel}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[rgba(14,28,56,0.72)]">MONTH</p>
-                <p className="mt-1 text-sm font-black text-[var(--text-on-accent)]">{formatRankTime(monthlyMinutes)}</p>
-              </div>
-            </div>
           </div>
         </section>
 

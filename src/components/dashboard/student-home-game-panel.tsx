@@ -51,7 +51,7 @@ export type StudentHomeRankState = {
   minutes: number;
   badge: string;
   caption: string;
-  preview: Array<{ rank: number; name: string; minutes: number }>;
+  preview: Array<{ rank: number; name: string; schoolName: string | null; minutes: number }>;
   isLoading: boolean;
 };
 
@@ -62,6 +62,23 @@ function formatMini(minutes: number) {
   if (hours <= 0) return `${mins}m`;
   if (mins === 0) return `${hours}h`;
   return `${hours}.${Math.round((mins / 60) * 10)}h`;
+}
+
+function formatMaskedStudentName(name?: string | null) {
+  const source = typeof name === "string" ? name.trim() : "";
+  if (!source) return "학생";
+
+  const chars = Array.from(source);
+  if (chars.length <= 1) return chars[0];
+  if (chars.length === 2) return `${chars[0]}*`;
+
+  const middleIndex = Math.floor(chars.length / 2);
+  return chars.map((char, index) => (index === middleIndex ? "*" : char)).join("");
+}
+
+function formatSchoolLabel(schoolName?: string | null) {
+  const source = typeof schoolName === "string" ? schoolName.trim() : "";
+  return source || "학교 미지정";
 }
 
 function RewardCountUp({ value }: { value: number }) {
@@ -827,17 +844,24 @@ export function StudentHomeGamePanel({
                   <div
                     key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
                     className={cn(
-                      "rounded-[1.15rem] border px-2.5 py-3 text-center shadow-[0_18px_34px_-28px_rgba(0,0,0,0.42)]",
+                      "rounded-[1.2rem] border px-2.5 py-3.5 text-center shadow-[0_18px_34px_-28px_rgba(0,0,0,0.42)]",
                       entry.rank === 1
-                        ? "border-[rgba(255,138,31,0.26)] bg-[rgba(255,255,255,0.68)]"
-                        : "border-[rgba(14,28,56,0.1)] bg-[rgba(255,255,255,0.5)]",
+                        ? "border-[rgba(255,138,31,0.28)] bg-[linear-gradient(180deg,rgba(255,251,244,0.96),rgba(255,239,214,0.84))]"
+                        : "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(180deg,rgba(255,249,240,0.88),rgba(255,255,255,0.72))]",
                     )}
                   >
-                    <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(14,28,56,0.1)] text-[11px] font-black text-[var(--text-on-accent)]">
+                    <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[11px] font-black text-[var(--text-on-accent)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.3)]">
                       {entry.rank === 1 ? <Crown className="h-4 w-4 text-[var(--accent-orange)]" /> : `#${entry.rank}`}
                     </div>
-                    <div className="mt-2 truncate text-sm font-black text-[var(--text-on-accent)]">{entry.name}</div>
-                    <div className="mt-1 text-[11px] font-black text-[var(--accent-orange)]">{formatMini(entry.minutes)}</div>
+                    <div className="mt-2 break-keep text-[14px] font-black tracking-tight text-[var(--text-on-accent)]">
+                      {formatMaskedStudentName(entry.name)}
+                    </div>
+                    <div className="mt-1 truncate text-[10px] font-bold tracking-[0.04em] text-[rgba(14,28,56,0.58)]">
+                      {formatSchoolLabel(entry.schoolName)}
+                    </div>
+                    <div className="mt-2 inline-flex rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] px-2.5 py-1 text-[11px] font-black text-[var(--accent-orange)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]">
+                      {formatMini(entry.minutes)}
+                    </div>
                   </div>
                 ))
               ) : (

@@ -2101,11 +2101,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const dailyTop = validDailyRankEntries.slice(0, 3).map((entry, index) => ({
       rank: index + 1,
       name: entry.displayNameSnapshot || '학생',
+      schoolName: entry.schoolNameSnapshot || null,
       minutes: Number(entry.value || 0),
     }));
     const weeklyTop = validWeeklyRankEntries.slice(0, 3).map((entry, index) => ({
       rank: index + 1,
       name: entry.displayNameSnapshot || '학생',
+      schoolName: entry.schoolNameSnapshot || null,
       minutes: Number(entry.value || 0),
     }));
     const monthlyTop = [...validRankEntries]
@@ -2114,6 +2116,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       .map((entry, index) => ({
         rank: index + 1,
         name: entry.displayNameSnapshot || '학생',
+        schoolName: entry.schoolNameSnapshot || null,
         minutes: Number(entry.value || 0),
       }));
 
@@ -2151,7 +2154,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       minutes: number;
       badge: string;
       caption: string;
-      preview: Array<{ rank: number; name: string; minutes: number }>;
+      preview: Array<{ rank: number; name: string; schoolName: string | null; minutes: number }>;
       isLoading: boolean;
     }>;
   }, [

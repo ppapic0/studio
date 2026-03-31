@@ -10,6 +10,7 @@ type RankEntry = {
   studentId: string;
   displayNameSnapshot: string;
   classNameSnapshot: string | null;
+  schoolNameSnapshot: string | null;
   value: number;
   rank: number;
 };
@@ -135,7 +136,11 @@ export async function GET(request: NextRequest) {
       ...weeklySnapPromises,
     ]);
 
-    const memberProfiles = new Map<string, { displayNameSnapshot: string; classNameSnapshot: string | null }>();
+    const memberProfiles = new Map<string, {
+      displayNameSnapshot: string;
+      classNameSnapshot: string | null;
+      schoolNameSnapshot: string | null;
+    }>();
     const activeStudentIds = new Set<string>();
 
     membersSnap.forEach((docSnap) => {
@@ -153,6 +158,11 @@ export async function GET(request: NextRequest) {
         classNameSnapshot: typeof data.className === 'string' && data.className.trim()
           ? data.className.trim()
           : null,
+        schoolNameSnapshot: typeof data.schoolName === 'string' && data.schoolName.trim()
+          ? data.schoolName.trim()
+          : typeof data.schoolNameSnapshot === 'string' && data.schoolNameSnapshot.trim()
+            ? data.schoolNameSnapshot.trim()
+            : null,
       });
     });
 
@@ -160,6 +170,7 @@ export async function GET(request: NextRequest) {
     const getProfile = (studentId: string) => memberProfiles.get(studentId) || {
       displayNameSnapshot: '학생',
       classNameSnapshot: null,
+      schoolNameSnapshot: null,
     };
 
     const dailyEntries = applyCompetitionRanks(
@@ -175,6 +186,7 @@ export async function GET(request: NextRequest) {
             studentId,
             displayNameSnapshot: profile.displayNameSnapshot,
             classNameSnapshot: profile.classNameSnapshot,
+            schoolNameSnapshot: profile.schoolNameSnapshot,
             value,
           };
         })
@@ -200,6 +212,7 @@ export async function GET(request: NextRequest) {
           studentId,
           displayNameSnapshot: profile.displayNameSnapshot,
           classNameSnapshot: profile.classNameSnapshot,
+          schoolNameSnapshot: profile.schoolNameSnapshot,
           value,
         };
       })
@@ -222,6 +235,9 @@ export async function GET(request: NextRequest) {
             classNameSnapshot: typeof data.classNameSnapshot === 'string' && data.classNameSnapshot.trim()
               ? data.classNameSnapshot.trim()
               : profile.classNameSnapshot,
+            schoolNameSnapshot: typeof data.schoolNameSnapshot === 'string' && data.schoolNameSnapshot.trim()
+              ? data.schoolNameSnapshot.trim()
+              : profile.schoolNameSnapshot,
             value,
           };
         })

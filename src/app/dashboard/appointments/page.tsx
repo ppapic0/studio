@@ -712,7 +712,7 @@ export function AppointmentsPageContent({
     'rounded-full font-black gap-2 transition-all',
     isMobile ? 'min-h-[3.25rem] px-2' : '',
     isStudentTrackTheme
-      ? 'text-[var(--text-on-dark-soft)] data-[state=active]:bg-[var(--accent-orange)] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_-16px_rgba(255,138,31,0.48)]'
+      ? 'text-[#5D739B] hover:bg-white/60 hover:text-[#17326B] data-[state=active]:bg-[var(--accent-orange)] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_-16px_rgba(255,138,31,0.48)]'
       : 'data-[state=active]:bg-white data-[state=active]:shadow-lg'
   );
   const studentEmptyStateClass = cn(

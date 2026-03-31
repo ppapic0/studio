@@ -44,11 +44,9 @@ import { PlannerChecklistItem } from './planner-checklist-item';
 import { PlannerTemplateSheet } from './planner-template-sheet';
 import { RecentStudySheet } from './recent-study-sheet';
 import { RepeatCopySheet } from './repeat-copy-sheet';
-import { RoutineComposerCard } from './routine-composer-card';
 import { ScheduleItemCard } from './schedule-item-card';
 import { StudyPlanSheet } from './study-plan-sheet';
 import {
-  ROUTINE_TEMPLATE_OPTIONS,
   STUDY_AMOUNT_UNIT_OPTIONS,
   type AttendanceAwaySlot,
   type StudyPlanMode,
@@ -309,10 +307,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     hasInPlan,
     hasOutPlan,
     handleSetAttendance,
-    newRoutineTitle,
-    setNewRoutineTitle,
-    selectedRoutineTemplateKey,
-    handleRoutineTemplateSelect,
     handleAddTask,
     handleUpdateScheduleRange,
     routineCopyWeeks,
@@ -1394,21 +1388,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 </div>
 
                 <div className="space-y-4">
-                  {!isPast ? (
-                    <RoutineComposerCard
-                      title="생활 루틴 추가"
-                      description="등원, 학원, 식사처럼 반복되는 흐름은 짧게 추가해두면 계속 재사용할 수 있어요."
-                      value={newRoutineTitle}
-                      onValueChange={setNewRoutineTitle}
-                      onSubmit={() => handleAddTask(newRoutineTitle, 'schedule')}
-                      isSubmitting={isSubmitting}
-                      isMobile={isMobile}
-                      selectedTemplateKey={selectedRoutineTemplateKey}
-                      onTemplateSelect={handleRoutineTemplateSelect}
-                      templateOptions={ROUTINE_TEMPLATE_OPTIONS}
-                    />
-                  ) : null}
-
                   {routineItems.length === 0 ? (
                     <div className="surface-card surface-card--ghost on-dark rounded-[1.5rem] border-dashed p-5 text-center">
                       <p className="text-sm font-black text-white">저장된 루틴이 아직 없어요</p>
