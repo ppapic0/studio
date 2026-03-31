@@ -555,9 +555,14 @@ export function StudentHomeGamePanel({
                   </div>
                 </div>
                 {sessionTimerLabel ? (
-                  <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-2 text-right">
+                  <div className={cn(
+                    "surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-2 text-right shrink-0",
+                    isMobile ? "min-w-[6.2rem]" : "min-w-[6.8rem]"
+                  )}>
                     <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-on-dark-muted)]">live</div>
-                    <div className="mt-1 text-lg font-black text-white">{sessionTimerLabel}</div>
+                    <div className="mt-1 whitespace-nowrap leading-none font-black tabular-nums text-white text-[clamp(0.95rem,4vw,1.125rem)]">
+                      {sessionTimerLabel}
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -757,23 +762,45 @@ export function StudentHomeGamePanel({
                 onOpenLeaderboard();
               }
             }}
-            className="surface-card surface-card--highlight w-full rounded-[1.65rem] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(14,28,56,0.18)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            className="surface-card surface-card--highlight relative w-full overflow-hidden rounded-[1.65rem] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(14,28,56,0.18)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[rgba(14,28,56,0.58)]">{selectedHomeRank.title}</div>
-                <div className="mt-1 text-[1.35rem] font-black tracking-tight">
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/18 blur-2xl" />
+              <div className="absolute -left-8 bottom-2 h-24 w-24 rounded-full bg-[rgba(255,255,255,0.12)] blur-2xl" />
+            </div>
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.22)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[rgba(14,28,56,0.7)]">
+                    <Swords className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
+                    {selectedHomeRank.title}
+                  </div>
+                  <div className="inline-flex rounded-full border border-[rgba(255,255,255,0.38)] bg-[rgba(255,248,236,0.56)] px-2.5 py-1 text-[10px] font-black text-[rgba(14,28,56,0.72)] shadow-[0_10px_24px_-18px_rgba(14,28,56,0.28)]">
+                    {selectedHomeRank.badge}
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-end gap-3">
+                  <div className="text-[1.55rem] font-black tracking-tight text-[var(--text-on-accent)]">
                   {selectedHomeRank.isLoading
                     ? "집계 중..."
                     : selectedHomeRank.rank > 0
                       ? `${selectedHomeRank.rank}위`
                       : "집계 준비중"}
+                  </div>
+                  <div className="rounded-full border border-[rgba(255,255,255,0.34)] bg-[rgba(255,255,255,0.22)] px-3 py-1 text-[11px] font-black text-[rgba(14,28,56,0.84)] shadow-[0_12px_28px_-20px_rgba(14,28,56,0.35)]">
+                    {selectedHomeRank.caption}
+                  </div>
                 </div>
-                <div className="mt-1 text-[11px] font-semibold text-[rgba(14,28,56,0.76)]">{selectedHomeRank.caption}</div>
+                <div className="mt-2 text-[11px] font-semibold text-[rgba(14,28,56,0.68)]">
+                  공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.
+                </div>
               </div>
-              <ChevronRight className="mt-1 h-4 w-4 text-[rgba(14,28,56,0.58)]" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.2)] shadow-[0_14px_28px_-20px_rgba(14,28,56,0.28)]">
+                <ChevronRight className="h-4 w-4 text-[rgba(14,28,56,0.62)]" />
+              </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="relative mt-4 rounded-[1.1rem] border border-[rgba(255,255,255,0.24)] bg-[rgba(255,255,255,0.14)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
+              <div className="flex flex-wrap gap-1.5">
               {(["daily", "weekly", "monthly"] as RankRange[]).map((range) => (
                 <button
                   key={range}
@@ -783,15 +810,16 @@ export function StudentHomeGamePanel({
                     onSelectRankRange(range);
                   }}
                   className={cn(
-                    "rounded-full border px-2.5 py-1 text-[10px] font-black transition-all",
+                    "rounded-full border px-3 py-1.5 text-[10px] font-black transition-all",
                     selectedRankRange === range
-                      ? "border-[rgba(14,28,56,0.18)] bg-[rgba(14,28,56,0.92)] text-white shadow-[0_12px_24px_-16px_rgba(14,28,56,0.55)]"
-                      : "border-[rgba(255,255,255,0.34)] bg-[rgba(255,248,236,0.58)] text-[rgba(14,28,56,0.8)] hover:bg-[rgba(255,255,255,0.82)] hover:text-[rgba(14,28,56,0.94)]",
+                      ? "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(135deg,rgba(14,28,56,0.96),rgba(27,59,128,0.92))] text-white shadow-[0_16px_28px_-18px_rgba(14,28,56,0.58)]"
+                      : "border-[rgba(255,255,255,0.34)] bg-[rgba(255,248,236,0.42)] text-[rgba(14,28,56,0.74)] hover:bg-[rgba(255,255,255,0.74)] hover:text-[rgba(14,28,56,0.92)]",
                   )}
                 >
                   {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
                 </button>
               ))}
+            </div>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
               {selectedHomeRank.preview.length > 0 ? (
@@ -813,8 +841,16 @@ export function StudentHomeGamePanel({
                   </div>
                 ))
               ) : (
-                <div className="col-span-3 rounded-[1.15rem] border border-dashed border-[rgba(14,28,56,0.18)] bg-[rgba(255,255,255,0.18)] px-3 py-4 text-center text-[11px] font-semibold text-[rgba(14,28,56,0.82)]">
-                  아직 표시할 랭킹이 없어요.
+                <div className="col-span-3 rounded-[1.25rem] border border-dashed border-[rgba(14,28,56,0.18)] bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,248,236,0.18))] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.36)] text-[var(--accent-orange)] shadow-[0_14px_26px_-22px_rgba(14,28,56,0.3)]">
+                    <Crown className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="mt-3 text-sm font-black text-[rgba(14,28,56,0.88)]">
+                    아직 표시할 랭킹이 없어요.
+                  </div>
+                  <div className="mt-1 text-[11px] font-semibold leading-5 text-[rgba(14,28,56,0.66)]">
+                    오늘 공부를 시작하면 여기에 경쟁 순위가 바로 보입니다.
+                  </div>
                 </div>
               )}
             </div>

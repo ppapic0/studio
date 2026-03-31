@@ -1174,6 +1174,10 @@ select {
 
   .student-analysis-shell {
     position: relative;
+    --text-on-dark: #17326b;
+    --text-on-dark-soft: #64779d;
+    --text-on-dark-muted: #8da0bf;
+    --accent-orange-soft: #d86a11;
   }
 
   .student-analysis-shell::before {
@@ -1182,20 +1186,22 @@ select {
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 0% 0%, rgba(79,124,255,0.06), transparent 20%),
-      radial-gradient(circle at 100% 0%, rgba(255,122,22,0.06), transparent 18%);
+      radial-gradient(circle at 0% 0%, rgba(255,198,126,0.16), transparent 24%),
+      radial-gradient(circle at 100% 0%, rgba(255,122,22,0.12), transparent 18%),
+      radial-gradient(circle at 50% 100%, rgba(255,255,255,0.08), transparent 26%);
   }
 
   .student-analysis-shell [data-slot="card"]:not(.tier-hero-card):not(.analysis-premium-card) {
-    border: 1px solid rgba(20, 41, 95, 0.11);
+    border: 1px solid rgba(255, 138, 31, 0.14);
     background:
-      radial-gradient(circle at top right, rgba(79,124,255,0.08), transparent 24%),
-      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(247,250,255,0.99) 100%);
+      radial-gradient(circle at top right, rgba(255,169,74,0.16), transparent 24%),
+      radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 34%),
+      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(255,247,239,0.99) 100%);
     box-shadow:
       0 1px 0 0 rgba(255,255,255,0.98) inset,
-      0 -1px 0 0 rgba(20,41,95,0.04) inset,
-      0 12px 28px -26px rgba(20,41,95,0.28),
-      0 26px 48px -38px rgba(20,41,95,0.18);
+      0 -1px 0 0 rgba(255,138,31,0.05) inset,
+      0 14px 30px -28px rgba(20,41,95,0.18),
+      0 28px 54px -40px rgba(255,138,31,0.16);
   }
 
   .student-analysis-shell [data-slot="card-header"] {
@@ -1204,30 +1210,175 @@ select {
   }
 
   .student-analysis-shell .analysis-tab-rail {
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 138, 31, 0.16);
     background:
-      linear-gradient(180deg, rgba(21,39,79,0.96) 0%, rgba(13,28,69,0.94) 100%);
+      radial-gradient(circle at top left, rgba(255,186,111,0.2), transparent 28%),
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,244,228,0.96) 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.06),
-      0 18px 34px -28px rgba(0,0,0,0.45);
+      inset 0 1px 0 rgba(255,255,255,0.92),
+      0 18px 34px -28px rgba(20,41,95,0.18),
+      0 22px 40px -34px rgba(255,138,31,0.2);
   }
 
   .student-analysis-shell .analysis-tab-trigger {
-    color: rgba(255,255,255,0.72);
+    color: #6d7da1;
   }
 
   .student-analysis-shell .analysis-tab-trigger[data-state="active"] {
     color: #ffffff;
     background:
-      linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.08) 100%);
+      linear-gradient(135deg, #ffb34f 0%, #ff8a1f 42%, #ff7312 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.1),
-      0 14px 28px -24px rgba(0,0,0,0.44);
+      inset 0 1px 0 rgba(255,255,255,0.24),
+      0 16px 28px -22px rgba(255,138,31,0.42),
+      0 0 0 1px rgba(255,255,255,0.18);
   }
 
   .student-analysis-shell .analysis-tab-trigger:hover {
-    color: #ffffff;
-    background: rgba(255,255,255,0.06);
+    color: #17326b;
+    background: rgba(255,138,31,0.08);
+  }
+
+  .student-analysis-shell .analysis-profile-shell {
+    color: #17326b;
+    border: 1px solid rgba(255, 138, 31, 0.18);
+    background:
+      radial-gradient(circle at top left, rgba(255,215,166,0.44), transparent 36%),
+      radial-gradient(circle at top right, rgba(255,138,31,0.16), transparent 28%),
+      linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(255,245,230,0.96) 58%, rgba(255,232,204,0.92) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.95) inset,
+      0 -1px 0 0 rgba(255,138,31,0.06) inset,
+      0 24px 46px -34px rgba(20,41,95,0.18),
+      0 28px 54px -42px rgba(255,138,31,0.22);
+  }
+
+  .student-analysis-shell .analysis-profile-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(112deg, transparent 16%, rgba(255,255,255,0.22) 34%, rgba(255,255,255,0.42) 49%, rgba(255,255,255,0.12) 64%, transparent 82%);
+    transform: translateX(-140%);
+    animation: analysis-sheen 7.2s linear infinite;
+  }
+
+  .student-analysis-shell .surface-card.on-dark {
+    --text-on-dark: #17326b;
+    --text-on-dark-soft: #64779d;
+    --text-on-dark-muted: #8da0bf;
+    --accent-orange-soft: #d86a11;
+    color: #17326b;
+  }
+
+  .student-analysis-shell .surface-card.on-dark.surface-card--primary,
+  .student-analysis-shell .surface-card.on-dark.surface-card--secondary {
+    border: 1px solid rgba(255, 138, 31, 0.14) !important;
+    background:
+      radial-gradient(circle at top right, rgba(255,186,111,0.2), transparent 24%),
+      radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 32%),
+      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(255,247,239,0.96) 100%) !important;
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.96) inset,
+      0 -1px 0 0 rgba(255,138,31,0.04) inset,
+      0 18px 34px -28px rgba(20,41,95,0.16),
+      0 26px 46px -38px rgba(255,138,31,0.16) !important;
+  }
+
+  .student-analysis-shell .surface-card.on-dark.surface-card--ghost {
+    border: 1px solid rgba(255, 138, 31, 0.12) !important;
+    background:
+      radial-gradient(circle at top right, rgba(255,186,111,0.14), transparent 22%),
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,250,245,0.94) 100%) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.96),
+      0 12px 24px -24px rgba(20,41,95,0.12) !important;
+  }
+
+  .student-analysis-shell .analysis-chart-stage--warm {
+    border-color: rgba(255, 138, 31, 0.16);
+    background:
+      radial-gradient(circle at top right, rgba(255,186,111,0.18), transparent 26%),
+      radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 34%),
+      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(255,248,241,0.98) 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.98) inset,
+      0 -1px 0 0 rgba(255,138,31,0.05) inset,
+      0 18px 34px -28px rgba(20,41,95,0.18),
+      0 28px 52px -40px rgba(255,138,31,0.16);
+  }
+
+  .student-analysis-shell .analysis-detail-panel {
+    border: 1px solid rgba(255, 138, 31, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,249,243,0.96) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.94),
+      0 16px 28px -24px rgba(20,41,95,0.12);
+  }
+
+  .student-analysis-shell .analysis-metric-chip {
+    border: 1px solid rgba(255, 138, 31, 0.18);
+    background: linear-gradient(180deg, rgba(255,250,243,0.96) 0%, rgba(255,235,208,0.92) 100%);
+    color: #17326b;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.96),
+      0 14px 28px -24px rgba(255,138,31,0.24);
+  }
+
+  .student-analysis-shell .analysis-detail-badge {
+    border: 1px solid rgba(255, 138, 31, 0.16);
+    background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,245,231,0.94) 100%);
+    color: #c86a10;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.96),
+      0 12px 24px -20px rgba(255,138,31,0.18);
+  }
+
+  .student-analysis-shell .analysis-warm-badge {
+    border: 1px solid rgba(255, 138, 31, 0.22);
+    background: linear-gradient(180deg, rgba(255,248,235,0.98) 0%, rgba(255,228,191,0.96) 100%);
+    color: #c86a10;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.94),
+      0 14px 28px -22px rgba(255,138,31,0.24);
+  }
+
+  .student-analysis-shell .analysis-soft-badge {
+    border: 1px solid rgba(214, 225, 245, 0.92);
+    background: rgba(255,255,255,0.94);
+    color: #17326b;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.96),
+      0 12px 22px -20px rgba(20,41,95,0.12);
+  }
+
+  .student-analysis-shell .analysis-subchip {
+    border: 1px solid rgba(214, 225, 245, 0.9);
+    background: rgba(255,255,255,0.96);
+    color: #7082a7;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.96);
+  }
+
+  .student-analysis-shell .analysis-icon-bubble {
+    border: 1px solid rgba(255, 138, 31, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,246,236,0.94) 100%);
+  }
+
+  .student-analysis-shell .analysis-meter-track {
+    background: rgba(20, 41, 95, 0.08);
+    box-shadow: inset 0 1px 1px rgba(20,41,95,0.08);
+  }
+
+  .student-analysis-shell .analysis-action-button {
+    border-color: rgba(255, 138, 31, 0.22);
+    color: #17326b;
+    background:
+      linear-gradient(180deg, rgba(255,248,237,0.98) 0%, rgba(255,228,194,0.96) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.92),
+      0 16px 28px -24px rgba(255,138,31,0.28);
   }
 
   .student-analysis-shell .analysis-record-card,
@@ -1261,10 +1412,10 @@ select {
 
     .analysis-action-button:hover {
       transform: translateY(-1px);
-      border-color: rgba(255, 255, 255, 0.18);
-      color: #ffffff;
+      border-color: rgba(255, 138, 31, 0.34);
+      color: #17326b;
       background:
-        linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+        linear-gradient(180deg, rgba(255,241,219,0.98) 0%, rgba(255,217,171,0.96) 100%);
     }
 
     .student-analysis-shell .analysis-record-card:hover,

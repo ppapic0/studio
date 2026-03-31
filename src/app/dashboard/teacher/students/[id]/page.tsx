@@ -1848,22 +1848,31 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const detailTabTriggerClass = isAnalysisPresentation
     ? 'analysis-tab-trigger min-w-0 rounded-[1rem] font-black text-xs gap-1.5 px-3 py-2.5'
     : 'min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2';
-  const detailChartCardClass = cn('overflow-hidden rounded-[1.65rem] border border-slate-200 bg-white', isAnalysisPresentation && 'analysis-chart-stage border-none');
+  const detailChartCardClass = cn('overflow-hidden rounded-[1.65rem] border border-slate-200 bg-white', isAnalysisPresentation && 'analysis-chart-stage analysis-chart-stage--warm border-none');
   const detailChartHeaderClass = cn('relative z-10', isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4');
   const detailChartContentClass = cn('relative z-10 pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5');
   const detailChartPanelClass = cn(
     'relative rounded-[1.3rem] border bg-white/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]',
     isMobile ? 'p-3' : 'p-4',
-    isAnalysisPresentation ? 'border-[#e4ebff]/80' : 'border-slate-100'
+    isAnalysisPresentation ? 'analysis-detail-panel border-none' : 'border-slate-100'
   );
-  const detailMetricChipClass = 'rounded-[1rem] border border-[#dbe7ff] bg-white/82 px-3 py-2 shadow-[0_14px_30px_-28px_rgba(20,41,95,0.42)]';
-  const detailBadgeClass = 'rounded-full border-[#dbe7ff] bg-white/84 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]';
+  const detailMetricChipClass = isAnalysisPresentation
+    ? 'analysis-metric-chip'
+    : 'rounded-[1rem] border border-[#dbe7ff] bg-white/82 px-3 py-2 shadow-[0_14px_30px_-28px_rgba(20,41,95,0.42)]';
+  const detailBadgeClass = isAnalysisPresentation
+    ? 'analysis-detail-badge'
+    : 'rounded-full border-[#dbe7ff] bg-white/84 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]';
   const detailInsightBandClass = cn(
     'mt-3 rounded-[1.15rem] px-3.5 py-3',
     isAnalysisPresentation ? 'analysis-signal-band' : 'border border-slate-200 bg-slate-50/85'
   );
-  const detailPrimaryTextClass = isAnalysisPresentation ? 'text-[var(--text-on-dark)]' : 'text-[#14295F]';
-  const detailSecondaryTextClass = isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : 'text-[#5c6e97]';
+  const detailPrimaryTextClass = isAnalysisPresentation ? 'text-[#17326B]' : 'text-[#14295F]';
+  const detailSecondaryTextClass = isAnalysisPresentation ? 'text-[#5F7299]' : 'text-[#5c6e97]';
+  const analysisWarmBadgeClass = isAnalysisPresentation ? 'analysis-warm-badge' : '';
+  const analysisSoftBadgeClass = isAnalysisPresentation ? 'analysis-soft-badge' : '';
+  const analysisSubChipClass = isAnalysisPresentation ? 'analysis-subchip' : '';
+  const analysisIconBubbleClass = isAnalysisPresentation ? 'analysis-icon-bubble' : '';
+  const analysisMeterTrackClass = isAnalysisPresentation ? 'analysis-meter-track' : '';
   const focusKpiCards = [
     {
       key: 'growth',
@@ -1976,22 +1985,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       )}>
         <div className="flex items-start gap-4 min-w-0">
           {!isStudentSelfView && (
-            <Button variant={isAnalysisPresentation ? 'dark' : 'ghost'} size="icon" className={cn("rounded-full h-10 w-10 shrink-0 mt-1", isAnalysisPresentation && "border-white/12 bg-white/8 hover:bg-white/12")} asChild>
+            <Button variant={isAnalysisPresentation ? 'outline' : 'ghost'} size="icon" className={cn("rounded-full h-10 w-10 shrink-0 mt-1", isAnalysisPresentation && detailActionButtonClass)} asChild>
               <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
             </Button>
           )}
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className={cn("font-black tracking-tighter truncate text-3xl sm:text-4xl", isAnalysisPresentation && "text-[var(--text-on-dark)]")}>{student?.name || '학생'}</h1>
-              <Badge variant={isAnalysisPresentation ? 'secondary' : 'default'} className={cn("px-2 py-0.5 rounded-full font-black text-[10px]", !isAnalysisPresentation && "bg-primary text-white")}>{formatSeatLabel(student)}</Badge>
+              <h1 className={cn("font-black tracking-tighter truncate text-3xl sm:text-4xl", isAnalysisPresentation && "text-[#17326B]")}>{student?.name || '학생'}</h1>
+              <Badge variant={isAnalysisPresentation ? 'outline' : 'default'} className={cn("px-2 py-0.5 rounded-full font-black text-[10px]", isAnalysisPresentation ? analysisWarmBadgeClass : "bg-primary text-white")}>{formatSeatLabel(student)}</Badge>
               {!isStudentSelfView && (
-                <Badge variant={isAnalysisPresentation ? 'dark' : 'outline'} className="font-black text-[10px] rounded-full"><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
+                <Badge variant={isAnalysisPresentation ? 'outline' : 'outline'} className={cn("font-black text-[10px] rounded-full", isAnalysisPresentation && analysisSoftBadgeClass)}><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
               )}
             </div>
-            <div className={cn("flex flex-wrap items-center gap-2 text-xs font-bold", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-muted-foreground")}>
-              <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-[var(--accent-orange-soft)]" : "text-primary")}><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
+            <div className={cn("flex flex-wrap items-center gap-2 text-xs font-bold", isAnalysisPresentation ? "text-[#6A7EAA]" : "text-muted-foreground")}>
+              <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-[#D86A11]" : "text-primary")}><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
               <span className="opacity-30">|</span><span>{student?.grade}</span><span className="opacity-30">|</span>
-              <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-emerald-300" : "text-emerald-600")}><LayoutGrid className="h-3 w-3" /> {student?.className || '반 미지정'}</span>
+              <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-[#2E9B73]" : "text-emerald-600")}><LayoutGrid className="h-3 w-3" /> {student?.className || '반 미지정'}</span>
               <span className="opacity-30">|</span><span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> 연속 공부 {studyStreakDays}일</span>
             </div>
           </div>
@@ -2089,7 +2098,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     COO 관점에서 지금 바로 처리할 행동만 먼저 모았습니다.
                   </CardDescription>
                 </div>
-                <Badge variant={isAnalysisPresentation ? 'secondary' : 'default'} className={cn("rounded-full px-3 py-1 text-[10px] font-black", !isAnalysisPresentation && "bg-[#14295F] text-white")}>
+                <Badge variant={isAnalysisPresentation ? 'outline' : 'default'} className={cn("rounded-full px-3 py-1 text-[10px] font-black", isAnalysisPresentation ? analysisWarmBadgeClass : "bg-[#14295F] text-white")}>
                   {todayActionChecklist.length}개 액션
                 </Badge>
               </div>
@@ -2118,14 +2127,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <Badge className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', isAnalysisPresentation ? 'border-[rgba(255,138,31,0.28)] bg-[rgba(255,138,31,0.18)] text-[#ffd7b4]' : item.accent)}>
+                          <Badge className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', isAnalysisPresentation ? analysisWarmBadgeClass : item.accent)}>
                             액션 {index + 1}
                           </Badge>
                           <p className={cn("text-sm font-black", detailPrimaryTextClass)}>{item.title}</p>
                         </div>
                         <p className={cn("mt-2 text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-slate-600")}>{item.detail}</p>
                       </div>
-                      <Button asChild size="sm" variant={isAnalysisPresentation ? 'secondary' : 'outline'} className="h-8 rounded-lg px-3 text-[11px] font-black">
+                      <Button asChild size="sm" variant={isAnalysisPresentation ? 'outline' : 'outline'} className={cn("h-8 rounded-lg px-3 text-[11px] font-black", isAnalysisPresentation && detailActionButtonClass)}>
                         <Link href={item.href}>바로 이동</Link>
                       </Button>
                     </div>
@@ -2145,7 +2154,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       문자, 상담, 리포트, 출결, 수납까지 운영 투입 신호를 한 번에 봅니다.
                     </CardDescription>
                   </div>
-                  <Badge variant={isAnalysisPresentation ? 'dark' : 'outline'} className="rounded-full px-3 py-1 text-[10px] font-black">
+                  <Badge variant={isAnalysisPresentation ? 'outline' : 'outline'} className={cn("rounded-full px-3 py-1 text-[10px] font-black", isAnalysisPresentation && analysisSoftBadgeClass)}>
                     최근 30일
                   </Badge>
                 </div>
@@ -2199,7 +2208,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <Badge variant="dark" className="px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shadow-none">
+                      <Badge variant={isAnalysisPresentation ? 'outline' : 'dark'} className={cn("px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shadow-none", isAnalysisPresentation && analysisSoftBadgeClass)}>
                         Focus Board
                       </Badge>
                       <CardTitle className="mt-3 break-keep text-[clamp(1rem,1.5vw,1.18rem)] font-black tracking-tight text-[var(--text-on-dark)]">개인 집중도 KPI</CardTitle>
@@ -2209,7 +2218,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div className="surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 px-3 py-2 text-right shadow-none">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-on-dark-muted)]">오늘 포커스</p>
-                      <p className="mt-1 text-sm font-black text-[var(--accent-orange-soft)]">{focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}</p>
+                      <p className="mt-1 text-sm font-black text-[#D86A11]">{focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}</p>
                     </div>
                   </div>
                 </CardHeader>
@@ -2219,20 +2228,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       <div key={key} className={cn("min-w-0 overflow-hidden rounded-[1.35rem] border px-3.5 py-3.5", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : panelClass)}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", isAnalysisPresentation ? "border border-white/12 bg-white/10 text-[var(--text-on-dark-soft)]" : chipClass)}>
+                            <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", isAnalysisPresentation ? analysisSubChipClass : chipClass)}>
                               {label}
                             </span>
                             <p className="mt-3 break-keep text-[clamp(1.25rem,3.2vw,1.8rem)] font-black tracking-tight text-[var(--text-on-dark)]">
                               {value}
                             </p>
                           </div>
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-white/12 bg-white/10 shadow-none">
+                          <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] shadow-none", isAnalysisPresentation ? analysisIconBubbleClass : "border border-white/12 bg-white/10")}>
                             <Icon className={cn("h-5 w-5", iconClass)} />
                           </div>
                         </div>
                         <p className="mt-2 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">{helper}</p>
                         <p className="mt-1 text-[11px] font-black text-[var(--accent-orange-soft)]">{note}</p>
-                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/12">
+                        <div className={cn("mt-4 h-1.5 overflow-hidden rounded-full", isAnalysisPresentation ? analysisMeterTrackClass : "bg-white/12")}>
                           <div className={cn("h-full rounded-full bg-gradient-to-r", meterClass)} style={{ width: `${meterValue}%` }} />
                         </div>
                       </div>
@@ -2257,7 +2266,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           {chartInsightSummary}
                         </CardDescription>
                       </div>
-                      <Badge variant="secondary" className="w-fit px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] shadow-none">
+                      <Badge variant={isAnalysisPresentation ? 'outline' : 'secondary'} className={cn("w-fit px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] shadow-none", isAnalysisPresentation && analysisWarmBadgeClass)}>
                         Coach Board
                       </Badge>
                     </div>
@@ -2268,7 +2277,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     {insightHighlights.map(({ key, label, badge, value, detail, accentClass }) => (
                       <div key={key} className="surface-card surface-card--ghost on-dark overflow-hidden rounded-[1.35rem] border border-white/10 p-4 shadow-none">
                         <div className="flex items-center justify-between gap-3">
-                          <Badge variant={key === 'daily' ? 'secondary' : 'dark'} className="px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] shadow-none">
+                          <Badge variant="outline" className={cn("px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] shadow-none", key === 'daily' ? analysisWarmBadgeClass : analysisSoftBadgeClass)}>
                             {badge}
                           </Badge>
                           <div className={cn("h-2 w-14 rounded-full bg-gradient-to-r", accentClass)} />

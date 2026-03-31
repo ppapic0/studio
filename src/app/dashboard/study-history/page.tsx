@@ -152,12 +152,34 @@ function buildStudyTaskMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetM
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
-const STUDY_HISTORY_CALENDAR_LEGEND = [
-  { label: '기록 없음', swatch: 'from-white via-slate-50 to-slate-100 ring-slate-200/90' },
-  { label: '짧은 몰입', swatch: 'from-white via-emerald-100 to-emerald-200 ring-emerald-300/90' },
-  { label: '집중 흐름', swatch: 'from-white via-teal-100 to-cyan-200 ring-teal-300/90' },
-  { label: '깊은 몰입', swatch: 'from-white via-sky-100 to-indigo-200 ring-blue-300/90' },
+type StudyHistoryFlowLevel = 'none' | 'warmup' | 'short' | 'steady' | 'deep';
+
+const STUDY_HISTORY_FLOW_THRESHOLDS = {
+  warmup: 60,
+  short: 180,
+  steady: 300,
+} as const;
+
+const STUDY_HISTORY_CALENDAR_LEGEND: Array<{
+  level: StudyHistoryFlowLevel;
+  label: string;
+  rangeLabel: string;
+  swatch: string;
+}> = [
+  { level: 'none', label: '기록 없음', rangeLabel: '0시간', swatch: 'bg-white ring-[#D7E1F0]' },
+  { level: 'warmup', label: '몰입 준비', rangeLabel: '1시간 미만', swatch: 'bg-[#E7EEFF] ring-[#C6D4F2]' },
+  { level: 'short', label: '짧은 몰입', rangeLabel: '1~3시간', swatch: 'bg-[#BFD0F5] ring-[#9DB5E8]' },
+  { level: 'steady', label: '집중 흐름', rangeLabel: '3~5시간', swatch: 'bg-[#5B7DC3] ring-[#3F5F9E]' },
+  { level: 'deep', label: '깊은 몰입', rangeLabel: '5시간 이상', swatch: 'bg-[#173A82] ring-[#0E285D]' },
 ] as const;
+
+function getStudyHistoryFlowLevel(minutes: number): StudyHistoryFlowLevel {
+  if (minutes <= 0) return 'none';
+  if (minutes < STUDY_HISTORY_FLOW_THRESHOLDS.warmup) return 'warmup';
+  if (minutes < STUDY_HISTORY_FLOW_THRESHOLDS.short) return 'short';
+  if (minutes < STUDY_HISTORY_FLOW_THRESHOLDS.steady) return 'steady';
+  return 'deep';
+}
 
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
@@ -484,48 +506,50 @@ export default function StudyHistoryPage() {
   };
 
   const getHeatmapColor = (minutes: number) => {
-    if (isParent) {
-      if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
-      if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,246,0.98)_60%,rgba(225,248,238,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.18)]';
-      if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(229,252,242,0.98)_56%,rgba(214,247,233,0.98)_100%)] ring-1 ring-inset ring-emerald-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_34px_-28px_rgba(13,148,136,0.22)]';
-      if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(223,250,246,0.98)_52%,rgba(210,243,246,0.98)_100%)] ring-1 ring-inset ring-teal-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(14,165,233,0.22)]';
-      if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,244,255,0.98)_50%,rgba(213,231,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
-      return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(220,236,255,0.98)_46%,rgba(205,221,255,0.98)_100%)] ring-1 ring-inset ring-blue-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.24)]';
-    }
-    if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(247,249,253,0.98)_100%)] ring-1 ring-inset ring-[#DCE5F4]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_30px_-28px_rgba(15,23,42,0.1)]';
-    if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(237,250,244,0.98)_58%,rgba(223,245,234,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_32px_-28px_rgba(16,185,129,0.16)]';
-    if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(228,249,244,0.98)_54%,rgba(214,243,240,0.98)_100%)] ring-1 ring-inset ring-teal-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-28px_rgba(13,148,136,0.18)]';
-    if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(226,247,250,0.98)_52%,rgba(212,238,247,0.98)_100%)] ring-1 ring-inset ring-cyan-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_20px_36px_-28px_rgba(14,165,233,0.2)]';
-    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,241,255,0.98)_48%,rgba(214,230,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
-    return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(222,234,255,0.98)_46%,rgba(208,221,255,0.98)_100%)] ring-1 ring-inset ring-indigo-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_24px_42px_-28px_rgba(59,130,246,0.22)]';
+    const level = getStudyHistoryFlowLevel(minutes);
+    if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(247,249,253,0.98)_100%)] ring-1 ring-inset ring-[#DCE5F4]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_30px_-28px_rgba(15,23,42,0.1)]';
+    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(248,251,255,0.99)_0%,rgba(234,241,255,0.98)_58%,rgba(220,230,249,0.98)_100%)] ring-1 ring-inset ring-[#C9D7F3]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_32px_-28px_rgba(34,61,117,0.14)]';
+    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(235,241,255,0.99)_0%,rgba(205,220,249,0.98)_56%,rgba(176,197,239,0.98)_100%)] ring-1 ring-inset ring-[#9DB5E8]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_34px_-28px_rgba(32,63,122,0.18)]';
+    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(183,201,238,0.99)_0%,rgba(106,133,194,0.98)_54%,rgba(53,84,148,0.98)_100%)] ring-1 ring-inset ring-[#4565A7]/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_22px_38px_-26px_rgba(23,50,107,0.32)]';
+    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(102,129,190,0.99)_0%,rgba(44,75,140,0.98)_54%,rgba(23,50,107,0.98)_100%)] ring-1 ring-inset ring-[#1F4387]/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_24px_42px_-24px_rgba(23,50,107,0.36)]';
+    return 'bg-[linear-gradient(180deg,rgba(72,101,165,0.99)_0%,rgba(29,58,123,0.98)_50%,rgba(16,39,88,0.99)_100%)] ring-1 ring-inset ring-[#173A82]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_26px_44px_-24px_rgba(13,31,70,0.4)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
-    if (minutes === 0) return 'from-slate-200 via-slate-300 to-slate-200';
-    if (minutes < 60) return 'from-emerald-300 via-emerald-400 to-teal-400';
-    if (minutes < 180) return 'from-emerald-400 via-teal-400 to-cyan-400';
-    if (minutes < 300) return 'from-teal-400 via-cyan-400 to-sky-400';
-    if (minutes < 480) return 'from-sky-400 via-blue-400 to-indigo-400';
-    return 'from-sky-500 via-blue-500 to-indigo-600';
+    const level = getStudyHistoryFlowLevel(minutes);
+    if (level === 'none') return 'from-slate-200 via-slate-300 to-slate-200';
+    if (level === 'warmup') return 'from-[#E6EEFF] via-[#C7D6F6] to-[#96ADE1]';
+    if (level === 'short') return 'from-[#D2DEFA] via-[#97B0E6] to-[#6486C9]';
+    if (level === 'steady') return 'from-[#B4C8F1] via-[#6987C8] to-[#27498A]';
+    return 'from-[#9CB4E8] via-[#4C70BC] to-[#17326B]';
   };
 
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
-    if (isParent) {
-      if (!isCurrentMonth) return 'border-slate-200 text-slate-400';
-      if (minutes === 0) return 'border-slate-200 text-slate-500';
-      if (minutes < 60) return 'border-emerald-300/95 text-slate-900';
-      if (minutes < 180) return 'border-emerald-400/95 text-slate-950';
-      if (minutes < 300) return 'border-teal-400/95 text-slate-950';
-      if (minutes < 480) return 'border-sky-400/95 text-slate-950';
-      return 'border-indigo-400/95 text-slate-950';
-    }
     if (!isCurrentMonth) return 'border-slate-200 text-slate-400';
-    if (minutes === 0) return 'border-slate-200 text-slate-500';
-    if (minutes < 60) return 'border-emerald-300/95 text-slate-900';
-    if (minutes < 180) return 'border-teal-300/95 text-slate-950';
-    if (minutes < 300) return 'border-cyan-300/95 text-slate-950';
-    if (minutes < 480) return 'border-sky-300/95 text-slate-950';
-    return 'border-indigo-300/95 text-slate-950';
+    const level = getStudyHistoryFlowLevel(minutes);
+    if (level === 'none') return 'border-slate-200 text-slate-500';
+    if (level === 'warmup') return 'border-[#B8CBF0]/95 text-[#274884]';
+    if (level === 'short') return 'border-[#7F99D3]/95 text-[#173A82]';
+    if (level === 'steady') return 'border-[#5B7DC3]/95 text-[#173A82]';
+    return 'border-[#254887]/95 text-[#112E68]';
+  };
+
+  const getCalendarValueTextClass = (minutes: number, isCurrentMonth: boolean) => {
+    if (!isCurrentMonth) return 'text-slate-400';
+    const level = getStudyHistoryFlowLevel(minutes);
+    if (level === 'none') return 'text-[#93A4C2]';
+    if (level === 'warmup') return 'text-[#274884]';
+    if (level === 'short') return 'text-[#173A82]';
+    return 'text-white drop-shadow-[0_1px_1px_rgba(10,24,56,0.2)]';
+  };
+
+  const getCalendarStatusTextClass = (minutes: number, isCurrentMonth: boolean) => {
+    if (!isCurrentMonth) return 'text-slate-300';
+    const level = getStudyHistoryFlowLevel(minutes);
+    if (level === 'none') return 'text-slate-400';
+    if (level === 'warmup') return 'text-[#6A7EA8]';
+    if (level === 'short') return 'text-[#4E6899]';
+    return 'text-white/78';
   };
 
   const monthTotalMinutes = useMemo(() => {
@@ -1000,15 +1024,20 @@ export default function StudyHistoryPage() {
             <div className="flex flex-wrap gap-1.5">
               {STUDY_HISTORY_CALENDAR_LEGEND.map((item) => (
                 <span key={item.label} className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-black shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)]",
+                  "inline-flex items-center gap-2 rounded-[1rem] px-2.5 py-1.5 font-black shadow-[0_12px_24px_-20px_rgba(15,23,42,0.16)]",
                   isParent
                     ? isMobile
-                      ? "border border-[#D9E1F2] bg-white text-[#173A82]/65 text-[8px]"
-                      : "border border-slate-200/75 bg-white/92 text-slate-500 text-[8px] sm:text-[9px]"
-                    : "border border-[#DCE5F4] bg-white text-[#5F7299] text-[8px] sm:text-[9px]"
+                      ? "border border-[#D9E1F2] bg-white text-[#173A82] text-[8px]"
+                      : "border border-slate-200/75 bg-white/92 text-slate-700 text-[8px] sm:text-[9px]"
+                    : "border border-[#DCE5F4] bg-white text-[#173A82] text-[8px] sm:text-[9px]"
                 )}>
-                  <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
-                  {item.label}
+                  <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full ring-1", item.swatch)} />
+                  <span className="flex flex-col leading-none">
+                    <span>{item.label}</span>
+                    <span className="mt-0.5 font-bold tracking-normal text-[#7285AD]">
+                      {item.rangeLabel}
+                    </span>
+                  </span>
                 </span>
               ))}
             </div>
@@ -1042,7 +1071,7 @@ export default function StudyHistoryPage() {
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isTodayCalendar = isSameDay(day, new Date());
-              const hasDeepFocus = isCurrentMonth && minutes >= 180;
+              const hasDeepFocus = isCurrentMonth && minutes >= STUDY_HISTORY_FLOW_THRESHOLDS.steady;
               const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
               const timeLabel = isCurrentMonth
                 ? (isMobile ? formatCompactCalendarMinutes(minutes) : formatMinutes(minutes))
@@ -1110,7 +1139,10 @@ export default function StudyHistoryPage() {
                       )}
                     >
                       {isMobile ? (
-                        <span className="dashboard-number block tabular-nums text-[0.68rem] leading-none tracking-[-0.08em]">
+                        <span className={cn(
+                          "dashboard-number block tabular-nums text-[0.68rem] leading-none tracking-[-0.08em]",
+                          getCalendarValueTextClass(minutes, isCurrentMonth)
+                        )}>
                           {timeLabel}
                         </span>
                       ) : (
@@ -1128,7 +1160,10 @@ export default function StudyHistoryPage() {
 
                   {!isMobile && isCurrentMonth && (
                     <div className="pointer-events-none absolute inset-x-3 bottom-12">
-                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                      <div className={cn(
+                        "text-[10px] font-black uppercase tracking-[0.16em]",
+                        getCalendarStatusTextClass(minutes, isCurrentMonth)
+                      )}>
                         {minutes > 0 ? '오늘 학습 기록' : '기록 대기'}
                       </div>
                     </div>

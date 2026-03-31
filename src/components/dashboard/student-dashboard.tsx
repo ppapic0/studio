@@ -119,6 +119,22 @@ function isSyntheticStudentId(studentId: unknown): boolean {
   );
 }
 
+function toKoreanSubjectLabel(raw?: string | null): string | undefined {
+  const source = typeof raw === 'string' ? raw.trim() : '';
+  if (!source) return undefined;
+  const key = source.toLowerCase();
+
+  if (key === 'kor' || key === 'korean' || key.includes('국어')) return '국어';
+  if (key === 'math' || key.includes('수학')) return '수학';
+  if (key === 'eng' || key === 'english' || key.includes('영어')) return '영어';
+  if (key === 'sci' || key === 'science' || key.includes('과학')) return '과학';
+  if (key === 'soc' || key === 'social' || key.includes('사회')) return '사회';
+  if (key === 'his' || key === 'history' || key.includes('한국사') || key.includes('역사')) return '한국사';
+  if (key === 'etc' || key.includes('기타')) return '기타';
+
+  return source;
+}
+
 const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
   late: 1,
   absence: 2,
@@ -2324,7 +2340,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         title: item.title || '오늘 할 일',
         reward: (item.targetMinutes || 0) >= 60 ? 8 : 3,
         done: Boolean(item.done),
-        subjectLabel: item.subject || undefined,
+        subjectLabel: toKoreanSubjectLabel(item.subject),
         timeLabel: item.targetMinutes ? formatMinutesMini(item.targetMinutes) : undefined,
       })) satisfies StudentHomeQuest[];
   }, [todayStudyTasks]);

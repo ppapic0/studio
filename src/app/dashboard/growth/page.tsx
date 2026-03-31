@@ -70,6 +70,66 @@ const RARITY_LABELS: Record<BoxRarity, string> = {
   epic: '에픽',
 };
 
+const STUDY_BOX_CLAIM_CACHE_PREFIX = 'point-track:claimed-boxes';
+const STUDY_BOX_ARRIVAL_TOAST_PREFIX = 'point-track:arrival-toast';
+const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
+
+function normalizeStudyBoxHours(values: number[]) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
+    )
+  ).sort((a, b) => a - b);
+}
+
+function readStudyBoxHoursCache(storageKey: string | null) {
+  if (typeof window === 'undefined' || !storageKey) return [];
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return normalizeStudyBoxHours(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return [];
+  }
+}
+
+function writeStudyBoxHoursCache(storageKey: string | null, values: number[]) {
+  if (typeof window === 'undefined' || !storageKey) return;
+
+  const normalized = normalizeStudyBoxHours(values);
+
+  try {
+    if (normalized.length === 0) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+
+    window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+  } catch {}
+}
+
+function hasSeenStudyBoxArrivalToast(storageKey: string | null) {
+  if (typeof window === 'undefined' || !storageKey) return false;
+
+  try {
+    return window.localStorage.getItem(storageKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markStudyBoxArrivalToastSeen(storageKey: string | null) {
+  if (typeof window === 'undefined' || !storageKey) return;
+
+  try {
+    window.localStorage.setItem(storageKey, '1');
+  } catch {}
+}
+
 function formatStudyMinutes(minutes: number) {
   const safe = Math.max(0, Math.round(minutes));
   const hours = Math.floor(safe / 60);
@@ -421,6 +481,7 @@ export default function GrowthPage() {
   const [pointBalance, setPointBalance] = useState(0);
   const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const liveClaimKeyRef = useRef<string | null>(null);
+  const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
 
   const progressRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -475,6 +536,11 @@ export default function GrowthPage() {
     return ((progress?.dailyPointStatus || {})[todayKey] || {}) as Record<string, any>;
   }, [progress?.dailyPointStatus, todayKey]);
 
+  const claimCacheKey = useMemo(() => {
+    if (!activeMembership?.id || !user?.uid) return null;
+    return `${STUDY_BOX_CLAIM_CACHE_PREFIX}:${activeMembership.id}:${user.uid}:${todayKey}`;
+  }, [activeMembership?.id, todayKey, user?.uid]);
+
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayStatus), [todayStatus]);
   const persistedRewardEntries = useMemo(() => coerceStudyBoxRewards(todayStatus), [todayStatus]);
   const persistedOpenedBoxes = useMemo(() => {
@@ -496,8 +562,13 @@ export default function GrowthPage() {
   }, [progress?.stats]);
 
   useEffect(() => {
-    setClaimedBoxes(persistedClaimedBoxes);
-  }, [persistedClaimedBoxes]);
+    const cachedClaimedBoxes = readStudyBoxHoursCache(claimCacheKey);
+    const nextClaimedBoxes = normalizeStudyBoxHours([...persistedClaimedBoxes, ...cachedClaimedBoxes]);
+
+    setClaimedBoxes(nextClaimedBoxes);
+    writeStudyBoxHoursCache(claimCacheKey, nextClaimedBoxes);
+    setHydratedClaimCacheKey(claimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY);
+  }, [claimCacheKey, persistedClaimedBoxes]);
 
   useEffect(() => {
     setRewardEntries(persistedRewardEntries);
@@ -593,6 +664,7 @@ export default function GrowthPage() {
 
   useEffect(() => {
     if (!isTimerActive || !progressRef) return;
+    if ((claimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY) !== hydratedClaimCacheKey) return;
 
     const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, claimedBoxes);
     if (availableMilestones.length === 0) return;
@@ -636,10 +708,20 @@ export default function GrowthPage() {
       { merge: true }
     )
       .then(() => {
-        toast({
-          title: availableMilestones.length > 1 ? `상자 ${availableMilestones.length}개 도착!` : '상자 도착!',
-          description: `+${availableMilestones.length} BOX · 보관함에서 열어보세요.`,
-        });
+        writeStudyBoxHoursCache(claimCacheKey, nextClaimedBoxes);
+
+        const arrivalToastKey =
+          activeMembership?.id && user?.uid
+            ? `${STUDY_BOX_ARRIVAL_TOAST_PREFIX}:${activeMembership.id}:${user.uid}:${todayKey}:${availableMilestones.join(',')}`
+            : null;
+
+        if (!hasSeenStudyBoxArrivalToast(arrivalToastKey)) {
+          toast({
+            title: availableMilestones.length > 1 ? `상자 ${availableMilestones.length}개 도착!` : '상자 도착!',
+            description: `+${availableMilestones.length} BOX · 보관함에서 열어보세요.`,
+          });
+          markStudyBoxArrivalToastSeen(arrivalToastKey);
+        }
       })
       .catch((error: any) => {
         console.warn('[point-track] live study box claim failed', error?.message || error);
@@ -651,8 +733,11 @@ export default function GrowthPage() {
       });
   }, [
     claimedBoxes,
+    claimCacheKey,
+    hydratedClaimCacheKey,
     isTimerActive,
     liveTodayMinutes,
+    activeMembership?.id,
     persistedClaimedBoxes,
     persistedRewardEntries,
     progress?.pointsBalance,
@@ -662,6 +747,7 @@ export default function GrowthPage() {
     todayKey,
     todayStatus,
     toast,
+    user?.uid,
   ]);
 
   const openVault = (hour?: number) => {

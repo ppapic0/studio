@@ -340,6 +340,20 @@ function MiniGrowthBars({
 }) {
   const max = Math.max(...data.map((item) => item.totalMinutes), 1);
   const yTicks = Array.from(new Set([max, Math.round(max / 2), 0])).sort((a, b) => b - a);
+  const chartHeight = 92;
+  const chartWidth = Math.max(220, data.length * 38);
+  const paddingX = 14;
+  const stepX = data.length > 1 ? (chartWidth - paddingX * 2) / (data.length - 1) : 0;
+  const baseLineY = chartHeight - 12;
+  const points = data.map((day, index) => {
+    const x = paddingX + stepX * index;
+    const progress = max > 0 ? day.totalMinutes / max : 0;
+    const y = baseLineY - progress * (chartHeight - 28);
+    return { ...day, x, y: Number.isFinite(y) ? y : baseLineY };
+  });
+  const linePath = points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ');
 
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3">
@@ -353,19 +367,73 @@ function MiniGrowthBars({
 
       <div className="relative">
         <div className="pointer-events-none absolute bottom-[2rem] top-1 left-0 w-px rounded-full bg-white/20" />
-        <div className="grid grid-cols-7 gap-2 pl-3">
+        <div className="pl-3">
+          <div className="relative h-[5.8rem]">
+            <svg
+              className="h-full w-full overflow-visible"
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient id="mini-growth-line" x1="0%" x2="100%" y1="0%" y2="0%">
+                  <stop offset="0%" stopColor="#FFD36D" />
+                  <stop offset="55%" stopColor="#FFB347" />
+                  <stop offset="100%" stopColor="#FF7A00" />
+                </linearGradient>
+                <filter id="mini-growth-glow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {yTicks.map((tick) => {
+                const tickProgress = max > 0 ? tick / max : 0;
+                const y = baseLineY - tickProgress * (chartHeight - 28);
+                return (
+                  <line
+                    key={tick}
+                    x1={paddingX}
+                    x2={chartWidth - paddingX}
+                    y1={y}
+                    y2={y}
+                    stroke="rgba(255,255,255,0.12)"
+                    strokeWidth="1"
+                    strokeDasharray={tick === 0 ? '0' : '4 5'}
+                  />
+                );
+              })}
+
+              <path
+                d={linePath}
+                fill="none"
+                stroke="url(#mini-growth-line)"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#mini-growth-glow)"
+              />
+
+              {points.map((point) => (
+                <g key={point.label}>
+                  <circle cx={point.x} cy={point.y} fill="rgba(255,122,0,0.22)" r="8.5" />
+                  <circle cx={point.x} cy={point.y} fill="#FFB347" r="5.5" />
+                  <circle cx={point.x} cy={point.y} fill="#FFF4D8" r="2.2" />
+                </g>
+              ))}
+            </svg>
+          </div>
+
+          <div className="mt-2 grid grid-cols-7 gap-2">
           {data.map((day, index) => (
             <div
               key={day.label}
               className="flex flex-col items-center gap-2 transition-all duration-300"
               style={{ transitionDelay: `${index * 50}ms` }}
             >
-              <div className="flex h-[5.8rem] items-end">
-                <div
-                  className="w-9 rounded-t-[1rem] rounded-b-[0.95rem] bg-[linear-gradient(180deg,#FFD36D_0%,#FFB347_45%,#FF7A00_100%)] shadow-[0_14px_24px_-18px_rgba(255,122,0,0.38)]"
-                  style={{ height: `${Math.max(24, (day.totalMinutes / max) * 78)}px` }}
-                />
-              </div>
               <div className="text-center">
                 <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
                 <p className="mt-1 text-[11px] font-black text-[var(--text-on-dark)]">
@@ -374,6 +442,7 @@ function MiniGrowthBars({
               </div>
             </div>
           ))}
+          </div>
         </div>
       </div>
     </div>
