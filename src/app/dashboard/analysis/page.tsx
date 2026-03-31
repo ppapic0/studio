@@ -297,10 +297,10 @@ function QuestStatBar({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3 text-sm font-black text-white">
-        <span className="text-white/68">{label}</span>
+        <span className="text-[var(--text-on-dark-soft)]">{label}</span>
         <span>{clampPercent(value)}%</span>
       </div>
-      <div className="rounded-full bg-white/8 p-1">
+      <div className="rounded-full bg-[rgba(255,255,255,0.1)] p-1 ring-1 ring-white/8">
         <div
           className={cn('relative h-3 rounded-full bg-gradient-to-r', gradient)}
           style={{ width: `${clampPercent(value)}%`, transition: 'width 700ms ease-out' }}
@@ -763,38 +763,38 @@ export default function AnalysisTrackPage() {
         </TabsList>
 
         <TabsContent value="growth" className="mt-0 space-y-4">
-          <section className="overflow-hidden rounded-[2.2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,170,70,0.16),transparent_26%),linear-gradient(135deg,#17326B_0%,#22478C_60%,#152E63_100%)] px-5 py-5 shadow-[0_28px_62px_-36px_rgba(0,0,0,0.58)]">
+          <section className="surface-card surface-card--primary on-dark overflow-hidden rounded-[2.2rem] px-5 py-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Badge className="border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black text-white/78 shadow-none">GROWTH TRACK</Badge>
-                <span className="text-[11px] font-black text-[#FFD79F]">{format(new Date(), 'M월 d일 EEEE', { locale: ko })}</span>
+                <Badge variant="dark" className="px-3 py-1 text-[10px] shadow-none">GROWTH TRACK</Badge>
+                <span className="text-[11px] font-black text-[var(--accent-orange-soft)]">{format(new Date(), 'M월 d일 EEEE', { locale: ko })}</span>
               </div>
-              <Badge className="border-[#FFB347]/18 bg-[#FF9626]/12 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">오늘 버프 {dailyBuff}</Badge>
+              <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">오늘 버프 {dailyBuff}</Badge>
             </div>
 
             <div className={cn('mt-5 grid gap-5', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]')}>
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <p className="text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight text-white">{displayName} Lv.{level}</p>
-                  <Badge className="border-[#FFB347]/18 bg-[#FF9626]/14 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">🔥 {playerTitle}</Badge>
+                  <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">🔥 {playerTitle}</Badge>
                 </div>
-                <p className="mt-2 text-sm font-semibold text-white/82">오늘도 성장한 하루를 만드는 중이에요.</p>
+                <p className="surface-caption mt-2 text-sm font-semibold">오늘도 성장한 하루를 만드는 중이에요.</p>
 
                 <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-3')}>
-                  <div className="rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">오늘 상태</p>
-                    <p className="mt-2 text-2xl font-black text-white">{minutesToCompactLabel(todayMinutes)}</p>
-                    <p className="mt-1 text-[11px] font-semibold text-white/74">{minutesToCompactLabel(heroGoalMinutes)} 목표</p>
+                  <div className="surface-card surface-card--light rounded-[1.2rem] px-4 py-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">오늘 상태</p>
+                    <p className="mt-2 text-2xl font-black text-[var(--text-primary)]">{minutesToCompactLabel(todayMinutes)}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">{minutesToCompactLabel(heroGoalMinutes)} 목표</p>
                   </div>
-                  <div className="rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">상승 폭</p>
-                    <p className="mt-2 text-2xl font-black text-[#FFD79F]">{signedPercent(kpi.weekDiffPct)}</p>
-                    <p className="mt-1 text-[11px] font-semibold text-white/74">지난 주 대비</p>
+                  <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">상승 폭</p>
+                    <p className="mt-2 text-2xl font-black text-[var(--accent-orange)]">{signedPercent(kpi.weekDiffPct)}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">지난 주 대비</p>
                   </div>
-                  <div className={cn('rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-4', isMobile && 'col-span-2')}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">분석 보상</p>
-                    <p className="mt-2 text-2xl font-black text-white">+{analysisRewardPoints}P</p>
-                    <p className="mt-1 text-[11px] font-semibold text-white/74">탐험 완료 보상</p>
+                  <div className={cn('surface-card surface-card--highlight rounded-[1.2rem] px-4 py-4', isMobile && 'col-span-2')}>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-accent)]">분석 보상</p>
+                    <p className="mt-2 text-2xl font-black text-[var(--text-on-accent)]">+{analysisRewardPoints}P</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[rgba(14,28,56,0.76)]">탐험 완료 보상</p>
                   </div>
                 </div>
 
@@ -804,13 +804,13 @@ export default function AnalysisTrackPage() {
                   <QuestStatBar label="계획 완수율" value={completionHp} accent="emerald" />
                 </div>
 
-                <div className="mt-5 rounded-[1.4rem] border border-white/10 bg-white/8 p-4">
+                <div className="surface-card surface-card--ghost on-dark mt-5 rounded-[1.4rem] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">오늘 상태</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">오늘 상태</p>
                       <p className="mt-2 text-lg font-black text-white">🔥 집중 중 (LIVE)</p>
                     </div>
-                    <p className="text-sm font-black text-[#FFD79F]">{heroProgress}% 성장</p>
+                    <p className="text-sm font-black text-[var(--accent-orange-soft)]">{heroProgress}% 성장</p>
                   </div>
                   <div className="mt-3 rounded-full bg-white/10 p-1">
                     <div
@@ -820,48 +820,48 @@ export default function AnalysisTrackPage() {
                       <div className="absolute inset-y-0 w-12 animate-pulse bg-white/30 blur-sm" />
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 text-sm font-semibold text-white/74">
+                  <div className="mt-3 flex items-center justify-between gap-3 text-sm font-semibold text-[var(--text-on-dark-soft)]">
                     <span>{minutesToCompactLabel(todayMinutes)} / {minutesToCompactLabel(heroGoalMinutes)}</span>
                     <span>{heroProgress >= 100 ? '오늘 목표 도달' : `${Math.max(0, heroGoalMinutes - todayMinutes)}분 남음`}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-[1.8rem] border border-white/10 bg-white/6 p-4">
+              <div className="surface-card surface-card--secondary on-dark rounded-[1.8rem] p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">AI COACH</p>
-                  <Badge className="border-emerald-400/18 bg-emerald-500/10 px-3 py-1 text-[10px] font-black text-emerald-200 shadow-none">전략 적용 가능</Badge>
+                  <p className="surface-kicker text-[10px]">AI COACH</p>
+                  <Badge className="border-emerald-400/18 bg-emerald-500/14 px-3 py-1 text-[10px] font-black text-emerald-100 shadow-none">전략 적용 가능</Badge>
                 </div>
                 <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">이번 주 성장 요약</h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-white/74">{insight.trend}</p>
+                <p className="surface-caption mt-2 text-sm font-semibold leading-6">{insight.trend}</p>
 
                 {isMobile ? (
                   <div className="mt-5 space-y-3">
-                    <div className="rounded-[1.35rem] border border-white/10 bg-white/6 p-4">
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-black text-white">미션. 오전 루틴 3일 연속</p>
-                        <span className="rounded-full bg-[#FF9626]/14 px-2.5 py-1 text-[10px] font-black text-[#FFD79F]">+20P</span>
+                        <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+20P</span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-white/74">오전 고정 루틴만 먼저 잡아도 리듬이 훨씬 안정됩니다.</p>
+                      <p className="surface-caption mt-2 text-sm font-semibold leading-6">오전 고정 루틴만 먼저 잡아도 리듬이 훨씬 안정됩니다.</p>
                     </div>
                   </div>
                 ) : (
                   <div className="mt-5 space-y-3">
-                    <div className="rounded-[1.35rem] border border-white/10 bg-white/6 p-4">
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-black text-white">미션 1. 오전 루틴 3일 연속</p>
-                        <span className="rounded-full bg-[#FF9626]/14 px-2.5 py-1 text-[10px] font-black text-[#FFD79F]">+20P</span>
+                        <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+20P</span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-white/74">집중 흐름이 좋은 시간대를 루틴으로 고정해 보세요.</p>
+                      <p className="surface-caption mt-2 text-sm font-semibold leading-6">집중 흐름이 좋은 시간대를 루틴으로 고정해 보세요.</p>
                     </div>
-                    <div className="rounded-[1.35rem] border border-white/10 bg-white/6 p-4">
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-black text-white">미션 2. 50분+ 세션 3회</p>
-                        <span className="rounded-full bg-[#FF9626]/14 px-2.5 py-1 text-[10px] font-black text-[#FFD79F]">+25P</span>
+                        <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+25P</span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-white/74">짧은 세션 비중을 줄이고 몰입 밀도를 높여보세요.</p>
+                      <p className="surface-caption mt-2 text-sm font-semibold leading-6">짧은 세션 비중을 줄이고 몰입 밀도를 높여보세요.</p>
                     </div>
-                    <div className="rounded-[1.35rem] border border-emerald-400/18 bg-emerald-500/10 p-4">
+                    <div className="surface-card rounded-[1.35rem] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(47,170,125,0.18),rgba(13,28,69,0.92))] p-4">
                       <div className="flex items-center gap-2 text-emerald-200">
                         <Brain className="h-4 w-4" />
                         <p className="text-sm font-black">코치 전략 적용 보상 +15P</p>
@@ -870,7 +870,7 @@ export default function AnalysisTrackPage() {
                   </div>
                 )}
 
-                <Button type="button" onClick={() => handleApplyStrategy('코치 전략 적용', 15)} className="mt-5 h-12 w-full rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] font-black text-white shadow-[0_20px_38px_-26px_rgba(255,122,22,0.44)]">
+                <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('코치 전략 적용', 15)} className="mt-5 h-12 w-full rounded-2xl font-black">
                   오늘 전략 자동 적용
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -878,16 +878,16 @@ export default function AnalysisTrackPage() {
             </div>
           </section>
 
-          <section className="student-night-panel rounded-[2rem] p-5 shadow-[0_24px_52px_-34px_rgba(0,0,0,0.56)]">
+          <section className="surface-card surface-card--secondary on-dark rounded-[2rem] p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <Badge className="border-[#FFB347]/18 bg-[#FF9626]/10 px-3 py-1 text-[10px] font-black text-[#FFD79F] shadow-none">GROWTH MAP</Badge>
+                <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">GROWTH MAP</Badge>
                 <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">이번 주 성장 맵</h2>
               </div>
-              <div className="rounded-[1.2rem] border border-[#FFB347]/18 bg-[#FF9626]/10 px-4 py-3 text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD79F]">최고 성장</p>
-                <p className="mt-1 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p>
-                <p className="mt-1 text-sm font-semibold text-white/74">{minutesToLabel(bestDay.totalMinutes)}</p>
+              <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-3 text-right">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">최고 성장</p>
+                <p className="mt-1 text-lg font-black text-[var(--text-primary)]">{shortDateLabel(bestDay.dateKey)}</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">{minutesToLabel(bestDay.totalMinutes)}</p>
               </div>
             </div>
             <div className="mt-5">
