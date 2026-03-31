@@ -1351,7 +1351,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         return aSort - bSort;
       });
   }, [studentProfile?.examCountdowns]);
-  const heroExam = examCountdowns.find((item) => item.id === 'mock') ?? examCountdowns[0] ?? null;
 
   const subjectProgress = useMemo(() => {
     const bucket = new Map<string, { total: number; done: number }>();
@@ -2034,10 +2033,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setIsExamSaving(false);
     }
   };
-  const handleOpenExamDialog = useCallback(() => {
-    setIsExamDialogOpen(true);
-  }, []);
-
   const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
 
   if (!isActive) return null;
@@ -2683,9 +2678,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         completionLabel={`${todayPlanRate}% 완료`}
         streakLabel={`${plannerStreakDays}일 연속`}
         heroMessage={heroMessage}
-        examCardTitle={heroExam?.title?.trim() ? heroExam.title : '날짜 설정하기'}
-        examCardDLabel={heroExam?.dLabel ?? '미설정'}
-        onOpenExamDialog={handleOpenExamDialog}
         totalMinutesLabel={formatMinutesToKorean(totalMinutesCount)}
         growthLabel={`${formatMinutesMini(totalMinutesCount)} / 10h`}
         growthPercent={growthPercent}
@@ -2798,11 +2790,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <DialogTrigger asChild>
               <button className="group text-left h-full w-full touch-manipulation">
                 <Card className={cn(
-                  "student-cta student-cta-card h-full border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
+                  "student-cta student-cta-card h-full border border-[#DCE5F5] bg-white shadow-[0_18px_40px_-30px_rgba(10,28,72,0.18)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_22px_46px_-30px_rgba(10,28,72,0.24)]",
                   "rounded-2xl p-4",
-                  unreadReportCount > 0 && "ring-1 ring-[#FF7A16]/35 border-[#FFBE73]"
+                  unreadReportCount > 0 && "ring-1 ring-[#FF7A16]/30 border-[#FFBE73]"
                 )}>
-                  <div className="rounded-2xl bg-[linear-gradient(180deg,#EFF4FF_0%,#E3EBFB_100%)] border border-[#D7E3F8] flex items-center justify-center shrink-0 h-12 w-12 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                  <div className="rounded-2xl bg-[linear-gradient(180deg,#F5F8FF_0%,#EAF0FC_100%)] border border-[#D7E3F8] flex items-center justify-center shrink-0 h-12 w-12 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
                     <FileText className="h-6 w-6 text-[#17326B]" />
                   </div>
                   <div className="grid min-w-0">
@@ -2814,9 +2806,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                         </Badge>
                       )}
                     </div>
-                    <span className="font-bold text-[#6781AE] uppercase tracking-widest text-[8px]">학습 피드백</span>
+                    <span className="font-bold text-[#6C7FA6] uppercase tracking-widest text-[8px]">학습 피드백</span>
                   </div>
-                  <ChevronRight className="ml-auto h-5 w-5 text-[#8AA0C7]" />
+                  <ChevronRight className="ml-auto h-5 w-5 text-[#9AAACE]" />
                 </Card>
               </button>
             </DialogTrigger>
@@ -2903,21 +2895,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               "student-cta student-cta-card student-utility-card h-full bg-white transition-colors duration-200 flex flex-row items-center gap-4 rounded-[2rem] p-6",
               unreadReportCount > 0 ? "border-[#FF7A16] ring-1 ring-[#FF7A16]/30" : "border border-slate-200/80"
             )}>
-              <div className="rounded-2xl bg-primary/5 flex items-center justify-center shrink-0 h-16 w-16">
-                <FileText className="h-8 w-8" />
+              <div className="rounded-2xl border border-[#D7E3F8] bg-[linear-gradient(180deg,#F5F8FF_0%,#EAF0FC_100%)] flex items-center justify-center shrink-0 h-16 w-16 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                <FileText className="h-8 w-8 text-[#17326B]" />
               </div>
               <div className="grid text-left min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-black tracking-tighter text-xl break-keep">선생님 리포트</span>
+                  <span className="font-black tracking-tighter text-xl break-keep text-[#17326B]">선생님 리포트</span>
                   {unreadReportCount > 0 && (
                     <Badge className="bg-[#FF7A16] text-white border-none font-black text-[9px] h-5 px-2 shrink-0">
                       {unreadReportCount} 새 리포트
                     </Badge>
                   )}
                 </div>
-                <span className="font-bold text-muted-foreground uppercase tracking-widest text-[10px]">학습 피드백</span>
+                <span className="font-bold text-[#6C7FA6] uppercase tracking-widest text-[10px]">학습 피드백</span>
               </div>
-              <ChevronRight className="ml-auto h-5 w-5 opacity-20" />
+              <ChevronRight className="ml-auto h-5 w-5 text-[#9AAACE]" />
             </Card>
           </Link>
         )}

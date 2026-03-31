@@ -110,17 +110,14 @@ export default function UiAuditPage() {
 
         <StudentHomeGamePanel
           isMobile={false}
-          dateLabel="3월 31일 화요일"
-          todayPointLabel="🔥 413 / 100 pt"
-          completionLabel="84% 완료"
-          streakLabel="12일 연속"
-          heroMessage="루틴, 퀘스트, 보상 흐름이 한눈에 읽히는지 확인합니다."
-          examCardTitle="6월 모의고사"
-          examCardDLabel="D-72"
-          onOpenExamDialog={() => setModalOpen(true)}
-          totalMinutesLabel="12시간 10분"
-          growthLabel="12h / 10h"
-          growthPercent={100}
+        dateLabel="3월 31일 화요일"
+        todayPointLabel="🔥 413 / 100 pt"
+        completionLabel="84% 완료"
+        streakLabel="12일 연속"
+        heroMessage="루틴, 퀘스트, 보상 흐름이 한눈에 읽히는지 확인합니다."
+        totalMinutesLabel="12시간 10분"
+        growthLabel="12h / 10h"
+        growthPercent={100}
           growthDeltaLabel="어제 대비 +14%"
           primaryActionLabel="집중 계속하기"
           onPrimaryAction={() => undefined}

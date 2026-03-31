@@ -388,11 +388,11 @@ function PodiumCard({
           : 'border-white/12 bg-[linear-gradient(180deg,rgba(12,27,63,0.9),rgba(20,41,95,0.82))]'
       )}
     >
-      <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-[rgba(255,138,31,0.16)] text-[var(--accent-orange)]' : 'bg-white/10 text-white/88')}>
+      <div className={cn('mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black', highlight ? 'bg-[rgba(14,28,56,0.12)] text-[var(--text-on-accent)]' : 'bg-white/10 text-white/88')}>
         {highlight ? <Crown className="h-4 w-4" /> : `#${rank}`}
       </div>
       <div className={cn('text-sm font-black tracking-tight text-white', highlight && 'text-[var(--text-primary)]')}>{name}</div>
-      <div className={cn('mt-1 text-sm font-black', highlight ? 'text-[var(--accent-orange)]' : 'text-white')}>{value}</div>
+      <div className={cn('mt-1 text-sm font-black', highlight ? 'text-[var(--text-on-accent)]' : 'text-white')}>{value}</div>
     </div>
   );
 }
@@ -979,8 +979,8 @@ export default function GrowthPage() {
                 <p className="mt-1 text-[1.45rem] font-black tracking-tight text-[var(--text-on-accent)]">{myRankLabel}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[rgba(14,28,56,0.58)]">MONTH</p>
-                <p className="mt-1 text-sm font-black text-[var(--accent-orange)]">{formatRankTime(monthlyMinutes)}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[rgba(14,28,56,0.72)]">MONTH</p>
+                <p className="mt-1 text-sm font-black text-[var(--text-on-accent)]">{formatRankTime(monthlyMinutes)}</p>
               </div>
             </div>
           </div>

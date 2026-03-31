@@ -392,9 +392,6 @@ export function StudentHomeGamePanel({
   completionLabel,
   streakLabel,
   heroMessage,
-  examCardTitle,
-  examCardDLabel,
-  onOpenExamDialog,
   totalMinutesLabel,
   growthLabel,
   growthPercent,
@@ -443,9 +440,6 @@ export function StudentHomeGamePanel({
   completionLabel: string;
   streakLabel: string;
   heroMessage: string;
-  examCardTitle: string;
-  examCardDLabel: string;
-  onOpenExamDialog: () => void;
   totalMinutesLabel: string;
   growthLabel: string;
   growthPercent: number;
@@ -519,36 +513,9 @@ export function StudentHomeGamePanel({
                 </Badge>
                 <span className="text-[11px] font-black text-white">{dateLabel}</span>
               </div>
-              <div className={cn("flex gap-3", isMobile ? "flex-col items-start" : "items-start")}>
-                <h2 className={cn("break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
-                  오늘도 성장한 하루
-                </h2>
-                <button
-                  type="button"
-                  onClick={onOpenExamDialog}
-                  className={cn(
-                    "surface-card surface-card--secondary on-dark group min-w-[180px] max-w-full rounded-[1.15rem] px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-[rgba(255,138,31,0.25)]",
-                    isMobile ? "w-auto" : "mt-1"
-                  )}
-                  aria-label="모의고사 일정 수정"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-[0.9rem] border border-[rgba(255,138,31,0.22)] bg-[rgba(255,138,31,0.14)] p-2">
-                      <CalendarDays className="h-4 w-4 text-[var(--accent-orange-soft)]" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="surface-kicker text-[10px]">모의고사</p>
-                      <p className="truncate text-sm font-black text-white">{examCardTitle}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <span className="surface-chip surface-chip--light px-2 py-1 text-[10px]">
-                        {examCardDLabel}
-                      </span>
-                      <p className="mt-1 text-[10px] font-bold text-[var(--text-on-dark-soft)]">수정</p>
-                    </div>
-                  </div>
-                </button>
-              </div>
+              <h2 className={cn("break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
+                오늘도 성장한 하루
+              </h2>
               <p className="surface-caption text-sm font-semibold">{heroMessage}</p>
             </div>
 
@@ -816,10 +783,10 @@ export function StudentHomeGamePanel({
                     onSelectRankRange(range);
                   }}
                   className={cn(
-                    "rounded-full px-2.5 py-1 text-[10px] font-black transition-all",
+                    "rounded-full border px-2.5 py-1 text-[10px] font-black transition-all",
                     selectedRankRange === range
-                      ? "bg-[var(--accent-orange)] text-white shadow-[0_10px_22px_-14px_rgba(255,122,22,0.72)]"
-                      : "bg-[rgba(14,28,56,0.14)] text-[var(--text-on-accent)] ring-1 ring-[rgba(14,28,56,0.08)]",
+                      ? "border-[rgba(14,28,56,0.18)] bg-[rgba(14,28,56,0.92)] text-white shadow-[0_12px_24px_-16px_rgba(14,28,56,0.55)]"
+                      : "border-[rgba(255,255,255,0.34)] bg-[rgba(255,248,236,0.58)] text-[rgba(14,28,56,0.8)] hover:bg-[rgba(255,255,255,0.82)] hover:text-[rgba(14,28,56,0.94)]",
                   )}
                 >
                   {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
@@ -846,7 +813,7 @@ export function StudentHomeGamePanel({
                   </div>
                 ))
               ) : (
-                <div className="col-span-3 rounded-[1.15rem] border border-dashed border-[rgba(14,28,56,0.14)] px-3 py-4 text-center text-[11px] font-semibold text-[rgba(14,28,56,0.72)]">
+                <div className="col-span-3 rounded-[1.15rem] border border-dashed border-[rgba(14,28,56,0.18)] bg-[rgba(255,255,255,0.18)] px-3 py-4 text-center text-[11px] font-semibold text-[rgba(14,28,56,0.82)]">
                   아직 표시할 랭킹이 없어요.
                 </div>
               )}

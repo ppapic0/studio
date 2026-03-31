@@ -6,7 +6,6 @@ import { format, isSameDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
   ArrowRight,
-  BookCopy,
   CalendarCheck2,
   ChevronDown,
   ChevronLeft,
@@ -19,7 +18,6 @@ import {
   Pencil,
   Plus,
   Sparkles,
-  StickyNote,
   Target,
 } from 'lucide-react';
 
@@ -242,8 +240,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     studyTasks,
     personalTasks,
     scheduleItems,
-    remainingStudyTasks,
-    remainingPersonalTasks,
     completedStudyCount,
     routineCountLabel,
     studyGoalSummaryLabel,
@@ -291,17 +287,12 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     examTemplate,
     handleCopyYesterdayPlan,
     clearTodayPlans,
-    handleMoveUnfinishedToTomorrow,
-    handleSaveUnfinishedAsTemplate,
-    handleDeleteUnfinished,
     handleToggleTask,
     handleDeleteTask,
     handleCommitStudyActualAmount,
     handleUpdateStudyWindow,
     isRoutineSectionOpen,
     setIsRoutineSectionOpen,
-    isMemoSectionOpen,
-    setIsMemoSectionOpen,
     inTime,
     setInTime,
     outTime,
@@ -321,8 +312,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     setNewRoutineTitle,
     selectedRoutineTemplateKey,
     handleRoutineTemplateSelect,
-    newPersonalTask,
-    setNewPersonalTask,
     handleAddTask,
     handleUpdateScheduleRange,
     routineCopyWeeks,
@@ -361,14 +350,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     () => studyTasks.reduce((sum: number, task: any) => sum + Math.max(0, task.targetMinutes || 0), 0),
     [studyTasks]
   );
-  const actualStudyMinutes = useMemo(
-    () => studyTasks.reduce((sum: number, task: any) => sum + (task.done ? Math.max(0, task.targetMinutes || 0) : 0), 0),
-    [studyTasks]
-  );
-  const outingCount = useMemo(
-    () => scheduleItems.filter((item: any) => String(item.title || '').startsWith('외출 예정')).length,
-    [scheduleItems]
-  );
   const [customSubjectLabel, setCustomSubjectLabel] = useState(DEFAULT_CUSTOM_SUBJECT_LABEL);
   const [customMinutePreset, setCustomMinutePreset] = useState(DEFAULT_CUSTOM_TIME_PRESET);
   const [customStudyTypeLabel, setCustomStudyTypeLabel] = useState(DEFAULT_CUSTOM_STUDY_TYPE);
@@ -404,7 +385,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
       .sort((left, right) => right.minutes - left.minutes);
   }, [quickSubjectOptions, studyTasks]);
 
-  const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
   const [isOutingModalOpen, setIsOutingModalOpen] = useState(false);
   const [isRoutineEditOpen, setIsRoutineEditOpen] = useState(false);
   const [routineDraftInTime, setRoutineDraftInTime] = useState(inTime || '17:30');
@@ -502,13 +482,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     ? '--:--'
     : `${inTime || '17:30'} → ${outTime || questEndTimeChoice || '22:30'}`;
   const todayHeaderSummary = `🔥 ${todayPointTotal} / ${dailyPointCap} pt · ${Math.max(1, todayStreakDays || 0)}일 연속`;
-  const totalMissionReward = Math.min(
-    dailyPointCap,
-    orderedChecklistTasks.reduce((sum: number, task: any) => sum + estimateTaskReward(task), 0)
-  );
-  const startCtaCaption = orderedChecklistTasks.length === 0
-    ? '미션을 추가해주세요'
-    : `예상 ${plannedStudyMinutes > 0 ? formatMinutesShort(plannedStudyMinutes) : '자율'} · +${totalMissionReward}P`;
   const routineStateLabel = isAbsentMode
     ? '미등원'
     : hasAwayPlan
@@ -522,14 +495,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
     setSelectedDate(nextDate);
   };
   const taskCount = orderedChecklistTasks.length;
-  const unfinishedCount = remainingStudyTasks.length + remainingPersonalTasks.length;
   const recommendedTasks = PLANNER_QUICK_TASK_SUGGESTIONS.slice(0, 4);
   const isRoutineActive = !isAbsentMode && (hasInPlan || hasOutPlan);
-  const startButtonLabel = isAbsentMode
-    ? '등원 시작 ▶'
-    : taskCount === 0
-      ? '미션을 추가해주세요'
-      : '시작하기 ▶';
 
   const openPresetEditor = (kind: Exclude<QuickPresetEditorKind, null>) => {
     setPresetEditorKind(kind);
@@ -727,23 +694,33 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         <header className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <p className="surface-kicker text-[11px]">PLAN</p>
-              <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">계획</h1>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#6C7FA6]">PLAN</p>
+              <h1 className="mt-2 text-[2rem] font-black tracking-tight text-[#17326B]">계획</h1>
             </div>
-            <div className="surface-chip surface-chip--dark px-4 py-2 text-[13px]">
+            <div className="rounded-full border border-[#FFD8B0] bg-[linear-gradient(180deg,#FFF8EE_0%,#FFF1DC_100%)] px-4 py-2 text-[13px] font-black text-[#17326B] shadow-[0_16px_30px_-24px_rgba(10,28,72,0.18)]">
               {todayHeaderSummary}
             </div>
           </div>
 
-          <div className="surface-card surface-card--ghost on-dark flex items-center justify-between rounded-[1.3rem] px-3 py-2">
-            <Button type="button" variant="dark" onClick={() => moveSelectedDate(-1)} className="h-9 w-9 rounded-full p-0">
+          <div className="flex items-center justify-between rounded-[1.3rem] border border-[#DCE5F4] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] px-3 py-2 shadow-[0_18px_34px_-28px_rgba(10,28,72,0.16)]">
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => moveSelectedDate(-1)}
+              className="h-9 w-9 rounded-full border border-[#DCE5F4] bg-white p-0 text-[#17326B] shadow-[0_14px_26px_-22px_rgba(10,28,72,0.16)] hover:bg-[#F5F8FF]"
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="text-center">
-              <p className="text-xs font-black text-white">{selectedDateLabel}</p>
-              <p className="surface-caption mt-0.5 text-[11px] font-semibold">{isToday ? '오늘 퀘스트' : '다른 날짜 보기'}</p>
+              <p className="text-xs font-black text-[#17326B]">{selectedDateLabel}</p>
+              <p className="mt-0.5 text-[11px] font-semibold text-[#6C7FA6]">{isToday ? '오늘 퀘스트' : '다른 날짜 보기'}</p>
             </div>
-            <Button type="button" variant="dark" onClick={() => moveSelectedDate(1)} className="h-9 w-9 rounded-full p-0">
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => moveSelectedDate(1)}
+              className="h-9 w-9 rounded-full border border-[#DCE5F4] bg-white p-0 text-[#17326B] shadow-[0_14px_26px_-22px_rgba(10,28,72,0.16)] hover:bg-[#F5F8FF]"
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -1145,9 +1122,13 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       </div>
                       <Button
                         type="button"
+                        variant="default"
                         onClick={handleCreateQuickBlock}
                         disabled={isSubmitting || !resolvedSubjectValue}
-                        className={cn('h-11 rounded-2xl px-5 font-black text-white shadow-[0_18px_30px_-20px_rgba(23,58,130,0.45)]', rewardGradient, isMobile && 'w-full')}
+                        className={cn(
+                          'h-11 rounded-2xl border border-[#DCE5F4] bg-white px-5 font-black text-[#17326B] shadow-[0_18px_30px_-20px_rgba(10,28,72,0.18)] hover:bg-[#F6F9FF] disabled:bg-white/75 disabled:text-[#8AA0C7]',
+                          isMobile && 'w-full'
+                        )}
                       >
                         퀘스트로 넣기
                       </Button>
@@ -1158,73 +1139,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
             </>
           )}
         </section>
-
-        {!isPast ? (
-          <section className="sticky bottom-24 z-20 rounded-[1.7rem] border border-[#FFB347]/18 bg-[linear-gradient(135deg,rgba(255,179,71,0.16)_0%,rgba(22,40,79,0.96)_38%,rgba(12,27,63,0.94)_100%)] px-4 py-4 shadow-[0_24px_50px_-30px_rgba(0,0,0,0.58)] backdrop-blur-sm">
-            <p className="text-[12px] font-black tracking-[0.18em] text-[var(--accent-orange-soft)]">🔥 오늘 플레이 시작</p>
-            <p className="mt-2 text-sm font-semibold text-[var(--text-on-dark-soft)]">{startCtaCaption}</p>
-            <Button
-              type="button"
-              disabled={isSubmitting || taskCount === 0}
-              onClick={async () => {
-                if (!isAbsentMode && !hasInPlan && !hasOutPlan) {
-                  await handleSetAttendance('attend');
-                }
-                const nextTask = orderedChecklistTasks.find((task: any) => !task.done) || orderedChecklistTasks[0];
-                if (nextTask) setExpandedTaskId(nextTask.id);
-              }}
-              className={cn('mt-4 h-12 w-full rounded-[1.4rem] px-5 font-black text-white shadow-[0_20px_36px_-24px_rgba(255,150,38,0.55)]', rewardGradient)}
-            >
-              {startButtonLabel}
-            </Button>
-          </section>
-        ) : null}
-
-        <Collapsible open={isWrapUpOpen} onOpenChange={setIsWrapUpOpen}>
-          <section className="surface-card surface-card--secondary on-dark rounded-[1.7rem] shadow-[0_20px_44px_-36px_rgba(0,0,0,0.5)]">
-            <CollapsibleTrigger asChild>
-              <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left">
-                <div>
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">SUMMARY</p>
-                  <p className="mt-1 text-lg font-black text-white">오늘 요약</p>
-                </div>
-                <ChevronDown className={cn('h-5 w-5 text-white transition-transform', isWrapUpOpen && 'rotate-180')} />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="border-t border-white/12 px-4 pb-4">
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-[1.1rem] border border-white/12 bg-white/[0.08] px-3 py-3">
-                  <p className="text-[10px] font-black tracking-[0.16em] text-[var(--text-on-dark-muted)]">계획 시간</p>
-                  <p className="mt-2 text-lg font-black text-white">{formatMinutesShort(plannedStudyMinutes)}</p>
-                </div>
-                <div className="rounded-[1.1rem] border border-white/12 bg-white/[0.08] px-3 py-3">
-                  <p className="text-[10px] font-black tracking-[0.16em] text-[var(--text-on-dark-muted)]">실제 공부</p>
-                  <p className="mt-2 text-lg font-black text-white">{formatMinutesShort(actualStudyMinutes)}</p>
-                </div>
-                <div className="rounded-[1.1rem] border border-white/12 bg-white/[0.08] px-3 py-3">
-                  <p className="text-[10px] font-black tracking-[0.16em] text-[var(--text-on-dark-muted)]">완료율</p>
-                  <p className="mt-2 text-lg font-black text-white">{completionPercent}%</p>
-                </div>
-                <div className="rounded-[1.1rem] border border-white/12 bg-white/[0.08] px-3 py-3">
-                  <p className="text-[10px] font-black tracking-[0.16em] text-[var(--text-on-dark-muted)]">외출 횟수</p>
-                  <p className="mt-2 text-lg font-black text-white">{outingCount}회</p>
-                </div>
-              </div>
-
-              {unfinishedCount > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <ActionChipButton icon={ChevronRight} label="내일로 미루기" onClick={handleMoveUnfinishedToTomorrow} disabled={isSubmitting} />
-                  <ActionChipButton icon={BookCopy} label="템플릿 반영" onClick={handleSaveUnfinishedAsTemplate} disabled={isSubmitting} tone="white" />
-                  <ActionChipButton icon={StickyNote} label="삭제하기" onClick={handleDeleteUnfinished} disabled={isSubmitting} tone="orange" />
-                </div>
-              ) : (
-                <div className="mt-4 rounded-[1.2rem] border border-dashed border-white/12 bg-white/[0.08] px-4 py-4 text-sm font-semibold text-[var(--text-on-dark-soft)]">
-                  오늘 정리할 남은 미션이 없어요.
-                </div>
-              )}
-            </CollapsibleContent>
-          </section>
-        </Collapsible>
 
         <Collapsible open={isRoutineSectionOpen} onOpenChange={setIsRoutineSectionOpen}>
           <section className="surface-card surface-card--secondary on-dark rounded-[1.9rem] shadow-[0_24px_48px_-38px_rgba(0,0,0,0.52)]">
@@ -1368,152 +1282,6 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
           </section>
         </Collapsible>
 
-        <Collapsible open={isMemoSectionOpen} onOpenChange={setIsMemoSectionOpen}>
-          <section className="surface-card surface-card--secondary on-dark rounded-[1.9rem] shadow-[0_24px_48px_-38px_rgba(0,0,0,0.5)]">
-            <CollapsibleTrigger asChild>
-              <button type="button" className={cn('flex w-full gap-3 p-5 text-left', isMobile ? 'flex-col items-start' : 'items-center justify-between')}>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">EXTRA</p>
-                  <h3 className="mt-1 text-xl font-black tracking-tight text-white">기타 계획</h3>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
-                    메모, 준비물, 상담 같은 보조 일정만 따로 모아두고 필요할 때 펼쳐보세요.
-                  </p>
-                </div>
-                <div className={cn('flex items-center gap-3', isMobile && 'w-full justify-between')}>
-                  <Badge variant="dark" className="rounded-full px-3 py-1 text-[10px] shadow-none">
-                    {personalTasks.length}개
-                  </Badge>
-                  <ChevronDown className={cn('h-5 w-5 text-white transition-transform', isMemoSectionOpen && 'rotate-180')} />
-                </div>
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className={cn('border-t border-white/12 px-4 pb-4', !isMobile && 'px-5 pb-5')}>
-              <div className="surface-card surface-card--secondary on-dark mt-5 rounded-[1.5rem] p-4 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.46)]">
-                <div className={cn('flex flex-col gap-3', !isMobile && 'md:flex-row md:items-center')}>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-white">짧은 메모나 일정 추가</p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-                      병원, 상담, 준비물처럼 보조 일정만 짧게 적어도 오늘 리스트에 바로 들어가요.
-                    </p>
-                  </div>
-                  {!isPast ? (
-                    <div className={cn('w-full gap-2', isMobile ? 'flex flex-col' : 'flex md:w-auto md:min-w-[22rem]')}>
-                      <Input
-                        value={newPersonalTask}
-                        onChange={(event) => setNewPersonalTask(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            handleAddTask(newPersonalTask, 'personal');
-                          }
-                        }}
-                        placeholder="예: 상담, 준비물 챙기기"
-                        disabled={isSubmitting}
-                        className="h-11 flex-1 rounded-2xl border-white/12 bg-white/[0.1] font-bold text-white placeholder:text-white/55"
-                      />
-                      <Button
-                        type="button"
-                        onClick={() => handleAddTask(newPersonalTask, 'personal')}
-                        disabled={isSubmitting || !newPersonalTask.trim()}
-                        className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-4 font-black text-white shadow-[0_18px_30px_-22px_rgba(255,122,22,0.35)]"
-                      >
-                        추가
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-
-                {!isPast ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsTaskCopyDialogOpen(true)}
-                      disabled={isSubmitting || !hasCopyableTasks}
-                      className="h-10 rounded-2xl border-white/12 bg-white/[0.1] px-4 text-[11px] font-black text-white hover:bg-white/[0.14]"
-                    >
-                      <Copy className="mr-2 h-3.5 w-3.5" />
-                      학습/기타 반복 복사
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {personalTasks.length === 0 ? (
-                  <div className="surface-card surface-card--ghost on-dark rounded-[1.5rem] border-dashed p-5 text-center">
-                    <p className="text-sm font-black text-white">기타 일정은 필요할 때만 적어도 충분해요</p>
-                    <p className="mt-2 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-                      공부 흐름을 방해하지 않도록, 보조 일정은 간단하게 남기는 구조로 두었어요.
-                    </p>
-                  </div>
-                ) : (
-                  personalTasks.map((task: any) => (
-                    <PlannerChecklistItem
-                      key={task.id}
-                      task={task}
-                      badgeLabel={task.tag || '메모'}
-                      badgeClassName="border border-[#FFB347]/22 bg-[#FF9626]/14 text-[var(--accent-orange-soft)]"
-                      durationLabel={task.startTime && task.endTime ? formatClockRange(task.startTime, task.endTime) : '오늘 안에'}
-                      detailLabel={task.tag || null}
-                      isVolumeTask={false}
-                      isMobile={isMobile}
-                      disabled={isPast}
-                      expanded={expandedTaskId === task.id}
-                      onExpandedChange={(expanded) => setExpandedTaskId(expanded ? task.id : null)}
-                      onToggle={() => handleToggleTask(task)}
-                      onDelete={() => handleDeleteTask(task)}
-                      onCommitActual={() => undefined}
-                      onUpdateWindow={(startTime, endTime) => handleUpdateStudyWindow(task, startTime, endTime)}
-                      rewardLabel="+3P"
-                      statusLabel={task.done ? '완료' : '메모'}
-                      statusTone={task.done ? 'completed' : 'planned'}
-                    />
-                  ))
-                )}
-              </div>
-            </CollapsibleContent>
-          </section>
-        </Collapsible>
-
-        {!isPast ? (
-          <Collapsible open={isWrapUpOpen} onOpenChange={setIsWrapUpOpen}>
-            <section className="surface-card surface-card--secondary on-dark rounded-[1.9rem] shadow-[0_24px_48px_-38px_rgba(0,0,0,0.5)]">
-              <CollapsibleTrigger asChild>
-                <button type="button" className={cn('flex w-full gap-3 p-5 text-left', isMobile ? 'flex-col items-start' : 'items-center justify-between')}>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-black tracking-[0.18em] text-[var(--text-on-dark-muted)]">WRAP UP</p>
-                    <h3 className="mt-1 text-xl font-black tracking-tight text-white">하루 정리</h3>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
-                      남은 할 일은 내일로 미루거나, 템플릿에 반영하거나, 오늘 안에서 정리할 수 있어요.
-                    </p>
-                  </div>
-                  <div className={cn('flex items-center gap-3', isMobile && 'w-full justify-between')}>
-                    <Badge variant="dark" className="rounded-full px-3 py-1 text-[10px] shadow-none">
-                      {remainingStudyTasks.length + remainingPersonalTasks.length}개
-                    </Badge>
-                    <ChevronDown className={cn('h-5 w-5 text-white transition-transform', isWrapUpOpen && 'rotate-180')} />
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className={cn('border-t border-white/12 px-4 pb-4', !isMobile && 'px-5 pb-5')}>
-                {remainingStudyTasks.length + remainingPersonalTasks.length > 0 ? (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <ActionChipButton icon={ChevronRight} label="내일로 미루기" onClick={handleMoveUnfinishedToTomorrow} disabled={isSubmitting} />
-                    <ActionChipButton icon={BookCopy} label="템플릿 반영" onClick={handleSaveUnfinishedAsTemplate} disabled={isSubmitting} tone="white" />
-                    <ActionChipButton icon={StickyNote} label="삭제하기" onClick={handleDeleteUnfinished} disabled={isSubmitting} tone="orange" />
-                  </div>
-                ) : (
-                  <div className="mt-5 rounded-[1.35rem] border border-dashed border-white/12 bg-white/[0.08] p-5 text-center">
-                    <p className="text-sm font-black text-white">오늘 정리할 남은 항목이 없어요</p>
-                    <p className="mt-2 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-                      체크리스트가 깔끔하게 정리되면 내일 계획도 훨씬 가벼워져요.
-                    </p>
-                  </div>
-                )}
-              </CollapsibleContent>
-            </section>
-          </Collapsible>
-        ) : null}
       </div>
 
       <Dialog open={isRoutineEditOpen} onOpenChange={setIsRoutineEditOpen}>

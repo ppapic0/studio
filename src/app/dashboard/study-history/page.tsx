@@ -492,12 +492,12 @@ export default function StudyHistoryPage() {
       if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,244,255,0.98)_50%,rgba(213,231,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
       return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(220,236,255,0.98)_46%,rgba(205,221,255,0.98)_100%)] ring-1 ring-inset ring-blue-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.24)]';
     }
-    if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(13,28,69,0.96)_0%,rgba(17,34,79,0.92)_100%)] ring-1 ring-inset ring-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_16px_30px_-28px_rgba(0,0,0,0.42)]';
-    if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(12,36,72,0.98)_0%,rgba(20,58,88,0.94)_100%)] ring-1 ring-inset ring-emerald-300/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_32px_-28px_rgba(16,185,129,0.22)]';
-    if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(13,42,79,0.98)_0%,rgba(18,78,96,0.94)_100%)] ring-1 ring-inset ring-emerald-300/36 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_34px_-28px_rgba(13,148,136,0.26)]';
-    if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(14,46,88,0.98)_0%,rgba(18,85,116,0.94)_100%)] ring-1 ring-inset ring-teal-300/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_36px_-28px_rgba(14,165,233,0.28)]';
-    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(18,49,101,0.98)_0%,rgba(28,73,151,0.94)_100%)] ring-1 ring-inset ring-sky-300/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_22px_38px_-28px_rgba(37,99,235,0.3)]';
-    return 'bg-[linear-gradient(180deg,rgba(26,57,122,0.98)_0%,rgba(40,71,143,0.94)_100%)] ring-1 ring-inset ring-[#FFD089]/34 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_24px_42px_-28px_rgba(20,41,95,0.34)]';
+    if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(247,249,253,0.98)_100%)] ring-1 ring-inset ring-[#DCE5F4]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_30px_-28px_rgba(15,23,42,0.1)]';
+    if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(237,250,244,0.98)_58%,rgba(223,245,234,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_32px_-28px_rgba(16,185,129,0.16)]';
+    if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(228,249,244,0.98)_54%,rgba(214,243,240,0.98)_100%)] ring-1 ring-inset ring-teal-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-28px_rgba(13,148,136,0.18)]';
+    if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(226,247,250,0.98)_52%,rgba(212,238,247,0.98)_100%)] ring-1 ring-inset ring-cyan-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_20px_36px_-28px_rgba(14,165,233,0.2)]';
+    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,241,255,0.98)_48%,rgba(214,230,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
+    return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(222,234,255,0.98)_46%,rgba(208,221,255,0.98)_100%)] ring-1 ring-inset ring-indigo-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_24px_42px_-28px_rgba(59,130,246,0.22)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
@@ -519,13 +519,13 @@ export default function StudyHistoryPage() {
       if (minutes < 480) return 'border-sky-400/95 text-slate-950';
       return 'border-indigo-400/95 text-slate-950';
     }
-    if (!isCurrentMonth) return 'border-white/10 text-white/30';
-    if (minutes === 0) return 'border-white/12 text-white/55';
-    if (minutes < 60) return 'border-emerald-300/45 text-white';
-    if (minutes < 180) return 'border-emerald-300/55 text-white';
-    if (minutes < 300) return 'border-teal-300/55 text-white';
-    if (minutes < 480) return 'border-sky-300/55 text-white';
-    return 'border-[#FFD089]/55 text-white';
+    if (!isCurrentMonth) return 'border-slate-200 text-slate-400';
+    if (minutes === 0) return 'border-slate-200 text-slate-500';
+    if (minutes < 60) return 'border-emerald-300/95 text-slate-900';
+    if (minutes < 180) return 'border-teal-300/95 text-slate-950';
+    if (minutes < 300) return 'border-cyan-300/95 text-slate-950';
+    if (minutes < 480) return 'border-sky-300/95 text-slate-950';
+    return 'border-indigo-300/95 text-slate-950';
   };
 
   const monthTotalMinutes = useMemo(() => {
@@ -863,8 +863,8 @@ export default function StudyHistoryPage() {
         className={cn(
           "overflow-hidden rounded-[2.5rem]",
           isMobile
-            ? "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.18),transparent_18%),linear-gradient(135deg,#10224D_0%,#173A82_52%,#244A9A_100%)] text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.52)]"
-            : "border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.2),transparent_20%),linear-gradient(135deg,#14295F_0%,#1B326D_52%,#2A4B9C_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.56)]"
+            ? "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1B3878_0%,#2B54A8_54%,#3D68BF_100%)] text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.42)]"
+            : "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1D3D80_0%,#2C53A5_54%,#4068BC_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.46)]"
         )}
       >
         <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
@@ -964,8 +964,8 @@ export default function StudyHistoryPage() {
                 key={item.label}
                 className={cn(
                   isMobile
-                    ? "min-w-0 overflow-hidden rounded-[1.55rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,25,69,0.8),rgba(28,59,131,0.92))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.42)] backdrop-blur-xl"
-                    : "min-w-0 overflow-hidden rounded-[1.8rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,25,69,0.72),rgba(28,59,131,0.86))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-28px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+                    ? "min-w-0 overflow-hidden rounded-[1.55rem] border border-white/18 bg-[linear-gradient(180deg,rgba(36,67,136,0.42),rgba(70,109,195,0.62))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_18px_36px_-28px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+                    : "min-w-0 overflow-hidden rounded-[1.8rem] border border-white/18 bg-[linear-gradient(180deg,rgba(34,64,129,0.38),rgba(72,110,192,0.58))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_18px_36px_-28px_rgba(0,0,0,0.28)] backdrop-blur-xl"
                 )}
               >
                 <p className={cn("font-black uppercase tracking-[0.18em] text-[#FFD089]", isMobile ? "text-[8px]" : "text-[10px]")}>
@@ -992,7 +992,7 @@ export default function StudyHistoryPage() {
         "relative mx-auto w-full overflow-hidden rounded-[3rem]",
         isParent
           ? "border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] ring-1 ring-white/70 shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)]"
-          : "border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.08),transparent_22%),linear-gradient(180deg,rgba(22,40,79,0.96)_0%,rgba(13,28,69,0.92)_100%)] shadow-[0_30px_70px_-48px_rgba(0,0,0,0.56)]"
+          : "border border-[#D9E4F5] bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.1),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] ring-1 ring-white/75 shadow-[0_28px_70px_-52px_rgba(15,23,42,0.3)]"
       )}>
         <CardContent className="relative p-0">
           <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
@@ -1005,7 +1005,7 @@ export default function StudyHistoryPage() {
                     ? isMobile
                       ? "border border-[#D9E1F2] bg-white text-[#173A82]/65 text-[8px]"
                       : "border border-slate-200/75 bg-white/92 text-slate-500 text-[8px] sm:text-[9px]"
-                    : "border border-white/10 bg-white/8 text-white/72 text-[8px] sm:text-[9px]"
+                    : "border border-[#DCE5F4] bg-white text-[#5F7299] text-[8px] sm:text-[9px]"
                 )}>
                   <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
                   {item.label}
@@ -1021,10 +1021,10 @@ export default function StudyHistoryPage() {
                     isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
                     isParent
                       ? "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
-                      : "rounded-2xl border border-white/8 bg-white/6 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+                      : "rounded-2xl border border-[#E3EAF6] bg-[linear-gradient(180deg,#FFFFFF_0%,#F6F9FF_100%)] text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]",
                     isParent
                       ? i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
-                      : i === 5 ? "text-sky-300" : i === 6 ? "text-rose-300" : "text-white/58"
+                      : i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#667AA3]"
                   )}
               >
                 {day}
@@ -1060,7 +1060,7 @@ export default function StudyHistoryPage() {
                     !isCurrentMonth
                       ? isParent
                         ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75"
-                        : "bg-[linear-gradient(180deg,rgba(17,34,79,0.72)_0%,rgba(13,28,69,0.76)_100%)] opacity-[0.55] ring-1 ring-white/8"
+                        : "bg-[linear-gradient(180deg,rgba(248,250,252,0.92)_0%,rgba(255,255,255,0.98)_100%)] opacity-[0.52] grayscale-[0.05] ring-1 ring-[#DCE5F4]/85"
                       : getHeatmapColor(minutes),
                     isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
                     isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
@@ -1082,8 +1082,8 @@ export default function StudyHistoryPage() {
                           "min-w-[2rem] px-2 py-1 text-xs",
                           isParent
                             ? idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700"
-                            : idx % 7 === 5 && isCurrentMonth ? "border-sky-300/32 bg-sky-400/12 text-sky-100" : idx % 7 === 6 && isCurrentMonth ? "border-rose-300/32 bg-rose-400/12 text-rose-100" : "border-white/10 bg-white/10 text-white/82",
-                          isTodayCalendar && (isParent ? "border-primary/20 text-primary" : "border-[#FFD089]/35 text-[#FFD089]")
+                            : idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
+                          isTodayCalendar && (isParent ? "border-primary/20 text-primary" : "border-primary/20 text-primary")
                         )}
                       >
                         {format(day, 'd')}
