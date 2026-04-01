@@ -192,7 +192,48 @@ export type StudyAvailabilitySlot =
 
 export type RoutineDifficulty = 'easy' | 'balanced' | 'stretch';
 
+export type LearnerType =
+  | 'middle_school_core'
+  | 'high_school_internal'
+  | 'high3_csat'
+  | 'n_susi'
+  | 'gongsi'
+  | 'goal_searching';
+
+export type QuestionSection =
+  | '목표 파악'
+  | '공부시간 파악'
+  | '과목 배분 파악'
+  | '계획 방식 파악';
+
+export interface OnboardingProgressMeta {
+  currentStep: number;
+  totalSteps: number;
+  progressPercent: number;
+  remainingMinutesLabel: string;
+  section: QuestionSection;
+  sectionLabel: string;
+}
+
 export interface OnboardingAnswer {
+  learnerType: LearnerType;
+  dailyStudyHours: '4h' | '6h' | '8h' | '10h' | '12h-plus';
+  mainBlockLength: '90m' | '120m' | '150m' | '180m' | 'long-flex';
+  breakPreference: '10-15' | '20' | '30' | '40+' | 'variable';
+  subjectPriority: string[];
+  weakSubjects: string[];
+  focusPeak: 'morning' | 'late-morning' | 'afternoon' | 'evening' | 'night' | 'variable';
+  planBreakReason:
+    | 'too-much-volume'
+    | 'subject-avoidance'
+    | 'late-start'
+    | 'concentration-drop'
+    | 'break-overrun'
+    | 'subject-imbalance'
+    | 'finish-gap';
+  planningStyle: 'time-table' | 'subject-hours' | 'big-block' | 'guided' | 'unknown';
+  reflectionStyle: 'time-check' | 'subject-progress' | 'memo' | 'auto-summary' | 'not-ready';
+  sharingPreference: SharingPreference;
   gradeBand: 'middle' | 'high' | 'repeat';
   examGoal: 'school-rank' | 'mock-improvement' | 'college-sprint' | 'balance-recovery' | 'habit-reset' | 'specific-test' | 'undecided';
   weekdayAvailability: StudyAvailabilitySlot[];
@@ -205,26 +246,31 @@ export interface OnboardingAnswer {
   preferredPlanStyle: 'time-table' | 'block' | 'todo' | 'guided' | 'searching';
   supportMode: 'solo' | 'remind' | 'peers' | 'teacher' | 'adaptive';
   bestFocusTime: 'morning' | 'afternoon' | 'evening' | 'late-night' | 'variable';
-  sharingPreference: SharingPreference;
-  reflectionStyle: 'daily-brief' | 'weekly-deep' | 'auto-summary' | 'not-yet';
+  legacyReflectionStyle: 'daily-brief' | 'weekly-deep' | 'auto-summary' | 'not-yet';
 }
 
-export interface RoutineArchetype {
+export interface StudyPlanArchetype {
   id:
-    | 'exam-sprint'
-    | 'school-balance'
-    | 'weak-subject-recovery'
-    | 'concept-rebuild'
-    | 'problem-solving-focus'
-    | 'memory-review-boost'
-    | 'evening-focus'
-    | 'routine-reset';
+    | 'hs_balanced_exam'
+    | 'math_heavy_exam'
+    | 'korean_math_core'
+    | 'n_susi_intensive'
+    | 'gongsi_standard'
+    | 'weak_subject_repair'
+    | 'volume_recovery'
+    | 'long_block_stable';
   name: string;
   shortLabel: string;
   summary: string;
   fitDescription: string;
   strategyHeadline: string;
+  defaultStudyLabel: string;
+  defaultBlockLabel: string;
+  defaultBreakLabel: string;
+  defaultTypeLabel: string;
 }
+
+export type RoutineArchetype = StudyPlanArchetype;
 
 export interface StudyBlock {
   id: string;
@@ -253,28 +299,97 @@ export interface DistractionRule {
   fallback: string;
 }
 
-export interface RecommendedRoutine {
+export interface SubjectAllocation {
+  subjectId: string;
+  subjectLabel: string;
+  minutes: number;
+  hoursLabel: string;
+  ratio: number;
+  emphasis: 'core' | 'support' | 'maintenance';
+  rationale: string;
+}
+
+export interface BreakRule {
   id: string;
-  archetypeId: RoutineArchetype['id'];
-  priority: 1 | 2 | 3;
+  label: string;
+  minutes: number;
+  description: string;
+}
+
+export interface RecommendationReason {
+  id: string;
+  label: string;
+  text: string;
+}
+
+export interface RecommendationFeedback {
+  downshift: string[];
+  upshift: string[];
+  operatingRules: string[];
+}
+
+export interface StudyPlanTemplate {
+  archetypeId: StudyPlanArchetype['id'];
   name: string;
+  subtitle: string;
+  totalStudyMinutes: number;
+  mainBlockMinutes: 120 | 150 | 180;
+  breakRule: BreakRule;
+  subjectAllocations: SubjectAllocation[];
+  studyBlocks: StudyBlock[];
+  recommendationReasons: RecommendationReason[];
+  feedback: RecommendationFeedback;
+  fitCopy: string[];
+  weekendExtension: string;
+}
+
+export interface RecommendedStudyPlan {
+  id: string;
+  archetypeId: StudyPlanArchetype['id'];
+  priority: 1 | 2 | 3;
+  badge: string;
+  name: string;
+  subtitle: string;
   oneLineDescription: string;
+  totalStudyMinutes: number;
+  totalStudyLabel: string;
+  blockMeta: string;
+  breakMeta: string;
+  typeMeta: string;
   fitStudent: string;
   difficulty: RoutineDifficulty;
   difficultyLabel: string;
   recommendationReasons: string[];
+  reasonEntries: RecommendationReason[];
   coreStrategies: string[];
   dayStructureSummary: string;
+  dayPreviewTitle: string;
+  dayPreview: string[];
   subjectPlacement: string;
+  subjectAllocations: SubjectAllocation[];
   sessionRule: string;
   breakRule: string;
+  breakRuleDetail: BreakRule;
   studyBlocks: StudyBlock[];
   reviewRules: ReviewRule[];
   distractionRules: DistractionRule[];
+  downgradeTitle: string;
   downgradeVersion: string[];
+  upgradeTitle: string;
   upgradeVersion: string[];
+  fitTitle: string;
+  fitCopy: string[];
+  ruleTitle: string;
+  ruleCopy: string[];
+  whyTitle: string;
+  whyCopy: string[];
   weekendExtension: string;
+  recommendationFeedback: RecommendationFeedback;
+  primaryCta: string;
+  secondaryCta: string;
 }
+
+export type RecommendedRoutine = RecommendedStudyPlan;
 
 export interface SharedRoutine {
   id: string;
@@ -311,11 +426,11 @@ export interface SharedRoutine {
 export interface UserStudyProfile {
   version: number;
   answers: OnboardingAnswer;
-  archetypeId: RoutineArchetype['id'];
+  archetypeId: StudyPlanArchetype['id'];
   archetypeName: string;
-  recommendedRoutines: RecommendedRoutine[];
+  recommendedRoutines: RecommendedStudyPlan[];
   selectedRoutineId: string;
-  selectedRoutine: RecommendedRoutine;
+  selectedRoutine: RecommendedStudyPlan;
   sharingPreference: SharingPreference;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;

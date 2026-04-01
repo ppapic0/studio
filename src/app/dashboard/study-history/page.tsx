@@ -155,9 +155,9 @@ const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 type StudyHistoryFlowLevel = 'none' | 'warmup' | 'short' | 'steady' | 'deep';
 
 const STUDY_HISTORY_FLOW_THRESHOLDS = {
-  warmup: 60,
-  short: 180,
-  steady: 300,
+  warmup: 180,
+  short: 360,
+  steady: 540,
 } as const;
 
 const STUDY_HISTORY_CALENDAR_LEGEND: Array<{
@@ -167,10 +167,10 @@ const STUDY_HISTORY_CALENDAR_LEGEND: Array<{
   swatch: string;
 }> = [
   { level: 'none', label: '기록 없음', rangeLabel: '0시간', swatch: 'bg-white ring-[#D7E1F0]' },
-  { level: 'warmup', label: '몰입 준비', rangeLabel: '1시간 미만', swatch: 'bg-[#FFF0DA] ring-[#FFD4A0]' },
-  { level: 'short', label: '짧은 몰입', rangeLabel: '1~3시간', swatch: 'bg-[#FFD7A6] ring-[#FFB969]' },
-  { level: 'steady', label: '집중 흐름', rangeLabel: '3~5시간', swatch: 'bg-[#FFBF71] ring-[#FF9626]' },
-  { level: 'deep', label: '깊은 몰입', rangeLabel: '5시간 이상', swatch: 'bg-[#FFA23D] ring-[#E57C11]' },
+  { level: 'warmup', label: '몰입 준비', rangeLabel: '3시간 미만', swatch: 'bg-[#FFF0DA] ring-[#FFD4A0]' },
+  { level: 'short', label: '짧은 몰입', rangeLabel: '3~6시간', swatch: 'bg-[#FFD7A6] ring-[#FFB969]' },
+  { level: 'steady', label: '집중 흐름', rangeLabel: '6~9시간', swatch: 'bg-[#FFBF71] ring-[#FF9626]' },
+  { level: 'deep', label: '깊은 몰입', rangeLabel: '9시간 이상', swatch: 'bg-[#FFA23D] ring-[#E57C11]' },
 ] as const;
 
 function getStudyHistoryFlowLevel(minutes: number): StudyHistoryFlowLevel {
@@ -511,8 +511,7 @@ export default function StudyHistoryPage() {
     if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(255,249,239,0.99)_0%,rgba(255,240,218,0.98)_58%,rgba(255,228,192,0.98)_100%)] ring-1 ring-inset ring-[#FFD4A0]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_32px_-28px_rgba(206,108,20,0.12)]';
     if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(255,239,214,0.99)_0%,rgba(255,215,166,0.98)_56%,rgba(255,196,122,0.98)_100%)] ring-1 ring-inset ring-[#FFB969]/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_34px_-28px_rgba(214,118,20,0.18)]';
     if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(255,220,174,0.99)_0%,rgba(255,191,113,0.98)_54%,rgba(255,164,61,0.98)_100%)] ring-1 ring-inset ring-[#FF9626]/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_22px_38px_-26px_rgba(222,116,16,0.24)]';
-    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,205,139,0.99)_0%,rgba(255,166,61,0.98)_54%,rgba(247,140,31,0.98)_100%)] ring-1 ring-inset ring-[#F18A18]/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_24px_42px_-24px_rgba(226,122,19,0.28)]';
-    return 'bg-[linear-gradient(180deg,rgba(255,192,111,0.99)_0%,rgba(255,154,50,0.98)_50%,rgba(236,126,20,0.99)_100%)] ring-1 ring-inset ring-[#DF7A12]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_26px_44px_-24px_rgba(214,110,16,0.34)]';
+    return 'bg-[linear-gradient(180deg,rgba(255,205,139,0.99)_0%,rgba(255,166,61,0.98)_54%,rgba(236,126,20,0.99)_100%)] ring-1 ring-inset ring-[#DF7A12]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_26px_44px_-24px_rgba(214,110,16,0.34)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
@@ -1129,7 +1128,7 @@ export default function StudyHistoryPage() {
                   )}
 
                   {isMobile && (
-                    <div className="relative z-10 flex justify-center pt-1.5">
+                    <div className="relative z-10 flex items-start justify-center px-1 pt-1.5">
                       <span
                         className={cn(
                           "inline-flex min-w-[1.35rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[0.56rem] font-black leading-none shadow-[0_8px_16px_-14px_rgba(15,23,42,0.22)]",
@@ -1148,12 +1147,12 @@ export default function StudyHistoryPage() {
                     </div>
                   )}
 
-                  <div className={cn("absolute left-0 right-0", isMobile ? "inset-y-0 flex items-center justify-center px-1.5" : "bottom-2 px-2")}>
+                  <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 flex justify-center px-1.5" : "bottom-2 px-2")}>
                     <div
                       className={cn(
                         "overflow-hidden text-center whitespace-nowrap",
                         isMobile
-                          ? "min-w-[2.15rem] rounded-full border px-2 py-1 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.2)]"
+                          ? "min-w-[2.2rem] rounded-full border px-2 py-[0.32rem] shadow-[0_10px_18px_-16px_rgba(15,23,42,0.2)]"
                           : "rounded-[0.95rem] border bg-white px-2.5 py-2 shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
                         getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                       )}

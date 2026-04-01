@@ -2621,7 +2621,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         growthLabel={`${formatMinutesMini(totalMinutesCount)} / 10h`}
         growthPercent={growthPercent}
         growthDeltaLabel={`어제 대비 ${studyVsYesterday >= 0 ? '+' : ''}${studyVsYesterday}%`}
-        primaryActionLabel={isTimerActive ? '집중 계속하기' : '집중 시작하기'}
+        primaryActionLabel={isTimerActive ? '공부 종료하기' : '집중 시작하기'}
         onPrimaryAction={handleStudyStartStop}
         primaryActionActive={isTimerActive}
         sessionTimerLabel={isTimerActive ? formatHeroSessionTimer(localSeconds) : null}

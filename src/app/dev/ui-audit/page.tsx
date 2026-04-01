@@ -119,7 +119,7 @@ export default function UiAuditPage() {
         growthLabel="12h / 10h"
         growthPercent={100}
           growthDeltaLabel="어제 대비 +14%"
-          primaryActionLabel="집중 계속하기"
+          primaryActionLabel="공부 종료하기"
           onPrimaryAction={() => undefined}
           primaryActionActive
           sessionTimerLabel="1:24:18"

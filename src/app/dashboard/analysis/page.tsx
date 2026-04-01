@@ -1,14 +1,12 @@
 'use client';
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { subDays, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
-  ArrowRight,
   BarChart3,
   Brain,
   Clock3,
@@ -43,13 +41,11 @@ import { buildWeeklyStudyInsight } from '@/lib/learning-insights';
 import { StudyLogDay } from '@/lib/types';
 import { StudentTrackSubnav } from '@/components/dashboard/student-track-subnav';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StudentDetailPage from '../teacher/students/[id]/page';
 import { StudentDetailPresentationProvider } from '@/components/dashboard/student-detail-presentation-mode';
 
 type ToneKey = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose';
-type RewardBurst = { id: number; title: string; points: number };
 
 const TONE_STYLES: Record<ToneKey, { chip: string; text: string; bar: string; ring: string; soft: string }> = {
   blue: {
@@ -312,27 +308,6 @@ function QuestStatBar({
   );
 }
 
-function RewardToast({
-  reward,
-}: {
-  reward: { id: number; title: string; points: number } | null;
-}) {
-  if (!reward) return null;
-  return (
-    <div className="fixed inset-x-4 top-20 z-50 mx-auto max-w-sm rounded-[1.4rem] border border-[#FFB347]/18 bg-[linear-gradient(135deg,#173A82_0%,#22479B_58%,#FF7A16_170%)] px-4 py-3 text-white shadow-[0_22px_42px_-26px_rgba(255,122,22,0.46)] transition-all duration-300">
-      <div className="flex items-center gap-3">
-        <div className="rounded-full bg-white/18 p-2">
-          <Sparkles className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">{reward.title}</p>
-          <p className="mt-1 text-lg font-black">+{reward.points}P 획득</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MiniGrowthBars({
   data,
 }: {
@@ -508,7 +483,6 @@ function GraphDungeonCard({
 }
 
 export default function AnalysisTrackPage() {
-  const router = useRouter();
   const { viewMode, activeMembership } = useAppContext();
   const { user } = useUser();
   const firestore = useFirestore();
@@ -758,20 +732,6 @@ export default function AnalysisTrackPage() {
     ],
     [sessionMetrics]
   );
-  const [analysisRewardPoints, setAnalysisRewardPoints] = useState(0);
-  const [rewardBurst, setRewardBurst] = useState<RewardBurst | null>(null);
-
-  useEffect(() => {
-    if (!rewardBurst) return;
-    const timeout = window.setTimeout(() => setRewardBurst(null), 1900);
-    return () => window.clearTimeout(timeout);
-  }, [rewardBurst]);
-
-  const grantReward = (title: string, points: number) => {
-    setAnalysisRewardPoints((prev) => prev + points);
-    setRewardBurst({ id: Date.now(), title, points });
-  };
-
   const dungeonCards = useMemo(
     () => [
       {
@@ -817,11 +777,14 @@ export default function AnalysisTrackPage() {
     () => (isMobile ? dungeonCards.filter((card) => card.unlocked) : dungeonCards),
     [dungeonCards, isMobile]
   );
-
-  const handleApplyStrategy = (title: string, points: number) => {
-    grantReward(title, points);
-    window.setTimeout(() => router.push('/dashboard/plan'), 260);
-  };
+  const unlockedDungeonCount = useMemo(
+    () => visibleDungeonCards.filter((card) => card.unlocked).length,
+    [visibleDungeonCards]
+  );
+  const availableDungeonRewards = useMemo(
+    () => visibleDungeonCards.filter((card) => card.unlocked).reduce((sum, card) => sum + card.reward, 0),
+    [visibleDungeonCards]
+  );
 
   if (!user) {
     return (
@@ -834,7 +797,6 @@ export default function AnalysisTrackPage() {
   return (
     <div className={cn('student-night-page pb-24', isMobile ? 'space-y-4' : 'space-y-6')}>
       {isMobile && <StudentTrackSubnav />}
-      <RewardToast reward={rewardBurst} />
 
       <Tabs defaultValue="growth" className="space-y-4">
         <TabsList className={cn('grid w-full grid-cols-2 rounded-[1.5rem] border border-white/12 bg-white/[0.08] p-1.5 shadow-[0_18px_42px_-32px_rgba(0,0,0,0.42)]', isMobile ? 'gap-1.5' : 'gap-2')}>
@@ -876,9 +838,9 @@ export default function AnalysisTrackPage() {
                     <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">지난 주 대비</p>
                   </div>
                   <div className={cn('surface-card surface-card--highlight rounded-[1.2rem] px-4 py-4', isMobile && 'col-span-2')}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-accent)]">분석 보상</p>
-                    <p className="mt-2 text-2xl font-black text-[var(--text-on-accent)]">+{analysisRewardPoints}P</p>
-                    <p className="mt-1 text-[11px] font-semibold text-[rgba(14,28,56,0.76)]">탐험 완료 보상</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-accent)]">열린 분석</p>
+                    <p className="mt-2 text-2xl font-black text-[var(--text-on-accent)]">{unlockedDungeonCount}개</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[rgba(14,28,56,0.76)]">확인 가능한 보상 +{availableDungeonRewards}P</p>
                   </div>
                 </div>
 
@@ -954,10 +916,6 @@ export default function AnalysisTrackPage() {
                   </div>
                 )}
 
-                <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('코치 전략 적용', 15)} className="mt-5 h-12 w-full rounded-2xl font-black">
-                  오늘 전략 자동 적용
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
               </div>
             </div>
           </section>
@@ -1076,7 +1034,6 @@ export default function AnalysisTrackPage() {
                         <div className="rounded-[1.2rem] border border-[#FFD7B4] bg-[#FFF1DE] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 전략</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 루틴 강화</p><p className="mt-1 text-sm font-semibold text-[#28478F]">계획트랙으로 연결</p></div>
                       </div>
                     )}
-                    <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('집중 시간 추이 적용', 10)} className="h-11 rounded-2xl px-5 font-black">이 전략 적용하기</Button>
                   </div>
                 ) : card.id === 'density' ? (
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3')}>
@@ -1087,9 +1044,6 @@ export default function AnalysisTrackPage() {
                         <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{item.meta}</p>
                       </div>
                     ))}
-                    <div className={cn(!isMobile && 'md:col-span-3', isMobile && 'col-span-2')}>
-                      <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('공부 밀도 전략 적용', 15)} className="h-11 rounded-2xl px-5 font-black">밀도 회복 전략 적용</Button>
-                    </div>
                   </div>
                 ) : card.id === 'rhythm' ? (
                   <div className="space-y-4">
@@ -1105,7 +1059,6 @@ export default function AnalysisTrackPage() {
                         <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
                       </div>
                     )}
-                    <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('리듬 패턴 전략 적용', 20)} className="h-11 rounded-2xl px-5 font-black">리듬 복구 전략 적용</Button>
                   </div>
                 ) : (
                   <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] border-dashed px-4 py-5 text-center">
@@ -1126,10 +1079,6 @@ export default function AnalysisTrackPage() {
                 <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">분석 결과를 바로 행동으로 연결</h2>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">보고 끝나는 것이 아니라, 지금 바로 계획트랙에 이어 붙이도록 설계했어요.</p>
               </div>
-              <Button type="button" variant="secondary" onClick={() => handleApplyStrategy('다음 목표 연결', 20)} className="h-12 rounded-2xl px-5 font-black">
-                오늘 전략 자동 적용
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
             </div>
           </section>
           ) : null}

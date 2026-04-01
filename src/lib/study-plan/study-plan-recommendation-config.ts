@@ -1,0 +1,438 @@
+import { type StudyPlanArchetype } from '@/lib/types';
+
+type RecommendationCardCopy = {
+  badge: string;
+  title: string;
+  subtitle: string;
+  totalStudy: string;
+  blockMeta: string;
+  breakMeta: string;
+  typeMeta: string;
+  whyTitle: string;
+  whyCopy: string[];
+  dayPreviewTitle: string;
+  fitTitle: string;
+  fitCopy: string[];
+  downshiftTitle: string;
+  downshiftCopy: string[];
+  upshiftTitle: string;
+  upshiftCopy: string[];
+  ruleTitle: string;
+  ruleCopy: string[];
+  primaryCta: string;
+  secondaryCta: string;
+};
+
+export const STUDY_PLAN_ARCHETYPES: StudyPlanArchetype[] = [
+  {
+    id: 'hs_balanced_exam',
+    name: '고3 표준 수능형',
+    shortLabel: '표준형',
+    summary: '국수영탐의 기본 비중을 균형 있게 가져가는 표준형 계획',
+    fitDescription: '총량과 과목 비중을 함께 안정화해야 하는 고3 수험생',
+    strategyHeadline: '총량을 먼저 안정화하고 과목 밸런스를 지키는 구조',
+    defaultStudyLabel: '총 10시간 기준',
+    defaultBlockLabel: '2~3시간 블록',
+    defaultBreakLabel: '휴식 30분',
+    defaultTypeLabel: '표준형',
+  },
+  {
+    id: 'math_heavy_exam',
+    name: '수학 집중 보완형',
+    shortLabel: '수학 보완',
+    summary: '수학 비중을 더 높게 잡아 점수 구간을 올리는 계획',
+    fitDescription: '수학 점수 향상이 가장 시급한 고3/N수생',
+    strategyHeadline: '수학 블록을 두껍게 유지하면서 다른 과목을 최소 기준으로 관리',
+    defaultStudyLabel: '총 10시간 기준',
+    defaultBlockLabel: '2~3시간 블록',
+    defaultBreakLabel: '휴식 30분',
+    defaultTypeLabel: '보완형',
+  },
+  {
+    id: 'korean_math_core',
+    name: '국수핵심 강화형',
+    shortLabel: '국수 핵심',
+    summary: '국어와 수학을 중심축으로 두고 영어·탐구를 관리하는 계획',
+    fitDescription: '핵심 과목의 체급을 먼저 올려야 하는 학생',
+    strategyHeadline: '국어와 수학을 앞쪽 블록에서 먼저 끝내는 구조',
+    defaultStudyLabel: '총 10시간 기준',
+    defaultBlockLabel: '2~3시간 블록',
+    defaultBreakLabel: '휴식 30분',
+    defaultTypeLabel: '핵심형',
+  },
+  {
+    id: 'n_susi_intensive',
+    name: 'N수 몰입형',
+    shortLabel: '장시간 몰입',
+    summary: '장시간 블록 중심으로 국수탐 핵심 과목 몰입을 강화하는 계획',
+    fitDescription: '학교 제약보다 장시간 몰입이 가능한 N수생',
+    strategyHeadline: '긴 블록과 높은 총량으로 핵심 과목 심화를 끌어올리는 구조',
+    defaultStudyLabel: '총 10~12시간 기준',
+    defaultBlockLabel: '3시간 블록 중심',
+    defaultBreakLabel: '휴식 30분',
+    defaultTypeLabel: '몰입형',
+  },
+  {
+    id: 'gongsi_standard',
+    name: '공시 표준 장기집중형',
+    shortLabel: '공시형',
+    summary: '시험 과목 수와 반복량을 고려해 장시간 블록으로 운영하는 계획',
+    fitDescription: '과목별 회독을 장시간 블록으로 누적해야 하는 공시 준비생',
+    strategyHeadline: '핵심 과목과 회독 흐름을 함께 유지하는 구조',
+    defaultStudyLabel: '총 8~10시간 기준',
+    defaultBlockLabel: '2~3시간 블록',
+    defaultBreakLabel: '휴식 20~30분',
+    defaultTypeLabel: '공시형',
+  },
+  {
+    id: 'weak_subject_repair',
+    name: '약한과목 보완형',
+    shortLabel: '약점 복구',
+    summary: '부담 과목을 가장 집중되는 시간대에 우선 배치하는 계획',
+    fitDescription: '특정 과목이 전체 계획을 무너뜨리는 학생',
+    strategyHeadline: '부담 과목을 미루지 않고 가장 좋은 시간에 먼저 확보',
+    defaultStudyLabel: '총 8~10시간 기준',
+    defaultBlockLabel: '2~3시간 블록',
+    defaultBreakLabel: '휴식 30분',
+    defaultTypeLabel: '보완형',
+  },
+  {
+    id: 'volume_recovery',
+    name: '공부 총량 회복형',
+    shortLabel: '총량 회복',
+    summary: '총량이 자주 무너지는 학습자를 위해 현실적으로 유지 가능한 계획',
+    fitDescription: '총량을 크게 잡았다가 자주 무너지는 학생',
+    strategyHeadline: '총량 욕심보다 유지 가능한 기본량부터 다시 쌓는 구조',
+    defaultStudyLabel: '총 6~8시간 기준',
+    defaultBlockLabel: '2시간 블록 중심',
+    defaultBreakLabel: '휴식 20~30분',
+    defaultTypeLabel: '회복형',
+  },
+  {
+    id: 'long_block_stable',
+    name: '장시간 안정형',
+    shortLabel: '안정 유지',
+    summary: '2~3시간 공부 블록을 안정적으로 이어가는 계획',
+    fitDescription: '긴 블록은 가능하지만 흔들림 없이 이어가는 운영이 필요한 학생',
+    strategyHeadline: '블록 수를 과하게 늘리지 않고 복귀 리듬을 먼저 안정화',
+    defaultStudyLabel: '총 8~10시간 기준',
+    defaultBlockLabel: '2~3시간 블록',
+    defaultBreakLabel: '휴식 20~30분',
+    defaultTypeLabel: '안정형',
+  },
+] as const;
+
+export const STUDY_PLAN_RECOMMENDATION_COPY: Record<StudyPlanArchetype['id'], RecommendationCardCopy> = {
+  hs_balanced_exam: {
+    badge: '가장 잘 맞아요',
+    title: '고3 표준 수능 계획',
+    subtitle: '국수영탐의 기본 비중을 안정적으로 가져가는 수험형 계획',
+    totalStudy: '총 10시간 기준',
+    blockMeta: '2~3시간 블록',
+    breakMeta: '휴식 30분',
+    typeMeta: '표준형',
+    whyTitle: '왜 이렇게 추천했어요',
+    whyCopy: [
+      '현재 학습 유형이 고3 수능형에 가깝고, 과목 밸런스를 유지하는 것이 중요해 보여요.',
+      '짧은 루틴보다 긴 공부 블록으로 하루를 운영하는 방식이 더 잘 맞는 학습자예요.',
+      '총량과 과목 비중을 먼저 안정화하는 것이 가장 현실적인 출발이에요.',
+    ],
+    dayPreviewTitle: '하루 배분 예시',
+    fitTitle: '이런 학습자에게 맞아요',
+    fitCopy: [
+      '고3 수험생',
+      '하루 공부 총량을 안정적으로 채우고 싶은 학생',
+      '국수영탐 균형을 무너뜨리지 않고 운영하고 싶은 학생',
+    ],
+    downshiftTitle: '너무 빡세면',
+    downshiftCopy: [
+      '탐구를 1시간으로 줄이고, 남은 시간은 복습으로 돌려도 괜찮아요.',
+      '총 10시간이 부담되면 8시간 버전으로 먼저 시작해도 돼요.',
+    ],
+    upshiftTitle: '잘 맞으면',
+    upshiftCopy: [
+      '수학이나 탐구 중 약한 과목에 30분~1시간을 추가해보세요.',
+      '주말에는 국어/수학 심화 블록을 하나 더 넣을 수 있어요.',
+    ],
+    ruleTitle: '운영 규칙',
+    ruleCopy: [
+      '핵심 과목은 가장 집중되는 시간대에 먼저 배치',
+      '쉬는 시간은 길게 끌지 말고 30분 이내로 복귀',
+    ],
+    primaryCta: '이 계획으로 시작하기',
+    secondaryCta: '조금 수정해서 사용할래요',
+  },
+  math_heavy_exam: {
+    badge: '수학 비중 강화형',
+    title: '수학 집중 보완 계획',
+    subtitle: '수학을 가장 중요한 축으로 두고 국어·탐구를 함께 운영하는 계획',
+    totalStudy: '총 10시간 기준',
+    blockMeta: '2~3시간 블록',
+    breakMeta: '휴식 30분',
+    typeMeta: '보완형',
+    whyTitle: '왜 이렇게 추천했어요',
+    whyCopy: [
+      '부담 과목이나 우선 과목으로 수학이 강하게 잡혀 있어요.',
+      '지금은 전체 균형도 중요하지만, 수학 비중을 확실히 높이는 것이 더 효과적이에요.',
+      '장시간 공부가 가능한 학습자라면 수학 블록을 두껍게 가져가는 전략이 잘 맞아요.',
+    ],
+    dayPreviewTitle: '하루 배분 예시',
+    fitTitle: '이런 학습자에게 맞아요',
+    fitCopy: [
+      '수학 점수 향상이 가장 시급한 고3/N수생',
+      '수학 때문에 전체 계획이 흔들리는 학생',
+      '긴 블록으로 수학을 깊게 가져가는 편이 맞는 학생',
+    ],
+    downshiftTitle: '너무 빡세면',
+    downshiftCopy: [
+      '수학 추가 30분을 빼고 표준 수능형으로 시작해도 괜찮아요.',
+      '영어는 유지하되 탐구를 하루 1시간으로 낮출 수 있어요.',
+    ],
+    upshiftTitle: '잘 맞으면',
+    upshiftCopy: [
+      '수학 블록 뒤에 오답 30분을 고정해보세요.',
+      '주말에는 수학 전용 심화 블록을 하나 더 넣어도 좋아요.',
+    ],
+    ruleTitle: '운영 규칙',
+    ruleCopy: [
+      '수학은 가장 집중되는 시간대의 첫 블록 또는 두 번째 블록에 배치',
+      '수학이 밀려도 영어 1시간은 최소 유지',
+    ],
+    primaryCta: '이 계획으로 시작하기',
+    secondaryCta: '조금 수정해서 사용할래요',
+  },
+  korean_math_core: {
+    badge: '국수 핵심형',
+    title: '국수 핵심 강화 계획',
+    subtitle: '국어와 수학을 중심축으로 두고 영어·탐구를 관리하는 계획',
+    totalStudy: '총 10시간 기준',
+    blockMeta: '2~3시간 블록',
+    breakMeta: '휴식 30분',
+    typeMeta: '핵심형',
+    whyTitle: '왜 이렇게 추천했어요',
+    whyCopy: [
+      '현재 목표상 국어와 수학의 비중이 가장 중요하게 보여요.',
+      '영어와 탐구를 아예 줄이는 것이 아니라, 국수 중심 구조로 우선순위를 분명히 잡는 것이 필요해요.',
+      '긴 블록 안에서 핵심 과목을 먼저 끝내는 방식이 잘 맞는 학습자예요.',
+    ],
+    dayPreviewTitle: '하루 배분 예시',
+    fitTitle: '이런 학습자에게 맞아요',
+    fitCopy: [
+      '국수의 체급을 먼저 올려야 하는 학생',
+      '핵심 과목부터 확실히 끝내야 마음이 편한 학생',
+      '영어와 탐구는 유지하되 우선순위는 국수에 두고 싶은 학생',
+    ],
+    downshiftTitle: '너무 빡세면',
+    downshiftCopy: [
+      '복습 30분을 탐구에 합치거나, 탐구를 1시간으로 줄여도 괜찮아요.',
+      '총량이 부담되면 국어 2.5h, 수학 3.5h로 낮출 수 있어요.',
+    ],
+    upshiftTitle: '잘 맞으면',
+    upshiftCopy: [
+      '수학 또는 국어 중 약한 쪽에 30분을 더 추가해보세요.',
+      '저녁 마지막 블록을 오답 전용으로 바꿔도 좋아요.',
+    ],
+    ruleTitle: '운영 규칙',
+    ruleCopy: [
+      '국수는 하루 앞쪽 블록에 우선 배치',
+      '영어와 탐구는 유지하되 핵심 과목 완료 후 배치',
+    ],
+    primaryCta: '이 계획으로 시작하기',
+    secondaryCta: '조금 수정해서 사용할래요',
+  },
+  n_susi_intensive: {
+    badge: 'N수 몰입형',
+    title: 'N수 장시간 몰입 계획',
+    subtitle: '긴 공부 블록으로 국수탐 핵심 과목에 깊게 몰입하는 계획',
+    totalStudy: '총 10~12시간 기준',
+    blockMeta: '3시간 블록 중심',
+    breakMeta: '휴식 30분',
+    typeMeta: '몰입형',
+    whyTitle: '왜 이렇게 추천했어요',
+    whyCopy: [
+      'N수생은 학교 일정 제약이 적어 긴 블록 운영이 가능해요.',
+      '짧은 루틴보다 장시간 몰입으로 핵심 과목 체급을 올리는 방식이 더 적합해요.',
+      '총량과 심화 학습을 동시에 가져가기 좋은 구조예요.',
+    ],
+    dayPreviewTitle: '하루 배분 예시',
+    fitTitle: '이런 학습자에게 맞아요',
+    fitCopy: [
+      '장시간 앉아서 공부하는 패턴이 익숙한 N수생',
+      '하루 공부 총량을 높게 가져가야 하는 학생',
+      '국수탐 중심으로 몰입이 필요한 학생',
+    ],
+    downshiftTitle: '너무 빡세면',
+    downshiftCopy: [
+      '복습 1시간을 30분으로 줄이고 총 10시간 버전으로 시작해도 괜찮아요.',
+      '3시간 블록이 부담되면 2시간 30분 블록으로 조정 가능해요.',
+    ],
+    upshiftTitle: '잘 맞으면',
+    upshiftCopy: [
+      '약한 과목 전용 1시간 블록을 추가할 수 있어요.',
+      '주간 단위로 탐구 심화 시간을 늘려도 좋아요.',
+    ],
+    ruleTitle: '운영 규칙',
+    ruleCopy: [
+      '가장 어려운 과목은 오전/초반 블록에 우선 배치',
+      '마지막 블록은 복습 또는 오답 정리로 마감',
+    ],
+    primaryCta: '이 계획으로 시작하기',
+    secondaryCta: '조금 수정해서 사용할래요',
+  },
+  gongsi_standard: {
+    badge: '공시 장기집중형',
+    title: '공시 표준 장시간 계획',
+    subtitle: '여러 시험 과목을 긴 블록으로 반복하며 누적하는 공시형 계획',
+    totalStudy: '총 8~10시간 기준',
+    blockMeta: '2~3시간 블록',
+    breakMeta: '휴식 20~30분',
+    typeMeta: '공시형',
+    whyTitle: '왜 이렇게 추천했어요',
+    whyCopy: [
+      '공시생은 과목 수와 반복량을 함께 고려해야 해요.',
+      '짧은 세션보다 과목 단위로 깊게 들어가는 긴 블록이 더 잘 맞아요.',
+      '과목별 누적 시간을 관리하는 방식이 중요해 보여요.',
+    ],
+    dayPreviewTitle: '하루 배분 예시',
+    fitTitle: '이런 학습자에게 맞아요',
+    fitCopy: [
+      '공시 준비생',
+      '직렬 과목별 누적 시간이 중요한 학습자',
+      '반복 회독과 장시간 집중이 필요한 학습자',
+    ],
+    downshiftTitle: '너무 빡세면',
+    downshiftCopy: [
+      '보조 과목 시간을 줄이고 핵심 과목 2개 중심으로 운영해도 괜찮아요.',
+      '총량이 흔들릴 때는 복습 시간을 고정하고 나머지를 줄이세요.',
+    ],
+    upshiftTitle: '잘 맞으면',
+    upshiftCopy: [
+      '핵심 과목 오답/회독 블록을 30분 추가할 수 있어요.',
+      '시험이 가까우면 취약 과목 한 개를 집중 보강해도 좋아요.',
+    ],
+    ruleTitle: '운영 규칙',
+    ruleCopy: [
+      '공시 과목은 하루마다 비중을 다르게 가져갈 수 있게 유연하게 설계',
+      '총량보다 회독 흐름이 끊기지 않도록 블록을 유지',
+    ],
+    primaryCta: '이 계획으로 시작하기',
+    secondaryCta: '조금 수정해서 사용할래요',
+  },
+  weak_subject_repair: {
+    badge: '약한 과목 보완형',
+    title: '약한 과목 우선 배치 계획',
+    subtitle: '부담되는 과목을 가장 집중되는 시간에 먼저 넣는 현실형 계획',
+    totalStudy: '총 8~10시간 기준',
+    blockMeta: '2~3시간 블록',
+    breakMeta: '휴식 30분',
+    typeMeta: '보완형',
+    whyTitle: '왜 이렇게 추천했어요',
+    whyCopy: [
+      '약한 과목이 분명하게 잡혀 있고, 이 과목이 계속 밀리는 패턴이 보여요.',
+      '부담되는 과목은 뒤로 미루기보다 가장 집중되는 시간에 먼저 넣는 게 좋아요.',
+      '전체 균형보다 현재는 약한 과목 회복이 더 중요해요.',
+    ],
+    dayPreviewTitle: '하루 배분 예시',
+    fitTitle: '이런 학습자에게 맞아요',
+    fitCopy: [
+      '특정 과목이 계획을 무너뜨리는 학생',
+      '약한 과목을 자꾸 피하게 되는 학생',
+      '집중 시간대를 전략적으로 쓰고 싶은 학생',
+    ],
+    downshiftTitle: '너무 빡세면',
+    downshiftCopy: [
+      '약한 과목 시간을 30분~1시간만 줄이고 유지해도 괜찮아요.',
+      '완전히 빼지 말고 최소 블록은 남겨두세요.',
+    ],
+    upshiftTitle: '잘 맞으면',
+    upshiftCopy: [
+      '약한 과목 뒤에 오답/복습 블록을 붙이면 더 좋아요.',
+      '주말에는 약한 과목 심화 블록을 추가해도 괜찮아요.',
+    ],
+    ruleTitle: '운영 규칙',
+    ruleCopy: [
+      '부담 과목은 집중력 높은 시간대의 첫 블록에 배치',
+      '뒤로 미루지 말고 최소 시간이라도 먼저 확보',
+    ],
+    primaryCta: '이 계획으로 시작하기',
+    secondaryCta: '조금 수정해서 사용할래요',
+  },
+  volume_recovery: {
+    badge: '총량 회복형',
+    title: '공부 총량 회복 계획',
+    subtitle: '무리한 욕심보다 유지 가능한 총량부터 다시 세우는 계획',
+    totalStudy: '총 6~8시간 기준',
+    blockMeta: '2시간 블록 중심',
+    breakMeta: '휴식 20~30분',
+    typeMeta: '회복형',
+    whyTitle: '왜 이렇게 추천했어요',
+    whyCopy: [
+      '총량을 크게 잡았다가 자주 무너지는 패턴이 보여요.',
+      '지금은 화려한 계획보다, 실제로 지킬 수 있는 기본량을 회복하는 것이 더 중요해요.',
+      '긴 블록 구조는 유지하되 블록 수를 줄여 재시작 부담을 낮췄어요.',
+    ],
+    dayPreviewTitle: '하루 배분 예시',
+    fitTitle: '이런 학습자에게 맞아요',
+    fitCopy: [
+      '총량 욕심 때문에 며칠 만에 계획이 깨지는 학생',
+      '끝까지 못 지키는 경험이 반복된 학생',
+      '다시 공부 리듬을 안정적으로 만들고 싶은 학생',
+    ],
+    downshiftTitle: '너무 빡세면',
+    downshiftCopy: [
+      '마지막 블록을 복습 1시간으로 줄이고 일찍 마감해도 괜찮아요.',
+      '처음 1주는 총량보다 첫 두 블록 성공률을 먼저 챙겨보세요.',
+    ],
+    upshiftTitle: '잘 맞으면',
+    upshiftCopy: [
+      '주중 한 블록을 30분 늘려 8시간 이상으로 올릴 수 있어요.',
+      '주말에는 부족한 과목 한 개를 추가 보강해보세요.',
+    ],
+    ruleTitle: '운영 규칙',
+    ruleCopy: [
+      '첫 두 블록 성공률이 총량보다 더 중요합니다.',
+      '하루가 늦게 시작돼도 첫 핵심 블록은 포기하지 않아요.',
+    ],
+    primaryCta: '이 계획으로 시작하기',
+    secondaryCta: '조금 수정해서 사용할래요',
+  },
+  long_block_stable: {
+    badge: '장시간 안정형',
+    title: '장시간 안정 운영 계획',
+    subtitle: '2~3시간 블록을 무리 없이 이어가는 안정적인 장시간 계획',
+    totalStudy: '총 8~10시간 기준',
+    blockMeta: '2~3시간 블록',
+    breakMeta: '휴식 20~30분',
+    typeMeta: '안정형',
+    whyTitle: '왜 이렇게 추천했어요',
+    whyCopy: [
+      '한 번 앉으면 길게 공부할 수 있지만, 중간 운영에서 흔들릴 여지가 보여요.',
+      '블록 수를 늘리기보다 복귀 리듬을 일정하게 만드는 편이 더 잘 맞아요.',
+      '안정적으로 이어지는 장시간 공부 구조를 먼저 세우는 것이 중요해요.',
+    ],
+    dayPreviewTitle: '하루 배분 예시',
+    fitTitle: '이런 학습자에게 맞아요',
+    fitCopy: [
+      '긴 블록 자체는 가능한 학생',
+      '블록 사이 휴식이 길어져 흐름이 끊기는 학생',
+      '무너지지 않는 기본 구조가 먼저 필요한 학생',
+    ],
+    downshiftTitle: '너무 빡세면',
+    downshiftCopy: [
+      '세 번째 블록을 2시간으로 줄이고 휴식을 더 명확히 잡아도 괜찮아요.',
+      '과목 수를 줄이고 핵심 과목 2~3개만 먼저 돌리세요.',
+    ],
+    upshiftTitle: '잘 맞으면',
+    upshiftCopy: [
+      '주말에 3시간 심화 블록을 한 개 추가할 수 있어요.',
+      '마지막 블록 뒤 30분 복습 회수까지 붙이면 더 안정적이에요.',
+    ],
+    ruleTitle: '운영 규칙',
+    ruleCopy: [
+      '휴식은 20~30분 안에 끝내고 바로 다음 블록으로 복귀',
+      '오래 앉는 것보다 블록 완주율을 우선으로 봅니다.',
+    ],
+    primaryCta: '이 계획으로 시작하기',
+    secondaryCta: '조금 수정해서 사용할래요',
+  },
+};
