@@ -888,7 +888,6 @@ export default function AnalysisTrackPage() {
                         <p className="text-sm font-black text-white">미션. 오전 루틴 3일 연속</p>
                         <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+20P</span>
                       </div>
-                      <p className="surface-caption mt-2 text-sm font-semibold leading-6">오전 고정 루틴만 먼저 잡아도 리듬이 훨씬 안정됩니다.</p>
                     </div>
                   </div>
                 ) : (
@@ -898,14 +897,12 @@ export default function AnalysisTrackPage() {
                         <p className="text-sm font-black text-white">미션 1. 오전 루틴 3일 연속</p>
                         <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+20P</span>
                       </div>
-                      <p className="surface-caption mt-2 text-sm font-semibold leading-6">집중 흐름이 좋은 시간대를 루틴으로 고정해 보세요.</p>
                     </div>
                     <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-black text-white">미션 2. 50분+ 세션 3회</p>
                         <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+25P</span>
                       </div>
-                      <p className="surface-caption mt-2 text-sm font-semibold leading-6">짧은 세션 비중을 줄이고 몰입 밀도를 높여보세요.</p>
                     </div>
                     <div className="surface-card rounded-[1.35rem] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(47,170,125,0.18),rgba(13,28,69,0.92))] p-4">
                       <div className="flex items-center gap-2 text-emerald-200">

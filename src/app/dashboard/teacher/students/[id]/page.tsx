@@ -1190,17 +1190,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return chips;
   }, [avgCompletionRate, avgStudyMinutes, rhythmScore, studentCounselingLogs, todayKey]);
 
-  const coachingHighlights = useMemo(() => {
-    const result: string[] = [];
-    result.push(`최근 ${RANGE_MAP[focusedChartView]}일 평균 공부시간은 ${minutesToLabel(avgStudyMinutes)}입니다.`);
-    if (avgCompletionRate >= 80) result.push('완수율이 안정적입니다. 난이도 상승 과제를 단계적으로 추가해도 좋습니다.');
-    else if (avgCompletionRate >= 60) result.push('완수율이 중간권입니다. 핵심 과목 1~2개 우선순위를 더 주면 성과가 빨라집니다.');
-    else result.push('완수율이 낮아 계획 단위를 더 작게 나누는 재설계가 필요합니다.');
-    if (rhythmScore >= 75) result.push('학습 리듬이 안정적입니다. 동일한 시작 루틴을 유지하는 것이 효과적입니다.');
-    else result.push('학습 리듬 변동이 큽니다. 매일 같은 시작 시간을 고정하세요.');
-    return result;
-  }, [focusedChartView, avgStudyMinutes, avgCompletionRate, rhythmScore]);
-
   const days30AgoMs = subDays(today, 30).getTime();
   const studentDailyReports = useMemo(
     () => [...(dailyReportsRaw || [])].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt)),
@@ -2212,7 +2201,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <>
               <Card className="analysis-premium-card surface-card surface-card--secondary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none">
                 <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
-                  <div className="flex items-start justify-between gap-3">
+                  <div className={cn(isMobile ? "flex flex-col items-stretch gap-3" : "flex items-start justify-between gap-3")}>
                     <div className="min-w-0">
                       <Badge variant={isAnalysisPresentation ? 'outline' : 'dark'} className={cn("px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shadow-none", isAnalysisPresentation && analysisSoftBadgeClass)}>
                         Focus Board
@@ -2222,16 +2211,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         학생 분석트랙에서 개인 집중 지표를 빠르게 확인합니다.
                       </CardDescription>
                     </div>
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 px-3 py-2 text-right shadow-none">
+                    <div className={cn(
+                      "surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 shadow-none",
+                      isMobile ? "flex items-center justify-between gap-3 px-3.5 py-2.5 text-left" : "px-3 py-2 text-right"
+                    )}>
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-on-dark-muted)]">오늘 포커스</p>
-                      <p className="mt-1 text-sm font-black text-[#D86A11]">{focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}</p>
+                      <p className={cn("font-black text-[#D86A11]", isMobile ? "text-base whitespace-nowrap" : "mt-1 text-sm")}>
+                        {focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}
+                      </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className={cn("relative z-10 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
-                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1 min-[420px]:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4")}>
+                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "sm:grid-cols-2 xl:grid-cols-4")}>
                     {focusKpiCards.map(({ key, label, value, helper, note, Icon, iconClass, panelClass, chipClass, meterClass, meterValue }) => (
-                      <div key={key} className={cn("min-w-0 overflow-hidden rounded-[1.35rem] border px-3.5 py-3.5", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : panelClass)}>
+                      <div key={key} className={cn("min-w-0 overflow-hidden rounded-[1.35rem] border px-4 py-4", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : panelClass)}>
                         <div className="space-y-3">
                           <div className="flex items-start justify-between gap-3">
                             <span className={cn(
@@ -2247,13 +2241,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           </div>
                         </div>
                         <p className={cn(
-                          "break-keep font-black tracking-tight text-[var(--text-on-dark)]",
-                          isMobile ? "text-[1.95rem] leading-none whitespace-nowrap" : "text-[clamp(1.25rem,3.2vw,1.8rem)]"
+                          "mt-3 break-keep font-black tracking-tight text-[var(--text-on-dark)]",
+                          isMobile ? "text-[clamp(2rem,8vw,2.55rem)] leading-[0.95] whitespace-nowrap" : "text-[clamp(1.25rem,3.2vw,1.8rem)]"
                         )}>
                           {value}
                         </p>
-                        <p className="text-[11px] font-semibold leading-5 break-keep text-[var(--text-on-dark-soft)]">{helper}</p>
-                        <p className="text-[11px] font-black break-keep text-[var(--accent-orange-soft)]">{note}</p>
+                        <div className="mt-3 space-y-1.5">
+                          <p className="text-[11px] font-semibold leading-5 break-keep text-[var(--text-on-dark-soft)]">{helper}</p>
+                          <p className="text-[11px] font-black break-keep text-[var(--accent-orange-soft)]">{note}</p>
+                        </div>
                         <div className={cn("mt-4 h-1.5 overflow-hidden rounded-full", isAnalysisPresentation ? analysisMeterTrackClass : "bg-white/12")}>
                           <div className={cn("h-full rounded-full bg-gradient-to-r", meterClass)} style={{ width: `${meterValue}%` }} />
                         </div>
@@ -3103,25 +3099,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><Target className="h-4 w-4 text-blue-500" /> 인지과학 코칭 포인트</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {coachingHighlights.map((message, index) => (
-                      <div key={message} className="flex items-start gap-2 rounded-xl border border-primary/10 bg-primary/5 px-3 py-2.5">
-                        <Badge className="h-5 min-w-5 rounded-full p-0 flex items-center justify-center text-[10px] font-black">{index + 1}</Badge>
-                        <p className="text-sm font-bold leading-relaxed text-slate-700">{message}</p>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
+                <Card className={cn("rounded-[1.5rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-3">
+                    <div className={cn(
+                      "rounded-xl border px-4 py-3",
+                      isAnalysisPresentation ? "border-[#dbe7ff] bg-white/92 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.16)]" : "border-slate-200 bg-slate-50"
+                    )}>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">전체분석 요약</p>
+                      <p className="mt-1 text-sm font-black leading-6 text-[#14295F]">{chartInsightHeadline}</p>
+                      <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                        최근 {RANGE_MAP[focusedChartView]}일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}% · 리듬 점수 {rhythmScore}점
+                      </p>
+                    </div>
                     {riskSignals.length === 0 ? (
                       <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">현재 뚜렷한 위험 신호는 없습니다. 유지 전략 중심의 피드백이 적합합니다.</div>
                     ) : (
@@ -3198,26 +3190,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[2rem] border-none shadow-lg bg-white md:col-span-2">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Target className="h-4 w-4 text-blue-500" /> 인지과학 코칭 포인트</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {coachingHighlights.map((message, index) => (
-                      <div key={message} className="flex items-start gap-2 rounded-xl border border-primary/10 bg-primary/5 px-3 py-2.5">
-                        <Badge className="h-5 min-w-5 rounded-full p-0 flex items-center justify-center text-[10px] font-black">{index + 1}</Badge>
-                        <p className="text-sm font-bold leading-relaxed text-slate-700">{message}</p>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
               </div>
 
-              <Card className="rounded-[2rem] border-none shadow-lg bg-white">
+              <Card className={cn("rounded-[2rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage")}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">전체분석 요약</p>
+                    <p className="mt-1 text-sm font-black leading-6 text-[#14295F]">{chartInsightHeadline}</p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                      최근 {RANGE_MAP[focusedChartView]}일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}% · 리듬 점수 {rhythmScore}점
+                    </p>
+                  </div>
                   {riskSignals.length === 0 ? (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">현재 뚜렷한 위험 신호는 없습니다. 유지 전략 중심의 피드백이 적합합니다.</div>
                   ) : (

@@ -315,6 +315,16 @@ function HeroMetricChip({
   accentClass: string;
   floatingGain?: FloatingGain | null;
 }) {
+  const valueLength = value.length;
+  const valueClass =
+    valueLength >= 11
+      ? 'text-[0.76rem] tracking-[-0.08em] sm:text-[0.92rem]'
+      : valueLength >= 9
+        ? 'text-[0.82rem] tracking-[-0.07em] sm:text-[1rem]'
+        : valueLength >= 7
+          ? 'text-[0.9rem] tracking-[-0.06em] sm:text-[1.08rem]'
+          : 'text-[0.98rem] tracking-[-0.04em] sm:text-[1.2rem]';
+
   return (
     <div className="surface-card surface-card--secondary on-dark relative min-w-0 rounded-[1.35rem] px-3 py-3">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
@@ -329,7 +339,7 @@ function HeroMetricChip({
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-on-dark-soft)]">{label}</div>
-          <div className="font-aggro-display mt-1 truncate text-[0.98rem] font-black tracking-[-0.04em] text-white sm:text-[1.2rem]">{value}</div>
+          <div className={cn("font-aggro-display mt-1 whitespace-nowrap leading-none font-black text-white", valueClass)}>{value}</div>
         </div>
       </div>
     </div>

@@ -1336,17 +1336,17 @@ select {
       0 12px 24px -24px rgba(20,41,95,0.12) !important;
   }
 
+  .student-analysis-shell .analysis-chart-stage,
   .student-analysis-shell .analysis-chart-stage--warm {
-    border-color: rgba(255, 138, 31, 0.16);
+    border-color: rgba(20, 41, 95, 0.1);
     background:
-      radial-gradient(circle at top right, rgba(255,186,111,0.18), transparent 26%),
-      radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 34%),
-      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(255,248,241,0.98) 100%);
+      radial-gradient(circle at top left, rgba(255,255,255,0.96), transparent 34%),
+      linear-gradient(180deg, rgba(255,255,255,0.995) 0%, rgba(255,255,255,0.985) 100%);
     box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.98) inset,
-      0 -1px 0 0 rgba(255,138,31,0.05) inset,
-      0 18px 34px -28px rgba(20,41,95,0.18),
-      0 28px 52px -40px rgba(255,138,31,0.16);
+      0 1px 0 0 rgba(255,255,255,0.99) inset,
+      0 -1px 0 0 rgba(20,41,95,0.04) inset,
+      0 18px 34px -28px rgba(20,41,95,0.16),
+      0 26px 48px -40px rgba(20,41,95,0.12);
   }
 
   .student-analysis-shell .analysis-overview-canvas {
