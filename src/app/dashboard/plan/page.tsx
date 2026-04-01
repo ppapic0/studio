@@ -91,6 +91,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import {
   EMPTY_ATTENDANCE_SCHEDULE_DRAFT,
   ROUTINE_TEMPLATE_OPTIONS,
+  STUDY_PLAN_MODE_OPTIONS,
   type AttendanceScheduleDraft,
   type AttendanceAwaySlot,
   type RecentStudyOption,
@@ -186,8 +187,20 @@ const SUBJECTS = [
   { id: 'social', label: '사탐', color: 'bg-amber-500', light: 'bg-amber-50', text: 'text-amber-600' },
   { id: 'science', label: '과탐', color: 'bg-purple-500', light: 'bg-purple-50', text: 'text-purple-600' },
   { id: 'history', label: '한국사', color: 'bg-slate-700', light: 'bg-slate-100', text: 'text-slate-700' },
-  { id: 'etc', label: '기타', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
+  { id: 'etc', label: '직접 입력', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
+const DEFAULT_CUSTOM_SUBJECT_LABEL = '직접 입력';
+
+function normalizeCustomSubjectLabel(label?: string | null) {
+  const trimmed = label?.trim();
+  return trimmed || DEFAULT_CUSTOM_SUBJECT_LABEL;
+}
+
+function resolveSubjectLabel(subject?: string | null, subjectLabel?: string | null) {
+  const subjectValue = subject || 'etc';
+  if (subjectValue === 'etc') return normalizeCustomSubjectLabel(subjectLabel);
+  return SUBJECTS.find((item) => item.id === subjectValue)?.label || DEFAULT_CUSTOM_SUBJECT_LABEL;
+}
 
 function resolveStudyPlanMode(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetAmount' | 'targetMinutes'>): StudyPlanMode {
   if (task.studyPlanMode) return task.studyPlanMode;
@@ -397,6 +410,7 @@ export default function StudyPlanPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [newStudyTask, setNewStudyTask] = useState('');
   const [newStudySubject, setNewStudySubject] = useState('math');
+  const [newStudyCustomSubject, setNewStudyCustomSubject] = useState(DEFAULT_CUSTOM_SUBJECT_LABEL);
   const [newStudyMode, setNewStudyMode] = useState<StudyPlanMode>('volume');
   const [newStudyMinutes, setNewStudyMinutes] = useState('60');
   const [newStudyTargetAmount, setNewStudyTargetAmount] = useState('');
@@ -432,6 +446,16 @@ export default function StudyPlanPage() {
   const [recentStudyHistory, setRecentStudyHistory] = useState<StudyPlanItem[]>([]);
   const [isRecentStudyLoading, setIsRecentStudyLoading] = useState(false);
   const [activeRecentStudyKey, setActiveRecentStudyKey] = useState<string | null>(null);
+
+  const planSubjectOptions = useMemo(
+    () =>
+      SUBJECTS.map((item) =>
+        item.id === 'etc'
+          ? { ...item, label: normalizeCustomSubjectLabel(newStudyCustomSubject) }
+          : item
+      ),
+    [newStudyCustomSubject]
+  );
 
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
@@ -618,7 +642,7 @@ export default function StudyPlanPage() {
   const buildRecentStudyOption = useCallback(
     (task: WithId<StudyPlanItem>, sourceWeekKey: string): RecentStudyOption => {
       const subjectValue = task.subject || 'etc';
-      const subject = SUBJECTS.find((item) => item.id === subjectValue);
+      const resolvedSubjectLabel = resolveSubjectLabel(subjectValue, task.subjectLabel);
       const studyModeValue = resolveStudyPlanMode(task);
       const amountUnitValue = (task.amountUnit || '문제') as StudyAmountUnit;
       const customAmountUnitValue = task.amountUnit === '직접입력' ? task.amountUnitLabel?.trim() || '' : '';
@@ -628,6 +652,7 @@ export default function StudyPlanPage() {
       return {
         key: [
           subjectValue,
+          subjectValue === 'etc' ? resolvedSubjectLabel : '',
           studyModeValue,
           studyModeValue === 'volume'
             ? `${Math.max(0, task.targetAmount || 0)}:${resolveAmountUnitLabel(task)}`
@@ -639,7 +664,7 @@ export default function StudyPlanPage() {
         sourceWeekKey,
         title: task.title,
         subjectValue,
-        subjectLabel: subject?.label || '기타',
+        subjectLabel: resolvedSubjectLabel,
         studyModeValue,
         studyModeLabel: studyModeValue === 'volume' ? '분량형' : '시간형',
         minuteValue: String(task.targetMinutes || ''),
@@ -1057,14 +1082,23 @@ export default function StudyPlanPage() {
 
   const studyTimeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
+    const labeledSummary = new Map<string, { subjectId: string; subjectLabel: string; minutes: number }>();
     let total = 0;
     studyTasks.forEach(task => {
       const subject = task.subject || 'etc';
+      const subjectLabel = resolveSubjectLabel(subject, task.subjectLabel);
+      const subjectKey = subject === 'etc' ? `etc:${subjectLabel}` : subject;
       const mins = task.targetMinutes || 0;
       summary[subject] = (summary[subject] || 0) + mins;
+      const current = labeledSummary.get(subjectKey);
+      if (current) {
+        current.minutes += mins;
+      } else {
+        labeledSummary.set(subjectKey, { subjectId: subjectKey, subjectLabel, minutes: mins });
+      }
       total += mins;
     });
-    return { breakdown: summary, total };
+    return { breakdown: summary, labeledBreakdown: Array.from(labeledSummary.values()), total };
   }, [studyTasks]);
   const volumeStudyTasks = useMemo(
     () => studyTasks.filter((task) => resolveStudyPlanMode(task) === 'volume'),
@@ -1073,12 +1107,12 @@ export default function StudyPlanPage() {
   const studyGoalSummaryLabel = useMemo(() => {
     const timeTaskCount = studyTasks.length - volumeStudyTasks.length;
     if (volumeStudyTasks.length > 0 && studyTimeSummary.total > 0) {
-      return `시간형 ${timeTaskCount}개 · 분량형 ${volumeStudyTasks.length}개`;
+      return `분량형 ${volumeStudyTasks.length}개 · 총 계획 ${formatMinutesSummary(studyTimeSummary.total)}`;
     }
     if (volumeStudyTasks.length > 0) {
       return `분량형 목표 ${volumeStudyTasks.length}개`;
     }
-    return `목표 ${Math.floor(studyTimeSummary.total / 60)}시간 ${studyTimeSummary.total % 60}분`;
+    return timeTaskCount > 0 ? `총 계획 ${formatMinutesSummary(studyTimeSummary.total)}` : '오늘 계획을 아직 정하지 않았어요';
   }, [studyTasks.length, volumeStudyTasks.length, studyTimeSummary.total]);
   const remainingStudyTasks = useMemo(
     () => studyTasks.filter((task) => !task.done),
@@ -1109,14 +1143,13 @@ export default function StudyPlanPage() {
   );
   const taskCopyOptions = useMemo(() => (
     copyableTaskItems.map((item) => {
-      const subject = SUBJECTS.find((entry) => entry.id === (item.subject || 'etc'));
       const isStudyItem = item.category === 'study' || !item.category;
       const planMetaLabel = buildStudyTaskMeta(item);
       return {
         id: item.id,
         title: item.title,
         meta: isStudyItem
-          ? `${subject?.label ?? '기타'} · ${planMetaLabel}`
+          ? `${resolveSubjectLabel(item.subject, item.subjectLabel)} · ${planMetaLabel}`
           : '기타 일정',
         badgeLabel: isStudyItem ? '학습' : '기타',
         badgeClassName: isStudyItem
@@ -1203,15 +1236,8 @@ export default function StudyPlanPage() {
     ? Math.min(100, Math.round((studyTimeSummary.total / recommendedDailyMinutes) * 100))
     : 0;
   const subjectBalanceEntries = useMemo(
-    () =>
-      Object.entries(studyTimeSummary.breakdown)
-        .map(([subjectId, minutes]) => ({
-          subjectId,
-          subjectLabel: SUBJECTS.find((item) => item.id === subjectId)?.label || '기타',
-          minutes,
-        }))
-        .sort((left, right) => right.minutes - left.minutes),
-    [studyTimeSummary.breakdown]
+    () => [...studyTimeSummary.labeledBreakdown].sort((left, right) => right.minutes - left.minutes),
+    [studyTimeSummary.labeledBreakdown]
   );
   const visibleStudyTasks = useMemo(() => orderedChecklistTasks.filter((task) => task.category === 'study' || !task.category).slice(0, 5), [orderedChecklistTasks]);
   const hiddenStudyTaskCount = Math.max(0, studyTasks.length - visibleStudyTasks.length);
@@ -1300,6 +1326,12 @@ export default function StudyPlanPage() {
         : null;
       if (matchedSubject) {
         setNewStudySubject(matchedSubject.id);
+        if (matchedSubject.id === 'etc') {
+          setNewStudyCustomSubject(normalizeCustomSubjectLabel(preset.subject));
+        }
+      } else if (preset.subject) {
+        setNewStudySubject('etc');
+        setNewStudyCustomSubject(normalizeCustomSubjectLabel(preset.subject));
       }
       setNewStudyMode(preset.studyMode || 'time');
       setNewStudyMinutes(String(preset.targetMinutes || 40));
@@ -1350,6 +1382,7 @@ export default function StudyPlanPage() {
     setActiveRecentStudyKey(null);
     setNewStudyTask('');
     setNewStudyMinutes('60');
+    setNewStudyCustomSubject(DEFAULT_CUSTOM_SUBJECT_LABEL);
     setNewStudyTargetAmount('');
     setNewStudyAmountUnit('문제');
     setNewStudyCustomAmountUnit('');
@@ -1359,6 +1392,7 @@ export default function StudyPlanPage() {
 
   const handlePrefillRecentStudy = (item: RecentStudyOption) => {
     setNewStudySubject(item.subjectValue);
+    setNewStudyCustomSubject(item.subjectValue === 'etc' ? normalizeCustomSubjectLabel(item.subjectLabel) : DEFAULT_CUSTOM_SUBJECT_LABEL);
     setNewStudyMode(item.studyModeValue);
     setNewStudyMinutes(item.minuteValue || '60');
     setNewStudyTargetAmount(item.amountValue);
@@ -1386,6 +1420,7 @@ export default function StudyPlanPage() {
     category: (task.category === 'personal' ? 'personal' : 'study'),
     title: task.title,
     subject: task.subject || 'etc',
+    subjectLabel: task.subject === 'etc' ? normalizeCustomSubjectLabel(task.subjectLabel) : undefined,
     studyPlanMode: resolveStudyPlanMode(task),
     targetMinutes: task.targetMinutes || undefined,
     targetAmount: task.targetAmount || undefined,
@@ -1485,6 +1520,7 @@ export default function StudyPlanPage() {
           dateKey: selectedDateKey,
           category: task.category,
           subject: task.category === 'study' ? task.subject || 'etc' : null,
+          subjectLabel: task.category === 'study' && (task.subject || 'etc') === 'etc' ? normalizeCustomSubjectLabel(task.subjectLabel) : null,
           studyPlanMode: task.category === 'study' ? task.studyPlanMode || 'time' : null,
           targetMinutes: task.category === 'study' ? task.targetMinutes || 0 : 0,
           targetAmount: task.category === 'study' ? task.targetAmount || 0 : 0,
@@ -1621,6 +1657,7 @@ export default function StudyPlanPage() {
           dateKey: tomorrowDateKey,
           category: task.category,
           subject: task.subject || 'etc',
+          subjectLabel: (task.subject || 'etc') === 'etc' ? normalizeCustomSubjectLabel(task.subjectLabel) : null,
           studyPlanMode: task.studyPlanMode || 'time',
           targetMinutes: task.targetMinutes || 0,
           targetAmount: task.targetAmount || 0,
@@ -1939,11 +1976,15 @@ export default function StudyPlanPage() {
         const studyAmountUnit = taskBlueprint?.amountUnit || recentStudy?.amountUnitValue || newStudyAmountUnit;
         const customUnitLabel = (taskBlueprint?.amountUnitLabel ?? recentStudy?.customAmountUnitValue ?? newStudyCustomAmountUnit).trim();
         const subjectValue = taskBlueprint?.subject || recentStudy?.subjectValue || newStudySubject;
+        const customSubjectLabel = taskBlueprint?.subjectLabel?.trim()
+          || (recentStudy?.subjectValue === 'etc' ? recentStudy.subjectLabel.trim() : '')
+          || (subjectValue === 'etc' ? normalizeCustomSubjectLabel(newStudyCustomSubject) : '');
         const shouldKeepMinutes = taskBlueprint
           ? Boolean(taskBlueprint.targetMinutes && studyMode === 'volume')
           : recentStudy ? recentStudy.enableVolumeMinutes : enableVolumeStudyMinutes;
 
         data.subject = subjectValue;
+        data.subjectLabel = subjectValue === 'etc' ? normalizeCustomSubjectLabel(customSubjectLabel) : null;
         data.studyPlanMode = studyMode;
 
         if (studyMode === 'time') {
@@ -1984,6 +2025,7 @@ export default function StudyPlanPage() {
       if (category === 'study') {
         if (!options?.preserveStudyComposer) {
           setNewStudyTask('');
+          setNewStudyCustomSubject(DEFAULT_CUSTOM_SUBJECT_LABEL);
           setNewStudyTargetAmount('');
           setNewStudyAmountUnit('문제');
           setNewStudyCustomAmountUnit('');
@@ -2800,32 +2842,6 @@ export default function StudyPlanPage() {
 
   return (
     <div className={cn("flex flex-col w-full max-w-5xl mx-auto pb-24", isMobile ? "gap-4 px-0" : "gap-6")}>
-      <header className={cn("flex flex-col", isMobile ? "gap-2 px-1" : "gap-3")}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className={cn("font-black uppercase tracking-[0.24em] text-primary/55", isMobile ? "text-[9px]" : "text-[11px]")}>
-              Plan Track
-            </p>
-            <h1 className={cn("mt-1 font-black tracking-tight text-primary", isMobile ? "text-[1.65rem]" : "text-[2.4rem]")}>
-              오늘 계획부터 차분하게 정리해요
-            </h1>
-            <p className={cn("mt-2 break-keep font-semibold text-[#5A6F95]", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
-              복잡한 허브 대신 오늘 할 일, 짧은 추천, 이번 주 독서실 일정만 먼저 보여드릴게요.
-            </p>
-          </div>
-          {isPast ? (
-            <Badge variant="destructive" className={cn("rounded-full font-black px-3 py-1 shadow-sm", isMobile ? "text-[8px] h-6" : "text-[10px]")}>
-              기록 모드
-            </Badge>
-          ) : (
-            <Badge className={cn("rounded-full border-none font-black text-white shadow-lg bg-gradient-to-r", isMobile ? "text-[8px] h-7 px-3" : "text-[10px] h-9 px-4", rewardGradient)}>
-              <Zap className={cn(isMobile ? "mr-1 h-3 w-3" : "mr-1.5 h-4 w-4")} />
-              오늘 기준 {formatMinutesSummary(recommendedDailyMinutes)}
-            </Badge>
-          )}
-        </div>
-      </header>
-
       <section className={cn("overflow-hidden rounded-[1.7rem] bg-[linear-gradient(180deg,#17326B_0%,#21448D_100%)] text-white shadow-[0_24px_56px_-34px_rgba(20,41,95,0.48)]", isMobile ? "rounded-[1.35rem]" : "rounded-[2rem]")}>
         <div className={cn("space-y-5", isMobile ? "p-4" : "p-6")}>
           <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-start justify-between")}>
@@ -2907,7 +2923,7 @@ export default function StudyPlanPage() {
               ) : (
                 <div className="space-y-3">
                   {visibleStudyTasks.map((task) => {
-                    const subject = SUBJECTS.find((item) => item.id === (task.subject || 'etc'));
+                    const subjectLabel = resolveSubjectLabel(task.subject, task.subjectLabel);
                     const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
                     const metaLabel = isVolumeTask
                       ? `${task.targetAmount || 0}${resolveAmountUnitLabel(task)}`
@@ -2923,11 +2939,13 @@ export default function StudyPlanPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge className="rounded-full border-none bg-white px-2.5 py-1 text-[9px] font-black text-[#17326B] shadow-none">
-                              {subject?.label || '기타'}
+                              {subjectLabel}
                             </Badge>
-                            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
-                              {isVolumeTask ? '분량형' : '시간형'}
-                            </span>
+                            {isVolumeTask ? (
+                              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+                                분량형
+                              </span>
+                            ) : null}
                           </div>
                           <p className={cn("mt-2 break-keep text-sm font-black", task.done ? "text-white/70 line-through" : "text-white")}>
                             {task.title}
@@ -3240,9 +3258,11 @@ export default function StudyPlanPage() {
         completedCount={completedStudyCount}
         remainingCount={remainingStudyTasks.length}
         goalSummaryLabel={studyGoalSummaryLabel}
-        subjectOptions={SUBJECTS}
+        subjectOptions={planSubjectOptions}
         subjectValue={newStudySubject}
         onSubjectChange={setNewStudySubject}
+        customSubjectValue={newStudyCustomSubject}
+        onCustomSubjectChange={setNewStudyCustomSubject}
         minuteValue={newStudyMinutes}
         onMinuteChange={setNewStudyMinutes}
         taskValue={newStudyTask}
@@ -3274,6 +3294,7 @@ export default function StudyPlanPage() {
         onAddPersonalTask={() => void handleAddTask(newPersonalTask, 'personal')}
         onTogglePersonalTask={(task) => void handleToggleTask(task)}
         onDeletePersonalTask={(task) => void handleDeleteTask(task)}
+        modeOptions={STUDY_PLAN_MODE_OPTIONS.filter((option) => option.value === 'volume')}
       />
 
       <AttendanceScheduleSheet

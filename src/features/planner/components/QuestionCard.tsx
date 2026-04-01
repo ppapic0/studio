@@ -135,7 +135,7 @@ export function QuestionCard({
           {question.options.map((option) => {
             const active = question.type === 'multi-select'
               ? Array.isArray(value) && value.includes(option.value)
-              : value === option.value;
+              : String(value ?? '') === String(option.value);
 
             return (
               <SelectCard

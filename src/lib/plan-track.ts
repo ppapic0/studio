@@ -7,6 +7,7 @@ export type PlannerTaskDraft = {
   category: 'study' | 'personal';
   title: string;
   subject?: string;
+  subjectLabel?: string;
   studyPlanMode?: StudyPlanMode;
   targetMinutes?: number;
   targetAmount?: number;

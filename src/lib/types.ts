@@ -750,6 +750,7 @@ export interface StudyPlanItem {
   dateKey: string;
   category?: 'schedule' | 'personal' | 'study';
   subject?: string;
+  subjectLabel?: string;
   studyPlanMode?: 'time' | 'volume';
   targetMinutes?: number;
   targetAmount?: number;

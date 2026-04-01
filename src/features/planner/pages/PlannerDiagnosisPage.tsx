@@ -57,6 +57,7 @@ function isQuestionAnswered(question: (typeof PLANNER_QUESTIONS)[number], answer
     return Array.isArray(value) && value.length > 0;
   }
   if (question.type === 'subject-grades') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
   return typeof value === 'string' && value.length > 0;
 }
 

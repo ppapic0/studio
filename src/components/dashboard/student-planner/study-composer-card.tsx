@@ -15,12 +15,12 @@ import {
 import { cn } from '@/lib/utils';
 
 import {
+  type StudyAmountUnit,
+  type StudyPlanMode,
+  STUDY_PLAN_MODE_OPTIONS,
   type RecentStudyOption,
   STUDY_AMOUNT_UNIT_OPTIONS,
   STUDY_MINUTE_PRESETS,
-  STUDY_PLAN_MODE_OPTIONS,
-  type StudyAmountUnit,
-  type StudyPlanMode,
 } from './planner-constants';
 
 type SubjectOption = {
@@ -37,6 +37,8 @@ type StudyComposerCardProps = {
   subjectOptions: SubjectOption[];
   subjectValue: string;
   onSubjectChange: (value: string) => void;
+  customSubjectValue?: string;
+  onCustomSubjectChange?: (value: string) => void;
   minuteValue: string;
   onMinuteChange: (value: string) => void;
   taskValue: string;
@@ -63,6 +65,7 @@ type StudyComposerCardProps = {
   compact?: boolean;
   disabled?: boolean;
   submitLabel?: string;
+  modeOptions?: Array<{ value: StudyPlanMode; label: string; description: string }>;
 };
 
 export function StudyComposerCard({
@@ -71,6 +74,8 @@ export function StudyComposerCard({
   subjectOptions,
   subjectValue,
   onSubjectChange,
+  customSubjectValue = '',
+  onCustomSubjectChange,
   minuteValue,
   onMinuteChange,
   taskValue,
@@ -97,6 +102,7 @@ export function StudyComposerCard({
   compact = false,
   disabled = false,
   submitLabel = '계획 추가',
+  modeOptions = STUDY_PLAN_MODE_OPTIONS,
 }: StudyComposerCardProps) {
   const isVolumeMode = studyModeValue === 'volume';
   const visibleRecentOptions = recentOptions.slice(0, isMobile ? 2 : 5);
@@ -206,8 +212,9 @@ export function StudyComposerCard({
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-2">
-          {STUDY_PLAN_MODE_OPTIONS.map((option) => {
+        {modeOptions.length > 1 ? (
+          <div className="grid grid-cols-2 gap-2">
+          {modeOptions.map((option) => {
             const isActive = option.value === studyModeValue;
             return (
               <Button
@@ -233,7 +240,8 @@ export function StudyComposerCard({
               </Button>
             );
           })}
-        </div>
+          </div>
+        ) : null}
 
         <div className={cn("grid gap-2", isVolumeMode ? "grid-cols-1" : isMobile ? "grid-cols-1" : compact ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)_7.2rem]")}>
           <Select value={subjectValue} onValueChange={onSubjectChange} disabled={disabled || isSubmitting}>
@@ -259,6 +267,19 @@ export function StudyComposerCard({
             />
           ) : null}
         </div>
+
+        {subjectValue === 'etc' && onCustomSubjectChange ? (
+          <Input
+            value={customSubjectValue}
+            onChange={(event) => onCustomSubjectChange(event.target.value)}
+            disabled={disabled || isSubmitting}
+            placeholder="예: 생윤, 물리, 미적분, 전공 과목"
+            className={cn(
+              "rounded-xl border-white/12 bg-white/[0.1] font-bold text-white shadow-none placeholder:text-white/55",
+              compact ? "h-10 text-[11px]" : "h-11 text-xs"
+            )}
+          />
+        ) : null}
 
         {!isVolumeMode ? (
           <div className="flex flex-wrap gap-2">

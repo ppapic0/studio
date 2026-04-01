@@ -1,7 +1,7 @@
 export const ONBOARDING_START_COPY = {
   title: '나에게 맞는 학습 계획 찾기',
-  subtitle: '몇 가지 질문만 답하면\n내 목표와 공부 스타일에 맞는 계획을 추천해드릴게요.',
-  description: '완벽하게 답하지 않아도 괜찮아요.\n지금 공부 패턴에 가장 가까운 걸 골라주세요.',
+  subtitle: '몇 가지 질문만 답하면\n앞으로 쓸 계획을 더 잘 추천할 수 있게 기준을 먼저 잡아드릴게요.',
+  description: '계획을 대신 짜주는 설문은 아니에요.\n지금 공부 패턴에 가장 가까운 걸 골라주시면, 이후 계획 추천과 코칭에 반영할게요.',
   primaryCta: '시작하기',
   secondaryCta: '나중에 할게요',
   footnote: '약 1~2분 걸려요',
@@ -25,8 +25,8 @@ export const ONBOARDING_BRIDGE_COPY = {
 export const ONBOARDING_LOADING_COPY = {
   title: '기준을 정리하는 중이에요',
   lines: [
-    '답변을 바탕으로\n앞으로 계획을 읽을 기준을 먼저 정리하고 있어요.',
-    '우선 과목, 총량, 공부 블록 길이까지\n실제로 코칭에 쓸 기준으로 맞추고 있어요.',
+    '답변을 바탕으로\n앞으로 쓸 계획을 읽을 기준을 먼저 정리하고 있어요.',
+    '우선 과목, 총량, 공부 블록 길이까지\n실제로 추천과 코칭에 쓸 기준으로 맞추고 있어요.',
     '조금만 기다리면\n오늘 계획에 바로 붙일 수 있게 저장해드릴게요.',
   ],
 } as const;
@@ -46,7 +46,7 @@ export const ONBOARDING_RESULTS_COPY = {
 
 export const ONBOARDING_SAVED_COPY = {
   title: '내 기준을 저장했어요',
-  subtitle: '이제 오늘 계획을 쓰면 부족한 점과 보강 포인트를 함께 보여드릴게요.',
+  subtitle: '이제 오늘 계획을 쓰면, 답변을 바탕으로 부족한 점과 보강 포인트를 함께 추천해드릴게요.',
   primaryCta: '오늘 계획 보러가기',
   secondaryCta: '답변 다시 보기',
   footnote: '기준은 언제든 다시 진단해서 내 공부 흐름에 맞게 바꿀 수 있어요.',

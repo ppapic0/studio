@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { PlanItemCard } from './plan-item-card';
 import {
   type RecentStudyOption,
+  STUDY_PLAN_MODE_OPTIONS,
   type StudyAmountUnit,
   type StudyPlanMode,
 } from './planner-constants';
@@ -45,6 +46,8 @@ type StudyPlanSheetProps = {
   subjectOptions: SubjectOption[];
   subjectValue: string;
   onSubjectChange: (value: string) => void;
+  customSubjectValue?: string;
+  onCustomSubjectChange?: (value: string) => void;
   minuteValue: string;
   onMinuteChange: (value: string) => void;
   taskValue: string;
@@ -76,6 +79,7 @@ type StudyPlanSheetProps = {
   onAddPersonalTask?: () => void;
   onTogglePersonalTask?: (task: WithId<StudyPlanItem>) => void;
   onDeletePersonalTask?: (task: WithId<StudyPlanItem>) => void;
+  modeOptions?: Array<{ value: StudyPlanMode; label: string; description: string }>;
 };
 
 function resolveStudyPlanMode(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetAmount' | 'targetMinutes'>): StudyPlanMode {
@@ -113,6 +117,8 @@ export function StudyPlanSheet({
   subjectOptions,
   subjectValue,
   onSubjectChange,
+  customSubjectValue = '',
+  onCustomSubjectChange,
   minuteValue,
   onMinuteChange,
   taskValue,
@@ -144,6 +150,7 @@ export function StudyPlanSheet({
   onAddPersonalTask,
   onTogglePersonalTask,
   onDeletePersonalTask,
+  modeOptions = STUDY_PLAN_MODE_OPTIONS,
 }: StudyPlanSheetProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -209,10 +216,12 @@ export function StudyPlanSheet({
             <div className="mt-4">
               <StudyComposerCard
                 title="학습 계획 추가"
-                description="최근 계획을 먼저 불러오거나, 시간형과 분량형 중 편한 방식으로 바로 적어보세요."
+                description={modeOptions.length > 1 ? '최근 계획을 먼저 불러오거나, 분량형 중심으로 바로 적어보세요.' : '최근 계획을 먼저 불러오거나, 끝낼 분량 중심으로 바로 적어보세요.'}
                 subjectOptions={subjectOptions}
                 subjectValue={subjectValue}
                 onSubjectChange={onSubjectChange}
+                customSubjectValue={customSubjectValue}
+                onCustomSubjectChange={onCustomSubjectChange}
                 studyModeValue={studyModeValue}
                 onStudyModeChange={onStudyModeChange}
                 minuteValue={minuteValue}
@@ -236,6 +245,7 @@ export function StudyPlanSheet({
                 onOpenRecentSheet={onOpenRecentSheet}
                 activeRecentTitle={activeRecentTitle}
                 onResetRecentPrefill={onResetRecentPrefill}
+                modeOptions={modeOptions}
               />
             </div>
           ) : null}
@@ -265,7 +275,7 @@ export function StudyPlanSheet({
                       disabled={isPast}
                       isMobile={isMobile}
                       tone="emerald"
-                      badgeLabel={`${subject?.label || '기타'} · ${isVolumeTask ? '분량형' : '시간형'}`}
+                      badgeLabel={`${task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'} · ${isVolumeTask ? '분량형' : '시간형'}`}
                       metaLabel={buildStudyTaskMeta(task)}
                       volumeMeta={isVolumeTask ? {
                         targetAmount: Math.max(0, task.targetAmount || 0),
@@ -348,7 +358,7 @@ export function StudyPlanSheet({
           ) : null}
 
           <div className="mt-4 rounded-[1.1rem] border border-white/12 bg-white/[0.08] px-4 py-3 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-            최근 계획을 불러와서 살짝 수정하거나, 분량형/시간형 중 편한 방식으로 새 계획을 짧게 추가해보세요.
+            최근 계획을 불러와서 살짝 수정하거나, 오늘 끝낼 분량 중심으로 새 계획을 짧게 추가해보세요.
           </div>
         </div>
       </DialogContent>
