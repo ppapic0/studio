@@ -853,10 +853,10 @@ export function StudentHomeGamePanel({
                     <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[11px] font-black text-[var(--text-on-accent)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.3)]">
                       {entry.rank === 1 ? <Crown className="h-4 w-4 text-[var(--accent-orange)]" /> : `#${entry.rank}`}
                     </div>
-                    <div className="mt-2 break-keep text-[14px] font-black tracking-tight text-[var(--text-on-accent)]">
+                    <div className="mt-2 break-keep text-[14px] font-black tracking-tight text-[rgba(20,41,95,0.96)]">
                       {formatMaskedStudentName(entry.name)}
                     </div>
-                    <div className="mt-1 truncate text-[10px] font-bold tracking-[0.04em] text-[rgba(14,28,56,0.58)]">
+                    <div className="mt-1 min-h-[1rem] truncate text-[10px] font-bold tracking-[0.02em] text-[rgba(20,41,95,0.72)]">
                       {formatSchoolLabel(entry.schoolName)}
                     </div>
                     <div className="mt-2 inline-flex rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] px-2.5 py-1 text-[11px] font-black text-[var(--accent-orange)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]">

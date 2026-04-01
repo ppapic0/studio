@@ -41,6 +41,7 @@ type RoutineOnboardingFlowProps = {
   studentName?: string;
   onSaveRoutineProfile: (profile: UserStudyProfile, selectedRoutine: RecommendedRoutine) => Promise<void>;
   onContinueToPlanner: () => void;
+  onSkipForNow: () => Promise<void> | void;
 };
 
 type QuestionSelectionState = Record<string, string | string[]>;
@@ -207,6 +208,7 @@ export function RoutineOnboardingFlow({
   studentName: _studentName,
   onSaveRoutineProfile,
   onContinueToPlanner,
+  onSkipForNow,
 }: RoutineOnboardingFlowProps) {
   const [phase, setPhase] = useState<'intro' | 'survey' | 'loading' | 'results' | 'saved'>('intro');
   const [stepIndex, setStepIndex] = useState(0);
@@ -216,6 +218,7 @@ export function RoutineOnboardingFlow({
   const [routineDrafts, setRoutineDrafts] = useState<Record<string, RoutineCustomizationDraft>>({});
   const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
 
   const recommendationResult = useMemo(() => generateRoutineRecommendationSet(answers), [answers]);
   const routines = useMemo(
@@ -345,6 +348,15 @@ export function RoutineOnboardingFlow({
     }
   };
 
+  const handleSkipForNow = async () => {
+    setIsSkipping(true);
+    try {
+      await onSkipForNow();
+    } finally {
+      setIsSkipping(false);
+    }
+  };
+
   if (phase === 'intro') {
     return (
       <div className="mx-auto flex w-full max-w-[460px] flex-col gap-4 px-4 pb-24 pt-3">
@@ -374,7 +386,10 @@ export function RoutineOnboardingFlow({
                 variant="dark"
                 size="lg"
                 className="h-12 rounded-[1.1rem]"
-                onClick={() => setPhase('loading')}
+                onClick={() => {
+                  void handleSkipForNow();
+                }}
+                disabled={isSkipping}
               >
                 {ONBOARDING_START_COPY.secondaryCta}
               </Button>

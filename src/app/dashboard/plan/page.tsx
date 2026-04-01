@@ -397,11 +397,11 @@ export default function StudyPlanPage() {
   const searchParams = useSearchParams();
 
   const isMobile = viewMode === 'mobile';
-  const shouldRenderLegacyPlanner = process.env.NEXT_PUBLIC_PLAN_TRACK_LEGACY === '1';
   const rewardGradient = 'from-[#14295F] via-[#1B326D] to-[#233E86]';
   const [planTrackEntryMode, setPlanTrackEntryMode] = useState<'auto' | 'onboarding' | 'planner'>('auto');
   const [routineSurfaceMode, setRoutineSurfaceMode] = useState<'home' | 'editor'>('home');
   const [routineWorkspace, setRoutineWorkspace] = useState<RoutineWorkspaceState | null>(null);
+  const [isRoutineGuideOpen, setIsRoutineGuideOpen] = useState(false);
   const [isReflectionSheetOpen, setIsReflectionSheetOpen] = useState(false);
   const [isRoutineBlockSheetOpen, setIsRoutineBlockSheetOpen] = useState(false);
   const [isRoutinePrivacySheetOpen, setIsRoutinePrivacySheetOpen] = useState(false);
@@ -672,29 +672,36 @@ export default function StudyPlanPage() {
       user?.displayName,
     ]
   );
+  const hasRoutineProfile = Boolean(studentProfile?.studyRoutineProfile?.selectedRoutineId);
+  const hasSeenRoutineOnboarding =
+    Boolean(studentProfile?.studyRoutineOnboarding?.status) || hasRoutineProfile;
+  const routineGuideTitle =
+    studentProfile?.studyRoutineProfile?.selectedRoutine?.name || '저장된 추천 루틴';
+  const routineGuideSummary =
+    studentProfile?.studyRoutineProfile?.selectedRoutine?.oneLineDescription ||
+    '처음 한 번 받아둔 추천 루틴이에요. 필요할 때만 펼쳐서 참고하고, 오늘 계획은 아래에서 자유롭게 적으면 돼요.';
 
   useEffect(() => {
-    if (shouldRenderLegacyPlanner || !isStudent || planTrackEntryMode !== 'auto' || isStudentProfileLoading) return;
-    if (studentProfile?.studyRoutineProfile?.selectedRoutineId) {
+    if (!isStudent || planTrackEntryMode !== 'auto' || isStudentProfileLoading) return;
+    if (hasSeenRoutineOnboarding) {
       setPlanTrackEntryMode('planner');
       return;
     }
     setPlanTrackEntryMode('onboarding');
   }, [
+    hasSeenRoutineOnboarding,
     isStudent,
     isStudentProfileLoading,
     planTrackEntryMode,
-    shouldRenderLegacyPlanner,
-    studentProfile?.studyRoutineProfile?.selectedRoutineId,
   ]);
 
   useEffect(() => {
-    if (shouldRenderLegacyPlanner || !isStudent || !studentProfile?.studyRoutineProfile) return;
+    if (!isStudent || !studentProfile?.studyRoutineProfile) return;
     setRoutineWorkspace((previous) => {
       const baseWorkspace = previous || studentProfile.studyRoutineWorkspace;
       return refreshRoutineWorkspaceForToday(studentProfile.studyRoutineProfile!, baseWorkspace);
     });
-  }, [isStudent, shouldRenderLegacyPlanner, studentProfile?.studyRoutineProfile, studentProfile?.studyRoutineWorkspace]);
+  }, [isStudent, studentProfile?.studyRoutineProfile, studentProfile?.studyRoutineWorkspace]);
 
   const fetchRecentStudyOptions = useCallback(async () => {
     if (!firestore || !user || !activeMembership || !isStudent || recentStudyWeekKeys.length === 0) {
@@ -837,6 +844,11 @@ export default function StudyPlanPage() {
         parentUids: studentProfile?.parentUids || [],
         createdAt: studentProfile?.createdAt || serverTimestamp(),
         updatedAt: serverTimestamp(),
+        studyRoutineOnboarding: {
+          status: 'completed',
+          completedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
         studyRoutineProfile: {
           ...profile,
           createdAt: studentProfile?.studyRoutineProfile?.createdAt || serverTimestamp(),
@@ -862,6 +874,28 @@ export default function StudyPlanPage() {
       description: '오늘부터 바로 쓸 수 있는 루틴이 계획트랙에 반영됐어요.',
     });
   }, [activeMembership, firestore, seedRecommendedRoutineToPlanner, studentProfile, studentProfileRef, toast, user]);
+
+  const handleDismissRoutineOnboarding = useCallback(async () => {
+    if (studentProfileRef) {
+      await setDoc(
+        studentProfileRef,
+        {
+          studyRoutineOnboarding: {
+            status: 'dismissed',
+            dismissedAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+    }
+
+    setPlanTrackEntryMode('planner');
+    toast({
+      title: '루틴 추천은 나중에 해도 괜찮아요',
+      description: '이제부터는 계획트랙에서 출입 일정과 오늘 공부를 바로 적을 수 있어요.',
+    });
+  }, [studentProfileRef, toast]);
 
   const persistRoutineWorkspace = useCallback(async (nextWorkspace: RoutineWorkspaceState) => {
     if (!studentProfileRef) return;
@@ -2248,78 +2282,18 @@ export default function StudyPlanPage() {
 
   if (!selectedDate) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
-  if (!shouldRenderLegacyPlanner && (planTrackEntryMode === 'auto' || isStudentProfileLoading)) {
+  if (planTrackEntryMode === 'auto' || isStudentProfileLoading) {
     return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
   }
 
-  if (!shouldRenderLegacyPlanner && planTrackEntryMode === 'onboarding') {
+  if (planTrackEntryMode === 'onboarding') {
     return (
       <RoutineOnboardingFlow
         studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
         onSaveRoutineProfile={handleSaveRoutineProfile}
         onContinueToPlanner={() => setPlanTrackEntryMode('planner')}
+        onSkipForNow={() => void handleDismissRoutineOnboarding()}
       />
-    );
-  }
-
-  if (!shouldRenderLegacyPlanner) {
-    if (!routineWorkspace) {
-      return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
-    }
-
-    return (
-      <>
-        {routineSurfaceMode === 'editor' ? (
-          <RoutineEditor
-            routine={routineWorkspace.activeRoutine}
-            onBack={() => setRoutineSurfaceMode('home')}
-            onSaveBlock={handleSaveRoutineBlock}
-            onDeleteBlock={handleDeleteRoutineBlock}
-          />
-        ) : (
-          <RoutineHome
-            studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
-            workspace={routineWorkspace}
-            sharingLabel={getVisibilityLabel(routineSocialProfile.visibility)}
-            onToggleBlock={handleToggleRoutineBlock}
-            onOpenEditor={() => setRoutineSurfaceMode('editor')}
-            onOpenPrivacy={() => setIsRoutinePrivacySheetOpen(true)}
-            onOpenReflection={() => setIsReflectionSheetOpen(true)}
-            onEditBlock={(block) => {
-              setSelectedRoutineBlock(block);
-              setIsRoutineBlockSheetOpen(true);
-            }}
-          />
-        )}
-
-        <RoutineBlockSheet
-          open={isRoutineBlockSheetOpen}
-          onOpenChange={(open) => {
-            setIsRoutineBlockSheetOpen(open);
-            if (!open) setSelectedRoutineBlock(null);
-          }}
-          block={selectedRoutineBlock}
-          onSave={(blockDraft) => void handleSaveRoutineBlock(blockDraft, selectedRoutineBlock?.id)}
-          onDelete={selectedRoutineBlock ? (blockId) => void handleDeleteRoutineBlock(blockId) : undefined}
-        />
-
-        <ReflectionSheet
-          open={isReflectionSheetOpen}
-          onOpenChange={setIsReflectionSheetOpen}
-          onSubmit={(reflection) => void handleSubmitReflection(reflection)}
-        />
-
-        <RoutinePrivacySheet
-          open={isRoutinePrivacySheetOpen}
-          onOpenChange={setIsRoutinePrivacySheetOpen}
-          socialProfile={routineSocialProfile}
-          studyProfile={studentProfile?.studyRoutineProfile}
-          studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
-          schoolName={studentProfile?.schoolName}
-          gradeLabel={studentProfile?.grade}
-          onSave={(nextProfile) => void handleSaveRoutineSocialProfile(nextProfile)}
-        />
-      </>
     );
   }
 
@@ -2330,7 +2304,7 @@ export default function StudyPlanPage() {
           <div className="flex flex-col">
             <h1 className={cn("font-black tracking-tighter text-primary leading-none", isMobile ? "text-xl" : "text-4xl")}>계획트랙</h1>
             <p className={cn("font-bold text-muted-foreground mt-1", isMobile ? "text-[8px] uppercase tracking-widest" : "text-sm")}>
-              {isPast ? '과거 기록 보기' : '일일 학습 매트릭스 · 루틴'}
+              {isPast ? '과거 기록 보기' : '등원 · 하원 · 외출 · 오늘 공부'}
             </p>
           </div>
           {isPast ? (
@@ -2403,6 +2377,119 @@ export default function StudyPlanPage() {
           <ChevronRight className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
         </Button>
       </div>
+
+      {!isPast ? (
+        <section className={cn("overflow-hidden rounded-[1.75rem] border border-[#DCE6F5] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.96)_100%)] shadow-[0_18px_42px_-34px_rgba(20,41,95,0.18)]", isMobile && "rounded-[1.35rem]")}>
+          <div className={cn("space-y-4", isMobile ? "p-4" : "p-5")}>
+            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
+              <div className="min-w-0">
+                <Badge className="border-none bg-primary/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-primary shadow-none">
+                  오늘 계획 보드
+                </Badge>
+                <h2 className={cn("mt-3 font-black tracking-tight text-primary break-keep", isMobile ? "text-lg" : "text-[1.35rem]")}>
+                  출입 일정은 먼저 체크하고, 오늘 공부는 자유롭게 적어도 괜찮아요
+                </h2>
+                <p className={cn("mt-2 break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
+                  루틴 추천은 처음 한 번만 받아두고, 이후에는 투두처럼 그날그날 필요한 공부 흐름을 직접 적고 체크하는 방식으로 써도 됩니다.
+                </p>
+              </div>
+              <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row")}>
+                {hasRoutineProfile ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn("rounded-xl border-2 bg-white font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
+                      onClick={() => {
+                        setRoutineSurfaceMode('home');
+                        setIsRoutineGuideOpen((previous) => !previous);
+                      }}
+                    >
+                      {isRoutineGuideOpen ? '추천 루틴 접기' : '추천 루틴 참고'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className={cn("rounded-xl font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
+                      onClick={() => {
+                        setIsRoutineGuideOpen(false);
+                        setRoutineSurfaceMode('home');
+                        setPlanTrackEntryMode('onboarding');
+                      }}
+                    >
+                      루틴 추천 다시 받기
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className={cn("rounded-xl font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
+                    onClick={() => setPlanTrackEntryMode('onboarding')}
+                  >
+                    루틴 추천 받아보기
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-primary/10 bg-white px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+              <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8AA0C7]">
+                    {hasRoutineProfile ? '저장된 추천 루틴' : '루틴 추천은 선택 기능'}
+                  </p>
+                  <p className="mt-1 text-sm font-black text-[#17326B]">
+                    {hasRoutineProfile ? routineGuideTitle : '처음 한 번만 받아두고, 나중에 필요할 때 다시 열 수 있어요.'}
+                  </p>
+                  <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                    {hasRoutineProfile
+                      ? routineGuideSummary
+                      : '지금은 아래에서 등원, 하원, 외출과 오늘 공부 루틴을 바로 적어도 충분해요.'}
+                  </p>
+                </div>
+                {hasRoutineProfile ? (
+                  <Badge className="rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-3 py-1 text-[10px] font-black text-[#D86A11] shadow-none">
+                    추천은 참고용
+                  </Badge>
+                ) : null}
+              </div>
+            </div>
+
+            {hasRoutineProfile && routineWorkspace ? (
+              <Collapsible open={isRoutineGuideOpen} onOpenChange={(open) => {
+                setIsRoutineGuideOpen(open);
+                if (!open) setRoutineSurfaceMode('home');
+              }}>
+                <CollapsibleContent className="space-y-4">
+                  {routineSurfaceMode === 'editor' ? (
+                    <RoutineEditor
+                      routine={routineWorkspace.activeRoutine}
+                      onBack={() => setRoutineSurfaceMode('home')}
+                      onSaveBlock={(blockDraft, blockId) => void handleSaveRoutineBlock(blockDraft, blockId)}
+                      onDeleteBlock={(blockId) => void handleDeleteRoutineBlock(blockId)}
+                    />
+                  ) : (
+                    <RoutineHome
+                      studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
+                      workspace={routineWorkspace}
+                      sharingLabel={getVisibilityLabel(routineSocialProfile.visibility)}
+                      onToggleBlock={(blockId) => void handleToggleRoutineBlock(blockId)}
+                      onOpenEditor={() => setRoutineSurfaceMode('editor')}
+                      onOpenPrivacy={() => setIsRoutinePrivacySheetOpen(true)}
+                      onOpenReflection={() => setIsReflectionSheetOpen(true)}
+                      onEditBlock={(block) => {
+                        setSelectedRoutineBlock(block);
+                        setIsRoutineBlockSheetOpen(true);
+                      }}
+                    />
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {!isPast && (
         <Card className={cn(
@@ -2528,13 +2615,13 @@ export default function StudyPlanPage() {
           <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-start justify-between")}>
             <div className="min-w-0">
               <Badge className="border-none bg-primary/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-primary shadow-none">
-                설정 스튜디오
+                today planner
               </Badge>
               <CardTitle className={cn("mt-3 font-black tracking-tight text-primary break-keep", isMobile ? "text-xl" : "text-3xl")}>
-                루틴과 공부 계획을 한 곳에서 빠르게 정리해요
+                오늘 필요한 출입 일정과 공부 루틴만 가볍게 적어요
               </CardTitle>
               <CardDescription className={cn("mt-2 break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
-                생활 루틴부터 학습 계획, 기타 일정까지 여기서 전체 설정을 끝내고 기록트랙에서는 빠르게만 손보세요.
+                독서실 등원, 하원, 외출 시간은 먼저 체크하고, 오늘 공부는 투두처럼 자유롭게 적고 완료 표시하면 됩니다.
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -2563,9 +2650,9 @@ export default function StudyPlanPage() {
                       <Clock className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className={cn("font-black tracking-tight text-primary", isMobile ? "text-base" : "text-xl")}>생활 루틴</h3>
+                      <h3 className={cn("font-black tracking-tight text-primary", isMobile ? "text-base" : "text-xl")}>출입/이동 일정</h3>
                       <p className={cn("break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
-                        등원, 하원, 식사, 학원처럼 매일 반복되는 흐름부터 먼저 정리해요.
+                        등원, 하원, 외출처럼 센터에서 먼저 확인해야 하는 시간을 가장 앞에서 적어요.
                       </p>
                     </div>
                   </div>
@@ -2598,8 +2685,8 @@ export default function StudyPlanPage() {
 
               {!isPast ? (
                 <RoutineComposerCard
-                  title="생활 루틴 추가"
-                  description="템플릿으로 빠르게 시작하고, 필요한 이름만 바로 고쳐서 저장해요."
+                  title="출입/이동 일정 추가"
+                  description="자주 쓰는 이동 일정은 템플릿으로 넣고, 필요하면 이름만 바로 바꿔 저장해요."
                   value={newRoutineTitle}
                   onValueChange={(value) => {
                     setNewRoutineTitle(value);
@@ -2622,9 +2709,9 @@ export default function StudyPlanPage() {
                 </div>
               ) : scheduleItems.length === 0 ? (
                 <div className="rounded-[1.5rem] border border-dashed border-primary/15 bg-white/72 p-6 text-center">
-                  <p className="text-sm font-black text-primary">아직 루틴이 없어요</p>
+                  <p className="text-sm font-black text-primary">아직 출입 일정이 없어요</p>
                   <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
-                    등원, 하원, 식사처럼 자주 반복되는 루틴을 먼저 만들어두면 하루 관리가 훨씬 쉬워져요.
+                    등원, 하원, 외출 시간을 먼저 적어두면 센터 체크와 하루 동선 관리가 훨씬 쉬워져요.
                   </p>
                   {!isPast ? (
                     <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -2670,9 +2757,9 @@ export default function StudyPlanPage() {
                       <BookOpen className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-base" : "text-xl")}>학습 계획</h3>
+                      <h3 className={cn("font-black tracking-tight text-slate-900", isMobile ? "text-base" : "text-xl")}>오늘 공부 루틴</h3>
                       <p className={cn("break-keep text-slate-500", isMobile ? "text-[11px] leading-5" : "text-sm leading-6")}>
-                        전에 쓰던 계획을 불러와서 조금만 바꾸거나, 새 목표를 바로 짧게 적어둘 수 있어요.
+                        추천을 꼭 따르지 않아도 괜찮아요. 오늘 하고 싶은 공부를 순서대로 자유롭게 적고 체크하면 돼요.
                       </p>
                     </div>
                   </div>
@@ -2689,8 +2776,8 @@ export default function StudyPlanPage() {
 
               {!isPast ? (
                 <StudyComposerCard
-                  title="학습 계획 추가"
-                  description="최근 계획을 먼저 불러오거나, 시간형과 분량형 중 편한 방식으로 바로 적어보세요."
+                  title="오늘 공부 추가"
+                  description="투두처럼 바로 적고, 최근에 하던 공부는 불러와서 조금만 바꿔 써도 괜찮아요."
                   subjectOptions={SUBJECTS}
                   subjectValue={newStudySubject}
                   onSubjectChange={setNewStudySubject}
@@ -2722,9 +2809,9 @@ export default function StudyPlanPage() {
 
               {studyTasks.length === 0 ? (
                 <div className="rounded-[1.5rem] border border-dashed border-emerald-200 bg-white/80 p-6 text-center">
-                  <p className="text-sm font-black text-emerald-700">첫 학습 계획을 추가해보세요</p>
+                  <p className="text-sm font-black text-emerald-700">첫 공부 블록을 추가해보세요</p>
                   <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-slate-500">
-                    시간을 먼저 정하지 않아도 괜찮아요. 오늘 끝낼 분량부터 적어도 바로 시작할 수 있어요.
+                    시간을 먼저 안 정해도 괜찮아요. 오늘 끝낼 분량부터 적고, 필요하면 나중에 시간만 붙여도 됩니다.
                   </p>
                 </div>
               ) : (
@@ -2931,6 +3018,34 @@ export default function StudyPlanPage() {
         isSubmitting={isSubmitting}
         isMobile={isMobile}
         weekdayOptions={WEEKDAY_OPTIONS}
+      />
+
+      <RoutineBlockSheet
+        open={isRoutineBlockSheetOpen}
+        onOpenChange={(open) => {
+          setIsRoutineBlockSheetOpen(open);
+          if (!open) setSelectedRoutineBlock(null);
+        }}
+        block={selectedRoutineBlock}
+        onSave={(blockDraft) => void handleSaveRoutineBlock(blockDraft, selectedRoutineBlock?.id)}
+        onDelete={selectedRoutineBlock ? (blockId) => void handleDeleteRoutineBlock(blockId) : undefined}
+      />
+
+      <ReflectionSheet
+        open={isReflectionSheetOpen}
+        onOpenChange={setIsReflectionSheetOpen}
+        onSubmit={(reflection) => void handleSubmitReflection(reflection)}
+      />
+
+      <RoutinePrivacySheet
+        open={isRoutinePrivacySheetOpen}
+        onOpenChange={setIsRoutinePrivacySheetOpen}
+        socialProfile={routineSocialProfile}
+        studyProfile={studentProfile?.studyRoutineProfile}
+        studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
+        schoolName={studentProfile?.schoolName}
+        gradeLabel={studentProfile?.grade}
+        onSave={(nextProfile) => void handleSaveRoutineSocialProfile(nextProfile)}
       />
 
       {false && (

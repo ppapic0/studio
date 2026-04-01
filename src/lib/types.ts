@@ -120,6 +120,7 @@ export interface StudentProfile {
     title: string;
     date: string; // yyyy-MM-dd
   }>;
+  studyRoutineOnboarding?: RoutineOnboardingState;
   studyRoutineProfile?: UserStudyProfile;
   studyRoutineWorkspace?: RoutineWorkspaceState;
   routineSocialProfile?: RoutineSocialProfile;
@@ -170,6 +171,13 @@ export interface RoutineSocialProfile {
   selectedGroupIds: string[];
   allowCheer: boolean;
   allowTemplateSave: boolean;
+  updatedAt?: Timestamp;
+}
+
+export interface RoutineOnboardingState {
+  status: 'completed' | 'dismissed';
+  completedAt?: Timestamp;
+  dismissedAt?: Timestamp;
   updatedAt?: Timestamp;
 }
 
