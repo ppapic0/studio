@@ -30,9 +30,9 @@ import { Label } from '@/components/ui/label';
 import { differenceInMinutes, format, isSameDay } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch } from 'firebase/firestore';
-import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3, Megaphone, TrendingUp } from 'lucide-react';
-import { CenterMembership, AttendanceRequest, AttendanceCurrent } from '@/lib/types';
+import { collection, collectionGroup, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch } from 'firebase/firestore';
+import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3, Megaphone, TrendingUp, CalendarClock, LogIn, MapPinned, ShieldAlert } from 'lucide-react';
+import { CenterMembership, AttendanceRequest, AttendanceCurrent, StudentScheduleDoc } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,7 @@ import {
 import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import { deriveRequestOperationsSummary } from '@/lib/attendance-kpi';
 import { AttendanceKpiBoard } from '@/components/dashboard/attendance-kpi-board';
+import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
 import {
   isActiveMembershipStatus,
   isTeacherOrAdminRole,
@@ -81,6 +82,18 @@ type StudyLogSummary = {
   checkedAt: Date | null;
 };
 
+type TodayScheduleInfo = {
+  hasRoutine: boolean;
+  isNoAttendanceDay: boolean;
+  expectedArrivalTime: string | null;
+  plannedDepartureTime: string | null;
+  hasExcursion: boolean;
+  excursionStartAt: string | null;
+  excursionEndAt: string | null;
+  scheduleStatus: StudentScheduleDoc['status'] | null;
+  actualArrivalAt: Date | null;
+};
+
 export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -89,7 +102,7 @@ export default function AttendancePage() {
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [attendanceRoutineMap, setAttendanceRoutineMap] = useState<Record<string, AttendanceRoutineInfo>>({});
+  const [attendanceRoutineMap, setAttendanceRoutineMap] = useState<Record<string, TodayScheduleInfo>>({});
   const [routineLoading, setRoutineLoading] = useState(false);
   const [studyLogMap, setStudyLogMap] = useState<Record<string, StudyLogSummary>>({});
   const [studyLogLoading, setStudyLogLoading] = useState(false);
@@ -130,6 +143,17 @@ export default function AttendancePage() {
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceCurrentDocs, isLoading: attendanceCurrentLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isTeacherOrAdmin });
+  const todaySchedulesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !dateKey) return null;
+    return query(
+      collectionGroup(firestore, 'schedules'),
+      where('centerId', '==', centerId),
+      where('dateKey', '==', dateKey)
+    );
+  }, [centerId, dateKey, firestore]);
+  const { data: todaySchedules, isLoading: todaySchedulesLoading } = useCollection<StudentScheduleDoc>(todaySchedulesQuery, {
+    enabled: isTeacherOrAdmin,
+  });
 
   // 3. 지각/결석 신청 내역 조회
   const requestsQuery = useMemoFirebase(() => {
@@ -151,8 +175,11 @@ export default function AttendancePage() {
     const loadRoutineMap = async () => {
       setRoutineLoading(true);
       try {
+        const scheduledIds = new Set(todaySchedules?.map((schedule) => schedule.uid).filter(Boolean));
         const entries = await Promise.all(
-          students.map(async (student) => {
+          students
+            .filter((student) => !scheduledIds.has(student.id))
+            .map(async (student) => {
             const routineQuery = query(
               collection(firestore, 'centers', centerId, 'plans', student.id, 'weeks', weekKey, 'items'),
               where('dateKey', '==', dateKey),
@@ -169,6 +196,12 @@ export default function AttendancePage() {
                 hasRoutine: routineInfo.hasRoutine,
                 isNoAttendanceDay: routineInfo.isNoAttendanceDay,
                 expectedArrivalTime: routineInfo.expectedArrivalTime,
+                plannedDepartureTime: null,
+                hasExcursion: false,
+                excursionStartAt: null,
+                excursionEndAt: null,
+                scheduleStatus: null,
+                actualArrivalAt: null,
               },
             ] as const;
           })
@@ -189,7 +222,7 @@ export default function AttendancePage() {
     return () => {
       cancelled = true;
     };
-  }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, students]);
+  }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, students, todaySchedules]);
 
   useEffect(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !students) {
@@ -260,6 +293,30 @@ export default function AttendancePage() {
   const formatLastVisitAt = (visitedAt: Date | null) => {
     if (!visitedAt) return '방문 기록 없음';
     return format(visitedAt, 'yyyy.MM.dd HH:mm');
+  };
+
+  const formatScheduleTimeRange = (routine?: TodayScheduleInfo | null) => {
+    if (!routine || !routine.hasRoutine) return '일정 미등록';
+    if (routine.isNoAttendanceDay) return '미등원 등록';
+    if (!routine.expectedArrivalTime || !routine.plannedDepartureTime) return '시간 미정';
+    return `${routine.expectedArrivalTime} ~ ${routine.plannedDepartureTime}`;
+  };
+
+  const isExcursionInProgress = (routine?: TodayScheduleInfo | null) => {
+    if (!routine?.hasExcursion || !routine.excursionStartAt || !routine.excursionEndAt || !dateKey) return false;
+    const now = new Date();
+    const todayKey = format(now, 'yyyy-MM-dd');
+    if (todayKey !== dateKey) return false;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const startMinutes = Number(routine.excursionStartAt.slice(0, 2)) * 60 + Number(routine.excursionStartAt.slice(3, 5));
+    const endMinutes = Number(routine.excursionEndAt.slice(0, 2)) * 60 + Number(routine.excursionEndAt.slice(3, 5));
+    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+  };
+
+  const resolveNoShowStatus = (routineStatus?: TodayScheduleInfo['scheduleStatus'] | null, displayStatus?: DisplayAttendanceStatus) => {
+    if (routineStatus) return routineStatus;
+    if (displayStatus === 'confirmed_absent' || displayStatus === 'excused_absent') return 'absent';
+    return null;
   };
 
   const handleStatusChange = async (studentId: string, status: AttendanceRecord['status'], checkedAt?: Date | null) => {
@@ -395,7 +452,7 @@ export default function AttendancePage() {
 
   const isLoading =
     membershipsLoading ||
-    (Boolean(selectedDate) && (membersLoading || attendanceLoading || attendanceCurrentLoading || studyLogLoading));
+    (Boolean(selectedDate) && (membersLoading || attendanceLoading || attendanceCurrentLoading || todaySchedulesLoading || studyLogLoading));
   const attendanceMap = useMemo(() => new Map(attendanceRecords?.map(r => [r.id, r])), [attendanceRecords]);
   const attendanceCurrentMap = useMemo(() => {
     const mapped = new Map<string, AttendanceCurrent>();
@@ -406,6 +463,24 @@ export default function AttendancePage() {
     });
     return mapped;
   }, [attendanceCurrentDocs]);
+  const todayScheduleMap = useMemo(() => {
+    const mapped = new Map<string, TodayScheduleInfo>();
+    (todaySchedules || []).forEach((schedule) => {
+      if (!schedule.uid) return;
+      mapped.set(schedule.uid, {
+        hasRoutine: true,
+        isNoAttendanceDay: Boolean(schedule.isAbsent || schedule.status === 'absent'),
+        expectedArrivalTime: schedule.arrivalPlannedAt || schedule.inTime || null,
+        plannedDepartureTime: schedule.departurePlannedAt || schedule.outTime || null,
+        hasExcursion: Boolean(schedule.hasExcursion),
+        excursionStartAt: schedule.excursionStartAt || null,
+        excursionEndAt: schedule.excursionEndAt || null,
+        scheduleStatus: schedule.status || null,
+        actualArrivalAt: toDateSafe(schedule.actualArrivalAt),
+      });
+    });
+    return mapped;
+  }, [todaySchedules]);
 
   const attendanceDisplayMap = useMemo(() => {
     const mapped = new Map<string, { status: DisplayAttendanceStatus; checkedAt: Date | null }>();
@@ -417,7 +492,7 @@ export default function AttendancePage() {
 
     (students || []).forEach((student) => {
       const record = attendanceMap.get(student.id);
-      const routine = attendanceRoutineMap[student.id];
+      const routine = todayScheduleMap.get(student.id) || attendanceRoutineMap[student.id];
       const liveAttendance = attendanceCurrentMap.get(student.id);
       const studyLog = studyLogMap[student.id];
       const liveCheckInAt = isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null;
@@ -457,6 +532,7 @@ export default function AttendancePage() {
     attendanceMap,
     attendanceCurrentMap,
     attendanceRoutineMap,
+    todayScheduleMap,
     dateKey,
     routineLoading,
     studyLogLoading,
@@ -465,9 +541,95 @@ export default function AttendancePage() {
     students,
   ]);
 
+  const mergedScheduleMap = useMemo(() => {
+    const mapped = new Map<string, TodayScheduleInfo>();
+    (students || []).forEach((student) => {
+      const directSchedule = todayScheduleMap.get(student.id);
+      if (directSchedule) {
+        mapped.set(student.id, directSchedule);
+        return;
+      }
+      const fallbackRoutine = attendanceRoutineMap[student.id];
+      if (fallbackRoutine) {
+        mapped.set(student.id, fallbackRoutine);
+      }
+    });
+    return mapped;
+  }, [attendanceRoutineMap, students, todayScheduleMap]);
+
+  const todayDateKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+
+  const sortedStudents = useMemo(() => {
+    return [...(students || [])].sort((a, b) => {
+      const aRoutine = mergedScheduleMap.get(a.id);
+      const bRoutine = mergedScheduleMap.get(b.id);
+      const aDisplay = attendanceDisplayMap.get(a.id);
+      const bDisplay = attendanceDisplayMap.get(b.id);
+
+      const aNoShow = buildNoShowFlag({
+        now: new Date(),
+        dateKey: todayDateKey,
+        selectedDateKey: dateKey,
+        arrivalPlannedAt: aRoutine?.expectedArrivalTime,
+        actualArrivalAt: aRoutine?.actualArrivalAt || aDisplay?.checkedAt || null,
+        status: resolveNoShowStatus(aRoutine?.scheduleStatus || null, aDisplay?.status),
+      });
+      const bNoShow = buildNoShowFlag({
+        now: new Date(),
+        dateKey: todayDateKey,
+        selectedDateKey: dateKey,
+        arrivalPlannedAt: bRoutine?.expectedArrivalTime,
+        actualArrivalAt: bRoutine?.actualArrivalAt || bDisplay?.checkedAt || null,
+        status: resolveNoShowStatus(bRoutine?.scheduleStatus || null, bDisplay?.status),
+      });
+
+      if (aNoShow !== bNoShow) return aNoShow ? -1 : 1;
+
+      const aArrival = aRoutine?.expectedArrivalTime || '99:99';
+      const bArrival = bRoutine?.expectedArrivalTime || '99:99';
+      if (aArrival !== bArrival) return aArrival.localeCompare(bArrival);
+
+      return (a.displayName || '').localeCompare(b.displayName || '', 'ko');
+    });
+  }, [attendanceDisplayMap, dateKey, mergedScheduleMap, students, todayDateKey]);
+
+  const attendanceScheduleSummary = useMemo(() => {
+    return sortedStudents.reduce(
+      (summary, student) => {
+        const routine = mergedScheduleMap.get(student.id);
+        const display = attendanceDisplayMap.get(student.id);
+        const actualArrivalAt = routine?.actualArrivalAt || display?.checkedAt || null;
+        const noShow = buildNoShowFlag({
+          now: new Date(),
+          dateKey: todayDateKey,
+          selectedDateKey: dateKey,
+          arrivalPlannedAt: routine?.expectedArrivalTime,
+          actualArrivalAt,
+          status: resolveNoShowStatus(routine?.scheduleStatus || null, display?.status),
+        });
+
+        if (routine?.hasRoutine && !routine.isNoAttendanceDay) {
+          summary.scheduled += 1;
+        }
+        if (noShow) {
+          summary.noShow += 1;
+        }
+        if (routine?.hasExcursion) {
+          summary.excursion += 1;
+        }
+        if (actualArrivalAt || display?.status === 'confirmed_present' || display?.status === 'confirmed_late' || routine?.scheduleStatus === 'checked_in') {
+          summary.checkedIn += 1;
+        }
+
+        return summary;
+      },
+      { scheduled: 0, noShow: 0, excursion: 0, checkedIn: 0 }
+    );
+  }, [attendanceDisplayMap, dateKey, mergedScheduleMap, sortedStudents, todayDateKey]);
+
   const missingRoutineStudents = useMemo(
-    () => (students || []).filter((student) => attendanceRoutineMap[student.id]?.hasRoutine === false),
-    [students, attendanceRoutineMap]
+    () => (students || []).filter((student) => mergedScheduleMap.get(student.id)?.hasRoutine === false),
+    [students, mergedScheduleMap]
   );
   const requestOpsSummary = useMemo(
     () => deriveRequestOperationsSummary(requests || [], new Date()),
@@ -625,24 +787,52 @@ export default function AttendancePage() {
                     </Alert>
                   </div>
                 )}
+                <div className="grid gap-3 px-8 pb-2 pt-6 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-[1.45rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">오늘 일정 등록</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{attendanceScheduleSummary.scheduled}명</p>
+                  </div>
+                  <div className="rounded-[1.45rem] border border-rose-200 bg-rose-50/70 px-4 py-4 shadow-sm">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-rose-400">미등원 플래그</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-rose-700">{attendanceScheduleSummary.noShow}명</p>
+                  </div>
+                  <div className="rounded-[1.45rem] border border-amber-200 bg-amber-50/70 px-4 py-4 shadow-sm">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-500">외출 예정/중</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-amber-700">{attendanceScheduleSummary.excursion}명</p>
+                  </div>
+                  <div className="rounded-[1.45rem] border border-emerald-200 bg-emerald-50/70 px-4 py-4 shadow-sm">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-500">체크인 완료</p>
+                    <p className="mt-2 text-2xl font-black tracking-tight text-emerald-700">{attendanceScheduleSummary.checkedIn}명</p>
+                  </div>
+                </div>
                 <Table>
                 <TableHeader className="bg-muted/10">
                   <TableRow className="border-none hover:bg-transparent h-12">
                     <TableHead className="font-black text-[10px] pl-8 whitespace-nowrap">학생</TableHead>
                     <TableHead className="font-black text-[10px] whitespace-nowrap">상태</TableHead>
+                    <TableHead className="hidden lg:table-cell font-black text-[10px] whitespace-nowrap">예정 일정</TableHead>
                     <TableHead className="hidden md:table-cell font-black text-[10px]">최근 방문 기록</TableHead>
                     <TableHead className="text-right pr-8 font-black text-[10px] whitespace-nowrap">처리</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {students?.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="h-40 text-center font-bold opacity-30 italic">학생 정보가 없습니다.</TableCell></TableRow>
-                  ) : students?.map((student) => {
+                    <TableRow><TableCell colSpan={5} className="h-40 text-center font-bold opacity-30 italic">학생 정보가 없습니다.</TableCell></TableRow>
+                  ) : sortedStudents.map((student) => {
                     const record = attendanceMap.get(student.id);
                     const status = attendanceDisplayMap.get(student.id)?.status || 'requested';
-                    const hasAttendanceRoutine = attendanceRoutineMap[student.id]?.hasRoutine !== false;
+                    const routine = mergedScheduleMap.get(student.id);
+                    const hasAttendanceRoutine = routine?.hasRoutine !== false;
                     const checkedAt = attendanceDisplayMap.get(student.id)?.checkedAt;
                     const manualStatus = record?.status && record.status !== 'requested' ? record.status : undefined;
+                    const noShowFlag = buildNoShowFlag({
+                      now: new Date(),
+                      dateKey: todayDateKey,
+                      selectedDateKey: dateKey,
+                      arrivalPlannedAt: routine?.expectedArrivalTime,
+                      actualArrivalAt: routine?.actualArrivalAt || checkedAt || null,
+                      status: resolveNoShowStatus(routine?.scheduleStatus || null, status),
+                    });
                     return (
                     <TableRow key={student.id} className="h-20 hover:bg-muted/5 transition-colors border-muted/10">
                       <TableCell className="pl-8">
@@ -658,32 +848,67 @@ export default function AttendancePage() {
                             {!routineLoading && !hasAttendanceRoutine && (
                               <Badge className="font-black text-[10px] border-none bg-amber-100 text-amber-700">미작성</Badge>
                             )}
+                            {noShowFlag && (
+                              <Badge className="font-black text-[10px] border-none bg-rose-100 text-rose-700">미등원</Badge>
+                            )}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={getBadgeVariant(status) as any}
-                          className={cn(
-                            "font-black text-[10px] rounded-md shadow-sm border-none",
-                            status === 'missing_routine' && "bg-amber-100 text-amber-700",
-                            status === 'confirmed_present_missing_routine' && "bg-emerald-100 text-emerald-700"
-                          )}
-                        >
-                          {status === 'confirmed_present'
-                            ? '출석'
-                            : status === 'confirmed_present_missing_routine'
-                              ? '출석(미작성)'
-                            : status === 'confirmed_late'
-                              ? '지각출석'
-                              : status === 'confirmed_absent'
-                                ? '결석'
-                                : status === 'excused_absent'
-                                  ? '사유결석'
-                                  : status === 'missing_routine'
-                                    ? '미작성'
-                                    : '미확인'}
-                        </Badge>
+                        <div className="flex flex-col gap-1.5">
+                          <Badge
+                            variant={getBadgeVariant(status) as any}
+                            className={cn(
+                              "w-fit font-black text-[10px] rounded-md shadow-sm border-none",
+                              status === 'missing_routine' && "bg-amber-100 text-amber-700",
+                              status === 'confirmed_present_missing_routine' && "bg-emerald-100 text-emerald-700"
+                            )}
+                          >
+                            {status === 'confirmed_present'
+                              ? '출석'
+                              : status === 'confirmed_present_missing_routine'
+                                ? '출석(미작성)'
+                              : status === 'confirmed_late'
+                                ? '지각출석'
+                                : status === 'confirmed_absent'
+                                  ? '결석'
+                                  : status === 'excused_absent'
+                                    ? '사유결석'
+                                    : status === 'missing_routine'
+                                      ? '미작성'
+                                      : '미확인'}
+                          </Badge>
+                          {routine?.hasExcursion ? (
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                              <MapPinned className="h-3.5 w-3.5" />
+                              {isExcursionInProgress(routine) ? '외출 중' : `외출 ${routine.excursionStartAt} ~ ${routine.excursionEndAt}`}
+                            </div>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <div className="grid gap-1">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-[#17326B]">
+                            <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
+                            {formatScheduleTimeRange(routine)}
+                          </div>
+                          {routine?.isNoAttendanceDay ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500">
+                              <CalendarX className="h-3.5 w-3.5" />
+                              미등원 등록
+                            </div>
+                          ) : noShowFlag ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500">
+                              <ShieldAlert className="h-3.5 w-3.5" />
+                              예정 시간 경과, 체크인 없음
+                            </div>
+                          ) : routine?.actualArrivalAt || checkedAt ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+                              <LogIn className="h-3.5 w-3.5" />
+                              체크인 완료
+                            </div>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-xs font-bold text-muted-foreground">
                         {formatLastVisitAt(checkedAt ?? null)}

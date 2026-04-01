@@ -48,6 +48,8 @@ export type AttendanceAwaySlot = {
 export type SavedAttendanceRoutine = AttendanceScheduleDraft & {
   id: string;
   name: string;
+  active?: boolean;
+  weekdays?: number[];
 };
 
 export const EMPTY_ATTENDANCE_SCHEDULE_DRAFT: AttendanceScheduleDraft = {

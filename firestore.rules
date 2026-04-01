@@ -113,6 +113,28 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
+
+      match /schedules/{dateKey} {
+        allow read: if (isSignedIn() && request.auth.uid == userId)
+          || (resource.data.centerId != null && isTeacherOrAdmin(resource.data.centerId));
+        allow create, update: if isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.dateKey == dateKey;
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /scheduleTemplates/{templateId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /plannerDiagnostics/{diagnosisId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /studyPlans/{weekKey} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     match /inviteCodes/{code} {

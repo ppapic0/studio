@@ -33,6 +33,8 @@ type CalendarDayOption = {
   isToday: boolean;
   isSelected: boolean;
   date: Date;
+  hasSchedule?: boolean;
+  isAbsent?: boolean;
 };
 
 type AttendanceScheduleSheetProps = {
@@ -55,8 +57,8 @@ type AttendanceScheduleSheetProps = {
   hasSelectedWeekdayTemplate: boolean;
   selectedWeekdayLabel: string;
   onApplySelectedWeekdayTemplateToToday: () => void;
-  selectedWeekday: number;
-  onSelectWeekday: (weekday: number) => void;
+  selectedWeekdays: number[];
+  onToggleWeekday: (weekday: number) => void;
   weekdayOptions: WeekdayOption[];
   weekdayDraft: AttendanceScheduleDraft;
   onWeekdayChange: (patch: Partial<AttendanceScheduleDraft>) => void;
@@ -69,6 +71,13 @@ type AttendanceScheduleSheetProps = {
   onApplyPresetToToday: (preset: SavedAttendanceRoutine) => void;
   onApplyPresetToWeekday: (preset: SavedAttendanceRoutine) => void;
   onDeletePreset: (presetId: string) => void;
+  onTogglePresetActive: (presetId: string, active: boolean) => void;
+  note: string;
+  onNoteChange: (value: string) => void;
+  recommendationPrefillSummary?: {
+    recommendedWeeklyDays: number;
+    recommendedDailyStudyMinutes: number;
+  } | null;
   personalTasks: Array<WithId<StudyPlanItem>>;
   personalTaskDraft: string;
   onPersonalTaskDraftChange: (value: string) => void;
@@ -89,6 +98,12 @@ function AttendanceDraftFields({
   disabled?: boolean;
 }) {
   const isAbsent = Boolean(draft.isAbsent);
+  const hasExcursionPlanned = Boolean(
+    draft.awayStartTime ||
+    draft.awayEndTime ||
+    draft.awayReason ||
+    (draft.awaySlots?.length || 0) > 0
+  );
 
   return (
       <div className="space-y-4">
@@ -121,7 +136,7 @@ function AttendanceDraftFields({
           >
             <XCircle className="mr-1.5 h-3.5 w-3.5" />
             미등원
-        </Button>
+          </Button>
       </div>
 
       <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
@@ -153,38 +168,86 @@ function AttendanceDraftFields({
           <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--accent-orange-soft)]">외출 일정</Label>
           <span className="text-[10px] font-bold text-[var(--text-on-dark-soft)]">학원/병원/식사 등</span>
         </div>
-        <div className={cn('mt-3 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,1fr)]')}>
-          <div className="space-y-1.5">
-            <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">외출 시작</Label>
-            <Input
-              type="time"
-              value={draft.awayStartTime}
-              onChange={(event) => onChange({ awayStartTime: event.target.value })}
-              disabled={disabled || isAbsent}
-              className={cn('rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none', isMobile ? 'h-11 text-sm' : 'h-12 text-base')}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">복귀 예정</Label>
-            <Input
-              type="time"
-              value={draft.awayEndTime}
-              onChange={(event) => onChange({ awayEndTime: event.target.value })}
-              disabled={disabled || isAbsent}
-              className={cn('rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none', isMobile ? 'h-11 text-sm' : 'h-12 text-base')}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">사유</Label>
-            <Input
-              value={draft.awayReason}
-              onChange={(event) => onChange({ awayReason: event.target.value })}
-              disabled={disabled || isAbsent}
-              placeholder="예: 영어학원, 병원, 저녁 식사"
-              className={cn('rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none placeholder:text-white/55', isMobile ? 'h-11 text-sm' : 'h-12 text-sm')}
-            />
-          </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              onChange({
+                awayStartTime: '',
+                awayEndTime: '',
+                awayReason: '',
+                awaySlots: [],
+              })
+            }
+            disabled={disabled || isAbsent}
+            className={cn(
+              'h-9 rounded-full px-4 text-[11px] font-black',
+              !hasExcursionPlanned
+                ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)]'
+                : 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]'
+            )}
+          >
+            외출 없음
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              onChange({
+                awayStartTime: draft.awayStartTime || draft.inTime || '18:00',
+                awayEndTime: draft.awayEndTime || draft.outTime || '19:00',
+              })
+            }
+            disabled={disabled || isAbsent}
+            className={cn(
+              'h-9 rounded-full px-4 text-[11px] font-black',
+              hasExcursionPlanned
+                ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)]'
+                : 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]'
+            )}
+          >
+            외출 있음
+          </Button>
         </div>
+        {hasExcursionPlanned ? (
+          <div className={cn('mt-3 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,1fr)]')}>
+            <div className="space-y-1.5">
+              <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">외출 시작</Label>
+              <Input
+                type="time"
+                value={draft.awayStartTime}
+                onChange={(event) => onChange({ awayStartTime: event.target.value })}
+                disabled={disabled || isAbsent}
+                className={cn('rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none', isMobile ? 'h-11 text-sm' : 'h-12 text-base')}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">복귀 예정</Label>
+              <Input
+                type="time"
+                value={draft.awayEndTime}
+                onChange={(event) => onChange({ awayEndTime: event.target.value })}
+                disabled={disabled || isAbsent}
+                className={cn('rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none', isMobile ? 'h-11 text-sm' : 'h-12 text-base')}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">사유</Label>
+              <Input
+                value={draft.awayReason}
+                onChange={(event) => onChange({ awayReason: event.target.value })}
+                disabled={disabled || isAbsent}
+                placeholder="예: 영어학원, 병원, 저녁 식사"
+                className={cn('rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none placeholder:text-white/55', isMobile ? 'h-11 text-sm' : 'h-12 text-sm')}
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+            외출이 없는 날이면 비워두면 돼요. 필요할 때만 시간과 사유를 적어요.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -222,8 +285,8 @@ export function AttendanceScheduleSheet({
   hasSelectedWeekdayTemplate,
   selectedWeekdayLabel,
   onApplySelectedWeekdayTemplateToToday,
-  selectedWeekday,
-  onSelectWeekday,
+  selectedWeekdays,
+  onToggleWeekday,
   weekdayOptions,
   weekdayDraft,
   onWeekdayChange,
@@ -236,6 +299,10 @@ export function AttendanceScheduleSheet({
   onApplyPresetToToday,
   onApplyPresetToWeekday,
   onDeletePreset,
+  onTogglePresetActive,
+  note,
+  onNoteChange,
+  recommendationPrefillSummary,
   personalTasks,
   personalTaskDraft,
   onPersonalTaskDraftChange,
@@ -243,6 +310,14 @@ export function AttendanceScheduleSheet({
   onTogglePersonalTask,
   onDeletePersonalTask,
 }: AttendanceScheduleSheetProps) {
+  const formatWeekdaySummary = (weekdays?: number[]) => {
+    if (!weekdays?.length) return '';
+    return weekdayOptions
+      .filter((option) => weekdays.includes(option.value))
+      .map((option) => option.label)
+      .join(', ');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -361,6 +436,20 @@ export function AttendanceScheduleSheet({
                           {day.weekdayLabel}
                         </span>
                         <span className="mt-1 block text-sm font-black leading-none">{day.dateLabel}</span>
+                        {day.hasSchedule ? (
+                          <span
+                            className={cn(
+                              'mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[8px] font-black',
+                              day.isSelected
+                                ? 'bg-white/18 text-white'
+                                : day.isAbsent
+                                  ? 'bg-rose-500/16 text-rose-200'
+                                  : 'bg-emerald-500/16 text-emerald-200'
+                            )}
+                          >
+                            {day.isAbsent ? '미등원' : '등록'}
+                          </span>
+                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -372,6 +461,15 @@ export function AttendanceScheduleSheet({
                   </Badge>
                 ) : null}
               </div>
+
+              {recommendationPrefillSummary ? (
+                <div className="rounded-[1.35rem] border border-[#FFB347]/22 bg-[#FF9626]/12 p-4">
+                  <p className="text-[11px] font-black text-[var(--accent-orange-soft)]">학습 플랜 기준 추천값</p>
+                  <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-white">
+                    이번 주 권장 등원 {recommendationPrefillSummary.recommendedWeeklyDays}일 · 하루 권장 공부 {Math.round(recommendationPrefillSummary.recommendedDailyStudyMinutes / 60)}시간
+                  </p>
+                </div>
+              ) : null}
 
               {hasSelectedWeekdayTemplate ? (
                 <div className="rounded-[1.35rem] border border-emerald-400/18 bg-emerald-500/10 p-4">
@@ -396,6 +494,17 @@ export function AttendanceScheduleSheet({
               ) : null}
 
               <AttendanceDraftFields draft={todayDraft} onChange={onTodayChange} isMobile={isMobile} disabled={isSubmitting} />
+
+              <div className="rounded-[1.35rem] border border-white/12 bg-white/[0.08] p-4">
+                <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">메모</Label>
+                <Input
+                  value={note}
+                  onChange={(event) => onNoteChange(event.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="운영 메모가 있으면 적어둘 수 있어요."
+                  className={cn('mt-2 rounded-xl border-white/12 bg-white/[0.1] font-black text-white shadow-none placeholder:text-white/55', isMobile ? 'h-11 text-sm' : 'h-12 text-sm')}
+                />
+              </div>
 
               <div className="surface-card surface-card--secondary on-dark rounded-[1.35rem] p-4 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.46)]">
                 <div className="flex items-center justify-between gap-3">
@@ -518,10 +627,10 @@ export function AttendanceScheduleSheet({
                       key={option.value}
                       type="button"
                       variant="outline"
-                      onClick={() => onSelectWeekday(option.value)}
+                      onClick={() => onToggleWeekday(option.value)}
                       className={cn(
                         'h-9 rounded-full px-4 text-[11px] font-black',
-                        selectedWeekday === option.value
+                        selectedWeekdays.includes(option.value)
                           ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)] shadow-[0_14px_26px_-20px_rgba(255,150,38,0.45)]'
                           : 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]'
                       )}
@@ -606,39 +715,65 @@ export function AttendanceScheduleSheet({
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 text-[var(--accent-orange-soft)]" />
-                            <p className="truncate text-sm font-black tracking-tight text-white">{preset.name}</p>
-                          </div>
-                          <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-                            {formatDraftSummary(preset)}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => onDeletePreset(preset.id)}
-                          className="h-9 w-9 rounded-full text-[var(--text-on-dark-soft)] hover:bg-white/[0.1] hover:text-rose-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-[var(--accent-orange-soft)]" />
+                        <p className="truncate text-sm font-black tracking-tight text-white">{preset.name}</p>
+                        {preset.active === false ? (
+                          <Badge variant="outline" className="border-white/12 bg-white/[0.08] text-[10px] font-black text-[var(--text-on-dark-soft)]">
+                            비활성
+                          </Badge>
+                        ) : (
+                          <Badge className="border border-emerald-300/22 bg-emerald-500/10 text-[10px] font-black text-emerald-200 shadow-none">
+                            활성
+                          </Badge>
+                        )}
                       </div>
-                      <div className={cn('mt-4 grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => onApplyPresetToToday(preset)}
-                          className="h-10 rounded-xl font-black"
-                        >
-                          이 날짜에 복사
+                      <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+                        {formatDraftSummary(preset)}
+                      </p>
+                      {preset.weekdays?.length ? (
+                        <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-on-dark-muted)]">
+                          반복 요일: {formatWeekdaySummary(preset.weekdays)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => onTogglePresetActive(preset.id, preset.active === false)}
+                        className="h-9 rounded-full border-white/12 bg-white/[0.08] px-3 text-[10px] font-black text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]"
+                      >
+                        {preset.active === false ? '다시 사용' : '비활성'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => onDeletePreset(preset.id)}
+                        className="h-9 w-9 rounded-full text-[var(--text-on-dark-soft)] hover:bg-white/[0.1] hover:text-rose-300"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className={cn('mt-4 grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => onApplyPresetToToday(preset)}
+                      disabled={preset.active === false}
+                      className="h-10 rounded-xl font-black"
+                    >
+                      이 날짜에 복사
                         </Button>
                         <Button
-                          type="button"
-                          variant="dark"
-                          onClick={() => onApplyPresetToWeekday(preset)}
-                          className="h-10 rounded-xl font-black"
-                        >
-                          매주 {selectedWeekdayLabel}에 복사
+                      type="button"
+                      variant="dark"
+                      onClick={() => onApplyPresetToWeekday(preset)}
+                      disabled={preset.active === false}
+                      className="h-10 rounded-xl font-black"
+                    >
+                      매주 {selectedWeekdayLabel}에 복사
                         </Button>
                       </div>
                     </div>

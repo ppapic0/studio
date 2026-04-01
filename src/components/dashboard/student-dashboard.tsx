@@ -2736,7 +2736,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <div className="rounded-2xl bg-[linear-gradient(180deg,#F5F8FF_0%,#EAF0FC_100%)] border border-[#D7E3F8] flex items-center justify-center shrink-0 h-12 w-12 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
                     <FileText className="h-6 w-6 text-[#17326B]" />
                   </div>
-                  <div className="grid min-w-0">
+                  <div className="student-copy-stack grid min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-black tracking-tighter text-sm text-[#17326B] break-keep">선생님 리포트</span>
                       {unreadReportCount > 0 && (
@@ -2837,7 +2837,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <div className="rounded-2xl border border-[#D7E3F8] bg-[linear-gradient(180deg,#F5F8FF_0%,#EAF0FC_100%)] flex items-center justify-center shrink-0 h-16 w-16 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
                 <FileText className="h-8 w-8 text-[#17326B]" />
               </div>
-              <div className="grid text-left min-w-0">
+              <div className="student-copy-stack grid text-left min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-black tracking-tighter text-xl break-keep text-[#17326B]">선생님 리포트</span>
                   {unreadReportCount > 0 && (
@@ -2863,7 +2863,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <div className={cn("rounded-2xl border border-[#FFE0B7] bg-[linear-gradient(180deg,#FFF3E2_0%,#FFE6C7_100%)] flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]", isMobile ? "h-12 w-12" : "h-16 w-16")}>
                   <ClipboardPen className={cn("text-[#FF9626]", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                 </div>
-                <div className="grid min-w-0">
+                <div className="student-copy-stack grid min-w-0">
                   <span className={cn("font-black tracking-tighter text-[#17326B] break-keep", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
                   <span className={cn("font-bold text-[#6781AE] uppercase tracking-widest text-[8px] sm:text-[10px]")}>빠른 요청</span>
                 </div>
@@ -2952,7 +2952,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   >
                     <ShieldAlert className={cn(penaltyPoints > 0 ? "text-[#EF476F]" : "text-[#17326B]", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                   </div>
-                  <div className="grid min-w-0 flex-1">
+                  <div className="student-copy-stack grid min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className={cn("font-black tracking-tighter text-[#17326B] break-keep", isMobile ? "text-sm" : "text-xl")}>나의 벌점 현황</span>
                       <Badge

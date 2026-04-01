@@ -1081,10 +1081,10 @@ export default function StudyHistoryPage() {
                   key={dateKey}
                   type="button"
                   onClick={() => setSelectedDateForPlan(day)}
-                  aria-label={format(day, 'M월 d일 (EEEE)', { locale: ko })}
+                  aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${isCurrentMonth ? `${timeLabel} 학습` : '이번 달 아님'}${hasPlans ? ' · 계획 있음' : ''}`}
                   className={cn(
                     "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
-                    isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
+                    isMobile ? "aspect-square min-h-0 p-1.5" : "min-h-[150px] p-3",
                     !isCurrentMonth
                       ? isParent
                         ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75"
@@ -1128,10 +1128,10 @@ export default function StudyHistoryPage() {
                   )}
 
                   {isMobile && (
-                    <div className="relative z-10 flex items-start justify-center px-1 pt-1.5">
+                    <div className="relative z-10 flex items-start justify-center px-1 pt-1">
                       <span
                         className={cn(
-                          "inline-flex min-w-[1.35rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[0.56rem] font-black leading-none shadow-[0_8px_16px_-14px_rgba(15,23,42,0.22)]",
+                          "inline-flex min-w-[1.45rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[0.54rem] font-black leading-none shadow-[0_8px_16px_-14px_rgba(15,23,42,0.22)]",
                           !isCurrentMonth
                             ? "border border-slate-200/85 bg-white/72 text-slate-400"
                             : idx % 7 === 5
@@ -1147,19 +1147,19 @@ export default function StudyHistoryPage() {
                     </div>
                   )}
 
-                  <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1.5 flex justify-center px-1.5" : "bottom-2 px-2")}>
+                  <div className={cn("absolute left-0 right-0", isMobile ? "bottom-1 flex justify-center px-1.5" : "bottom-2 px-2")}>
                     <div
                       className={cn(
                         "overflow-hidden text-center whitespace-nowrap",
                         isMobile
-                          ? "min-w-[2.2rem] rounded-full border px-2 py-[0.32rem] shadow-[0_10px_18px_-16px_rgba(15,23,42,0.2)]"
+                          ? "min-w-[2.7rem] rounded-full border px-2.5 py-[0.34rem] shadow-[0_10px_18px_-16px_rgba(15,23,42,0.2)]"
                           : "rounded-[0.95rem] border bg-white px-2.5 py-2 shadow-[0_16px_26px_-22px_rgba(15,23,42,0.26)]",
                         getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                       )}
                     >
                       {isMobile ? (
                         <span className={cn(
-                          "block tabular-nums text-[0.74rem] font-black leading-none tracking-[-0.05em]",
+                          "block tabular-nums text-[0.68rem] font-black leading-none tracking-[-0.04em]",
                           getCalendarValueTextClass(minutes, isCurrentMonth)
                         )}>
                           {timeLabel}

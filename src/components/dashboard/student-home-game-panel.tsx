@@ -856,7 +856,7 @@ export function StudentHomeGamePanel({
                     <div className="mt-2 break-keep text-[14px] font-black tracking-tight text-[rgba(20,41,95,0.96)]">
                       {formatMaskedStudentName(entry.name)}
                     </div>
-                    <div className="mt-1 min-h-[1rem] truncate text-[10px] font-bold tracking-[0.02em] text-[rgba(20,41,95,0.72)]">
+                    <div className="mt-1 min-h-[1.1rem] truncate text-[10px] font-bold leading-4 tracking-[0.02em] text-[rgba(20,41,95,0.82)]">
                       {formatSchoolLabel(entry.schoolName)}
                     </div>
                     <div className="mt-2 inline-flex rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] px-2.5 py-1 text-[11px] font-black text-[var(--accent-orange)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]">

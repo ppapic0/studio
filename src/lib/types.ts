@@ -123,8 +123,186 @@ export interface StudentProfile {
   studyRoutineOnboarding?: RoutineOnboardingState;
   studyRoutineProfile?: UserStudyProfile;
   studyRoutineWorkspace?: RoutineWorkspaceState;
+  studyPlannerDiagnostic?: StudyPlannerDiagnosticRecord;
   routineSocialProfile?: RoutineSocialProfile;
   savedRoutineTemplates?: RoutineTemplateSave[];
+}
+
+export type ScheduleSubjectKey = '국어' | '수학' | '영어' | '탐구';
+
+export interface StudentScheduleOuting {
+  id: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
+}
+
+export interface StudentScheduleDoc {
+  uid: string;
+  studentName: string;
+  centerId: string | null;
+  dateKey: string;
+  timezone: string;
+  arrivalPlannedAt: string;
+  departurePlannedAt: string;
+  hasExcursion: boolean;
+  excursionStartAt: string | null;
+  excursionEndAt: string | null;
+  excursionReason: string | null;
+  note: string | null;
+  recurrenceSourceId: string | null;
+  status: 'scheduled' | 'checked_in' | 'excursion' | 'checked_out' | 'absent';
+  actualArrivalAt: Timestamp | null;
+  actualDepartureAt: Timestamp | null;
+  inTime: string;
+  outTime: string;
+  isAbsent: boolean;
+  outings: StudentScheduleOuting[];
+  recommendedStudyMinutes?: number | null;
+  recommendedWeeklyDays?: number | null;
+  source?: 'manual' | 'regular-routine' | 'planner-diagnostic';
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface StudentScheduleSettings {
+  weekdayTemplates: Record<string, StudentScheduleDoc>;
+  savedRoutines: Array<{
+    id: string;
+    name: string;
+    schedule: StudentScheduleDoc;
+  }>;
+  updatedAt?: Timestamp;
+}
+
+export interface StudentScheduleTemplate {
+  id?: string;
+  name: string;
+  weekdays: number[];
+  arrivalPlannedAt: string;
+  departurePlannedAt: string;
+  hasExcursionDefault: boolean;
+  defaultExcursionStartAt: string | null;
+  defaultExcursionEndAt: string | null;
+  defaultExcursionReason?: string | null;
+  active: boolean;
+  timezone: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export type PlannerLearnerGrade =
+  | 'middle-1'
+  | 'middle-2'
+  | 'middle-3'
+  | 'high-1'
+  | 'high-2'
+  | 'high-3'
+  | 'n-susi'
+  | 'gongsi';
+
+export type PlannerMainGoal = 'csat' | 'school' | 'both' | 'gongsi' | 'etc';
+
+export type PlannerExamWindow = 'under-1-month' | 'one-to-three-months' | 'over-three-months';
+
+export type PlannerStudyHoursBand = 'under-2' | '2-4' | '4-6' | '6-plus';
+
+export type PlannerLikert = 1 | 2 | 3 | 4 | 5;
+
+export type PlannerSubject =
+  | '국어'
+  | '수학'
+  | '영어'
+  | '탐구'
+  | '한국사'
+  | '전공'
+  | '행정법/행정학'
+  | '기타';
+
+export type PlannerStudyActivity = '개념이해' | '문제풀이' | '암기' | '오답정리' | '백지회상' | '설명해보기';
+
+export type PlannerBurnoutReason =
+  | '너무 어려워서'
+  | '왜 해야 하는지 모르겠어서'
+  | '그냥 지쳐서'
+  | '특별히 없음';
+
+export type PlannerMotivationType = '더 잘하고 싶어서' | '못하면 안 될 것 같아서' | '모르겠음';
+
+export type PlannerSuccessRecency = '최근 1주' | '1개월 내' | '기억 안 남';
+
+export interface StudyPlannerAnswers {
+  grade: PlannerLearnerGrade;
+  goal: PlannerMainGoal;
+  examWindow: PlannerExamWindow;
+  averageStudyHours: PlannerStudyHoursBand;
+  planningScore: PlannerLikert;
+  reflectionScore: PlannerLikert;
+  unknownHandling: '바로 찾아봄' | '표시 후 나중에' | '그냥 넘김';
+  subjectGrades: Partial<Record<ScheduleSubjectKey, number | null>>;
+  topTimeSubjects: PlannerSubject[];
+  studyActivities: PlannerStudyActivity[];
+  lowEfficiencySubject: PlannerSubject | '없음';
+  burnoutReasons: PlannerBurnoutReason[];
+  motivationType: PlannerMotivationType;
+  lastSuccessRecency: PlannerSuccessRecency;
+}
+
+export interface StudyPlannerMetric {
+  label: '학습 계획성' | '자기성찰' | '과목 밸런스' | '학습 활동 다양성' | '동기 수준';
+  value: number;
+}
+
+export interface StudyPlannerScores {
+  planning: number;
+  reflection: number;
+  subjectBalance: number;
+  activityDiversity: number;
+  motivation: number;
+}
+
+export interface StudyPlannerFlags {
+  lowPlanningFlag: boolean;
+  lowReflectionFlag: boolean;
+  lowMotivationFlag: boolean;
+  efficiencyMismatchFlag: boolean;
+  burnoutRiskFlag: boolean;
+  avoidanceMotivationFlag: boolean;
+}
+
+export interface StudyPlannerInsight {
+  id: string;
+  text: string;
+}
+
+export interface GeneratedStudyTodo {
+  과목: string;
+  활동: string;
+  시간: number;
+}
+
+export interface GeneratedStudyPlan {
+  weekly_balance: Record<ScheduleSubjectKey, number>;
+  daily_todos: GeneratedStudyTodo[];
+  coaching_message: string;
+}
+
+export interface StudyPlannerDiagnosticResult {
+  scores: StudyPlannerScores;
+  flags: StudyPlannerFlags;
+  metrics: StudyPlannerMetric[];
+  insights: StudyPlannerInsight[];
+  generatedPlan: GeneratedStudyPlan;
+  recommendedWeeklyDays: number;
+  recommendedDailyMinutes: number;
+  createdAtISO: string;
+}
+
+export interface StudyPlannerDiagnosticRecord {
+  answers: StudyPlannerAnswers;
+  result: StudyPlannerDiagnosticResult;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export type RoutineVisibility = 'private' | 'friends' | 'group' | 'anonymous' | 'profile';

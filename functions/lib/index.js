@@ -1,12 +1,50 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ensureCurrentUserMemberships = exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+exports.generateStudyPlan = exports.ensureCurrentUserMemberships = exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+const functions = __importStar(require("firebase-functions"));
+const admin = __importStar(require("firebase-admin"));
+const https_1 = require("firebase-functions/v2/https");
+const params_1 = require("firebase-functions/params");
+const geminiClient_1 = require("./geminiClient");
+const plannerSchema_1 = require("./plannerSchema");
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 const region = "asia-northeast3";
+const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"];
 const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 const SMS_BYTE_LIMIT = 90;
@@ -3467,5 +3505,100 @@ exports.ensureCurrentUserMemberships = functions
         centerIds: Array.from(repairedCenterIds),
         repairedCount: repairedCenterIds.size,
     };
+});
+function buildFallbackStudyPlan(profile) {
+    const weakSubject = Array.isArray(profile.weakSubjects) && profile.weakSubjects.length > 0
+        ? profile.weakSubjects[0]
+        : "수학";
+    return {
+        weekly_balance: {
+            국어: 25,
+            수학: 30,
+            영어: 20,
+            탐구: 25,
+        },
+        daily_todos: [
+            { 과목: weakSubject, 활동: "오답 원인 다시 쓰고 비슷한 문제 5개 적용해보기", 시간: 60 },
+            { 과목: "국어", 활동: "지문 2개 정독 후 핵심 문장 직접 요약하기", 시간: 40 },
+            { 과목: "영어", 활동: "틀린 유형 문장 해석 + 단어 회상 테스트", 시간: 40 },
+            { 과목: "탐구", 활동: "개념 빈칸 회상 후 빠르게 확인하기", 시간: 40 },
+        ],
+        coaching_message: "이번 주는 많이 하는 과목과 효율이 낮은 과목이 겹치지 않는지 먼저 점검해보세요. 시작 전 1분 계획, 끝난 뒤 3분 점검만 붙여도 흐름이 훨씬 덜 흔들릴 수 있어요.",
+    };
+}
+exports.generateStudyPlan = (0, https_1.onCall)({
+    region,
+    secrets: [geminiApiKey],
+    timeoutSeconds: 60,
+    memory: "512MiB",
+}, async (request) => {
+    var _a;
+    if (!((_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new https_1.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const parsedInput = plannerSchema_1.generateStudyPlanInputSchema.safeParse(request.data);
+    if (!parsedInput.success) {
+        functions.logger.warn("generateStudyPlan invalid input", {
+            uid: request.auth.uid,
+            issues: parsedInput.error.issues.map((issue) => ({
+                path: issue.path.join("."),
+                message: issue.message,
+            })),
+        });
+        throw new https_1.HttpsError("invalid-argument", "입력값 형식이 올바르지 않습니다.", {
+            userMessage: "학습 진단 입력값을 다시 확인해 주세요.",
+        });
+    }
+    const { profile } = parsedInput.data;
+    const prompt = [
+        "너는 고등학생 학습 코치다.",
+        "Zimmerman 자기조절학습, Bloom 활동 유형, Sweller 인지부하, Dweck 동기 패턴, retrieval practice, review spacing을 반영해 이번 주 공부 계획을 JSON으로 생성해라.",
+        "학생을 비난하지 말고, 친근하지만 가벼워 보이지 않는 말투를 써라.",
+        "응답은 반드시 JSON만 반환하고 마크다운을 쓰지 마라.",
+        "weekly_balance는 반드시 국어/수학/영어/탐구 4개 키만 사용하라.",
+        "조건:",
+        "- weekly_balance는 국어/수학/영어/탐구 합이 100이어야 한다.",
+        "- daily_todos는 4~7개.",
+        "- 각 todo 시간은 20~120분.",
+        "- weak subject를 완전히 피하지 말 것.",
+        "- least efficient subject는 활동 유형을 바꾸는 방향으로 제안할 것.",
+        "- planning/reflection score가 낮으면 시작 전 계획 1분, 종료 전 점검 3분 같은 마이크로 루틴을 포함할 것.",
+        "",
+        "학생 프로필 JSON:",
+        JSON.stringify(profile, null, 2),
+    ].join("\n");
+    const apiKey = geminiApiKey.value();
+    const candidateModels = ["gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"];
+    let lastError = null;
+    for (const model of candidateModels) {
+        try {
+            const rawText = await (0, geminiClient_1.generateStructuredStudyPlan)({
+                apiKey,
+                prompt,
+                model,
+            });
+            const parsed = JSON.parse(rawText);
+            const validated = (0, plannerSchema_1.validateStudyPlanOutput)(parsed);
+            functions.logger.info("generateStudyPlan success", {
+                uid: request.auth.uid,
+                model,
+                todoCount: validated.daily_todos.length,
+            });
+            return validated;
+        }
+        catch (error) {
+            lastError = error;
+            functions.logger.warn("generateStudyPlan model attempt failed", {
+                uid: request.auth.uid,
+                model,
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+    functions.logger.error("generateStudyPlan fallback used", {
+        uid: request.auth.uid,
+        error: lastError instanceof Error ? lastError.message : String(lastError),
+    });
+    return (0, plannerSchema_1.validateStudyPlanOutput)(buildFallbackStudyPlan(profile));
 });
 //# sourceMappingURL=index.js.map

@@ -119,6 +119,7 @@ export default function DashboardLayout({
                 : isStudentMode
                   ? 'student-night-shell w-full min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,165,60,0.08),transparent_16%),linear-gradient(180deg,#ffffff_0%,#f8fafd_48%,#eef3fb_100%)]'
                   : 'w-full min-h-screen',
+            isStudentMode && 'student-font-shell',
             playStudentEntry && isStudentMode && 'student-shell-glow'
           )}
         >

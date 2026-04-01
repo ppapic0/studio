@@ -387,6 +387,36 @@
     word-break: keep-all;
   }
 
+  .student-font-shell :where(.font-numeric, .dashboard-number, .stat-number, .tabular-nums, .metric-hero, .metric-primary, .metric-secondary, .metric-inline, .metric-unit) {
+    font-family: "Pretendard Variable", "Pretendard", system-ui, sans-serif !important;
+  }
+
+  .student-font-shell :where(.surface-card, .student-utility-card) :where(h1, h2, h3, h4, [data-slot="card-title"], .student-aggro-heading) {
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.16;
+  }
+
+  .student-font-shell :where(.surface-card, .student-utility-card) :where(p, [data-slot="card-description"], .student-aggro-body) {
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.012em;
+    line-height: 1.42;
+  }
+
+  .student-font-shell :where(.surface-card, .student-utility-card) :where(.surface-kicker, .student-aggro-kicker) {
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    line-height: 1.2;
+  }
+
+  .student-font-shell :where(.surface-card, .student-utility-card) .student-copy-stack > *:not(.tabular-nums):not(.dashboard-number):not(.font-numeric) {
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
 button,
 input,
 textarea,

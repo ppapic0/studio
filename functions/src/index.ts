@@ -1,11 +1,17 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
+
+import { generateStructuredStudyPlan } from "./geminiClient";
+import { generateStudyPlanInputSchema, validateStudyPlanOutput } from "./plannerSchema";
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
 
 const region = "asia-northeast3";
+const geminiApiKey = defineSecret("GEMINI_API_KEY");
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
 const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 type AllowedRole = (typeof allowedRoles)[number];
@@ -4279,3 +4285,108 @@ export const ensureCurrentUserMemberships = functions
       repairedCount: repairedCenterIds.size,
     };
   });
+
+function buildFallbackStudyPlan(profile: Record<string, any>) {
+  const weakSubject = Array.isArray(profile.weakSubjects) && profile.weakSubjects.length > 0
+    ? profile.weakSubjects[0]
+    : "수학";
+  return {
+    weekly_balance: {
+      국어: 25,
+      수학: 30,
+      영어: 20,
+      탐구: 25,
+    },
+    daily_todos: [
+      { 과목: weakSubject, 활동: "오답 원인 다시 쓰고 비슷한 문제 5개 적용해보기", 시간: 60 },
+      { 과목: "국어", 활동: "지문 2개 정독 후 핵심 문장 직접 요약하기", 시간: 40 },
+      { 과목: "영어", 활동: "틀린 유형 문장 해석 + 단어 회상 테스트", 시간: 40 },
+      { 과목: "탐구", 활동: "개념 빈칸 회상 후 빠르게 확인하기", 시간: 40 },
+    ],
+    coaching_message:
+      "이번 주는 많이 하는 과목과 효율이 낮은 과목이 겹치지 않는지 먼저 점검해보세요. 시작 전 1분 계획, 끝난 뒤 3분 점검만 붙여도 흐름이 훨씬 덜 흔들릴 수 있어요.",
+  };
+}
+
+export const generateStudyPlan = onCall(
+  {
+    region,
+    secrets: [geminiApiKey],
+    timeoutSeconds: 60,
+    memory: "512MiB",
+  },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const parsedInput = generateStudyPlanInputSchema.safeParse(request.data);
+    if (!parsedInput.success) {
+      functions.logger.warn("generateStudyPlan invalid input", {
+        uid: request.auth.uid,
+        issues: parsedInput.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      });
+      throw new HttpsError("invalid-argument", "입력값 형식이 올바르지 않습니다.", {
+        userMessage: "학습 진단 입력값을 다시 확인해 주세요.",
+      });
+    }
+    const { profile } = parsedInput.data;
+
+    const prompt = [
+      "너는 고등학생 학습 코치다.",
+      "Zimmerman 자기조절학습, Bloom 활동 유형, Sweller 인지부하, Dweck 동기 패턴, retrieval practice, review spacing을 반영해 이번 주 공부 계획을 JSON으로 생성해라.",
+      "학생을 비난하지 말고, 친근하지만 가벼워 보이지 않는 말투를 써라.",
+      "응답은 반드시 JSON만 반환하고 마크다운을 쓰지 마라.",
+      "weekly_balance는 반드시 국어/수학/영어/탐구 4개 키만 사용하라.",
+      "조건:",
+      "- weekly_balance는 국어/수학/영어/탐구 합이 100이어야 한다.",
+      "- daily_todos는 4~7개.",
+      "- 각 todo 시간은 20~120분.",
+      "- weak subject를 완전히 피하지 말 것.",
+      "- least efficient subject는 활동 유형을 바꾸는 방향으로 제안할 것.",
+      "- planning/reflection score가 낮으면 시작 전 계획 1분, 종료 전 점검 3분 같은 마이크로 루틴을 포함할 것.",
+      "",
+      "학생 프로필 JSON:",
+      JSON.stringify(profile, null, 2),
+    ].join("\n");
+
+    const apiKey = geminiApiKey.value();
+    const candidateModels = ["gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"];
+    let lastError: unknown = null;
+
+    for (const model of candidateModels) {
+      try {
+        const rawText = await generateStructuredStudyPlan({
+          apiKey,
+          prompt,
+          model,
+        });
+        const parsed = JSON.parse(rawText);
+        const validated = validateStudyPlanOutput(parsed);
+        functions.logger.info("generateStudyPlan success", {
+          uid: request.auth.uid,
+          model,
+          todoCount: validated.daily_todos.length,
+        });
+        return validated;
+      } catch (error) {
+        lastError = error;
+        functions.logger.warn("generateStudyPlan model attempt failed", {
+          uid: request.auth.uid,
+          model,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    functions.logger.error("generateStudyPlan fallback used", {
+      uid: request.auth.uid,
+      error: lastError instanceof Error ? lastError.message : String(lastError),
+    });
+
+    return validateStudyPlanOutput(buildFallbackStudyPlan(profile));
+  }
+);

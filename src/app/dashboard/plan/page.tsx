@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { 
   Card, 
@@ -101,6 +102,8 @@ import {
   type WithId,
   type GrowthProgress,
   type RecommendedRoutine,
+  type StudentScheduleDoc,
+  type StudentScheduleTemplate,
   type StudentProfile,
   type UserStudyProfile,
 } from '@/lib/types';
@@ -110,9 +113,12 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
+  EMPTY_ATTENDANCE_SCHEDULE_DRAFT,
   ROUTINE_TEMPLATE_OPTIONS,
+  type AttendanceScheduleDraft,
   type AttendanceAwaySlot,
   type RecentStudyOption,
+  type SavedAttendanceRoutine,
   type StudyAmountUnit,
   type StudyPlanMode,
 } from '@/components/dashboard/student-planner/planner-constants';
@@ -131,6 +137,7 @@ import { RoutineEditor } from '@/components/dashboard/student-planner/routine-ed
 import { ReflectionSheet } from '@/components/dashboard/student-planner/reflection-sheet';
 import { RoutineBlockSheet } from '@/components/dashboard/student-planner/routine-block-sheet';
 import { RoutinePrivacySheet } from '@/components/dashboard/student-planner/routine-privacy-sheet';
+import { AttendanceScheduleSheet } from '@/components/dashboard/student-planner/attendance-schedule-sheet';
 import {
   addReflectionEntry,
   addRoutineBlock,
@@ -159,6 +166,14 @@ import {
   type PlannerTaskDraft,
   type PlannerTemplateRecord,
 } from '@/lib/plan-track';
+import {
+  addMinutesToTime,
+  buildDraftFromScheduleDoc,
+  buildLegacyScheduleTitles,
+  buildScheduleDocFromDraft,
+  parseTimeToMinutes,
+  validateScheduleDraft,
+} from '@/features/schedules/lib/scheduleModel';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -450,6 +465,22 @@ export default function StudyPlanPage() {
   const [awayEndTime, setAwayEndTime] = useState('');
   const [awayReason, setAwayReason] = useState('');
   const [extraAwayPlans, setExtraAwayPlans] = useState<AttendanceAwaySlot[]>([]);
+  const [isScheduleAbsent, setIsScheduleAbsent] = useState(false);
+  const [scheduleNote, setScheduleNote] = useState('');
+  const [isAttendanceScheduleSheetOpen, setIsAttendanceScheduleSheetOpen] = useState(false);
+  const [weekdayDraft, setWeekdayDraft] = useState<AttendanceScheduleDraft>(EMPTY_ATTENDANCE_SCHEDULE_DRAFT);
+  const [selectedRecurringWeekdays, setSelectedRecurringWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [presetName, setPresetName] = useState('');
+  const [scheduleRecommendationPrefill, setScheduleRecommendationPrefill] = useState<null | {
+    recommendedWeeklyDays: number;
+    recommendedDailyStudyMinutes: number;
+    recommendedArrivalTime: string;
+    recommendedDepartureTime: string;
+    repeatWeekdays: number[];
+    weeklyBalance: Record<string, number>;
+    source?: string;
+    createdAtISO?: string;
+  }>(null);
 
   useEffect(() => {
     const requestedDate = searchParams.get('date');
@@ -477,6 +508,34 @@ export default function StudyPlanPage() {
     if (!searchParams.get('privacy')) return;
     setIsRoutinePrivacySheetOpen(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!user || !searchParams.get('schedulePrefill')) return;
+    try {
+      const raw = window.localStorage.getItem(`planner-schedule-prefill:${user.uid}`);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as typeof scheduleRecommendationPrefill;
+      if (!parsed) return;
+      setScheduleRecommendationPrefill(parsed);
+      setSelectedRecurringWeekdays(parsed.repeatWeekdays || [1, 2, 3, 4, 5]);
+      setWeekdayDraft((previous) => ({
+        ...previous,
+        inTime: parsed.recommendedArrivalTime || previous.inTime,
+        outTime: parsed.recommendedDepartureTime || previous.outTime,
+      }));
+      setInTime(parsed.recommendedArrivalTime || '09:00');
+      setOutTime(parsed.recommendedDepartureTime || '22:00');
+      setIsAttendanceScheduleSheetOpen(true);
+    } catch {
+      window.localStorage.removeItem(`planner-schedule-prefill:${user.uid}`);
+    }
+  }, [searchParams, user]);
+
+  const clearSchedulePrefillCache = useCallback(() => {
+    if (!user) return;
+    window.localStorage.removeItem(`planner-schedule-prefill:${user.uid}`);
+    setScheduleRecommendationPrefill(null);
+  }, [user]);
 
   useEffect(() => {
     if (!selectedDate) return;
@@ -655,6 +714,28 @@ export default function StudyPlanPage() {
   const { data: studentProfile, isLoading: isStudentProfileLoading } = useDoc<StudentProfile>(studentProfileRef, {
     enabled: isStudent,
   });
+  const selectedScheduleRef = useMemoFirebase(() => {
+    if (!firestore || !user || !selectedDateKey) return null;
+    return doc(firestore, 'users', user.uid, 'schedules', selectedDateKey);
+  }, [firestore, selectedDateKey, user]);
+  const { data: selectedScheduleDoc } = useDoc<StudentScheduleDoc>(selectedScheduleRef, { enabled: isStudent });
+  const weekSchedulesQuery = useMemoFirebase(() => {
+    if (!firestore || !user || weekDays.length === 0) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'schedules'),
+      where('dateKey', '>=', format(weekDays[0], 'yyyy-MM-dd')),
+      where('dateKey', '<=', format(weekDays[6], 'yyyy-MM-dd'))
+    );
+  }, [firestore, user, weekDays]);
+  const { data: weekSchedules } = useCollection<StudentScheduleDoc>(weekSchedulesQuery, { enabled: isStudent });
+
+  const scheduleTemplatesQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'users', user.uid, 'scheduleTemplates'));
+  }, [firestore, user]);
+  const { data: scheduleTemplates } = useCollection<StudentScheduleTemplate>(scheduleTemplatesQuery, {
+    enabled: isStudent,
+  });
   const routineSocialProfile = useMemo(
     () =>
       buildInitialRoutineSocialProfile({
@@ -680,6 +761,66 @@ export default function StudyPlanPage() {
   const routineGuideSummary =
     studentProfile?.studyRoutineProfile?.selectedRoutine?.oneLineDescription ||
     '처음 한 번 받아둔 추천 루틴이에요. 필요할 때만 펼쳐서 참고하고, 오늘 계획은 아래에서 자유롭게 적으면 돼요.';
+  const selectedWeekdayValue = selectedDate ? getDay(selectedDate) : 1;
+  const activeScheduleTemplates = useMemo(
+    () => (scheduleTemplates || []).filter((template) => template.active !== false),
+    [scheduleTemplates]
+  );
+  const matchingWeekdayTemplate = useMemo(
+    () =>
+      activeScheduleTemplates.find((template) =>
+        Array.isArray(template.weekdays) && template.weekdays.includes(selectedWeekdayValue)
+      ),
+    [activeScheduleTemplates, selectedWeekdayValue]
+  );
+  const hasSelectedWeekdayTemplate = Boolean(matchingWeekdayTemplate);
+  const selectedRecurringWeekdayLabel = useMemo(() => {
+    const labels = WEEKDAY_OPTIONS.filter((option) => selectedRecurringWeekdays.includes(option.value)).map((option) => option.label);
+    if (labels.length === 0) return '요일 미선택';
+    return labels.join(', ');
+  }, [selectedRecurringWeekdays]);
+  const matchingWeekdayLabel = useMemo(
+    () => WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayValue)?.label || '해당 요일',
+    [selectedWeekdayValue]
+  );
+  const savedAttendanceRoutines = useMemo<SavedAttendanceRoutine[]>(
+    () =>
+      activeScheduleTemplates.map((template) => ({
+        id: template.id || `template-${template.name}`,
+        name: template.name,
+        inTime: template.arrivalPlannedAt,
+        outTime: template.departurePlannedAt,
+        awayStartTime: template.defaultExcursionStartAt || '',
+        awayEndTime: template.defaultExcursionEndAt || '',
+        awayReason: template.defaultExcursionReason || '',
+        awaySlots: [],
+        isAbsent: false,
+        active: template.active !== false,
+        weekdays: template.weekdays,
+      })),
+    [activeScheduleTemplates]
+  );
+  const weekScheduleMap = useMemo(
+    () =>
+      Object.fromEntries(
+        (weekSchedules || []).map((schedule) => [schedule.dateKey, schedule])
+      ) as Record<string, StudentScheduleDoc>,
+    [weekSchedules]
+  );
+  const attendanceCalendarDays = useMemo(
+    () =>
+      weekDays.map((day) => ({
+        key: format(day, 'yyyy-MM-dd'),
+        weekdayLabel: format(day, 'EEE', { locale: ko }),
+        dateLabel: format(day, 'd'),
+        isToday: isSameDay(day, new Date()),
+        isSelected: selectedDate ? isSameDay(day, selectedDate) : false,
+        date: day,
+        hasSchedule: Boolean(weekScheduleMap[format(day, 'yyyy-MM-dd')]),
+        isAbsent: Boolean(weekScheduleMap[format(day, 'yyyy-MM-dd')]?.isAbsent),
+      })),
+    [selectedDate, weekDays, weekScheduleMap]
+  );
 
   useEffect(() => {
     if (!isStudent || planTrackEntryMode !== 'auto' || isStudentProfileLoading) return;
@@ -771,10 +912,16 @@ export default function StudyPlanPage() {
   const hasCopyableTasks = copyableTaskItems.length > 0;
   const hasCopyableRoutines = copyableRoutineItems.length > 0;
 
-  const hasInPlan = useMemo(() => scheduleItems.some(i => i.title.includes('등원 예정')), [scheduleItems]);
-  const hasOutPlan = useMemo(() => scheduleItems.some(i => i.title.includes('하원 예정')), [scheduleItems]);
+  const hasInPlan = useMemo(
+    () => Boolean(selectedScheduleDoc ? !selectedScheduleDoc.isAbsent && selectedScheduleDoc.arrivalPlannedAt : scheduleItems.some(i => i.title.includes('등원 예정'))),
+    [scheduleItems, selectedScheduleDoc]
+  );
+  const hasOutPlan = useMemo(
+    () => Boolean(selectedScheduleDoc ? !selectedScheduleDoc.isAbsent && selectedScheduleDoc.departurePlannedAt : scheduleItems.some(i => i.title.includes('하원 예정'))),
+    [scheduleItems, selectedScheduleDoc]
+  );
   const hasAwayPlan = Boolean(awayStartTime && awayEndTime) || extraAwayPlans.some((slot) => Boolean(slot.startTime && slot.endTime));
-  const isAbsentMode = useMemo(() => scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [scheduleItems]);
+  const isAbsentMode = useMemo(() => isScheduleAbsent || scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [isScheduleAbsent, scheduleItems]);
 
   const seedRecommendedRoutineToPlanner = useCallback(async (routine: RecommendedRoutine) => {
     if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
@@ -975,30 +1122,83 @@ export default function StudyPlanPage() {
   }, [routineSocialProfile, studentProfile?.studyRoutineProfile, studentProfileRef, toast]);
 
   useEffect(() => {
-    const arrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
-    const dismissal = scheduleItems.find((item) => item.title.startsWith('하원 예정: '));
-    const awayItems = scheduleItems
+    const fallbackArrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
+    const fallbackDismissal = scheduleItems.find((item) => item.title.startsWith('하원 예정: '));
+    const fallbackAwayItems = scheduleItems
       .filter((item) => item.title.startsWith('외출 예정'))
       .map((item) => parseAwayScheduleTitle(item.title))
       .filter((item): item is AttendanceAwaySlot => Boolean(item))
       .sort((left, right) => left.startTime.localeCompare(right.startTime));
 
-    setInTime(arrival?.title.split(': ')[1] || '09:00');
-    setOutTime(dismissal?.title.split(': ')[1] || '22:00');
+    const scheduleSource = selectedScheduleDoc
+      ? buildDraftFromScheduleDoc(selectedScheduleDoc)
+      : matchingWeekdayTemplate
+        ? buildDraftFromScheduleDoc({
+            inTime: matchingWeekdayTemplate.arrivalPlannedAt,
+            outTime: matchingWeekdayTemplate.departurePlannedAt,
+            isAbsent: false,
+            outings:
+              matchingWeekdayTemplate.hasExcursionDefault &&
+              matchingWeekdayTemplate.defaultExcursionStartAt &&
+              matchingWeekdayTemplate.defaultExcursionEndAt
+                ? [
+                    {
+                      id: 'weekday-template',
+                      startTime: matchingWeekdayTemplate.defaultExcursionStartAt,
+                      endTime: matchingWeekdayTemplate.defaultExcursionEndAt,
+                      reason: matchingWeekdayTemplate.defaultExcursionReason || '',
+                    },
+                  ]
+                : [],
+          })
+        : null;
 
-    if (awayItems.length > 0) {
-      const [firstAway, ...restAway] = awayItems;
-      setAwayStartTime(firstAway.startTime);
-      setAwayEndTime(firstAway.endTime);
-      setAwayReason(firstAway.reason);
-      setExtraAwayPlans(restAway);
-    } else {
-      setAwayStartTime('');
-      setAwayEndTime('');
-      setAwayReason('');
-      setExtraAwayPlans([]);
+    const draft = scheduleSource || {
+      inTime: fallbackArrival?.title.split(': ')[1] || '09:00',
+      outTime: fallbackDismissal?.title.split(': ')[1] || '22:00',
+      awayStartTime: fallbackAwayItems[0]?.startTime || '',
+      awayEndTime: fallbackAwayItems[0]?.endTime || '',
+      awayReason: fallbackAwayItems[0]?.reason || '',
+      awaySlots: fallbackAwayItems.slice(1),
+      isAbsent: scheduleItems.some((item) => item.title.includes('등원하지 않습니다')),
+    };
+
+    setInTime(draft.inTime || '09:00');
+    setOutTime(draft.outTime || '22:00');
+    setAwayStartTime(draft.awayStartTime || '');
+    setAwayEndTime(draft.awayEndTime || '');
+    setAwayReason(draft.awayReason || '');
+    setExtraAwayPlans(draft.awaySlots || []);
+    setIsScheduleAbsent(Boolean(draft.isAbsent));
+    setScheduleNote((selectedScheduleDoc as any)?.note || '');
+  }, [matchingWeekdayTemplate, scheduleItems, selectedScheduleDoc]);
+
+  useEffect(() => {
+    if (matchingWeekdayTemplate) {
+      setWeekdayDraft(
+        buildDraftFromScheduleDoc({
+          inTime: matchingWeekdayTemplate.arrivalPlannedAt,
+          outTime: matchingWeekdayTemplate.departurePlannedAt,
+          isAbsent: false,
+          outings:
+            matchingWeekdayTemplate.hasExcursionDefault &&
+            matchingWeekdayTemplate.defaultExcursionStartAt &&
+            matchingWeekdayTemplate.defaultExcursionEndAt
+              ? [
+                  {
+                    id: matchingWeekdayTemplate.id || 'weekday-template',
+                    startTime: matchingWeekdayTemplate.defaultExcursionStartAt,
+                    endTime: matchingWeekdayTemplate.defaultExcursionEndAt,
+                    reason: matchingWeekdayTemplate.defaultExcursionReason || '',
+                  },
+                ]
+              : [],
+        })
+      );
+      return;
     }
-  }, [scheduleItems]);
+    setWeekdayDraft(EMPTY_ATTENDANCE_SCHEDULE_DRAFT);
+  }, [matchingWeekdayTemplate]);
 
   const studyTimeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
@@ -1880,67 +2080,122 @@ export default function StudyPlanPage() {
     }
   };
 
+  const buildCurrentAttendanceDraft = useCallback((): AttendanceScheduleDraft => ({
+    inTime,
+    outTime,
+    awayStartTime,
+    awayEndTime,
+    awayReason,
+    awaySlots: extraAwayPlans,
+    isAbsent: isScheduleAbsent,
+  }), [awayEndTime, awayReason, awayStartTime, extraAwayPlans, inTime, isScheduleAbsent, outTime]);
+
+  const syncLegacyScheduleItems = useCallback(async (dateKey: string, scheduleDoc: StudentScheduleDoc | null) => {
+    if (!firestore || !user || !activeMembership) return;
+
+    const targetWeekKey = format(new Date(`${dateKey}T00:00:00`), "yyyy-'W'II");
+    const itemsRef = collection(
+      firestore,
+      'centers',
+      activeMembership.id,
+      'plans',
+      user.uid,
+      'weeks',
+      targetWeekKey,
+      'items'
+    );
+    const currentSnapshot = await getDocs(
+      query(itemsRef, where('dateKey', '==', dateKey), where('category', '==', 'schedule'))
+    );
+    const batch = writeBatch(firestore);
+    currentSnapshot.docs.forEach((docSnap) => batch.delete(doc(itemsRef, docSnap.id)));
+
+    if (scheduleDoc) {
+      buildLegacyScheduleTitles(scheduleDoc).forEach((title) => {
+        batch.set(doc(itemsRef), {
+          title,
+          done: false,
+          weight: 0,
+          dateKey,
+          category: 'schedule',
+          studyPlanWeekId: targetWeekKey,
+          centerId: activeMembership.id,
+          studentId: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+    }
+
+    await batch.commit();
+  }, [activeMembership, firestore, user]);
+
+  const persistStudentSchedule = useCallback(async (params: {
+    dateKey: string;
+    draft: AttendanceScheduleDraft;
+    awaySlots?: AttendanceAwaySlot[];
+    note?: string | null;
+    recurrenceSourceId?: string | null;
+    source?: StudentScheduleDoc['source'];
+    recommendedStudyMinutes?: number | null;
+    recommendedWeeklyDays?: number | null;
+  }) => {
+    if (!firestore || !user) return;
+
+    const validationMessage = validateScheduleDraft(params.draft, params.awaySlots || []);
+    if (validationMessage) {
+      throw new Error(validationMessage);
+    }
+
+    const scheduleRef = doc(firestore, 'users', user.uid, 'schedules', params.dateKey);
+    const scheduleDoc = buildScheduleDocFromDraft({
+      uid: user.uid,
+      studentName: studentProfile?.name || activeMembership?.displayName || user.displayName || '학생',
+      centerId: activeMembership?.id || null,
+      dateKey: params.dateKey,
+      draft: params.draft,
+      extraAwaySlots: params.awaySlots || [],
+      note: params.note || null,
+      recurrenceSourceId: params.recurrenceSourceId || null,
+      recommendedStudyMinutes: params.recommendedStudyMinutes || null,
+      recommendedWeeklyDays: params.recommendedWeeklyDays || null,
+      source: params.source,
+    });
+
+    await setDoc(scheduleRef, {
+      ...scheduleDoc,
+      createdAt: (selectedScheduleDoc as any)?.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    await syncLegacyScheduleItems(params.dateKey, scheduleDoc as StudentScheduleDoc);
+  }, [activeMembership, firestore, selectedScheduleDoc, studentProfile?.name, syncLegacyScheduleItems, user]);
+
   const handleSetAttendance = async (type: 'attend' | 'absent') => {
     if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
     setIsSubmitting(true);
-    
-    const batch = writeBatch(firestore);
-    const colRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items');
 
     try {
-      scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('외출 예정')).forEach(i => {
-        batch.delete(doc(colRef, i.id));
-      });
-
       if (type === 'attend') {
-        const normalizedAwayPlans = [
-          createAwaySlot({
-            id: 'away-primary',
-            startTime: awayStartTime,
-            endTime: awayEndTime,
-            reason: awayReason.trim(),
-          }),
-          ...extraAwayPlans.map((slot) =>
-            createAwaySlot({
-              id: slot.id,
-              startTime: slot.startTime,
-              endTime: slot.endTime,
-              reason: slot.reason.trim(),
-            })
-          ),
-        ].filter((slot) => slot.startTime && slot.endTime);
-
-        batch.set(doc(colRef), {
-          title: `등원 예정: ${inTime}`,
-          done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
-          studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        });
-        batch.set(doc(colRef), {
-          title: `하원 예정: ${outTime}`,
-          done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
-          studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        });
-        normalizedAwayPlans.forEach((slot) => {
-          const awayLabel = slot.reason ? `외출 예정 · ${slot.reason}: ${slot.startTime} ~ ${slot.endTime}` : `외출 예정: ${slot.startTime} ~ ${slot.endTime}`;
-          batch.set(doc(colRef), {
-            title: awayLabel,
-            done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
-            studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
-            createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-          });
+        await persistStudentSchedule({
+          dateKey: selectedDateKey,
+          draft: buildCurrentAttendanceDraft(),
+          awaySlots: extraAwayPlans,
+          note: scheduleNote,
+          source: scheduleRecommendationPrefill ? 'planner-diagnostic' : 'manual',
+          recommendedStudyMinutes: scheduleRecommendationPrefill?.recommendedDailyStudyMinutes || null,
+          recommendedWeeklyDays: scheduleRecommendationPrefill?.recommendedWeeklyDays || null,
         });
       } else {
-        batch.set(doc(colRef), {
-          title: `이날 등원하지 않습니다`,
-          done: false, weight: 0, dateKey: selectedDateKey, category: 'schedule',
-          studyPlanWeekId: weekKey, centerId: activeMembership.id, studentId: user.uid,
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        await persistStudentSchedule({
+          dateKey: selectedDateKey,
+          draft: {
+            ...buildCurrentAttendanceDraft(),
+            isAbsent: true,
+          },
+          note: scheduleNote,
         });
       }
-
-      await batch.commit();
       const existingDayStatus = (progress?.dailyPointStatus?.[selectedDateKey] || {}) as Record<string, any>;
       if (type === 'attend' && progressRef && !existingDayStatus.attendance) {
         await setDoc(progressRef, {
@@ -1978,6 +2233,271 @@ export default function StudyPlanPage() {
       setIsSubmitting(false);
     }
   };
+
+  const applyAttendanceDraftToState = useCallback((draft: AttendanceScheduleDraft) => {
+    setInTime(draft.inTime || '09:00');
+    setOutTime(draft.outTime || '22:00');
+    setAwayStartTime(draft.awayStartTime || '');
+    setAwayEndTime(draft.awayEndTime || '');
+    setAwayReason(draft.awayReason || '');
+    setExtraAwayPlans(draft.awaySlots || []);
+    setIsScheduleAbsent(Boolean(draft.isAbsent));
+  }, []);
+
+  const handleTodayScheduleChange = useCallback((patch: Partial<AttendanceScheduleDraft>) => {
+    applyAttendanceDraftToState({
+      ...buildCurrentAttendanceDraft(),
+      ...patch,
+      awaySlots: patch.awaySlots ?? extraAwayPlans,
+    });
+  }, [applyAttendanceDraftToState, buildCurrentAttendanceDraft, extraAwayPlans]);
+
+  const handleWeekdayDraftChange = useCallback((patch: Partial<AttendanceScheduleDraft>) => {
+    setWeekdayDraft((previous) => ({
+      ...previous,
+      ...patch,
+      awaySlots: patch.awaySlots ?? previous.awaySlots,
+    }));
+  }, []);
+
+  const handleSaveTodaySchedule = useCallback(async () => {
+    if (!selectedDateKey) return;
+    setIsSubmitting(true);
+    try {
+      await persistStudentSchedule({
+        dateKey: selectedDateKey,
+        draft: buildCurrentAttendanceDraft(),
+        awaySlots: extraAwayPlans,
+        note: scheduleNote,
+        source: scheduleRecommendationPrefill ? 'planner-diagnostic' : 'manual',
+        recommendedStudyMinutes: scheduleRecommendationPrefill?.recommendedDailyStudyMinutes || null,
+        recommendedWeeklyDays: scheduleRecommendationPrefill?.recommendedWeeklyDays || null,
+      });
+      toast({
+        title: '날짜별 일정 저장 완료',
+        description: '선택한 날짜의 등하원·외출 일정을 저장했어요.',
+      });
+      clearSchedulePrefillCache();
+      setIsAttendanceScheduleSheetOpen(false);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '일정 저장 실패',
+        description: typeof error?.message === 'string' ? error.message : '일정을 저장하지 못했어요.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [buildCurrentAttendanceDraft, clearSchedulePrefillCache, extraAwayPlans, persistStudentSchedule, scheduleNote, scheduleRecommendationPrefill, selectedDateKey, toast]);
+
+  const handleSetTodayAbsent = useCallback(async () => {
+    if (!selectedDateKey) return;
+    setIsSubmitting(true);
+    try {
+      await persistStudentSchedule({
+        dateKey: selectedDateKey,
+        draft: {
+          ...buildCurrentAttendanceDraft(),
+          isAbsent: true,
+        },
+        note: scheduleNote,
+      });
+      toast({
+        title: '미등원 일정 저장 완료',
+        description: '선택한 날짜를 미등원 일정으로 저장했어요.',
+      });
+      clearSchedulePrefillCache();
+      setIsAttendanceScheduleSheetOpen(false);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '일정 저장 실패',
+        description: typeof error?.message === 'string' ? error.message : '일정을 저장하지 못했어요.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [buildCurrentAttendanceDraft, clearSchedulePrefillCache, persistStudentSchedule, scheduleNote, selectedDateKey, toast]);
+
+  const handleResetTodaySchedule = useCallback(async () => {
+    if (!firestore || !user || !selectedDateKey) return;
+    setIsSubmitting(true);
+    try {
+      await deleteDoc(doc(firestore, 'users', user.uid, 'schedules', selectedDateKey));
+      await syncLegacyScheduleItems(selectedDateKey, null);
+      applyAttendanceDraftToState(EMPTY_ATTENDANCE_SCHEDULE_DRAFT);
+      setScheduleNote('');
+      clearSchedulePrefillCache();
+      toast({
+        title: '이 날짜 일정 초기화',
+        description: '저장된 날짜별 일정을 비웠어요.',
+      });
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: '초기화 실패',
+        description: '일정을 초기화하지 못했어요.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [applyAttendanceDraftToState, clearSchedulePrefillCache, firestore, selectedDateKey, syncLegacyScheduleItems, toast, user]);
+
+  const handleToggleRecurringWeekday = useCallback((weekday: number) => {
+    setSelectedRecurringWeekdays((previous) =>
+      previous.includes(weekday)
+        ? previous.filter((value) => value !== weekday)
+        : [...previous, weekday].sort()
+    );
+  }, []);
+
+  const handleCopyTodayToWeekday = useCallback(() => {
+    setWeekdayDraft(buildCurrentAttendanceDraft());
+  }, [buildCurrentAttendanceDraft]);
+
+  const handleSaveWeekdayTemplate = useCallback(async () => {
+    if (!firestore || !user) return;
+    if (selectedRecurringWeekdays.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: '반복 요일을 선택해 주세요',
+        description: '최소 1개 이상의 요일을 선택해야 저장할 수 있어요.',
+      });
+      return;
+    }
+
+    const validationMessage = validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []);
+    if (validationMessage) {
+      toast({
+        variant: 'destructive',
+        title: '반복 루틴 저장 실패',
+        description: validationMessage,
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const templateId = matchingWeekdayTemplate?.id || `template-${selectedRecurringWeekdays.join('-')}`;
+      await setDoc(doc(firestore, 'users', user.uid, 'scheduleTemplates', templateId), {
+        name: presetName.trim() || `${selectedRecurringWeekdayLabel} 기본 루틴`,
+        weekdays: selectedRecurringWeekdays,
+        arrivalPlannedAt: weekdayDraft.inTime,
+        departurePlannedAt: weekdayDraft.outTime,
+        hasExcursionDefault: Boolean(weekdayDraft.awayStartTime && weekdayDraft.awayEndTime),
+        defaultExcursionStartAt: weekdayDraft.awayStartTime || null,
+        defaultExcursionEndAt: weekdayDraft.awayEndTime || null,
+        defaultExcursionReason: weekdayDraft.awayReason?.trim() || null,
+        active: true,
+        timezone: 'Asia/Seoul',
+        createdAt: matchingWeekdayTemplate?.createdAt || serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      toast({
+        title: '정기 루틴 저장 완료',
+        description: `매주 ${selectedRecurringWeekdayLabel}에 적용할 기본값을 저장했어요.`,
+      });
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: '정기 루틴 저장 실패',
+        description: '반복 루틴을 저장하지 못했어요.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [firestore, matchingWeekdayTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, toast, user, weekdayDraft]);
+
+  const handleSaveSchedulePreset = useCallback(async () => {
+    if (!firestore || !user) return;
+    if (!presetName.trim()) {
+      toast({
+        variant: 'destructive',
+        title: '루틴 이름을 적어주세요',
+        description: '저장한 루틴 목록에서 구분할 이름이 필요해요.',
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(firestore, 'users', user.uid, 'scheduleTemplates'), {
+        name: presetName.trim(),
+        weekdays: selectedRecurringWeekdays.length > 0 ? selectedRecurringWeekdays : [selectedWeekdayValue],
+        arrivalPlannedAt: inTime,
+        departurePlannedAt: outTime,
+        hasExcursionDefault: Boolean(awayStartTime && awayEndTime),
+        defaultExcursionStartAt: awayStartTime || null,
+        defaultExcursionEndAt: awayEndTime || null,
+        defaultExcursionReason: awayReason.trim() || null,
+        active: true,
+        timezone: 'Asia/Seoul',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setPresetName('');
+      toast({
+        title: '루틴 저장 완료',
+        description: '다음부터 날짜 입력이나 정기 루틴에 바로 복사할 수 있어요.',
+      });
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: '루틴 저장 실패',
+        description: '루틴을 저장하지 못했어요.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [awayEndTime, awayReason, awayStartTime, firestore, inTime, outTime, presetName, selectedRecurringWeekdays, selectedWeekdayValue, toast, user]);
+
+  const handleDeleteScheduleTemplate = useCallback(async (templateId: string) => {
+    if (!firestore || !user) return;
+    await deleteDoc(doc(firestore, 'users', user.uid, 'scheduleTemplates', templateId));
+  }, [firestore, user]);
+
+  const handleApplyPresetToToday = useCallback((preset: SavedAttendanceRoutine) => {
+    applyAttendanceDraftToState(preset);
+  }, [applyAttendanceDraftToState]);
+
+  const handleApplyPresetToWeekday = useCallback((preset: SavedAttendanceRoutine) => {
+    setWeekdayDraft(preset);
+  }, []);
+
+  const handleApplySelectedWeekdayTemplateToToday = useCallback(() => {
+    if (!matchingWeekdayTemplate) return;
+    applyAttendanceDraftToState({
+      inTime: matchingWeekdayTemplate.arrivalPlannedAt,
+      outTime: matchingWeekdayTemplate.departurePlannedAt,
+      awayStartTime: matchingWeekdayTemplate.defaultExcursionStartAt || '',
+      awayEndTime: matchingWeekdayTemplate.defaultExcursionEndAt || '',
+      awayReason: matchingWeekdayTemplate.defaultExcursionReason || '',
+      awaySlots: [],
+      isAbsent: false,
+    });
+    setScheduleNote((matchingWeekdayTemplate as any)?.note || '');
+  }, [applyAttendanceDraftToState, matchingWeekdayTemplate]);
+
+  const handleToggleScheduleTemplateActive = useCallback(async (templateId: string, active: boolean) => {
+    if (!firestore || !user) return;
+    try {
+      await updateDoc(doc(firestore, 'users', user.uid, 'scheduleTemplates', templateId), {
+        active,
+        updatedAt: serverTimestamp(),
+      });
+      toast({
+        title: active ? '반복 루틴을 다시 사용해요' : '반복 루틴을 잠시 껐어요',
+        description: active
+          ? '다음부터는 이 루틴을 날짜 기본값으로 다시 불러와요.'
+          : '저장해둔 내용은 남겨두고 자동 프리필만 잠시 멈춰둘게요.',
+      });
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: '루틴 상태 변경 실패',
+        description: '반복 루틴 활성 상태를 바꾸지 못했어요.',
+      });
+    }
+  }, [firestore, toast, user]);
 
   const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
     if (isPast || !firestore || !user || !activeMembership || !weekKey) return;
@@ -2339,12 +2859,12 @@ export default function StudyPlanPage() {
             </span>
           </div>
           <div className={cn("grid grid-cols-7 gap-1 sm:gap-4", isMobile ? "px-0" : "px-0")}>
-            {weekDays.map((day) => {
-              const isSelected = isSameDay(day, selectedDate);
-              const isTodayBtn = isSameDay(day, new Date());
+            {attendanceCalendarDays.map((day) => {
+              const isSelected = day.isSelected;
+              const isTodayBtn = day.isToday;
               return (
                 <button
-                  key={day.toISOString()}
+                  key={day.key}
                   className={cn(
                     "flex flex-col items-center justify-center transition-all duration-500 rounded-[1.25rem] sm:rounded-[2.5rem] border-2 h-auto py-2.5 sm:py-5 shrink-0",
                     isMobile ? "px-0" : "px-4",
@@ -2353,10 +2873,24 @@ export default function StudyPlanPage() {
                       : "bg-white border-transparent hover:border-primary/20",
                     isTodayBtn && !isSelected && "border-primary/30"
                   )}
-                  onClick={() => setSelectedDate(day)}
+                  onClick={() => setSelectedDate(day.date)}
                 >
-                  <span className={cn("font-black uppercase tracking-widest leading-none", isMobile ? "text-[7px] mb-1" : "text-[10px] mb-2", isSelected ? "text-white/60" : "text-muted-foreground/40")}>{format(day, 'EEE', { locale: ko })}</span>
-                  <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-base" : "text-2xl", isSelected ? "text-white" : "text-primary")}>{format(day, 'd')}</span>
+                  <span className={cn("font-black uppercase tracking-widest leading-none", isMobile ? "text-[7px] mb-1" : "text-[10px] mb-2", isSelected ? "text-white/60" : "text-muted-foreground/40")}>{day.weekdayLabel}</span>
+                  <span className={cn("font-black tracking-tighter tabular-nums leading-none", isMobile ? "text-base" : "text-2xl", isSelected ? "text-white" : "text-primary")}>{day.dateLabel}</span>
+                  {day.hasSchedule ? (
+                    <span
+                      className={cn(
+                        "mt-2 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.14em]",
+                        isSelected
+                          ? "bg-white/14 text-white"
+                          : day.isAbsent
+                            ? "border border-rose-200 bg-rose-50 text-rose-600"
+                            : "border border-emerald-100 bg-emerald-50 text-emerald-700"
+                      )}
+                    >
+                      {day.isAbsent ? '미등원' : '등록'}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -2393,7 +2927,18 @@ export default function StudyPlanPage() {
                   루틴 추천은 처음 한 번만 받아두고, 이후에는 투두처럼 그날그날 필요한 공부 흐름을 직접 적고 체크하는 방식으로 써도 됩니다.
                 </p>
               </div>
-              <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row")}>
+              <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row flex-wrap justify-end")}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn("rounded-xl border-2 bg-white font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
+                  onClick={() => setIsAttendanceScheduleSheetOpen(true)}
+                >
+                  일정 등록 화면 열기
+                </Button>
+                <Button asChild variant="outline" className={cn("rounded-xl border-2 bg-white font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}>
+                  <Link href="/dashboard/plan/diagnosis">학습 플래너 진단</Link>
+                </Button>
                 {hasRoutineProfile ? (
                   <>
                     <Button
@@ -2432,6 +2977,30 @@ export default function StudyPlanPage() {
                 )}
               </div>
             </div>
+
+            {scheduleRecommendationPrefill ? (
+              <div className="rounded-[1.25rem] border border-[#FFCF9D] bg-[#FFF7EF] px-4 py-4">
+                <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D86A11]">플래너 연동 추천</p>
+                    <p className="mt-1 text-sm font-black text-[#17326B]">
+                      이번 주 권장 등원 {scheduleRecommendationPrefill.recommendedWeeklyDays}일 · 하루 권장 공부 {Math.round(scheduleRecommendationPrefill.recommendedDailyStudyMinutes / 60)}시간
+                    </p>
+                    <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                      진단 결과를 바탕으로 출입 일정 화면을 바로 열어뒀어요. 필요하면 수정해서 저장하면 됩니다.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className={cn("rounded-xl font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
+                    onClick={() => setIsAttendanceScheduleSheetOpen(true)}
+                  >
+                    일정 확인하기
+                  </Button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="rounded-[1.25rem] border border-primary/10 bg-white px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
               <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
@@ -2587,21 +3156,12 @@ export default function StudyPlanPage() {
                   </div>
                 </div>
                 {!isPast && (
-                  <button onClick={() => {
-                    const batch = writeBatch(firestore!);
-                    const colRef = collection(firestore!, 'centers', activeMembership!.id, 'plans', user!.uid, 'weeks', weekKey, 'items');
-                    scheduleItems.filter(i => i.title.includes('등원') || i.title.includes('하원') || i.title.includes('등원하지 않습니다') || i.title.includes('외출 예정')).forEach(i => batch.delete(doc(colRef, i.id)));
-                    batch.commit().then(async () => {
-                      if (isToday) {
-                        await applySameDayRoutinePenalty('당일 출석 루틴 초기화');
-                        toast({
-                          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
-                          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
-                        });
-                      }
-                      toast({ title: "설정을 재설정합니다." });
-                    });
-                  }} className={cn("font-black uppercase text-muted-foreground underline underline-offset-4 hover:text-primary transition-all relative z-10", isMobile ? "text-[8px]" : "text-[10px]")}>재설정</button>
+                  <button
+                    onClick={() => void handleResetTodaySchedule()}
+                    className={cn("font-black uppercase text-muted-foreground underline underline-offset-4 hover:text-primary transition-all relative z-10", isMobile ? "text-[8px]" : "text-[10px]")}
+                  >
+                    재설정
+                  </button>
                 )}
               </div>
             )}
@@ -2661,6 +3221,14 @@ export default function StudyPlanPage() {
                   <Badge className="rounded-full border border-primary/10 bg-white px-3 py-1 text-[10px] font-black text-primary shadow-sm">
                     현재 {routineCountLabel}
                   </Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAttendanceScheduleSheetOpen(true)}
+                    className={cn("rounded-full border-primary/12 bg-white font-black text-primary", isMobile ? "h-8 px-3 text-[10px]" : "h-9 px-4 text-[11px]")}
+                  >
+                    상세 일정 등록
+                  </Button>
                   {isToday ? (
                     <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
                       당일 수정 시 벌점 +{SAME_DAY_ROUTINE_PENALTY_POINTS}
@@ -2976,6 +3544,52 @@ export default function StudyPlanPage() {
         onQuickAdd={handleQuickAddRecentStudy}
         isSubmitting={isSubmitting}
         isMobile={isMobile}
+      />
+
+      <AttendanceScheduleSheet
+        open={isAttendanceScheduleSheetOpen}
+        onOpenChange={setIsAttendanceScheduleSheetOpen}
+        isMobile={isMobile}
+        isSubmitting={isSubmitting}
+        selectedDateLabel={format(selectedDate, 'yyyy. MM. dd', { locale: ko })}
+        isToday={isToday}
+        sameDayPenaltyPoints={SAME_DAY_ROUTINE_PENALTY_POINTS}
+        weekRangeLabel={weekRangeLabel}
+        calendarDays={attendanceCalendarDays}
+        onMoveWeek={moveWeek}
+        onSelectDate={setSelectedDate}
+        todayDraft={buildCurrentAttendanceDraft()}
+        onTodayChange={handleTodayScheduleChange}
+        onSaveToday={handleSaveTodaySchedule}
+        onSetTodayAbsent={handleSetTodayAbsent}
+        onResetToday={() => void handleResetTodaySchedule()}
+        hasSelectedWeekdayTemplate={hasSelectedWeekdayTemplate}
+        selectedWeekdayLabel={matchingWeekdayLabel}
+        onApplySelectedWeekdayTemplateToToday={handleApplySelectedWeekdayTemplateToToday}
+        selectedWeekdays={selectedRecurringWeekdays}
+        onToggleWeekday={handleToggleRecurringWeekday}
+        weekdayOptions={WEEKDAY_OPTIONS}
+        weekdayDraft={weekdayDraft}
+        onWeekdayChange={handleWeekdayDraftChange}
+        onCopyTodayToWeekday={handleCopyTodayToWeekday}
+        onSaveWeekday={handleSaveWeekdayTemplate}
+        presetName={presetName}
+        onPresetNameChange={setPresetName}
+        onSavePreset={handleSaveSchedulePreset}
+        savedRoutines={savedAttendanceRoutines}
+        onApplyPresetToToday={handleApplyPresetToToday}
+        onApplyPresetToWeekday={handleApplyPresetToWeekday}
+        onDeletePreset={(presetId) => void handleDeleteScheduleTemplate(presetId)}
+        onTogglePresetActive={(presetId, active) => void handleToggleScheduleTemplateActive(presetId, active)}
+        note={scheduleNote}
+        onNoteChange={setScheduleNote}
+        recommendationPrefillSummary={scheduleRecommendationPrefill}
+        personalTasks={personalTasks as Array<WithId<StudyPlanItem>>}
+        personalTaskDraft={newPersonalTask}
+        onPersonalTaskDraftChange={setNewPersonalTask}
+        onAddPersonalTask={() => void handleAddTask(newPersonalTask, 'personal')}
+        onTogglePersonalTask={(task) => void handleToggleTask(task)}
+        onDeletePersonalTask={(task) => void handleDeleteTask(task)}
       />
 
       <RepeatCopySheet
