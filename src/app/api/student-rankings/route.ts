@@ -117,6 +117,9 @@ export async function GET(request: NextRequest) {
       .collection(`centers/${centerId}/members`)
       .where('role', '==', 'student')
       .get();
+    const studentsSnapPromise = adminDb
+      .collection(`centers/${centerId}/students`)
+      .get();
     const dailySnapPromise = adminDb
       .collection(`centers/${centerId}/dailyStudentStats/${todayKey}/students`)
       .get();
@@ -129,12 +132,39 @@ export async function GET(request: NextRequest) {
       adminDb.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()
     );
 
-    const [membersSnap, dailySnap, monthlySnap, ...weeklySnaps] = await Promise.all([
+    const [membersSnap, studentsSnap, dailySnap, monthlySnap, ...weeklySnaps] = await Promise.all([
       membersSnapPromise,
+      studentsSnapPromise,
       dailySnapPromise,
       monthlySnapPromise,
       ...weeklySnapPromises,
     ]);
+
+    const studentProfiles = new Map<string, {
+      displayNameSnapshot: string;
+      classNameSnapshot: string | null;
+      schoolNameSnapshot: string | null;
+    }>();
+
+    studentsSnap.forEach((docSnap) => {
+      const studentId = docSnap.id;
+      if (isSyntheticStudentId(studentId)) return;
+
+      const data = docSnap.data() as Record<string, unknown>;
+      studentProfiles.set(studentId, {
+        displayNameSnapshot: typeof data.name === 'string' && data.name.trim()
+          ? data.name.trim()
+          : typeof data.displayName === 'string' && data.displayName.trim()
+            ? data.displayName.trim()
+            : '학생',
+        classNameSnapshot: typeof data.className === 'string' && data.className.trim()
+          ? data.className.trim()
+          : null,
+        schoolNameSnapshot: typeof data.schoolName === 'string' && data.schoolName.trim()
+          ? data.schoolName.trim()
+          : null,
+      });
+    });
 
     const memberProfiles = new Map<string, {
       displayNameSnapshot: string;
@@ -151,23 +181,24 @@ export async function GET(request: NextRequest) {
       if (normalizeMembershipStatus(data.status) !== 'active') return;
 
       activeStudentIds.add(studentId);
+      const studentProfile = studentProfiles.get(studentId);
       memberProfiles.set(studentId, {
         displayNameSnapshot: typeof data.displayName === 'string' && data.displayName.trim()
           ? data.displayName.trim()
-          : '학생',
+          : studentProfile?.displayNameSnapshot || '학생',
         classNameSnapshot: typeof data.className === 'string' && data.className.trim()
           ? data.className.trim()
-          : null,
+          : studentProfile?.classNameSnapshot || null,
         schoolNameSnapshot: typeof data.schoolName === 'string' && data.schoolName.trim()
           ? data.schoolName.trim()
           : typeof data.schoolNameSnapshot === 'string' && data.schoolNameSnapshot.trim()
             ? data.schoolNameSnapshot.trim()
-            : null,
+            : studentProfile?.schoolNameSnapshot || null,
       });
     });
 
     const shouldInclude = (studentId: string) => activeStudentIds.size === 0 || activeStudentIds.has(studentId);
-    const getProfile = (studentId: string) => memberProfiles.get(studentId) || {
+    const getProfile = (studentId: string) => memberProfiles.get(studentId) || studentProfiles.get(studentId) || {
       displayNameSnapshot: '학생',
       classNameSnapshot: null,
       schoolNameSnapshot: null,
