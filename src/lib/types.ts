@@ -353,9 +353,11 @@ export interface RoutineSocialProfile {
 }
 
 export interface RoutineOnboardingState {
-  status: 'completed' | 'dismissed';
+  status?: 'completed' | 'dismissed';
+  presentedAt?: Timestamp;
   completedAt?: Timestamp;
   dismissedAt?: Timestamp;
+  version?: number;
   updatedAt?: Timestamp;
 }
 

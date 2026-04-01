@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import type { StudyPlanItem, WithId } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -69,6 +70,12 @@ type StudyPlanSheetProps = {
   onToggleTask: (task: WithId<StudyPlanItem>) => void;
   onDeleteTask: (task: WithId<StudyPlanItem>) => void;
   onCommitActual: (task: WithId<StudyPlanItem>, value: number) => void;
+  personalTasks?: Array<WithId<StudyPlanItem>>;
+  personalTaskValue?: string;
+  onPersonalTaskChange?: (value: string) => void;
+  onAddPersonalTask?: () => void;
+  onTogglePersonalTask?: (task: WithId<StudyPlanItem>) => void;
+  onDeletePersonalTask?: (task: WithId<StudyPlanItem>) => void;
 };
 
 function resolveStudyPlanMode(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetAmount' | 'targetMinutes'>): StudyPlanMode {
@@ -131,6 +138,12 @@ export function StudyPlanSheet({
   onToggleTask,
   onDeleteTask,
   onCommitActual,
+  personalTasks = [],
+  personalTaskValue = '',
+  onPersonalTaskChange,
+  onAddPersonalTask,
+  onTogglePersonalTask,
+  onDeletePersonalTask,
 }: StudyPlanSheetProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,10 +164,10 @@ export function StudyPlanSheet({
                 </div>
               <div className="min-w-0">
                 <DialogTitle className="text-xl font-black tracking-tight text-white">
-                  학습 계획 수정
+                  오늘 계획 수정
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-[11px] font-semibold text-[var(--text-on-dark-soft)]">
-                  최근 계획 불러오기부터 분량형·시간형 추가, 체크까지 한 번에 관리해요.
+                  오늘 공부와 보조 일정을 한 번에 정리해요.
                 </DialogDescription>
               </div>
             </div>
@@ -266,6 +279,73 @@ export function StudyPlanSheet({
               </div>
             )}
           </div>
+
+          {onPersonalTaskChange && onAddPersonalTask && onTogglePersonalTask && onDeletePersonalTask ? (
+            <div className="mt-4 rounded-[1.45rem] border border-white/12 bg-white/[0.06] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-black text-white">기타 일정</p>
+                <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+                  병원, 상담, 준비물처럼 오늘만 챙길 일을 짧게 적어둘 수 있어요.
+                </p>
+              </div>
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] shadow-none">
+                {personalTasks.length}개
+              </Badge>
+            </div>
+
+            {!isPast ? (
+              <div className="mt-3 flex items-center gap-2 rounded-[1.1rem] border border-white/12 bg-white/[0.08] p-2">
+                <Input
+                  placeholder="예: 병원, 상담, 준비물 챙기기"
+                  value={personalTaskValue}
+                  onChange={(event) => onPersonalTaskChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      onAddPersonalTask();
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  className="h-10 border-none bg-transparent text-sm font-bold text-white shadow-none focus-visible:ring-0 placeholder:text-white/55"
+                />
+                <Button
+                  type="button"
+                  onClick={onAddPersonalTask}
+                  disabled={isSubmitting || !personalTaskValue.trim()}
+                  className={cn('rounded-xl bg-white text-[#17326B] hover:bg-white/90', isMobile ? 'h-10 px-4 text-xs' : 'h-10 px-4 text-sm')}
+                >
+                  추가
+                </Button>
+              </div>
+            ) : null}
+
+            <div className="mt-3">
+              {personalTasks.length === 0 ? (
+                <div className="rounded-[1.1rem] border border-dashed border-white/12 bg-white/[0.04] px-4 py-5 text-center">
+                  <p className="text-[12px] font-black text-white">보조 일정은 필요할 때만 적어도 충분해요</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {personalTasks.map((task) => (
+                    <PlanItemCard
+                      key={task.id}
+                      id={task.id}
+                      title={task.title}
+                      checked={task.done}
+                      onToggle={() => onTogglePersonalTask(task)}
+                      onDelete={() => onDeletePersonalTask(task)}
+                      disabled={isPast}
+                      isMobile={isMobile}
+                      tone="amber"
+                      badgeLabel="기타 일정"
+                      compact
+                    />
+                  ))}
+                </div>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-4 rounded-[1.1rem] border border-white/12 bg-white/[0.08] px-4 py-3 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
             최근 계획을 불러와서 살짝 수정하거나, 분량형/시간형 중 편한 방식으로 새 계획을 짧게 추가해보세요.

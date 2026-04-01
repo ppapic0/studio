@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 import { BookmarkPlus, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock3, Copy, Loader2, Plus, RotateCcw, Save, Sparkles, Trash2, XCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +42,7 @@ type CalendarDayOption = {
 type AttendanceScheduleSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTab?: 'today' | 'weekday' | 'saved';
   isMobile: boolean;
   isSubmitting: boolean;
   selectedDateLabel: string;
@@ -268,6 +271,7 @@ function formatDraftSummary(draft: AttendanceScheduleDraft) {
 export function AttendanceScheduleSheet({
   open,
   onOpenChange,
+  initialTab = 'today',
   isMobile,
   isSubmitting,
   selectedDateLabel,
@@ -310,6 +314,13 @@ export function AttendanceScheduleSheet({
   onTogglePersonalTask,
   onDeletePersonalTask,
 }: AttendanceScheduleSheetProps) {
+  const [activeTab, setActiveTab] = useState<'today' | 'weekday' | 'saved'>(initialTab);
+
+  useEffect(() => {
+    if (!open) return;
+    setActiveTab(initialTab);
+  }, [initialTab, open]);
+
   const formatWeekdaySummary = (weekdays?: number[]) => {
     if (!weekdays?.length) return '';
     return weekdayOptions
@@ -372,7 +383,7 @@ export function AttendanceScheduleSheet({
             </div>
           </div>
 
-          <Tabs defaultValue="today" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'today' | 'weekday' | 'saved')} className="space-y-4">
           <TabsList className={cn('grid w-full rounded-2xl border border-white/12 bg-white/[0.08] p-1', isMobile ? 'grid-cols-1 gap-1' : 'grid-cols-3')}>
               <TabsTrigger value="today" className="rounded-xl text-[11px] font-black text-[var(--text-on-dark-soft)] data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">특정 날짜</TabsTrigger>
               <TabsTrigger value="weekday" className="rounded-xl text-[11px] font-black text-[var(--text-on-dark-soft)] data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">매주 반복</TabsTrigger>
