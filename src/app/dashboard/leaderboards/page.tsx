@@ -38,6 +38,7 @@ type RankEntryView = {
   studentId: string;
   displayNameSnapshot: string;
   classNameSnapshot: string | null;
+  schoolNameSnapshot?: string | null;
   value: number;
   rank: number;
 };
@@ -82,6 +83,15 @@ const RANGE_META: Record<RankRange, { label: string; title: string; hint: string
 function formatMaskedName(name?: string | null) {
   if (!name) return '익명 학생';
   return name.length > 1 ? `${name.charAt(0)}*${name.slice(-1)}` : name;
+}
+
+function formatSchoolName(schoolName?: string | null) {
+  const source = typeof schoolName === 'string' ? schoolName.trim() : '';
+  if (!source) return '학교 미지정';
+  if (/^\d+\s*반$/u.test(source) || /반$/u.test(source) && !/학교|중|고|대/u.test(source)) {
+    return '학교 미지정';
+  }
+  return source;
 }
 
 function formatHourValue(minutes: number) {
@@ -573,7 +583,9 @@ function LeaderboardRow({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 truncate text-xs font-semibold text-[var(--text-secondary)]">{player.classNameSnapshot || '반 미지정'}</p>
+          <p className="mt-1 truncate text-xs font-semibold text-[var(--text-secondary)]">
+            {formatSchoolName(player.schoolNameSnapshot)}
+          </p>
           <div className="mt-3 leaderboard-race-track h-3 overflow-hidden rounded-full bg-[#FFE8D0]">
             <div
               className={cn(

@@ -12,7 +12,7 @@ export const ONBOARDING_SURVEY_COPY = {
   nextCta: '다음',
   previousCta: '이전',
   skipCta: '잘 모르겠어요',
-  submitCta: '내 계획 추천받기',
+  submitCta: '내 기준 저장하기',
   helperText: '정답은 없어요. 지금 나와 가장 가까운 걸 골라주세요.',
 } as const;
 
@@ -23,11 +23,11 @@ export const ONBOARDING_BRIDGE_COPY = {
 } as const;
 
 export const ONBOARDING_LOADING_COPY = {
-  title: '계획을 정리하는 중이에요',
+  title: '기준을 정리하는 중이에요',
   lines: [
-    '답변을 바탕으로\n하루 공부 총량과 과목 배분을 먼저 보고 있어요.',
-    '블록 길이와 쉬는 시간까지\n실제로 운영할 수 있게 정리하고 있어요.',
-    '조금만 기다리면\n바로 시작할 수 있는 계획을 보여드릴게요.',
+    '답변을 바탕으로\n앞으로 계획을 읽을 기준을 먼저 정리하고 있어요.',
+    '우선 과목, 총량, 공부 블록 길이까지\n실제로 코칭에 쓸 기준으로 맞추고 있어요.',
+    '조금만 기다리면\n오늘 계획에 바로 붙일 수 있게 저장해드릴게요.',
   ],
 } as const;
 
@@ -45,9 +45,9 @@ export const ONBOARDING_RESULTS_COPY = {
 } as const;
 
 export const ONBOARDING_SAVED_COPY = {
-  title: '내 계획으로 저장했어요',
-  subtitle: '이제 오늘 계획에서 바로 시작할 수 있어요.',
+  title: '내 기준을 저장했어요',
+  subtitle: '이제 오늘 계획을 쓰면 부족한 점과 보강 포인트를 함께 보여드릴게요.',
   primaryCta: '오늘 계획 보러가기',
-  secondaryCta: '조금 더 수정하기',
-  footnote: '계획은 언제든 내 공부 흐름에 맞게 바꿀 수 있어요.',
+  secondaryCta: '답변 다시 보기',
+  footnote: '기준은 언제든 다시 진단해서 내 공부 흐름에 맞게 바꿀 수 있어요.',
 } as const;

@@ -102,8 +102,6 @@ const subjectOptions: PlannerQuestionOption<PlannerSubject>[] = [
   { value: '영어', label: '영어' },
   { value: '탐구', label: '탐구' },
   { value: '한국사', label: '한국사' },
-  { value: '전공', label: '전공/직렬 과목' },
-  { value: '행정법/행정학', label: '행정법/행정학 계열' },
 ];
 
 export const PLANNER_SUBJECT_GRADE_FIELDS: Array<{ key: keyof StudyPlannerAnswers['subjectGrades']; label: string }> = [

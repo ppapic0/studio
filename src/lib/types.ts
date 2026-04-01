@@ -603,6 +603,7 @@ export interface SharedRoutine {
 
 export interface UserStudyProfile {
   version: number;
+  planningMode?: 'recommended-routine' | 'feedback-coach';
   answers: OnboardingAnswer;
   archetypeId: StudyPlanArchetype['id'];
   archetypeName: string;

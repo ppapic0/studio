@@ -938,14 +938,6 @@ export default function AnalysisTrackPage() {
           </section>
 
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <Badge variant="dark" className="px-3 py-1 text-[10px] shadow-none">GRAPH DUNGEON</Badge>
-                <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">그래프 던전들</h2>
-              </div>
-              {!isMobile ? <p className="text-sm font-semibold text-[var(--text-on-dark-soft)]">핵심 그래프를 한 번에 보고, 해석하고, 전략으로 연결하세요.</p> : null}
-            </div>
-
             {visibleDungeonCards.map((card) => (
               <GraphDungeonCard
                 key={card.id}

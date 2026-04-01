@@ -174,6 +174,7 @@ import {
   parseTimeToMinutes,
   validateScheduleDraft,
 } from '@/features/schedules/lib/scheduleModel';
+import { buildPlanCoachFeedback } from '@/lib/plan-feedback';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -753,14 +754,12 @@ export default function StudyPlanPage() {
       user?.displayName,
     ]
   );
-  const hasRoutineProfile = Boolean(studentProfile?.studyRoutineProfile?.selectedRoutineId);
+  const hasRoutineProfile = Boolean(studentProfile?.studyRoutineProfile);
   const hasSeenRoutineOnboarding =
     Boolean(studentProfile?.studyRoutineOnboarding?.status) || hasRoutineProfile;
-  const routineGuideTitle =
-    studentProfile?.studyRoutineProfile?.selectedRoutine?.name || '저장된 추천 루틴';
+  const routineGuideTitle = '저장된 학습 기준';
   const routineGuideSummary =
-    studentProfile?.studyRoutineProfile?.selectedRoutine?.oneLineDescription ||
-    '처음 한 번 받아둔 추천 루틴이에요. 필요할 때만 펼쳐서 참고하고, 오늘 계획은 아래에서 자유롭게 적으면 돼요.';
+    '처음 한 번 답한 설문 기준이에요. 이제는 이 기준을 바탕으로 학생이 직접 쓴 오늘 계획을 읽고 부족한 점과 보강 포인트를 보여줍니다.';
   const selectedWeekdayValue = selectedDate ? getDay(selectedDate) : 1;
   const activeScheduleTemplates = useMemo(
     () => (scheduleTemplates || []).filter((template) => template.active !== false),
@@ -838,6 +837,7 @@ export default function StudyPlanPage() {
 
   useEffect(() => {
     if (!isStudent || !studentProfile?.studyRoutineProfile) return;
+    if (studentProfile.studyRoutineProfile.planningMode === 'feedback-coach') return;
     setRoutineWorkspace((previous) => {
       const baseWorkspace = previous || studentProfile.studyRoutineWorkspace;
       return refreshRoutineWorkspaceForToday(studentProfile.studyRoutineProfile!, baseWorkspace);
@@ -907,6 +907,16 @@ export default function StudyPlanPage() {
   const scheduleItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const personalTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'personal') || [], [dailyPlans]);
   const studyTasks = useMemo(() => dailyPlans?.filter(p => p.category === 'study' || !p.category) || [], [dailyPlans]);
+  const planCoachFeedback = useMemo(
+    () =>
+      buildPlanCoachFeedback({
+        profile: studentProfile?.studyRoutineProfile,
+        studyTasks,
+        scheduleItems,
+        selectedDate,
+      }),
+    [scheduleItems, selectedDate, studentProfile?.studyRoutineProfile, studyTasks]
+  );
   const copyableTaskItems = useMemo(() => dailyPlans?.filter(p => p.category !== 'schedule') || [], [dailyPlans]);
   const copyableRoutineItems = useMemo(() => dailyPlans?.filter(p => p.category === 'schedule') || [], [dailyPlans]);
   const hasCopyableTasks = copyableTaskItems.length > 0;
@@ -964,7 +974,7 @@ export default function StudyPlanPage() {
     await batch.commit();
   }, [activeMembership, dailyPlans?.length, firestore, isPast, selectedDateKey, user, weekKey]);
 
-  const handleSaveRoutineProfile = useCallback(async (profile: UserStudyProfile, selectedRoutine: RecommendedRoutine) => {
+  const handleSaveRoutineProfile = useCallback(async (profile: UserStudyProfile) => {
     if (!firestore || !user || !activeMembership || !studentProfileRef) return;
 
     const fallbackDisplayName =
@@ -1001,11 +1011,7 @@ export default function StudyPlanPage() {
           createdAt: studentProfile?.studyRoutineProfile?.createdAt || serverTimestamp(),
           updatedAt: serverTimestamp(),
         },
-        studyRoutineWorkspace: {
-          ...buildInitialRoutineWorkspace(profile),
-          updatedAt: serverTimestamp(),
-          lastOpenedAt: serverTimestamp(),
-        },
+        studyRoutineWorkspace: null,
         routineSocialProfile: {
           ...nextSocialProfile,
           updatedAt: serverTimestamp(),
@@ -1014,13 +1020,12 @@ export default function StudyPlanPage() {
       { merge: true }
     );
 
-    await seedRecommendedRoutineToPlanner(selectedRoutine);
-    setRoutineWorkspace(buildInitialRoutineWorkspace(profile));
+    setRoutineWorkspace(null);
     toast({
-      title: '추천 루틴 저장 완료',
-      description: '오늘부터 바로 쓸 수 있는 루틴이 계획트랙에 반영됐어요.',
+      title: '학습 기준 저장 완료',
+      description: '이제 직접 쓴 오늘 계획을 기준으로 부족한 점과 보강 포인트를 함께 보여드릴게요.',
     });
-  }, [activeMembership, firestore, seedRecommendedRoutineToPlanner, studentProfile, studentProfileRef, toast, user]);
+  }, [activeMembership, firestore, studentProfile, studentProfileRef, toast, user]);
 
   const handleDismissRoutineOnboarding = useCallback(async () => {
     if (studentProfileRef) {
@@ -2940,31 +2945,14 @@ export default function StudyPlanPage() {
                   <Link href="/dashboard/plan/diagnosis">학습 플래너 진단</Link>
                 </Button>
                 {hasRoutineProfile ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className={cn("rounded-xl border-2 bg-white font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
-                      onClick={() => {
-                        setRoutineSurfaceMode('home');
-                        setIsRoutineGuideOpen((previous) => !previous);
-                      }}
-                    >
-                      {isRoutineGuideOpen ? '추천 루틴 접기' : '추천 루틴 참고'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className={cn("rounded-xl font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
-                      onClick={() => {
-                        setIsRoutineGuideOpen(false);
-                        setRoutineSurfaceMode('home');
-                        setPlanTrackEntryMode('onboarding');
-                      }}
-                    >
-                      루틴 추천 다시 받기
-                    </Button>
-                  </>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className={cn("rounded-xl font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
+                    onClick={() => setPlanTrackEntryMode('onboarding')}
+                  >
+                    학습 기준 다시 진단하기
+                  </Button>
                 ) : (
                   <Button
                     type="button"
@@ -2972,7 +2960,7 @@ export default function StudyPlanPage() {
                     className={cn("rounded-xl font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
                     onClick={() => setPlanTrackEntryMode('onboarding')}
                   >
-                    루틴 추천 받아보기
+                    학습 기준 진단하기
                   </Button>
                 )}
               </div>
@@ -3006,55 +2994,61 @@ export default function StudyPlanPage() {
               <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8AA0C7]">
-                    {hasRoutineProfile ? '저장된 추천 루틴' : '루틴 추천은 선택 기능'}
+                    {hasRoutineProfile ? '저장된 학습 기준' : '학습 기준 진단은 선택 기능'}
                   </p>
                   <p className="mt-1 text-sm font-black text-[#17326B]">
-                    {hasRoutineProfile ? routineGuideTitle : '처음 한 번만 받아두고, 나중에 필요할 때 다시 열 수 있어요.'}
+                    {hasRoutineProfile ? routineGuideTitle : '처음 한 번만 답해두면 매일 계획을 읽는 기준으로 쓸 수 있어요.'}
                   </p>
                   <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
                     {hasRoutineProfile
                       ? routineGuideSummary
-                      : '지금은 아래에서 등원, 하원, 외출과 오늘 공부 루틴을 바로 적어도 충분해요.'}
+                      : '지금은 아래에서 등원, 하원, 외출과 오늘 공부 루틴을 먼저 적고, 필요할 때 학습 기준 진단을 받아도 충분해요.'}
                   </p>
                 </div>
                 {hasRoutineProfile ? (
                   <Badge className="rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-3 py-1 text-[10px] font-black text-[#D86A11] shadow-none">
-                    추천은 참고용
+                    매일 피드백 기준
                   </Badge>
                 ) : null}
               </div>
             </div>
 
-            {hasRoutineProfile && routineWorkspace ? (
-              <Collapsible open={isRoutineGuideOpen} onOpenChange={(open) => {
-                setIsRoutineGuideOpen(open);
-                if (!open) setRoutineSurfaceMode('home');
-              }}>
-                <CollapsibleContent className="space-y-4">
-                  {routineSurfaceMode === 'editor' ? (
-                    <RoutineEditor
-                      routine={routineWorkspace.activeRoutine}
-                      onBack={() => setRoutineSurfaceMode('home')}
-                      onSaveBlock={(blockDraft, blockId) => void handleSaveRoutineBlock(blockDraft, blockId)}
-                      onDeleteBlock={(blockId) => void handleDeleteRoutineBlock(blockId)}
-                    />
-                  ) : (
-                    <RoutineHome
-                      studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
-                      workspace={routineWorkspace}
-                      sharingLabel={getVisibilityLabel(routineSocialProfile.visibility)}
-                      onToggleBlock={(blockId) => void handleToggleRoutineBlock(blockId)}
-                      onOpenEditor={() => setRoutineSurfaceMode('editor')}
-                      onOpenPrivacy={() => setIsRoutinePrivacySheetOpen(true)}
-                      onOpenReflection={() => setIsReflectionSheetOpen(true)}
-                      onEditBlock={(block) => {
-                        setSelectedRoutineBlock(block);
-                        setIsRoutineBlockSheetOpen(true);
-                      }}
-                    />
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
+            {hasRoutineProfile && planCoachFeedback ? (
+              <div className="rounded-[1.45rem] border border-[#DCE5F4] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] px-4 py-4 shadow-[0_18px_36px_-28px_rgba(20,41,95,0.16)]">
+                <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D86A11]">오늘 계획 피드백</p>
+                    <p className="mt-1 text-sm font-black text-[#17326B]">{planCoachFeedback.headline}</p>
+                    <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">{planCoachFeedback.summary}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className="rounded-full border border-[#D8E3F7] bg-white px-3 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+                      기준 {Math.round(planCoachFeedback.recommendedMinutes / 60)}시간
+                    </Badge>
+                    <Badge className="rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-3 py-1 text-[10px] font-black text-[#D86A11] shadow-none">
+                      현재 {Math.round(planCoachFeedback.totalPlannedMinutes / 60)}시간
+                    </Badge>
+                  </div>
+                </div>
+                <div className={cn("mt-4 grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
+                  <div className="rounded-[1.1rem] border border-emerald-100 bg-emerald-50/70 px-3 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">잘 들어간 점</p>
+                    <div className="mt-2 space-y-2">
+                      {(planCoachFeedback.strengths.length > 0 ? planCoachFeedback.strengths : ['지금은 먼저 오늘 계획을 적은 것 자체가 출발점이에요.']).map((item) => (
+                        <p key={item} className="break-keep text-[12px] font-semibold leading-5 text-[#245C55]">{item}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.1rem] border border-[#FFD9B4] bg-[#FFF7EF] px-3 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#D86A11]">보강하면 좋은 점</p>
+                    <div className="mt-2 space-y-2">
+                      {planCoachFeedback.suggestions.map((item) => (
+                        <p key={item} className="break-keep text-[12px] font-semibold leading-5 text-[#5C4A36]">{item}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : null}
           </div>
         </section>

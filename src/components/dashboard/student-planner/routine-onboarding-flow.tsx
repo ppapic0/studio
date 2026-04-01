@@ -18,17 +18,16 @@ import {
   type OnboardingQuestionOption,
 } from '@/components/dashboard/student-planner/onboarding-questions';
 import { RecommendationLoadingScreen } from '@/components/dashboard/student-planner/recommendation-loading-screen';
-import { RecommendationResultScreen } from '@/components/dashboard/student-planner/recommendation-result-screen';
 import { SavePlanSuccessScreen } from '@/components/dashboard/student-planner/save-plan-success-screen';
 import { StudyPlanQuestionCard } from '@/components/dashboard/student-planner/study-plan-question-card';
 import { Button } from '@/components/ui/button';
-import { createDefaultOnboardingAnswers, customizeRecommendedRoutine, generateRoutineRecommendationSet, getSubjectOption, type RoutineCustomizationDraft } from '@/lib/recommend-routine';
+import { createDefaultOnboardingAnswers, generateRoutineRecommendationSet } from '@/lib/recommend-routine';
 import { estimateRemainingTime, getSectionLabel } from '@/lib/study-plan/estimate-remaining-time';
-import { type OnboardingAnswer, type RecommendedRoutine, type UserStudyProfile } from '@/lib/types';
+import { type OnboardingAnswer, type UserStudyProfile } from '@/lib/types';
 
 type RoutineOnboardingFlowProps = {
   studentName?: string;
-  onSaveRoutineProfile: (profile: UserStudyProfile, selectedRoutine: RecommendedRoutine) => Promise<void>;
+  onSaveRoutineProfile: (profile: UserStudyProfile) => Promise<void>;
   onContinueToPlanner: () => void;
   onSkipForNow: () => Promise<void> | void;
 };
@@ -55,47 +54,64 @@ export function RoutineOnboardingFlow({
   onContinueToPlanner,
   onSkipForNow,
 }: RoutineOnboardingFlowProps) {
-  const [phase, setPhase] = useState<'intro' | 'survey' | 'loading' | 'results' | 'saved'>('intro');
+  const [phase, setPhase] = useState<'intro' | 'survey' | 'loading' | 'saved'>('intro');
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<OnboardingAnswer>(() => createDefaultOnboardingAnswers());
   const [selectionState, setSelectionState] = useState<QuestionSelectionState>({});
-  const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
-  const [routineDrafts, setRoutineDrafts] = useState<Record<string, RoutineCustomizationDraft>>({});
-  const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null);
-  const [isSavingRoutineId, setIsSavingRoutineId] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
 
   const recommendationResult = useMemo(() => generateRoutineRecommendationSet(answers), [answers]);
-  const routines = useMemo(
-    () =>
-      recommendationResult.recommendations.map((routine) =>
-        routineDrafts[routine.id]
-          ? customizeRecommendedRoutine(routine, answers, routineDrafts[routine.id])
-          : routine
-      ),
-    [answers, recommendationResult.recommendations, routineDrafts]
-  );
 
   useEffect(() => {
     if (phase !== 'loading') return;
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      setSelectedRoutineId((current) => current || routines[0]?.id || null);
-      setPhase('results');
+      void (async () => {
+        if (cancelled || isSavingProfile) return;
+        const primaryRoutine = recommendationResult.recommendations[0];
+        const matchedArchetype =
+          recommendationResult.matchedArchetypes.find((entry) => entry.archetype.id === primaryRoutine?.archetypeId)?.archetype ||
+          recommendationResult.matchedArchetypes[0]?.archetype;
+
+        if (!primaryRoutine || !matchedArchetype) {
+          setPhase('survey');
+          return;
+        }
+
+        const profile: UserStudyProfile = {
+          version: 1,
+          planningMode: 'feedback-coach',
+          answers,
+          archetypeId: matchedArchetype.id,
+          archetypeName: matchedArchetype.name,
+          recommendedRoutines: recommendationResult.recommendations,
+          selectedRoutineId: primaryRoutine.id,
+          selectedRoutine: primaryRoutine,
+          sharingPreference: 'private',
+        };
+
+        setIsSavingProfile(true);
+        try {
+          await onSaveRoutineProfile(profile);
+          if (!cancelled) {
+            setPhase('saved');
+          }
+        } finally {
+          if (!cancelled) {
+            setIsSavingProfile(false);
+          }
+        }
+      })();
     }, 1100);
-    return () => window.clearTimeout(timer);
-  }, [phase, routines]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [answers, isSavingProfile, onSaveRoutineProfile, phase, recommendationResult]);
 
   const currentQuestion = ONBOARDING_QUESTIONS[stepIndex];
   const bridgeMessage = getBridgeMessage(stepIndex);
-  const selectedRoutine = routines.find((routine) => routine.id === selectedRoutineId) || routines[0];
-  const availablePrioritySubjects = useMemo(() => {
-    const candidates = [...answers.subjectPriority, ...answers.weakSubjects.filter((value) => value !== 'none')]
-      .filter((value, index, array) => array.indexOf(value) === index)
-      .map((value) => getSubjectOption(value))
-      .map((subject) => ({ id: subject.id, label: subject.label }));
-    return candidates.slice(0, 4);
-  }, [answers.subjectPriority, answers.weakSubjects]);
-
   const progressMeta = {
     currentStep: stepIndex + 1,
     totalSteps: ONBOARDING_QUESTIONS.length,
@@ -155,43 +171,6 @@ export function RoutineOnboardingFlow({
     setStepIndex((previous) => previous + 1);
   };
 
-  const updateRoutineDraft = (routineId: string, patch: Partial<RoutineCustomizationDraft>) => {
-    setRoutineDrafts((previous) => ({
-      ...previous,
-      [routineId]: {
-        ...previous[routineId],
-        ...patch,
-      },
-    }));
-  };
-
-  const handleSaveRoutine = async (routine: RecommendedRoutine) => {
-    const matchedArchetype =
-      recommendationResult.matchedArchetypes.find((entry) => entry.archetype.id === routine.archetypeId)?.archetype ||
-      recommendationResult.matchedArchetypes[0]?.archetype;
-    if (!matchedArchetype) return;
-
-    const profile: UserStudyProfile = {
-      version: 1,
-      answers,
-      archetypeId: matchedArchetype.id,
-      archetypeName: matchedArchetype.name,
-      recommendedRoutines: routines,
-      selectedRoutineId: routine.id,
-      selectedRoutine: routine,
-      sharingPreference: 'private',
-    };
-
-    setIsSavingRoutineId(routine.id);
-    try {
-      await onSaveRoutineProfile(profile, routine);
-      setSelectedRoutineId(routine.id);
-      setPhase('saved');
-    } finally {
-      setIsSavingRoutineId(null);
-    }
-  };
-
   const handleSkipForNow = async () => {
     setIsSkipping(true);
     try {
@@ -209,31 +188,11 @@ export function RoutineOnboardingFlow({
     return <RecommendationLoadingScreen />;
   }
 
-  if (phase === 'saved' && selectedRoutine) {
+  if (phase === 'saved') {
     return (
       <SavePlanSuccessScreen
-        routine={selectedRoutine}
         onContinue={onContinueToPlanner}
-        onBackToResults={() => setPhase('results')}
-      />
-    );
-  }
-
-  if (phase === 'results') {
-    return (
-      <RecommendationResultScreen
-        routines={routines}
-        editingRoutineId={editingRoutineId}
-        routineDrafts={routineDrafts}
-        availablePrioritySubjects={availablePrioritySubjects}
-        onBack={() => setPhase('survey')}
-        onToggleEditing={(routineId) => setEditingRoutineId((previous) => (previous === routineId ? null : routineId))}
-        onDraftUpdate={updateRoutineDraft}
-        onSelect={(routine) => {
-          setSelectedRoutineId(routine.id);
-          void handleSaveRoutine(routine);
-        }}
-        savingRoutineId={isSavingRoutineId}
+        onBackToResults={() => setPhase('survey')}
       />
     );
   }

@@ -5,16 +5,12 @@ import { ArrowRight } from 'lucide-react';
 import { ONBOARDING_SAVED_COPY } from '@/components/dashboard/student-planner/onboarding-copy';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { type RecommendedRoutine } from '@/lib/types';
-
 type SavePlanSuccessScreenProps = {
-  routine: RecommendedRoutine;
   onContinue: () => void;
   onBackToResults: () => void;
 };
 
 export function SavePlanSuccessScreen({
-  routine,
   onContinue,
   onBackToResults,
 }: SavePlanSuccessScreenProps) {
@@ -27,8 +23,10 @@ export function SavePlanSuccessScreen({
             <p className="text-[14px] font-semibold leading-7 text-white/88">{ONBOARDING_SAVED_COPY.subtitle}</p>
           </div>
           <div className="rounded-[1.45rem] border border-white/24 bg-white/10 p-4">
-            <p className="text-[1.35rem] font-black tracking-[-0.03em] text-white">{routine.name}</p>
-            <p className="mt-2 text-[13px] font-semibold leading-6 text-white/84">{routine.subtitle}</p>
+            <p className="text-[1.2rem] font-black tracking-[-0.03em] text-white">이제 직접 쓴 계획을 기준으로 읽어드릴게요</p>
+            <p className="mt-2 text-[13px] font-semibold leading-6 text-white/84">
+              우선 과목이 빠졌는지, 총량이 너무 가벼운지, 복습이 없는지처럼 매일 계획에서 바로 보완 포인트를 확인할 수 있어요.
+            </p>
           </div>
           <div className="grid gap-3">
             <Button
