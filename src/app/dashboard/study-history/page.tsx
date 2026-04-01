@@ -507,6 +507,15 @@ export default function StudyHistoryPage() {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
+  const formatCalendarMinutesLabel = (minutes: number) => {
+    if (minutes <= 0) return '미기록';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours <= 0) return `${mins}분`;
+    if (mins === 0) return `${hours}시간`;
+    return `${hours}시간 ${mins}분`;
+  };
+
   const getHeatmapColor = (minutes: number) => {
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
@@ -528,11 +537,11 @@ export default function StudyHistoryPage() {
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'border-slate-200/90 bg-white/96 text-slate-500';
-    if (level === 'warmup') return 'border-emerald-300/95 bg-white text-slate-900';
-    if (level === 'short') return 'border-teal-300/95 bg-white text-slate-950';
-    if (level === 'steady') return 'border-sky-300/95 bg-white text-[#14295F]';
-    return 'border-blue-300/95 bg-white text-[#14295F]';
+    if (level === 'none') return 'border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,251,0.98))] text-slate-500 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.12)]';
+    if (level === 'warmup') return 'border-emerald-200/95 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(237,251,244,0.98))] text-slate-900 shadow-[0_12px_20px_-18px_rgba(16,185,129,0.18)]';
+    if (level === 'short') return 'border-teal-200/95 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(232,251,247,0.98))] text-slate-950 shadow-[0_12px_20px_-18px_rgba(13,148,136,0.18)]';
+    if (level === 'steady') return 'border-sky-200/95 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(235,245,255,0.98))] text-[#14295F] shadow-[0_12px_20px_-18px_rgba(37,99,235,0.18)]';
+    return 'border-blue-200/95 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(229,238,255,0.98))] text-[#14295F] shadow-[0_14px_24px_-18px_rgba(20,41,95,0.2)]';
   };
 
   const getCalendarValueTextClass = (minutes: number, isCurrentMonth: boolean) => {
@@ -552,6 +561,15 @@ export default function StudyHistoryPage() {
     if (level === 'short') return 'text-teal-800';
     if (level === 'steady') return 'text-sky-800';
     return 'text-[#14295F]';
+  };
+
+  const getStudyHistoryFlowShortLabel = (minutes: number) => {
+    const level = getStudyHistoryFlowLevel(minutes);
+    if (level === 'none') return '0시간';
+    if (level === 'warmup') return '몰입 준비';
+    if (level === 'short') return '짧은 몰입';
+    if (level === 'steady') return '집중 흐름';
+    return '깊은 몰입';
   };
 
   const getCalendarStatusTextClass = (minutes: number, isCurrentMonth: boolean) => {
@@ -905,8 +923,8 @@ export default function StudyHistoryPage() {
         <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
           <div className={cn(isMobile ? "space-y-4" : "flex items-start justify-between gap-4")}>
             <div className={cn(isMobile ? "space-y-3" : "space-y-3")}>
-              <div className="min-w-0 flex-1 space-y-3">
-              <div className="space-y-2">
+                <div className="min-w-0 flex-1 space-y-3">
+                <div className={cn("space-y-2", isMobile ? "pb-2" : "pb-1")}>
                 <h2
                   className={cn(
                     "font-black tracking-tight",
@@ -930,7 +948,7 @@ export default function StudyHistoryPage() {
             </div>
           </div>
 
-          <div className={cn("mt-5 grid", isMobile ? "grid-cols-3 gap-2.5" : "md:grid-cols-3 gap-3")}>
+            <div className={cn("grid", isMobile ? "mt-7 grid-cols-3 gap-2.5" : "mt-6 md:grid-cols-3 gap-3")}>
             {[
               {
                 label: '이번 달 총 공부시간',
@@ -1047,9 +1065,10 @@ export default function StudyHistoryPage() {
               const isTodayCalendar = isSameDay(day, new Date());
               const hasDeepFocus = isCurrentMonth && minutes >= STUDY_HISTORY_FLOW_THRESHOLDS.steady;
               const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
-              const exactTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
+              const exactTimeLabel = isCurrentMonth ? formatCalendarMinutesLabel(minutes) : '--';
               const flowLabel = getStudyHistoryFlowLabel(minutes);
-              const isLongTimeLabel = exactTimeLabel.length >= 5;
+              const flowShortLabel = getStudyHistoryFlowShortLabel(minutes);
+              const isLongTimeLabel = exactTimeLabel.length >= 7;
 
               return (
                 <button
@@ -1103,12 +1122,12 @@ export default function StudyHistoryPage() {
                     )}
                   </div>
 
-                  <div className={cn("mt-auto flex", isMobile ? "justify-center pb-1" : "justify-start pt-6")}>
+                  <div className={cn("mt-auto flex", isMobile ? "justify-center pb-0.5" : "justify-start pt-6")}>
                     {isCurrentMonth ? (
                       <div
                         className={cn(
-                          "inline-flex max-w-full flex-col items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
-                          isMobile ? "min-w-[3rem] px-1.5 py-1.5" : "min-w-[4.65rem] px-2.5 py-1.5",
+                          "inline-flex w-full max-w-full flex-col items-center justify-center rounded-[1rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
+                          isMobile ? "min-h-[2.45rem] px-1.5 py-1.5" : "min-w-[4.65rem] px-2.5 py-1.5",
                           getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                         )}
                       >
@@ -1117,8 +1136,8 @@ export default function StudyHistoryPage() {
                             "dashboard-number block whitespace-nowrap tabular-nums leading-none",
                             isMobile
                               ? isLongTimeLabel
-                                ? "text-[0.64rem] tracking-[-0.04em]"
-                                : "text-[0.72rem] tracking-[-0.06em]"
+                                ? "text-[0.58rem] tracking-[-0.035em]"
+                                : "text-[0.7rem] tracking-[-0.045em]"
                               : "text-[1rem] tracking-[-0.05em]",
                             getCalendarValueTextClass(minutes, isCurrentMonth)
                           )}
@@ -1132,7 +1151,7 @@ export default function StudyHistoryPage() {
                             getCalendarFlowTextClass(minutes, isCurrentMonth)
                           )}
                         >
-                          {flowLabel}
+                          {isMobile ? flowShortLabel : flowLabel}
                         </span>
                       </div>
                     ) : (

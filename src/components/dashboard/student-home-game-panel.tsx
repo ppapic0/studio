@@ -530,7 +530,7 @@ export function StudentHomeGamePanel({
                 </Badge>
                 <span className="text-[11px] font-black text-white">{dateLabel}</span>
               </div>
-              <h2 className={cn("break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
+              <h2 className={cn("font-aggro-display break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
                 오늘도 성장한 하루
               </h2>
               <p className="surface-caption text-sm font-semibold">{heroMessage}</p>
@@ -622,7 +622,7 @@ export function StudentHomeGamePanel({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="surface-kicker text-[10px]">reward</div>
-                  <div className="mt-2 text-[1.65rem] font-black tracking-tight text-white">
+                  <div className="font-aggro-display mt-2 text-[1.65rem] font-black tracking-tight text-white">
                     {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 대기` : "상자 생성중"}
                   </div>
                   <div className="surface-caption mt-1 text-sm font-semibold">{boxSubLabel}</div>
@@ -707,14 +707,14 @@ export function StudentHomeGamePanel({
                   <Clock3 className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
                   오늘
                 </div>
-                <div className="mt-2 text-xl font-black text-[var(--text-primary)]">{todayStudyLabel}</div>
+                <div className="font-aggro-display mt-2 text-xl font-black text-[var(--text-primary)]">{todayStudyLabel}</div>
               </div>
               <div className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                   <Wallet className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
                   포인트
                 </div>
-                <div className="mt-2 text-xl font-black text-[var(--text-primary)]">{pointBalance.toLocaleString()}P</div>
+                <div className="font-aggro-display mt-2 text-xl font-black text-[var(--text-primary)]">{pointBalance.toLocaleString()}P</div>
                 <div className="mt-1 text-[11px] font-black text-[var(--accent-orange)]">오늘 +{todayPointGain}P</div>
               </div>
             </div>
@@ -797,7 +797,7 @@ export function StudentHomeGamePanel({
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-end gap-3">
-                  <div className="text-[1.55rem] font-black tracking-tight text-[var(--text-on-accent)]">
+                  <div className="font-aggro-display text-[1.55rem] font-black tracking-tight text-[var(--text-on-accent)]">
                   {selectedHomeRank.isLoading
                     ? "집계 중..."
                     : selectedHomeRank.rank > 0

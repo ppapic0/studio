@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ChevronLeft } from 'lucide-react';
 
 import {
@@ -60,15 +60,24 @@ export function RoutineOnboardingFlow({
   const [selectionState, setSelectionState] = useState<QuestionSelectionState>({});
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const hasTriggeredLoadingSaveRef = useRef(false);
 
   const recommendationResult = useMemo(() => generateRoutineRecommendationSet(answers), [answers]);
 
   useEffect(() => {
+    if (phase !== 'loading') {
+      hasTriggeredLoadingSaveRef.current = false;
+      return;
+    }
+    if (hasTriggeredLoadingSaveRef.current) return;
+    hasTriggeredLoadingSaveRef.current = true;
+
     if (phase !== 'loading') return;
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void (async () => {
-        if (cancelled || isSavingProfile) return;
+        if (cancelled) return;
         const primaryRoutine = recommendationResult.recommendations[0];
         const matchedArchetype =
           recommendationResult.matchedArchetypes.find((entry) => entry.archetype.id === primaryRoutine?.archetypeId)?.archetype ||
@@ -92,10 +101,17 @@ export function RoutineOnboardingFlow({
         };
 
         setIsSavingProfile(true);
+        setSaveError(null);
         try {
           await onSaveRoutineProfile(profile);
           if (!cancelled) {
             setPhase('saved');
+          }
+        } catch (error) {
+          console.error('[routine-onboarding] save profile failed', error);
+          if (!cancelled) {
+            setSaveError('기준 저장 중 문제가 있었어요. 다시 한 번 눌러주세요.');
+            setPhase('survey');
           }
         } finally {
           if (!cancelled) {
@@ -108,7 +124,7 @@ export function RoutineOnboardingFlow({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [answers, isSavingProfile, onSaveRoutineProfile, phase, recommendationResult]);
+  }, [answers, onSaveRoutineProfile, phase, recommendationResult]);
 
   const currentQuestion = ONBOARDING_QUESTIONS[stepIndex];
   const bridgeMessage = getBridgeMessage(stepIndex);
@@ -156,6 +172,7 @@ export function RoutineOnboardingFlow({
   };
 
   const handleNext = () => {
+    setSaveError(null);
     if (stepIndex === ONBOARDING_QUESTIONS.length - 1) {
       setPhase('loading');
       return;
@@ -164,6 +181,7 @@ export function RoutineOnboardingFlow({
   };
 
   const handleSkip = () => {
+    setSaveError(null);
     if (stepIndex === ONBOARDING_QUESTIONS.length - 1) {
       setPhase('loading');
       return;
@@ -200,6 +218,12 @@ export function RoutineOnboardingFlow({
   return (
     <div className="mx-auto flex w-full max-w-[460px] flex-col gap-4 px-4 pb-24 pt-3">
       <OnboardingProgressHeader meta={progressMeta} />
+
+      {saveError ? (
+        <div className="rounded-[1.2rem] border border-[rgba(255,138,31,0.18)] bg-[linear-gradient(180deg,rgba(255,247,236,0.98)_0%,rgba(255,242,228,0.94)_100%)] px-4 py-3">
+          <p className="text-[13px] font-bold leading-6 text-[#17326B]">{saveError}</p>
+        </div>
+      ) : null}
 
       {bridgeMessage ? (
         <div className="rounded-[1.35rem] border border-[rgba(255,138,31,0.12)] bg-[linear-gradient(180deg,rgba(255,248,239,0.95)_0%,rgba(255,244,234,0.9)_100%)] px-4 py-4">

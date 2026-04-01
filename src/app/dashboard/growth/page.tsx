@@ -329,7 +329,7 @@ function HeroMetricChip({
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-on-dark-soft)]">{label}</div>
-          <div className="mt-1 truncate text-[0.98rem] font-black tracking-[-0.04em] text-white sm:text-[1.2rem]">{value}</div>
+          <div className="font-aggro-display mt-1 truncate text-[0.98rem] font-black tracking-[-0.04em] text-white sm:text-[1.2rem]">{value}</div>
         </div>
       </div>
     </div>
@@ -809,7 +809,7 @@ export default function GrowthPage() {
           <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-center justify-between gap-3")}>
             <div className={cn(isMobile ? "w-full" : "")}>
               <p className="surface-kicker text-[11px]">POINT TRACK</p>
-              <h1 className="mt-2 text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
+              <h1 className="font-aggro-display mt-2 text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
               <div className="mt-3 grid grid-cols-2 gap-2.5">
                 <HeroMetricChip
                   icon={Flame}
@@ -851,10 +851,10 @@ export default function GrowthPage() {
             />
 
             <div className="text-center">
-              <p className="text-sm font-black text-[var(--accent-orange-soft)]">
+              <p className="font-aggro-display text-sm font-black text-[var(--accent-orange-soft)]">
                 {totalAvailableBoxes > 0 ? '상자 도착' : heroMode === 'studying' ? '집중 중' : '다음 상자'}
               </p>
-              <div className="mt-1 text-[2rem] font-black tracking-tight text-white">{heroPrimaryLabel}</div>
+              <div className="font-aggro-display mt-1 text-[2rem] font-black tracking-tight text-white">{heroPrimaryLabel}</div>
               <p className="mt-1 text-sm font-bold text-white">{heroSecondaryLabel}</p>
             </div>
 
@@ -862,15 +862,15 @@ export default function GrowthPage() {
               <div className="grid w-full grid-cols-3 gap-2">
                 <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-3 text-center">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">상태</p>
-                  <p className="mt-2 text-sm font-black text-white">집중 중</p>
+                  <p className="font-aggro-display mt-2 text-sm font-black text-white">집중 중</p>
                 </div>
                 <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-3 text-center">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">세션</p>
-                  <p className="mt-2 text-sm font-black text-white">{formatHeroTimer(liveSessionSeconds)}</p>
+                  <p className="font-aggro-display mt-2 text-sm font-black text-white">{formatHeroTimer(liveSessionSeconds)}</p>
                 </div>
                 <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-3 text-center">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">도착</p>
-                  <p className="mt-2 text-sm font-black text-[var(--accent-orange-soft)]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
+                  <p className="font-aggro-display mt-2 text-sm font-black text-[var(--accent-orange-soft)]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
                 </div>
               </div>
             ) : null}
@@ -880,7 +880,7 @@ export default function GrowthPage() {
               onClick={handleHeroCta}
               variant={totalAvailableBoxes > 0 ? 'secondary' : 'dark'}
               className={cn(
-                'point-track-hero-cta mt-2 h-14 w-full rounded-[1.4rem] text-base font-black',
+                'point-track-hero-cta font-aggro-display mt-2 h-14 w-full rounded-[1.4rem] text-base font-black',
                 totalAvailableBoxes > 0
                   ? ''
                   : 'border border-white/12 bg-[rgba(255,255,255,0.94)] text-[var(--text-on-light)]'
@@ -982,8 +982,8 @@ export default function GrowthPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4D679F]">REWARD SHOP</p>
-              <p className="mt-2 text-base font-black tracking-tight text-[#14295F]">갖고 싶은 선물 문의</p>
-              <p className="mt-1 text-sm font-semibold leading-5 text-[#385287]">카카오톡 선물하기로 받을 수 있는 선물을 문의해보세요.</p>
+              <p className="font-aggro-display mt-2 text-base font-black tracking-tight text-[#14295F]">갖고 싶은 선물 문의</p>
+              <p className="mt-1 text-sm font-bold leading-5 text-[#24457f]">카카오톡 선물하기로 받을 수 있는 선물을 문의해보세요.</p>
             </div>
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(180deg,#ffcb82_0%,#ff9b2b_100%)] text-[#173A82] shadow-[0_12px_24px_-16px_rgba(255,138,31,0.55)]">
               <ChevronRight className="h-5 w-5" />

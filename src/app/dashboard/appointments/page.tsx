@@ -694,7 +694,7 @@ export function AppointmentsPageContent({
   const studentSectionTitleClass = cn(
     'font-black flex items-center gap-3 break-keep',
     isMobile ? 'text-lg' : 'text-xl',
-    isStudentTrackTheme ? 'text-[var(--text-on-dark)]' : 'text-primary'
+    isStudentTrackTheme ? 'font-aggro-display text-[var(--text-on-dark)]' : 'text-primary'
   );
   const studentSectionDescriptionClass = cn(
     'font-bold text-xs mt-1',
@@ -726,7 +726,7 @@ export function AppointmentsPageContent({
   const studentGhostPanelClass = isStudentTrackTheme
     ? 'surface-card surface-card--ghost on-dark rounded-[1.25rem] border-white/10 shadow-none'
     : 'rounded-[1.25rem] border bg-slate-50/40';
-  const studentTitleTextClass = isStudentTrackTheme ? 'text-[var(--text-on-dark)]' : 'text-primary';
+  const studentTitleTextClass = isStudentTrackTheme ? 'font-aggro-display text-[var(--text-on-dark)]' : 'text-primary';
   const studentMetaTextClass = isStudentTrackTheme ? 'text-[var(--text-on-dark-muted)]' : 'text-muted-foreground';
   const studentBodyTextClass = isStudentTrackTheme ? 'text-[var(--text-on-dark-soft)]' : 'text-slate-700';
 
@@ -739,7 +739,7 @@ export function AppointmentsPageContent({
               <div className={cn("flex justify-between gap-4", isMobile ? "flex-col" : "items-start")}>
                 <div className="min-w-0">
                   <Badge variant="dark" className="px-3 py-1 text-[10px] shadow-none">COUNSEL TRACK</Badge>
-                  <h1 className={cn("mt-3 font-black tracking-tighter leading-none text-[var(--text-on-dark)]", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
+                  <h1 className={cn("font-aggro-display mt-3 font-black tracking-tighter leading-none text-[var(--text-on-dark)]", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
                   <p className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-orange-soft)]">
                     상담 예약 · 피드백 센터
                   </p>

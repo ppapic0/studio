@@ -415,6 +415,7 @@ export default function StudyPlanPage() {
   const isMobile = viewMode === 'mobile';
   const rewardGradient = 'from-[#14295F] via-[#1B326D] to-[#233E86]';
   const [planTrackEntryMode, setPlanTrackEntryMode] = useState<'auto' | 'onboarding' | 'planner'>('auto');
+  const [hasDismissedRoutineOnboardingLocally, setHasDismissedRoutineOnboardingLocally] = useState(false);
   const [routineSurfaceMode, setRoutineSurfaceMode] = useState<'home' | 'editor'>('home');
   const [routineWorkspace, setRoutineWorkspace] = useState<RoutineWorkspaceState | null>(null);
   const [isRoutineGuideOpen, setIsRoutineGuideOpen] = useState(false);
@@ -756,7 +757,9 @@ export default function StudyPlanPage() {
   );
   const hasRoutineProfile = Boolean(studentProfile?.studyRoutineProfile);
   const hasSeenRoutineOnboarding =
-    Boolean(studentProfile?.studyRoutineOnboarding?.status) || hasRoutineProfile;
+    hasDismissedRoutineOnboardingLocally ||
+    Boolean(studentProfile?.studyRoutineOnboarding?.status) ||
+    hasRoutineProfile;
   const routineGuideTitle = '저장된 학습 기준';
   const routineGuideSummary =
     '처음 한 번 답한 설문 기준이에요. 이제는 이 기준을 바탕으로 학생이 직접 쓴 오늘 계획을 읽고 부족한 점과 보강 포인트를 보여줍니다.';
@@ -1028,21 +1031,31 @@ export default function StudyPlanPage() {
   }, [activeMembership, firestore, studentProfile, studentProfileRef, toast, user]);
 
   const handleDismissRoutineOnboarding = useCallback(async () => {
-    if (studentProfileRef) {
-      await setDoc(
-        studentProfileRef,
-        {
-          studyRoutineOnboarding: {
-            status: 'dismissed',
-            dismissedAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          },
-        },
-        { merge: true }
-      );
-    }
-
+    setHasDismissedRoutineOnboardingLocally(true);
     setPlanTrackEntryMode('planner');
+
+    try {
+      if (studentProfileRef) {
+        await setDoc(
+          studentProfileRef,
+          {
+            studyRoutineOnboarding: {
+              status: 'dismissed',
+              dismissedAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+          },
+          { merge: true }
+        );
+      }
+    } catch (error) {
+      console.error('[plan-track] dismiss routine onboarding failed', error);
+      toast({
+        title: '바로 계획 화면으로 이동했어요',
+        description: '루틴 설문 저장이 잠시 늦어졌어요. 필요하면 나중에 다시 열 수 있어요.',
+      });
+      return;
+    }
     toast({
       title: '루틴 추천은 나중에 해도 괜찮아요',
       description: '이제부터는 계획트랙에서 출입 일정과 오늘 공부를 바로 적을 수 있어요.',
@@ -2817,7 +2830,7 @@ export default function StudyPlanPage() {
         studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
         onSaveRoutineProfile={handleSaveRoutineProfile}
         onContinueToPlanner={() => setPlanTrackEntryMode('planner')}
-        onSkipForNow={() => void handleDismissRoutineOnboarding()}
+        onSkipForNow={handleDismissRoutineOnboarding}
       />
     );
   }
