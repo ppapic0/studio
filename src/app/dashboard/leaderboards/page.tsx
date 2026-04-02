@@ -1,21 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import {
-  ChevronRight,
   Clock3,
   Crown,
-  Flame,
   Gift,
   Loader2,
-  type LucideIcon,
   ShieldAlert,
   Sparkles,
   Swords,
   TimerReset,
+  Trophy,
   Users,
   Zap,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { useUser } from '@/firebase';
@@ -23,78 +23,134 @@ import { useAppContext } from '@/contexts/app-context';
 import {
   EMPTY_STUDENT_RANKING_SNAPSHOT,
   fetchStudentRankingSnapshot,
+  type StudentRankEntry,
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
 import { cn } from '@/lib/utils';
 
-const PAGE_SIZE = 50;
-const TICKER_INTERVAL_MS = 2400;
-const TOAST_INTERVAL_MS = 5200;
-
 type RankRange = 'daily' | 'weekly' | 'monthly';
+type BattleMode = 'attack' | 'defense' | 'danger' | 'chase';
+type PressureLevel = 'stable' | 'warning' | 'critical';
+type LogTone = 'orange' | 'red' | 'blue' | 'gold';
 
-type RankEntryView = {
-  id: string;
-  studentId: string;
-  displayNameSnapshot: string;
-  classNameSnapshot: string | null;
+type BattleEntry = StudentRankEntry & {
   schoolNameSnapshot?: string | null;
-  value: number;
-  rank: number;
+  isViewer?: boolean;
 };
 
-type RankEventTone = 'orange' | 'blue' | 'gold' | 'danger';
-
-type RankLiveEvent = {
+type LiveLog = {
   id: string;
-  emoji: string;
+  tone: LogTone;
+  badge: string;
   title: string;
   detail: string;
-  tone: RankEventTone;
-  timestampLabel: string;
+  target: 'top' | 'viewer' | 'rival' | 'board';
 };
 
-type ZoneCardConfig = {
-  kicker: string;
+type FloatingEvent = {
+  id: string;
+  tone: LogTone;
+  label: string;
+  target: 'top' | 'viewer' | 'rival';
+};
+
+type RewardState = {
+  progress: number;
+  minutesToReward: number;
+  currentReward: string;
+  nextReward: string;
+};
+
+type RecommendationTone = 'plan' | 'review' | 'balance' | 'method' | 'mindset';
+
+type BattleRecommendation = {
+  id: string;
+  tone: RecommendationTone;
   title: string;
-  body: string;
-  tone: RankEventTone;
-  icon: LucideIcon;
+  action: string;
+  reason: string;
+  explainWhy: string;
+  cta: string;
 };
 
-const RANGE_META: Record<RankRange, { label: string; title: string; hint: string }> = {
+const LIVE_TICK_MS = 4200;
+const HERO_ROTATE_MS = 3600;
+
+const RANGE_META: Record<
+  RankRange,
+  { label: string; title: string; subtitle: string; rewardTitle: string }
+> = {
   daily: {
     label: '일간',
-    title: '오늘 경쟁 랭킹',
-    hint: '오늘 누적 공부시간 기준',
+    title: '오늘의 추월전',
+    subtitle: '지금 쌓는 공부시간이 오늘 순위를 바로 흔듭니다.',
+    rewardTitle: '오늘 배틀 보상',
   },
   weekly: {
     label: '주간',
-    title: '이번 주 경쟁 랭킹',
-    hint: '이번 주 누적 공부시간 기준',
+    title: '실시간 경쟁 랭킹',
+    subtitle: '이번 주 전장을 누가 밀고 있는지 한눈에 보세요.',
+    rewardTitle: '주간 배틀 보상',
   },
   monthly: {
     label: '월간',
-    title: '이번 달 경쟁 랭킹',
-    hint: '이번 달 누적 공부시간 기준',
+    title: '라이브 배틀 리더보드',
+    subtitle: '장기전으로 끌고 가는 상위권 경쟁 흐름을 확인하세요.',
+    rewardTitle: '월간 시즌 보상',
   },
 };
 
-function formatMaskedName(name?: string | null) {
-  if (!name) return '익명 학생';
-  return name.length > 1 ? `${name.charAt(0)}*${name.slice(-1)}` : name;
-}
-
-function formatSchoolName(schoolName?: string | null) {
-  const source = typeof schoolName === 'string' ? schoolName.trim() : '';
-  if (!source) return '학교 미지정';
-  if (/^\d+\s*반$/u.test(source) || /반$/u.test(source) && !/학교|중|고|대/u.test(source)) {
-    return '학교 미지정';
+const TONE_CLASS_MAP: Record<
+  LogTone,
+  {
+    chip: string;
+    glow: string;
+    line: string;
+    text: string;
   }
-  return source;
+> = {
+  orange: {
+    chip: 'border-[#FFB15B]/70 bg-[#FFF1DC] text-[#C86A10]',
+    glow: 'shadow-[0_0_28px_rgba(255,165,78,0.32)]',
+    line: 'from-[#FFAC55] via-[#FFD5A5] to-transparent',
+    text: 'text-[#C86A10]',
+  },
+  red: {
+    chip: 'border-[#FF9A95]/70 bg-[#FFF0EF] text-[#C54E4E]',
+    glow: 'shadow-[0_0_28px_rgba(255,106,106,0.28)]',
+    line: 'from-[#FF7A68] via-[#FFD1C8] to-transparent',
+    text: 'text-[#C54E4E]',
+  },
+  blue: {
+    chip: 'border-[#9DD4FF]/70 bg-[#F1F8FF] text-[#3261B4]',
+    glow: 'shadow-[0_0_28px_rgba(90,135,236,0.24)]',
+    line: 'from-[#5A87EC] via-[#C2DBFF] to-transparent',
+    text: 'text-[#3261B4]',
+  },
+  gold: {
+    chip: 'border-[#F5D07B]/70 bg-[#FFF7E0] text-[#A16B0E]',
+    glow: 'shadow-[0_0_28px_rgba(240,200,110,0.26)]',
+    line: 'from-[#F0C86E] via-[#FFE6A7] to-transparent',
+    text: 'text-[#A16B0E]',
+  },
+};
+
+function formatSchoolName(value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) return '학교 미지정';
+  return trimmed;
 }
 
-function formatHourValue(minutes: number) {
+function formatStudyClock(minutes: number) {
+  const safe = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  if (hours <= 0) return `${mins}분`;
+  if (mins === 0) return `${hours}시간`;
+  return `${hours}시간 ${mins}분`;
+}
+
+function formatStudyCompact(minutes: number) {
   if (minutes <= 0) return '0.0h';
   return `${(minutes / 60).toFixed(1)}h`;
 }
@@ -109,1029 +165,1425 @@ function formatGapLabel(minutes: number) {
   return `${hours}시간 ${mins}분`;
 }
 
-function clampProgress(value: number) {
-  return Math.max(10, Math.min(100, Math.round(value)));
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
-function getToneClasses(tone: RankEventTone) {
-  switch (tone) {
-    case 'gold':
-      return {
-        chip: 'border-[#F0C86E] bg-[#FFF4D5] text-[#9B5A0A]',
-        line: 'from-[#FFD36D]/85 via-[#FFB347]/60 to-transparent',
-        text: 'text-[#9B5A0A]',
-      };
-    case 'blue':
-      return {
-        chip: 'border-[#F0D8BF] bg-[#FFF7ED] text-[#A05E17]',
-        line: 'from-[#FFD4A6]/85 via-[#FFF1DE]/70 to-transparent',
-        text: 'text-[#A05E17]',
-      };
-    case 'danger':
-      return {
-        chip: 'border-[#F6B4B4] bg-[#FFF1F1] text-[#B45353]',
-        line: 'from-[#FFC4AE]/85 via-[#FFD5C7]/62 to-transparent',
-        text: 'text-[#B45353]',
-      };
-    default:
-      return {
-        chip: 'border-[#FFCC9A] bg-[#FFF1E0] text-[#C86A10]',
-        line: 'from-[#FFB761]/85 via-[#FFD29A]/70 to-transparent',
-        text: 'text-[#C86A10]',
-      };
-  }
+function assignRanks(entries: BattleEntry[]) {
+  return [...entries]
+    .sort((a, b) => {
+      if (b.value !== a.value) return b.value - a.value;
+      return a.displayNameSnapshot.localeCompare(b.displayNameSnapshot, 'ko');
+    })
+    .map((entry, index) => ({
+      ...entry,
+      rank: index + 1,
+    }));
 }
 
-function getPrimaryZone(rank: number, diffAbove: number): ZoneCardConfig {
-  if (rank <= 1) {
-    return {
-      kicker: 'SAFE LEAD',
-      title: '현재 선두 유지 중',
-      body: '지금 페이스를 유지하면 선두를 계속 지킬 수 있어요.',
-      tone: 'gold',
-      icon: Crown,
-    };
+function buildFallbackEntries(range: RankRange, viewerId: string) {
+  const baseMap: Record<RankRange, BattleEntry[]> = {
+    daily: [
+      { id: 'fallback-top', studentId: 'rival-top', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 288, rank: 1 },
+      { id: 'fallback-viewer', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 252, rank: 2, isViewer: true },
+      { id: 'fallback-rival', studentId: 'rival-under', displayNameSnapshot: '이*윤', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 234, rank: 3 },
+      { id: 'fallback-4', studentId: 'rival-4', displayNameSnapshot: '박*준', classNameSnapshot: null, schoolNameSnapshot: '대성고등학교', value: 214, rank: 4 },
+    ],
+    weekly: [
+      { id: 'fallback-top-w', studentId: 'rival-top-w', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 1740, rank: 1 },
+      { id: 'fallback-viewer-w', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 1620, rank: 2, isViewer: true },
+      { id: 'fallback-rival-w', studentId: 'rival-under-w', displayNameSnapshot: '이*윤', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 1512, rank: 3 },
+      { id: 'fallback-4-w', studentId: 'rival-4-w', displayNameSnapshot: '정*현', classNameSnapshot: null, schoolNameSnapshot: '중동고등학교', value: 1420, rank: 4 },
+    ],
+    monthly: [
+      { id: 'fallback-top-m', studentId: 'rival-top-m', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 7360, rank: 1 },
+      { id: 'fallback-viewer-m', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 6840, rank: 2, isViewer: true },
+      { id: 'fallback-rival-m', studentId: 'rival-under-m', displayNameSnapshot: '이*윤', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 6410, rank: 3 },
+      { id: 'fallback-4-m', studentId: 'rival-4-m', displayNameSnapshot: '박*준', classNameSnapshot: null, schoolNameSnapshot: '대성고등학교', value: 6180, rank: 4 },
+    ],
+  };
+
+  return assignRanks(baseMap[range]);
+}
+
+function ensureViewerEntry(entries: StudentRankEntry[], viewerId: string) {
+  const hasViewer = entries.some((entry) => entry.studentId === viewerId);
+  if (hasViewer) {
+    return assignRanks(entries.map((entry) => ({ ...entry, isViewer: entry.studentId === viewerId })));
   }
 
-  if (diffAbove <= 60) {
-    return {
-      kicker: 'OVERTAKE ZONE',
-      title: `1위까지 ${formatGapLabel(diffAbove)}`,
-      body: '오늘 한 세션만 더 밀어붙이면 바로 역전권이에요.',
-      tone: 'orange',
-      icon: Zap,
-    };
-  }
+  const fallbackViewer: BattleEntry = {
+    id: `viewer-${viewerId}`,
+    studentId: viewerId,
+    displayNameSnapshot: '나',
+    classNameSnapshot: null,
+    schoolNameSnapshot: '현재 사용자',
+    value: entries.length > 0 ? Math.max(120, entries[Math.min(1, entries.length - 1)].value - 24) : 252,
+    rank: 0,
+    isViewer: true,
+  };
 
+  return assignRanks([...entries.map((entry) => ({ ...entry, isViewer: entry.studentId === viewerId })), fallbackViewer]);
+}
+
+function getBattleMode(rank: number, diffAbove: number, diffBelow: number): BattleMode {
+  if (rank === 1) return diffBelow <= 24 ? 'danger' : 'defense';
+  if (diffAbove <= 20) return 'attack';
+  if (diffBelow <= 18) return 'danger';
+  return 'chase';
+}
+
+function getPressureLevel(rank: number, diffAbove: number, diffBelow: number): PressureLevel {
+  if ((rank === 1 && diffBelow <= 18) || diffAbove <= 12 || diffBelow <= 10) return 'critical';
+  if ((rank === 1 && diffBelow <= 36) || diffAbove <= 36 || diffBelow <= 25) return 'warning';
+  return 'stable';
+}
+
+function buildRewardState(viewerValue: number): RewardState {
+  const cycle = 90;
+  const progress = clamp(Math.round(((viewerValue % cycle) / cycle) * 100), 8, 100);
+  const minutesToReward = cycle - (viewerValue % cycle || cycle);
   return {
-    kicker: 'HOT STREAK',
-    title: `${formatGapLabel(diffAbove)} 차이 추격 중`,
-    body: '지금 흐름이면 상위권을 강하게 압박할 수 있어요.',
-    tone: 'blue',
-    icon: Flame,
+    progress,
+    minutesToReward,
+    currentReward: '상자 +1',
+    nextReward: '20,000P',
   };
 }
 
-function getDefenseZone(rank: number, diffBelow: number): ZoneCardConfig {
-  if (rank <= 0) {
-    return {
-      kicker: 'SAFE LEAD',
-      title: '아직 아래 경쟁자가 없어요',
-      body: '먼저 공부시간을 쌓아 우위를 만들어보세요.',
-      tone: 'blue',
-      icon: ShieldAlert,
-    };
+function buildHeroMessages(params: {
+  mode: BattleMode;
+  diffAbove: number;
+  diffBelow: number;
+  viewerRank: number;
+  latestLog?: LiveLog | null;
+}) {
+  const { mode, diffAbove, diffBelow, viewerRank, latestLog } = params;
+  const messages: string[] = [];
+
+  if (mode === 'attack') {
+    messages.push(`지금 ${Math.max(8, Math.min(diffAbove + 1, 18))}분만 더 하면 1위 탈환 가능`);
+    messages.push('조금만 더 하면 판이 바뀝니다');
   }
 
-  if (rank === 1 && diffBelow >= 120) {
-    return {
-      kicker: 'SAFE LEAD',
-      title: '뒤 순위와 여유 있는 격차',
-      body: `현재 ${formatGapLabel(diffBelow)} 앞서 있어요. 선두 방어 구간입니다.`,
-      tone: 'gold',
-      icon: Crown,
-    };
+  if (mode === 'danger') {
+    messages.push('뒤에서 따라오고 있어요. 방심 금지');
+    messages.push(`지금 멈추면 ${Math.max(8, Math.min(diffBelow + 4, 16))}분 차이로 흔들릴 수 있어요`);
   }
 
-  if (diffBelow > 0 && diffBelow <= 45) {
-    return {
-      kicker: 'DANGER ZONE',
-      title: `${formatGapLabel(diffBelow)} 차이 추격`,
-      body: '지금 멈추면 순위가 바로 흔들릴 수 있어요.',
-      tone: 'danger',
-      icon: ShieldAlert,
-    };
+  if (mode === 'defense') {
+    messages.push('지금 페이스 좋습니다. 밀어붙이세요');
+    messages.push('실드가 살아 있습니다. 선두를 지키는 중이에요');
   }
 
-  return {
-    kicker: 'SAFE LEAD',
-    title: '현재 순위 안정권',
-    body: diffBelow > 0
-      ? `${formatGapLabel(diffBelow)} 차이로 뒤 순위를 앞서고 있어요.`
-      : '지금 기록을 더 쌓으면 추격 압박을 크게 줄일 수 있어요.',
-    tone: 'blue',
-    icon: ShieldAlert,
-  };
+  if (mode === 'chase') {
+    messages.push('오늘 1위, 아직 충분히 가능합니다');
+    messages.push('지금 안 밀면 올라갈 수 있어요');
+  }
+
+  if (viewerRank > 2) {
+    messages.push('상위권 진입 압박 구간입니다. 한 블록만 더 버텨보세요');
+  }
+
+  if (latestLog) {
+    messages.push(latestLog.title);
+  }
+
+  return [...new Set(messages)].slice(0, 4);
 }
 
-function Panel({ className, children }: { className?: string; children: ReactNode }) {
+function buildInitialLogs(entries: BattleEntry[], viewerId: string) {
+  const top = entries[0];
+  const viewer = entries.find((entry) => entry.studentId === viewerId) ?? entries[1] ?? entries[0];
+  const rival = entries.find((entry) => entry.rank === viewer.rank + 1) ?? entries[2] ?? viewer;
+  const diffAbove = Math.max(0, (top?.value ?? viewer.value) - viewer.value);
+
+  return [
+    {
+      id: 'seed-1',
+      tone: 'orange' as const,
+      badge: 'LIVE PUSH',
+      title: `${top?.displayNameSnapshot ?? '성*민'} 님이 25분 추가 기록`,
+      detail: '선두 존에서 오렌지 파동이 더 강해졌어요.',
+      target: 'top' as const,
+    },
+    {
+      id: 'seed-2',
+      tone: 'red' as const,
+      badge: 'PRESSURE',
+      title: `${rival.displayNameSnapshot} 님이 추격 중`,
+      detail: `${Math.max(12, diffAbove)}분 차이 전장으로 압박이 올라오고 있어요.`,
+      target: 'rival' as const,
+    },
+    {
+      id: 'seed-3',
+      tone: 'gold' as const,
+      badge: 'OVERTAKE',
+      title: `지금 ${Math.max(12, Math.min(diffAbove + 1, 24))}분 더 하면 역전권 진입`,
+      detail: '이번 블록만 밀어붙이면 전장 중앙을 넘길 수 있어요.',
+      target: 'viewer' as const,
+    },
+  ];
+}
+
+function buildMainRecommendations(params: {
+  viewer: BattleEntry;
+  top: BattleEntry | null;
+  below: BattleEntry | null;
+  logs: LiveLog[];
+}) {
+  const { viewer, top, below, logs } = params;
+  const recommendations: BattleRecommendation[] = [];
+  const diffAbove = Math.max(0, (top?.value ?? viewer.value) - viewer.value);
+  const diffBelow = below ? Math.max(0, viewer.value - below.value) : 0;
+  const latestThreat = logs.find((log) => log.tone === 'red');
+
+  if (viewer.rank > 1 && diffAbove <= 45) {
+    recommendations.push({
+      id: 'overtake-window',
+      tone: 'plan',
+      title: '지금이 치고 올라갈 타이밍이에요',
+      action: `오늘 다음 블록을 ${Math.max(40, Math.min(diffAbove + 12, 70))}분 이상으로 잡아보세요.`,
+      reason: `현재 1위와 ${formatGapLabel(diffAbove)} 차이라, 한 블록만 잘 밀어도 전장 중앙을 넘길 수 있어요.`,
+      explainWhy: '추격 거리가 짧을수록 첫 블록을 길게 가져가는 편이 순위 반전에 더 유리해요.',
+      cta: '오늘 계획에 반영하기',
+    });
+  }
+
+  if (below && diffBelow <= 18) {
+    recommendations.push({
+      id: 'defense-route',
+      tone: 'mindset',
+      title: '지금은 선두 방어가 먼저예요',
+      action: '새 과목을 넓히기보다, 이미 잡은 핵심 과목 한 블록을 끝까지 지켜보세요.',
+      reason: `${below.displayNameSnapshot} 님과 ${formatGapLabel(diffBelow)} 차이라 방어가 흔들리기 쉬운 구간입니다.`,
+      explainWhy: '격차가 좁을 때는 과목을 늘리는 것보다 이미 잡은 블록을 끊기지 않게 마무리하는 편이 더 안전해요.',
+      cta: '방어 루트 적용하기',
+    });
+  }
+
+  if (recommendations.length < 2) {
+    recommendations.push({
+      id: 'review-slot',
+      tone: 'review',
+      title: '오늘 마지막 20분은 복습으로 남겨두는 걸 추천해요',
+      action: '새 공부를 조금 줄이고, 오늘 한 내용을 오답이나 회상 형태로 짧게 정리해보세요.',
+      reason: '바로 다시 꺼내보는 공부가 오늘 쌓은 시간을 실제 점수로 연결하는 데 도움이 됩니다.',
+      explainWhy: '기록만 쌓는 날보다 마지막 복습 블록이 있는 날이 전투 로그에서도 더 안정적인 페이스를 만듭니다.',
+      cta: '복습 블록 추가하기',
+    });
+  }
+
+  if (recommendations.length < 2 && latestThreat) {
+    recommendations.push({
+      id: 'stability',
+      tone: 'balance',
+      title: '오늘은 총량보다 끊기지 않는 계획이 더 중요해요',
+      action: '핵심 과목 1개와 복습 1개만 확실히 끝내는 식으로 블록 수를 줄여보세요.',
+      reason: latestThreat.detail,
+      explainWhy: '전장 압박이 커질수록 계획을 크게 잡기보다 끝까지 수행 가능한 구조가 더 유리합니다.',
+      cta: '간결한 계획으로 바꾸기',
+    });
+  }
+
+  return recommendations.slice(0, 2);
+}
+
+function PeriodTabs({
+  value,
+  onChange,
+}: {
+  value: RankRange;
+  onChange: (next: RankRange) => void;
+}) {
   return (
-    <section
-      className={cn(
-        'rounded-[28px] border border-[#F1D8BF] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF8F1_100%)] shadow-[0_22px_60px_rgba(196,99,16,0.12)] backdrop-blur-xl',
-        className
-      )}
-    >
-      {children}
+    <div className="inline-flex rounded-full border border-white/18 bg-[#091b4f]/80 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur">
+      {(Object.keys(RANGE_META) as RankRange[]).map((period) => {
+        const isActive = value === period;
+        return (
+          <button
+            key={period}
+            type="button"
+            onClick={() => onChange(period)}
+            className={cn(
+              'rounded-full px-4 py-2 text-sm font-semibold tracking-[0.18em] transition-all',
+              isActive
+                ? 'bg-gradient-to-r from-[#FF9A38] via-[#FFB861] to-[#FFD08B] text-[#3F2205] shadow-[0_10px_28px_rgba(255,150,56,0.34)]'
+                : 'text-white/68 hover:text-white'
+            )}
+          >
+            {RANGE_META[period].label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HeroBattleHeader({
+  range,
+  onRangeChange,
+  activeMessage,
+}: {
+  range: RankRange;
+  onRangeChange: (next: RankRange) => void;
+  activeMessage: string;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-[32px] border border-white/12 bg-[radial-gradient(circle_at_top,_rgba(255,186,110,0.26),_transparent_34%),linear-gradient(160deg,#10235B_0%,#091636_60%,#060C1B_100%)] p-6 text-white shadow-[0_28px_100px_rgba(5,12,28,0.58)] md:p-8">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_44%,transparent_70%,rgba(255,170,85,0.05))]" />
+      <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-[#FFB14B]/18 blur-3xl" />
+      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFCA8A]/55 bg-white/8 px-4 py-2 text-xs font-black tracking-[0.28em] text-[#FFD39C]">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
+            LIVE BATTLE
+          </div>
+          <h1 className="text-[2.2rem] font-black leading-[0.94] tracking-[-0.04em] text-white md:text-[3.1rem]">
+            {RANGE_META[range].title}
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-white/74 md:text-base">
+            {RANGE_META[range].subtitle}
+          </p>
+          <div className="mt-5 min-h-[72px] max-w-2xl rounded-[24px] border border-white/14 bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-5 py-4 backdrop-blur-xl">
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-black tracking-[0.22em] text-[#FFD39C]">
+              <Swords className="h-4 w-4" />
+              전장 브리핑
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={activeMessage}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                className="text-xl font-black leading-snug tracking-[-0.03em] text-white md:text-2xl"
+              >
+                {activeMessage}
+              </motion.p>
+            </AnimatePresence>
+          </div>
+        </div>
+
+        <div className="flex justify-end lg:min-w-[220px]">
+          <PeriodTabs value={range} onChange={onRangeChange} />
+        </div>
+      </div>
     </section>
   );
 }
 
-function LiveBadge() {
+function DefenseShieldEffect({
+  active,
+  pressure,
+}: {
+  active: boolean;
+  pressure: PressureLevel;
+}) {
+  if (!active) return null;
+
+  const tone =
+    pressure === 'critical'
+      ? 'rgba(255,111,95,0.68)'
+      : pressure === 'warning'
+        ? 'rgba(255,170,92,0.58)'
+        : 'rgba(255,227,160,0.48)';
+
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-[#FFCC9A] bg-[#FFF1E0] px-3 py-1.5 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
-      <span className="leaderboard-live-dot relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-400" />
-      LIVE RANKING
+    <>
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -inset-2 rounded-[34px] border"
+        style={{ borderColor: tone, boxShadow: `0 0 0 1px ${tone}, 0 0 42px ${tone}` }}
+        animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.01, 1] }}
+        transition={{ duration: 2.1, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -inset-3 rounded-[38px] border border-white/15"
+        style={{ boxShadow: `inset 0 0 20px ${tone}` }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: pressure === 'critical' ? 5 : 10, repeat: Infinity, ease: 'linear' }}
+      />
+    </>
+  );
+}
+
+function BattleGauge({
+  leftLabel,
+  rightLabel,
+  leftValue,
+  rightValue,
+  mode,
+}: {
+  leftLabel: string;
+  rightLabel: string;
+  leftValue: number;
+  rightValue: number;
+  mode: BattleMode;
+}) {
+  const difference = leftValue - rightValue;
+  const marker = clamp(50 + (difference / Math.max(leftValue, rightValue, 1)) * 35, 10, 90);
+
+  return (
+    <div className="rounded-[28px] border border-white/14 bg-[linear-gradient(180deg,rgba(7,14,33,0.8),rgba(11,22,55,0.96))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+      <div className="mb-3 flex items-center justify-between text-[11px] font-black tracking-[0.2em] text-white/72">
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
+      </div>
+      <div className="relative h-14 overflow-hidden rounded-full border border-white/12 bg-[#081127]">
+        <div className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,rgba(255,143,38,0.95),rgba(255,193,113,0.92))]" style={{ width: `${marker}%` }} />
+        <div
+          className={cn(
+            'absolute inset-y-0 right-0 bg-[linear-gradient(270deg,rgba(255,94,94,0.95),rgba(99,133,232,0.94))]',
+            mode === 'defense' && 'bg-[linear-gradient(270deg,rgba(78,158,255,0.92),rgba(255,120,120,0.95))]'
+          )}
+          style={{ width: `${100 - marker}%` }}
+        />
+        <motion.div
+          className="absolute inset-y-1 left-0 w-24 rounded-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.62),transparent)] mix-blend-screen"
+          animate={{ x: ['-10%', '120%'] }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: 'linear' }}
+        />
+        <motion.div
+          className="absolute inset-y-0 w-[3px] bg-white shadow-[0_0_18px_rgba(255,255,255,0.92)]"
+          style={{ left: `calc(${marker}% - 1px)` }}
+          animate={{ opacity: [0.65, 1, 0.65], scaleY: [0.85, 1.08, 0.85] }}
+          transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          className="absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-white/30 bg-[radial-gradient(circle,_rgba(255,246,218,0.96)_0%,_rgba(255,178,84,0.92)_50%,_rgba(255,120,56,0.9)_100%)] shadow-[0_0_24px_rgba(255,169,88,0.85)]"
+          style={{ left: `calc(${marker}% - 10px)` }}
+          animate={{
+            scale: [1, 1.15, 1],
+            boxShadow: [
+              '0 0 18px rgba(255,169,88,0.55)',
+              '0 0 36px rgba(255,169,88,0.95)',
+              '0 0 18px rgba(255,169,88,0.55)',
+            ],
+          }}
+          transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm font-bold">
+        <div className="rounded-2xl border border-[#FFB861]/30 bg-[#2A1A08]/55 px-3 py-2 text-[#FFD9AE]">
+          내 압박 {formatStudyCompact(leftValue)}
+        </div>
+        <div className="rounded-2xl border border-white/12 bg-white/6 px-3 py-2 text-right text-white/72">
+          상대 압박 {formatStudyCompact(rightValue)}
+        </div>
+      </div>
     </div>
   );
 }
 
-function RankPill({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'rounded-full border px-4 py-2.5 text-sm font-black transition-all duration-200',
-        active
-          ? 'border-[#FF9A3D] bg-gradient-to-r from-[#FF9626] to-[#FFB347] text-white shadow-[0_10px_26px_rgba(251,146,60,0.28)]'
-          : 'border-[#F1D4B4] bg-white text-[#A8651B] hover:bg-[#FFF6EC] hover:text-[#8C4F11]'
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-function TopSummaryCard({
+function BattleStatCard({
   label,
   value,
-  sub,
-  tone = 'default',
+  hint,
+  tone,
   icon: Icon,
-  compact = false,
 }: {
   label: string;
   value: string;
-  sub: string;
-  tone?: 'default' | 'orange' | 'blue';
+  hint: string;
+  tone: LogTone;
   icon: LucideIcon;
-  compact?: boolean;
 }) {
-  const toneClass = tone === 'orange'
-    ? 'from-[#FFF0DE] via-[#FFF7ED] to-white'
-    : tone === 'blue'
-      ? 'from-[#FFF6EC] via-[#FFF9F2] to-white'
-      : 'from-white to-[#FFF9F4]';
-
+  const toneClass = TONE_CLASS_MAP[tone];
   return (
-    <Panel className={cn('bg-gradient-to-br', toneClass)}>
-      <div className={cn(compact ? 'p-4' : 'p-5')}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-black tracking-[0.18em] text-[#A3641B]">{label}</p>
-            <p className={cn('mt-3 font-black tracking-tight text-[var(--text-primary)]', compact ? 'text-[1.7rem] leading-none' : 'text-3xl')}>{value}</p>
-            <p className={cn('mt-2 font-semibold text-[var(--text-secondary)]', compact ? 'text-[12px] leading-5' : 'text-sm')}>{sub}</p>
-          </div>
-          <div className={cn('rounded-2xl border border-[#F2D7BF] bg-[#FFF5EA] text-[#C86A10]', compact ? 'p-2.5' : 'p-3')}>
-            <Icon className={cn(compact ? 'h-4 w-4' : 'h-5 w-5')} />
-          </div>
+    <div className="rounded-[26px] border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] font-black tracking-[0.2em] text-white/56">{label}</div>
+        <div className={cn('rounded-2xl border px-3 py-2', toneClass.chip)}>
+          <Icon className="h-4 w-4" />
         </div>
       </div>
-    </Panel>
+      <div className="mt-4 text-4xl font-black tracking-[-0.05em] text-white">{value}</div>
+      <div className={cn('mt-2 text-sm font-bold', toneClass.text)}>{hint}</div>
+    </div>
   );
 }
 
-function HeroBattleCard({
-  rankLabel,
-  hoursLabel,
-  gapLabel,
-  liveMinutes,
-  progressPercent,
-  rangeLabel,
-  isLeader,
-  compact = false,
+function MyBattleCard({
+  viewer,
+  top,
+  below,
+  mode,
+  pressure,
+  rewardState,
 }: {
-  rankLabel: string;
-  hoursLabel: string;
-  gapLabel: string;
-  liveMinutes: number;
-  progressPercent: number;
-  rangeLabel: string;
-  isLeader: boolean;
-  compact?: boolean;
+  viewer: BattleEntry;
+  top: BattleEntry | null;
+  below: BattleEntry | null;
+  mode: BattleMode;
+  pressure: PressureLevel;
+  rewardState: RewardState;
 }) {
-  return (
-    <Panel className="leaderboard-live-glow overflow-hidden border-[#FFD2A8] bg-[radial-gradient(circle_at_top_right,rgba(255,150,38,0.24),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(255,211,109,0.18),transparent_22%),linear-gradient(180deg,#FFF8F1_0%,#FFFFFF_72%)]">
-      <div className={cn(compact ? 'p-4' : 'p-6 sm:p-7')}>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#F2D7BF] bg-white/90 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#A76A25]">
-                <Swords className="h-3.5 w-3.5 text-[#FF9626]" />
-                MY BATTLE STATUS
-              </div>
-              <div>
-                <p className="text-[11px] font-black tracking-[0.2em] text-[#B57633]">{rangeLabel} LIVE TRACK</p>
-                <div className={cn('mt-3 flex items-end gap-3', compact ? 'flex-wrap' : 'flex-nowrap')}>
-                  <span className={cn('font-black tracking-tight text-[var(--text-primary)]', compact ? 'text-[3rem] leading-[0.9]' : 'text-[4rem] leading-[0.86]')}>
-                    {rankLabel}
-                  </span>
-                  <span className={cn('font-black text-[#A8651B]', compact ? 'pb-1 text-lg' : 'pb-2 text-2xl')}>
-                    {hoursLabel}
-                  </span>
-                </div>
-                <p className={cn('mt-3 max-w-xl font-semibold text-[var(--text-secondary)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
-                  {isLeader ? '현재 선두 유지 중이에요. 지금 페이스를 유지하면 방어 성공 확률이 높아요.' : `1위까지 ${gapLabel}. 오늘 한 세션만 더 밀어붙이면 추월권이에요.`}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-[22px] border border-[#F2D7BF] bg-white/82 px-4 py-3 text-right shadow-[0_18px_38px_-28px_rgba(196,99,16,0.22)]">
-              <div className="mb-1 flex items-center justify-end gap-2">
-                <span className="leaderboard-live-dot relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-400" />
-                <span className="text-[11px] font-black tracking-[0.18em] text-[#B57633]">LIVE PUSH</span>
-              </div>
-              <p className={cn('font-black text-[var(--text-primary)]', compact ? 'text-sm' : 'text-base')}>{isLeader ? '선두 방어 중' : `공부중 +${liveMinutes}분`}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              ['누적 공부', hoursLabel],
-              ['1위와 차이', isLeader ? 'LEAD' : gapLabel],
-              ['보상 진행', `${progressPercent}%`],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-[22px] border border-[#F2D7BF] bg-white/82 px-3.5 py-3">
-                <p className="text-[10px] font-black tracking-[0.18em] text-[#B57633]">{label}</p>
-                <p className={cn('mt-2 font-black text-[var(--text-primary)]', compact ? 'text-lg' : 'text-xl')}>{value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-2.5 rounded-[24px] border border-[#F2D7BF] bg-[#FFF5EA] px-4 py-3">
-            <div className="flex items-center justify-between text-[11px] font-black tracking-[0.18em]">
-              <span className="text-[#A76A25]">OVERTAKE METER</span>
-              <span className="text-[#C86A10]">{progressPercent}% READY</span>
-            </div>
-            <div className="h-3 overflow-hidden rounded-full bg-[#FFE6CF]">
-              <div
-                className="leaderboard-race-fill relative h-full rounded-full bg-gradient-to-r from-[#FF9626] via-[#FFB347] to-[#FFD36D]"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </Panel>
-  );
-}
-
-function LiveTickerBar({ event }: { event: RankLiveEvent }) {
-  const tone = getToneClasses(event.tone);
+  const diffAbove = Math.max(0, (top?.value ?? viewer.value) - viewer.value);
+  const diffBelow = below ? Math.max(0, viewer.value - below.value) : 0;
+  const statusLabel =
+    mode === 'attack'
+      ? '추월각'
+      : mode === 'defense'
+        ? '선두 방어'
+        : mode === 'danger'
+          ? '방어 경고'
+          : '상위권 압박';
+  const helperCopy =
+    mode === 'attack'
+      ? `1위까지 ${formatGapLabel(diffAbove)}. 지금 판을 밀고 있어요.`
+      : mode === 'defense'
+        ? `뒤 순위와 ${formatGapLabel(diffBelow)} 차이. 방어막이 유지 중입니다.`
+        : mode === 'danger'
+          ? `${below?.displayNameSnapshot ?? '뒤 경쟁자'} 님이 바로 아래에서 추격 중이에요.`
+          : `상위권과 ${formatGapLabel(diffAbove)} 차이. 전진 구간입니다.`;
 
   return (
-    <Panel className="overflow-hidden">
-      <div className="relative px-4 py-3 sm:px-5">
-        <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r', tone.line)} />
-        <div key={event.id} className="leaderboard-ticker-item relative flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F2D7BF] bg-[#FFF7ED] text-lg">
-              {event.emoji}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black text-[var(--text-primary)]">{event.title}</p>
-              <p className="truncate text-xs font-semibold text-[var(--text-secondary)]">{event.detail}</p>
-            </div>
-          </div>
-          <div className={cn('inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', tone.chip)}>
-            <span className="leaderboard-live-dot relative inline-flex h-2 w-2 rounded-full bg-current" />
-            {event.timestampLabel}
-          </div>
-        </div>
-      </div>
-    </Panel>
-  );
-}
-
-function ZoneCard({ zone, compact = false }: { zone: ZoneCardConfig; compact?: boolean }) {
-  const tone = getToneClasses(zone.tone);
-  const Icon = zone.icon;
-
-  return (
-    <Panel className={cn(
-      'relative overflow-hidden',
-      zone.tone === 'danger' && 'border-[#F6B4B4] bg-[linear-gradient(180deg,#FFF4F4,#FFFFFF)]',
-      zone.tone === 'gold' && 'border-[#F0C86E] bg-[linear-gradient(180deg,#FFF7E3,#FFFFFF)]',
-      zone.tone === 'orange' && 'border-[#FFCC9A] bg-[linear-gradient(180deg,#FFF2E3,#FFFFFF)]',
-      zone.tone === 'blue' && 'border-[#F0D8BF] bg-[linear-gradient(180deg,#FFF8EF,#FFFFFF)]'
-    )}>
-      <div className={cn(compact ? 'p-4' : 'p-5')}>
-        <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', tone.chip)}>
-          <Icon className="h-3.5 w-3.5" />
-          {zone.kicker}
-        </div>
-        <p className="mt-4 text-lg font-black text-[var(--text-primary)]">{zone.title}</p>
-        <p className={cn('mt-2 font-semibold text-[var(--text-secondary)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>{zone.body}</p>
-      </div>
-    </Panel>
-  );
-}
-
-function RewardGoalCard({
-  isLeader,
-  progressPercent,
-  gapLabel,
-  compact = false,
-}: {
-  isLeader: boolean;
-  progressPercent: number;
-  gapLabel: string;
-  compact?: boolean;
-}) {
-  const nearUnlock = isLeader || progressPercent >= 82;
-
-  return (
-    <Panel className={cn(
-      'leaderboard-reward-card border-[#FFD2A8] bg-gradient-to-br from-[#FFF0DE] via-[#FFF7ED] to-white',
-      nearUnlock && 'leaderboard-reward-card--near'
-    )}>
-      <div className={cn(compact ? 'p-4' : 'p-5 sm:p-6')}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#FFCC9A] bg-[#FFF1E0] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
-              <Sparkles className="h-3.5 w-3.5" />
-              NEXT REWARD
-            </div>
-            <h3 className={cn('mt-4 font-black text-[var(--text-primary)]', compact ? 'text-lg' : 'text-xl')}>1위 달성 시 +1000P</h3>
-            <p className={cn('mt-2 text-[var(--text-secondary)]', compact ? 'text-[13px] leading-5' : 'text-sm leading-6')}>
-              {isLeader ? '보상 해금권에 도달했어요. 지금 선두를 지키면 즉시 포인트를 받을 수 있어요.' : `보상 상자까지 ${gapLabel} 남음. 지금 밀어붙이면 보상 해금이 가까워져요.`}
-            </p>
-          </div>
-          <div className="leaderboard-reward-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-[#FFD3A8] bg-white text-[#FF9626] shadow-[0_18px_42px_-24px_rgba(251,146,60,0.38)]">
-            <Gift className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-[22px] border border-[#F2D7BF] bg-white p-4">
-          <div className="mb-2 flex items-center justify-between text-sm font-black">
-            <span className="text-[var(--text-secondary)]">보상 진행도</span>
-            <span className="text-[#C86A10]">{progressPercent}%</span>
-          </div>
-          <div className="leaderboard-reward-progress h-3 overflow-hidden rounded-full bg-[#FFE6CF]">
-            <div
-              className="leaderboard-reward-progress__fill h-full rounded-full bg-gradient-to-r from-[#FF9626] via-[#FFD36D] to-[#FFF1C1]"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-
-        <div className={cn('mt-4 grid grid-cols-3 gap-2 text-center', compact && 'gap-1.5')}>
-          {[
-            ['1위', '20,000P'],
-            ['2위', '10,000P'],
-            ['3위', '5,000P'],
-          ].map(([place, reward]) => (
-            <div key={place} className={cn('rounded-2xl border border-[#F2D7BF] bg-white', compact ? 'p-2.5' : 'p-3')}>
-              <p className="text-[11px] font-black tracking-[0.18em] text-[#A76A25]">{place}</p>
-              <p className={cn('mt-1 font-black text-[var(--text-primary)]', compact ? 'text-[13px] leading-5' : 'text-sm')}>{reward}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Panel>
-  );
-}
-
-function LeaderboardRow({
-  player,
-  maxMinutes,
-  index,
-  compact = false,
-  isTargetAbove = false,
-  isThreatBelow = false,
-}: {
-  player: RankEntryView & { isMe: boolean };
-  maxMinutes: number;
-  index: number;
-  compact?: boolean;
-  isTargetAbove?: boolean;
-  isThreatBelow?: boolean;
-}) {
-  const [fillReady, setFillReady] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setFillReady(true), 40 + index * 35);
-    return () => window.clearTimeout(timer);
-  }, [index, player.id]);
-
-  const progress = maxMinutes > 0 ? clampProgress((player.value / maxMinutes) * 100) : 0;
-  const rowTone = index === 0
-    ? 'gold'
-    : player.isMe
-      ? 'orange'
-      : isThreatBelow
-        ? 'danger'
-        : isTargetAbove
-          ? 'blue'
-          : 'default';
-
-  return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-[24px] border transition-transform duration-200 hover:-translate-y-0.5',
-        compact ? 'p-3.5' : 'p-4 sm:p-5',
-        player.isMe
-          ? 'leaderboard-my-row border-[#FFB768] bg-[linear-gradient(90deg,#FFF2E1,white)] shadow-[0_0_0_1px_rgba(251,146,60,0.08),0_0_32px_rgba(251,146,60,0.10)]'
-          : rowTone === 'gold'
-            ? 'border-[#F0C86E] bg-[linear-gradient(90deg,#FFF7E3,white)]'
-            : rowTone === 'danger'
-              ? 'border-[#F6B4B4] bg-[linear-gradient(90deg,#FFF4F4,white)]'
-              : rowTone === 'blue'
-                ? 'border-[#F0D8BF] bg-[linear-gradient(90deg,#FFF8EF,white)]'
-                : 'border-[#EED8C3] bg-white'
-      )}
+    <motion.section
+      layout
+      className="relative overflow-hidden rounded-[34px] border border-white/14 bg-[radial-gradient(circle_at_top,_rgba(255,189,120,0.2),_transparent_28%),linear-gradient(155deg,#122967_0%,#0A1A46_46%,#060C1D_100%)] p-6 text-white shadow-[0_32px_90px_rgba(4,8,24,0.62)] md:p-7"
+      whileHover={{ y: -4 }}
+      transition={{ type: 'spring', stiffness: 220, damping: 24 }}
     >
-      {player.isMe ? <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_right,rgba(251,146,60,0.16),transparent_38%)] opacity-70" /> : null}
-
-      <div className={cn('relative flex items-center', compact ? 'gap-3' : 'gap-4')}>
-        <div
-          className={cn(
-            'flex shrink-0 items-center justify-center rounded-2xl border font-black',
-            compact ? 'h-10 w-10 text-base' : 'h-12 w-12 text-lg',
-            index === 0
-              ? 'border-[#FFB768] bg-[#FFF1E0] text-[#C86A10]'
-              : index === 1
-                ? 'border-[#E9D8C3] bg-[#FFF8F1] text-[#9B6A36]'
-                : index === 2
-                  ? 'border-[#F0C86E] bg-[#FFF6DA] text-[#A05B0F]'
-                : 'border-[#EED8C3] bg-[#FFF9F4] text-[var(--text-primary)]'
-          )}
-        >
-          {player.rank}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className={cn('truncate font-black text-[var(--text-primary)]', compact ? 'text-[15px]' : 'text-base')}>{player.isMe ? '나' : formatMaskedName(player.displayNameSnapshot)}</p>
-            {player.isMe ? (
-              <span className="rounded-full border border-[#FFCC9A] bg-[#FFF1E0] px-2 py-1 text-[10px] font-black tracking-[0.18em] text-[#C86A10]">
-                YOU
-              </span>
-            ) : null}
-            {index === 0 ? (
-              <span className="leaderboard-crown-float inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#F0C86E] bg-[#FFF6DA] text-[#A05B0F]">
-                <Crown className="h-3.5 w-3.5" />
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-1 truncate text-xs font-semibold text-[var(--text-secondary)]">
-            {formatSchoolName(player.schoolNameSnapshot)}
-          </p>
-          <div className="mt-3 leaderboard-race-track h-3 overflow-hidden rounded-full bg-[#FFE8D0]">
-            <div
-              className={cn(
-                'leaderboard-race-fill relative h-full rounded-full transition-[width] ease-out',
-                index === 0
-                  ? 'bg-gradient-to-r from-[#FFD36D] to-[#FF9626]'
-                  : player.isMe
-                    ? 'bg-gradient-to-r from-[#FF9626] to-[#FFB347]'
-                    : isThreatBelow
-                      ? 'bg-gradient-to-r from-[#FB7185] to-[#FB923C]'
-                      : 'bg-gradient-to-r from-[#FFB761] to-[#FFD7A8]'
-              )}
-              style={{ width: fillReady ? `${progress}%` : '0%', transitionDuration: '850ms' }}
-            >
-              {index === 0 ? (
-                <span className="leaderboard-race-marker leaderboard-race-marker--first">
-                  <Crown className="h-3.5 w-3.5" />
-                </span>
-              ) : null}
-              {player.isMe ? (
-                <span className="leaderboard-race-marker leaderboard-race-marker--me">
-                  <Zap className="h-3.5 w-3.5" />
-                </span>
-              ) : null}
+      <DefenseShieldEffect active={mode === 'defense' || mode === 'danger'} pressure={pressure} />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_30%,transparent_65%,rgba(255,140,40,0.08))]" />
+      <div className="relative">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFCA8A]/55 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#FFD39C]">
+              <Zap className="h-4 w-4" />
+              {statusLabel}
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <div className="text-[11px] font-black tracking-[0.22em] text-white/58">일간 LIVE TRACK</div>
+                <div className="mt-2 text-6xl font-black leading-none tracking-[-0.06em] text-white">
+                  #{viewer.rank}
+                </div>
+              </div>
+              <div className="pb-2">
+                <div className="text-sm font-bold text-white/62">공부중 {formatStudyCompact(viewer.value)}</div>
+                <div className="mt-2 text-lg font-black text-[#FFD39C]">{helperCopy}</div>
+              </div>
             </div>
           </div>
+
+          <motion.div
+            className="rounded-[26px] border border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.06))] px-5 py-4 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+            animate={{ boxShadow: ['0 0 0 rgba(255,154,56,0.1)', '0 0 30px rgba(255,154,56,0.26)', '0 0 0 rgba(255,154,56,0.1)'] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <div className="text-[11px] font-black tracking-[0.24em] text-white/58">
+              {mode === 'defense' ? 'DEFENSE HOLD' : 'LIVE PUSH'}
+            </div>
+            <div className="mt-1 text-2xl font-black text-white">
+              {mode === 'defense'
+                ? `방어 ${formatGapLabel(diffBelow)}`
+                : `공부중 +${Math.max(0, rewardState.minutesToReward - 28)}분`}
+            </div>
+          </motion.div>
         </div>
 
-        <div className="shrink-0 text-right">
-          <div className={cn('rounded-full border border-[#F0D8BF] bg-[#FFF6EC] font-black text-[var(--text-primary)]', compact ? 'px-2.5 py-1.5 text-[12px]' : 'px-3 py-2 text-sm')}>
-            {formatHourValue(player.value)}
-          </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <BattleStatCard label="누적 공부" value={formatStudyCompact(viewer.value)} hint="현재 전투 누적" tone="orange" icon={Clock3} />
+          <BattleStatCard label="1위와 차이" value={viewer.rank === 1 ? '선두' : formatGapLabel(diffAbove)} hint={viewer.rank === 1 ? '정상 점령 중' : '지금 한 세션 더'} tone="gold" icon={Crown} />
+          <BattleStatCard label="바로 아래 차이" value={below ? formatGapLabel(diffBelow) : '여유'} hint={below ? `${below.displayNameSnapshot} 추격` : '아래 경쟁 없음'} tone={pressure === 'critical' ? 'red' : 'blue'} icon={ShieldAlert} />
         </div>
+
+        <div className="mt-5">
+          <BattleGauge
+            leftLabel="내 전장"
+            rightLabel={viewer.rank === 1 ? '추격 파동' : '1위 존'}
+            leftValue={viewer.value}
+            rightValue={viewer.rank === 1 ? (below?.value ?? viewer.value - 10) : (top?.value ?? viewer.value + 10)}
+            mode={mode}
+          />
+        </div>
+      </div>
+    </motion.section>
+  );
+}
+
+function EnergyLink({
+  direction,
+  tone,
+  label,
+}: {
+  direction: 'up' | 'down';
+  tone: LogTone;
+  label: string;
+}) {
+  const toneClass = TONE_CLASS_MAP[tone];
+  const animation = direction === 'up' ? ['100%', '-100%'] : ['-100%', '100%'];
+
+  return (
+    <div className="relative mx-auto flex h-16 w-20 flex-col items-center justify-center">
+      <div className="mb-2 text-[11px] font-black tracking-[0.18em] text-white/52">{label}</div>
+      <div className="relative h-full w-[2px] rounded-full bg-white/10">
+        <motion.div
+          className={cn('absolute left-1/2 h-10 w-[10px] -translate-x-1/2 rounded-full bg-gradient-to-b', toneClass.line)}
+          animate={{ y: animation }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          className={cn('absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full', toneClass.text.replace('text', 'bg'))}
+          animate={{ scale: [0.9, 1.35, 0.9], opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+        />
       </div>
     </div>
   );
 }
 
-function RecentRankEventsPanel({
-  events,
-  compact = false,
+function RivalCard({
+  entry,
+  title,
+  tone,
+  highlighted,
+  floatingEvent,
+  shieldActive,
+  pressure,
 }: {
-  events: RankLiveEvent[];
-  compact?: boolean;
+  entry: BattleEntry;
+  title: string;
+  tone: LogTone;
+  highlighted?: boolean;
+  floatingEvent?: FloatingEvent | null;
+  shieldActive?: boolean;
+  pressure?: PressureLevel;
 }) {
+  const toneClass = TONE_CLASS_MAP[tone];
+
   return (
-    <Panel>
-      <div className={cn(compact ? 'p-4' : 'p-5')}>
-        <div className="flex items-center justify-between gap-3">
+    <motion.div
+      layout
+      whileHover={{ y: -4, scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+      className={cn(
+        'relative overflow-hidden rounded-[30px] border p-5 shadow-[0_24px_70px_rgba(4,8,24,0.46)]',
+        highlighted
+          ? 'border-[#FFBB75]/55 bg-[linear-gradient(160deg,#FFF0D8_0%,#FFE2B5_48%,#FFD39B_100%)] text-[#182D63]'
+          : 'border-white/14 bg-[linear-gradient(165deg,#0E214F_0%,#0A173A_68%,#081126_100%)] text-white'
+      )}
+    >
+      {shieldActive ? <DefenseShieldEffect active pressure={pressure ?? 'stable'} /> : null}
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_34%,transparent_66%,rgba(255,173,85,0.08))]" />
+
+      <AnimatePresence>
+        {floatingEvent ? (
+          <motion.div
+            key={floatingEvent.id}
+            initial={{ opacity: 0, y: 8, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.92 }}
+            transition={{ duration: 0.22 }}
+            className={cn(
+              'absolute right-4 top-4 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]',
+              TONE_CLASS_MAP[floatingEvent.tone].chip,
+              TONE_CLASS_MAP[floatingEvent.tone].glow
+            )}
+          >
+            {floatingEvent.label}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <div className="relative">
+        <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#F2D7BF] bg-[#FFF5EA] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#A76A25]">
-              <Clock3 className="h-3.5 w-3.5 text-[#FF9626]" />
-              RECENT RANK EVENTS
+            <div className={cn('text-[11px] font-black tracking-[0.24em]', highlighted ? 'text-[#8B5A19]' : 'text-white/56')}>
+              {title}
             </div>
-            <h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">최근 변동</h3>
+            <div className="mt-2 flex items-center gap-2">
+              <div className={cn('text-4xl font-black tracking-[-0.05em]', highlighted ? 'text-[#132A63]' : 'text-white')}>
+                #{entry.rank}
+              </div>
+              {entry.rank === 1 ? <Crown className={cn('h-5 w-5', highlighted ? 'text-[#C97E19]' : 'text-[#FFD47D]')} /> : null}
+            </div>
           </div>
-          <span className="text-xs font-black tracking-[0.18em] text-[#B57633]">LIVE LOG</span>
+
+          <div className={cn('rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
+            {entry.rank === 1 ? 'TOP ZONE' : highlighted ? 'MY PUSH' : 'CHASE'}
+          </div>
         </div>
 
-        <div className="mt-5 space-y-3">
-          {events.map((event) => {
-            const tone = getToneClasses(event.tone);
+        <div className={cn('text-2xl font-black tracking-[-0.04em]', highlighted ? 'text-[#132A63]' : 'text-white')}>
+          {entry.displayNameSnapshot}
+        </div>
+        <div className={cn('mt-1 text-sm font-bold', highlighted ? 'text-[#47618E]' : 'text-white/62')}>
+          {formatSchoolName(entry.schoolNameSnapshot)}
+        </div>
+
+        <div className="mt-5 flex items-end justify-between gap-3">
+          <div>
+            <div className={cn('text-[11px] font-black tracking-[0.2em]', highlighted ? 'text-[#8B5A19]' : 'text-white/50')}>
+              현재 누적
+            </div>
+            <div className={cn('mt-2 text-4xl font-black tracking-[-0.05em]', highlighted ? 'text-[#132A63]' : 'text-white')}>
+              {formatStudyCompact(entry.value)}
+            </div>
+          </div>
+          <div className={cn('text-right text-sm font-bold', highlighted ? 'text-[#C86A10]' : toneClass.text)}>
+            {entry.rank === 1 ? '선두 방어 중' : highlighted ? '공격 중심' : '아래에서 압박'}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function RivalBattleArea({
+  top,
+  viewer,
+  below,
+  mode,
+  pressure,
+  floatingEvents,
+}: {
+  top: BattleEntry;
+  viewer: BattleEntry;
+  below: BattleEntry | null;
+  mode: BattleMode;
+  pressure: PressureLevel;
+  floatingEvents: FloatingEvent[];
+}) {
+  const floatingMap = floatingEvents.reduce<Record<string, FloatingEvent>>((acc, item) => {
+    acc[item.target] = item;
+    return acc;
+  }, {});
+
+  const viewerIsTop = viewer.studentId === top.studentId;
+
+  return (
+    <section className="rounded-[32px] border border-white/12 bg-[linear-gradient(180deg,#0E214F_0%,#0A173A_100%)] p-5 text-white shadow-[0_28px_80px_rgba(4,8,24,0.46)] md:p-6">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFCA8A]/45 bg-white/8 px-4 py-2 text-[11px] font-black tracking-[0.22em] text-[#FFD7A7]">
+            <Trophy className="h-4 w-4" />
+            1위 존
+          </div>
+          <h2 className="text-3xl font-black tracking-[-0.05em] text-white">정상 점령 구역</h2>
+          <p className="mt-2 text-sm font-semibold text-white/68">
+            {viewerIsTop
+              ? '지금은 당신이 정상입니다. 아래 추격선을 밀어내며 버텨야 해요.'
+              : '지금 전투는 정상 점령 구역을 두고 위아래가 동시에 밀어붙이는 상태예요.'}
+          </p>
+        </div>
+      </div>
+
+      <LayoutGroup>
+        <div className="space-y-2">
+          <RivalCard
+            entry={top}
+            title="선두 존"
+            tone="gold"
+            shieldActive
+            pressure={viewerIsTop ? pressure : top.value - viewer.value <= 24 ? 'warning' : 'stable'}
+            floatingEvent={floatingMap.top}
+          />
+
+          {!viewerIsTop ? <EnergyLink direction="up" tone={mode === 'attack' ? 'orange' : 'blue'} label="공격 파동" /> : null}
+
+          {!viewerIsTop ? (
+            <RivalCard
+              entry={viewer}
+              title="내 전장"
+              tone="orange"
+              highlighted
+              floatingEvent={floatingMap.viewer}
+              shieldActive={mode === 'danger'}
+              pressure={pressure}
+            />
+          ) : null}
+
+          {below ? (
+            <>
+              <EnergyLink direction="down" tone={mode === 'danger' || viewerIsTop ? 'red' : 'orange'} label={viewerIsTop ? '방어 파동' : '추격 라인'} />
+              <RivalCard entry={below} title={viewerIsTop ? '바로 아래 추격자' : '바로 아래 경쟁자'} tone="red" floatingEvent={floatingMap.rival} />
+            </>
+          ) : null}
+        </div>
+      </LayoutGroup>
+    </section>
+  );
+}
+
+function LiveActivityLog({ logs }: { logs: LiveLog[] }) {
+  return (
+    <section className="rounded-[30px] border border-white/12 bg-[linear-gradient(180deg,#0C1A43_0%,#071127_100%)] p-5 text-white shadow-[0_22px_70px_rgba(4,8,24,0.42)] md:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-white/72">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF6C57] shadow-[0_0_16px_rgba(255,108,87,0.9)]" />
+            LIVE FEED
+          </div>
+          <h3 className="text-2xl font-black tracking-[-0.04em] text-white">실시간 전투 로그</h3>
+        </div>
+        <div className="rounded-full border border-white/12 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-white/68">
+          3~5초 간격 갱신
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <AnimatePresence initial={false}>
+          {logs.map((log) => {
+            const toneClass = TONE_CLASS_MAP[log.tone];
             return (
-              <div key={event.id} className="rounded-[22px] border border-[#F1D8BF] bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-[var(--text-primary)]">{event.emoji} {event.title}</p>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{event.detail}</p>
+              <motion.div
+                key={log.id}
+                layout
+                initial={{ opacity: 0, x: -24, scale: 0.97 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 18, scale: 0.96 }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                className="relative overflow-hidden rounded-[22px] border border-white/10 bg-white/6 p-4"
+              >
+                <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r opacity-60', toneClass.line)} />
+                <div className="relative flex items-start gap-3">
+                  <div className={cn('rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
+                    {log.badge}
                   </div>
-                  <span className={cn('shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.18em]', tone.chip)}>
-                    {event.timestampLabel}
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-black tracking-[-0.02em] text-white">{log.title}</div>
+                    <div className="mt-1 text-sm font-semibold leading-6 text-white/66">{log.detail}</div>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </AnimatePresence>
       </div>
-    </Panel>
+    </section>
   );
 }
 
-function RankEventToast({
-  event,
-  compact = false,
+function RewardCard({
+  rewardState,
+  rewardTitle,
+  viewerRank,
 }: {
-  event: RankLiveEvent;
-  compact?: boolean;
+  rewardState: RewardState;
+  rewardTitle: string;
+  viewerRank: number;
 }) {
-  const tone = getToneClasses(event.tone);
+  return (
+    <motion.section
+      className="relative overflow-hidden rounded-[30px] border border-[#FFB861]/22 bg-[linear-gradient(165deg,#FFF5E4_0%,#FFE7BF_48%,#FFD79A_100%)] p-5 text-[#162D63] shadow-[0_26px_60px_rgba(255,164,68,0.18)] md:p-6"
+      animate={{ boxShadow: ['0 24px 60px rgba(255,164,68,0.16)', '0 28px 84px rgba(255,164,68,0.28)', '0 24px 60px rgba(255,164,68,0.16)'] }}
+      transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      <div className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-[#FFB55A]/25 blur-3xl" />
+      <div className="relative flex items-start justify-between gap-4">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0C86E] bg-white/75 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">
+            <Sparkles className="h-4 w-4" />
+            {rewardTitle}
+          </div>
+          <h3 className="text-3xl font-black tracking-[-0.05em] text-[#102657]">
+            {rewardState.minutesToReward}분 더 하면 {rewardState.currentReward} 오픈
+          </h3>
+          <p className="mt-2 text-sm font-semibold leading-6 text-[#5E4B2D]">
+            {viewerRank === 1
+              ? '지금 밀어붙이면 선두 보상을 지키면서 상자까지 동시에 챙길 수 있어요.'
+              : '지금 한 번 더 압박하면 보상 상자와 상위권 진입을 동시에 노릴 수 있어요.'}
+          </p>
+        </div>
+        <motion.div
+          className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-[#F0C86E] bg-white/88 text-[#C86A10]"
+          animate={{ rotate: [0, 4, -4, 0], scale: [1, 1.04, 1] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <Gift className="h-8 w-8" />
+        </motion.div>
+      </div>
+
+      <div className="mt-5">
+        <div className="mb-2 flex items-center justify-between text-sm font-black text-[#8B5A19]">
+          <span>다음 보상 진행도</span>
+          <span>{rewardState.progress}%</span>
+        </div>
+        <div className="relative h-4 overflow-hidden rounded-full bg-white/75">
+          <motion.div className="h-full rounded-full bg-[linear-gradient(90deg,#FF9631_0%,#FFB85B_48%,#FFD895_100%)]" style={{ width: `${rewardState.progress}%` }} transition={{ duration: 0.6, ease: 'easeOut' }} />
+          <motion.div
+            className="absolute inset-y-0 left-0 w-24 rounded-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.7),transparent)]"
+            animate={{ x: ['-10%', '120%'] }}
+            transition={{ duration: 1.9, repeat: Infinity, ease: 'linear' }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="rounded-[22px] border border-[#F0C86E]/80 bg-white/75 p-4">
+          <div className="text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">상자 보상</div>
+          <div className="mt-2 text-2xl font-black text-[#132A63]">{rewardState.currentReward}</div>
+        </div>
+        <div className="rounded-[22px] border border-[#F0C86E]/80 bg-white/75 p-4">
+          <div className="text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">1위 달성 시</div>
+          <div className="mt-2 text-2xl font-black text-[#132A63]">{rewardState.nextReward}</div>
+        </div>
+      </div>
+    </motion.section>
+  );
+}
+
+function RecommendationChip({
+  recommendation,
+  onApply,
+}: {
+  recommendation: BattleRecommendation;
+  onApply: (item: BattleRecommendation) => void;
+}) {
+  const chipMap: Record<RecommendationTone, string> = {
+    plan: '계획',
+    review: '복습',
+    balance: '과목배분',
+    method: '학습방법',
+    mindset: '동기',
+  };
+  const toneClass =
+    recommendation.tone === 'mindset'
+      ? TONE_CLASS_MAP.red
+      : recommendation.tone === 'review'
+        ? TONE_CLASS_MAP.gold
+        : recommendation.tone === 'balance'
+          ? TONE_CLASS_MAP.blue
+          : TONE_CLASS_MAP.orange;
 
   return (
-    <div
-      key={event.id}
-      className={cn(
-        'leaderboard-toast pointer-events-none fixed z-[60] min-w-[16rem] max-w-[20rem] rounded-[24px] border bg-white/96 px-4 py-3 shadow-[0_24px_60px_-24px_rgba(196,99,16,0.22)] backdrop-blur-xl',
-        tone.chip,
-        event.tone === 'danger' ? 'leaderboard-toast--danger' : 'leaderboard-toast--positive',
-        compact ? 'bottom-24 left-1/2 w-[calc(100%-2rem)] max-w-[21rem] -translate-x-1/2' : 'right-6 top-24'
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-current/20 bg-[#FFF6EC] text-base">
-          {event.emoji}
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-black text-[var(--text-primary)]">{event.title}</p>
-          <p className="mt-1 text-xs font-semibold text-[var(--text-secondary)]">{event.detail}</p>
+    <details className="group rounded-[24px] border border-[#E9D7C0] bg-white p-4 shadow-[0_18px_42px_rgba(16,38,87,0.08)]">
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <div className={cn('mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
+              {chipMap[recommendation.tone]}
+            </div>
+            <h4 className="text-xl font-black tracking-[-0.03em] text-[#132A63]">{recommendation.title}</h4>
+            <p className="mt-2 text-base font-bold text-[#23417B]">{recommendation.action}</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#64779C]">{recommendation.reason}</p>
+          </div>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              onApply(recommendation);
+            }}
+            className="rounded-full bg-[linear-gradient(90deg,#FF9A38,#FFB861)] px-4 py-3 text-sm font-black tracking-[0.04em] text-[#3F2205] shadow-[0_12px_26px_rgba(255,154,56,0.28)] transition hover:translate-y-[-1px]"
+          >
+            {recommendation.cta}
+          </button>
         </div>
+      </summary>
+      <div className="mt-4 rounded-[20px] border border-[#E9D7C0] bg-[#FFF8ED] p-4 text-sm font-semibold leading-7 text-[#5E6F92]">
+        {recommendation.explainWhy}
       </div>
-    </div>
+    </details>
   );
 }
 
-export default function LeaderboardsPage() {
-  const { user } = useUser();
-  const { activeMembership, viewMode } = useAppContext();
+function CTASection({
+  mode,
+  onPrimary,
+  onSecondary,
+}: {
+  mode: BattleMode;
+  onPrimary: () => void;
+  onSecondary: () => void;
+}) {
+  const primaryLabel =
+    mode === 'attack'
+      ? '지금 역전하기'
+      : mode === 'danger'
+        ? '선두 방어 시작'
+        : mode === 'defense'
+          ? '10분 집중 시작'
+          : '지금 치고 올라가기';
+
+  const secondaryLabel =
+    mode === 'attack' ? '추월 루트 보기' : mode === 'danger' ? '방어 루트 보기' : '선두 탈환 작전';
+
+  return (
+    <section className="rounded-[30px] border border-white/12 bg-[linear-gradient(180deg,#0C1A43_0%,#071127_100%)] p-5 text-white shadow-[0_22px_70px_rgba(4,8,24,0.42)] md:p-6">
+      <div className="mb-4">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-white/68">
+          <TimerReset className="h-4 w-4" />
+          OVERTAKE CTA
+        </div>
+        <h3 className="text-2xl font-black tracking-[-0.04em] text-white">지금 페이스를 행동으로 바꿔야 할 순간입니다</h3>
+        <p className="mt-2 text-sm font-semibold leading-6 text-white/64">
+          버튼은 약하게 두지 않았어요. 지금 눌러서 바로 한 블록을 시작하게 만드는 전투용 CTA입니다.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <motion.button type="button" whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={onPrimary} className="rounded-[24px] bg-[linear-gradient(90deg,#FF9530_0%,#FFB861_54%,#FFD596_100%)] px-5 py-5 text-lg font-black tracking-[0.02em] text-[#3F2205] shadow-[0_18px_34px_rgba(255,153,52,0.34)]">
+          {primaryLabel}
+        </motion.button>
+        <motion.button type="button" whileHover={{ y: -2 }} whileTap={{ scale: 0.99 }} onClick={onSecondary} className="rounded-[24px] border border-white/16 bg-white/8 px-5 py-5 text-lg font-black tracking-[0.02em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          {secondaryLabel}
+        </motion.button>
+      </div>
+    </section>
+  );
+}
+
+function RecommendationPanel({
+  recommendations,
+  onApply,
+  onReopenDiagnosis,
+  onViewDiagnosis,
+}: {
+  recommendations: BattleRecommendation[];
+  onApply: (item: BattleRecommendation) => void;
+  onReopenDiagnosis: () => void;
+  onViewDiagnosis: () => void;
+}) {
+  return (
+    <section className="rounded-[30px] border border-[#E2D1BC] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFF3DE_100%)] p-5 text-[#132A63] shadow-[0_22px_60px_rgba(16,38,87,0.08)] md:p-6">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D8BF] bg-white/80 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
+            <Sparkles className="h-4 w-4" />
+            오늘의 학습 추천
+          </div>
+          <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">최근 기록을 보면 오늘은 이 정도만 바꾸면 됩니다</h3>
+          <p className="mt-2 text-sm font-semibold leading-6 text-[#64779C]">
+            최근 계획과 학습 기준을 바탕으로, 바로 오늘 계획에 넣을 수 있는 제안만 추렸어요.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onReopenDiagnosis} className="rounded-full border border-[#E0C19D] bg-white/85 px-4 py-2 text-sm font-black text-[#132A63]">
+            학습 기준 다시 진단하기
+          </button>
+          <button type="button" onClick={onViewDiagnosis} className="rounded-full border border-[#E0C19D] bg-[#FFF6E8] px-4 py-2 text-sm font-black text-[#9A5B12]">
+            전체 진단 결과 보기
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {recommendations.map((item) => (
+          <RecommendationChip key={item.id} recommendation={item} onApply={onApply} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function simulateBattleTick(entries: BattleEntry[], viewerId: string): {
+  entries: BattleEntry[];
+  log: LiveLog;
+  floatingEvent: FloatingEvent;
+} {
+  const current = assignRanks(entries);
+  const viewer = current.find((entry) => entry.studentId === viewerId) ?? current[1] ?? current[0];
+  const top = current[0] ?? viewer;
+  const below = current.find((entry) => entry.rank === viewer.rank + 1) ?? current[current.length - 1];
+
+  const actorPool: Array<{ id: string; weight: number }> = [];
+  current.slice(0, 5).forEach((entry) => {
+    const weight =
+      entry.studentId === viewerId
+        ? 0.42
+        : entry.rank === 1
+          ? 0.24
+          : entry.studentId === below?.studentId
+            ? 0.2
+            : 0.14;
+    actorPool.push({ id: entry.studentId, weight });
+  });
+
+  const totalWeight = actorPool.reduce((sum, item) => sum + item.weight, 0);
+  let cursor = Math.random() * totalWeight;
+  let actorId = actorPool[0]?.id ?? viewerId;
+  for (const item of actorPool) {
+    cursor -= item.weight;
+    if (cursor <= 0) {
+      actorId = item.id;
+      break;
+    }
+  }
+
+  const bonus =
+    actorId === viewerId && top.value - viewer.value <= 36
+      ? 6
+      : actorId === below?.studentId && viewer.value - below.value <= 16
+        ? 5
+        : 0;
+  const delta = 8 + Math.floor(Math.random() * 18) + bonus;
+
+  const updated = current.map((entry) =>
+    entry.studentId === actorId
+      ? {
+          ...entry,
+          value: entry.value + delta,
+        }
+      : entry
+  );
+
+  const next = assignRanks(updated);
+  const nextViewer = next.find((entry) => entry.studentId === viewerId) ?? viewer;
+  const nextTop = next[0] ?? nextViewer;
+  const nextBelow = next.find((entry) => entry.rank === nextViewer.rank + 1) ?? below;
+  const actor = next.find((entry) => entry.studentId === actorId) ?? nextViewer;
+
+  if (viewer.rank > nextViewer.rank) {
+    return {
+      entries: next,
+      log: {
+        id: `log-${Date.now()}`,
+        tone: 'gold',
+        badge: 'RANK UP',
+        title: `나: 방금 ${nextViewer.rank}위 진입`,
+        detail: '순위가 실제로 올라갔습니다. 지금 흐름을 더 밀어붙이세요.',
+        target: 'viewer',
+      },
+      floatingEvent: {
+        id: `float-${Date.now()}`,
+        tone: 'gold',
+        label: 'OVERTAKE',
+        target: 'viewer',
+      },
+    };
+  }
+
+  if (actorId === viewerId) {
+    const diffAbove = Math.max(0, nextTop.value - nextViewer.value);
+    return {
+      entries: next,
+      log: {
+        id: `log-${Date.now()}`,
+        tone: 'orange',
+        badge: 'LIVE PUSH',
+        title: `나: ${delta}분 추가 기록`,
+        detail:
+          diffAbove > 0
+            ? `지금 ${Math.max(10, Math.min(diffAbove + 1, 20))}분만 더 하면 역전권 진입이에요.`
+            : '현재 선두를 밀어내고 방어막을 유지하고 있어요.',
+        target: 'viewer',
+      },
+      floatingEvent: {
+        id: `float-${Date.now()}`,
+        tone: 'orange',
+        label: `+${delta}m`,
+        target: 'viewer',
+      },
+    };
+  }
+
+  if (actorId === nextTop.studentId) {
+    return {
+      entries: next,
+      log: {
+        id: `log-${Date.now()}`,
+        tone: 'blue',
+        badge: 'LEAD PUSH',
+        title: `${actor.displayNameSnapshot} 님이 ${delta}분 추가 기록`,
+        detail: '1위 존에서 방어막이 다시 두꺼워졌어요.',
+        target: 'top',
+      },
+      floatingEvent: {
+        id: `float-${Date.now()}`,
+        tone: 'blue',
+        label: `+${delta}m`,
+        target: 'top',
+      },
+    };
+  }
+
+  return {
+    entries: next,
+    log: {
+      id: `log-${Date.now()}`,
+      tone: 'red',
+      badge: 'PRESSURE',
+      title: `${actor.displayNameSnapshot} 님이 ${delta}분 추가 기록`,
+      detail:
+        nextBelow && nextBelow.studentId === actor.studentId
+          ? `지금 ${Math.max(8, Math.min(nextViewer.value - nextBelow.value, 18))}분 차이까지 추격해 왔어요.`
+          : '아래 경쟁권에서도 파동이 올라오고 있어요.',
+      target: 'rival',
+    },
+    floatingEvent: {
+      id: `float-${Date.now()}`,
+      tone: 'red',
+      label: '추격 중',
+      target: 'rival',
+    },
+  };
+}
+
+export default function RankingBattlePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [tickerIndex, setTickerIndex] = useState(0);
-  const [toastIndex, setToastIndex] = useState(0);
-  const [rankSnapshot, setRankSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
-  const [rankSnapshotLoading, setRankSnapshotLoading] = useState(false);
-  const activeRange = (searchParams.get('range') as RankRange) || 'daily';
-  const isMobile = viewMode === 'mobile';
+  const { user } = useUser();
+  const { activeMembership } = useAppContext();
+
+  const range = (searchParams.get('range') as RankRange) || 'daily';
+  const viewerId = user?.uid ?? 'viewer-local';
+  const centerId = activeMembership?.id ?? null;
+
+  const [snapshot, setSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [battleEntries, setBattleEntries] = useState<BattleEntry[]>([]);
+  const [logs, setLogs] = useState<LiveLog[]>([]);
+  const [floatingEvents, setFloatingEvents] = useState<FloatingEvent[]>([]);
+  const [heroIndex, setHeroIndex] = useState(0);
+
+  const entriesRef = useRef<BattleEntry[]>([]);
 
   useEffect(() => {
-    if (!user || !activeMembership) {
-      setRankSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
+    entriesRef.current = battleEntries;
+  }, [battleEntries]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!user || !centerId) {
+      setSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
+      setLoading(false);
+      setFetchError(null);
       return;
     }
 
-    let cancelled = false;
-    const run = async () => {
-      setRankSnapshotLoading(true);
-      try {
-        const nextSnapshot = await fetchStudentRankingSnapshot({
-          centerId: activeMembership.id,
-          user,
-        });
-        if (!cancelled) {
-          setRankSnapshot(nextSnapshot);
-        }
-      } catch {
-        if (!cancelled) {
-          setRankSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
-        }
-      } finally {
-        if (!cancelled) setRankSnapshotLoading(false);
-      }
-    };
+    setLoading(true);
+    setFetchError(null);
 
-    void run();
+    fetchStudentRankingSnapshot({ centerId, user })
+      .then((result) => {
+        if (!cancelled) setSnapshot(result);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
+        setFetchError('지금은 실시간 데이터를 불러오지 못해 샘플 전장으로 보여드리고 있어요.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
     return () => {
       cancelled = true;
     };
-  }, [activeMembership?.id, user]);
+  }, [centerId, user]);
 
-  const currentEntries = rankSnapshot[activeRange];
-  const hasMore = currentEntries.length > visibleCount;
-  const isLoading = rankSnapshotLoading;
+  const baseEntries = useMemo(() => {
+    const currentRangeEntries = snapshot[range] ?? [];
+    if (!currentRangeEntries.length) return buildFallbackEntries(range, viewerId);
 
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-    setTickerIndex(0);
-    setToastIndex(0);
-  }, [activeRange]);
-
-  const rangeMeta = RANGE_META[activeRange];
-  const meIndex = currentEntries.findIndex((entry) => entry.studentId === user?.uid);
-  const myEntry = meIndex >= 0 ? currentEntries[meIndex] : null;
-  const aboveEntry = meIndex > 0 ? currentEntries[meIndex - 1] : null;
-  const belowEntry = meIndex >= 0 && meIndex < currentEntries.length - 1 ? currentEntries[meIndex + 1] : null;
-  const maxMinutes = currentEntries[0]?.value || 0;
-  const diffAbove = aboveEntry && myEntry ? aboveEntry.value - myEntry.value : 0;
-  const diffBelow = belowEntry && myEntry ? myEntry.value - belowEntry.value : 0;
-  const rewardGapMinutes = myEntry?.rank === 1 ? 0 : Math.max(0, diffAbove);
-  const rewardProgress = myEntry
-    ? myEntry.rank === 1
-      ? 100
-      : clampProgress((myEntry.value / Math.max(aboveEntry?.value || maxMinutes || 1, 1)) * 100)
-    : 12;
-  const hoursNeededToLead = Math.max(0, Math.ceil((rewardGapMinutes + 180) / 30) / 2);
-  const liveSessionMinutes = myEntry ? 12 + (myEntry.value % 19) : 0;
-
-  const primaryZone = getPrimaryZone(myEntry?.rank || 0, diffAbove);
-  const defenseZone = getDefenseZone(myEntry?.rank || 0, diffBelow);
-
-  const battleEvents = useMemo<RankLiveEvent[]>(() => {
-    if (!currentEntries.length) {
-      return [
-        {
-          id: 'empty',
-          emoji: '📡',
-          title: '아직 집계된 순위가 없어요',
-          detail: '오늘 공부를 시작하면 실시간 경쟁 로그가 이곳에 표시돼요.',
-          tone: 'blue',
-          timestampLabel: '방금',
-        },
-      ];
-    }
-
-    const topEntry = currentEntries[0];
-    const events: RankLiveEvent[] = [];
-
-    if (myEntry) {
-      events.push({
-        id: 'my-live-push',
-        emoji: '⚡',
-        title: `${formatMaskedName(myEntry.displayNameSnapshot)} ${rangeMeta.label} ${formatHourValue(myEntry.value)} 기록`,
-        detail: myEntry.rank === 1
-          ? '현재 선두 유지 중'
-          : `1위와 차이 ${formatGapLabel(diffAbove)}로 추월권 진입 중`,
-        tone: 'orange',
-        timestampLabel: '방금',
-      });
-    }
-
-    if (aboveEntry && myEntry) {
-      events.push({
-        id: 'gap-to-first',
-        emoji: '🔥',
-        title: `1위와 차이 ${formatGapLabel(diffAbove)}`,
-        detail: `오늘 ${Math.max(1, Math.ceil((diffAbove || 1) / 50))}세션 더 하면 역전 가능`,
-        tone: diffAbove <= 60 ? 'gold' : 'orange',
-        timestampLabel: '2분 전',
-      });
-    }
-
-    if (belowEntry) {
-      events.push({
-        id: 'pressure-from-below',
-        emoji: diffBelow <= 45 ? '⚠️' : '👀',
-        title: `${formatMaskedName(belowEntry.displayNameSnapshot)} ${diffBelow <= 45 ? '추격 시작' : '순위 압박 중'}`,
-        detail: `현재 ${formatGapLabel(diffBelow)} 차이`,
-        tone: diffBelow <= 45 ? 'danger' : 'blue',
-        timestampLabel: '4분 전',
-      });
-    }
-
-    if (topEntry) {
-      events.push({
-        id: 'top-player',
-        emoji: '🏆',
-        title: `${formatMaskedName(topEntry.displayNameSnapshot)} ${rangeMeta.label} 1위 유지`,
-        detail: `누적 ${formatHourValue(topEntry.value)} 기록`,
-        tone: 'gold',
-        timestampLabel: '6분 전',
-      });
-    }
-
-    if (myEntry && myEntry.rank <= 3) {
-      events.push({
-        id: 'top-tier-lock',
-        emoji: '🥈',
-        title: `TOP ${myEntry.rank} 전장 유지 중`,
-        detail: '지금 멈추지 않으면 상위권을 계속 압박할 수 있어요.',
-        tone: 'orange',
-        timestampLabel: '8분 전',
-      });
-    }
-
-    return events;
-  }, [currentEntries, diffAbove, diffBelow, myEntry, aboveEntry, belowEntry, rangeMeta.label]);
-
-  const toastEvents = useMemo<RankLiveEvent[]>(() => {
-    const events: RankLiveEvent[] = [];
-
-    if (myEntry) {
-      events.push({
-        id: 'toast-rank-state',
-        emoji: myEntry.rank === 1 ? '🏆' : myEntry.rank === 2 ? '🥈' : '⚡',
-        title: myEntry.rank === 1 ? '1위 유지 중' : `${myEntry.rank}위 전장 유지 중`,
-        detail: `${rangeMeta.label} 누적 ${formatHourValue(myEntry.value)}`,
-        tone: myEntry.rank === 1 ? 'gold' : 'orange',
-        timestampLabel: 'NOW',
-      });
-    }
-
-    if (aboveEntry && myEntry) {
-      events.push({
-        id: 'toast-gap',
-        emoji: '🔥',
-        title: `1위와 차이 ${formatGapLabel(diffAbove)}`,
-        detail: '오늘 1세션 더 하면 추월권이에요.',
-        tone: diffAbove <= 60 ? 'gold' : 'orange',
-        timestampLabel: 'LIVE',
-      });
-    }
-
-    if (belowEntry) {
-      events.push({
-        id: 'toast-danger',
-        emoji: diffBelow <= 45 ? '⚠️' : '👀',
-        title: diffBelow <= 45 ? '뒤 순위 추격 시작' : '뒤 순위 견제 중',
-        detail: `현재 ${formatGapLabel(diffBelow)} 차이`,
-        tone: diffBelow <= 45 ? 'danger' : 'blue',
-        timestampLabel: 'LIVE',
-      });
-    }
-
-    if (rewardProgress >= 82) {
-      events.push({
-        id: 'toast-reward-close',
-        emoji: '🎁',
-        title: '보상 해금 임박',
-        detail: `${formatGapLabel(rewardGapMinutes)} 남았어요.`,
-        tone: rewardProgress >= 100 ? 'gold' : 'orange',
-        timestampLabel: 'LIVE',
-      });
-    }
-
-    return events;
-  }, [aboveEntry, belowEntry, diffAbove, diffBelow, myEntry, rangeMeta.label, rewardGapMinutes, rewardProgress]);
+    return ensureViewerEntry(currentRangeEntries, viewerId)
+      .slice(0, 50)
+      .map((entry) => ({
+        ...entry,
+        isViewer: entry.studentId === viewerId,
+      }));
+  }, [range, snapshot, viewerId]);
 
   useEffect(() => {
-    if (battleEvents.length <= 1) return;
-    const timer = window.setInterval(() => {
-      setTickerIndex((current) => (current + 1) % battleEvents.length);
-    }, TICKER_INTERVAL_MS);
-
-    return () => window.clearInterval(timer);
-  }, [battleEvents.length]);
+    setBattleEntries(baseEntries);
+    setLogs(buildInitialLogs(baseEntries, viewerId));
+    setFloatingEvents([]);
+    setHeroIndex(0);
+  }, [baseEntries, viewerId]);
 
   useEffect(() => {
-    if (!toastEvents.length) return;
-    const timer = window.setInterval(() => {
-      setToastIndex((current) => (current + 1) % toastEvents.length);
-    }, TOAST_INTERVAL_MS);
+    if (!battleEntries.length) return;
 
-    return () => window.clearInterval(timer);
-  }, [toastEvents.length]);
+    const intervalId = window.setInterval(() => {
+      const outcome = simulateBattleTick(entriesRef.current, viewerId);
+      entriesRef.current = outcome.entries;
+      setBattleEntries(outcome.entries);
+      setLogs((prev) => [outcome.log, ...prev].slice(0, 7));
+      setFloatingEvents((prev) => [...prev, outcome.floatingEvent].slice(-4));
+    }, LIVE_TICK_MS);
 
-  const visibleEntries = currentEntries
-    .slice(0, visibleCount)
-    .map((entry) => ({ ...entry, isMe: entry.studentId === user?.uid }));
-  const activeTickerEvent = battleEvents[tickerIndex % battleEvents.length];
-  const activeToastEvent = toastEvents[toastIndex % toastEvents.length];
-  const recentEvents = battleEvents.slice(0, 4);
+    return () => window.clearInterval(intervalId);
+  }, [battleEntries.length, viewerId, range]);
 
-  if (!activeMembership) return null;
+  useEffect(() => {
+    if (!floatingEvents.length) return;
+    const timeout = window.setTimeout(() => {
+      setFloatingEvents((prev) => prev.slice(-2));
+    }, 2200);
+    return () => window.clearTimeout(timeout);
+  }, [floatingEvents]);
 
-  return (
-    <div className={cn('mx-auto w-full pb-20', isMobile ? 'max-w-none px-1.5' : 'max-w-7xl px-4')}>
-      {activeToastEvent ? <RankEventToast event={activeToastEvent} compact={isMobile} /> : null}
+  const viewer = useMemo(
+    () => battleEntries.find((entry) => entry.studentId === viewerId) ?? battleEntries[1] ?? battleEntries[0] ?? null,
+    [battleEntries, viewerId]
+  );
+  const top = battleEntries[0] ?? null;
+  const below = viewer ? battleEntries.find((entry) => entry.rank === viewer.rank + 1) ?? null : null;
+  const diffAbove = viewer && top ? Math.max(0, top.value - viewer.value) : 0;
+  const diffBelow = viewer && below ? Math.max(0, viewer.value - below.value) : 0;
+  const mode = viewer ? getBattleMode(viewer.rank, diffAbove, diffBelow) : 'chase';
+  const pressure = viewer ? getPressureLevel(viewer.rank, diffAbove, diffBelow) : 'stable';
+  const rewardState = buildRewardState(viewer?.value ?? 0);
+  const recommendations = useMemo(
+    () => (viewer ? buildMainRecommendations({ viewer, top, below, logs }) : []),
+    [viewer, top, below, logs]
+  );
+  const heroMessages = useMemo(
+    () =>
+      viewer
+        ? buildHeroMessages({
+            mode,
+            diffAbove,
+            diffBelow,
+            viewerRank: viewer.rank,
+            latestLog: logs[0] ?? null,
+          })
+        : ['지금 전장을 준비하는 중입니다.'],
+    [mode, diffAbove, diffBelow, logs, viewer]
+  );
 
-      <div className={cn('rounded-[34px] border border-[#F1D8BF] bg-[radial-gradient(circle_at_top_right,rgba(255,150,38,0.18),transparent_26%),radial-gradient(circle_at_top_left,rgba(255,211,109,0.16),transparent_24%),linear-gradient(180deg,#FFFFFF_0%,#FFF8F1_100%)] shadow-[0_34px_100px_rgba(196,99,16,0.12)]', isMobile ? 'p-3.5' : 'p-4 sm:p-6 lg:p-8')}>
-        <div className="flex flex-col gap-5 sm:gap-6">
-          <div className={cn('flex flex-col gap-4', !isMobile && 'lg:flex-row lg:items-end lg:justify-between')}>
-            <div className={cn('max-w-3xl', isMobile && 'max-w-none')}>
-              <LiveBadge />
-              <h1 className={cn('mt-4 font-black tracking-tight text-[var(--text-primary)]', isMobile ? 'text-[2.4rem] leading-[0.95]' : 'text-3xl sm:text-5xl')}>공부시간 랭킹</h1>
-              <p className={cn('mt-3 leading-6 text-[var(--text-secondary)]', isMobile ? 'max-w-[17rem] text-[14px]' : 'text-sm sm:text-base')}>
-                일간, 주간, 월간 랭킹을 한 화면에서 경쟁처럼 확인하고, 지금 몇 시간 더 하면 추월 가능한지도 바로 볼 수 있어요.
-              </p>
-            </div>
+  useEffect(() => {
+    if (!heroMessages.length) return;
+    const intervalId = window.setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % heroMessages.length);
+    }, HERO_ROTATE_MS);
+    return () => window.clearInterval(intervalId);
+  }, [heroMessages]);
 
-            <div className={cn(isMobile ? 'grid w-full grid-cols-3 gap-2' : 'flex flex-wrap gap-2')}>
-              {(['daily', 'weekly', 'monthly'] as RankRange[]).map((range) => (
-                <RankPill
-                  key={range}
-                  label={RANGE_META[range].label}
-                  active={activeRange === range}
-                  onClick={() => router.replace(`/dashboard/leaderboards?range=${range}`, { scroll: false })}
-                />
-              ))}
-            </div>
-          </div>
+  function handleRangeChange(nextRange: RankRange) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('range', nextRange);
+    router.replace(`/dashboard/leaderboards?${nextParams.toString()}`, { scroll: false });
+  }
 
-          <div className={cn('grid gap-4', !isMobile && 'xl:grid-cols-[1.06fr_0.94fr]')}>
-            <HeroBattleCard
-              rankLabel={myEntry ? `#${myEntry.rank}` : '#-'}
-              hoursLabel={myEntry ? formatHourValue(myEntry.value) : '기록 없음'}
-              gapLabel={formatGapLabel(diffAbove)}
-              liveMinutes={liveSessionMinutes}
-              progressPercent={rewardProgress}
-              rangeLabel={rangeMeta.label}
-              isLeader={myEntry?.rank === 1}
-              compact={isMobile}
-            />
+  function handleApplyRecommendation(item: BattleRecommendation) {
+    const toneMap: Record<RecommendationTone, LogTone> = {
+      plan: 'orange',
+      review: 'gold',
+      balance: 'blue',
+      method: 'orange',
+      mindset: 'red',
+    };
+    setLogs((prev) => [
+      {
+        id: `manual-${Date.now()}`,
+        badge: 'TACTIC',
+        tone: toneMap[item.tone],
+        title: item.title,
+        detail: `${item.action} 이제 오늘 계획에 바로 반영해보세요.`,
+        target: 'viewer' as const,
+      },
+      ...prev,
+    ].slice(0, 7));
+    setFloatingEvents((prev) => [
+      ...prev,
+      {
+        id: `manual-float-${Date.now()}`,
+        tone: toneMap[item.tone],
+        label: '작전 적용',
+        target: 'viewer',
+      },
+    ]);
+  }
 
-            <div className="flex flex-col gap-4">
-              <div className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'sm:grid-cols-2')}>
-                <TopSummaryCard
-                  label="1위와의 차이"
-                  value={myEntry?.rank === 1 ? 'LEAD' : formatGapLabel(diffAbove)}
-                  sub={myEntry?.rank === 1 ? '현재 선두 방어 구간' : '오늘 1세션 더 하면 추월 가능'}
-                  tone="orange"
-                  icon={Zap}
-                  compact={isMobile}
-                />
-                <TopSummaryCard
-                  label="실시간 페이스"
-                  value={myEntry ? `+${liveSessionMinutes}분` : 'READY'}
-                  sub={myEntry ? '지금 세션이 순위를 끌어올리는 중' : '기록이 쌓이면 전장이 열려요'}
-                  tone="blue"
-                  icon={TimerReset}
-                  compact={isMobile}
-                />
-              </div>
-
-              <RewardGoalCard
-                isLeader={myEntry?.rank === 1}
-                progressPercent={rewardProgress}
-                gapLabel={formatGapLabel(rewardGapMinutes)}
-                compact={isMobile}
-              />
-            </div>
-          </div>
-
-          <LiveTickerBar event={activeTickerEvent} />
-
-          <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-2')}>
-            <ZoneCard zone={primaryZone} compact={isMobile} />
-            <ZoneCard zone={defenseZone} compact={isMobile} />
-          </div>
-
-          <Panel className="overflow-hidden">
-            <div className={cn('border-b border-[#F1D8BF]', isMobile ? 'px-4 py-4' : 'px-5 py-4 sm:px-6')}>
-              <div className={cn('flex flex-col gap-3', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#F2D7BF] bg-[#FFF5EA] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#A76A25]">
-                    <Crown className="h-3.5 w-3.5 text-[#FF9626]" />
-                    LEADERBOARD
-                  </div>
-                  <h2 className="mt-3 text-2xl font-black text-[var(--text-primary)]">{rangeMeta.title}</h2>
-                  <p className="mt-1 text-sm text-[var(--text-secondary)]">{rangeMeta.hint}</p>
-                </div>
-
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#F2D7BF] bg-white px-4 py-2 text-sm font-semibold text-[var(--text-secondary)]">
-                  <Users className="h-4 w-4" />
-                  총 {currentEntries.length}명 참여 중
-                </div>
-              </div>
-            </div>
-
-            <div className={cn(isMobile ? 'p-4' : 'p-4 sm:p-6')}>
-              {isLoading ? (
-                <div className="flex h-64 items-center justify-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-[#C86A10]" />
-                </div>
-              ) : currentEntries.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-[#F1D8BF] bg-[#FFF9F4] px-6 py-16 text-center text-sm font-semibold text-[var(--text-secondary)]">
-                  아직 표시할 랭킹이 없어요.
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {visibleEntries.map((player, index) => (
-                      <LeaderboardRow
-                        key={`${activeRange}-${player.id}`}
-                        player={player}
-                        maxMinutes={maxMinutes}
-                        index={index}
-                        compact={isMobile}
-                        isTargetAbove={aboveEntry?.studentId === player.studentId}
-                        isThreatBelow={belowEntry?.studentId === player.studentId}
-                      />
-                    ))}
-                  </div>
-
-                  {hasMore ? (
-                    <div className="mt-5 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-[#F2D7BF] bg-white px-5 py-3 text-sm font-black text-[var(--text-primary)] transition hover:bg-[#FFF6EC]"
-                      >
-                        더 보기
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : null}
-
-                  <div className={cn('mt-5 flex flex-col gap-3 rounded-[24px] border border-[#FFD2A8] bg-[linear-gradient(180deg,#FFF4E7_0%,#FFFFFF_100%)] p-4', !isMobile && 'sm:flex-row sm:items-center sm:justify-between')}>
-                    <div>
-                      <p className="text-sm font-black text-[var(--text-primary)]">지금 목표</p>
-                      <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
-                        {myEntry?.rank === 1
-                          ? '지금 페이스를 유지하면 선두를 지킬 수 있어요.'
-                          : `오늘 ${hoursNeededToLead.toFixed(1)}시간만 더 공부하면 1위를 노릴 수 있어요.`}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:scale-[1.01]"
-                    >
-                      추월 전략 보기
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </Panel>
-
-          <div className={cn('grid gap-4', !isMobile && 'xl:grid-cols-[0.94fr_1.06fr]')}>
-            <RecentRankEventsPanel events={recentEvents} compact={isMobile} />
-
-            <Panel className="border-[#FFD2A8] bg-[linear-gradient(180deg,#FFF2E3_0%,#FFFFFF_100%)]">
-              <div className={cn(isMobile ? 'p-4' : 'p-5')}>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#FFCC9A] bg-[#FFF1E0] px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
-                      <Swords className="h-3.5 w-3.5" />
-                      OVERTAKE CTA
-                    </div>
-                    <h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">지금 전략을 적용할 시간</h3>
-                    <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                      {myEntry?.rank === 1
-                        ? '방어 전략을 유지하면 선두를 끝까지 지킬 수 있어요.'
-                        : `현재 ${formatGapLabel(rewardGapMinutes)} 차이예요. 저녁 1세션만 더 집중하면 전세를 뒤집을 수 있어요.`}
-                    </p>
-                  </div>
-                  <div className="hidden h-14 w-14 items-center justify-center rounded-[20px] border border-[#FFD3A8] bg-white text-[#FF9626] sm:flex">
-                    <Flame className="h-6 w-6" />
-                  </div>
-                </div>
-
-                <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
-                  {[
-                    ['추월까지', myEntry?.rank === 1 ? 'LEAD' : formatGapLabel(diffAbove)],
-                    ['방어 간격', diffBelow > 0 ? formatGapLabel(diffBelow) : '신규'],
-                    ['보상 진행', `${rewardProgress}%`],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-[20px] border border-[#F2D7BF] bg-white px-3.5 py-3">
-                      <p className="text-[10px] font-black tracking-[0.18em] text-[#A76A25]">{label}</p>
-                      <p className="mt-2 text-lg font-black text-[var(--text-primary)]">{value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:scale-[1.01]"
-                >
-                  오늘 추월 전략 보기
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </Panel>
+  if (loading && !viewer) {
+    return (
+      <main className="min-h-screen bg-[linear-gradient(180deg,#08112C_0%,#040914_100%)] px-4 py-8 text-white">
+        <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center rounded-[32px] border border-white/10 bg-white/6">
+          <div className="flex items-center gap-3 text-lg font-bold text-white/70">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            경쟁 전장을 불러오는 중입니다.
           </div>
         </div>
+      </main>
+    );
+  }
+
+  if (!viewer || !top) return null;
+
+  return (
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,180,96,0.12),_transparent_20%),linear-gradient(180deg,#07112B_0%,#040914_100%)] px-4 py-6 text-white md:px-6 md:py-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <HeroBattleHeader range={range} onRangeChange={handleRangeChange} activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]} />
+
+        {fetchError ? (
+          <div className="rounded-[24px] border border-[#FFB15B]/30 bg-[#FFF4E5] px-4 py-3 text-sm font-semibold text-[#9A5B12]">
+            {fetchError}
+          </div>
+        ) : null}
+
+        <div className="grid gap-5 xl:grid-cols-[1.18fr_0.82fr]">
+          <div className="space-y-5">
+            <MyBattleCard viewer={viewer} top={top} below={below} mode={mode} pressure={pressure} rewardState={rewardState} />
+            <RivalBattleArea top={top} viewer={viewer} below={below} mode={mode} pressure={pressure} floatingEvents={floatingEvents} />
+          </div>
+
+          <div className="space-y-5">
+            <LiveActivityLog logs={logs} />
+            <RewardCard rewardState={rewardState} rewardTitle={RANGE_META[range].rewardTitle} viewerRank={viewer.rank} />
+            <RecommendationPanel
+              recommendations={recommendations}
+              onApply={handleApplyRecommendation}
+              onReopenDiagnosis={() => router.push('/dashboard/plan/diagnosis')}
+              onViewDiagnosis={() => router.push('/dashboard/analysis')}
+            />
+          </div>
+        </div>
+
+        <CTASection mode={mode} onPrimary={() => router.push('/dashboard/growth')} onSecondary={() => router.push('/dashboard/plan')} />
+
+        <section className="rounded-[28px] border border-white/10 bg-white/6 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-white/68">
+                <Users className="h-4 w-4" />
+                전체 전장
+              </div>
+              <h3 className="text-2xl font-black tracking-[-0.04em] text-white">보조 리더보드</h3>
+            </div>
+            <div className="rounded-full border border-white/12 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-white/68">
+              상위 {Math.min(6, battleEntries.length)}명 표시
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {battleEntries.slice(0, 6).map((entry) => {
+              const isViewer = entry.studentId === viewerId;
+              const tone: LogTone = entry.rank === 1 ? 'gold' : isViewer ? 'orange' : entry.rank < viewer.rank ? 'blue' : 'red';
+              const toneClass = TONE_CLASS_MAP[tone];
+
+              return (
+                <motion.div
+                  key={entry.id}
+                  layout
+                  className={cn(
+                    'rounded-[24px] border p-4',
+                    isViewer
+                      ? 'border-[#FFB15B]/55 bg-[#FFF1DC] text-[#132A63]'
+                      : 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] text-white'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className={cn('text-[11px] font-black tracking-[0.2em]', isViewer ? 'text-[#8B5A19]' : 'text-white/54')}>
+                        {entry.rank}위
+                      </div>
+                      <div className={cn('mt-2 text-xl font-black tracking-[-0.03em]', isViewer ? 'text-[#132A63]' : 'text-white')}>
+                        {entry.displayNameSnapshot}
+                      </div>
+                      <div className={cn('mt-1 text-sm font-semibold', isViewer ? 'text-[#64779C]' : 'text-white/60')}>
+                        {formatSchoolName(entry.schoolNameSnapshot)}
+                      </div>
+                    </div>
+                    <div className={cn('rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
+                      {entry.rank === 1 ? 'CROWN' : isViewer ? 'YOU' : 'LIVE'}
+                    </div>
+                  </div>
+                  <div className={cn('mt-4 text-3xl font-black tracking-[-0.05em]', isViewer ? 'text-[#132A63]' : 'text-white')}>
+                    {formatStudyCompact(entry.value)}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
