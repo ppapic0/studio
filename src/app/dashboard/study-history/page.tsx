@@ -965,7 +965,7 @@ export default function StudyHistoryPage() {
           <div className={cn(isMobile ? "space-y-4" : "flex items-start justify-between gap-4")}>
             <div className={cn(isMobile ? "space-y-4" : "space-y-3")}>
                 <div className="min-w-0 flex-1 space-y-4">
-                <div className={cn("space-y-3", isMobile ? "pb-4" : "pb-2")}>
+                <div className={cn("space-y-3", isMobile ? "pb-7" : "pb-4")}>
                 <h2
                   className={cn(
                     "font-black tracking-tight",
@@ -989,7 +989,7 @@ export default function StudyHistoryPage() {
             </div>
           </div>
 
-            <div className={cn("grid", isMobile ? "mt-9 grid-cols-3 gap-2.5" : "mt-7 md:grid-cols-3 gap-3")}>
+            <div className={cn("grid", isMobile ? "mt-12 grid-cols-3 gap-2.5" : "mt-9 md:grid-cols-3 gap-3")}>
             {[
               {
                 label: '이번 달 총 공부시간',

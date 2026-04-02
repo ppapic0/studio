@@ -817,6 +817,17 @@ export default function StudyPlanPage() {
       ),
     [activeScheduleTemplates, selectedWeekdayValue]
   );
+  const matchingRecurringTemplate = useMemo(() => {
+    const normalizedSelected = [...selectedRecurringWeekdays].sort((left, right) => left - right);
+    if (normalizedSelected.length === 0) return null;
+
+    return (
+      activeScheduleTemplates.find((template) => {
+        const weekdays = Array.isArray(template.weekdays) ? [...template.weekdays].sort((left, right) => left - right) : [];
+        return weekdays.length === normalizedSelected.length && weekdays.every((value, index) => value === normalizedSelected[index]);
+      }) || null
+    );
+  }, [activeScheduleTemplates, selectedRecurringWeekdays]);
   const hasSelectedWeekdayTemplate = Boolean(matchingWeekdayTemplate);
   const selectedRecurringWeekdayLabel = useMemo(() => {
     const labels = WEEKDAY_OPTIONS.filter((option) => selectedRecurringWeekdays.includes(option.value)).map((option) => option.label);
@@ -1121,31 +1132,29 @@ export default function StudyPlanPage() {
   }, [matchingWeekdayTemplate, scheduleItems, selectedScheduleDoc]);
 
   useEffect(() => {
-    if (matchingWeekdayTemplate) {
+    if (matchingRecurringTemplate) {
       setWeekdayDraft(
         buildDraftFromScheduleDoc({
-          inTime: matchingWeekdayTemplate.arrivalPlannedAt,
-          outTime: matchingWeekdayTemplate.departurePlannedAt,
+          inTime: matchingRecurringTemplate.arrivalPlannedAt,
+          outTime: matchingRecurringTemplate.departurePlannedAt,
           isAbsent: false,
           outings:
-            matchingWeekdayTemplate.hasExcursionDefault &&
-            matchingWeekdayTemplate.defaultExcursionStartAt &&
-            matchingWeekdayTemplate.defaultExcursionEndAt
+            matchingRecurringTemplate.hasExcursionDefault &&
+            matchingRecurringTemplate.defaultExcursionStartAt &&
+            matchingRecurringTemplate.defaultExcursionEndAt
               ? [
                   {
-                    id: matchingWeekdayTemplate.id || 'weekday-template',
-                    startTime: matchingWeekdayTemplate.defaultExcursionStartAt,
-                    endTime: matchingWeekdayTemplate.defaultExcursionEndAt,
-                    reason: matchingWeekdayTemplate.defaultExcursionReason || '',
+                    id: matchingRecurringTemplate.id || 'weekday-template',
+                    startTime: matchingRecurringTemplate.defaultExcursionStartAt,
+                    endTime: matchingRecurringTemplate.defaultExcursionEndAt,
+                    reason: matchingRecurringTemplate.defaultExcursionReason || '',
                   },
                 ]
               : [],
         })
       );
-      return;
     }
-    setWeekdayDraft(EMPTY_ATTENDANCE_SCHEDULE_DRAFT);
-  }, [matchingWeekdayTemplate]);
+  }, [matchingRecurringTemplate]);
 
   const studyTimeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
@@ -2468,21 +2477,46 @@ export default function StudyPlanPage() {
 
     setIsSubmitting(true);
     try {
-      const templateId = matchingWeekdayTemplate?.id || `template-${selectedRecurringWeekdays.join('-')}`;
-      await setDoc(doc(firestore, 'users', user.uid, 'scheduleTemplates', templateId), {
-        name: presetName.trim() || `${selectedRecurringWeekdayLabel} 기본 루틴`,
-        weekdays: selectedRecurringWeekdays,
-        arrivalPlannedAt: weekdayDraft.inTime,
-        departurePlannedAt: weekdayDraft.outTime,
-        hasExcursionDefault: Boolean(weekdayDraft.awayStartTime && weekdayDraft.awayEndTime),
-        defaultExcursionStartAt: weekdayDraft.awayStartTime || null,
-        defaultExcursionEndAt: weekdayDraft.awayEndTime || null,
-        defaultExcursionReason: weekdayDraft.awayReason?.trim() || null,
-        active: true,
-        timezone: 'Asia/Seoul',
-        createdAt: matchingWeekdayTemplate?.createdAt || serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+      const targetWeekdays = [...selectedRecurringWeekdays].sort((left, right) => left - right);
+      const templateId = matchingRecurringTemplate?.id || `template-${selectedRecurringWeekdays.join('-')}`;
+      const batch = writeBatch(firestore);
+
+      activeScheduleTemplates.forEach((template) => {
+        if (!template.id || template.id === templateId || !Array.isArray(template.weekdays)) return;
+        const overlappingWeekdays = template.weekdays.filter((weekday) => targetWeekdays.includes(weekday));
+        if (overlappingWeekdays.length === 0) return;
+
+        const remainingWeekdays = template.weekdays.filter((weekday) => !targetWeekdays.includes(weekday));
+        batch.set(
+          doc(firestore, 'users', user.uid, 'scheduleTemplates', template.id),
+          {
+            weekdays: remainingWeekdays,
+            active: remainingWeekdays.length > 0,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+
+      batch.set(
+        doc(firestore, 'users', user.uid, 'scheduleTemplates', templateId),
+        {
+          name: presetName.trim() || `${selectedRecurringWeekdayLabel} 기본 루틴`,
+          weekdays: targetWeekdays,
+          arrivalPlannedAt: weekdayDraft.inTime,
+          departurePlannedAt: weekdayDraft.outTime,
+          hasExcursionDefault: Boolean(weekdayDraft.awayStartTime && weekdayDraft.awayEndTime),
+          defaultExcursionStartAt: weekdayDraft.awayStartTime || null,
+          defaultExcursionEndAt: weekdayDraft.awayEndTime || null,
+          defaultExcursionReason: weekdayDraft.awayReason?.trim() || null,
+          active: true,
+          timezone: 'Asia/Seoul',
+          createdAt: matchingRecurringTemplate?.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      await batch.commit();
       toast({
         title: '정기 루틴 저장 완료',
         description: `매주 ${selectedRecurringWeekdayLabel}에 적용할 기본값을 저장했어요.`,
@@ -2498,7 +2532,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [firestore, matchingWeekdayTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, toast, user, weekdayDraft]);
+  }, [activeScheduleTemplates, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, toast, user, weekdayDraft]);
 
   const handleSaveSchedulePreset = useCallback(async () => {
     if (!firestore || !user) return;

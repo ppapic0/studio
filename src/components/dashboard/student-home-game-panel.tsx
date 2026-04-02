@@ -159,16 +159,16 @@ function QuestRow({
       type="button"
       onClick={() => onToggle(quest.id)}
       className={cn(
-        "relative flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left transition-all duration-200",
+        "relative flex w-full items-center gap-3 rounded-[1.25rem] border px-4 py-3 text-left transition-all duration-200",
         quest.done
-          ? "border border-emerald-300/32 bg-[linear-gradient(180deg,rgba(47,170,125,0.2),rgba(13,28,69,0.92))]"
-          : "surface-card surface-card--secondary on-dark hover:-translate-y-0.5 hover:border-[rgba(255,138,31,0.3)]",
+          ? "border-emerald-300/40 bg-[linear-gradient(180deg,rgba(236,255,246,0.98),rgba(221,248,234,0.98))] shadow-[0_14px_30px_-24px_rgba(47,170,125,0.45)]"
+          : "border-[rgba(24,52,107,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,242,233,0.98))] shadow-[0_16px_34px_-28px_rgba(20,39,92,0.28)] hover:-translate-y-0.5 hover:border-[rgba(255,138,31,0.35)] hover:shadow-[0_18px_36px_-28px_rgba(255,138,31,0.34)]",
       )}
     >
       {gainKey ? (
         <span
           key={gainKey}
-          className="pointer-events-none absolute right-3 top-2 rounded-full border border-[rgba(255,138,31,0.26)] bg-[rgba(255,138,31,0.16)] px-2 py-1 text-[11px] font-black text-[var(--accent-orange-soft)]"
+          className="pointer-events-none absolute right-3 top-2 rounded-full border border-[rgba(255,138,31,0.24)] bg-[rgba(255,138,31,0.12)] px-2 py-1 text-[11px] font-black text-[var(--accent-orange)]"
           style={{ animation: "planner-fade-rise 900ms ease-out both" }}
         >
           +{quest.reward}P
@@ -178,8 +178,8 @@ function QuestRow({
         className={cn(
           "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all",
           quest.done
-            ? "border-emerald-300/40 bg-emerald-300/18 text-emerald-100"
-            : "border-white/14 bg-white/12 text-[var(--text-on-dark)]",
+            ? "border-emerald-300/40 bg-emerald-300/18 text-emerald-700"
+            : "border-[rgba(24,52,107,0.14)] bg-[rgba(24,52,107,0.04)] text-[var(--text-primary)]",
         )}
       >
         {quest.done ? <Check className="h-4 w-4" /> : <Target className="h-4 w-4" />}
@@ -187,26 +187,26 @@ function QuestRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {quest.subjectLabel ? (
-            <span className="surface-chip surface-chip--dark px-2 py-1 text-[10px] uppercase tracking-[0.16em]">
+            <span className="rounded-full border border-[rgba(24,52,107,0.12)] bg-[rgba(24,52,107,0.04)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-primary)]">
               {quest.subjectLabel}
             </span>
           ) : null}
           {quest.timeLabel ? (
-            <span className="text-[11px] font-black text-[var(--accent-orange-soft)]">{quest.timeLabel}</span>
+            <span className="text-[11px] font-black text-[var(--accent-orange)]">{quest.timeLabel}</span>
           ) : null}
         </div>
         <div
           className={cn(
             "mt-1 text-sm font-black tracking-tight",
-            quest.done ? "text-[var(--text-on-dark-soft)] line-through decoration-white/35" : "text-[var(--text-on-dark)]",
+            quest.done ? "text-[var(--text-secondary)] line-through decoration-[rgba(24,52,107,0.24)]" : "text-[var(--text-primary)]",
           )}
         >
           {quest.title}
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">reward</div>
-        <div className="mt-1 text-sm font-black text-[var(--accent-orange-soft)]">+{quest.reward}</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-tertiary)]">reward</div>
+        <div className="mt-1 text-sm font-black text-[var(--accent-orange)]">+{quest.reward}</div>
       </div>
     </button>
   );
@@ -662,16 +662,16 @@ export function StudentHomeGamePanel({
       </section>
 
       <section className={cn("mt-3 grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[1.2fr_0.8fr]")}>
-        <div className="surface-card surface-card--primary on-dark rounded-[1.65rem] p-4 text-white">
+        <div className="rounded-[1.65rem] border border-[rgba(24,52,107,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,242,233,0.98))] p-4 text-[var(--text-primary)] shadow-[0_24px_60px_-36px_rgba(20,39,92,0.28)]">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="surface-kicker text-[10px]">quest board</div>
-              <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">오늘의 퀘스트</h3>
+              <div className="surface-kicker text-[10px] text-[var(--accent-orange)]">quest board</div>
+              <h3 className="mt-1 text-[1.35rem] font-black tracking-tight text-[var(--text-primary)]">오늘의 퀘스트</h3>
             </div>
             <Button
               type="button"
               variant="ghost"
-              className="h-9 rounded-full px-3 text-[11px] font-black text-[var(--text-on-dark-soft)] hover:bg-white/8 hover:text-white"
+              className="h-9 rounded-full border border-[rgba(24,52,107,0.12)] bg-white/70 px-3 text-[11px] font-black text-[var(--text-primary)] hover:bg-[rgba(255,138,31,0.12)] hover:text-[var(--text-primary)]"
               onClick={onOpenPlan}
             >
               더보기 <ChevronRight className="ml-1 h-4 w-4" />
@@ -688,12 +688,12 @@ export function StudentHomeGamePanel({
                 />
               ))
             ) : (
-              <div className="surface-card surface-card--ghost on-dark rounded-[1.25rem] border-dashed px-4 py-6 text-center">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,138,31,0.2)] bg-[rgba(255,138,31,0.12)] text-[var(--accent-orange-soft)]">
+              <div className="rounded-[1.25rem] border border-dashed border-[rgba(255,138,31,0.28)] bg-[rgba(255,250,243,0.92)] px-4 py-6 text-center">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,138,31,0.2)] bg-[rgba(255,138,31,0.12)] text-[var(--accent-orange)]">
                   <Swords className="h-5 w-5" />
                 </div>
-                <div className="mt-3 text-base font-black text-white">아직 오늘 퀘스트가 없어요</div>
-                <div className="surface-caption mt-1 text-sm font-semibold">계획트랙에서 오늘 할 일을 추가해 보세요.</div>
+                <div className="mt-3 text-base font-black text-[var(--text-primary)]">아직 오늘 퀘스트가 없어요</div>
+                <div className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">계획트랙에서 오늘 할 일을 추가해 보세요.</div>
               </div>
             )}
           </div>
