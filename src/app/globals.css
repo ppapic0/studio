@@ -1219,13 +1219,10 @@ select {
     --text-on-dark-soft: #64779d;
     --text-on-dark-muted: #8da0bf;
     --accent-orange-soft: #d86a11;
-    border: 1px solid rgba(219, 231, 255, 0.86);
-    border-radius: 2rem;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,0.995) 0%, rgba(255,250,245,0.985) 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.98),
-      0 26px 52px -42px rgba(20,41,95,0.16);
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .student-analysis-shell::before {
@@ -1233,10 +1230,7 @@ select {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background:
-      radial-gradient(circle at 0% 0%, rgba(255,198,126,0.16), transparent 24%),
-      radial-gradient(circle at 100% 0%, rgba(255,122,22,0.12), transparent 18%),
-      radial-gradient(circle at 50% 100%, rgba(255,255,255,0.08), transparent 26%);
+    background: none;
   }
 
   .student-analysis-shell [data-slot="card"]:not(.tier-hero-card):not(.analysis-premium-card) {

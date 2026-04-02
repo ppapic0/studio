@@ -427,7 +427,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
 
   const isAnalysisPresentation = presentationMode === 'student-analysis';
-  const isMobile = viewMode === 'mobile' && !isAnalysisPresentation;
+  const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
   const today = new Date();
   const todayKey = format(today, 'yyyy-MM-dd');
@@ -3088,17 +3088,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border-none shadow-lg bg-white">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 인지 리듬 지표</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성 점수</span><span>{focusKpi.rhythmScore}점</span></div><Progress value={focusKpi.rhythmScore} className="h-2" /></div>
-                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
-                    <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
-                  </CardContent>
-                </Card>
-
                 <Card className={cn("rounded-[1.5rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base font-black tracking-tight flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
@@ -3176,20 +3165,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                   </CardContent>
                 </Card>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-3">
-                <Card className="rounded-[2rem] border-none shadow-lg bg-white">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 인지 리듬 지표</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>리듬 안정성 점수</span><span>{focusKpi.rhythmScore}점</span></div><Progress value={focusKpi.rhythmScore} className="h-2" /></div>
-                    <div className="space-y-2"><div className="flex items-center justify-between text-xs font-black"><span>집중 성장률(평균)</span><span className={cn(averageGrowthRate >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{averageGrowthRate >= 0 ? '+' : ''}{averageGrowthRate}%</span></div><Progress value={Math.min(100, Math.max(0, 50 + averageGrowthRate))} className="h-2" /></div>
-                    <Badge variant="secondary" className="font-black text-[10px] rounded-full px-3 py-1">연속 1시간+ 공부 {studyStreakDays}일</Badge>
-                  </CardContent>
-                </Card>
-
               </div>
 
               <Card className={cn("rounded-[2rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage")}>

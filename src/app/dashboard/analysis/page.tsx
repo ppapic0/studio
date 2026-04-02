@@ -431,6 +431,7 @@ function GraphDungeonCard({
   preview,
   previewHint,
   children,
+  lightMode = false,
 }: {
   title: string;
   eyebrow: string;
@@ -439,15 +440,20 @@ function GraphDungeonCard({
   preview: React.ReactNode;
   previewHint: string;
   children: ReactNode;
+  lightMode?: boolean;
 }) {
   return (
     <section
       className={cn(
-        'surface-card on-dark rounded-[1.85rem] border p-4 shadow-[0_24px_46px_-34px_rgba(0,0,0,0.52)] transition-transform duration-200',
+        'rounded-[1.85rem] border p-4 transition-transform duration-200',
         unlocked && 'hover:-translate-y-0.5 hover:scale-[1.01]',
-        unlocked
-          ? 'surface-card--secondary border-[color:var(--border-subtle)]'
-          : 'surface-card--ghost border-dashed border-white/12 opacity-90'
+        lightMode
+          ? unlocked
+            ? 'border-[#F1DCC4] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,247,239,0.96)_100%)] shadow-[0_24px_48px_-34px_rgba(190,112,28,0.28)]'
+            : 'border-dashed border-[#EDD9C7] bg-white/90 opacity-95 shadow-[0_22px_42px_-36px_rgba(191,115,31,0.18)]'
+          : unlocked
+            ? 'surface-card surface-card--secondary on-dark border-[color:var(--border-subtle)] shadow-[0_24px_46px_-34px_rgba(0,0,0,0.52)]'
+            : 'surface-card surface-card--ghost on-dark border-dashed border-white/12 opacity-90 shadow-[0_24px_46px_-34px_rgba(0,0,0,0.52)]'
       )}
     >
       <div className="min-w-0">
@@ -456,21 +462,35 @@ function GraphDungeonCard({
             <Badge variant="secondary" className="px-2.5 py-1 text-[10px] shadow-none">
               {eyebrow}
             </Badge>
-            <span className={cn('text-[10px] font-black uppercase tracking-[0.18em]', unlocked ? 'text-[var(--text-on-dark-soft)]' : 'inline-flex items-center gap-1 text-[var(--text-on-dark-muted)]')}>
+            <span className={cn(
+              'text-[10px] font-black uppercase tracking-[0.18em]',
+              lightMode
+                ? unlocked
+                  ? 'text-[#C97416]'
+                  : 'inline-flex items-center gap-1 text-[#9C7C5B]'
+                : unlocked
+                  ? 'text-[var(--text-on-dark-soft)]'
+                  : 'inline-flex items-center gap-1 text-[var(--text-on-dark-muted)]'
+            )}>
               {unlocked ? '🔓 unlocked' : <><Lock className="h-3 w-3" /> locked</>}
             </span>
           </div>
-          <h3 className="mt-3 text-lg font-black tracking-tight text-white">{title}</h3>
-          <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight}</p>
+          <h3 className={cn('mt-3 text-lg font-black tracking-tight', lightMode ? 'text-[#17326B]' : 'text-white')}>{title}</h3>
+          <p className={cn('mt-1 text-sm font-semibold', lightMode ? 'text-[#526B93]' : 'text-[var(--text-on-dark-soft)]')}>{insight}</p>
         </div>
       </div>
 
-      <div className="mt-4 rounded-[1.35rem] border border-white/12 bg-white/[0.08] px-3 py-3">
+      <div className={cn(
+        'mt-4 rounded-[1.35rem] px-3 py-3',
+        lightMode
+          ? 'border border-[#F0DDC8] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,243,230,0.92)_100%)]'
+          : 'border border-white/12 bg-white/[0.08]'
+      )}>
         {preview}
-        <p className="mt-3 text-right text-[11px] font-semibold text-[var(--text-on-dark-soft)]">{previewHint}</p>
+        <p className={cn('mt-3 text-right text-[11px] font-semibold', lightMode ? 'text-[#7A6B5A]' : 'text-[var(--text-on-dark-soft)]')}>{previewHint}</p>
       </div>
 
-      <div className="mt-4 border-t border-white/12 pt-4">{children}</div>
+      <div className={cn('mt-4 pt-4', lightMode ? 'border-t border-[#F1E2D0]' : 'border-t border-white/12')}>{children}</div>
     </section>
   );
 }
@@ -787,22 +807,44 @@ export default function AnalysisTrackPage() {
     );
   }
 
+  const mobilePanelClass = 'rounded-[1.35rem] border border-[#F0DDC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,245,234,0.95)_100%)] shadow-[0_22px_44px_-34px_rgba(191,115,31,0.22)]';
+  const mobileMiniCardClass = 'rounded-[1.2rem] border border-[#F0DDC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,244,233,0.94)_100%)] p-4';
+  const mobileMiniLabelClass = 'text-[10px] font-black uppercase tracking-[0.18em] text-[#9C7C5B]';
+  const mobileMiniValueClass = 'mt-2 text-lg font-black text-[#17326B]';
+  const mobileMiniMetaClass = 'mt-1 text-sm font-semibold text-[#526B93]';
+
   return (
-    <div className={cn('student-night-page pb-24', isMobile ? 'space-y-4' : 'space-y-6')}>
+    <div className={cn(isMobile ? 'bg-[linear-gradient(180deg,#FFFDF9_0%,#FFF4E8_100%)] pb-24 space-y-4' : 'student-night-page pb-24 space-y-6')}>
       {isMobile && <StudentTrackSubnav />}
 
       <Tabs defaultValue="growth" className="space-y-4">
-        <TabsList className={cn('grid w-full grid-cols-2 rounded-[1.5rem] border border-white/12 bg-white/[0.08] p-1.5 shadow-[0_18px_42px_-32px_rgba(0,0,0,0.42)]', isMobile ? 'gap-1.5' : 'gap-2')}>
-          <TabsTrigger value="growth" className="rounded-[1.1rem] px-3 py-2.5 text-xs font-black text-[var(--text-on-dark-soft)] hover:text-white data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">
+        <TabsList className={cn(
+          'grid w-full grid-cols-2 rounded-[1.5rem] p-1.5',
+          isMobile
+            ? 'gap-1.5 border border-[#F0DDC9] bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF2E5_100%)] shadow-[0_16px_34px_-28px_rgba(191,115,31,0.18)]'
+            : 'gap-2 border border-white/12 bg-white/[0.08] shadow-[0_18px_42px_-32px_rgba(0,0,0,0.42)]'
+        )}>
+          <TabsTrigger value="growth" className={cn(
+            'rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626] data-[state=active]:text-white',
+            isMobile ? 'text-[#6B5676] hover:text-[#17326B]' : 'text-[var(--text-on-dark-soft)] hover:text-white'
+          )}>
             <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> 성장 맵
           </TabsTrigger>
-          <TabsTrigger value="full" className="rounded-[1.1rem] px-3 py-2.5 text-xs font-black text-[var(--text-on-dark-soft)] hover:text-white data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">
+          <TabsTrigger value="full" className={cn(
+            'rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626] data-[state=active]:text-white',
+            isMobile ? 'text-[#6B5676] hover:text-[#17326B]' : 'text-[var(--text-on-dark-soft)] hover:text-white'
+          )}>
             <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> 전체 분석
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="growth" className="mt-0 space-y-4">
-          <section className="surface-card surface-card--primary on-dark overflow-hidden rounded-[2.2rem] px-5 py-5">
+          <section className={cn(
+            'overflow-hidden rounded-[2.2rem] px-5 py-5',
+            isMobile
+              ? 'border border-[#F0DDC7] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,245,234,0.96)_100%)] shadow-[0_26px_54px_-36px_rgba(191,115,31,0.24)]'
+              : 'surface-card surface-card--primary on-dark'
+          )}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Badge variant="dark" className="px-3 py-1 text-[10px] shadow-none">GROWTH TRACK</Badge>
@@ -814,10 +856,10 @@ export default function AnalysisTrackPage() {
             <div className={cn('mt-5 grid gap-5', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]')}>
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight text-white">{displayName}</p>
+                  <p className={cn('text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight', isMobile ? 'text-[#17326B]' : 'text-white')}>{displayName}</p>
                   <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">🔥 {playerTitle}</Badge>
                 </div>
-                <p className="surface-caption mt-2 text-sm font-semibold">오늘도 성장한 하루를 만드는 중이에요.</p>
+                <p className={cn('mt-2 text-sm font-semibold', isMobile ? 'text-[#526B93]' : 'surface-caption')}>오늘도 성장한 하루를 만드는 중이에요.</p>
 
                 <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-2')}>
                   <div className="surface-card surface-card--light rounded-[1.2rem] px-4 py-4">
@@ -838,15 +880,15 @@ export default function AnalysisTrackPage() {
                   <QuestStatBar label="계획 완수율" value={completionHp} accent="emerald" />
                 </div>
 
-                <div className="surface-card surface-card--ghost on-dark mt-5 rounded-[1.4rem] p-4">
+                <div className={cn('mt-5 rounded-[1.4rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--ghost on-dark')}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">오늘 상태</p>
-                      <p className="mt-2 text-lg font-black text-white">🔥 집중 중 (LIVE)</p>
+                      <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', isMobile ? 'text-[#9C7C5B]' : 'text-[var(--text-on-dark-muted)]')}>오늘 상태</p>
+                      <p className={cn('mt-2 text-lg font-black', isMobile ? 'text-[#17326B]' : 'text-white')}>🔥 집중 중 (LIVE)</p>
                     </div>
                     <p className="text-sm font-black text-[var(--accent-orange-soft)]">{heroProgress}% 성장</p>
                   </div>
-                  <div className="mt-3 rounded-full bg-white/10 p-1">
+                  <div className={cn('mt-3 rounded-full p-1', isMobile ? 'bg-[#F6E7D4]' : 'bg-white/10')}>
                     <div
                       className="relative h-3 rounded-full bg-[linear-gradient(90deg,#FFD36D_0%,#FFB347_34%,#FF7A00_64%,#69CBFF_100%)]"
                       style={{ width: `${heroProgress}%`, transition: 'width 800ms ease-out' }}
@@ -854,19 +896,19 @@ export default function AnalysisTrackPage() {
                       <div className="absolute inset-y-0 w-12 animate-pulse bg-white/30 blur-sm" />
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 text-sm font-semibold text-[var(--text-on-dark-soft)]">
+                  <div className={cn('mt-3 flex items-center justify-between gap-3 text-sm font-semibold', isMobile ? 'text-[#6B5676]' : 'text-[var(--text-on-dark-soft)]')}>
                     <span>{minutesToCompactLabel(todayMinutes)} / {minutesToCompactLabel(heroGoalMinutes)}</span>
                     <span>{heroProgress >= 100 ? '오늘 목표 도달' : `${Math.max(0, heroGoalMinutes - todayMinutes)}분 남음`}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="surface-card surface-card--secondary on-dark rounded-[1.8rem] p-4">
+              <div className={cn('rounded-[1.8rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--secondary on-dark')}>
                 <p className="surface-kicker text-[10px]">WEEKLY SUMMARY</p>
-                <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">이번 주 성장 요약</h2>
+                <h2 className={cn('mt-3 text-[1.35rem] font-black tracking-tight', isMobile ? 'text-[#17326B]' : 'text-white')}>이번 주 성장 요약</h2>
                 <div className="mt-4 space-y-2.5">
                   {weeklySummaryLines.map((line) => (
-                    <p key={line} className="surface-caption text-sm font-semibold leading-6">
+                    <p key={line} className={cn('text-sm font-semibold leading-6', isMobile ? 'text-[#526B93]' : 'surface-caption')}>
                       {line}
                     </p>
                   ))}
@@ -875,11 +917,11 @@ export default function AnalysisTrackPage() {
             </div>
           </section>
 
-          <section className="surface-card surface-card--secondary on-dark rounded-[2rem] p-5">
+          <section className={cn('rounded-[2rem] p-5', isMobile ? mobilePanelClass : 'surface-card surface-card--secondary on-dark')}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">GROWTH MAP</Badge>
-                <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">이번 주 성장 맵</h2>
+                <h2 className={cn('mt-3 text-[1.35rem] font-black tracking-tight', isMobile ? 'text-[#17326B]' : 'text-white')}>이번 주 성장 맵</h2>
               </div>
               <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-3 text-right">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">최고 성장</p>
@@ -900,6 +942,7 @@ export default function AnalysisTrackPage() {
                 eyebrow={card.eyebrow}
                 insight={card.insight}
                 unlocked={card.unlocked}
+                lightMode={isMobile}
                 previewHint={card.previewHint}
                 preview={
                   card.id === 'density' ? (
@@ -935,8 +978,8 @@ export default function AnalysisTrackPage() {
                 }
               >
                 {card.id === 'focus' ? (
-                  <div className="space-y-4">
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
+                    <div className="space-y-4">
+                    <div className={cn('rounded-[1.35rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--ghost on-dark')}>
                       <ResponsiveContainer width="100%" height={isMobile ? 180 : 260}>
                         <ComposedChart data={chartData} margin={{ top: 12, right: 8, left: isMobile ? 6 : 12, bottom: 0 }}>
                           <defs>
@@ -963,7 +1006,7 @@ export default function AnalysisTrackPage() {
                     </div>
                     {isMobile ? (
                       <div className="grid gap-3">
-                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{minutesToLabel(bestDay.totalMinutes)}</p></div>
+                        <div className={mobileMiniCardClass}><p className={mobileMiniLabelClass}>최고 몰입일</p><p className={mobileMiniValueClass}>{shortDateLabel(bestDay.dateKey)}</p><p className={mobileMiniMetaClass}>{minutesToLabel(bestDay.totalMinutes)}</p></div>
                       </div>
                     ) : (
                       <div className="grid gap-3 md:grid-cols-3">
@@ -976,16 +1019,16 @@ export default function AnalysisTrackPage() {
                 ) : card.id === 'density' ? (
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3')}>
                     {sessionCards.map((item) => (
-                      <div key={item.label} className={cn('surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && item.label === '평균 길이' && 'col-span-2')}>
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">{item.label}</p>
-                        <p className="mt-2 text-lg font-black text-white">{item.value}</p>
-                        <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{item.meta}</p>
+                      <div key={item.label} className={cn(isMobile ? mobileMiniCardClass : 'surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && item.label === '평균 길이' && 'col-span-2')}>
+                        <p className={isMobile ? mobileMiniLabelClass : 'text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]'}>{item.label}</p>
+                        <p className={isMobile ? mobileMiniValueClass : 'mt-2 text-lg font-black text-white'}>{item.value}</p>
+                        <p className={isMobile ? mobileMiniMetaClass : 'mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]'}>{item.meta}</p>
                       </div>
                     ))}
                   </div>
                 ) : card.id === 'rhythm' ? (
                   <div className="space-y-4">
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
+                    <div className={cn('rounded-[1.35rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--ghost on-dark')}>
                       <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} />
                     </div>
                     {isMobile ? (
@@ -1000,19 +1043,19 @@ export default function AnalysisTrackPage() {
                   </div>
                 ) : (
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3')}>
-                    <div className={cn('surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && 'col-span-2')}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">현재 상태</p>
-                      <p className="mt-2 text-lg font-black text-white">{sessionMetrics.total >= 10 ? '시간대 비교 가능' : '기본 흐름 확인 중'}</p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">
+                    <div className={cn(isMobile ? mobileMiniCardClass : 'surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && 'col-span-2')}>
+                      <p className={isMobile ? mobileMiniLabelClass : 'text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]'}>현재 상태</p>
+                      <p className={isMobile ? mobileMiniValueClass : 'mt-2 text-lg font-black text-white'}>{sessionMetrics.total >= 10 ? '시간대 비교 가능' : '기본 흐름 확인 중'}</p>
+                      <p className={isMobile ? mobileMiniMetaClass : 'mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]'}>
                         {sessionMetrics.total >= 10
                           ? '오전과 오후 중 어디서 더 오래 버티는지 함께 보고 있어요.'
                           : '세션이 더 쌓일수록 오전/오후 효율 판단이 더 선명해져요.'}
                       </p>
                     </div>
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">수집된 세션</p>
-                      <p className="mt-2 text-lg font-black text-white">{sessionMetrics.total}회</p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">
+                    <div className={isMobile ? mobileMiniCardClass : 'surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4'}>
+                      <p className={isMobile ? mobileMiniLabelClass : 'text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]'}>수집된 세션</p>
+                      <p className={isMobile ? mobileMiniValueClass : 'mt-2 text-lg font-black text-white'}>{sessionMetrics.total}회</p>
+                      <p className={isMobile ? mobileMiniMetaClass : 'mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]'}>
                         최근 14일 기준 평균 {minutesToLabel(sessionMetrics.avgDurationMinutes)} 세션
                       </p>
                     </div>
@@ -1047,7 +1090,7 @@ export default function AnalysisTrackPage() {
         </TabsContent>
 
         <TabsContent value="full" className="mt-0">
-          <div className="analysis-shell overflow-hidden rounded-[2.2rem] border border-[#E7EDF8] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(255,250,245,0.985)_100%)] px-2 py-3 shadow-[0_24px_48px_-42px_rgba(20,41,95,0.16)] sm:px-3 sm:py-4">
+          <div className="analysis-shell">
             <StudentDetailPresentationProvider value="student-analysis">
               <StudentDetailPage params={selfParams} />
             </StudentDetailPresentationProvider>

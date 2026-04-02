@@ -971,11 +971,11 @@ export default function StudyHistoryPage() {
             : "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1D3D80_0%,#2C53A5_54%,#4068BC_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.46)]"
         )}
       >
-        <CardContent className={cn(isMobile ? "px-5 pb-6 pt-10" : "px-8 pb-9 pt-10")}>
-          <div className={cn(isMobile ? "space-y-6" : "flex items-start justify-between gap-5")}>
-            <div className={cn(isMobile ? "space-y-6" : "space-y-3")}>
-                <div className="min-w-0 flex-1 space-y-6">
-                <div className={cn("space-y-[1.125rem]", isMobile ? "pb-8" : "pb-5")}>
+        <CardContent className={cn(isMobile ? "px-5 pb-7 pt-12" : "px-8 pb-9 pt-10")}>
+          <div className={cn(isMobile ? "space-y-7" : "flex items-start justify-between gap-5")}>
+            <div className={cn(isMobile ? "space-y-7" : "space-y-3")}>
+                <div className="min-w-0 flex-1 space-y-7">
+                <div className={cn("space-y-[1.25rem]", isMobile ? "pb-10" : "pb-5")}>
                 <h2
                   className={cn(
                     "font-black tracking-tight",
@@ -987,7 +987,7 @@ export default function StudyHistoryPage() {
                 <p
                   className={cn(
                     "max-w-2xl break-keep font-semibold",
-                    isMobile ? "text-[13px] leading-6 text-white/82" : "text-sm leading-6 text-white/86"
+                    isMobile ? "text-[13px] leading-7 text-white/82" : "text-sm leading-6 text-white/86"
                   )}
                 >
                   {isParent
@@ -999,7 +999,7 @@ export default function StudyHistoryPage() {
             </div>
           </div>
 
-            <div className={cn("grid", isMobile ? "mt-14 grid-cols-3 gap-2.5" : "mt-10 md:grid-cols-3 gap-3")}>
+            <div className={cn("grid", isMobile ? "mt-16 grid-cols-3 gap-3" : "mt-10 md:grid-cols-3 gap-3")}>
             {[
               {
                 label: '이번 달 총 공부시간',
@@ -1031,14 +1031,14 @@ export default function StudyHistoryPage() {
                 key={item.label}
                 className={cn(
                   isMobile
-                    ? "min-w-0 overflow-hidden rounded-[1.55rem] border border-white/18 bg-[linear-gradient(180deg,rgba(36,67,136,0.42),rgba(70,109,195,0.62))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_18px_36px_-28px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+                    ? "min-w-0 overflow-hidden rounded-[1.55rem] border border-white/18 bg-[linear-gradient(180deg,rgba(36,67,136,0.42),rgba(70,109,195,0.62))] px-4 py-[1.05rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_18px_36px_-28px_rgba(0,0,0,0.28)] backdrop-blur-xl"
                     : "min-w-0 overflow-hidden rounded-[1.8rem] border border-white/18 bg-[linear-gradient(180deg,rgba(34,64,129,0.38),rgba(72,110,192,0.58))] px-5 py-[1.15rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_18px_36px_-28px_rgba(0,0,0,0.28)] backdrop-blur-xl"
                 )}
               >
                 <p className={cn("font-black uppercase tracking-[0.18em] text-[#FFD089]", isMobile ? "text-[8px]" : "text-[10px]")}>
                   {isMobile ? item.mobileLabel : item.label}
                 </p>
-                <div className={cn("flex items-end gap-2", isMobile ? "mt-3" : "mt-3")}>
+                <div className={cn("flex items-end gap-2", isMobile ? "mt-3.5" : "mt-3")}>
                   <span className={cn(
                     "dashboard-number min-w-0 font-black leading-none tracking-[-0.06em] text-white",
                     isMobile ? "text-[1.28rem]" : "text-[1.9rem] sm:text-[2.35rem]"
@@ -1046,7 +1046,7 @@ export default function StudyHistoryPage() {
                     {item.value}
                   </span>
                 </div>
-                <p className={cn("break-keep font-semibold text-white/92", isMobile ? "mt-2 text-[9px] leading-[1.2rem]" : "mt-2.5 text-xs leading-5")}>
+                <p className={cn("break-keep font-semibold text-white/92", isMobile ? "mt-2.5 text-[9px] leading-[1.2rem]" : "mt-2.5 text-xs leading-5")}>
                   {isMobile ? item.mobileNote : item.note}
                 </p>
               </div>
