@@ -418,6 +418,8 @@ export function AttendanceScheduleSheet({
     });
   };
 
+  const selectedDayMeta = calendarDays.find((day) => day.isSelected);
+
   return (
     <>
       <Dialog
