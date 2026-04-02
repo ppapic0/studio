@@ -2282,7 +2282,7 @@ export default function StudyPlanPage() {
   }, []);
 
   const handleSaveTodaySchedule = useCallback(async () => {
-    if (!selectedDateKey) return;
+    if (!selectedDateKey) return false;
     setIsSubmitting(true);
     try {
       await persistStudentSchedule({
@@ -2300,12 +2300,14 @@ export default function StudyPlanPage() {
       });
       clearSchedulePrefillCache();
       setIsAttendanceScheduleSheetOpen(false);
+      return true;
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: '일정 저장 실패',
         description: typeof error?.message === 'string' ? error.message : '일정을 저장하지 못했어요.',
       });
+      return false;
     } finally {
       setIsSubmitting(false);
     }
@@ -2377,14 +2379,14 @@ export default function StudyPlanPage() {
   }, [buildCurrentAttendanceDraft]);
 
   const handleSaveWeekdayTemplate = useCallback(async () => {
-    if (!firestore || !user) return;
+    if (!firestore || !user) return false;
     if (selectedRecurringWeekdays.length === 0) {
       toast({
         variant: 'destructive',
         title: '반복 요일을 선택해 주세요',
         description: '최소 1개 이상의 요일을 선택해야 저장할 수 있어요.',
       });
-      return;
+      return false;
     }
 
     const validationMessage = validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []);
@@ -2394,7 +2396,7 @@ export default function StudyPlanPage() {
         title: '반복 루틴 저장 실패',
         description: validationMessage,
       });
-      return;
+      return false;
     }
 
     setIsSubmitting(true);
@@ -2418,12 +2420,14 @@ export default function StudyPlanPage() {
         title: '정기 루틴 저장 완료',
         description: `매주 ${selectedRecurringWeekdayLabel}에 적용할 기본값을 저장했어요.`,
       });
+      return true;
     } catch {
       toast({
         variant: 'destructive',
         title: '정기 루틴 저장 실패',
         description: '반복 루틴을 저장하지 못했어요.',
       });
+      return false;
     } finally {
       setIsSubmitting(false);
     }
