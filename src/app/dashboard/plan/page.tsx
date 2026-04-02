@@ -85,6 +85,7 @@ import {
   type WithId,
 } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -1075,7 +1076,7 @@ export default function StudyPlanPage() {
           throw (writeResults.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined)?.reason;
         }
     } catch (error) {
-      console.error('[plan-track] dismiss routine onboarding failed', error);
+      logHandledClientIssue('[plan-track] dismiss routine onboarding failed', error);
       toast({
         title: '바로 계획 화면으로 이동했어요',
         description: '루틴 설문 저장이 잠시 늦어졌어요. 필요하면 나중에 다시 열 수 있어요.',
@@ -2990,7 +2991,7 @@ export default function StudyPlanPage() {
       });
       return true;
     } catch (error) {
-      console.error(error);
+      logHandledClientIssue('[plan-track] copy plans failed', error);
       toast({ variant: 'destructive', title: '복사 중 오류가 발생했습니다.' });
       return false;
     } finally {

@@ -20,6 +20,7 @@ import { RecommendationLoadingScreen } from '@/components/dashboard/student-plan
 import { SavePlanSuccessScreen } from '@/components/dashboard/student-planner/save-plan-success-screen';
 import { StudyPlanQuestionCard } from '@/components/dashboard/student-planner/study-plan-question-card';
 import { Button } from '@/components/ui/button';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { createDefaultOnboardingAnswers, generateRoutineRecommendationSet } from '@/lib/recommend-routine';
 import { estimateRemainingTime, getSectionLabel } from '@/lib/study-plan/estimate-remaining-time';
 import { type OnboardingAnswer, type UserStudyProfile } from '@/lib/types';
@@ -115,7 +116,7 @@ export function RoutineOnboardingFlow({
             }
           }
         } catch (error) {
-          console.error('[routine-onboarding] save profile failed', error);
+          logHandledClientIssue('[routine-onboarding] save profile failed', error);
           if (!cancelled) {
             setSaveError('기준 저장 중 문제가 있었어요. 다시 한 번 눌러주세요.');
             setPhase('survey');

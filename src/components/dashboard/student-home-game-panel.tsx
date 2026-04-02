@@ -149,17 +149,21 @@ function QuestRow({
   quest,
   onToggle,
   gainKey,
+  disabled = false,
 }: {
   quest: StudentHomeQuest;
   onToggle: (id: string) => void;
   gainKey?: number | null;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={() => onToggle(quest.id)}
+      disabled={disabled}
       className={cn(
         "relative flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left transition-all duration-200",
+        disabled && "cursor-wait opacity-70",
         quest.done
           ? "border border-emerald-300/32 bg-[linear-gradient(180deg,rgba(47,170,125,0.2),rgba(13,28,69,0.92))]"
           : "surface-card surface-card--secondary on-dark hover:-translate-y-0.5 hover:border-[rgba(255,138,31,0.3)]",
@@ -430,6 +434,7 @@ export function StudentHomeGamePanel({
   todayPointGain,
   quests,
   questGain,
+  pendingQuestIds = [],
   onToggleQuest,
   onOpenPlan,
   weeklyTrend,
@@ -478,6 +483,7 @@ export function StudentHomeGamePanel({
   todayPointGain: number;
   quests: StudentHomeQuest[];
   questGain: { id: string; key: number; amount: number } | null;
+  pendingQuestIds?: string[];
   onToggleQuest: (id: string) => void;
   onOpenPlan: () => void;
   weeklyTrend: Array<{ date: string; minutes: number }>;
@@ -693,6 +699,7 @@ export function StudentHomeGamePanel({
                   quest={quest}
                   onToggle={onToggleQuest}
                   gainKey={questGain?.id === quest.id ? questGain.key : null}
+                  disabled={pendingQuestIds.includes(quest.id)}
                 />
               ))
             ) : (

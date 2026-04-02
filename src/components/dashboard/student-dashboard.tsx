@@ -104,6 +104,7 @@ import {
   fetchStudentRankingSnapshot,
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
 
@@ -287,7 +288,7 @@ function shouldShowStudyBoxArrivalToast(centerId: string, userId: string, dateKe
   if (typeof window === 'undefined') return true;
   try {
     const storageKey = `track:study-box-toast:${centerId}:${userId}`;
-    const eventKey = `${dateKey}:${milestones.sort((a, b) => a - b).join(',')}`;
+    const eventKey = `${dateKey}:${[...milestones].sort((a, b) => a - b).join(',')}`;
     const lastShownKey = window.localStorage.getItem(storageKey);
     if (lastShownKey === eventKey) return false;
     window.localStorage.setItem(storageKey, eventKey);
@@ -1102,6 +1103,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [revealedHomeReward, setRevealedHomeReward] = useState<number | null>(null);
   const [isClaimingHomeBox, setIsClaimingHomeBox] = useState(false);
   const [questGain, setQuestGain] = useState<{ id: string; key: number; amount: number } | null>(null);
+  const [pendingQuestIds, setPendingQuestIds] = useState<string[]>([]);
+  const pendingQuestIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => { setToday(new Date()); }, []);
 
@@ -1288,13 +1291,24 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!latestUnviewed) return;
 
     const storageKey = `student-report-auto-open:${user.uid}`;
-    const lastOpenedReportId = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+    let lastOpenedReportId: string | null = null;
+    if (typeof window !== 'undefined') {
+      try {
+        lastOpenedReportId = window.localStorage.getItem(storageKey);
+      } catch {
+        lastOpenedReportId = null;
+      }
+    }
     if (lastOpenedReportId === latestUnviewed.id) return;
 
     setSelectedTeacherReport(latestUnviewed);
     setIsTeacherReportDialogOpen(true);
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(storageKey, latestUnviewed.id);
+      try {
+        window.localStorage.setItem(storageKey, latestUnviewed.id);
+      } catch {
+        // Storage access can fail in restrictive browser modes; auto-open still works.
+      }
     }
   }, [isActive, isTeacherReportsLoading, teacherReports, user?.uid]);
 
@@ -1591,7 +1605,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             console.warn('[student-track] duplicated stop request ignored', { centerId, userId: user.uid, sessionId });
           } else {
             stopCommitError = commitError;
-            console.error('[student-track] stop commit failed', commitError);
           }
         }
 
@@ -1647,8 +1660,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             console.warn('[student-track] stop fallback saved core study logs while optional writes were skipped');
             }
           } catch (fallbackError: any) {
-            console.error('[student-track] stop fallback failed', fallbackError);
+            logHandledClientIssue('[student-track] stop fallback failed', fallbackError);
           }
+        }
+
+        if (stopCommitError) {
+          logHandledClientIssue('[student-track] stop commit failed', stopCommitError);
         }
 
         if (!stopCommitError && !stopRequestDeduped) {
@@ -1738,7 +1755,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           await batch.commit();
         } catch (commitError: any) {
           startCommitError = commitError;
-          console.error('[student-track] start commit failed', commitError);
         }
 
         if (startCommitError && studyLogRef) {
@@ -1756,8 +1772,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             startCommitError = null;
             console.warn('[student-track] start fallback kept study-day doc in sync');
           } catch (fallbackError: any) {
-            console.error('[student-track] start fallback failed', fallbackError);
+            logHandledClientIssue('[student-track] start fallback failed', fallbackError);
           }
+        }
+
+        if (startCommitError) {
+          logHandledClientIssue('[student-track] start commit failed', startCommitError);
         }
 
         if (!startCommitError) {
@@ -1802,7 +1822,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       }
     } catch (e: any) {
       const detail = typeof e?.message === 'string' ? e.message : '\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
-      console.error('[student-track] start/stop failed', e);
+      logHandledClientIssue('[student-track] start/stop failed', e);
       toast({ variant: 'destructive', title: '\uACF5\uBD80 \uC0C1\uD0DC \uBCC0\uACBD \uC2E4\uD328', description: detail });
     } finally {
       setIsProcessingAction(false);
@@ -2014,7 +2034,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       });
       setIsExamDialogOpen(false);
     } catch (error) {
-      console.error('[student-dashboard] save exam countdowns failed', error);
+      logHandledClientIssue('[student-dashboard] save exam countdowns failed', error);
       toast({
         variant: 'destructive',
         title: '시험 설정 저장 실패',
@@ -2381,6 +2401,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleHomeQuestToggle = useCallback(async (taskId: string) => {
     if (!firestore || !activeMembership || !user || !weekKey || !progressRef) return;
+    if (pendingQuestIdsRef.current.has(taskId)) return;
     const targetTask = todayStudyTasks.find((task) => task.id === taskId);
     if (!targetTask) return;
 
@@ -2398,6 +2419,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     );
 
     try {
+      pendingQuestIdsRef.current.add(taskId);
+      setPendingQuestIds((prev) => (prev.includes(taskId) ? prev : [...prev, taskId]));
       await updateDoc(taskRef, {
         done: nextDone,
         updatedAt: serverTimestamp(),
@@ -2499,12 +2522,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }, { merge: true });
       }
     } catch (error: any) {
-      console.error('[student-track] home quest toggle failed', error);
+      logHandledClientIssue('[student-track] home quest toggle failed', error);
       toast({
         variant: 'destructive',
         title: '퀘스트 저장 실패',
         description: typeof error?.message === 'string' ? error.message : '잠시 후 다시 시도해주세요.',
       });
+    } finally {
+      pendingQuestIdsRef.current.delete(taskId);
+      setPendingQuestIds((prev) => prev.filter((id) => id !== taskId));
     }
   }, [
     activeMembership,
@@ -2571,9 +2597,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         setRevealedHomeReward(reward);
         setHomeBoxStage('revealed');
       } catch (error) {
-        console.error('[student-track] home reward open failed', error);
+        logHandledClientIssue('[student-track] home reward open failed', error);
         setHomeOpenedBoxes(persistedOpenedBoxes);
         setHomeBoxStage('idle');
+        toast({
+          variant: 'destructive',
+          title: '보상 상자 열기 실패',
+          description: '잠시 후 다시 시도해 주세요.',
+        });
       } finally {
         setIsClaimingHomeBox(false);
       }
@@ -2589,6 +2620,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     progressRef,
     rewardByHour,
     selectedHomeBox,
+    toast,
     todayKey,
     todayPointStatus,
   ]);
@@ -2638,6 +2670,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         todayPointGain={todayPointAmount}
         quests={homeQuestList}
         questGain={questGain}
+        pendingQuestIds={pendingQuestIds}
         onToggleQuest={handleHomeQuestToggle}
         onOpenPlan={() => router.push('/dashboard/plan')}
         weeklyTrend={studyTimeTrend}
