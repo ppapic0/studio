@@ -808,7 +808,7 @@ export function StudentHomeGamePanel({
                     <div className="mt-3 flex flex-wrap items-end gap-2.5">
                       <div
                         className={cn(
-                          "font-aggro-display text-[var(--text-on-accent)]",
+                          "font-aggro-display text-[#14295F]",
                           selectedHomeRank.rank > 0
                             ? "text-[2.8rem] font-black leading-[0.86] tracking-[-0.05em]"
                             : "text-[1.55rem] font-black leading-[1.02] tracking-[-0.03em]",
@@ -948,7 +948,7 @@ export function StudentHomeGamePanel({
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-end gap-3">
-                    <div className="font-aggro-display text-[1.55rem] font-black tracking-tight text-[var(--text-on-accent)]">
+                    <div className="font-aggro-display text-[1.55rem] font-black tracking-tight text-[#14295F]">
                       {rankDisplayLabel}
                     </div>
                     <div className="rounded-full border border-[rgba(255,255,255,0.34)] bg-[rgba(255,255,255,0.22)] px-3 py-1 text-[11px] font-black text-[rgba(14,28,56,0.84)] shadow-[0_12px_28px_-20px_rgba(14,28,56,0.35)]">
@@ -997,7 +997,7 @@ export function StudentHomeGamePanel({
                           : "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(180deg,rgba(255,249,240,0.88),rgba(255,255,255,0.72))]",
                       )}
                     >
-                      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[11px] font-black text-[var(--text-on-accent)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.3)]">
+                      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[11px] font-black text-[#14295F] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.3)]">
                         {entry.rank === 1 ? <Crown className="h-4 w-4 text-[var(--accent-orange)]" /> : `#${entry.rank}`}
                       </div>
                       <div className="mt-2 break-keep text-[14px] font-black tracking-tight text-[rgba(20,41,95,0.96)]">
