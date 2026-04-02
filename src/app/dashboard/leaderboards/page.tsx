@@ -444,7 +444,7 @@ function HeroBattleHeader({
 }) {
   if (isMobile) {
     return (
-      <section className={cn(MOBILE_BATTLE_PANEL_CLASS, 'relative overflow-hidden p-5 text-[#132A63]')}>
+      <section className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-[#132A63]')}>
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_36%,transparent_72%,rgba(255,171,86,0.08))]" />
         <div className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-[#FFB14B]/16 blur-3xl" />
         <div className="relative space-y-4">
@@ -457,7 +457,7 @@ function HeroBattleHeader({
               <h1 className="max-w-[8.5ch] text-[2.35rem] font-aggro-display font-black leading-[0.94] tracking-[-0.05em] text-[#132A63]">
                 {RANGE_META[range].title}
               </h1>
-              <p className="mt-3 max-w-[18rem] text-[14px] font-semibold leading-6 text-[#5B7098]">
+              <p className="student-aggro-body mt-3 max-w-[18rem] text-[14px] text-[#5B7098]">
                 {RANGE_META[range].subtitle}
               </p>
             </div>
@@ -469,7 +469,7 @@ function HeroBattleHeader({
                 <Swords className="h-3.5 w-3.5 shrink-0" />
                 전장 브리핑
               </div>
-              <p className="mt-1 text-[15px] font-black leading-6 tracking-[-0.03em] text-[#132A63]">
+              <p className="student-aggro-body mt-1 text-[15px] text-[#132A63]">
                 {activeMessage}
               </p>
             </div>
@@ -486,7 +486,7 @@ function HeroBattleHeader({
 
   return (
     <section className={cn(
-      'relative overflow-hidden rounded-[32px] border border-[#E7D2BE] bg-[radial-gradient(circle_at_top,_rgba(255,192,118,0.26),_transparent_34%),linear-gradient(155deg,#FFF9EF_0%,#FFF1DD_62%,#FFE6BD_100%)] text-[#132A63] shadow-[0_28px_80px_rgba(22,45,99,0.12)]',
+      'student-utility-card relative overflow-hidden rounded-[32px] border border-[#E7D2BE] bg-[radial-gradient(circle_at_top,_rgba(255,192,118,0.26),_transparent_34%),linear-gradient(155deg,#FFF9EF_0%,#FFF1DD_62%,#FFE6BD_100%)] text-[#132A63] shadow-[0_28px_80px_rgba(22,45,99,0.12)]',
       isMobile ? 'p-5' : 'p-6 md:p-8'
     )}>
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),transparent_44%,transparent_72%,rgba(255,170,85,0.08))]" />
@@ -507,7 +507,7 @@ function HeroBattleHeader({
             {RANGE_META[range].title}
           </h1>
           <p className={cn(
-            'max-w-2xl font-semibold text-[#5B7098]',
+            'student-aggro-body max-w-2xl text-[#5B7098]',
             isMobile ? 'mt-3 text-base leading-8' : 'mt-3 text-sm leading-7 md:text-base'
           )}>
             {RANGE_META[range].subtitle}
@@ -528,7 +528,7 @@ function HeroBattleHeader({
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.28, ease: 'easeOut' }}
                 className={cn(
-                  'font-black leading-snug tracking-[-0.03em] text-[#132A63]',
+                  'font-aggro-display font-black leading-snug tracking-[-0.03em] text-[#132A63]',
                   isMobile ? 'text-[1.05rem]' : 'text-xl md:text-2xl'
                 )}
               >
@@ -684,11 +684,11 @@ function CompactBattleMetric({
   const toneClass = TONE_CLASS_MAP[tone];
 
   return (
-    <div className={cn(MOBILE_BATTLE_INSET_CLASS, 'relative overflow-hidden px-3.5 py-3')}>
+    <div className={cn(MOBILE_BATTLE_INSET_CLASS, 'student-utility-card relative overflow-hidden px-3.5 py-3')}>
       <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r', toneClass.line)} />
       <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">{label}</div>
       <div className="mt-2 text-[1.35rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">{value}</div>
-      <div className={cn('mt-2 text-[12px] font-black leading-5', toneClass.text)}>{hint}</div>
+      <div className={cn('student-aggro-body mt-2 text-[12px] leading-5', toneClass.text)}>{hint}</div>
     </div>
   );
 }
@@ -764,7 +764,7 @@ function MyBattleCard({
     return (
       <motion.section
         layout
-        className={cn(MOBILE_BATTLE_PANEL_CLASS, 'relative overflow-hidden p-4 text-[#132A63]')}
+        className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-4 text-[#132A63]')}
         whileHover={{ y: -2 }}
         transition={{ type: 'spring', stiffness: 220, damping: 24 }}
       >
@@ -801,7 +801,7 @@ function MyBattleCard({
                 </div>
               </div>
             </div>
-            <p className="mt-3 text-[14px] font-black leading-6 tracking-[-0.02em] text-[#C86A10]">
+            <p className="student-aggro-body mt-3 text-[14px] text-[#C86A10]">
               {helperCopy}
             </p>
           </div>
@@ -840,7 +840,7 @@ function MyBattleCard({
     <motion.section
       layout
       className={cn(
-        'relative overflow-hidden rounded-[34px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top_right,rgba(255,187,108,0.24),transparent_28%),linear-gradient(180deg,#FFF9F1_0%,#FFF4E8_48%,#FFE7C8_100%)] text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.12)]',
+        'student-utility-card relative overflow-hidden rounded-[34px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top_right,rgba(255,187,108,0.24),transparent_28%),linear-gradient(180deg,#FFF9F1_0%,#FFF4E8_48%,#FFE7C8_100%)] text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.12)]',
         isMobile ? 'p-5' : 'p-6 md:p-7'
       )}
       whileHover={{ y: -4 }}
@@ -868,7 +868,7 @@ function MyBattleCard({
               </div>
               <div className={cn(isMobile ? '' : 'pb-2')}>
                 <div className={cn('font-bold text-[#6E7893]', isMobile ? 'text-sm' : 'text-sm')}>공부중 {formatStudyCompact(viewer.value)}</div>
-                <div className={cn('mt-2 font-black text-[#C86A10]', isMobile ? 'text-base leading-7' : 'text-lg')}>{helperCopy}</div>
+                <div className={cn('student-aggro-body mt-2 text-[#C86A10]', isMobile ? 'text-base leading-7' : 'text-lg leading-8')}>{helperCopy}</div>
               </div>
             </div>
           </div>
@@ -1198,7 +1198,7 @@ function StandingsSidebar({
     const secondaryLeaders = leaders.slice(1, 3);
 
     return (
-      <aside className={cn(MOBILE_BATTLE_PANEL_CLASS, 'relative overflow-hidden p-4 text-[#132A63]')}>
+      <aside className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-4 text-[#132A63]')}>
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.74),transparent_36%,transparent_72%,rgba(255,174,90,0.08))]" />
 
         <div className="relative">
@@ -1208,7 +1208,7 @@ function StandingsSidebar({
               TOP 3 LIVE
             </div>
             <h3 className="mt-3 text-[1.6rem] font-black tracking-[-0.04em] text-[#132A63]">실시간 TOP 3</h3>
-            <p className="mt-2 text-[13px] font-semibold leading-6 text-[#64779C]">
+            <p className="student-aggro-body mt-2 text-[13px] text-[#64779C]">
               지금 전장을 흔들고 있는 상위권입니다. 먼저 흐름부터 보고 바로 아래 내 위치를 확인하세요.
             </p>
           </div>
@@ -1232,7 +1232,7 @@ function StandingsSidebar({
                     1위
                     <Crown className="h-3.5 w-3.5" />
                   </div>
-                  <div className="mt-3 truncate text-[1.45rem] font-black tracking-[-0.04em] text-[#132A63]">
+                  <div className="font-aggro-display mt-3 truncate text-[1.45rem] font-black tracking-[-0.04em] text-[#132A63]">
                     {topLeader.displayNameSnapshot}
                   </div>
                   <div className="mt-1 truncate text-[12px] font-semibold text-[#6E7893]">
@@ -1285,7 +1285,7 @@ function StandingsSidebar({
                         </div>
                       ) : null}
                     </div>
-                    <div className="mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
+                    <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
                       {entry.displayNameSnapshot}
                     </div>
                     <div className="mt-1 truncate text-[11px] font-semibold text-[#6E7893]">
@@ -1319,7 +1319,7 @@ function StandingsSidebar({
 
   return (
     <aside className={cn(
-      'rounded-[30px] border border-[#E6D2BE] bg-[radial-gradient(circle_at_top_right,rgba(255,192,120,0.16),transparent_26%),linear-gradient(180deg,#FFF9F1_0%,#FFF1DE_100%)] text-[#132A63] shadow-[0_20px_48px_rgba(20,41,95,0.1)]',
+      'student-utility-card rounded-[30px] border border-[#E6D2BE] bg-[radial-gradient(circle_at_top_right,rgba(255,192,120,0.16),transparent_26%),linear-gradient(180deg,#FFF9F1_0%,#FFF1DE_100%)] text-[#132A63] shadow-[0_20px_48px_rgba(20,41,95,0.1)]',
       isMobile ? 'p-4' : 'p-5 md:p-6'
     )}>
       <div className={cn(isMobile ? 'mb-3' : 'mb-4')}>
@@ -1328,7 +1328,7 @@ function StandingsSidebar({
           현재 순위
         </div>
         <h3 className={cn('font-black tracking-[-0.04em] text-[#132A63]', isMobile ? 'text-xl' : 'text-2xl')}>실시간 TOP 3</h3>
-        <p className={cn('mt-2 font-semibold leading-6 text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>
+        <p className={cn('student-aggro-body mt-2 leading-6 text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>
           지금 올라와 있는 상위권과 내 현재 위치를 바로 확인해보세요.
         </p>
       </div>
@@ -1364,7 +1364,7 @@ function StandingsSidebar({
                         </div>
                       ) : null}
                     </div>
-                    <div className="mt-2 truncate text-base font-black tracking-[-0.03em] text-[#132A63]">
+                    <div className="font-aggro-display mt-2 truncate text-base font-black tracking-[-0.03em] text-[#132A63]">
                       {entry.displayNameSnapshot}
                     </div>
                     <div className="mt-0.5 truncate text-[12px] font-semibold text-[#6E7893]">
@@ -1386,7 +1386,7 @@ function StandingsSidebar({
                         {entry.rank}위
                         {entry.rank === 1 ? <Crown className="h-3.5 w-3.5" /> : null}
                       </div>
-                      <div className="mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
+                      <div className="font-aggro-display mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
                         {entry.displayNameSnapshot}
                       </div>
                       <div className="mt-1 truncate text-xs font-semibold text-[#6E7893]">
@@ -1976,6 +1976,7 @@ export default function RankingBattlePage() {
 
   return (
     <main className={cn(
+      'student-font-shell',
       'bg-[radial-gradient(circle_at_top,_rgba(255,186,106,0.18),_transparent_22%),linear-gradient(180deg,#FFFCF8_0%,#FFF3E4_100%)] text-[#132A63]',
       isMobile ? 'min-h-0 px-0 py-0' : 'min-h-screen px-4 py-6 md:px-6 md:py-8'
     )}>
