@@ -395,7 +395,7 @@ function PeriodTabs({
   onChange: (next: RankRange) => void;
 }) {
   return (
-    <div className="inline-flex rounded-full border border-white/18 bg-[#091b4f]/80 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur">
+    <div className="inline-flex rounded-full border border-[#E5C7A8] bg-white/92 p-1 shadow-[0_14px_36px_rgba(17,39,88,0.08)] backdrop-blur">
       {(Object.keys(RANGE_META) as RankRange[]).map((period) => {
         const isActive = value === period;
         return (
@@ -407,7 +407,7 @@ function PeriodTabs({
               'rounded-full px-4 py-2 text-sm font-semibold tracking-[0.18em] transition-all',
               isActive
                 ? 'bg-gradient-to-r from-[#FF9A38] via-[#FFB861] to-[#FFD08B] text-[#3F2205] shadow-[0_10px_28px_rgba(255,150,56,0.34)]'
-                : 'text-white/68 hover:text-white'
+                : 'text-[#576C98] hover:text-[#132A63]'
             )}
           >
             {RANGE_META[period].label}
@@ -428,23 +428,23 @@ function HeroBattleHeader({
   activeMessage: string;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-[32px] border border-white/12 bg-[radial-gradient(circle_at_top,_rgba(255,186,110,0.26),_transparent_34%),linear-gradient(160deg,#10235B_0%,#091636_60%,#060C1B_100%)] p-6 text-white shadow-[0_28px_100px_rgba(5,12,28,0.58)] md:p-8">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_44%,transparent_70%,rgba(255,170,85,0.05))]" />
+    <section className="relative overflow-hidden rounded-[32px] border border-[#E7D2BE] bg-[radial-gradient(circle_at_top,_rgba(255,192,118,0.26),_transparent_34%),linear-gradient(155deg,#FFF9EF_0%,#FFF1DD_62%,#FFE6BD_100%)] p-6 text-[#132A63] shadow-[0_28px_80px_rgba(22,45,99,0.12)] md:p-8">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),transparent_44%,transparent_72%,rgba(255,170,85,0.08))]" />
       <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-[#FFB14B]/18 blur-3xl" />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFCA8A]/55 bg-white/8 px-4 py-2 text-xs font-black tracking-[0.28em] text-[#FFD39C]">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/82 px-4 py-2 text-xs font-black tracking-[0.28em] text-[#BA6815]">
             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
             LIVE BATTLE
           </div>
-          <h1 className="text-[2.2rem] font-black leading-[0.94] tracking-[-0.04em] text-white md:text-[3.1rem]">
+          <h1 className="text-[2.2rem] font-black leading-[0.94] tracking-[-0.04em] text-[#132A63] md:text-[3.1rem]">
             {RANGE_META[range].title}
           </h1>
-          <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-white/74 md:text-base">
+          <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-[#5B7098] md:text-base">
             {RANGE_META[range].subtitle}
           </p>
-          <div className="mt-5 min-h-[72px] max-w-2xl rounded-[24px] border border-white/14 bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] px-5 py-4 backdrop-blur-xl">
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-black tracking-[0.22em] text-[#FFD39C]">
+          <div className="mt-5 min-h-[72px] max-w-2xl rounded-[24px] border border-[#EDD4BD] bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,249,240,0.92))] px-5 py-4 backdrop-blur-xl shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-black tracking-[0.22em] text-[#BA6815]">
               <Swords className="h-4 w-4" />
               전장 브리핑
             </div>
@@ -455,7 +455,7 @@ function HeroBattleHeader({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.28, ease: 'easeOut' }}
-                className="text-xl font-black leading-snug tracking-[-0.03em] text-white md:text-2xl"
+                className="text-xl font-black leading-snug tracking-[-0.03em] text-[#132A63] md:text-2xl"
               >
                 {activeMessage}
               </motion.p>
@@ -524,17 +524,17 @@ function BattleGauge({
   const marker = clamp(50 + (difference / Math.max(leftValue, rightValue, 1)) * 35, 10, 90);
 
   return (
-    <div className="rounded-[28px] border border-white/14 bg-[linear-gradient(180deg,rgba(7,14,33,0.8),rgba(11,22,55,0.96))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-      <div className="mb-3 flex items-center justify-between text-[11px] font-black tracking-[0.2em] text-white/72">
+    <div className="rounded-[28px] border border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFCF5_0%,#FFF6E7_100%)] p-4 shadow-[0_18px_34px_rgba(20,41,95,0.08)]">
+      <div className="mb-3 flex items-center justify-between text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">
         <span>{leftLabel}</span>
         <span>{rightLabel}</span>
       </div>
-      <div className="relative h-14 overflow-hidden rounded-full border border-white/12 bg-[#081127]">
+      <div className="relative h-14 overflow-hidden rounded-full border border-[#E6D8C8] bg-[#FFF0DD]">
         <div className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,rgba(255,143,38,0.95),rgba(255,193,113,0.92))]" style={{ width: `${marker}%` }} />
         <div
           className={cn(
-            'absolute inset-y-0 right-0 bg-[linear-gradient(270deg,rgba(255,94,94,0.95),rgba(99,133,232,0.94))]',
-            mode === 'defense' && 'bg-[linear-gradient(270deg,rgba(78,158,255,0.92),rgba(255,120,120,0.95))]'
+            'absolute inset-y-0 right-0 bg-[linear-gradient(270deg,rgba(255,111,95,0.92),rgba(255,177,132,0.72))]',
+            mode === 'defense' && 'bg-[linear-gradient(270deg,rgba(255,140,102,0.88),rgba(255,200,154,0.68))]'
           )}
           style={{ width: `${100 - marker}%` }}
         />
@@ -564,10 +564,10 @@ function BattleGauge({
         />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3 text-sm font-bold">
-        <div className="rounded-2xl border border-[#FFB861]/30 bg-[#2A1A08]/55 px-3 py-2 text-[#FFD9AE]">
+        <div className="rounded-2xl border border-[#FFC27A]/60 bg-[#FFF0D7] px-3 py-2 text-[#B96510]">
           내 압박 {formatStudyCompact(leftValue)}
         </div>
-        <div className="rounded-2xl border border-white/12 bg-white/6 px-3 py-2 text-right text-white/72">
+        <div className="rounded-2xl border border-[#E6D8C8] bg-white/92 px-3 py-2 text-right text-[#6E7893]">
           상대 압박 {formatStudyCompact(rightValue)}
         </div>
       </div>
@@ -590,14 +590,14 @@ function BattleStatCard({
 }) {
   const toneClass = TONE_CLASS_MAP[tone];
   return (
-    <div className="rounded-[26px] border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+    <div className="rounded-[26px] border border-[#E8D6C1] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] p-4 shadow-[0_14px_30px_rgba(20,41,95,0.08)]">
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-black tracking-[0.2em] text-white/56">{label}</div>
+        <div className="text-[11px] font-black tracking-[0.2em] text-[#7784A2]">{label}</div>
         <div className={cn('rounded-2xl border px-3 py-2', toneClass.chip)}>
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <div className="mt-4 text-4xl font-black tracking-[-0.05em] text-white">{value}</div>
+      <div className="mt-4 text-4xl font-black tracking-[-0.05em] text-[#132A63]">{value}</div>
       <div className={cn('mt-2 text-sm font-bold', toneClass.text)}>{hint}</div>
     </div>
   );
@@ -640,42 +640,42 @@ function MyBattleCard({
   return (
     <motion.section
       layout
-      className="relative overflow-hidden rounded-[34px] border border-white/14 bg-[radial-gradient(circle_at_top,_rgba(255,189,120,0.2),_transparent_28%),linear-gradient(155deg,#122967_0%,#0A1A46_46%,#060C1D_100%)] p-6 text-white shadow-[0_32px_90px_rgba(4,8,24,0.62)] md:p-7"
+      className="relative overflow-hidden rounded-[34px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top,_rgba(255,191,124,0.24),_transparent_30%),linear-gradient(160deg,#FFFBF5_0%,#FFF4E6_44%,#FFE3B8_100%)] p-6 text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.12)] md:p-7"
       whileHover={{ y: -4 }}
       transition={{ type: 'spring', stiffness: 220, damping: 24 }}
     >
       <DefenseShieldEffect active={mode === 'defense' || mode === 'danger'} pressure={pressure} />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_30%,transparent_65%,rgba(255,140,40,0.08))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_30%,transparent_65%,rgba(255,140,40,0.08))]" />
       <div className="relative">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFCA8A]/55 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#FFD39C]">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#BA6815]">
               <Zap className="h-4 w-4" />
               {statusLabel}
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <div className="text-[11px] font-black tracking-[0.22em] text-white/58">일간 LIVE TRACK</div>
-                <div className="mt-2 text-6xl font-black leading-none tracking-[-0.06em] text-white">
+                <div className="text-[11px] font-black tracking-[0.22em] text-[#7A86A2]">일간 LIVE TRACK</div>
+                <div className="mt-2 text-6xl font-black leading-none tracking-[-0.06em] text-[#132A63]">
                   #{viewer.rank}
                 </div>
               </div>
               <div className="pb-2">
-                <div className="text-sm font-bold text-white/62">공부중 {formatStudyCompact(viewer.value)}</div>
-                <div className="mt-2 text-lg font-black text-[#FFD39C]">{helperCopy}</div>
+                <div className="text-sm font-bold text-[#6E7893]">공부중 {formatStudyCompact(viewer.value)}</div>
+                <div className="mt-2 text-lg font-black text-[#C86A10]">{helperCopy}</div>
               </div>
             </div>
           </div>
 
           <motion.div
-            className="rounded-[26px] border border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.06))] px-5 py-4 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+            className="rounded-[26px] border border-[#F2D3AA] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF5E8_100%)] px-5 py-4 text-right shadow-[0_18px_40px_rgba(20,41,95,0.08)]"
             animate={{ boxShadow: ['0 0 0 rgba(255,154,56,0.1)', '0 0 30px rgba(255,154,56,0.26)', '0 0 0 rgba(255,154,56,0.1)'] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           >
-            <div className="text-[11px] font-black tracking-[0.24em] text-white/58">
+            <div className="text-[11px] font-black tracking-[0.24em] text-[#7A86A2]">
               {mode === 'defense' ? 'DEFENSE HOLD' : 'LIVE PUSH'}
             </div>
-            <div className="mt-1 text-2xl font-black text-white">
+            <div className="mt-1 text-2xl font-black text-[#132A63]">
               {mode === 'defense'
                 ? `방어 ${formatGapLabel(diffBelow)}`
                 : `공부중 +${Math.max(0, rewardState.minutesToReward - 28)}분`}
@@ -717,8 +717,8 @@ function EnergyLink({
 
   return (
     <div className="relative mx-auto flex h-16 w-20 flex-col items-center justify-center">
-      <div className="mb-2 text-[11px] font-black tracking-[0.18em] text-white/52">{label}</div>
-      <div className="relative h-full w-[2px] rounded-full bg-white/10">
+      <div className="mb-2 text-[11px] font-black tracking-[0.18em] text-[#7A86A2]">{label}</div>
+      <div className="relative h-full w-[2px] rounded-full bg-[#E8D7C4]">
         <motion.div
           className={cn('absolute left-1/2 h-10 w-[10px] -translate-x-1/2 rounded-full bg-gradient-to-b', toneClass.line)}
           animate={{ y: animation }}
@@ -760,14 +760,14 @@ function RivalCard({
       whileTap={{ scale: 0.99 }}
       transition={{ type: 'spring', stiffness: 260, damping: 22 }}
       className={cn(
-        'relative overflow-hidden rounded-[30px] border p-5 shadow-[0_24px_70px_rgba(4,8,24,0.46)]',
+        'relative overflow-hidden rounded-[30px] border p-5 shadow-[0_18px_42px_rgba(20,41,95,0.1)]',
         highlighted
           ? 'border-[#FFBB75]/55 bg-[linear-gradient(160deg,#FFF0D8_0%,#FFE2B5_48%,#FFD39B_100%)] text-[#182D63]'
-          : 'border-white/14 bg-[linear-gradient(165deg,#0E214F_0%,#0A173A_68%,#081126_100%)] text-white'
+          : 'border-[#E8D6C1] bg-[linear-gradient(165deg,#FFFFFF_0%,#FFF6EA_72%,#FFECD1_100%)] text-[#132A63]'
       )}
     >
       {shieldActive ? <DefenseShieldEffect active pressure={pressure ?? 'stable'} /> : null}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_34%,transparent_66%,rgba(255,173,85,0.08))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.7),transparent_34%,transparent_66%,rgba(255,173,85,0.08))]" />
 
       <AnimatePresence>
         {floatingEvent ? (
@@ -791,11 +791,11 @@ function RivalCard({
       <div className="relative">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <div className={cn('text-[11px] font-black tracking-[0.24em]', highlighted ? 'text-[#8B5A19]' : 'text-white/56')}>
+            <div className={cn('text-[11px] font-black tracking-[0.24em]', highlighted ? 'text-[#8B5A19]' : 'text-[#7A86A2]')}>
               {title}
             </div>
             <div className="mt-2 flex items-center gap-2">
-              <div className={cn('text-4xl font-black tracking-[-0.05em]', highlighted ? 'text-[#132A63]' : 'text-white')}>
+              <div className={cn('text-4xl font-black tracking-[-0.05em]', highlighted ? 'text-[#132A63]' : 'text-[#132A63]')}>
                 #{entry.rank}
               </div>
               {entry.rank === 1 ? <Crown className={cn('h-5 w-5', highlighted ? 'text-[#C97E19]' : 'text-[#FFD47D]')} /> : null}
@@ -807,19 +807,19 @@ function RivalCard({
           </div>
         </div>
 
-        <div className={cn('text-2xl font-black tracking-[-0.04em]', highlighted ? 'text-[#132A63]' : 'text-white')}>
+        <div className={cn('text-2xl font-black tracking-[-0.04em]', highlighted ? 'text-[#132A63]' : 'text-[#132A63]')}>
           {entry.displayNameSnapshot}
         </div>
-        <div className={cn('mt-1 text-sm font-bold', highlighted ? 'text-[#47618E]' : 'text-white/62')}>
+        <div className={cn('mt-1 text-sm font-bold', highlighted ? 'text-[#47618E]' : 'text-[#6E7893]')}>
           {formatSchoolName(entry.schoolNameSnapshot)}
         </div>
 
         <div className="mt-5 flex items-end justify-between gap-3">
           <div>
-            <div className={cn('text-[11px] font-black tracking-[0.2em]', highlighted ? 'text-[#8B5A19]' : 'text-white/50')}>
+            <div className={cn('text-[11px] font-black tracking-[0.2em]', highlighted ? 'text-[#8B5A19]' : 'text-[#7A86A2]')}>
               현재 누적
             </div>
-            <div className={cn('mt-2 text-4xl font-black tracking-[-0.05em]', highlighted ? 'text-[#132A63]' : 'text-white')}>
+            <div className={cn('mt-2 text-4xl font-black tracking-[-0.05em]', highlighted ? 'text-[#132A63]' : 'text-[#132A63]')}>
               {formatStudyCompact(entry.value)}
             </div>
           </div>
@@ -855,15 +855,15 @@ function RivalBattleArea({
   const viewerIsTop = viewer.studentId === top.studentId;
 
   return (
-    <section className="rounded-[32px] border border-white/12 bg-[linear-gradient(180deg,#0E214F_0%,#0A173A_100%)] p-5 text-white shadow-[0_28px_80px_rgba(4,8,24,0.46)] md:p-6">
+    <section className="rounded-[32px] border border-[#E8D1B7] bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF1DD_100%)] p-5 text-[#132A63] shadow-[0_20px_48px_rgba(20,41,95,0.1)] md:p-6">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFCA8A]/45 bg-white/8 px-4 py-2 text-[11px] font-black tracking-[0.22em] text-[#FFD7A7]">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-4 py-2 text-[11px] font-black tracking-[0.22em] text-[#BA6815]">
             <Trophy className="h-4 w-4" />
             1위 존
           </div>
-          <h2 className="text-3xl font-black tracking-[-0.05em] text-white">정상 점령 구역</h2>
-          <p className="mt-2 text-sm font-semibold text-white/68">
+          <h2 className="text-3xl font-black tracking-[-0.05em] text-[#132A63]">정상 점령 구역</h2>
+          <p className="mt-2 text-sm font-semibold text-[#64779C]">
             {viewerIsTop
               ? '지금은 당신이 정상입니다. 아래 추격선을 밀어내며 버텨야 해요.'
               : '지금 전투는 정상 점령 구역을 두고 위아래가 동시에 밀어붙이는 상태예요.'}
@@ -926,7 +926,7 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
           <motion.div
             key={entry.studentId}
             layout
-            className="relative overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+            className="relative overflow-hidden rounded-[22px] border border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] p-4 shadow-[0_14px_28px_rgba(20,41,95,0.08)]"
             whileHover={{ y: -2, scale: 1.01 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
           >
@@ -937,18 +937,18 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
                   <span className="inline-flex h-2 w-2 rounded-full bg-current opacity-80" />
                   {entry.rank}위 LIVE
                 </div>
-                <div className="mt-3 truncate text-lg font-black tracking-[-0.03em] text-white">
+                <div className="mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
                   {entry.displayNameSnapshot}
                 </div>
-                <div className="mt-1 truncate text-xs font-semibold text-white/58">
+                <div className="mt-1 truncate text-xs font-semibold text-[#6E7893]">
                   {formatSchoolName(entry.schoolNameSnapshot)}
                 </div>
               </div>
               {entry.rank === 1 ? <Crown className="h-5 w-5 text-[#FFD989]" /> : null}
             </div>
 
-            <div className="mt-4 rounded-[18px] border border-white/10 bg-black/10 px-3 py-3">
-              <div className="text-[11px] font-black tracking-[0.18em] text-white/58">현재 공부중</div>
+            <div className="mt-4 rounded-[18px] border border-[#E8D8C6] bg-[#FFF4E3] px-3 py-3">
+              <div className="text-[11px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부중</div>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={`${entry.studentId}-${entry.value}`}
@@ -956,7 +956,7 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.98 }}
                   transition={{ duration: 0.22, ease: 'easeOut' }}
-                  className="mt-2 text-2xl font-black tracking-[-0.05em] text-white"
+                  className="mt-2 text-2xl font-black tracking-[-0.05em] text-[#132A63]"
                 >
                   {formatStudyClock(entry.value)}
                 </motion.div>
@@ -971,16 +971,16 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
 
 function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEntry[] }) {
   return (
-    <section className="rounded-[30px] border border-white/12 bg-[linear-gradient(180deg,#0C1A43_0%,#071127_100%)] p-5 text-white shadow-[0_22px_70px_rgba(4,8,24,0.42)] md:p-6">
+    <section className="rounded-[30px] border border-[#E6D2BE] bg-[linear-gradient(180deg,#FFF9F0_0%,#FFF0DB_100%)] p-5 text-[#132A63] shadow-[0_20px_54px_rgba(20,41,95,0.1)] md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-white/72">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF6C57] shadow-[0_0_16px_rgba(255,108,87,0.9)]" />
             LIVE FEED
           </div>
-          <h3 className="text-2xl font-black tracking-[-0.04em] text-white">실시간 전투 로그</h3>
+          <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">실시간 전투 로그</h3>
         </div>
-        <div className="rounded-full border border-white/12 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-white/68">
+        <div className="rounded-full border border-[#E7D5C0] bg-white/92 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#6E7893]">
           3~5초 간격 갱신
         </div>
       </div>
@@ -999,7 +999,7 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 18, scale: 0.96 }}
                 transition={{ duration: 0.28, ease: 'easeOut' }}
-                className="relative overflow-hidden rounded-[22px] border border-white/10 bg-white/6 p-4"
+                className="relative overflow-hidden rounded-[22px] border border-[#E8D5C1] bg-white p-4 shadow-[0_14px_28px_rgba(20,41,95,0.08)]"
               >
                 <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r opacity-60', toneClass.line)} />
                 <div className="relative flex items-start gap-3">
@@ -1007,8 +1007,8 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
                     {log.badge}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-base font-black tracking-[-0.02em] text-white">{log.title}</div>
-                    <div className="mt-1 text-sm font-semibold leading-6 text-white/66">{log.detail}</div>
+                    <div className="text-base font-black tracking-[-0.02em] text-[#132A63]">{log.title}</div>
+                    <div className="mt-1 text-sm font-semibold leading-6 text-[#64779C]">{log.detail}</div>
                   </div>
                 </div>
               </motion.div>
@@ -1501,9 +1501,9 @@ export default function RankingBattlePage() {
 
   if (loading && !viewer) {
     return (
-      <main className="min-h-screen bg-[linear-gradient(180deg,#08112C_0%,#040914_100%)] px-4 py-8 text-white">
-        <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center rounded-[32px] border border-white/10 bg-white/6">
-          <div className="flex items-center gap-3 text-lg font-bold text-white/70">
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,195,122,0.16),_transparent_24%),linear-gradient(180deg,#FFFDF9_0%,#FFF3E4_100%)] px-4 py-8 text-[#132A63]">
+        <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center rounded-[32px] border border-[#E7D3C0] bg-white/92 shadow-[0_28px_80px_rgba(20,41,95,0.08)]">
+          <div className="flex items-center gap-3 text-lg font-bold text-[#64779C]">
             <Loader2 className="h-5 w-5 animate-spin" />
             경쟁 전장을 불러오는 중입니다.
           </div>
@@ -1515,7 +1515,7 @@ export default function RankingBattlePage() {
   if (!viewer || !top) return null;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,180,96,0.12),_transparent_20%),linear-gradient(180deg,#07112B_0%,#040914_100%)] px-4 py-6 text-white md:px-6 md:py-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,186,106,0.18),_transparent_22%),linear-gradient(180deg,#FFFCF8_0%,#FFF3E4_100%)] px-4 py-6 text-[#132A63] md:px-6 md:py-8">
       <div className="mx-auto max-w-7xl space-y-5">
         <HeroBattleHeader range={range} onRangeChange={handleRangeChange} activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]} />
 

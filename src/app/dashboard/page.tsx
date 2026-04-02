@@ -158,13 +158,17 @@ export default function DashboardPage() {
   }, [activeMembership, studentProfile, userProfile?.phoneNumber]);
 
   const effectiveSelfPhone = savedPhoneFallback || resolvedSelfPhone;
-  const studentRoutineOnboarding = studentProfile?.studyRoutineOnboarding;
+  const studentRoutineOnboarding =
+    studentProfile?.studyRoutineOnboarding || userProfile?.studyRoutineOnboarding;
+  const studentRoutineProfile =
+    studentProfile?.studyRoutineProfile || userProfile?.studyRoutineProfile;
   const shouldForceStudentOnboarding =
     isStudentRole &&
     !isStudentProfileLoading &&
+    !isUserProfileLoading &&
     !hasFinishedStudentOnboarding &&
     !Boolean(
-      studentProfile?.studyRoutineProfile ||
+      studentRoutineProfile ||
       studentRoutineOnboarding?.completedAt ||
       studentRoutineOnboarding?.dismissedAt ||
       studentRoutineOnboarding?.status
@@ -193,20 +197,26 @@ export default function DashboardPage() {
   }, [activeMembership, user, effectiveSelfPhone, isPhoneLookupReady]);
 
   useEffect(() => {
-    if (!shouldForceStudentOnboarding || !studentProfileRef || studentOnboardingPresentationRef.current) return;
+    if (!shouldForceStudentOnboarding || !userProfileRef || studentOnboardingPresentationRef.current) return;
     studentOnboardingPresentationRef.current = true;
-    void setDoc(
-      studentProfileRef,
-      {
-        studyRoutineOnboarding: {
-          presentedAt: studentRoutineOnboarding?.presentedAt || serverTimestamp(),
-          version: PLAN_TRACK_ONBOARDING_VERSION,
-          updatedAt: serverTimestamp(),
-        },
+
+    const onboardingPayload = {
+      studyRoutineOnboarding: {
+        presentedAt: studentRoutineOnboarding?.presentedAt || serverTimestamp(),
+        version: PLAN_TRACK_ONBOARDING_VERSION,
+        updatedAt: serverTimestamp(),
       },
-      { merge: true }
-    );
-  }, [shouldForceStudentOnboarding, studentProfileRef, studentRoutineOnboarding?.presentedAt]);
+    };
+
+    void Promise.allSettled([
+      setDoc(userProfileRef, onboardingPayload, { merge: true }),
+      studentProfileRef ? setDoc(studentProfileRef, onboardingPayload, { merge: true }) : Promise.resolve(),
+    ]).then((results) => {
+      if (results.every((result) => result.status === 'rejected')) {
+        console.error('[dashboard] failed to persist onboarding presentation state');
+      }
+    });
+  }, [shouldForceStudentOnboarding, studentProfileRef, studentRoutineOnboarding?.presentedAt, userProfileRef]);
 
   async function onInviteSubmit(values: z.infer<typeof inviteFormSchema>) {
     if (!user || !functions) return;
@@ -292,43 +302,78 @@ export default function DashboardPage() {
 
   const handleSaveStudentRoutineProfile = useCallback(
     async (profile: UserStudyProfile) => {
-      if (!firestore || !user || !activeMembership || !studentProfileRef) return;
+      if (!firestore || !user || !activeMembership || !userProfileRef) return;
 
-      await setDoc(
-        studentProfileRef,
-        {
-          id: user.uid,
-          name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
-          schoolName: studentProfile?.schoolName || '학교 미정',
-          grade: studentProfile?.grade || '학년 미정',
-          seatNo: studentProfile?.seatNo || 0,
-          targetDailyMinutes: studentProfile?.targetDailyMinutes || 240,
-          parentUids: studentProfile?.parentUids || [],
-          createdAt: studentProfile?.createdAt || serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          studyRoutineOnboarding: {
-            presentedAt: studentRoutineOnboarding?.presentedAt || serverTimestamp(),
-            status: 'completed',
-            completedAt: serverTimestamp(),
-            version: PLAN_TRACK_ONBOARDING_VERSION,
+      const onboardingPayload = {
+        presentedAt: studentRoutineOnboarding?.presentedAt || serverTimestamp(),
+        status: 'completed' as const,
+        completedAt: serverTimestamp(),
+        version: PLAN_TRACK_ONBOARDING_VERSION,
+        updatedAt: serverTimestamp(),
+      };
+      const studyProfilePayload = {
+        ...profile,
+        createdAt: studentRoutineProfile?.createdAt || serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      const writeResults = await Promise.allSettled([
+        setDoc(
+          userProfileRef,
+          {
             updatedAt: serverTimestamp(),
+            studyRoutineOnboarding: onboardingPayload,
+            studyRoutineProfile: studyProfilePayload,
           },
-          studyRoutineProfile: {
-            ...profile,
-            createdAt: studentProfile?.studyRoutineProfile?.createdAt || serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          },
-          studyRoutineWorkspace: null,
-        },
-        { merge: true }
-      );
+          { merge: true }
+        ),
+        studentProfileRef
+          ? setDoc(
+              studentProfileRef,
+              {
+                id: user.uid,
+                name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
+                schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
+                grade: studentProfile?.grade || '학년 미정',
+                seatNo: studentProfile?.seatNo || 0,
+                targetDailyMinutes: studentProfile?.targetDailyMinutes || 240,
+                parentUids: studentProfile?.parentUids || [],
+                createdAt: studentProfile?.createdAt || serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                studyRoutineOnboarding: onboardingPayload,
+                studyRoutineProfile: studyProfilePayload,
+                studyRoutineWorkspace: null,
+              },
+              { merge: true }
+            )
+          : Promise.resolve(),
+      ]);
+
+      if (writeResults.every((result) => result.status === 'rejected')) {
+        throw (writeResults.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined)?.reason;
+      }
+
+      if (writeResults.some((result) => result.status === 'rejected')) {
+        console.warn('[dashboard] mirrored student profile write partially failed', writeResults);
+      }
 
       toast({
         title: '학습 기준 저장 완료',
         description: '이제부터는 직접 쓴 계획을 바탕으로 더 잘 맞는 코칭과 추천을 보여드릴게요.',
       });
     },
-    [activeMembership, firestore, studentProfile, studentProfileRef, studentRoutineOnboarding?.presentedAt, toast, user]
+    [
+      activeMembership,
+      firestore,
+      studentProfile,
+      studentProfileRef,
+      studentRoutineOnboarding?.presentedAt,
+      studentRoutineProfile?.createdAt,
+      toast,
+      user,
+      userProfile?.schoolName,
+      userProfileRef,
+    ]
   );
 
   const handleSavePhoneCapture = async () => {

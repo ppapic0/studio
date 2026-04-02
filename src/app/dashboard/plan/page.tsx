@@ -80,6 +80,7 @@ import {
   type StudentProfile,
   type StudentScheduleDoc,
   type StudentScheduleTemplate,
+  type User as UserType,
   type UserStudyProfile,
   type WithId,
 } from '@/lib/types';
@@ -513,6 +514,14 @@ export default function StudyPlanPage() {
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
   const [isCompletionSubmitting, setIsCompletionSubmitting] = useState(false);
 
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+  const { data: userProfile } = useDoc<UserType>(userProfileRef, {
+    enabled: Boolean(userProfileRef),
+  });
+
   useEffect(() => {
     const requestedDate = searchParams.get('date');
     if (!requestedDate) {
@@ -780,8 +789,10 @@ export default function StudyPlanPage() {
   const { data: scheduleTemplates } = useCollection<StudentScheduleTemplate>(scheduleTemplatesQuery, {
     enabled: isStudent,
   });
-  const hasRoutineProfile = Boolean(studentProfile?.studyRoutineProfile);
-  const routineOnboardingState = studentProfile?.studyRoutineOnboarding;
+  const effectiveRoutineProfile = studentProfile?.studyRoutineProfile || userProfile?.studyRoutineProfile;
+  const routineOnboardingState = studentProfile?.studyRoutineOnboarding || userProfile?.studyRoutineOnboarding;
+  const effectivePlannerDiagnostic = studentProfile?.studyPlannerDiagnostic || userProfile?.studyPlannerDiagnostic || null;
+  const hasRoutineProfile = Boolean(effectiveRoutineProfile);
   const hasSeenRoutineOnboarding =
     hasDismissedRoutineOnboardingLocally ||
     hasRoutineProfile ||
@@ -952,63 +963,97 @@ export default function StudyPlanPage() {
   const isAbsentMode = useMemo(() => isScheduleAbsent || scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [isScheduleAbsent, scheduleItems]);
 
   const handleSaveRoutineProfile = useCallback(async (profile: UserStudyProfile) => {
-    if (!firestore || !user || !activeMembership || !studentProfileRef) return;
+    if (!firestore || !user || !activeMembership || !userProfileRef) return;
 
-    await setDoc(
-      studentProfileRef,
-      {
-        id: user.uid,
-        name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
-        schoolName: studentProfile?.schoolName || '학교 미정',
-        grade: studentProfile?.grade || '학년 미정',
-        seatNo: studentProfile?.seatNo || 0,
-        targetDailyMinutes: studentProfile?.targetDailyMinutes || 240,
-        parentUids: studentProfile?.parentUids || [],
-        createdAt: studentProfile?.createdAt || serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        studyRoutineOnboarding: {
-          presentedAt: studentProfile?.studyRoutineOnboarding?.presentedAt || serverTimestamp(),
-          status: 'completed',
-          completedAt: serverTimestamp(),
-          version: PLAN_TRACK_ONBOARDING_VERSION,
+    const onboardingPayload = {
+      presentedAt: routineOnboardingState?.presentedAt || serverTimestamp(),
+      status: 'completed' as const,
+      completedAt: serverTimestamp(),
+      version: PLAN_TRACK_ONBOARDING_VERSION,
+      updatedAt: serverTimestamp(),
+    };
+    const studyProfilePayload = {
+      ...profile,
+      createdAt: effectiveRoutineProfile?.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const writeResults = await Promise.allSettled([
+      setDoc(
+        userProfileRef,
+        {
           updatedAt: serverTimestamp(),
+          studyRoutineOnboarding: onboardingPayload,
+          studyRoutineProfile: studyProfilePayload,
         },
-        studyRoutineProfile: {
-          ...profile,
-          createdAt: studentProfile?.studyRoutineProfile?.createdAt || serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        studyRoutineWorkspace: null,
-      },
-      { merge: true }
-    );
+        { merge: true }
+      ),
+      studentProfileRef
+        ? setDoc(
+            studentProfileRef,
+            {
+              id: user.uid,
+              name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
+              schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
+              grade: studentProfile?.grade || '학년 미정',
+              seatNo: studentProfile?.seatNo || 0,
+              targetDailyMinutes: studentProfile?.targetDailyMinutes || 240,
+              parentUids: studentProfile?.parentUids || [],
+              createdAt: studentProfile?.createdAt || serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              studyRoutineOnboarding: onboardingPayload,
+              studyRoutineProfile: studyProfilePayload,
+              studyRoutineWorkspace: null,
+            },
+            { merge: true }
+          )
+        : Promise.resolve(),
+    ]);
+
+    if (writeResults.every((result) => result.status === 'rejected')) {
+      throw (writeResults.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined)?.reason;
+    }
 
     toast({
       title: '학습 기준 저장 완료',
       description: '이제 직접 쓴 오늘 계획을 기준으로 부족한 점과 보강 포인트를 함께 보여드릴게요.',
     });
-  }, [activeMembership, firestore, studentProfile, studentProfileRef, toast, user]);
+  }, [
+    activeMembership,
+    effectiveRoutineProfile?.createdAt,
+    firestore,
+    routineOnboardingState?.presentedAt,
+    studentProfile,
+    studentProfileRef,
+    toast,
+    user,
+    userProfile?.schoolName,
+    userProfileRef,
+  ]);
 
   const handleDismissRoutineOnboarding = useCallback(async () => {
       setHasDismissedRoutineOnboardingLocally(true);
       setPlanTrackEntryMode('planner');
 
       try {
-        if (studentProfileRef) {
-        await setDoc(
-          studentProfileRef,
-          {
-            studyRoutineOnboarding: {
-              presentedAt: studentProfile?.studyRoutineOnboarding?.presentedAt || serverTimestamp(),
-              status: 'dismissed',
-              dismissedAt: serverTimestamp(),
-              version: PLAN_TRACK_ONBOARDING_VERSION,
-              updatedAt: serverTimestamp(),
-            },
+        const dismissPayload = {
+          studyRoutineOnboarding: {
+            presentedAt: routineOnboardingState?.presentedAt || serverTimestamp(),
+            status: 'dismissed' as const,
+            dismissedAt: serverTimestamp(),
+            version: PLAN_TRACK_ONBOARDING_VERSION,
+            updatedAt: serverTimestamp(),
           },
-          { merge: true }
-        );
-      }
+        };
+
+        const writeResults = await Promise.allSettled([
+          userProfileRef ? setDoc(userProfileRef, dismissPayload, { merge: true }) : Promise.resolve(),
+          studentProfileRef ? setDoc(studentProfileRef, dismissPayload, { merge: true }) : Promise.resolve(),
+        ]);
+
+        if (writeResults.every((result) => result.status === 'rejected')) {
+          throw (writeResults.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined)?.reason;
+        }
     } catch (error) {
       console.error('[plan-track] dismiss routine onboarding failed', error);
       toast({
@@ -1021,7 +1066,7 @@ export default function StudyPlanPage() {
       title: '루틴 추천은 나중에 해도 괜찮아요',
       description: '이제부터는 계획트랙에서 출입 일정과 오늘 공부를 바로 적을 수 있어요.',
     });
-  }, [studentProfile?.studyRoutineOnboarding?.presentedAt, studentProfileRef, toast]);
+  }, [routineOnboardingState?.presentedAt, studentProfileRef, toast, userProfileRef]);
 
   useEffect(() => {
     const fallbackArrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
@@ -1249,11 +1294,11 @@ export default function StudyPlanPage() {
     [checklistTasks]
   );
   const recommendedDailyMinutes = useMemo(() => {
-    const mapped = studentProfile?.studyRoutineProfile?.answers?.dailyStudyHours
-      ? DAILY_STUDY_MINUTES_MAP[studentProfile.studyRoutineProfile.answers.dailyStudyHours]
+    const mapped = effectiveRoutineProfile?.answers?.dailyStudyHours
+      ? DAILY_STUDY_MINUTES_MAP[effectiveRoutineProfile.answers.dailyStudyHours]
       : 0;
     return mapped || studentProfile?.targetDailyMinutes || 240;
-  }, [studentProfile?.studyRoutineProfile?.answers?.dailyStudyHours, studentProfile?.targetDailyMinutes]);
+  }, [effectiveRoutineProfile?.answers?.dailyStudyHours, studentProfile?.targetDailyMinutes]);
   const planProgressPercent = recommendedDailyMinutes > 0
     ? Math.min(100, Math.round((studyTimeSummary.total / recommendedDailyMinutes) * 100))
     : 0;
@@ -1263,31 +1308,31 @@ export default function StudyPlanPage() {
   );
   const visibleChecklistTasks = useMemo(() => orderedChecklistTasks.slice(0, 5), [orderedChecklistTasks]);
   const hiddenChecklistTaskCount = Math.max(0, checklistTasks.length - visibleChecklistTasks.length);
-  const latestDiagnostic = studentProfile?.studyPlannerDiagnostic || null;
+  const latestDiagnostic = effectivePlannerDiagnostic;
   const mainRecommendations = useMemo(
     () =>
       buildMainPlanRecommendations({
-        profile: studentProfile?.studyRoutineProfile,
+        profile: effectiveRoutineProfile,
         diagnostic: latestDiagnostic,
         latestStudyPlan: currentStudyPlan,
         todayStudyTasks: studyTasks,
         recentStudyTasks: recentStudyHistory,
       }),
-    [currentStudyPlan, latestDiagnostic, recentStudyHistory, studentProfile?.studyRoutineProfile, studyTasks]
+    [currentStudyPlan, effectiveRoutineProfile, latestDiagnostic, recentStudyHistory, studyTasks]
   );
   const prioritySubjectLabels = useMemo(
     () =>
       Array.from(
         new Set(
           [
-            ...(studentProfile?.studyRoutineProfile?.answers?.subjectPriority || []),
-            ...(studentProfile?.studyRoutineProfile?.answers?.weakSubjects || []),
+            ...(effectiveRoutineProfile?.answers?.subjectPriority || []),
+            ...(effectiveRoutineProfile?.answers?.weakSubjects || []),
           ]
             .map((subject) => SUBJECTS.find((item) => item.id === subject)?.label || subject)
             .filter((subject) => subject && subject !== 'none')
         )
       ),
-    [studentProfile?.studyRoutineProfile?.answers?.subjectPriority, studentProfile?.studyRoutineProfile?.answers?.weakSubjects]
+    [effectiveRoutineProfile?.answers?.subjectPriority, effectiveRoutineProfile?.answers?.weakSubjects]
   );
   const weeklyScheduleOverview = useMemo(() => {
     return weekDays.map((day) => {

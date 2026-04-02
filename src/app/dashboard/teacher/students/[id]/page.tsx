@@ -3734,17 +3734,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </DialogContent>
         </Dialog>
 
-      {!isMobile && (
-        <Card className="rounded-[2rem] border-none shadow-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white overflow-hidden">
-          <CardContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70 whitespace-nowrap">성장 요약</p>
-              <p className="text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap">포인트 {(progress?.seasonLp || 0).toLocaleString()} · 스킬 평균 {Math.round(((progress?.stats?.focus || 0) + (progress?.stats?.consistency || 0) + (progress?.stats?.achievement || 0) + (progress?.stats?.resilience || 0)) / 4)}점</p>
-            </div>
-            <Button className="rounded-xl font-black bg-white text-emerald-700 hover:bg-white/90" onClick={() => setIsMasteryModalOpen(true)}><Zap className="h-4 w-4 mr-1.5" /> 성장지표 상세 보기</Button>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

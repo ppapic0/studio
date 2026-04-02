@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import type { GeneratedStudyPlan, StudyPlanItem, StudyPlannerAnswers, StudyPlannerDiagnosticResult, StudentProfile } from '@/lib/types';
+import type { GeneratedStudyPlan, StudyPlanItem, StudyPlannerAnswers, StudyPlannerDiagnosticResult, StudentProfile, User as UserType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type PlannerDiagnosisPageProps = {
@@ -88,6 +88,13 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
   const { data: studentProfile } = useDoc<StudentProfile>(centerStudentRef, {
     enabled: Boolean(centerStudentRef),
   });
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user?.uid]
+  );
+  const { data: userProfile } = useDoc<UserType>(userProfileRef, {
+    enabled: Boolean(userProfileRef),
+  });
 
   const currentWeekKey = useMemo(() => format(new Date(), "yyyy-'W'II"), []);
   const currentWeekItemsQuery = useMemoFirebase(
@@ -107,14 +114,17 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
   const [result, setResult] = useState<StudyPlannerDiagnosticResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const effectiveRoutineProfile = studentProfile?.studyRoutineProfile || userProfile?.studyRoutineProfile || null;
+  const effectivePlannerDiagnostic = studentProfile?.studyPlannerDiagnostic || userProfile?.studyPlannerDiagnostic || null;
+
   const seedAnswers = useMemo(
     () =>
       buildSeedPlannerAnswers({
-        profile: studentProfile?.studyRoutineProfile || null,
-        latestDiagnostic: studentProfile?.studyPlannerDiagnostic || null,
+        profile: effectiveRoutineProfile,
+        latestDiagnostic: effectivePlannerDiagnostic,
         recentStudyTasks: currentWeekItems || [],
       }),
-    [currentWeekItems, studentProfile?.studyPlannerDiagnostic, studentProfile?.studyRoutineProfile]
+    [currentWeekItems, effectivePlannerDiagnostic, effectiveRoutineProfile]
   );
   const hasSeedData = Boolean(seedAnswers);
   const seedDataSummary = useMemo(() => {
@@ -227,15 +237,24 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
       updatedAt: serverTimestamp(),
     }, { merge: true });
 
-    if (activeMembership?.id) {
-      await setDoc(doc(firestore, 'centers', activeMembership.id, 'students', user.uid), {
-        studyPlannerDiagnostic: {
-          answers: nextAnswers,
-          result: nextResult,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-      }, { merge: true });
+    const diagnosticMirrorPayload = {
+      studyPlannerDiagnostic: {
+        answers: nextAnswers,
+        result: nextResult,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+    };
+
+    const writeResults = await Promise.allSettled([
+      userProfileRef ? setDoc(userProfileRef, diagnosticMirrorPayload, { merge: true }) : Promise.resolve(),
+      activeMembership?.id
+        ? setDoc(doc(firestore, 'centers', activeMembership.id, 'students', user.uid), diagnosticMirrorPayload, { merge: true })
+        : Promise.resolve(),
+    ]);
+
+    if (writeResults.every((result) => result.status === 'rejected')) {
+      throw (writeResults.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined)?.reason;
     }
     return true;
   };

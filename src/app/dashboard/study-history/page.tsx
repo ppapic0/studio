@@ -544,6 +544,26 @@ export default function StudyHistoryPage() {
     return 'from-sky-500 via-blue-500 to-indigo-600';
   };
 
+  const getStudentCalendarCellClass = (minutes: number, isCurrentMonth: boolean) => {
+    if (!isCurrentMonth) {
+      return 'bg-[linear-gradient(180deg,rgba(249,250,252,0.92)_0%,rgba(255,255,255,0.98)_100%)] opacity-[0.52] grayscale-[0.04] ring-1 ring-[#E7EDF7]/90 shadow-none';
+    }
+    const level = getStudyHistoryFlowLevel(minutes);
+    if (level === 'none') {
+      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,232,204,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(255,250,245,0.99)_100%)] ring-1 ring-inset ring-[#F3D9B8] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_30px_-28px_rgba(122,62,16,0.12)]';
+    }
+    if (level === 'warmup') {
+      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,200,133,0.24),transparent_34%),linear-gradient(180deg,rgba(255,251,245,0.995)_0%,rgba(255,244,232,0.992)_100%)] ring-1 ring-inset ring-[#FFDAB3] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_20px_34px_-28px_rgba(255,138,31,0.14)]';
+    }
+    if (level === 'short') {
+      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,189,104,0.28),transparent_36%),linear-gradient(180deg,rgba(255,249,240,0.995)_0%,rgba(255,236,214,0.992)_100%)] ring-1 ring-inset ring-[#FFC98D] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_22px_36px_-28px_rgba(255,138,31,0.18)]';
+    }
+    if (level === 'steady') {
+      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,170,71,0.3),transparent_38%),linear-gradient(180deg,rgba(255,246,235,0.995)_0%,rgba(255,226,191,0.992)_100%)] ring-1 ring-inset ring-[#FFB96F] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_24px_40px_-28px_rgba(255,138,31,0.22)]';
+    }
+    return 'bg-[radial-gradient(circle_at_top_right,rgba(255,154,47,0.34),transparent_38%),linear-gradient(180deg,rgba(255,240,224,0.995)_0%,rgba(255,212,156,0.992)_100%)] ring-1 ring-inset ring-[#FF9A3F] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_28px_44px_-28px_rgba(255,138,31,0.26)]';
+  };
+
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
     const level = getStudyHistoryFlowLevel(minutes);
@@ -599,16 +619,7 @@ export default function StudyHistoryPage() {
     if (level === 'none') {
       return 'border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,251,0.98))] text-slate-400 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.12)]';
     }
-    if (level === 'warmup') {
-      return 'border-[#FFD8B5] bg-[linear-gradient(180deg,rgba(255,248,240,0.98),rgba(255,241,224,0.98))] text-[#9A5B16] shadow-[0_12px_22px_-18px_rgba(255,138,31,0.18)]';
-    }
-    if (level === 'short') {
-      return 'border-[#FFC892] bg-[linear-gradient(180deg,rgba(255,241,224,0.98),rgba(255,228,196,0.98))] text-[#8D4C10] shadow-[0_12px_22px_-18px_rgba(255,138,31,0.22)]';
-    }
-    if (level === 'steady') {
-      return 'border-[#FFB56F] bg-[linear-gradient(180deg,rgba(255,228,196,0.98),rgba(255,213,168,0.98))] text-[#7A3E10] shadow-[0_12px_24px_-18px_rgba(255,138,31,0.24)]';
-    }
-    return 'border-[#FF9B3D] bg-[linear-gradient(180deg,rgba(255,214,171,0.98),rgba(255,188,117,0.98))] text-[#5F2A00] shadow-[0_14px_26px_-18px_rgba(255,138,31,0.28)]';
+    return 'border-[#FFB366] bg-[linear-gradient(180deg,rgba(255,229,194,0.98),rgba(255,209,161,0.98))] text-[#7A3E10] shadow-[0_14px_24px_-18px_rgba(255,138,31,0.24)]';
   };
 
   const monthTotalMinutes = useMemo(() => {
@@ -1247,7 +1258,7 @@ export default function StudyHistoryPage() {
                         ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75"
                         : "bg-[linear-gradient(180deg,rgba(248,250,252,0.92)_0%,rgba(255,255,255,0.98)_100%)] opacity-[0.52] grayscale-[0.05] ring-1 ring-[#DCE5F4]/85"
                       : useParentLikeMobileCalendar
-                        ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(252,247,240,0.98)_100%)] ring-1 ring-inset ring-[#F3D9B8] shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_14px_24px_-24px_rgba(122,62,16,0.14)]"
+                        ? getStudentCalendarCellClass(minutes, isCurrentMonth)
                         : getHeatmapColor(minutes),
                     isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
                     isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
@@ -1255,6 +1266,9 @@ export default function StudyHistoryPage() {
                 >
                   {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-primary/20" />}
                   <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
+                  {isCurrentMonth && useParentLikeMobileCalendar && minutes > 0 && (
+                    <div className="pointer-events-none absolute inset-x-4 top-0 h-14 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.55),rgba(255,255,255,0)_72%)] opacity-80" />
+                  )}
                   {isCurrentMonth && !useParentLikeMobileCalendar && (
                     <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-1.5 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
                       <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
@@ -1322,13 +1336,7 @@ export default function StudyHistoryPage() {
                                 : "text-[1rem] tracking-[-0.05em]",
                             useParentLikeMobileCalendar
                               ? minutes > 0
-                                ? minutes < STUDY_HISTORY_FLOW_THRESHOLDS.warmup
-                                  ? "text-[#9A5B16]"
-                                  : minutes < STUDY_HISTORY_FLOW_THRESHOLDS.short
-                                    ? "text-[#8D4C10]"
-                                    : minutes < STUDY_HISTORY_FLOW_THRESHOLDS.steady
-                                      ? "text-[#7A3E10]"
-                                      : "text-[#5F2A00]"
+                                ? "text-[#7A3E10]"
                                 : "text-slate-400"
                               : getCalendarValueTextClass(minutes, isCurrentMonth)
                           )}
