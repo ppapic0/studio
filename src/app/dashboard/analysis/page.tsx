@@ -8,7 +8,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
   BarChart3,
-  Brain,
   Clock3,
   Flame,
   Gift,
@@ -428,7 +427,6 @@ function GraphDungeonCard({
   title,
   eyebrow,
   insight,
-  reward,
   unlocked,
   preview,
   previewHint,
@@ -437,7 +435,6 @@ function GraphDungeonCard({
   title: string;
   eyebrow: string;
   insight: string;
-  reward: number;
   unlocked: boolean;
   preview: React.ReactNode;
   previewHint: string;
@@ -453,8 +450,8 @@ function GraphDungeonCard({
           : 'surface-card--ghost border-dashed border-white/12 opacity-90'
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="min-w-0">
+        <div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="px-2.5 py-1 text-[10px] shadow-none">
               {eyebrow}
@@ -465,10 +462,6 @@ function GraphDungeonCard({
           </div>
           <h3 className="mt-3 text-lg font-black tracking-tight text-white">{title}</h3>
           <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">Reward</p>
-          <p className="mt-1 text-lg font-black text-[var(--accent-orange-soft)]">+{reward}P</p>
         </div>
       </div>
 
@@ -724,6 +717,18 @@ export default function AnalysisTrackPage() {
     (best, item) => (item.totalMinutes > best.totalMinutes ? item : best),
     weeklyData[0] || { dateKey: format(new Date(), 'yyyy-MM-dd'), label: '오늘', shortLabel: '오늘', totalMinutes: 0, avgMinutes: 0 }
   );
+  const weeklySummaryLines = useMemo(() => {
+    const blankDays = weeklyData.filter((item) => item.totalMinutes === 0).length;
+    return [
+      kpi.weekDiffPct >= 0
+        ? `최근 7일 누적 공부시간은 지난 주보다 ${Math.abs(kpi.weekDiffPct)}% 올라갔어요.`
+        : `최근 7일 누적 공부시간은 지난 주보다 ${Math.abs(kpi.weekDiffPct)}% 줄었어요.`,
+      `${shortDateLabel(bestDay.dateKey)}에 ${minutesToLabel(bestDay.totalMinutes)}으로 가장 길게 공부했어요.`,
+      blankDays > 0
+        ? `최근 7일 중 기록이 없는 날이 ${blankDays}일 있어서 흐름이 조금 끊겼어요.`
+        : '최근 7일은 매일 기록이 이어져서 흐름이 안정적이에요.',
+    ];
+  }, [bestDay.dateKey, bestDay.totalMinutes, kpi.weekDiffPct, weeklyData]);
   const densityData = useMemo(
     () => [
       { label: '완료율', value: clampPercent(sessionMetrics.completionRate) },
@@ -739,7 +744,6 @@ export default function AnalysisTrackPage() {
         eyebrow: 'FOCUS TREND',
         title: '집중 시간 추이',
         insight: kpi.weekDiffPct >= 0 ? `${signedPercent(kpi.weekDiffPct)} 상승 흐름` : `${signedPercent(kpi.weekDiffPct)} 하락 감지`,
-        reward: 10,
         unlocked: true,
         previewHint: '최근 14일 누적 추이',
       },
@@ -748,7 +752,6 @@ export default function AnalysisTrackPage() {
         eyebrow: 'DENSITY LAB',
         title: '공부 밀도 분석',
         insight: sessionMetrics.total > 0 ? `평균 ${minutesToLabel(sessionMetrics.avgDurationMinutes)} 세션` : '세션 데이터 수집 중',
-        reward: 15,
         unlocked: sessionMetrics.total > 0,
         previewHint: '세션 건강도 확인',
       },
@@ -757,7 +760,6 @@ export default function AnalysisTrackPage() {
         eyebrow: 'RHYTHM MAP',
         title: '리듬 패턴',
         insight: insight.trend,
-        reward: 20,
         unlocked: kpi.studyDays >= 4,
         previewHint: '주간 리듬 흐름',
       },
@@ -765,10 +767,9 @@ export default function AnalysisTrackPage() {
         id: 'slot' as const,
         eyebrow: 'TIME SLOT',
         title: '시간대 효율',
-        insight: '세션 10회 이상이면 해금',
-        reward: 25,
-        unlocked: sessionMetrics.total >= 10,
-        previewHint: sessionMetrics.total >= 10 ? '효율 분석 가능' : `${Math.max(0, 10 - sessionMetrics.total)}회 더 필요`,
+        insight: sessionMetrics.total >= 10 ? '오전/오후 흐름을 비교해볼 수 있어요' : '세션이 적어도 기본 흐름부터 먼저 볼 수 있어요',
+        unlocked: true,
+        previewHint: sessionMetrics.total >= 10 ? '효율 분석 가능' : '기본 흐름 먼저 보기',
       },
     ],
     [insight.trend, kpi.studyDays, kpi.weekDiffPct, sessionMetrics]
@@ -861,45 +862,15 @@ export default function AnalysisTrackPage() {
               </div>
 
               <div className="surface-card surface-card--secondary on-dark rounded-[1.8rem] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="surface-kicker text-[10px]">AI COACH</p>
-                  <Badge className="border-emerald-400/18 bg-emerald-500/14 px-3 py-1 text-[10px] font-black text-emerald-100 shadow-none">전략 적용 가능</Badge>
-                </div>
+                <p className="surface-kicker text-[10px]">WEEKLY SUMMARY</p>
                 <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">이번 주 성장 요약</h2>
-                <p className="surface-caption mt-2 text-sm font-semibold leading-6">{insight.trend}</p>
-
-                {isMobile ? (
-                  <div className="mt-5 space-y-3">
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-black text-white">미션. 오전 루틴 3일 연속</p>
-                        <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+20P</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-5 space-y-3">
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-black text-white">미션 1. 오전 루틴 3일 연속</p>
-                        <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+20P</span>
-                      </div>
-                    </div>
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-black text-white">미션 2. 50분+ 세션 3회</p>
-                        <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">+25P</span>
-                      </div>
-                    </div>
-                    <div className="surface-card rounded-[1.35rem] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(47,170,125,0.18),rgba(13,28,69,0.92))] p-4">
-                      <div className="flex items-center gap-2 text-emerald-200">
-                        <Brain className="h-4 w-4" />
-                        <p className="text-sm font-black">코치 전략 적용 보상 +15P</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
+                <div className="mt-4 space-y-2.5">
+                  {weeklySummaryLines.map((line) => (
+                    <p key={line} className="surface-caption text-sm font-semibold leading-6">
+                      {line}
+                    </p>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
@@ -928,7 +899,6 @@ export default function AnalysisTrackPage() {
                 title={card.title}
                 eyebrow={card.eyebrow}
                 insight={card.insight}
-                reward={card.reward}
                 unlocked={card.unlocked}
                 previewHint={card.previewHint}
                 preview={
@@ -946,14 +916,6 @@ export default function AnalysisTrackPage() {
                         <Bar dataKey="value" radius={[8, 8, 4, 4]} fill="#FF9626" />
                       </BarChart>
                     </ResponsiveContainer>
-                  ) : card.id === 'slot' && !card.unlocked ? (
-                    <div className="grid h-[5.5rem] grid-cols-7 gap-2 opacity-65">
-                      {Array.from({ length: 7 }).map((_, index) => (
-                        <div key={index} className="flex items-end">
-                          <div className="w-full rounded-t-2xl rounded-b-xl bg-white/10" style={{ height: `${26 + (index % 3) * 10}px` }} />
-                        </div>
-                      ))}
-                    </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={88}>
                       <ComposedChart data={weeklyData} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
@@ -1037,10 +999,34 @@ export default function AnalysisTrackPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] border-dashed px-4 py-5 text-center">
-                    <Lock className="mx-auto h-8 w-8 text-[var(--text-on-dark-muted)]" />
-                    <p className="mt-3 text-lg font-black text-white">시간대 효율은 아직 잠겨 있어요</p>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">세션 {Math.max(0, 10 - sessionMetrics.total)}회만 더 쌓이면 오전/오후 효율 카드가 열립니다.</p>
+                  <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3')}>
+                    <div className={cn('surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && 'col-span-2')}>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">현재 상태</p>
+                      <p className="mt-2 text-lg font-black text-white">{sessionMetrics.total >= 10 ? '시간대 비교 가능' : '기본 흐름 확인 중'}</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">
+                        {sessionMetrics.total >= 10
+                          ? '오전과 오후 중 어디서 더 오래 버티는지 함께 보고 있어요.'
+                          : '세션이 더 쌓일수록 오전/오후 효율 판단이 더 선명해져요.'}
+                      </p>
+                    </div>
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">수집된 세션</p>
+                      <p className="mt-2 text-lg font-black text-white">{sessionMetrics.total}회</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">
+                        최근 14일 기준 평균 {minutesToLabel(sessionMetrics.avgDurationMinutes)} 세션
+                      </p>
+                    </div>
+                    <div className="rounded-[1.2rem] border border-[#FFD7B4] bg-[#FFF1DE] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">코치 메모</p>
+                      <p className="mt-2 text-lg font-black text-[#17326B]">
+                        {sessionMetrics.total >= 10 ? '집중 잘 되는 시간대를 붙잡아보세요' : '지금은 꾸준히 기록을 쌓는 게 먼저예요'}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[#28478F]">
+                        {sessionMetrics.total >= 10
+                          ? '잘 되는 시간대를 계획트랙 첫 블록에 고정하면 흐름이 더 안정돼요.'
+                          : '시간대 판단은 나중에 더 정확해지니, 우선 공부 시작 시간을 일정하게 맞춰보세요.'}
+                      </p>
+                    </div>
                   </div>
                 )}
               </GraphDungeonCard>
@@ -1061,7 +1047,7 @@ export default function AnalysisTrackPage() {
         </TabsContent>
 
         <TabsContent value="full" className="mt-0">
-          <div className="analysis-shell surface-card surface-card--primary on-dark overflow-hidden rounded-[2.2rem] border border-white/10 px-2 py-3 sm:px-3 sm:py-4">
+          <div className="analysis-shell overflow-hidden rounded-[2.2rem] border border-[#E7EDF8] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(255,250,245,0.985)_100%)] px-2 py-3 shadow-[0_24px_48px_-42px_rgba(20,41,95,0.16)] sm:px-3 sm:py-4">
             <StudentDetailPresentationProvider value="student-analysis">
               <StudentDetailPage params={selfParams} />
             </StudentDetailPresentationProvider>

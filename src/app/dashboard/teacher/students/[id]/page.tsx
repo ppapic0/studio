@@ -426,8 +426,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const { toast } = useToast();
   const router = useRouter();
 
-  const isMobile = viewMode === 'mobile';
   const isAnalysisPresentation = presentationMode === 'student-analysis';
+  const isMobile = viewMode === 'mobile' && !isAnalysisPresentation;
   const centerId = activeMembership?.id;
   const today = new Date();
   const todayKey = format(today, 'yyyy-MM-dd');
