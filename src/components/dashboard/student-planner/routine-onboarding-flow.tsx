@@ -31,6 +31,7 @@ type RoutineOnboardingFlowProps = {
   onContinueToPlanner: () => void;
   onSkipForNow?: () => Promise<void> | void;
   allowSkip?: boolean;
+  autoContinueOnSave?: boolean;
 };
 
 type QuestionSelectionState = Record<string, string | string[]>;
@@ -55,6 +56,7 @@ export function RoutineOnboardingFlow({
   onContinueToPlanner,
   onSkipForNow,
   allowSkip = true,
+  autoContinueOnSave = false,
 }: RoutineOnboardingFlowProps) {
   const [phase, setPhase] = useState<'intro' | 'survey' | 'loading' | 'saved'>('intro');
   const [stepIndex, setStepIndex] = useState(0);
@@ -107,7 +109,11 @@ export function RoutineOnboardingFlow({
         try {
           await onSaveRoutineProfile(profile);
           if (!cancelled) {
-            setPhase('saved');
+            if (autoContinueOnSave) {
+              onContinueToPlanner();
+            } else {
+              setPhase('saved');
+            }
           }
         } catch (error) {
           console.error('[routine-onboarding] save profile failed', error);
@@ -126,7 +132,7 @@ export function RoutineOnboardingFlow({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [answers, onSaveRoutineProfile, phase, recommendationResult]);
+  }, [answers, autoContinueOnSave, onContinueToPlanner, onSaveRoutineProfile, phase, recommendationResult]);
 
   const currentQuestion = ONBOARDING_QUESTIONS[stepIndex];
   const bridgeMessage = getBridgeMessage(stepIndex);

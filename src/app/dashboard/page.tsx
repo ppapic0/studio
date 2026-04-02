@@ -42,6 +42,30 @@ const parentLinkFormSchema = z.object({
 
 const PLAN_TRACK_ONBOARDING_VERSION = 1;
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object') return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function stripUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry) => entry !== undefined)
+      .map((entry) => stripUndefinedDeep(entry)) as T;
+  }
+
+  if (isPlainObject(value)) {
+    const nextEntries = Object.entries(value)
+      .filter(([, entryValue]) => entryValue !== undefined)
+      .map(([entryKey, entryValue]) => [entryKey, stripUndefinedDeep(entryValue)]);
+
+    return Object.fromEntries(nextEntries) as T;
+  }
+
+  return value;
+}
+
 function normalizePhone(raw: string): string {
   return raw.replace(/\D/g, '');
 }
@@ -311,11 +335,11 @@ export default function DashboardPage() {
         version: PLAN_TRACK_ONBOARDING_VERSION,
         updatedAt: serverTimestamp(),
       };
-      const studyProfilePayload = {
+      const studyProfilePayload = stripUndefinedDeep({
         ...profile,
         createdAt: studentRoutineProfile?.createdAt || serverTimestamp(),
         updatedAt: serverTimestamp(),
-      };
+      });
 
       const writeResults = await Promise.allSettled([
         setDoc(
@@ -490,6 +514,7 @@ export default function DashboardPage() {
           studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
           onSaveRoutineProfile={handleSaveStudentRoutineProfile}
           onContinueToPlanner={() => setHasFinishedStudentOnboarding(true)}
+          autoContinueOnSave
           allowSkip={false}
         />
       );

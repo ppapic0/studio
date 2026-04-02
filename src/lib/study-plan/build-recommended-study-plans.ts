@@ -276,7 +276,7 @@ function buildStudyBlocks(
       blocks.push({
         id: `${allocation.subjectId}-${allocationIndex}-${localIndex + 1}`,
         title: localIndex === 0 ? titlePrefix : `${allocation.subjectLabel} 이어서`,
-        subjectId: allocation.subjectId === 'review' ? undefined : allocation.subjectId,
+        ...(allocation.subjectId === 'review' ? {} : { subjectId: allocation.subjectId }),
         subjectLabel: allocation.subjectLabel,
         kind: inferBlockKind(allocation.subjectId, allocation.emphasis),
         startTime: cursor,
