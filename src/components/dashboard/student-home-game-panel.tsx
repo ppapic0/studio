@@ -506,6 +506,14 @@ export function StudentHomeGamePanel({
     return { id: `trend-mark-${index}`, label };
   });
   const hasMoreReadyBoxes = boxes.filter((box) => box.state === "ready").length > 1;
+  const rankPreview = selectedHomeRank.preview.slice(0, 3);
+  const featuredRankEntry = rankPreview[0] ?? null;
+  const secondaryRankEntries = rankPreview.slice(1, 3);
+  const rankDisplayLabel = selectedHomeRank.isLoading
+    ? "집계 중..."
+    : selectedHomeRank.rank > 0
+      ? `${selectedHomeRank.rank}위`
+      : "집계 준비중";
 
   return (
     <>
@@ -769,116 +777,256 @@ export function StudentHomeGamePanel({
               </div>
             </div>
 
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={onOpenLeaderboard}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onOpenLeaderboard();
-              }
-            }}
-            className="surface-card surface-card--highlight relative w-full overflow-hidden rounded-[1.65rem] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(14,28,56,0.18)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-          >
-            <div className="pointer-events-none absolute inset-0">
-              <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/18 blur-2xl" />
-              <div className="absolute -left-8 bottom-2 h-24 w-24 rounded-full bg-[rgba(255,255,255,0.12)] blur-2xl" />
-            </div>
-            <div className="relative flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.22)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[rgba(14,28,56,0.7)]">
-                    <Swords className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
-                    {selectedHomeRank.title}
+          {isMobile ? (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={onOpenLeaderboard}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onOpenLeaderboard();
+                }
+              }}
+              className="student-utility-card relative w-full overflow-hidden rounded-[1.72rem] border border-[rgba(241,205,160,0.84)] bg-[radial-gradient(circle_at_top_right,rgba(255,183,100,0.2),transparent_30%),linear-gradient(180deg,rgba(255,253,248,0.99)_0%,rgba(255,246,232,0.97)_52%,rgba(255,241,221,0.95)_100%)] p-4 text-left shadow-[0_24px_44px_-30px_rgba(17,39,88,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(20,41,95,0.14)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            >
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,transparent,rgba(255,150,56,0.88),transparent)]" />
+              <div className="pointer-events-none absolute -right-10 -top-9 h-24 w-24 rounded-full bg-[rgba(255,184,104,0.2)] blur-3xl" />
+              <div className="relative">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(239,201,153,0.9)] bg-white/86 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#9A5B12] shadow-[0_10px_22px_-18px_rgba(17,39,88,0.18)]">
+                        <Swords className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
+                        {selectedHomeRank.title}
+                      </div>
+                      <div className="inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-[rgba(255,249,240,0.92)] px-2.5 py-1.5 text-[10px] font-black text-[rgba(20,41,95,0.78)] shadow-[0_10px_22px_-18px_rgba(20,41,95,0.16)]">
+                        {selectedHomeRank.badge}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-end gap-2.5">
+                      <div
+                        className={cn(
+                          "font-aggro-display text-[var(--text-on-accent)]",
+                          selectedHomeRank.rank > 0
+                            ? "text-[2.8rem] font-black leading-[0.86] tracking-[-0.05em]"
+                            : "text-[1.55rem] font-black leading-[1.02] tracking-[-0.03em]",
+                        )}
+                      >
+                        {rankDisplayLabel}
+                      </div>
+                      <div className="max-w-[11.5rem] rounded-full border border-[rgba(242,208,164,0.84)] bg-white/82 px-3 py-1.5 text-[11px] font-black leading-4 text-[rgba(20,41,95,0.82)] shadow-[0_12px_24px_-18px_rgba(17,39,88,0.16)]">
+                        {selectedHomeRank.caption}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 max-w-[15.5rem] text-[11px] font-semibold leading-5 text-[rgba(20,41,95,0.66)]">
+                      공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.
+                    </div>
                   </div>
-                  <div className="inline-flex rounded-full border border-[rgba(255,255,255,0.38)] bg-[rgba(255,248,236,0.56)] px-2.5 py-1 text-[10px] font-black text-[rgba(14,28,56,0.72)] shadow-[0_10px_24px_-18px_rgba(14,28,56,0.28)]">
-                    {selectedHomeRank.badge}
+
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(20,41,95,0.08)] bg-white/78 shadow-[0_14px_28px_-22px_rgba(17,39,88,0.18)]">
+                    <ChevronRight className="h-4 w-4 text-[rgba(20,41,95,0.58)]" />
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-end gap-3">
-                  <div className="font-aggro-display text-[1.55rem] font-black tracking-tight text-[var(--text-on-accent)]">
-                  {selectedHomeRank.isLoading
-                    ? "집계 중..."
-                    : selectedHomeRank.rank > 0
-                      ? `${selectedHomeRank.rank}위`
-                      : "집계 준비중"}
-                  </div>
-                  <div className="rounded-full border border-[rgba(255,255,255,0.34)] bg-[rgba(255,255,255,0.22)] px-3 py-1 text-[11px] font-black text-[rgba(14,28,56,0.84)] shadow-[0_12px_28px_-20px_rgba(14,28,56,0.35)]">
-                    {selectedHomeRank.caption}
+
+                <div className="mt-4 rounded-[1.18rem] border border-[rgba(231,216,194,0.92)] bg-white/80 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_24px_-22px_rgba(17,39,88,0.14)]">
+                  <div className="grid grid-cols-3 gap-1">
+                    {(["daily", "weekly", "monthly"] as RankRange[]).map((range) => (
+                      <button
+                        key={range}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSelectRankRange(range);
+                        }}
+                        className={cn(
+                          "rounded-[0.95rem] px-3 py-2 text-[10px] font-black transition-all",
+                          selectedRankRange === range
+                            ? "bg-[linear-gradient(135deg,#14295F_0%,#1E478F_100%)] text-white shadow-[0_14px_24px_-18px_rgba(20,41,95,0.5)]"
+                            : "text-[rgba(20,41,95,0.62)] hover:bg-white hover:text-[#132A63]",
+                        )}
+                      >
+                        {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div className="mt-2 text-[11px] font-semibold text-[rgba(14,28,56,0.68)]">
-                  공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.
-                </div>
-              </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.2)] shadow-[0_14px_28px_-20px_rgba(14,28,56,0.28)]">
-                <ChevronRight className="h-4 w-4 text-[rgba(14,28,56,0.62)]" />
-              </div>
-            </div>
-            <div className="relative mt-4 rounded-[1.1rem] border border-[rgba(255,255,255,0.24)] bg-[rgba(255,255,255,0.14)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
-              <div className="flex flex-wrap gap-1.5">
-              {(["daily", "weekly", "monthly"] as RankRange[]).map((range) => (
-                <button
-                  key={range}
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onSelectRankRange(range);
-                  }}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-[10px] font-black transition-all",
-                    selectedRankRange === range
-                      ? "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(135deg,rgba(14,28,56,0.96),rgba(27,59,128,0.92))] text-white shadow-[0_16px_28px_-18px_rgba(14,28,56,0.58)]"
-                      : "border-[rgba(255,255,255,0.34)] bg-[rgba(255,248,236,0.42)] text-[rgba(14,28,56,0.74)] hover:bg-[rgba(255,255,255,0.74)] hover:text-[rgba(14,28,56,0.92)]",
+
+                <div className="mt-4 space-y-2.5">
+                  {rankPreview.length > 0 ? (
+                    <>
+                      {featuredRankEntry ? (
+                        <div className="relative overflow-hidden rounded-[1.38rem] border border-[rgba(240,202,151,0.92)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,246,227,0.94))] px-4 py-4 shadow-[0_18px_34px_-26px_rgba(20,41,95,0.18)]">
+                          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,transparent,rgba(255,150,56,0.92),transparent)]" />
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="inline-flex items-center rounded-full border border-[rgba(240,202,151,0.74)] bg-white/84 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-[#9A5B12]">
+                                1위
+                              </div>
+                              <div className="font-aggro-display mt-3 truncate text-[1.38rem] font-black tracking-[-0.04em] text-[#14295F]">
+                                {formatMaskedStudentName(featuredRankEntry.name)}
+                              </div>
+                              <div className="mt-1 truncate text-[11px] font-semibold text-[rgba(20,41,95,0.64)]">
+                                {formatSchoolLabel(featuredRankEntry.schoolName)}
+                              </div>
+                            </div>
+                            <div className="shrink-0 rounded-full border border-[rgba(240,202,151,0.74)] bg-white/86 px-3 py-1.5 text-[11px] font-black text-[#C86A10] shadow-[0_12px_24px_-18px_rgba(255,150,56,0.24)]">
+                              {formatMini(featuredRankEntry.minutes)}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {secondaryRankEntries.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {secondaryRankEntries.map((entry) => (
+                            <div
+                              key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
+                              className="rounded-[1.22rem] border border-[rgba(229,216,200,0.96)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,249,241,0.9))] px-3 py-3.5 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.14)]"
+                            >
+                              <div className="inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-white/88 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[rgba(20,41,95,0.68)]">
+                                {entry.rank}위
+                              </div>
+                              <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#14295F]">
+                                {formatMaskedStudentName(entry.name)}
+                              </div>
+                              <div className="mt-1 min-h-[1.15rem] truncate text-[10px] font-bold leading-4 text-[rgba(20,41,95,0.62)]">
+                                {formatSchoolLabel(entry.schoolName)}
+                              </div>
+                              <div className="mt-3 inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-[rgba(255,251,246,0.96)] px-2.5 py-1 text-[11px] font-black text-[#C86A10]">
+                                {formatMini(entry.minutes)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="rounded-[1.32rem] border border-dashed border-[rgba(20,41,95,0.14)] bg-[linear-gradient(180deg,rgba(255,255,255,0.86),rgba(255,248,236,0.68))] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(240,202,151,0.74)] bg-white/84 text-[var(--accent-orange)] shadow-[0_14px_24px_-20px_rgba(17,39,88,0.16)]">
+                        <Crown className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="font-aggro-display mt-3 text-[1rem] font-black tracking-[-0.03em] text-[#14295F]">
+                        아직 표시할 랭킹이 없어요.
+                      </div>
+                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[rgba(20,41,95,0.64)]">
+                        오늘 공부를 시작하면 여기에 경쟁 순위가 바로 보입니다.
+                      </div>
+                    </div>
                   )}
-                >
-                  {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
-                </button>
-              ))}
+                </div>
+              </div>
             </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {selectedHomeRank.preview.length > 0 ? (
-                selectedHomeRank.preview.slice(0, 3).map((entry) => (
-                  <div
-                    key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
-                    className={cn(
-                      "rounded-[1.2rem] border px-2.5 py-3.5 text-center shadow-[0_18px_34px_-28px_rgba(0,0,0,0.42)]",
-                      entry.rank === 1
-                        ? "border-[rgba(255,138,31,0.28)] bg-[linear-gradient(180deg,rgba(255,251,244,0.96),rgba(255,239,214,0.84))]"
-                        : "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(180deg,rgba(255,249,240,0.88),rgba(255,255,255,0.72))]",
-                    )}
-                  >
-                    <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[11px] font-black text-[var(--text-on-accent)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.3)]">
-                      {entry.rank === 1 ? <Crown className="h-4 w-4 text-[var(--accent-orange)]" /> : `#${entry.rank}`}
+          ) : (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={onOpenLeaderboard}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onOpenLeaderboard();
+                }
+              }}
+              className="surface-card surface-card--highlight relative w-full overflow-hidden rounded-[1.65rem] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(14,28,56,0.18)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            >
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/18 blur-2xl" />
+                <div className="absolute -left-8 bottom-2 h-24 w-24 rounded-full bg-[rgba(255,255,255,0.12)] blur-2xl" />
+              </div>
+              <div className="relative flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.22)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[rgba(14,28,56,0.7)]">
+                      <Swords className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
+                      {selectedHomeRank.title}
                     </div>
-                    <div className="mt-2 break-keep text-[14px] font-black tracking-tight text-[rgba(20,41,95,0.96)]">
-                      {formatMaskedStudentName(entry.name)}
-                    </div>
-                    <div className="mt-1 min-h-[1.1rem] truncate text-[10px] font-bold leading-4 tracking-[0.02em] text-[rgba(20,41,95,0.82)]">
-                      {formatSchoolLabel(entry.schoolName)}
-                    </div>
-                    <div className="mt-2 inline-flex rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] px-2.5 py-1 text-[11px] font-black text-[var(--accent-orange)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]">
-                      {formatMini(entry.minutes)}
+                    <div className="inline-flex rounded-full border border-[rgba(255,255,255,0.38)] bg-[rgba(255,248,236,0.56)] px-2.5 py-1 text-[10px] font-black text-[rgba(14,28,56,0.72)] shadow-[0_10px_24px_-18px_rgba(14,28,56,0.28)]">
+                      {selectedHomeRank.badge}
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="col-span-3 rounded-[1.25rem] border border-dashed border-[rgba(14,28,56,0.18)] bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,248,236,0.18))] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.36)] text-[var(--accent-orange)] shadow-[0_14px_26px_-22px_rgba(14,28,56,0.3)]">
-                    <Crown className="h-4.5 w-4.5" />
+                  <div className="mt-3 flex flex-wrap items-end gap-3">
+                    <div className="font-aggro-display text-[1.55rem] font-black tracking-tight text-[var(--text-on-accent)]">
+                      {rankDisplayLabel}
+                    </div>
+                    <div className="rounded-full border border-[rgba(255,255,255,0.34)] bg-[rgba(255,255,255,0.22)] px-3 py-1 text-[11px] font-black text-[rgba(14,28,56,0.84)] shadow-[0_12px_28px_-20px_rgba(14,28,56,0.35)]">
+                      {selectedHomeRank.caption}
+                    </div>
                   </div>
-                  <div className="mt-3 text-sm font-black text-[rgba(14,28,56,0.88)]">
-                    아직 표시할 랭킹이 없어요.
-                  </div>
-                  <div className="mt-1 text-[11px] font-semibold leading-5 text-[rgba(14,28,56,0.66)]">
-                    오늘 공부를 시작하면 여기에 경쟁 순위가 바로 보입니다.
+                  <div className="mt-2 text-[11px] font-semibold text-[rgba(14,28,56,0.68)]">
+                    공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.
                   </div>
                 </div>
-              )}
+                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.2)] shadow-[0_14px_28px_-20px_rgba(14,28,56,0.28)]">
+                  <ChevronRight className="h-4 w-4 text-[rgba(14,28,56,0.62)]" />
+                </div>
+              </div>
+              <div className="relative mt-4 rounded-[1.1rem] border border-[rgba(255,255,255,0.24)] bg-[rgba(255,255,255,0.14)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
+                <div className="flex flex-wrap gap-1.5">
+                  {(["daily", "weekly", "monthly"] as RankRange[]).map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelectRankRange(range);
+                      }}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-[10px] font-black transition-all",
+                        selectedRankRange === range
+                          ? "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(135deg,rgba(14,28,56,0.96),rgba(27,59,128,0.92))] text-white shadow-[0_16px_28px_-18px_rgba(14,28,56,0.58)]"
+                          : "border-[rgba(255,255,255,0.34)] bg-[rgba(255,248,236,0.42)] text-[rgba(14,28,56,0.74)] hover:bg-[rgba(255,255,255,0.74)] hover:text-[rgba(14,28,56,0.92)]",
+                      )}
+                    >
+                      {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {rankPreview.length > 0 ? (
+                  rankPreview.map((entry) => (
+                    <div
+                      key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
+                      className={cn(
+                        "rounded-[1.2rem] border px-2.5 py-3.5 text-center shadow-[0_18px_34px_-28px_rgba(0,0,0,0.42)]",
+                        entry.rank === 1
+                          ? "border-[rgba(255,138,31,0.28)] bg-[linear-gradient(180deg,rgba(255,251,244,0.96),rgba(255,239,214,0.84))]"
+                          : "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(180deg,rgba(255,249,240,0.88),rgba(255,255,255,0.72))]",
+                      )}
+                    >
+                      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[11px] font-black text-[var(--text-on-accent)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.3)]">
+                        {entry.rank === 1 ? <Crown className="h-4 w-4 text-[var(--accent-orange)]" /> : `#${entry.rank}`}
+                      </div>
+                      <div className="mt-2 break-keep text-[14px] font-black tracking-tight text-[rgba(20,41,95,0.96)]">
+                        {formatMaskedStudentName(entry.name)}
+                      </div>
+                      <div className="mt-1 min-h-[1.1rem] truncate text-[10px] font-bold leading-4 tracking-[0.02em] text-[rgba(20,41,95,0.82)]">
+                        {formatSchoolLabel(entry.schoolName)}
+                      </div>
+                      <div className="mt-2 inline-flex rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] px-2.5 py-1 text-[11px] font-black text-[var(--accent-orange)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]">
+                        {formatMini(entry.minutes)}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-3 rounded-[1.25rem] border border-dashed border-[rgba(14,28,56,0.18)] bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,248,236,0.18))] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.36)] text-[var(--accent-orange)] shadow-[0_14px_26px_-22px_rgba(14,28,56,0.3)]">
+                      <Crown className="h-4.5 w-4.5" />
+                    </div>
+                    <div className="mt-3 text-sm font-black text-[rgba(14,28,56,0.88)]">
+                      아직 표시할 랭킹이 없어요.
+                    </div>
+                    <div className="mt-1 text-[11px] font-semibold leading-5 text-[rgba(14,28,56,0.66)]">
+                      오늘 공부를 시작하면 여기에 경쟁 순위가 바로 보입니다.
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 
