@@ -376,9 +376,16 @@ function StatAnalysisCard({
         )}
         onClick={onClick}
       >
-        <CardHeader className={cn('pb-2 flex flex-row items-start justify-between', isMobile ? 'px-4 pt-4' : 'px-5 pt-5')}>
+        <CardHeader className={cn('pb-2 flex flex-row items-start justify-between', isMobile ? 'gap-2 px-4 pt-4' : 'px-5 pt-5')}>
           <div className="min-w-0">
-            <CardTitle className={cn('min-w-0 font-black uppercase break-keep text-[var(--text-on-dark-muted)]', isMobile ? 'text-[9px] leading-tight tracking-[0.2em]' : 'text-[10px] tracking-[0.22em]')}>
+            <CardTitle
+              className={cn(
+                'min-w-0 break-keep',
+                isMobile
+                  ? 'font-sans text-[13px] font-black leading-[1.2] tracking-[-0.02em] text-[#17326B]'
+                  : 'font-black uppercase text-[10px] tracking-[0.22em] text-[var(--text-on-dark-muted)]'
+              )}
+            >
               {title}
             </CardTitle>
             <div className={cn('mt-3 font-black tracking-tight break-keep text-[var(--text-on-dark)]', isMobile ? 'text-[1.3rem] leading-tight' : 'text-[1.7rem]')}>
@@ -2031,7 +2038,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4", isAnalysisPresentation && 'analysis-summary-rail')}>
+      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-4", isAnalysisPresentation && 'analysis-summary-rail')}>
         <StatAnalysisCard
           title="평균 공부시간"
           value={minutesToLabel(avgStudyMinutes)}
@@ -2206,8 +2213,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       <Badge variant={isAnalysisPresentation ? 'outline' : 'dark'} className={cn("px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shadow-none", isAnalysisPresentation && analysisSoftBadgeClass)}>
                         Focus Board
                       </Badge>
-                      <CardTitle className="mt-3 break-keep text-[clamp(1rem,1.5vw,1.18rem)] font-black tracking-tight text-[var(--text-on-dark)]">개인 집중도 KPI</CardTitle>
-                      <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+                      <CardTitle className={cn(
+                        "mt-3 break-keep text-[clamp(1rem,1.5vw,1.18rem)] font-black tracking-tight",
+                        isAnalysisPresentation ? "text-[#17326B]" : "text-[var(--text-on-dark)]"
+                      )}>
+                        개인 집중도 KPI
+                      </CardTitle>
+                      <CardDescription className={cn(
+                        "mt-1 text-[11px] font-semibold leading-5",
+                        isAnalysisPresentation ? "text-[#5F7299]" : "text-[var(--text-on-dark-soft)]"
+                      )}>
                         학생 분석트랙에서 개인 집중 지표를 빠르게 확인합니다.
                       </CardDescription>
                     </div>
@@ -2215,7 +2230,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       "surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 shadow-none",
                       isMobile ? "flex items-center justify-between gap-3 px-3.5 py-2.5 text-left" : "px-3 py-2 text-right"
                     )}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-on-dark-muted)]">오늘 포커스</p>
+                      <p className={cn(
+                        "text-[10px] font-black uppercase tracking-[0.2em]",
+                        isAnalysisPresentation ? "text-[#6A7EA7]" : "text-[var(--text-on-dark-muted)]"
+                      )}>
+                        오늘 포커스
+                      </p>
                       <p className={cn("font-black text-[#D86A11]", isMobile ? "text-base whitespace-nowrap" : "mt-1 text-sm")}>
                         {focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}
                       </p>
@@ -2223,9 +2243,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </CardHeader>
                 <CardContent className={cn("relative z-10 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
-                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "sm:grid-cols-2 xl:grid-cols-4")}>
-                    {focusKpiCards.map(({ key, label, value, helper, note, Icon, iconClass, panelClass, chipClass, meterClass, meterValue }) => (
-                      <div key={key} className={cn("min-w-0 overflow-hidden rounded-[1.35rem] border px-4 py-4", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : panelClass)}>
+                  <div
+                    className={cn(
+                      isMobile && "overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    )}
+                  >
+                    <div className={cn("gap-3", isMobile ? "flex min-w-max" : "grid sm:grid-cols-2 xl:grid-cols-4")}>
+                      {focusKpiCards.map(({ key, label, value, helper, note, Icon, iconClass, panelClass, chipClass, meterClass, meterValue }) => (
+                        <div
+                          key={key}
+                          className={cn(
+                            "min-w-0 overflow-hidden rounded-[1.35rem] border px-4 py-4",
+                            isMobile && "w-[13.5rem] shrink-0",
+                            isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : panelClass
+                          )}
+                        >
                         <div className="space-y-3">
                           <div className="flex items-start justify-between gap-3">
                             <span className={cn(
@@ -2241,20 +2273,27 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           </div>
                         </div>
                         <p className={cn(
-                          "mt-3 break-keep font-black tracking-tight text-[var(--text-on-dark)]",
+                          "mt-3 break-keep font-black tracking-tight",
+                          isAnalysisPresentation ? "text-[#17326B]" : "text-[var(--text-on-dark)]",
                           isMobile ? "text-[clamp(2rem,8vw,2.55rem)] leading-[0.95] whitespace-nowrap" : "text-[clamp(1.25rem,3.2vw,1.8rem)]"
                         )}>
                           {value}
                         </p>
                         <div className="mt-3 space-y-1.5">
-                          <p className="text-[11px] font-semibold leading-5 break-keep text-[var(--text-on-dark-soft)]">{helper}</p>
+                          <p className={cn(
+                            "text-[11px] font-semibold leading-5 break-keep",
+                            isAnalysisPresentation ? "text-[#5F7299]" : "text-[var(--text-on-dark-soft)]"
+                          )}>
+                            {helper}
+                          </p>
                           <p className="text-[11px] font-black break-keep text-[var(--accent-orange-soft)]">{note}</p>
                         </div>
                         <div className={cn("mt-4 h-1.5 overflow-hidden rounded-full", isAnalysisPresentation ? analysisMeterTrackClass : "bg-white/12")}>
                           <div className={cn("h-full rounded-full bg-gradient-to-r", meterClass)} style={{ width: `${meterValue}%` }} />
                         </div>
-                      </div>
-                    ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -2268,10 +2307,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.25fr)_auto] items-start")}>
                       <div className="min-w-0">
-                        <CardTitle className="break-keep text-[clamp(1rem,1.5vw,1.2rem)] font-black tracking-tight text-[var(--text-on-dark)]">
+                        <CardTitle className={cn(
+                          "break-keep text-[clamp(1rem,1.5vw,1.2rem)] font-black tracking-tight",
+                          isAnalysisPresentation ? "text-[#17326B]" : "text-[var(--text-on-dark)]"
+                        )}>
                           {chartInsightHeadline}
                         </CardTitle>
-                        <CardDescription className="mt-2 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+                        <CardDescription className={cn(
+                          "mt-2 text-[11px] font-semibold leading-5",
+                          isAnalysisPresentation ? "text-[#5F7299]" : "text-[var(--text-on-dark-soft)]"
+                        )}>
                           {chartInsightSummary}
                         </CardDescription>
                       </div>
@@ -2282,25 +2327,57 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </CardHeader>
                 <CardContent className={cn("relative z-10 space-y-3 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
-                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "lg:grid-cols-2")}>
-                    {insightHighlights.map(({ key, label, badge, value, detail, accentClass }) => (
-                      <div key={key} className="surface-card surface-card--ghost on-dark overflow-hidden rounded-[1.35rem] border border-white/10 p-4 shadow-none">
+                  <div
+                    className={cn(
+                      isMobile && "overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    )}
+                  >
+                    <div className={cn("gap-3", isMobile ? "flex min-w-max" : "grid lg:grid-cols-2")}>
+                      {insightHighlights.map(({ key, label, badge, value, detail, accentClass }) => (
+                        <div
+                          key={key}
+                          className={cn(
+                            "surface-card surface-card--ghost on-dark overflow-hidden rounded-[1.35rem] border border-white/10 p-4 shadow-none",
+                            isMobile && "w-[14rem] shrink-0"
+                          )}
+                        >
                         <div className="flex items-center justify-between gap-3">
                           <Badge variant="outline" className={cn("px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] shadow-none", key === 'daily' ? analysisWarmBadgeClass : analysisSoftBadgeClass)}>
                             {badge}
                           </Badge>
                           <div className={cn("h-2 w-14 rounded-full bg-gradient-to-r", accentClass)} />
                         </div>
-                        <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">{label}</p>
-                        <p className="mt-2 break-keep text-sm font-black leading-6 text-[var(--text-on-dark)]">{value}</p>
-                        <p className="mt-2 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">{detail}</p>
-                      </div>
-                    ))}
+                        <p className={cn(
+                          "mt-3 text-[10px] font-black uppercase tracking-[0.18em]",
+                          isAnalysisPresentation ? "text-[#6A7EA7]" : "text-[var(--text-on-dark-muted)]"
+                        )}>
+                          {label}
+                        </p>
+                        <p className={cn(
+                          "mt-2 break-keep text-sm font-black leading-6",
+                          isAnalysisPresentation ? "text-[#17326B]" : "text-[var(--text-on-dark)]"
+                        )}>
+                          {value}
+                        </p>
+                        <p className={cn(
+                          "mt-2 text-[12px] font-semibold leading-5",
+                          isAnalysisPresentation ? "text-[#5F7299]" : "text-[var(--text-on-dark-soft)]"
+                        )}>
+                          {detail}
+                        </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
                     {insightSupportCards.map(({ key, label, value, toneClass }) => (
                       <div key={key} className="surface-card surface-card--ghost on-dark rounded-[1.2rem] border border-white/10 px-3.5 py-3 shadow-none">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">{label}</p>
+                        <p className={cn(
+                          "text-[10px] font-black uppercase tracking-[0.18em]",
+                          isAnalysisPresentation ? "text-[#6A7EA7]" : "text-[var(--text-on-dark-muted)]"
+                        )}>
+                          {label}
+                        </p>
                         <p className={cn("mt-2 break-keep text-[12px] font-black leading-5", toneClass)}>{value}</p>
                       </div>
                     ))}

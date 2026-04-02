@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, subDays } from 'date-fns';
 import {
@@ -15,7 +14,6 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import {
-  ChevronRight,
   Flame,
   Gift,
   Lock,
@@ -985,21 +983,18 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <Link
-          href="/dashboard/appointments/inquiries"
-          className="rounded-[1.8rem] border border-[#FFE1B7]/50 bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] px-4 py-4 shadow-[0_20px_48px_-34px_rgba(0,0,0,0.28)] backdrop-blur-xl"
-        >
+        <div className="rounded-[1.8rem] border border-[#FFE1B7]/50 bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] px-4 py-4 shadow-[0_20px_48px_-34px_rgba(0,0,0,0.28)] backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4D679F]">REWARD SHOP</p>
-              <p className="font-aggro-display mt-2 text-base font-black tracking-tight text-[#14295F]">갖고 싶은 선물 문의</p>
-              <p className="mt-1 text-sm font-bold leading-5 text-[#24457f]">카카오톡 선물하기로 받을 수 있는 선물을 문의해보세요.</p>
+              <p className="font-aggro-display mt-2 text-base font-black tracking-tight text-[#14295F]">기프티콘샵 추후 오픈</p>
+              <p className="mt-1 text-sm font-bold leading-5 text-[#24457f]">추후 기프티콘샵이 연동되면 이곳에서 보상 교환이 가능해져요.</p>
             </div>
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(180deg,#ffcb82_0%,#ff9b2b_100%)] text-[#173A82] shadow-[0_12px_24px_-16px_rgba(255,138,31,0.55)]">
-              <ChevronRight className="h-5 w-5" />
+            <div className="inline-flex h-12 min-w-[3rem] items-center justify-center rounded-full border border-[#FFBE77] bg-white/92 px-3 text-[11px] font-black tracking-[0.18em] text-[#C86A10] shadow-[0_12px_24px_-18px_rgba(255,138,31,0.35)]">
+              SOON
             </div>
           </div>
-        </Link>
+        </div>
       </div>
 
       <Dialog open={isVaultOpen} onOpenChange={handleVaultChange}>

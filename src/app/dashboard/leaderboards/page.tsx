@@ -452,8 +452,8 @@ function HeroBattleHeader({
             LIVE BATTLE
           </div>
           <h1 className={cn(
-            'font-black leading-[0.94] tracking-[-0.04em] text-[#132A63]',
-            isMobile ? 'max-w-[220px] text-[2.8rem]' : 'text-[2.2rem] md:text-[3.1rem]'
+            'font-aggro-display font-black tracking-[-0.05em] text-[#132A63]',
+            isMobile ? 'text-[2.1rem] leading-[0.92] whitespace-nowrap' : 'text-[2.2rem] leading-[0.94] md:text-[3.1rem]'
           )}>
             {RANGE_META[range].title}
           </h1>
@@ -1009,9 +1009,11 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
 function StandingsSidebar({
   leaders,
   viewer,
+  isMobile = false,
 }: {
   leaders: BattleEntry[];
   viewer: BattleEntry;
+  isMobile?: boolean;
 }) {
   const toneMap: Record<number, LogTone> = {
     1: 'gold',
@@ -1020,17 +1022,22 @@ function StandingsSidebar({
   };
 
   return (
-    <aside className="rounded-[30px] border border-[#E6D2BE] bg-[linear-gradient(180deg,#FFF9F0_0%,#FFF0DB_100%)] p-5 text-[#132A63] shadow-[0_20px_48px_rgba(20,41,95,0.1)] md:p-6">
-      <div className="mb-4">
+    <aside className={cn(
+      'rounded-[30px] border border-[#E6D2BE] bg-[linear-gradient(180deg,#FFF9F0_0%,#FFF0DB_100%)] text-[#132A63] shadow-[0_20px_48px_rgba(20,41,95,0.1)]',
+      isMobile ? 'p-4' : 'p-5 md:p-6'
+    )}>
+      <div className={cn(isMobile ? 'mb-3' : 'mb-4')}>
         <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
           <Trophy className="h-4 w-4" />
           현재 순위
         </div>
-        <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">실시간 TOP 3</h3>
-        <p className="mt-2 text-sm font-semibold leading-6 text-[#64779C]">지금 올라와 있는 상위권과 내 현재 위치를 바로 확인해보세요.</p>
+        <h3 className={cn('font-black tracking-[-0.04em] text-[#132A63]', isMobile ? 'text-xl' : 'text-2xl')}>실시간 TOP 3</h3>
+        <p className={cn('mt-2 font-semibold leading-6 text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>
+          지금 올라와 있는 상위권과 내 현재 위치를 바로 확인해보세요.
+        </p>
       </div>
 
-      <div className="space-y-3">
+      <div className={cn(isMobile ? 'space-y-2.5' : 'space-y-3')}>
         {leaders.map((entry) => {
           const toneClass = TONE_CLASS_MAP[toneMap[entry.rank] ?? 'blue'];
           return (
@@ -1038,47 +1045,83 @@ function StandingsSidebar({
               key={entry.studentId}
               layout
               className={cn(
-                'rounded-[22px] border px-4 py-4 shadow-[0_14px_28px_rgba(20,41,95,0.08)]',
+                'rounded-[22px] border shadow-[0_14px_28px_rgba(20,41,95,0.08)]',
                 entry.isViewer
                   ? 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF4E1_0%,#FFE7BF_100%)]'
                   : 'border-[#E8D5C1] bg-white'
               )}
+              style={isMobile ? { padding: '14px 16px' } : { padding: '16px' }}
               whileHover={{ y: -2, scale: 1.01 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
-                    {entry.rank}위
-                    {entry.rank === 1 ? <Crown className="h-3.5 w-3.5" /> : null}
+              {isMobile ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
+                        {entry.rank}위
+                        {entry.rank === 1 ? <Crown className="h-3.5 w-3.5" /> : null}
+                      </div>
+                      {entry.isViewer ? (
+                        <div className="rounded-full border border-[#FFBE77] bg-white/92 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+                          나
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 truncate text-base font-black tracking-[-0.03em] text-[#132A63]">
+                      {entry.displayNameSnapshot}
+                    </div>
+                    <div className="mt-0.5 truncate text-[12px] font-semibold text-[#6E7893]">
+                      {formatSchoolName(entry.schoolNameSnapshot)}
+                    </div>
                   </div>
-                  <div className="mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
-                    {entry.displayNameSnapshot}
-                  </div>
-                  <div className="mt-1 truncate text-xs font-semibold text-[#6E7893]">
-                    {formatSchoolName(entry.schoolNameSnapshot)}
+                  <div className="shrink-0 text-right">
+                    <div className="text-[11px] font-black tracking-[0.18em] text-[#7A86A2]">공부중</div>
+                    <div className="mt-1 text-[1.6rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                      {formatStudyCompact(entry.value)}
+                    </div>
                   </div>
                 </div>
-                {entry.isViewer ? (
-                  <div className="rounded-full border border-[#FFBE77] bg-white/92 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
-                    나
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
+                        {entry.rank}위
+                        {entry.rank === 1 ? <Crown className="h-3.5 w-3.5" /> : null}
+                      </div>
+                      <div className="mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
+                        {entry.displayNameSnapshot}
+                      </div>
+                      <div className="mt-1 truncate text-xs font-semibold text-[#6E7893]">
+                        {formatSchoolName(entry.schoolNameSnapshot)}
+                      </div>
+                    </div>
+                    {entry.isViewer ? (
+                      <div className="rounded-full border border-[#FFBE77] bg-white/92 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
+                        나
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
-              <div className="mt-4 text-3xl font-black tracking-[-0.05em] text-[#132A63]">
-                {formatStudyCompact(entry.value)}
-              </div>
+                  <div className="mt-4 text-3xl font-black tracking-[-0.05em] text-[#132A63]">
+                    {formatStudyCompact(entry.value)}
+                  </div>
+                </>
+              )}
             </motion.div>
           );
         })}
       </div>
 
-      <div className="mt-4 rounded-[22px] border border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] px-4 py-4 shadow-[0_14px_28px_rgba(20,41,95,0.08)]">
+      <div className={cn(
+        'rounded-[22px] border border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] shadow-[0_14px_28px_rgba(20,41,95,0.08)]',
+        isMobile ? 'mt-3 px-4 py-3.5' : 'mt-4 px-4 py-4'
+      )}>
         <div className="text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">내 현재 순위</div>
         <div className="mt-2 flex items-end justify-between gap-3">
           <div>
-            <div className="text-4xl font-black tracking-[-0.06em] text-[#132A63]">#{viewer.rank}</div>
-            <div className="mt-1 text-sm font-semibold text-[#64779C]">{formatStudyClock(viewer.value)} 공부중</div>
+            <div className={cn('font-black tracking-[-0.06em] text-[#132A63]', isMobile ? 'text-[2.2rem]' : 'text-4xl')}>#{viewer.rank}</div>
+            <div className={cn('mt-1 font-semibold text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>{formatStudyClock(viewer.value)} 공부중</div>
           </div>
           <div className="rounded-full border border-[#F0D3B2] bg-[#FFF5E5] px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#9A5B12]">
             LIVE
@@ -1650,7 +1693,7 @@ export default function RankingBattlePage() {
             <MyBattleCard viewer={viewer} top={top} below={below} mode={mode} pressure={pressure} rewardState={rewardState} isMobile={viewMode === 'mobile'} />
           </div>
           <div className="space-y-5">
-            <StandingsSidebar leaders={liveLeaders} viewer={viewer} />
+            <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile={viewMode === 'mobile'} />
           </div>
         </div>
       </div>

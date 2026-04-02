@@ -129,26 +129,42 @@ function AnalysisTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ name?: string; value?: number }>;
+  payload?: Array<{ name?: string; value?: number; color?: string; dataKey?: string }>;
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
+  const metrics = payload
+    .filter((item) => typeof item.value === 'number' && Number.isFinite(item.value))
+    .map((item) => ({
+      name: item.name ?? item.dataKey ?? '지표',
+      value: Number(item.value ?? 0),
+      color:
+        item.color ??
+        (item.name?.includes('밀도')
+          ? '#FF7A16'
+          : item.name?.includes('리듬') || item.name?.includes('평균')
+            ? '#FFB347'
+            : '#2554D4'),
+    }));
 
-  const focusMinutes = Number(payload.find((item) => item.name === '집중 시간')?.value || 0);
-  const rhythmMinutes = Number(payload.find((item) => item.name === '리듬선')?.value || 0);
+  const formatMetricValue = (name: string, value: number) => {
+    if (name.includes('밀도') || name.includes('상승') || name.includes('완수율')) return `${Math.round(value)}%`;
+    if (name.includes('점수')) return `${Math.round(value)}점`;
+    return minutesToLabel(value);
+  };
 
   return (
     <div className="analysis-card rounded-[1.15rem] px-3 py-2.5 shadow-[0_22px_36px_-28px_rgba(20,41,95,0.46)]">
       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]">{label}</p>
-      <div className="mt-2 flex items-end gap-4">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">집중 시간</p>
-          <p className="text-lg font-black text-[#14295F]">{minutesToLabel(focusMinutes)}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ff7a16]">리듬선</p>
-          <p className="text-sm font-black text-[#14295F]">{minutesToLabel(rhythmMinutes)}</p>
-        </div>
+      <div className={cn('mt-2 grid gap-3', metrics.length > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
+        {metrics.map((metric) => (
+          <div key={metric.name}>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: metric.color }}>
+              {metric.name}
+            </p>
+            <p className="text-lg font-black text-[#14295F]">{formatMetricValue(metric.name, metric.value)}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -312,6 +328,7 @@ function MiniGrowthBars({
 }: {
   data: Array<{ label: string; totalMinutes: number }>;
 }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const max = Math.max(...data.map((item) => item.totalMinutes), 1);
   const yTicks = Array.from(new Set([max, Math.round(max / 2), 0])).sort((a, b) => b - a);
   const chartHeight = 92;
@@ -328,6 +345,7 @@ function MiniGrowthBars({
   const linePath = points
     .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
     .join(' ');
+  const activePoint = activeIndex != null ? points[activeIndex] : null;
 
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3">
@@ -343,6 +361,12 @@ function MiniGrowthBars({
         <div className="pointer-events-none absolute bottom-[2rem] top-1 left-0 w-px rounded-full bg-white/20" />
         <div className="pl-3">
           <div className="relative h-[5.8rem]">
+            {activePoint ? (
+              <div className="pointer-events-none absolute right-0 top-0 z-20 rounded-[1rem] border border-[#F0DDC8] bg-white/95 px-3 py-2 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.35)]">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#64779C]">{activePoint.label}</p>
+                <p className="mt-1 text-sm font-black text-[#14295F]">{minutesToLabel(activePoint.totalMinutes)}</p>
+              </div>
+            ) : null}
             <svg
               className="h-full w-full overflow-visible"
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
@@ -391,11 +415,20 @@ function MiniGrowthBars({
                 filter="url(#mini-growth-glow)"
               />
 
-              {points.map((point) => (
-                <g key={point.label}>
-                  <circle cx={point.x} cy={point.y} fill="rgba(255,122,0,0.22)" r="8.5" />
-                  <circle cx={point.x} cy={point.y} fill="#FFB347" r="5.5" />
-                  <circle cx={point.x} cy={point.y} fill="#FFF4D8" r="2.2" />
+              {points.map((point, index) => (
+                <g
+                  key={point.label}
+                  role="button"
+                  tabIndex={0}
+                  className="cursor-pointer"
+                  aria-label={`${point.label} ${minutesToLabel(point.totalMinutes)}`}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onFocus={() => setActiveIndex(index)}
+                  onClick={() => setActiveIndex(index)}
+                >
+                  <circle cx={point.x} cy={point.y} fill="rgba(255,122,0,0.22)" r={activeIndex === index ? 11 : 8.5} />
+                  <circle cx={point.x} cy={point.y} fill="#FFB347" r={activeIndex === index ? 6.2 : 5.5} />
+                  <circle cx={point.x} cy={point.y} fill="#FFF4D8" r={activeIndex === index ? 2.8 : 2.2} />
                 </g>
               ))}
             </svg>
@@ -403,18 +436,23 @@ function MiniGrowthBars({
 
           <div className="mt-2 grid grid-cols-7 gap-2">
           {data.map((day, index) => (
-            <div
+            <button
               key={day.label}
-              className="flex flex-col items-center gap-2 transition-all duration-300"
+              type="button"
+              onMouseEnter={() => setActiveIndex(index)}
+              onFocus={() => setActiveIndex(index)}
+              onClick={() => setActiveIndex(index)}
+              className={cn(
+                'flex flex-col items-center gap-2 rounded-[0.8rem] px-1 py-1 text-center transition-all duration-300',
+                activeIndex === index ? 'bg-white/12' : 'bg-transparent'
+              )}
               style={{ transitionDelay: `${index * 50}ms` }}
             >
-              <div className="text-center">
-                <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
-                <p className="mt-1 text-[11px] font-black text-[var(--text-on-dark)]">
-                  {day.totalMinutes > 0 ? `${Math.round(day.totalMinutes / 60)}h` : '--'}
-                </p>
-              </div>
-            </div>
+              <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
+              <p className="text-[11px] font-black text-[var(--text-on-dark)]">
+                {day.totalMinutes > 0 ? `${Math.round(day.totalMinutes / 60)}h` : '--'}
+              </p>
+            </button>
           ))}
           </div>
         </div>
@@ -449,8 +487,8 @@ function GraphDungeonCard({
         unlocked && 'hover:-translate-y-0.5 hover:scale-[1.01]',
         lightMode
           ? unlocked
-            ? 'border-[#F1DCC4] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,247,239,0.96)_100%)] shadow-[0_24px_48px_-34px_rgba(190,112,28,0.28)]'
-            : 'border-dashed border-[#EDD9C7] bg-white/90 opacity-95 shadow-[0_22px_42px_-36px_rgba(191,115,31,0.18)]'
+            ? 'border border-[#F1DEC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(255,247,239,0.96)_100%)] shadow-[0_20px_40px_-34px_rgba(190,112,28,0.18)]'
+            : 'border border-[#F3E3D1] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(255,248,241,0.94)_100%)] opacity-95 shadow-[0_18px_36px_-34px_rgba(191,115,31,0.14)]'
           : unlocked
             ? 'surface-card surface-card--secondary on-dark border-[color:var(--border-subtle)] shadow-[0_24px_46px_-34px_rgba(0,0,0,0.52)]'
             : 'surface-card surface-card--ghost on-dark border-dashed border-white/12 opacity-90 shadow-[0_24px_46px_-34px_rgba(0,0,0,0.52)]'
@@ -483,14 +521,14 @@ function GraphDungeonCard({
       <div className={cn(
         'mt-4 rounded-[1.35rem] px-3 py-3',
         lightMode
-          ? 'border border-[#F0DDC8] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,243,230,0.92)_100%)]'
+          ? 'border border-[#F2E2D1] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,248,240,0.9)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]'
           : 'border border-white/12 bg-white/[0.08]'
       )}>
         {preview}
         <p className={cn('mt-3 text-right text-[11px] font-semibold', lightMode ? 'text-[#7A6B5A]' : 'text-[var(--text-on-dark-soft)]')}>{previewHint}</p>
       </div>
 
-      <div className={cn('mt-4 pt-4', lightMode ? 'border-t border-[#F1E2D0]' : 'border-t border-white/12')}>{children}</div>
+      <div className={cn('mt-4 pt-4', lightMode ? '' : 'border-t border-white/12')}>{children}</div>
     </section>
   );
 }
@@ -807,8 +845,10 @@ export default function AnalysisTrackPage() {
     );
   }
 
-  const mobilePanelClass = 'rounded-[1.35rem] border border-[#F0DDC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,245,234,0.95)_100%)] shadow-[0_22px_44px_-34px_rgba(191,115,31,0.22)]';
-  const mobileMiniCardClass = 'rounded-[1.2rem] border border-[#F0DDC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,244,233,0.94)_100%)] p-4';
+  const mobilePanelClass = 'rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,246,236,0.93)_100%)] shadow-[0_18px_38px_-34px_rgba(191,115,31,0.16)]';
+  const mobileMiniCardClass = 'rounded-[1.2rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.76)_0%,rgba(255,248,240,0.72)_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]';
+  const mobileHeroStatCardClass = 'rounded-[1.28rem] border border-[#F0DDC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,246,237,0.94)_100%)] p-4 shadow-[0_18px_34px_-30px_rgba(191,115,31,0.18)]';
+  const mobileSummaryPanelClass = 'rounded-[1.45rem] border border-[#F0DDC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,244,232,0.95)_100%)] p-4 shadow-[0_18px_36px_-32px_rgba(191,115,31,0.18)]';
   const mobileMiniLabelClass = 'text-[10px] font-black uppercase tracking-[0.18em] text-[#9C7C5B]';
   const mobileMiniValueClass = 'mt-2 text-lg font-black text-[#17326B]';
   const mobileMiniMetaClass = 'mt-1 text-sm font-semibold text-[#526B93]';
@@ -862,12 +902,12 @@ export default function AnalysisTrackPage() {
                 <p className={cn('mt-2 text-sm font-semibold', isMobile ? 'text-[#526B93]' : 'surface-caption')}>오늘도 성장한 하루를 만드는 중이에요.</p>
 
                 <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-2')}>
-                  <div className="surface-card surface-card--light rounded-[1.2rem] px-4 py-4">
+                  <div className={cn(isMobile ? mobileHeroStatCardClass : 'surface-card surface-card--light rounded-[1.2rem] px-4 py-4')}>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">오늘 상태</p>
                     <p className="mt-2 text-2xl font-black text-[var(--text-primary)]">{minutesToCompactLabel(todayMinutes)}</p>
                     <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">{minutesToCompactLabel(heroGoalMinutes)} 목표</p>
                   </div>
-                  <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-4">
+                  <div className={cn(isMobile ? mobileHeroStatCardClass : 'surface-card surface-card--ivory rounded-[1.2rem] px-4 py-4')}>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">상승 폭</p>
                     <p className="mt-2 text-2xl font-black text-[var(--accent-orange)]">{signedPercent(kpi.weekDiffPct)}</p>
                     <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">지난 주 대비</p>
@@ -880,7 +920,7 @@ export default function AnalysisTrackPage() {
                   <QuestStatBar label="계획 완수율" value={completionHp} accent="emerald" />
                 </div>
 
-                <div className={cn('mt-5 rounded-[1.4rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--ghost on-dark')}>
+                <div className={cn('mt-5 rounded-[1.4rem] p-4', isMobile ? mobileSummaryPanelClass : 'surface-card surface-card--ghost on-dark')}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', isMobile ? 'text-[#9C7C5B]' : 'text-[var(--text-on-dark-muted)]')}>오늘 상태</p>
@@ -903,7 +943,7 @@ export default function AnalysisTrackPage() {
                 </div>
               </div>
 
-              <div className={cn('rounded-[1.8rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--secondary on-dark')}>
+              <div className={cn('rounded-[1.8rem] p-4', isMobile ? mobileSummaryPanelClass : 'surface-card surface-card--secondary on-dark')}>
                 <p className="surface-kicker text-[10px]">WEEKLY SUMMARY</p>
                 <h2 className={cn('mt-3 text-[1.35rem] font-black tracking-tight', isMobile ? 'text-[#17326B]' : 'text-white')}>이번 주 성장 요약</h2>
                 <div className="mt-4 space-y-2.5">
@@ -923,7 +963,7 @@ export default function AnalysisTrackPage() {
                 <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">GROWTH MAP</Badge>
                 <h2 className={cn('mt-3 text-[1.35rem] font-black tracking-tight', isMobile ? 'text-[#17326B]' : 'text-white')}>이번 주 성장 맵</h2>
               </div>
-              <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-3 text-right">
+              <div className={cn(isMobile ? `${mobileMiniCardClass} text-right` : 'surface-card surface-card--ivory rounded-[1.2rem] px-4 py-3 text-right')}>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">최고 성장</p>
                 <p className="mt-1 text-lg font-black text-[var(--text-primary)]">{shortDateLabel(bestDay.dateKey)}</p>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">{minutesToLabel(bestDay.totalMinutes)}</p>
@@ -947,31 +987,49 @@ export default function AnalysisTrackPage() {
                 preview={
                   card.id === 'density' ? (
                     <ResponsiveContainer width="100%" height={88}>
-                      <BarChart data={densityData} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+                      <BarChart data={densityData} margin={{ top: 8, right: 10, left: 14, bottom: 2 }}>
                         <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
                         <YAxis
-                          width={30}
+                          width={38}
                           tick={{ fontSize: 9, fontWeight: 800, fill: 'var(--chart-axis)' }}
                           tickLine={{ stroke: 'var(--chart-grid)' }}
                           axisLine={{ stroke: 'var(--chart-grid)' }}
                           tickFormatter={(value) => `${Number(value)}%`}
+                          tickMargin={8}
                         />
-                        <Bar dataKey="value" radius={[8, 8, 4, 4]} fill="#FF9626" />
+                        <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(255,150,38,0.08)' }} />
+                        <Bar name="집중 밀도" dataKey="value" radius={[8, 8, 4, 4]} fill="#FF9626" activeBar={{ fill: '#FFAE4F' }} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
                     <ResponsiveContainer width="100%" height={88}>
-                      <ComposedChart data={weeklyData} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+                      <ComposedChart data={weeklyData} margin={{ top: 8, right: 10, left: 14, bottom: 2 }}>
                         <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
                         <YAxis
-                          width={30}
+                          width={38}
                           tick={{ fontSize: 9, fontWeight: 800, fill: 'var(--chart-axis)' }}
                           tickLine={{ stroke: 'var(--chart-grid)' }}
                           axisLine={{ stroke: 'var(--chart-grid)' }}
                           tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`}
+                          tickMargin={8}
                         />
-                        <Bar dataKey={card.id === 'rhythm' ? 'avgMinutes' : 'totalMinutes'} radius={[8, 8, 4, 4]} fill={card.id === 'rhythm' ? '#18B67A' : '#2E6BFF'} />
-                        <Line type="monotone" dataKey="avgMinutes" stroke={card.id === 'rhythm' ? '#8EF0C9' : '#FFB347'} strokeWidth={2.2} dot={false} />
+                        <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(46,107,255,0.06)' }} />
+                        <Bar
+                          name={card.id === 'rhythm' ? '평균 공부시간' : '집중 시간'}
+                          dataKey={card.id === 'rhythm' ? 'avgMinutes' : 'totalMinutes'}
+                          radius={[8, 8, 4, 4]}
+                          fill={card.id === 'rhythm' ? '#18B67A' : '#2E6BFF'}
+                          activeBar={{ fill: card.id === 'rhythm' ? '#29C58D' : '#4B84FF' }}
+                        />
+                        <Line
+                          type="monotone"
+                          name={card.id === 'rhythm' ? '리듬선' : '평균 흐름'}
+                          dataKey="avgMinutes"
+                          stroke={card.id === 'rhythm' ? '#8EF0C9' : '#FFB347'}
+                          strokeWidth={2.2}
+                          dot={false}
+                          activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
+                        />
                       </ComposedChart>
                     </ResponsiveContainer>
                   )
@@ -981,7 +1039,7 @@ export default function AnalysisTrackPage() {
                     <div className="space-y-4">
                     <div className={cn('rounded-[1.35rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--ghost on-dark')}>
                       <ResponsiveContainer width="100%" height={isMobile ? 180 : 260}>
-                        <ComposedChart data={chartData} margin={{ top: 12, right: 8, left: isMobile ? 6 : 12, bottom: 0 }}>
+                        <ComposedChart data={chartData} margin={{ top: 12, right: 14, left: isMobile ? 18 : 12, bottom: 4 }}>
                           <defs>
                             <linearGradient id="analysis-focus-gradient" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#2E6BFF" />
@@ -991,15 +1049,16 @@ export default function AnalysisTrackPage() {
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
                           <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }} tickLine={false} axisLine={false} />
                           <YAxis
-                            width={isMobile ? 32 : 40}
+                            width={isMobile ? 46 : 40}
                             tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }}
                             tickLine={{ stroke: 'var(--chart-grid)' }}
                             axisLine={{ stroke: 'var(--chart-grid)' }}
                             tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`}
+                            tickMargin={8}
                           />
-                          <Tooltip content={<AnalysisTooltip />} />
-                          <Bar dataKey="totalMinutes" name="집중 시간" radius={[10, 10, 4, 4]} fill="url(#analysis-focus-gradient)" />
-                          <Line type="monotone" dataKey="avgMinutes" name="리듬선" stroke="#FFB347" strokeWidth={2.6} dot={false} />
+                          <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(46,107,255,0.08)' }} />
+                          <Bar dataKey="totalMinutes" name="집중 시간" radius={[10, 10, 4, 4]} fill="url(#analysis-focus-gradient)" activeBar={{ fill: '#5A90FF' }} />
+                          <Line type="monotone" dataKey="avgMinutes" name="리듬선" stroke="#FFB347" strokeWidth={2.6} dot={false} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} />
                           <ReferenceDot x={bestDay.label} y={bestDay.totalMinutes} r={6} fill="#FFD36D" stroke="#fff" strokeWidth={2} />
                         </ComposedChart>
                       </ResponsiveContainer>
