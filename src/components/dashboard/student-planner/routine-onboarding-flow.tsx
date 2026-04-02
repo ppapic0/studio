@@ -11,7 +11,6 @@ import { OnboardingIntroScreen } from '@/components/dashboard/student-planner/on
 import { OnboardingProgressHeader } from '@/components/dashboard/student-planner/onboarding-progress-header';
 import {
   applySingleOptionPatch,
-  getSelectedLabels,
   ONBOARDING_QUESTIONS,
   toggleMultiQuestionValue,
   type OnboardingQuestionConfig,
@@ -135,6 +134,12 @@ export function RoutineOnboardingFlow({
   }, [answers, autoContinueOnSave, onContinueToPlanner, onSaveRoutineProfile, phase, recommendationResult]);
 
   const currentQuestion = ONBOARDING_QUESTIONS[stepIndex];
+  const currentSelectedLabels =
+    currentQuestion.type === 'multi' && Array.isArray(selectionState[currentQuestion.id])
+      ? currentQuestion.options
+          .filter((option) => selectionState[currentQuestion.id]?.includes(option.id))
+          .map((option) => option.label)
+      : [];
   const bridgeMessage = getBridgeMessage(stepIndex);
   const progressMeta = {
     currentStep: stepIndex + 1,
@@ -250,7 +255,7 @@ export function RoutineOnboardingFlow({
       <StudyPlanQuestionCard
         question={currentQuestion}
         selectedValue={selectionState[currentQuestion.id]}
-        selectedLabels={currentQuestion.type === 'multi' ? getSelectedLabels(currentQuestion, answers) : []}
+        selectedLabels={currentSelectedLabels}
         onSingleSelect={(option) => handleSingleSelect(currentQuestion.id, option)}
         onMultiToggle={(option) => {
           if (currentQuestion.type !== 'multi') return;
