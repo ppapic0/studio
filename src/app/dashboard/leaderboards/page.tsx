@@ -133,6 +133,13 @@ const TONE_CLASS_MAP: Record<
   },
 };
 
+const MOBILE_BATTLE_PANEL_CLASS =
+  'rounded-[1.8rem] border border-[#E8D4BF] bg-[radial-gradient(circle_at_top,rgba(255,190,120,0.2),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,245,233,0.96)_100%)] shadow-[0_24px_50px_-32px_rgba(20,41,95,0.2)]';
+const MOBILE_BATTLE_INSET_CLASS =
+  'rounded-[1.35rem] border border-[#EEDBC7] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,248,239,0.92)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_16px_34px_-28px_rgba(20,41,95,0.16)]';
+const MOBILE_BATTLE_STRIP_CLASS =
+  'rounded-[1.2rem] border border-[#F0D9BF] bg-[linear-gradient(180deg,rgba(255,250,242,0.98)_0%,rgba(255,243,225,0.94)_100%)] shadow-[0_14px_28px_-24px_rgba(20,41,95,0.16)]';
+
 function formatSchoolName(value?: string | null) {
   const trimmed = value?.trim();
   if (!trimmed) return '학교 미지정';
@@ -435,6 +442,48 @@ function HeroBattleHeader({
   activeMessage: string;
   isMobile?: boolean;
 }) {
+  if (isMobile) {
+    return (
+      <section className={cn(MOBILE_BATTLE_PANEL_CLASS, 'relative overflow-hidden p-5 text-[#132A63]')}>
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_36%,transparent_72%,rgba(255,171,86,0.08))]" />
+        <div className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-[#FFB14B]/16 blur-3xl" />
+        <div className="relative space-y-4">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3.5 py-2 text-[10px] font-black tracking-[0.18em] text-[#BA6815]">
+              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
+              LIVE BATTLE
+            </div>
+            <div>
+              <h1 className="max-w-[8.5ch] text-[2.35rem] font-aggro-display font-black leading-[0.94] tracking-[-0.05em] text-[#132A63]">
+                {RANGE_META[range].title}
+              </h1>
+              <p className="mt-3 max-w-[18rem] text-[14px] font-semibold leading-6 text-[#5B7098]">
+                {RANGE_META[range].subtitle}
+              </p>
+            </div>
+          </div>
+
+          <div className={cn(MOBILE_BATTLE_STRIP_CLASS, 'flex items-center justify-between gap-3 px-4 py-3.5')}>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[10px] font-black tracking-[0.16em] text-[#BA6815]">
+                <Swords className="h-3.5 w-3.5 shrink-0" />
+                전장 브리핑
+              </div>
+              <p className="mt-1 text-[15px] font-black leading-6 tracking-[-0.03em] text-[#132A63]">
+                {activeMessage}
+              </p>
+            </div>
+            <div className="shrink-0 rounded-full border border-[#F2C78F] bg-white/80 px-2.5 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+              LIVE
+            </div>
+          </div>
+
+          <PeriodTabs value={range} onChange={onRangeChange} isMobile />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className={cn(
       'relative overflow-hidden rounded-[32px] border border-[#E7D2BE] bg-[radial-gradient(circle_at_top,_rgba(255,192,118,0.26),_transparent_34%),linear-gradient(155deg,#FFF9EF_0%,#FFF1DD_62%,#FFE6BD_100%)] text-[#132A63] shadow-[0_28px_80px_rgba(22,45,99,0.12)]',
@@ -453,7 +502,7 @@ function HeroBattleHeader({
           </div>
           <h1 className={cn(
             'font-aggro-display font-black tracking-[-0.05em] text-[#132A63]',
-            isMobile ? 'text-[2.1rem] leading-[0.92] whitespace-nowrap' : 'text-[2.2rem] leading-[0.94] md:text-[3.1rem]'
+            isMobile ? 'text-[2.1rem] leading-[0.92]' : 'text-[2.2rem] leading-[0.94] md:text-[3.1rem]'
           )}>
             {RANGE_META[range].title}
           </h1>
@@ -539,23 +588,34 @@ function BattleGauge({
   leftValue,
   rightValue,
   mode,
+  isMobile = false,
 }: {
   leftLabel: string;
   rightLabel: string;
   leftValue: number;
   rightValue: number;
   mode: BattleMode;
+  isMobile?: boolean;
 }) {
   const difference = leftValue - rightValue;
   const marker = clamp(50 + (difference / Math.max(leftValue, rightValue, 1)) * 35, 10, 90);
 
   return (
-    <div className="rounded-[28px] border border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFCF5_0%,#FFF6E7_100%)] p-4 shadow-[0_18px_34px_rgba(20,41,95,0.08)]">
-      <div className="mb-3 flex items-center justify-between text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">
+    <div className={cn(
+      'rounded-[28px] border border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFCF5_0%,#FFF6E7_100%)] shadow-[0_18px_34px_rgba(20,41,95,0.08)]',
+      isMobile ? 'p-3.5' : 'p-4'
+    )}>
+      <div className={cn(
+        'mb-3 flex items-center justify-between font-black tracking-[0.2em] text-[#7A86A2]',
+        isMobile ? 'text-[10px]' : 'text-[11px]'
+      )}>
         <span>{leftLabel}</span>
         <span>{rightLabel}</span>
       </div>
-      <div className="relative h-14 overflow-hidden rounded-full border border-[#E6D8C8] bg-[#FFF0DD]">
+      <div className={cn(
+        'relative overflow-hidden rounded-full border border-[#E6D8C8] bg-[#FFF0DD]',
+        isMobile ? 'h-12' : 'h-14'
+      )}>
         <div className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,rgba(255,143,38,0.95),rgba(255,193,113,0.92))]" style={{ width: `${marker}%` }} />
         <div
           className={cn(
@@ -589,14 +649,46 @@ function BattleGauge({
           transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
         />
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 text-sm font-bold">
-        <div className="rounded-2xl border border-[#FFC27A]/60 bg-[#FFF0D7] px-3 py-2 text-[#B96510]">
+      <div className={cn(
+        'mt-3 grid grid-cols-2 font-bold',
+        isMobile ? 'gap-2.5 text-[12px]' : 'gap-3 text-sm'
+      )}>
+        <div className={cn(
+          'rounded-2xl border border-[#FFC27A]/60 bg-[#FFF0D7] text-[#B96510]',
+          isMobile ? 'px-3 py-2.5' : 'px-3 py-2'
+        )}>
           내 압박 {formatStudyCompact(leftValue)}
         </div>
-        <div className="rounded-2xl border border-[#E6D8C8] bg-white/92 px-3 py-2 text-right text-[#6E7893]">
+        <div className={cn(
+          'rounded-2xl border border-[#E6D8C8] bg-white/92 text-right text-[#6E7893]',
+          isMobile ? 'px-3 py-2.5' : 'px-3 py-2'
+        )}>
           상대 압박 {formatStudyCompact(rightValue)}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CompactBattleMetric({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  tone: LogTone;
+}) {
+  const toneClass = TONE_CLASS_MAP[tone];
+
+  return (
+    <div className={cn(MOBILE_BATTLE_INSET_CLASS, 'relative overflow-hidden px-3.5 py-3')}>
+      <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r', toneClass.line)} />
+      <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">{label}</div>
+      <div className="mt-2 text-[1.35rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">{value}</div>
+      <div className={cn('mt-2 text-[12px] font-black leading-5', toneClass.text)}>{hint}</div>
     </div>
   );
 }
@@ -667,6 +759,82 @@ function MyBattleCard({
         : mode === 'danger'
           ? `${below?.displayNameSnapshot ?? '뒤 경쟁자'} 님이 바로 아래에서 추격 중이에요.`
           : `상위권과 ${formatGapLabel(diffAbove)} 차이. 전진 구간입니다.`;
+
+  if (isMobile) {
+    return (
+      <motion.section
+        layout
+        className={cn(MOBILE_BATTLE_PANEL_CLASS, 'relative overflow-hidden p-4 text-[#132A63]')}
+        whileHover={{ y: -2 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+      >
+        <DefenseShieldEffect active={mode === 'defense' || mode === 'danger'} pressure={pressure} />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_36%,transparent_72%,rgba(255,156,56,0.08))]" />
+        <div className="pointer-events-none absolute inset-[1px] rounded-[1.72rem] border border-white/60" />
+
+        <div className="relative">
+          <div className="flex items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#BA6815]">
+              <Zap className="h-3.5 w-3.5" />
+              {statusLabel}
+            </div>
+            <div className="rounded-full border border-[#F0D8B7] bg-white/80 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#7A86A2]">
+              {mode === 'defense' ? 'DEFENSE HOLD' : 'LIVE PUSH'}
+            </div>
+          </div>
+
+          <div className={cn(MOBILE_BATTLE_INSET_CLASS, 'mt-3 px-4 py-4')}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">내 현재 순위</div>
+                <div className="mt-2 text-[3.1rem] font-black leading-none tracking-[-0.07em] text-[#132A63]">
+                  #{viewer.rank}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부중</div>
+                <div className="mt-2 text-[1.85rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                  {formatStudyCompact(viewer.value)}
+                </div>
+                <div className="mt-1 text-[12px] font-black text-[#C86A10]">
+                  {mode === 'defense' ? `방어 ${formatGapLabel(diffBelow)}` : `추월까지 ${formatGapLabel(diffAbove)}`}
+                </div>
+              </div>
+            </div>
+            <p className="mt-3 text-[14px] font-black leading-6 tracking-[-0.02em] text-[#C86A10]">
+              {helperCopy}
+            </p>
+          </div>
+
+          <div className="mt-3">
+            <BattleGauge
+              leftLabel="내 전장"
+              rightLabel={viewer.rank === 1 ? '추격 파동' : '1위 존'}
+              leftValue={viewer.value}
+              rightValue={viewer.rank === 1 ? (below?.value ?? viewer.value - 10) : (top?.value ?? viewer.value + 10)}
+              mode={mode}
+              isMobile
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <CompactBattleMetric
+              label="1위와 차이"
+              value={viewer.rank === 1 ? '선두' : formatGapLabel(diffAbove)}
+              hint={viewer.rank === 1 ? '정상 점령 중' : '한 세션 더'}
+              tone="gold"
+            />
+            <CompactBattleMetric
+              label="바로 아래"
+              value={below ? formatGapLabel(diffBelow) : '여유'}
+              hint={below ? `${below.displayNameSnapshot} 추격` : '아래 경쟁 없음'}
+              tone={pressure === 'critical' ? 'red' : 'blue'}
+            />
+          </div>
+        </div>
+      </motion.section>
+    );
+  }
 
   return (
     <motion.section
@@ -1024,6 +1192,130 @@ function StandingsSidebar({
     2: 'orange',
     3: 'red',
   };
+
+  if (isMobile) {
+    const topLeader = leaders[0] ?? null;
+    const secondaryLeaders = leaders.slice(1, 3);
+
+    return (
+      <aside className={cn(MOBILE_BATTLE_PANEL_CLASS, 'relative overflow-hidden p-4 text-[#132A63]')}>
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.74),transparent_36%,transparent_72%,rgba(255,174,90,0.08))]" />
+
+        <div className="relative">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#9A5B12]">
+              <Trophy className="h-3.5 w-3.5" />
+              TOP 3 LIVE
+            </div>
+            <h3 className="mt-3 text-[1.6rem] font-black tracking-[-0.04em] text-[#132A63]">실시간 TOP 3</h3>
+            <p className="mt-2 text-[13px] font-semibold leading-6 text-[#64779C]">
+              지금 전장을 흔들고 있는 상위권입니다. 먼저 흐름부터 보고 바로 아래 내 위치를 확인하세요.
+            </p>
+          </div>
+
+          {topLeader ? (
+            <motion.div
+              key={topLeader.studentId}
+              layout
+              className={cn(
+                MOBILE_BATTLE_INSET_CLASS,
+                'mt-4 relative overflow-hidden px-4 py-4',
+                topLeader.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
+              )}
+              whileHover={{ y: -2, scale: 1.01 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', TONE_CLASS_MAP.gold.line)} />
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', TONE_CLASS_MAP.gold.chip)}>
+                    1위
+                    <Crown className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="mt-3 truncate text-[1.45rem] font-black tracking-[-0.04em] text-[#132A63]">
+                    {topLeader.displayNameSnapshot}
+                  </div>
+                  <div className="mt-1 truncate text-[12px] font-semibold text-[#6E7893]">
+                    {formatSchoolName(topLeader.schoolNameSnapshot)}
+                  </div>
+                </div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-[#F0D3B2] bg-[#FFF6E8] text-[#C86A10]">
+                  <Trophy className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-4 flex items-end justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부중</div>
+                  <div className="mt-2 text-[2rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                    {formatStudyCompact(topLeader.value)}
+                  </div>
+                </div>
+                <div className="rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+                  {topLeader.isViewer ? '나' : 'LEAD'}
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
+
+          {secondaryLeaders.length ? (
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              {secondaryLeaders.map((entry) => {
+                const toneClass = TONE_CLASS_MAP[toneMap[entry.rank] ?? 'blue'];
+
+                return (
+                  <motion.div
+                    key={entry.studentId}
+                    layout
+                    className={cn(
+                      MOBILE_BATTLE_INSET_CLASS,
+                      'relative overflow-hidden px-3.5 py-3',
+                      entry.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
+                    )}
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                  >
+                    <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r', toneClass.line)} />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.16em]', toneClass.chip)}>
+                        {entry.rank}위
+                      </div>
+                      {entry.isViewer ? (
+                        <div className="rounded-full border border-[#FFBE77] bg-white/92 px-2 py-1 text-[9px] font-black tracking-[0.14em] text-[#C86A10]">
+                          나
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
+                      {entry.displayNameSnapshot}
+                    </div>
+                    <div className="mt-1 truncate text-[11px] font-semibold text-[#6E7893]">
+                      {formatSchoolName(entry.schoolNameSnapshot)}
+                    </div>
+                    <div className="mt-3 text-[1.45rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                      {formatStudyCompact(entry.value)}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <div className={cn(MOBILE_BATTLE_STRIP_CLASS, 'mt-3 flex items-center justify-between gap-3 px-4 py-3.5')}>
+            <div className="min-w-0">
+              <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">내 현재 순위</div>
+              <div className="mt-1 flex items-end gap-2">
+                <div className="text-[1.8rem] font-black leading-none tracking-[-0.06em] text-[#132A63]">#{viewer.rank}</div>
+                <div className="pb-0.5 text-[12px] font-black text-[#64779C]">{formatStudyCompact(viewer.value)} 공부중</div>
+              </div>
+            </div>
+            <div className="rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+              {viewer.rank <= 3 ? 'TOP ZONE' : 'CHASE'}
+            </div>
+          </div>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className={cn(
@@ -1501,6 +1793,7 @@ export default function RankingBattlePage() {
   const searchParams = useSearchParams();
   const { user } = useUser();
   const { activeMembership, viewMode } = useAppContext();
+  const isMobile = viewMode === 'mobile';
 
   const range = (searchParams.get('range') as RankRange) || 'daily';
   const viewerId = user?.uid ?? 'viewer-local';
@@ -1682,9 +1975,12 @@ export default function RankingBattlePage() {
   if (!viewer || !top) return null;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,186,106,0.18),_transparent_22%),linear-gradient(180deg,#FFFCF8_0%,#FFF3E4_100%)] px-4 py-6 text-[#132A63] md:px-6 md:py-8">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <HeroBattleHeader range={range} onRangeChange={handleRangeChange} activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]} isMobile={viewMode === 'mobile'} />
+    <main className={cn(
+      'bg-[radial-gradient(circle_at_top,_rgba(255,186,106,0.18),_transparent_22%),linear-gradient(180deg,#FFFCF8_0%,#FFF3E4_100%)] text-[#132A63]',
+      isMobile ? 'min-h-0 px-0 py-0' : 'min-h-screen px-4 py-6 md:px-6 md:py-8'
+    )}>
+      <div className={cn('mx-auto', isMobile ? 'max-w-none space-y-4' : 'max-w-7xl space-y-5')}>
+        <HeroBattleHeader range={range} onRangeChange={handleRangeChange} activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]} isMobile={isMobile} />
 
         {fetchError ? (
           <div className="rounded-[24px] border border-[#FFB15B]/30 bg-[#FFF4E5] px-4 py-3 text-sm font-semibold text-[#9A5B12]">
@@ -1692,14 +1988,21 @@ export default function RankingBattlePage() {
           </div>
         ) : null}
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
-          <div className="space-y-5">
-            <MyBattleCard viewer={viewer} top={top} below={below} mode={mode} pressure={pressure} rewardState={rewardState} isMobile={viewMode === 'mobile'} />
+        {isMobile ? (
+          <div className="space-y-4">
+            <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
+            <MyBattleCard viewer={viewer} top={top} below={below} mode={mode} pressure={pressure} rewardState={rewardState} isMobile />
           </div>
-          <div className="space-y-5">
-            <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile={viewMode === 'mobile'} />
+        ) : (
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
+            <div className="space-y-5">
+              <MyBattleCard viewer={viewer} top={top} below={below} mode={mode} pressure={pressure} rewardState={rewardState} />
+            </div>
+            <div className="space-y-5">
+              <StandingsSidebar leaders={liveLeaders} viewer={viewer} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </main>
   );
