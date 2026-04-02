@@ -435,7 +435,7 @@ export default function StudyPlanPage() {
   const searchParams = useSearchParams();
 
   const isMobile = viewMode === 'mobile';
-  const rewardGradient = 'from-[#14295F] via-[#1B326D] to-[#233E86]';
+  const rewardGradient = 'from-[#14295F] via-[#1A3673] to-[#FF8A2A]';
   const [planTrackEntryMode, setPlanTrackEntryMode] = useState<'auto' | 'onboarding' | 'planner'>('auto');
   const [hasDismissedRoutineOnboardingLocally, setHasDismissedRoutineOnboardingLocally] = useState(false);
   const onboardingPresentationRef = useRef(false);
@@ -678,6 +678,10 @@ export default function StudyPlanPage() {
     if (!selectedDate) return;
     setSelectedDate(addDays(selectedDate, direction * 7));
   };
+  const moveSelectedDay = useCallback((direction: -1 | 1) => {
+    if (!selectedDate) return;
+    setSelectedDate(addDays(selectedDate, direction));
+  }, [selectedDate]);
 
   const recentStudyWeekKeys = useMemo(() => {
     if (!selectedDate) return [];
@@ -3016,6 +3020,16 @@ export default function StudyPlanPage() {
   const examTemplate = BUILTIN_PLANNER_TEMPLATES.find((template) => template.id === 'builtin-exam') || BUILTIN_PLANNER_TEMPLATES[0];
   const selectedDateTitle = format(selectedDate || new Date(), 'M월 d일 EEEE', { locale: ko });
   const selectedDateSheetLabel = format(selectedDate || new Date(), 'yyyy. MM. dd', { locale: ko });
+  const selectedDateHeroKicker = isToday
+    ? '오늘의 투두리스트'
+    : isPast
+      ? '지난 날짜 투두리스트'
+      : '선택한 날짜 투두리스트';
+  const selectedDateHeroDescription = isToday
+    ? '오늘 해야 할 공부와 기타 일정을 먼저 적고, 끝낸 항목부터 가볍게 체크해보세요.'
+    : isPast
+      ? '지난 날짜 계획과 완료 기록을 다시 보면서 공부 흐름을 점검해보세요.'
+      : '다가올 하루의 공부와 기타 일정을 미리 정리하고, 준비를 차분하게 맞춰보세요.';
 
   if (!isStudent) {
     return <div className="flex items-center justify-center h-[400px] px-4"><Card className="max-w-md w-full rounded-[2.5rem] border-none shadow-2xl"><CardHeader className="text-center"><CardTitle className="font-black text-2xl tracking-tighter">학생 전용 페이지</CardTitle><CardDescription className="font-bold">학생 계정으로 로그인해야 학습 계획을 관리할 수 있습니다.</CardDescription></CardHeader></Card></div>;
@@ -3039,100 +3053,139 @@ export default function StudyPlanPage() {
   }
 
   return (
-    <div className={cn("flex flex-col w-full max-w-5xl mx-auto pb-24", isMobile ? "gap-4 px-0" : "gap-6")}>
-      <section className={cn("overflow-hidden rounded-[1.7rem] bg-[linear-gradient(180deg,#17326B_0%,#21448D_100%)] text-white shadow-[0_24px_56px_-34px_rgba(20,41,95,0.48)]", isMobile ? "rounded-[1.35rem]" : "rounded-[2rem]")}>
-        <div className={cn("space-y-6", isMobile ? "p-4" : "p-7")}>
-          <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)] items-start")}>
-            <div className="min-w-0 space-y-5">
-              <div className="space-y-3">
-                <Badge className="border-none bg-white/12 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-white shadow-none">
-                  오늘의 투두리스트
+    <div className={cn("student-font-shell flex flex-col w-full max-w-5xl mx-auto pb-24", isMobile ? "gap-4 px-0" : "gap-6")}>
+      <section className={cn("student-utility-card overflow-hidden rounded-[1.7rem] border border-[#1F427E]/28 bg-[radial-gradient(circle_at_top_right,rgba(255,173,78,0.18),transparent_26%),radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_32%),linear-gradient(180deg,#11285B_0%,#17326B_46%,#21448D_100%)] text-white shadow-[0_24px_56px_-34px_rgba(20,41,95,0.48)]", isMobile ? "rounded-[1.35rem]" : "rounded-[2rem]")}>
+        <div className={cn("space-y-5", isMobile ? "p-4" : "p-7")}>
+          <div className={cn(
+            "rounded-[1.45rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.05)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_22px_42px_-30px_rgba(4,11,31,0.48)]",
+            isMobile ? "px-4 py-4" : "px-5 py-5"
+          )}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1 space-y-3">
+                <Badge className="student-aggro-kicker border-none bg-white/12 px-3 py-1 text-[9px] text-white shadow-none">
+                  {selectedDateHeroKicker}
                 </Badge>
-                <div className="space-y-3">
-                  <h2 className={cn("font-black tracking-tight text-white", isMobile ? "text-[1.5rem] leading-[1.18]" : "text-[2.1rem] leading-[1.08]")}>
-                    {selectedDateTitle}
-                  </h2>
-                  <p className={cn("max-w-xl break-keep font-semibold text-white/78", isMobile ? "text-[12.5px] leading-6" : "text-[15px] leading-7")}>
-                    오늘 해야 할 공부와 기타 일정을 먼저 적고, 끝낸 항목부터 가볍게 체크해보세요.
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-[1.35rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-                <div className={cn("gap-3", isMobile ? "space-y-3" : "flex items-end justify-between")}>
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">오늘 목표시간 진행</p>
-                    <p className={cn("mt-2 break-keep font-black text-white", isMobile ? "text-[1rem] leading-6" : "text-[1.05rem] leading-7")}>
-                      {studyGoalSummaryLabel}
+                    <h2 className={cn("font-aggro-display break-keep font-black tracking-[-0.04em] text-white", isMobile ? "text-[1.65rem] leading-[1.08]" : "text-[2.35rem] leading-[1.03]")}>
+                      {selectedDateTitle}
+                    </h2>
+                    <p className={cn("student-aggro-body mt-3 max-w-xl break-keep text-white/76", isMobile ? "text-[12.5px] leading-6" : "text-[15px] leading-7")}>
+                      {selectedDateHeroDescription}
                     </p>
                   </div>
-                  <div className={cn("flex items-center gap-2", isMobile ? "justify-between" : "justify-end")}>
-                    <span className="text-[11px] font-semibold text-white/60">총 계획 {formatMinutesSummary(studyTimeSummary.total)}</span>
-                    <Badge className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-black text-white shadow-none">
-                      목표 {formatMinutesSummary(recommendedDailyMinutes)}
-                    </Badge>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn("rounded-full border border-white/16 bg-white/10 text-white hover:bg-white/16 hover:text-white", isMobile ? "h-10 w-10" : "h-11 w-11")}
+                      onClick={() => moveSelectedDay(-1)}
+                      aria-label="이전 날짜 보기"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn("rounded-full border border-white/16 bg-white/10 text-white hover:bg-white/16 hover:text-white", isMobile ? "h-10 w-10" : "h-11 w-11")}
+                      onClick={() => moveSelectedDay(1)}
+                      aria-label="다음 날짜 보기"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-                <div className="relative mt-4">
-                  <Progress value={planProgressPercent} className="h-3.5 bg-white/10 shadow-[inset_0_1px_2px_rgba(7,18,48,0.22)]" indicatorClassName={cn("bg-gradient-to-r", rewardGradient)} />
-                  <div className="pointer-events-none absolute inset-0 rounded-full bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.12)_50%,transparent_100%)] opacity-80" />
                 </div>
               </div>
             </div>
 
-            <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]")}>
-              <div className={cn(
-                "rounded-[1.35rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.08)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_16px_32px_-26px_rgba(4,11,31,0.42)]",
-                isMobile ? "col-span-2 px-4 py-4" : "row-span-2 px-5 py-5"
-              )}>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/65">총 계획 시간</p>
-                <p className={cn("mt-3 font-black tracking-tight text-white", isMobile ? "text-[1.95rem] leading-none" : "text-[2.35rem] leading-none")}>
-                  {formatMinutesSummary(studyTimeSummary.total)}
-                </p>
-                <p className={cn("mt-3 break-keep font-semibold text-white/62", isMobile ? "text-[11px] leading-5" : "text-[12px] leading-5")}>
-                  오늘 계획에 등록된 공부와 기타 일정의 총량이에요.
-                </p>
+            <div className={cn(
+              "mt-4 rounded-[1.25rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.06)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]",
+              isMobile ? "p-3.5" : "p-4"
+            )}>
+              <div className={cn("grid gap-2.5", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+                <div className="rounded-[1rem] border border-white/10 bg-white/[0.07] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <p className="student-aggro-kicker text-[9px] text-white/64">총 계획 시간</p>
+                  <p className={cn("font-aggro-display mt-2 font-black tracking-[-0.04em] text-white", isMobile ? "text-[1.22rem]" : "text-[1.5rem]")}>
+                    {formatMinutesSummary(studyTimeSummary.total)}
+                  </p>
+                </div>
+                <div className="rounded-[1rem] border border-white/10 bg-white/[0.07] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <p className="student-aggro-kicker text-[9px] text-white/64">등록 투두</p>
+                  <p className={cn("font-aggro-display mt-2 font-black tracking-[-0.04em] text-white", isMobile ? "text-[1.22rem]" : "text-[1.5rem]")}>
+                    {checklistTasks.length}개
+                  </p>
+                </div>
+                <div className="rounded-[1rem] border border-[#FFB665]/18 bg-[linear-gradient(180deg,rgba(255,187,108,0.14)_0%,rgba(255,255,255,0.08)_100%)] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+                  <p className="student-aggro-kicker text-[9px] text-white/64">오늘 목표 대비</p>
+                  <p className={cn("font-aggro-display mt-2 font-black tracking-[-0.04em] text-[#FFD6A1]", isMobile ? "text-[1.22rem]" : "text-[1.5rem]")}>
+                    {planProgressPercent}%
+                  </p>
+                </div>
               </div>
-              <div className="rounded-[1.15rem] border border-white/10 bg-white/[0.07] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/62">등록 투두</p>
-                <p className={cn("mt-2 font-black tracking-tight text-white", isMobile ? "text-[1.5rem]" : "text-[1.6rem]")}>{checklistTasks.length}개</p>
+            </div>
+
+            <div className={cn(
+              "mt-4 rounded-[1.25rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.05)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]",
+              isMobile ? "px-4 py-4" : "px-4 py-4"
+            )}>
+              <div className={cn("gap-3", isMobile ? "space-y-3" : "flex items-end justify-between")}>
+                <div className="min-w-0">
+                  <p className="student-aggro-kicker text-[10px] text-white/68">오늘 목표시간 진행</p>
+                  <p className={cn("font-aggro-display mt-2 break-keep font-black text-white", isMobile ? "text-[1.08rem] leading-6" : "text-[1.18rem] leading-7")}>
+                    {studyGoalSummaryLabel}
+                  </p>
+                </div>
+                <div className={cn("flex items-center gap-2", isMobile ? "justify-between" : "justify-end")}>
+                  <span className="student-aggro-body text-[11px] font-black text-white/64">총 계획 {formatMinutesSummary(studyTimeSummary.total)}</span>
+                  <Badge className="student-aggro-body rounded-full border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white shadow-none">
+                    목표 {formatMinutesSummary(recommendedDailyMinutes)}
+                  </Badge>
+                </div>
               </div>
-              <div className="rounded-[1.15rem] border border-white/10 bg-white/[0.07] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/62">오늘 목표 대비</p>
-                <p className={cn("mt-2 font-black tracking-tight text-white", isMobile ? "text-[1.5rem]" : "text-[1.6rem]")}>{planProgressPercent}%</p>
+              <div className="relative mt-4">
+                <Progress
+                  value={planProgressPercent}
+                  className="h-3.5 bg-white/12 shadow-[inset_0_1px_2px_rgba(7,18,48,0.24)]"
+                  indicatorClassName="bg-[linear-gradient(90deg,rgba(255,255,255,0.78)_0%,#FFFFFF_52%,rgba(255,255,255,0.88)_100%)]"
+                />
+                <div className="pointer-events-none absolute inset-0 rounded-full bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.16)_50%,transparent_100%)] opacity-80" />
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2.5 pt-1">
+          <div className="rounded-[1.2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(10,24,57,0.18)_0%,rgba(255,255,255,0.05)_100%)] px-4 py-4">
+            <div className="flex flex-wrap items-center gap-2.5">
             {(subjectBalanceEntries.length > 0 ? subjectBalanceEntries.slice(0, 4).map((entry) => (
-              <Badge key={entry.subjectId} className="rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-black text-[#17326B] shadow-[0_8px_18px_-16px_rgba(8,20,54,0.48)]">
+              <Badge key={entry.subjectId} className="student-aggro-body rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-black text-[#17326B] shadow-[0_8px_18px_-16px_rgba(8,20,54,0.48)]">
                 {entry.subjectLabel} {formatMinutesSummary(entry.minutes)}
               </Badge>
             )) : prioritySubjectLabels.slice(0, 4).map((label) => (
-              <Badge key={label} className="rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-black text-[#17326B] shadow-[0_8px_18px_-16px_rgba(8,20,54,0.48)]">
+              <Badge key={label} className="student-aggro-body rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-black text-[#17326B] shadow-[0_8px_18px_-16px_rgba(8,20,54,0.48)]">
                 {label}
               </Badge>
             )))}
             {subjectBalanceEntries.length === 0 && prioritySubjectLabels.length === 0 ? (
-              <Badge className="rounded-full border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white shadow-none">
+              <Badge className="student-aggro-body rounded-full border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white shadow-none">
                 우선 과목을 아직 정하지 않았어요
               </Badge>
             ) : null}
+            </div>
           </div>
 
           <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto]")}>
             <div className="space-y-3">
               {visibleChecklistTasks.length === 0 ? (
-                <div className="rounded-[1.25rem] border border-dashed border-white/20 bg-white/6 px-4 py-6 text-center">
-                  <p className="text-base font-black text-white">오늘 계획이 아직 비어 있어요</p>
-                  <p className="mt-2 break-keep text-[12px] font-semibold leading-5 text-white/70">
+                <div className="rounded-[1.25rem] border border-dashed border-white/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.05)_100%)] px-4 py-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+                  <p className="font-aggro-display text-[1.05rem] font-black text-white">오늘 계획이 아직 비어 있어요</p>
+                  <p className="student-aggro-body mt-2 break-keep text-[12px] font-semibold leading-5 text-white/70">
                     첫 공부 블록이나 기타 일정 하나만 적어도 충분해요. 오늘 바로 시작할 수 있는 것부터 가볍게 넣어보세요.
                   </p>
                   <Button
                     type="button"
                     variant="secondary"
-                    className="mt-4 h-10 rounded-[1rem] px-5 font-black"
+                    className="student-aggro-body mt-4 h-10 rounded-[1rem] border border-white/12 bg-white px-5 font-black text-[#17326B] shadow-[0_10px_24px_-18px_rgba(6,14,36,0.45)] hover:bg-[#FFF4E8]"
                     onClick={() => openStudyPlanSheet()}
                     disabled={isPast}
                   >
@@ -3150,30 +3203,38 @@ export default function StudyPlanPage() {
                       <div
                         key={task.id}
                         className={cn(
-                          "flex items-center justify-between gap-3 rounded-[1.15rem] border px-4 py-3 transition-colors",
-                          task.done ? "border-emerald-300 bg-emerald-50/15" : "border-white/10 bg-white/8"
+                          "flex items-center justify-between gap-3 rounded-[1.15rem] border px-4 py-3 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+                          task.done
+                            ? "border-[#FFB86F]/40 bg-[linear-gradient(180deg,rgba(255,182,101,0.18)_0%,rgba(255,255,255,0.08)_100%)]"
+                            : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.07)_100%)] hover:border-white/16"
                         )}
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className="rounded-full border-none bg-white px-2.5 py-1 text-[9px] font-black text-[#17326B] shadow-none">
+                            <Badge className="student-aggro-body rounded-full border-none bg-white px-2.5 py-1 text-[9px] font-black text-[#17326B] shadow-none">
                               {subjectLabel}
                             </Badge>
                             {isStudyTask && isVolumeTask ? (
-                              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+                              <span className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
                                 분량형
                               </span>
                             ) : null}
                           </div>
-                          <p className={cn("mt-2 break-keep text-sm font-black", task.done ? "text-white/70 line-through" : "text-white")}>
+                          <p className={cn("font-aggro-display mt-2 break-keep text-[1rem] font-black tracking-[-0.03em]", task.done ? "text-white/70 line-through" : "text-white")}>
                             {task.title}
                           </p>
-                          <p className="mt-1 text-[11px] font-semibold text-white/68">{metaLabel}</p>
+                          <p className="student-aggro-body mt-1 text-[11px] font-semibold text-white/68">{metaLabel}</p>
                         </div>
                         <Button
                           type="button"
                           variant={task.done ? 'outline' : 'secondary'}
-                          className={cn("shrink-0 rounded-full px-4 font-black", isMobile ? "h-9 text-[11px]" : "h-10 text-xs")}
+                          className={cn(
+                            "student-aggro-body shrink-0 rounded-full px-4 font-black shadow-none",
+                            task.done
+                              ? "border-white/16 bg-white/8 text-white hover:bg-white/12 hover:text-white"
+                              : "border border-white/12 bg-white text-[#17326B] hover:bg-[#FFF4E8]",
+                            isMobile ? "h-9 text-[11px]" : "h-10 text-xs"
+                          )}
                           onClick={() => void handleToggleTask(task as WithId<StudyPlanItem>)}
                           disabled={isPast}
                         >
@@ -3183,7 +3244,7 @@ export default function StudyPlanPage() {
                     );
                   })}
                   {hiddenChecklistTaskCount > 0 ? (
-                    <p className="text-[11px] font-semibold text-white/70">
+                    <p className="student-aggro-body text-[11px] font-semibold text-white/70">
                       나머지 {hiddenChecklistTaskCount}개는 계획 수정에서 이어서 볼 수 있어요.
                     </p>
                   ) : null}
@@ -3194,7 +3255,7 @@ export default function StudyPlanPage() {
             <div className={cn("flex gap-2", isMobile ? "grid grid-cols-2" : "flex-col justify-start")}>
               <Button
                 type="button"
-                className={cn("rounded-[1rem] font-black text-white bg-gradient-to-r shadow-lg", isMobile ? "h-11 text-[12px]" : "h-11 min-w-[132px] text-xs", rewardGradient)}
+                className={cn("student-aggro-body rounded-[1rem] border border-white/10 font-black text-white bg-gradient-to-r shadow-[0_18px_28px_-24px_rgba(255,138,42,0.6)]", isMobile ? "h-11 text-[12px]" : "h-11 min-w-[132px] text-xs", rewardGradient)}
                 onClick={() => openStudyPlanSheet()}
                 disabled={isPast}
               >
@@ -3204,7 +3265,7 @@ export default function StudyPlanPage() {
               <Button
                 type="button"
                 variant="outline"
-                className={cn("rounded-[1rem] border-white/25 bg-white/8 font-black text-white hover:bg-white/12", isMobile ? "h-11 text-[12px]" : "h-11 min-w-[132px] text-xs")}
+                className={cn("student-aggro-body rounded-[1rem] border-white/18 bg-white/8 font-black text-white hover:bg-white/12 hover:text-white", isMobile ? "h-11 text-[12px]" : "h-11 min-w-[132px] text-xs")}
                 onClick={() => setIsStudyPlanSheetOpen(true)}
               >
                 <PencilLine className="mr-2 h-4 w-4" />
@@ -3213,15 +3274,15 @@ export default function StudyPlanPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-4">
+          <div className="rounded-[1.2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(8,20,49,0.18)_0%,rgba(255,255,255,0.06)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/65">빠른 추가</p>
+              <p className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.18em] text-white/65">빠른 추가</p>
               {PLANNER_QUICK_TASK_SUGGESTIONS.slice(0, 4).map((suggestion) => (
                 <button
                   key={suggestion.id}
                   type="button"
                   onClick={() => void handleQuickAddSuggestion(suggestion.id)}
-                  className="rounded-full border border-white/18 bg-white/10 px-3 py-1.5 text-[10px] font-black text-white transition hover:bg-white/16"
+                  className="student-aggro-body rounded-full border border-white/16 bg-white px-3 py-1.5 text-[10px] font-black text-[#17326B] transition hover:border-[#FFB665]/60 hover:bg-[#FFF4E8]"
                   disabled={isPast}
                 >
                   {suggestion.title}
@@ -3232,24 +3293,24 @@ export default function StudyPlanPage() {
         </div>
       </section>
 
-      <section className={cn("overflow-hidden rounded-[1.7rem] border border-[#DCE6F5] bg-white shadow-[0_20px_48px_-34px_rgba(20,41,95,0.18)]", isMobile ? "rounded-[1.35rem]" : "rounded-[2rem]")}>
+      <section className={cn("student-utility-card overflow-hidden rounded-[1.7rem] border border-[#DCE6F5] bg-[radial-gradient(circle_at_top_right,rgba(255,166,84,0.16),transparent_18%),linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_20px_48px_-34px_rgba(20,41,95,0.18)]", isMobile ? "rounded-[1.35rem]" : "rounded-[2rem]")}>
         <div className={cn("space-y-4", isMobile ? "p-4" : "p-5")}>
           <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
             <div className="min-w-0">
-              <Badge className="border-none bg-primary/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-primary shadow-none">
+              <Badge className="student-aggro-kicker border-none bg-[#14295F]/8 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-[#14295F] shadow-none">
                 이번 주 독서실 일정
               </Badge>
-              <h2 className={cn("mt-3 font-black tracking-tight text-[#17326B]", isMobile ? "text-lg" : "text-[1.35rem]")}>
+              <h2 className={cn("font-aggro-display mt-3 font-black tracking-[-0.04em] text-[#17326B]", isMobile ? "text-[1.18rem] leading-7" : "text-[1.55rem] leading-[1.2]")}>
                 월요일부터 일요일까지, 이번 주 출입 계획을 한눈에 확인해요
               </h2>
-              <p className={cn("mt-2 break-keep font-semibold text-[#5A6F95]", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
+              <p className={cn("student-aggro-body mt-2 break-keep font-semibold text-[#5A6F95]", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
                 주간 overview만 먼저 보고, 자세한 수정은 시트에서 가볍게 이어가면 됩니다.
               </p>
             </div>
             <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-wrap justify-end")}>
               <Button
                 type="button"
-                className={cn("rounded-xl font-black text-white bg-gradient-to-r", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs", rewardGradient)}
+                className={cn("student-aggro-body rounded-xl border border-[#14295F]/10 font-black text-white bg-gradient-to-r shadow-[0_14px_26px_-20px_rgba(255,138,42,0.48)]", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs", rewardGradient)}
                 onClick={() => openAttendanceSheetForDate(tomorrowDate, 'today')}
               >
                 내일 일정 수정하기
@@ -3257,7 +3318,7 @@ export default function StudyPlanPage() {
               <Button
                 type="button"
                 variant="outline"
-                className={cn("rounded-xl border-2 bg-white font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
+                className={cn("student-aggro-body rounded-xl border border-[#D8E3F2] bg-white font-black text-[#17326B] hover:bg-[#FFF7EF]", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
                 onClick={() => {
                   setAttendanceSheetInitialTab('weekday');
                   setIsAttendanceScheduleSheetOpen(true);
@@ -3269,20 +3330,20 @@ export default function StudyPlanPage() {
           </div>
 
           {scheduleRecommendationPrefill ? (
-            <div className="rounded-[1.15rem] border border-[#FFE2C5] bg-[#FFF7EF] px-4 py-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#D86A11]">플래너 연동 추천</p>
-              <p className="mt-2 break-keep text-sm font-black text-[#17326B]">
+            <div className="rounded-[1.15rem] border border-[#FFE2C5] bg-[#FFF7EF] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+              <p className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.18em] text-[#D86A11]">플래너 연동 추천</p>
+              <p className="font-aggro-display mt-2 break-keep text-[1.02rem] font-black text-[#17326B]">
                 이번 주 권장 등원 {scheduleRecommendationPrefill.recommendedWeeklyDays}일 · 하루 권장 공부 {formatMinutesSummary(scheduleRecommendationPrefill.recommendedDailyStudyMinutes)}
               </p>
-              <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#6C5A49]">
+              <p className="student-aggro-body mt-1 break-keep text-[12px] font-semibold leading-5 text-[#6C5A49]">
                 추천 등원 {scheduleRecommendationPrefill.recommendedArrivalTime} · 추천 하원 {scheduleRecommendationPrefill.recommendedDepartureTime}
               </p>
             </div>
           ) : null}
 
           {needsTomorrowSchedule ? (
-            <div className="rounded-[1.15rem] border border-[#FFD7B5] bg-[#FFF4E8] px-4 py-4">
-              <p className="text-sm font-black text-[#17326B]">내일 독서실 일정이 아직 없어요. 오늘 미리 정해두면 좋아요.</p>
+            <div className="rounded-[1.15rem] border border-[#FFD7B5] bg-[#FFF4E8] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+              <p className="font-aggro-display text-[1rem] font-black text-[#17326B]">내일 독서실 일정이 아직 없어요. 오늘 미리 정해두면 좋아요.</p>
             </div>
           ) : null}
 
@@ -3292,18 +3353,18 @@ export default function StudyPlanPage() {
               variant="outline"
               size="icon"
               onClick={() => moveWeek(-1)}
-              className={cn("rounded-xl border-2 bg-white text-primary hover:bg-primary hover:text-white", isMobile ? "h-9 w-9" : "h-10 w-10")}
+              className={cn("rounded-xl border border-[#D8E3F2] bg-white text-[#17326B] hover:border-[#17326B] hover:bg-[#17326B] hover:text-white", isMobile ? "h-9 w-9" : "h-10 w-10")}
               aria-label="지난 주 보기"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <p className="text-center text-[11px] font-black uppercase tracking-[0.18em] text-[#8AA0C7]">{weekRangeLabel}</p>
+            <p className="student-aggro-kicker text-center text-[11px] font-black uppercase tracking-[0.18em] text-[#8AA0C7]">{weekRangeLabel}</p>
             <Button
               type="button"
               variant="outline"
               size="icon"
               onClick={() => moveWeek(1)}
-              className={cn("rounded-xl border-2 bg-white text-primary hover:bg-primary hover:text-white", isMobile ? "h-9 w-9" : "h-10 w-10")}
+              className={cn("rounded-xl border border-[#D8E3F2] bg-white text-[#17326B] hover:border-[#17326B] hover:bg-[#17326B] hover:text-white", isMobile ? "h-9 w-9" : "h-10 w-10")}
               aria-label="다음 주 보기"
             >
               <ChevronRight className="h-4 w-4" />
@@ -3318,23 +3379,25 @@ export default function StudyPlanPage() {
                 onClick={() => openAttendanceSheetForDate(day.date, 'today')}
                 className={cn(
                   "rounded-[1rem] border px-2 py-3 text-left transition-all",
-                  day.isSelected ? "border-primary bg-[#F2F6FF] shadow-sm" : "border-[#E5ECF7] bg-white hover:border-primary/30",
-                  day.isToday && !day.isSelected && "border-primary/30"
+                  day.isSelected
+                    ? "border-[#17326B] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.3)]"
+                    : "border-[#E5ECF7] bg-white hover:-translate-y-[1px] hover:border-[#FFB665]/70",
+                  day.isToday && !day.isSelected && "border-[#FFB665]/70"
                 )}
               >
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#8AA0C7]">{day.weekdayLabel}</p>
-                <p className="mt-2 text-base font-black tracking-tight text-[#17326B]">{day.dateLabel}</p>
+                <p className="student-aggro-kicker text-[9px] font-black uppercase tracking-[0.16em] text-[#8AA0C7]">{day.weekdayLabel}</p>
+                <p className="font-aggro-display mt-2 text-base font-black tracking-[-0.03em] text-[#17326B]">{day.dateLabel}</p>
                 <Badge
                   className={cn(
-                    'mt-3 rounded-full border px-2 py-0.5 text-[8px] font-black shadow-none',
+                    'student-aggro-body mt-3 rounded-full border px-2 py-0.5 text-[8px] font-black shadow-none',
                     SCHEDULE_STATUS_BADGE_TONE[day.status] || SCHEDULE_STATUS_BADGE_TONE['미정']
                   )}
                 >
                   {day.status}
                 </Badge>
-                <p className="mt-1 break-keep text-[10px] font-semibold leading-4 text-[#5A6F95]">{day.timeLabel}</p>
+                <p className="student-aggro-body mt-1 break-keep text-[10px] font-semibold leading-4 text-[#5A6F95]">{day.timeLabel}</p>
                 {day.hasExcursion ? (
-                  <Badge className="mt-2 rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-2 py-0.5 text-[8px] font-black text-[#D86A11] shadow-none">
+                  <Badge className="student-aggro-body mt-2 rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-2 py-0.5 text-[8px] font-black text-[#D86A11] shadow-none">
                     외출
                   </Badge>
                 ) : null}
@@ -3342,30 +3405,31 @@ export default function StudyPlanPage() {
             ))}
           </div>
 
-          <div className="rounded-[1.15rem] border border-[#E6EDF8] bg-[#F8FBFF] px-4 py-4">
+          <div className="rounded-[1.15rem] border border-[#E6EDF8] bg-[#F8FBFF] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
             <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8AA0C7]">선택한 날짜</p>
+                <p className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.18em] text-[#8AA0C7]">선택한 날짜</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-black text-[#17326B]">{selectedDateTitle}</p>
+                  <p className="font-aggro-display text-[1.02rem] font-black text-[#17326B]">{selectedDateTitle}</p>
                   <Badge
                     className={cn(
-                      'rounded-full border px-2.5 py-1 text-[9px] font-black shadow-none',
+                      'student-aggro-body rounded-full border px-2.5 py-1 text-[9px] font-black shadow-none',
                       SCHEDULE_STATUS_BADGE_TONE[selectedScheduleOverview?.status || '미정'] || SCHEDULE_STATUS_BADGE_TONE['미정']
                     )}
                   >
                     {selectedScheduleOverview?.status || '미정'}
                   </Badge>
                 </div>
-                <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                <p className="student-aggro-body mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
                   {selectedScheduleOverview?.timeLabel || '아직 정해진 시간이 없어요.'}
                 </p>
               </div>
               <Button
                 type="button"
                 variant="secondary"
-                className={cn("rounded-xl font-black", isMobile ? "h-10 w-full text-[11px]" : "h-10 px-4 text-xs")}
+                className={cn("student-aggro-body rounded-xl border border-[#17326B]/10 bg-[#17326B] font-black text-white hover:bg-[#102756]", isMobile ? "h-10 w-full text-[11px]" : "h-10 px-4 text-xs")}
                 onClick={() => openAttendanceSheetForDate(selectedDate, 'today')}
+                disabled={isPast}
               >
                 이 날짜만 수정
               </Button>
