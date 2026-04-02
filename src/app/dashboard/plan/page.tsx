@@ -89,6 +89,14 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   EMPTY_ATTENDANCE_SCHEDULE_DRAFT,
   ROUTINE_TEMPLATE_OPTIONS,
   STUDY_PLAN_MODE_OPTIONS,
@@ -221,6 +229,24 @@ function buildStudyTaskMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetM
     return `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel} · ${progressRate}%`;
   }
   return task.targetMinutes ? `${task.targetMinutes}분 목표` : '시간 자유';
+}
+
+function buildChecklistMeta(task: Pick<StudyPlanItem, 'category' | 'studyPlanMode' | 'targetMinutes' | 'targetAmount' | 'actualAmount' | 'amountUnit' | 'amountUnitLabel' | 'done' | 'completedWithinPlannedTime' | 'completionOvertimeMinutes'>) {
+  if (task.category === 'personal') {
+    if (task.done && (task.completionOvertimeMinutes || 0) > 0) {
+      return `기타 일정 · ${task.completionOvertimeMinutes}분 더 걸림`;
+    }
+    return task.done ? '기타 일정 · 완료' : '기타 일정';
+  }
+
+  const baseMeta = buildStudyTaskMeta(task);
+  if (task.done && task.completedWithinPlannedTime === false && (task.completionOvertimeMinutes || 0) > 0) {
+    return `${baseMeta} · ${task.completionOvertimeMinutes}분 더 걸림`;
+  }
+  if (task.done && task.completedWithinPlannedTime === true) {
+    return `${baseMeta} · 제시간 완료`;
+  }
+  return baseMeta;
 }
 
 function normalizeStudyTitle(title: string) {
@@ -481,6 +507,11 @@ export default function StudyPlanPage() {
     source?: string;
     createdAtISO?: string;
   }>(null);
+  const [completionReviewItem, setCompletionReviewItem] = useState<WithId<StudyPlanItem> | null>(null);
+  const [completionWithinPlannedTime, setCompletionWithinPlannedTime] = useState(true);
+  const [completionOvertimeMinutes, setCompletionOvertimeMinutes] = useState('10');
+  const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
+  const [isCompletionSubmitting, setIsCompletionSubmitting] = useState(false);
 
   useEffect(() => {
     const requestedDate = searchParams.get('date');
@@ -503,6 +534,12 @@ export default function StudyPlanPage() {
 
     setSelectedDate(nextDate);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!completionReviewItem) return;
+    setCompletionWithinPlannedTime(true);
+    setCompletionOvertimeMinutes('10');
+  }, [completionReviewItem]);
 
   useEffect(() => {
     if (!user || !searchParams.get('schedulePrefill')) return;
@@ -820,25 +857,10 @@ export default function StudyPlanPage() {
 
   useEffect(() => {
     if (!isStudent || planTrackEntryMode !== 'auto' || isStudentProfileLoading) return;
-    if (hasSeenRoutineOnboarding) {
-      setPlanTrackEntryMode('planner');
-      return;
-    }
-    setPlanTrackEntryMode('onboarding');
-    if (studentProfileRef && !onboardingPresentationRef.current) {
+    if (!hasSeenRoutineOnboarding && !onboardingPresentationRef.current) {
       onboardingPresentationRef.current = true;
-      void setDoc(
-        studentProfileRef,
-        {
-          studyRoutineOnboarding: {
-            presentedAt: serverTimestamp(),
-            version: PLAN_TRACK_ONBOARDING_VERSION,
-            updatedAt: serverTimestamp(),
-          },
-        },
-        { merge: true }
-      );
     }
+    setPlanTrackEntryMode('planner');
   }, [
     hasSeenRoutineOnboarding,
     isStudent,
@@ -1239,8 +1261,8 @@ export default function StudyPlanPage() {
     () => [...studyTimeSummary.labeledBreakdown].sort((left, right) => right.minutes - left.minutes),
     [studyTimeSummary.labeledBreakdown]
   );
-  const visibleStudyTasks = useMemo(() => orderedChecklistTasks.filter((task) => task.category === 'study' || !task.category).slice(0, 5), [orderedChecklistTasks]);
-  const hiddenStudyTaskCount = Math.max(0, studyTasks.length - visibleStudyTasks.length);
+  const visibleChecklistTasks = useMemo(() => orderedChecklistTasks.slice(0, 5), [orderedChecklistTasks]);
+  const hiddenChecklistTaskCount = Math.max(0, checklistTasks.length - visibleChecklistTasks.length);
   const latestDiagnostic = studentProfile?.studyPlannerDiagnostic || null;
   const mainRecommendations = useMemo(
     () =>
@@ -2545,23 +2567,111 @@ export default function StudyPlanPage() {
     if (resolveStudyPlanMode(item) === 'volume') return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     const nextState = !item.done;
-    
-    await updateDoc(itemRef, { done: nextState, updatedAt: serverTimestamp() });
-    
-    if (nextState) {
-      const nextCompletedCount = checklistTasks.filter((task) => task.id !== item.id && task.done).length + 1;
-      const awarded = await awardPlannerCompletionPoints(item, nextCompletedCount, checklistTasks.length);
+
+    if (!nextState) {
+      await updateDoc(itemRef, {
+        done: false,
+        completedAt: null,
+        completedWithinPlannedTime: null,
+        completionOvertimeMinutes: null,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+
+    setCompletionReviewItem(item);
+    setIsCompletionDialogOpen(true);
+  };
+
+  const handleConfirmTaskCompletion = useCallback(async () => {
+    if (
+      !completionReviewItem ||
+      !firestore ||
+      !user ||
+      !activeMembership ||
+      !isStudent ||
+      !weekKey ||
+      !selectedDateKey
+    ) {
+      return;
+    }
+
+    const overtimeMinutes = completionWithinPlannedTime
+      ? 0
+      : Math.max(0, Math.round(Number(completionOvertimeMinutes) || 0));
+
+    if (!completionWithinPlannedTime && overtimeMinutes <= 0) {
+      toast({
+        variant: 'destructive',
+        title: '추가로 걸린 시간을 적어주세요',
+        description: '계획보다 더 걸렸다면 몇 분 더 걸렸는지 입력해주시면 돼요.',
+      });
+      return;
+    }
+
+    setIsCompletionSubmitting(true);
+    try {
+      const itemRef = doc(
+        firestore,
+        'centers',
+        activeMembership.id,
+        'plans',
+        user.uid,
+        'weeks',
+        weekKey,
+        'items',
+        completionReviewItem.id
+      );
+
+      await updateDoc(itemRef, {
+        done: true,
+        completedAt: serverTimestamp(),
+        completedWithinPlannedTime: completionWithinPlannedTime,
+        completionOvertimeMinutes: completionWithinPlannedTime ? 0 : overtimeMinutes,
+        updatedAt: serverTimestamp(),
+      });
+
+      const nextCompletedCount =
+        checklistTasks.filter((task) => task.id !== completionReviewItem.id && task.done).length + 1;
+      const awarded = await awardPlannerCompletionPoints(
+        completionReviewItem,
+        nextCompletedCount,
+        checklistTasks.length
+      );
+
       if (awarded > 0) {
         pushFloatingPointBurst(`+${awarded}`);
-        toast({
-          title: `+${awarded} 포인트`,
-          description: nextCompletedCount === checklistTasks.length
-            ? '오늘 계획을 끝까지 밀어붙였어요.'
-            : '체크와 동시에 포인트가 반영됐어요.',
-        });
       }
+
+      toast({
+        title: completionWithinPlannedTime ? '제시간에 완료했어요' : '완료 시간까지 함께 기록했어요',
+        description: completionWithinPlannedTime
+          ? awarded > 0
+            ? `계획 완료와 함께 +${awarded} 포인트가 반영됐어요.`
+            : '완료 체크가 반영됐어요.'
+          : `${overtimeMinutes}분 더 걸린 기록까지 저장했어요.`,
+      });
+
+      setIsCompletionDialogOpen(false);
+      setCompletionReviewItem(null);
+    } finally {
+      setIsCompletionSubmitting(false);
     }
-  };
+  }, [
+    activeMembership,
+    awardPlannerCompletionPoints,
+    checklistTasks,
+    completionOvertimeMinutes,
+    completionReviewItem,
+    completionWithinPlannedTime,
+    firestore,
+    isStudent,
+    pushFloatingPointBurst,
+    selectedDateKey,
+    toast,
+    user,
+    weekKey,
+  ]);
 
   const handleCommitStudyActualAmount = async (item: WithId<StudyPlanItem>, nextActualAmount: number) => {
     if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
@@ -2857,7 +2967,7 @@ export default function StudyPlanPage() {
                 {selectedDateTitle}
               </h2>
               <p className={cn("mt-2 break-keep font-semibold text-white/72", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
-                오늘 해야 할 공부를 먼저 적고, 끝낸 블록부터 가볍게 체크해보세요.
+                오늘 해야 할 공부와 기타 일정을 먼저 적고, 끝낸 항목부터 가볍게 체크해보세요.
               </p>
             </div>
             <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-3")}>
@@ -2867,7 +2977,7 @@ export default function StudyPlanPage() {
               </div>
               <div className="rounded-[1.15rem] border border-white/10 bg-white/8 px-4 py-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/65">등록 투두</p>
-                <p className="mt-2 text-xl font-black tracking-tight text-white">{studyTasks.length}개</p>
+                <p className="mt-2 text-xl font-black tracking-tight text-white">{checklistTasks.length}개</p>
               </div>
               <div className={cn("rounded-[1.15rem] border border-white/10 bg-white/8 px-4 py-3", isMobile && "col-span-2")}>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/65">오늘 목표 대비</p>
@@ -2908,11 +3018,11 @@ export default function StudyPlanPage() {
 
           <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto]")}>
             <div className="space-y-3">
-              {visibleStudyTasks.length === 0 ? (
+              {visibleChecklistTasks.length === 0 ? (
                 <div className="rounded-[1.25rem] border border-dashed border-white/20 bg-white/6 px-4 py-6 text-center">
                   <p className="text-base font-black text-white">오늘 계획이 아직 비어 있어요</p>
                   <p className="mt-2 break-keep text-[12px] font-semibold leading-5 text-white/70">
-                    첫 블록만 적어도 충분해요. 예를 들어 수학 60분, 영어 단어 30분처럼 오늘 바로 시작할 수 있는 것부터 넣어보세요.
+                    첫 공부 블록이나 기타 일정 하나만 적어도 충분해요. 오늘 바로 시작할 수 있는 것부터 가볍게 넣어보세요.
                   </p>
                   <Button
                     type="button"
@@ -2926,12 +3036,11 @@ export default function StudyPlanPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {visibleStudyTasks.map((task) => {
-                    const subjectLabel = resolveSubjectLabel(task.subject, task.subjectLabel);
+                  {visibleChecklistTasks.map((task) => {
+                    const isStudyTask = task.category === 'study' || !task.category;
+                    const subjectLabel = isStudyTask ? resolveSubjectLabel(task.subject, task.subjectLabel) : '기타 일정';
                     const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
-                    const metaLabel = isVolumeTask
-                      ? `${task.targetAmount || 0}${resolveAmountUnitLabel(task)}`
-                      : `${task.targetMinutes || 0}분`;
+                    const metaLabel = buildChecklistMeta(task);
                     return (
                       <div
                         key={task.id}
@@ -2945,7 +3054,7 @@ export default function StudyPlanPage() {
                             <Badge className="rounded-full border-none bg-white px-2.5 py-1 text-[9px] font-black text-[#17326B] shadow-none">
                               {subjectLabel}
                             </Badge>
-                            {isVolumeTask ? (
+                            {isStudyTask && isVolumeTask ? (
                               <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
                                 분량형
                               </span>
@@ -2954,7 +3063,7 @@ export default function StudyPlanPage() {
                           <p className={cn("mt-2 break-keep text-sm font-black", task.done ? "text-white/70 line-through" : "text-white")}>
                             {task.title}
                           </p>
-                          <p className="mt-1 text-[11px] font-semibold text-white/68">{metaLabel} · {buildStudyTaskMeta(task)}</p>
+                          <p className="mt-1 text-[11px] font-semibold text-white/68">{metaLabel}</p>
                         </div>
                         <Button
                           type="button"
@@ -2968,9 +3077,9 @@ export default function StudyPlanPage() {
                       </div>
                     );
                   })}
-                  {hiddenStudyTaskCount > 0 ? (
+                  {hiddenChecklistTaskCount > 0 ? (
                     <p className="text-[11px] font-semibold text-white/70">
-                      나머지 {hiddenStudyTaskCount}개는 계획 수정에서 이어서 볼 수 있어요.
+                      나머지 {hiddenChecklistTaskCount}개는 계획 수정에서 이어서 볼 수 있어요.
                     </p>
                   ) : null}
                 </div>
@@ -3014,102 +3123,6 @@ export default function StudyPlanPage() {
                 </button>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className={cn("overflow-hidden rounded-[1.7rem] border border-[#DCE6F5] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_22px_54px_-38px_rgba(20,41,95,0.18)]", isMobile ? "rounded-[1.35rem]" : "rounded-[2rem]")}>
-        <div className={cn("space-y-4", isMobile ? "p-4" : "p-5")}>
-          <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
-            <div className="min-w-0">
-              <Badge className="border-none bg-primary/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-primary shadow-none">
-                오늘의 학습 추천
-              </Badge>
-              <h2 className={cn("mt-3 font-black tracking-tight text-[#17326B]", isMobile ? "text-lg" : "text-[1.35rem]")}>
-                최근 계획과 학습 기준을 바탕으로, 오늘은 이 정도만 바꿔보세요.
-              </h2>
-              <p className={cn("mt-2 break-keep font-semibold text-[#5A6F95]", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
-                긴 리포트 대신 오늘 바로 반영할 수 있는 제안만 1~2개로 정리했어요.
-              </p>
-            </div>
-            <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-wrap justify-end")}>
-              <Button
-                type="button"
-                variant="outline"
-                className={cn("rounded-xl border-2 bg-white font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
-                onClick={() => setPlanTrackEntryMode('onboarding')}
-              >
-                {hasRoutineProfile ? '학습 기준 다시 진단하기' : '학습 기준 진단하기'}
-              </Button>
-              <Button asChild variant="secondary" className={cn("rounded-xl font-black", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}>
-                <Link href="/dashboard/plan/diagnosis">{latestDiagnostic ? '전체 진단 결과 보기' : '학습 플래너 진단하기'}</Link>
-              </Button>
-            </div>
-          </div>
-
-          {hasRoutineProfile ? (
-            <div className="rounded-[1.1rem] border border-[#E6EDF8] bg-white px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8AA0C7]">저장된 학습 기준</p>
-              <p className="mt-1 text-sm font-black text-[#17326B]">{routineGuideSummary}</p>
-            </div>
-          ) : (
-            <div className="rounded-[1.1rem] border border-[#FFE2C5] bg-[#FFF7EF] px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#D86A11]">기준이 아직 없어요</p>
-              <p className="mt-1 text-sm font-black text-[#17326B]">처음 한 번만 답해두면 이후엔 자동으로 뜨지 않고, 계획을 읽는 기준으로만 사용돼요.</p>
-            </div>
-          )}
-
-          <div className="grid gap-3">
-            {mainRecommendations.map((recommendation) => {
-              const isExpanded = expandedRecommendationIds.includes(recommendation.id);
-              return (
-                <Collapsible
-                  key={recommendation.id}
-                  open={isExpanded}
-                  onOpenChange={(open) =>
-                    setExpandedRecommendationIds((previous) =>
-                      open ? [...new Set([...previous, recommendation.id])] : previous.filter((item) => item !== recommendation.id)
-                    )
-                  }
-                >
-                  <div className="rounded-[1.25rem] border border-[#E1EAF7] bg-white px-4 py-4 shadow-[0_14px_32px_-28px_rgba(20,41,95,0.16)]">
-                    <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
-                      <div className="min-w-0">
-                        <Badge className={cn("rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] shadow-none", RECOMMENDATION_BADGE_TONE[recommendation.badge])}>
-                          {recommendation.badge}
-                        </Badge>
-                        <p className="mt-3 text-base font-black tracking-tight text-[#17326B]">{recommendation.title}</p>
-                        <p className="mt-2 break-keep text-[13px] font-semibold leading-6 text-[#27416C]">{recommendation.action}</p>
-                        <p className="mt-2 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">{recommendation.reason}</p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className={cn("rounded-[0.95rem] font-black", isMobile ? "h-10 w-full text-[11px]" : "h-10 px-4 text-xs")}
-                        onClick={() => openStudyPlanSheet(recommendation.applyPreset)}
-                        disabled={isPast}
-                      >
-                        오늘 계획에 반영하기
-                      </Button>
-                    </div>
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="mt-3 h-9 rounded-[0.95rem] px-3 text-[11px] font-black text-[#17326B] hover:bg-[#F4F7FC]"
-                      >
-                        왜 이렇게 추천했나요?
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="mt-2 rounded-[1rem] border border-[#EEF3FB] bg-[#F8FBFF] px-3 py-3">
-                        <p className="break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">{recommendation.explainWhy}</p>
-                      </div>
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-              );
-            })}
           </div>
         </div>
       </section>
@@ -3240,6 +3253,136 @@ export default function StudyPlanPage() {
           </div>
         </div>
       </section>
+
+      <Dialog
+        open={isCompletionDialogOpen}
+        onOpenChange={(open) => {
+          setIsCompletionDialogOpen(open);
+          if (!open && !isCompletionSubmitting) {
+            setCompletionReviewItem(null);
+          }
+        }}
+      >
+        <DialogContent className="w-[min(92vw,28rem)] rounded-[1.8rem] border border-[#E5ECF7] bg-white p-0 shadow-[0_24px_60px_-30px_rgba(20,41,95,0.32)]">
+          <div className="rounded-t-[1.8rem] bg-[linear-gradient(180deg,#17326B_0%,#21448D_100%)] px-6 py-5 text-white">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-xl font-black tracking-tight text-white">
+                완료 체크 전에 한 번만 확인할게요
+              </DialogTitle>
+              <DialogDescription className="mt-1 break-keep text-[12px] font-semibold leading-5 text-white/72">
+                {completionReviewItem?.category === 'personal'
+                  ? '기타 일정도 완료 체크할 수 있어요. 예상보다 더 걸렸다면 시간도 같이 남겨둘 수 있어요.'
+                  : '계획한 시간 안에 끝났는지 같이 기록해두면, 다음 추천이 더 정확해져요.'}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-4 px-6 py-5">
+            {completionReviewItem ? (
+              <div className="rounded-[1.2rem] border border-[#E6EDF8] bg-[#F8FBFF] px-4 py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border-none bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary shadow-none">
+                    {completionReviewItem.category === 'personal'
+                      ? '기타 일정'
+                      : resolveSubjectLabel(completionReviewItem.subject, completionReviewItem.subjectLabel)}
+                  </Badge>
+                  {completionReviewItem.category !== 'personal' ? (
+                    <span className="text-[10px] font-black text-[#8AA0C7]">
+                      {buildStudyTaskMeta(completionReviewItem)}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-2 break-keep text-base font-black text-[#17326B]">
+                  {completionReviewItem.title}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCompletionWithinPlannedTime(true)}
+                className={cn(
+                  'rounded-[1.15rem] border px-4 py-4 text-left transition-all',
+                  completionWithinPlannedTime
+                    ? 'border-[#FFB347] bg-[#FFF4E8] shadow-[0_12px_28px_-20px_rgba(216,106,17,0.35)]'
+                    : 'border-[#E6EDF8] bg-white'
+                )}
+              >
+                <p className="text-sm font-black text-[#17326B]">제시간에 끝냈어요</p>
+                <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                  계획한 흐름 안에서 마무리했다면 이대로 저장하면 돼요.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompletionWithinPlannedTime(false)}
+                className={cn(
+                  'rounded-[1.15rem] border px-4 py-4 text-left transition-all',
+                  !completionWithinPlannedTime
+                    ? 'border-[#FFB347] bg-[#FFF4E8] shadow-[0_12px_28px_-20px_rgba(216,106,17,0.35)]'
+                    : 'border-[#E6EDF8] bg-white'
+                )}
+              >
+                <p className="text-sm font-black text-[#17326B]">더 걸렸어요</p>
+                <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                  계획보다 더 걸렸다면 얼마나 더 걸렸는지만 적어둘 수 있어요.
+                </p>
+              </button>
+            </div>
+
+            {!completionWithinPlannedTime ? (
+              <div className="rounded-[1.15rem] border border-[#FFE2C5] bg-[#FFF8F1] px-4 py-4">
+                <Label htmlFor="completion-overtime" className="text-[12px] font-black text-[#17326B]">
+                  추가로 걸린 시간
+                </Label>
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    id="completion-overtime"
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={completionOvertimeMinutes}
+                    onChange={(event) => setCompletionOvertimeMinutes(event.target.value)}
+                    className="h-12 rounded-[1rem] border-[#FFD7B5] bg-white text-base font-black text-[#17326B]"
+                  />
+                  <span className="text-sm font-black text-[#D86A11]">분</span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="flex-col gap-2 border-t border-[#EEF3FB] bg-[#FCFDFF] px-6 py-4 sm:flex-col">
+            <Button
+              type="button"
+              onClick={() => void handleConfirmTaskCompletion()}
+              disabled={isCompletionSubmitting}
+              className={cn('h-12 w-full rounded-[1rem] font-black text-white bg-gradient-to-r', rewardGradient)}
+            >
+              {isCompletionSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  저장 중
+                </>
+              ) : (
+                '완료 기록 저장'
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsCompletionDialogOpen(false);
+                setCompletionReviewItem(null);
+              }}
+              disabled={isCompletionSubmitting}
+              className="h-11 w-full rounded-[1rem] border-[#DCE6F5] bg-white font-black text-[#17326B]"
+            >
+              다시 보기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <RecentStudySheet
         open={isRecentStudySheetOpen}

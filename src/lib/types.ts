@@ -761,6 +761,9 @@ export interface StudyPlanItem {
   endTime?: string;
   priority?: 'low' | 'medium' | 'high';
   tag?: string;
+  completedAt?: Timestamp | null;
+  completedWithinPlannedTime?: boolean | null;
+  completionOvertimeMinutes?: number | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

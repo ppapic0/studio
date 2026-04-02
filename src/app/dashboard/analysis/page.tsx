@@ -777,14 +777,6 @@ export default function AnalysisTrackPage() {
     () => (isMobile ? dungeonCards.filter((card) => card.unlocked) : dungeonCards),
     [dungeonCards, isMobile]
   );
-  const unlockedDungeonCount = useMemo(
-    () => visibleDungeonCards.filter((card) => card.unlocked).length,
-    [visibleDungeonCards]
-  );
-  const availableDungeonRewards = useMemo(
-    () => visibleDungeonCards.filter((card) => card.unlocked).reduce((sum, card) => sum + card.reward, 0),
-    [visibleDungeonCards]
-  );
 
   if (!user) {
     return (
@@ -826,7 +818,7 @@ export default function AnalysisTrackPage() {
                 </div>
                 <p className="surface-caption mt-2 text-sm font-semibold">오늘도 성장한 하루를 만드는 중이에요.</p>
 
-                <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-3')}>
+                <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-2')}>
                   <div className="surface-card surface-card--light rounded-[1.2rem] px-4 py-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">오늘 상태</p>
                     <p className="mt-2 text-2xl font-black text-[var(--text-primary)]">{minutesToCompactLabel(todayMinutes)}</p>
@@ -836,11 +828,6 @@ export default function AnalysisTrackPage() {
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">상승 폭</p>
                     <p className="mt-2 text-2xl font-black text-[var(--accent-orange)]">{signedPercent(kpi.weekDiffPct)}</p>
                     <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">지난 주 대비</p>
-                  </div>
-                  <div className={cn('surface-card surface-card--highlight rounded-[1.2rem] px-4 py-4', isMobile && 'col-span-2')}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-accent)]">열린 분석</p>
-                    <p className="mt-2 text-2xl font-black text-[var(--text-on-accent)]">{unlockedDungeonCount}개</p>
-                    <p className="mt-1 text-[11px] font-semibold text-[rgba(14,28,56,0.76)]">확인 가능한 보상 +{availableDungeonRewards}P</p>
                   </div>
                 </div>
 

@@ -1,10 +1,11 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
+import { RoutineOnboardingFlow } from '@/components/dashboard/student-planner/routine-onboarding-flow';
 import { useUser, useFunctions, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2, RefreshCw, Compass, Sparkles, Link2, Phone } from 'lucide-react';
@@ -28,7 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
-import { type StudentProfile, type User as UserType } from '@/lib/types';
+import { type StudentProfile, type User as UserType, type UserStudyProfile } from '@/lib/types';
 
 const inviteFormSchema = z.object({
   inviteCode: z.string().trim().min(1, '초대 코드를 입력해 주세요.'),
@@ -38,6 +39,8 @@ const parentLinkFormSchema = z.object({
   studentLinkCode: z.string().trim().regex(/^\d{6}$/, '학생 코드(6자리 숫자)를 입력해 주세요.'),
   parentPhoneNumber: z.string().trim().optional(),
 });
+
+const PLAN_TRACK_ONBOARDING_VERSION = 1;
 
 function normalizePhone(raw: string): string {
   return raw.replace(/\D/g, '');
@@ -114,6 +117,8 @@ export default function DashboardPage() {
   const [phoneCaptureValue, setPhoneCaptureValue] = useState('');
   const [isPhoneCaptureSaving, setIsPhoneCaptureSaving] = useState(false);
   const [savedPhoneFallback, setSavedPhoneFallback] = useState('');
+  const [hasFinishedStudentOnboarding, setHasFinishedStudentOnboarding] = useState(false);
+  const studentOnboardingPresentationRef = useRef(false);
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const isStudentRole = activeMembership?.role === 'student';
   const isParentRole = activeMembership?.role === 'parent';
@@ -153,6 +158,17 @@ export default function DashboardPage() {
   }, [activeMembership, studentProfile, userProfile?.phoneNumber]);
 
   const effectiveSelfPhone = savedPhoneFallback || resolvedSelfPhone;
+  const studentRoutineOnboarding = studentProfile?.studyRoutineOnboarding;
+  const shouldForceStudentOnboarding =
+    isStudentRole &&
+    !isStudentProfileLoading &&
+    !hasFinishedStudentOnboarding &&
+    !Boolean(
+      studentProfile?.studyRoutineProfile ||
+      studentRoutineOnboarding?.completedAt ||
+      studentRoutineOnboarding?.dismissedAt ||
+      studentRoutineOnboarding?.status
+    );
   const isPhoneLookupReady = useMemo(() => {
     if (!activeMembership || !user) return false;
     if (activeMembership.role === 'student') {
@@ -175,6 +191,22 @@ export default function DashboardPage() {
     setPhoneCaptureValue((prev) => prev || '');
     setIsPhoneCaptureOpen(true);
   }, [activeMembership, user, effectiveSelfPhone, isPhoneLookupReady]);
+
+  useEffect(() => {
+    if (!shouldForceStudentOnboarding || !studentProfileRef || studentOnboardingPresentationRef.current) return;
+    studentOnboardingPresentationRef.current = true;
+    void setDoc(
+      studentProfileRef,
+      {
+        studyRoutineOnboarding: {
+          presentedAt: studentRoutineOnboarding?.presentedAt || serverTimestamp(),
+          version: PLAN_TRACK_ONBOARDING_VERSION,
+          updatedAt: serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+  }, [shouldForceStudentOnboarding, studentProfileRef, studentRoutineOnboarding?.presentedAt]);
 
   async function onInviteSubmit(values: z.infer<typeof inviteFormSchema>) {
     if (!user || !functions) return;
@@ -257,6 +289,47 @@ export default function DashboardPage() {
       { merge: true }
     );
   };
+
+  const handleSaveStudentRoutineProfile = useCallback(
+    async (profile: UserStudyProfile) => {
+      if (!firestore || !user || !activeMembership || !studentProfileRef) return;
+
+      await setDoc(
+        studentProfileRef,
+        {
+          id: user.uid,
+          name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
+          schoolName: studentProfile?.schoolName || '학교 미정',
+          grade: studentProfile?.grade || '학년 미정',
+          seatNo: studentProfile?.seatNo || 0,
+          targetDailyMinutes: studentProfile?.targetDailyMinutes || 240,
+          parentUids: studentProfile?.parentUids || [],
+          createdAt: studentProfile?.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          studyRoutineOnboarding: {
+            presentedAt: studentRoutineOnboarding?.presentedAt || serverTimestamp(),
+            status: 'completed',
+            completedAt: serverTimestamp(),
+            version: PLAN_TRACK_ONBOARDING_VERSION,
+            updatedAt: serverTimestamp(),
+          },
+          studyRoutineProfile: {
+            ...profile,
+            createdAt: studentProfile?.studyRoutineProfile?.createdAt || serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+          studyRoutineWorkspace: null,
+        },
+        { merge: true }
+      );
+
+      toast({
+        title: '학습 기준 저장 완료',
+        description: '이제부터는 직접 쓴 계획을 바탕으로 더 잘 맞는 코칭과 추천을 보여드릴게요.',
+      });
+    },
+    [activeMembership, firestore, studentProfile, studentProfileRef, studentRoutineOnboarding?.presentedAt, toast, user]
+  );
 
   const handleSavePhoneCapture = async () => {
     if (!user || !activeMembership || !firestore) {
@@ -363,6 +436,17 @@ export default function DashboardPage() {
             </DialogContent>
           </Dialog>
         </>
+      );
+    }
+
+    if (userRole === 'student' && shouldForceStudentOnboarding) {
+      return (
+        <RoutineOnboardingFlow
+          studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
+          onSaveRoutineProfile={handleSaveStudentRoutineProfile}
+          onContinueToPlanner={() => setHasFinishedStudentOnboarding(true)}
+          allowSkip={false}
+        />
       );
     }
 

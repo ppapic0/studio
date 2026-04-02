@@ -1102,6 +1102,136 @@ export default function StudyHistoryPage() {
               const flowShortLabel = getStudyHistoryFlowShortLabel(minutes);
               const isLongTimeLabel = exactTimeLabel.length >= 7;
               const isCompactLongTimeLabel = compactTimeLabel.length >= 8;
+              const flowLevel = getStudyHistoryFlowLevel(minutes);
+
+              if (!isParent) {
+                const studentStatusLabel = !isCurrentMonth
+                  ? ''
+                  : minutes > 0
+                    ? flowLabel
+                    : hasPlans
+                      ? '계획은 있고 아직 기록 전이에요'
+                      : '기록 없음';
+                const studentStatusTone =
+                  minutes > 0
+                    ? getCalendarStatusTextClass(minutes, isCurrentMonth)
+                    : hasPlans
+                      ? 'text-[#173A82]/68'
+                      : 'text-slate-400';
+                const studentCellClass = !isCurrentMonth
+                  ? 'bg-[linear-gradient(180deg,rgba(248,250,252,0.94)_0%,rgba(255,255,255,0.98)_100%)] opacity-[0.45] ring-1 ring-[#E4EAF5]/90'
+                  : flowLevel === 'none'
+                    ? 'bg-[radial-gradient(circle_at_top_right,rgba(255,187,128,0.16),transparent_36%),linear-gradient(180deg,#FFFFFF_0%,#FFF8F1_100%)] ring-1 ring-inset ring-[#F5DCC2] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_20px_34px_-28px_rgba(184,102,25,0.18)]'
+                    : 'bg-[radial-gradient(circle_at_top_right,rgba(255,168,89,0.24),transparent_35%),linear-gradient(180deg,#FFFFFF_0%,#FFF5EA_100%)] ring-1 ring-inset ring-[#F3D2AA] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_22px_38px_-28px_rgba(184,102,25,0.22)]';
+
+                return (
+                  <button
+                    key={dateKey}
+                    type="button"
+                    onClick={() => setSelectedDateForPlan(day)}
+                    aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${isCurrentMonth ? `${exactTimeLabel} 학습` : '이번 달 아님'}${hasPlans ? ' · 계획 있음' : ''}`}
+                    className={cn(
+                      'group relative overflow-hidden rounded-[1.55rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8A1F]/35',
+                      isMobile ? 'aspect-square min-h-0 p-2' : 'min-h-[154px] p-3.5',
+                      studentCellClass,
+                      isCurrentMonth && 'hover:-translate-y-[2px] hover:shadow-[0_28px_46px_-30px_rgba(122,62,16,0.26)] active:translate-y-0',
+                      isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-inset ring-[#FF8A1F]/35 shadow-[0_26px_44px_-26px_rgba(255,138,31,0.26)]'
+                    )}
+                  >
+                    <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-white/95" />
+                    {isCurrentMonth ? (
+                      <div className="pointer-events-none absolute inset-x-3 bottom-3 h-12 rounded-[1rem] bg-[radial-gradient(circle_at_top,rgba(255,168,89,0.16),transparent_72%)]" />
+                    ) : null}
+
+                    <div className="relative z-10 flex h-full flex-col">
+                      <div className="flex items-start justify-between gap-2">
+                        <span
+                          className={cn(
+                            'inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]',
+                            isMobile ? 'min-w-[1.7rem] px-2 py-0.5 text-[10px]' : 'min-w-[2.15rem] px-2.5 py-1 text-xs',
+                            idx % 7 === 5 && isCurrentMonth
+                              ? 'border-blue-100 bg-blue-50 text-blue-700'
+                              : idx % 7 === 6 && isCurrentMonth
+                                ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                : 'border-white/90 bg-white/95 text-[#173A82]',
+                            isTodayCalendar && 'border-[#FFD1A0] text-[#D96A11]'
+                          )}
+                        >
+                          {format(day, 'd')}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {hasPlans ? <span className="h-2 w-2 rounded-full bg-[#FF8A1F] shadow-[0_0_0_4px_rgba(255,138,31,0.12)]" /> : null}
+                          {isTodayCalendar ? (
+                            <span className="rounded-full border border-[#FFD8B5] bg-[#FFF4E6] px-2 py-1 text-[9px] font-black tracking-[0.14em] text-[#D96A11]">
+                              오늘
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="mt-auto flex flex-col items-start gap-2">
+                        {isCurrentMonth ? (
+                          <div
+                            className={cn(
+                              'inline-flex max-w-full flex-col rounded-[1.15rem] border px-3 py-2 shadow-[0_16px_28px_-22px_rgba(122,62,16,0.24)]',
+                              isMobile ? 'min-h-[3.15rem] justify-center' : 'min-h-[3.4rem] justify-center',
+                              getStudentCalendarTimeChipClass(minutes, isCurrentMonth)
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'dashboard-number whitespace-nowrap leading-none tabular-nums',
+                                isMobile
+                                  ? isCompactLongTimeLabel
+                                    ? 'text-[0.72rem] tracking-[-0.04em]'
+                                    : 'text-[0.92rem] tracking-[-0.045em]'
+                                  : isCompactLongTimeLabel
+                                    ? 'text-[0.92rem] tracking-[-0.04em]'
+                                    : 'text-[1.12rem] tracking-[-0.05em]',
+                                minutes > 0
+                                  ? minutes < STUDY_HISTORY_FLOW_THRESHOLDS.warmup
+                                    ? 'text-[#9A5B16]'
+                                    : minutes < STUDY_HISTORY_FLOW_THRESHOLDS.short
+                                      ? 'text-[#8D4C10]'
+                                      : minutes < STUDY_HISTORY_FLOW_THRESHOLDS.steady
+                                        ? 'text-[#7A3E10]'
+                                        : 'text-[#5F2A00]'
+                                  : 'text-slate-400'
+                              )}
+                            >
+                              {compactTimeLabel}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className={cn(isMobile ? 'h-[3.15rem]' : 'h-[3.4rem]')} aria-hidden="true" />
+                        )}
+
+                        {isCurrentMonth ? (
+                          <div className="space-y-1">
+                            <p className={cn('break-keep font-black tracking-tight', isMobile ? 'text-[10px] leading-4' : 'text-[11px] leading-4', studentStatusTone)}>
+                              {studentStatusLabel}
+                            </p>
+                            {minutes > 0 || hasPlans ? (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {minutes > 0 ? (
+                                  <span className="rounded-full border border-[#FFE2C2] bg-white/92 px-2 py-1 text-[9px] font-black text-[#9A5B16] shadow-[0_10px_20px_-18px_rgba(122,62,16,0.22)]">
+                                    {flowShortLabel}
+                                  </span>
+                                ) : null}
+                                {hasPlans ? (
+                                  <span className="rounded-full border border-[#DDE6F5] bg-white/92 px-2 py-1 text-[9px] font-black text-[#173A82] shadow-[0_10px_20px_-18px_rgba(20,41,95,0.18)]">
+                                    계획 있음
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </button>
+                );
+              }
 
               return (
                 <button

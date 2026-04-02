@@ -336,7 +336,7 @@ export function AttendanceScheduleSheet({
         presetName,
       })
     );
-  }, [initialTab, note, open, presetName, selectedWeekdays, todayDraft, weekdayDraft]);
+  }, [initialTab, open]);
 
   const formatWeekdaySummary = (weekdays?: number[]) => {
     if (!weekdays?.length) return '';

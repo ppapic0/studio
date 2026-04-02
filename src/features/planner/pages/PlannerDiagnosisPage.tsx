@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 import { PlannerProgressHeader } from '@/features/planner/components/PlannerProgressHeader';
 import { QuestionCard } from '@/features/planner/components/QuestionCard';
@@ -15,13 +15,15 @@ import { WeeklyTodoCard } from '@/features/planner/components/WeeklyTodoCard';
 import { PLANNER_INTRO_COPY, PLANNER_LOADING_COPY, PLANNER_RESULT_COPY } from '@/features/planner/config/plannerCopy';
 import { PLANNER_BLOCK_TITLES, PLANNER_QUESTIONS, PLANNER_TOTAL_QUESTION_COUNT } from '@/features/planner/config/plannerQuestions';
 import { buildPlannerInsights } from '@/features/planner/lib/buildPlannerInsights';
+import { buildSeedPlannerAnswers } from '@/features/planner/lib/buildSeedPlannerAnswers';
 import { callGenerateStudyPlan } from '@/features/planner/lib/callGenerateStudyPlan';
 import { deriveSchedulePrefill } from '@/features/planner/lib/deriveSchedulePrefill';
 import { scorePlannerDiagnosis } from '@/features/planner/lib/scorePlannerDiagnosis';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/contexts/app-context';
-import { useFirestore, useFunctions, useUser } from '@/firebase';
-import type { GeneratedStudyPlan, StudyPlannerAnswers, StudyPlannerDiagnosticResult } from '@/lib/types';
+import { useCollection, useDoc, useFirestore, useFunctions, useUser } from '@/firebase';
+import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import type { GeneratedStudyPlan, StudyPlanItem, StudyPlannerAnswers, StudyPlannerDiagnosticResult, StudentProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type PlannerDiagnosisPageProps = {
@@ -67,17 +69,59 @@ function normalizeAnswers(answers: Partial<StudyPlannerAnswers>) {
 
 export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const firestore = useFirestore();
   const functions = useFunctions();
   const { user } = useUser();
   const { activeMembership, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
+  const autoRequested = searchParams.get('auto') === '1';
+  const autoTriggeredRef = useRef(false);
+
+  const centerStudentRef = useMemoFirebase(
+    () =>
+      firestore && user && activeMembership?.id
+        ? doc(firestore, 'centers', activeMembership.id, 'students', user.uid)
+        : null,
+    [activeMembership?.id, firestore, user?.uid]
+  );
+  const { data: studentProfile } = useDoc<StudentProfile>(centerStudentRef, {
+    enabled: Boolean(centerStudentRef),
+  });
+
+  const currentWeekKey = useMemo(() => format(new Date(), "yyyy-'W'II"), []);
+  const currentWeekItemsQuery = useMemoFirebase(
+    () =>
+      firestore && user && activeMembership?.id
+        ? collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', currentWeekKey, 'items')
+        : null,
+    [activeMembership?.id, currentWeekKey, firestore, user?.uid]
+  );
+  const { data: currentWeekItems } = useCollection<StudyPlanItem>(currentWeekItemsQuery, {
+    enabled: Boolean(currentWeekItemsQuery),
+  });
 
   const [phase, setPhase] = useState<'intro' | 'questions' | 'loading' | 'result'>('intro');
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Partial<StudyPlannerAnswers>>(getInitialAnswers);
   const [result, setResult] = useState<StudyPlannerDiagnosticResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const seedAnswers = useMemo(
+    () =>
+      buildSeedPlannerAnswers({
+        profile: studentProfile?.studyRoutineProfile || null,
+        latestDiagnostic: studentProfile?.studyPlannerDiagnostic || null,
+        recentStudyTasks: currentWeekItems || [],
+      }),
+    [currentWeekItems, studentProfile?.studyPlannerDiagnostic, studentProfile?.studyRoutineProfile]
+  );
+  const hasSeedData = Boolean(seedAnswers);
+  const seedDataSummary = useMemo(() => {
+    if (!seedAnswers) return null;
+    const subjectSummary = seedAnswers.topTimeSubjects.slice(0, 2).join(' · ') || '과목 기준';
+    return `${subjectSummary} 중심으로 최근 계획과 이전 학습 기준을 바로 반영할 수 있어요.`;
+  }, [seedAnswers]);
 
   const currentQuestion = PLANNER_QUESTIONS[questionIndex];
 
@@ -196,11 +240,11 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
     return true;
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (overrideAnswers?: StudyPlannerAnswers) => {
     setIsGenerating(true);
     setPhase('loading');
     try {
-      const normalizedAnswers = normalizeAnswers(answers);
+      const normalizedAnswers = overrideAnswers || normalizeAnswers(answers);
       if (!user) {
         const fallbackResult = buildFallbackResult(normalizedAnswers);
         setResult(fallbackResult);
@@ -245,6 +289,13 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
     }
   };
 
+  useEffect(() => {
+    if (!autoRequested || !seedAnswers || autoTriggeredRef.current) return;
+    autoTriggeredRef.current = true;
+    setAnswers(seedAnswers);
+    void handleGenerate(seedAnswers);
+  }, [autoRequested, seedAnswers]);
+
   const handlePrefillSchedule = () => {
     if (!result || !user) return;
     const prefill = deriveSchedulePrefill({
@@ -277,9 +328,44 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
             {studentName ? `${studentName} 학생에게 ` : ''}{PLANNER_INTRO_COPY.subtitle}
           </p>
           <p className="mt-3 break-keep text-[13px] font-semibold leading-6 text-[#5A6F95]">{PLANNER_INTRO_COPY.description}</p>
+          {hasSeedData ? (
+            <div className="mt-5 rounded-[1.35rem] border border-[#FFE2C5] bg-[#FFF7EF] px-4 py-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-[#FF8A1F]/12 p-2 text-[#FF8A1F]">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#D86A11]">기존 데이터 기반 추천</p>
+                  <p className="mt-2 break-keep text-[13px] font-black leading-6 text-[#17326B]">
+                    이전 설문과 최근 계획을 바탕으로 바로 추천받을 수 있어요.
+                  </p>
+                  <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#6C5A49]">
+                    {seedDataSummary}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="mt-6 grid gap-3">
-            <Button variant="secondary" className="h-12 rounded-[1rem] font-black" onClick={() => setPhase('questions')}>
-              {PLANNER_INTRO_COPY.primaryCta}
+            {hasSeedData ? (
+              <Button
+                variant="secondary"
+                className="h-12 rounded-[1rem] font-black"
+                onClick={() => {
+                  if (!seedAnswers) return;
+                  setAnswers(seedAnswers);
+                  void handleGenerate(seedAnswers);
+                }}
+              >
+                기존 기준으로 바로 추천받기
+              </Button>
+            ) : null}
+            <Button
+              variant={hasSeedData ? 'outline' : 'secondary'}
+              className="h-12 rounded-[1rem] font-black"
+              onClick={() => setPhase('questions')}
+            >
+              {hasSeedData ? '질문 다시 답하고 진단하기' : PLANNER_INTRO_COPY.primaryCta}
             </Button>
             <Button asChild variant="outline" className="h-12 rounded-[1rem] font-black">
               <Link href="/dashboard/plan">{PLANNER_INTRO_COPY.secondaryCta}</Link>

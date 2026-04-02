@@ -29,7 +29,8 @@ type RoutineOnboardingFlowProps = {
   studentName?: string;
   onSaveRoutineProfile: (profile: UserStudyProfile) => Promise<void>;
   onContinueToPlanner: () => void;
-  onSkipForNow: () => Promise<void> | void;
+  onSkipForNow?: () => Promise<void> | void;
+  allowSkip?: boolean;
 };
 
 type QuestionSelectionState = Record<string, string | string[]>;
@@ -53,6 +54,7 @@ export function RoutineOnboardingFlow({
   onSaveRoutineProfile,
   onContinueToPlanner,
   onSkipForNow,
+  allowSkip = true,
 }: RoutineOnboardingFlowProps) {
   const [phase, setPhase] = useState<'intro' | 'survey' | 'loading' | 'saved'>('intro');
   const [stepIndex, setStepIndex] = useState(0);
@@ -190,6 +192,7 @@ export function RoutineOnboardingFlow({
   };
 
   const handleSkipForNow = async () => {
+    if (!onSkipForNow) return;
     setIsSkipping(true);
     try {
       await onSkipForNow();
@@ -199,7 +202,14 @@ export function RoutineOnboardingFlow({
   };
 
   if (phase === 'intro') {
-    return <OnboardingIntroScreen onStart={() => setPhase('survey')} onSkip={() => void handleSkipForNow()} isSkipping={isSkipping} />;
+    return (
+      <OnboardingIntroScreen
+        onStart={() => setPhase('survey')}
+        onSkip={() => void handleSkipForNow()}
+        isSkipping={isSkipping}
+        allowSkip={allowSkip}
+      />
+    );
   }
 
   if (phase === 'loading') {

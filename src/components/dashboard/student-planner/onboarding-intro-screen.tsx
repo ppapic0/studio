@@ -8,11 +8,17 @@ import { ONBOARDING_START_COPY } from '@/components/dashboard/student-planner/on
 
 type OnboardingIntroScreenProps = {
   onStart: () => void;
-  onSkip: () => void;
+  onSkip?: () => void;
   isSkipping?: boolean;
+  allowSkip?: boolean;
 };
 
-export function OnboardingIntroScreen({ onStart, onSkip, isSkipping = false }: OnboardingIntroScreenProps) {
+export function OnboardingIntroScreen({
+  onStart,
+  onSkip,
+  isSkipping = false,
+  allowSkip = true,
+}: OnboardingIntroScreenProps) {
   return (
     <div className="mx-auto flex w-full max-w-[460px] flex-col gap-4 px-4 pb-24 pt-4">
       <Card variant="primary" className="overflow-hidden rounded-[2rem]">
@@ -35,15 +41,17 @@ export function OnboardingIntroScreen({ onStart, onSkip, isSkipping = false }: O
               {ONBOARDING_START_COPY.primaryCta}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <Button
-              variant="dark"
-              size="lg"
-              className="h-12 rounded-[1.1rem]"
-              onClick={onSkip}
-              disabled={isSkipping}
-            >
-              {ONBOARDING_START_COPY.secondaryCta}
-            </Button>
+            {allowSkip ? (
+              <Button
+                variant="dark"
+                size="lg"
+                className="h-12 rounded-[1.1rem]"
+                onClick={onSkip}
+                disabled={isSkipping}
+              >
+                {ONBOARDING_START_COPY.secondaryCta}
+              </Button>
+            ) : null}
           </div>
 
           <div className="rounded-[1.2rem] border border-white/12 bg-white/8 px-4 py-4">

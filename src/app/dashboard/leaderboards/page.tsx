@@ -11,9 +11,7 @@ import {
   ShieldAlert,
   Sparkles,
   Swords,
-  TimerReset,
   Trophy,
-  Users,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
@@ -910,7 +908,68 @@ function RivalBattleArea({
   );
 }
 
-function LiveActivityLog({ logs }: { logs: LiveLog[] }) {
+function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
+  if (!entries.length) return null;
+
+  const toneMap: Record<number, LogTone> = {
+    1: 'gold',
+    2: 'orange',
+    3: 'red',
+  };
+
+  return (
+    <div className="mb-4 grid gap-3 md:grid-cols-3">
+      {entries.map((entry) => {
+        const tone = toneMap[entry.rank] ?? 'blue';
+        const toneClass = TONE_CLASS_MAP[tone];
+        return (
+          <motion.div
+            key={entry.studentId}
+            layout
+            className="relative overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+            whileHover={{ y: -2, scale: 1.01 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', toneClass.line)} />
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
+                  <span className="inline-flex h-2 w-2 rounded-full bg-current opacity-80" />
+                  {entry.rank}위 LIVE
+                </div>
+                <div className="mt-3 truncate text-lg font-black tracking-[-0.03em] text-white">
+                  {entry.displayNameSnapshot}
+                </div>
+                <div className="mt-1 truncate text-xs font-semibold text-white/58">
+                  {formatSchoolName(entry.schoolNameSnapshot)}
+                </div>
+              </div>
+              {entry.rank === 1 ? <Crown className="h-5 w-5 text-[#FFD989]" /> : null}
+            </div>
+
+            <div className="mt-4 rounded-[18px] border border-white/10 bg-black/10 px-3 py-3">
+              <div className="text-[11px] font-black tracking-[0.18em] text-white/58">현재 공부중</div>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={`${entry.studentId}-${entry.value}`}
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  className="mt-2 text-2xl font-black tracking-[-0.05em] text-white"
+                >
+                  {formatStudyClock(entry.value)}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEntry[] }) {
   return (
     <section className="rounded-[30px] border border-white/12 bg-[linear-gradient(180deg,#0C1A43_0%,#071127_100%)] p-5 text-white shadow-[0_22px_70px_rgba(4,8,24,0.42)] md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -925,6 +984,8 @@ function LiveActivityLog({ logs }: { logs: LiveLog[] }) {
           3~5초 간격 갱신
         </div>
       </div>
+
+      <LiveTopThreeBoard entries={leaders} />
 
       <div className="space-y-3">
         <AnimatePresence initial={false}>
@@ -1079,51 +1140,6 @@ function RecommendationChip({
         {recommendation.explainWhy}
       </div>
     </details>
-  );
-}
-
-function CTASection({
-  mode,
-  onPrimary,
-  onSecondary,
-}: {
-  mode: BattleMode;
-  onPrimary: () => void;
-  onSecondary: () => void;
-}) {
-  const primaryLabel =
-    mode === 'attack'
-      ? '지금 역전하기'
-      : mode === 'danger'
-        ? '선두 방어 시작'
-        : mode === 'defense'
-          ? '10분 집중 시작'
-          : '지금 치고 올라가기';
-
-  const secondaryLabel =
-    mode === 'attack' ? '추월 루트 보기' : mode === 'danger' ? '방어 루트 보기' : '선두 탈환 작전';
-
-  return (
-    <section className="rounded-[30px] border border-white/12 bg-[linear-gradient(180deg,#0C1A43_0%,#071127_100%)] p-5 text-white shadow-[0_22px_70px_rgba(4,8,24,0.42)] md:p-6">
-      <div className="mb-4">
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-white/68">
-          <TimerReset className="h-4 w-4" />
-          OVERTAKE CTA
-        </div>
-        <h3 className="text-2xl font-black tracking-[-0.04em] text-white">지금 페이스를 행동으로 바꿔야 할 순간입니다</h3>
-        <p className="mt-2 text-sm font-semibold leading-6 text-white/64">
-          버튼은 약하게 두지 않았어요. 지금 눌러서 바로 한 블록을 시작하게 만드는 전투용 CTA입니다.
-        </p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <motion.button type="button" whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={onPrimary} className="rounded-[24px] bg-[linear-gradient(90deg,#FF9530_0%,#FFB861_54%,#FFD596_100%)] px-5 py-5 text-lg font-black tracking-[0.02em] text-[#3F2205] shadow-[0_18px_34px_rgba(255,153,52,0.34)]">
-          {primaryLabel}
-        </motion.button>
-        <motion.button type="button" whileHover={{ y: -2 }} whileTap={{ scale: 0.99 }} onClick={onSecondary} className="rounded-[24px] border border-white/16 bg-white/8 px-5 py-5 text-lg font-black tracking-[0.02em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-          {secondaryLabel}
-        </motion.button>
-      </div>
-    </section>
   );
 }
 
@@ -1414,6 +1430,7 @@ export default function RankingBattlePage() {
     [battleEntries, viewerId]
   );
   const top = battleEntries[0] ?? null;
+  const liveLeaders = useMemo(() => battleEntries.slice(0, 3), [battleEntries]);
   const below = viewer ? battleEntries.find((entry) => entry.rank === viewer.rank + 1) ?? null : null;
   const diffAbove = viewer && top ? Math.max(0, top.value - viewer.value) : 0;
   const diffBelow = viewer && below ? Math.max(0, viewer.value - below.value) : 0;
@@ -1515,7 +1532,7 @@ export default function RankingBattlePage() {
           </div>
 
           <div className="space-y-5">
-            <LiveActivityLog logs={logs} />
+            <LiveActivityLog logs={logs} leaders={liveLeaders} />
             <RewardCard rewardState={rewardState} rewardTitle={RANGE_META[range].rewardTitle} viewerRank={viewer.rank} />
             <RecommendationPanel
               recommendations={recommendations}
@@ -1525,64 +1542,6 @@ export default function RankingBattlePage() {
             />
           </div>
         </div>
-
-        <CTASection mode={mode} onPrimary={() => router.push('/dashboard/growth')} onSecondary={() => router.push('/dashboard/plan')} />
-
-        <section className="rounded-[28px] border border-white/10 bg-white/6 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-white/68">
-                <Users className="h-4 w-4" />
-                전체 전장
-              </div>
-              <h3 className="text-2xl font-black tracking-[-0.04em] text-white">보조 리더보드</h3>
-            </div>
-            <div className="rounded-full border border-white/12 bg-white/8 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-white/68">
-              상위 {Math.min(6, battleEntries.length)}명 표시
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {battleEntries.slice(0, 6).map((entry) => {
-              const isViewer = entry.studentId === viewerId;
-              const tone: LogTone = entry.rank === 1 ? 'gold' : isViewer ? 'orange' : entry.rank < viewer.rank ? 'blue' : 'red';
-              const toneClass = TONE_CLASS_MAP[tone];
-
-              return (
-                <motion.div
-                  key={entry.id}
-                  layout
-                  className={cn(
-                    'rounded-[24px] border p-4',
-                    isViewer
-                      ? 'border-[#FFB15B]/55 bg-[#FFF1DC] text-[#132A63]'
-                      : 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] text-white'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className={cn('text-[11px] font-black tracking-[0.2em]', isViewer ? 'text-[#8B5A19]' : 'text-white/54')}>
-                        {entry.rank}위
-                      </div>
-                      <div className={cn('mt-2 text-xl font-black tracking-[-0.03em]', isViewer ? 'text-[#132A63]' : 'text-white')}>
-                        {entry.displayNameSnapshot}
-                      </div>
-                      <div className={cn('mt-1 text-sm font-semibold', isViewer ? 'text-[#64779C]' : 'text-white/60')}>
-                        {formatSchoolName(entry.schoolNameSnapshot)}
-                      </div>
-                    </div>
-                    <div className={cn('rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
-                      {entry.rank === 1 ? 'CROWN' : isViewer ? 'YOU' : 'LIVE'}
-                    </div>
-                  </div>
-                  <div className={cn('mt-4 text-3xl font-black tracking-[-0.05em]', isViewer ? 'text-[#132A63]' : 'text-white')}>
-                    {formatStudyCompact(entry.value)}
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </section>
       </div>
     </main>
   );
