@@ -1532,14 +1532,6 @@ export default function RankingBattlePage() {
           </div>
 
           <div className="space-y-5">
-            <LiveActivityLog logs={logs} leaders={liveLeaders} />
-            <RewardCard rewardState={rewardState} rewardTitle={RANGE_META[range].rewardTitle} viewerRank={viewer.rank} />
-            <RecommendationPanel
-              recommendations={recommendations}
-              onApply={handleApplyRecommendation}
-              onReopenDiagnosis={() => router.push('/dashboard/plan/diagnosis')}
-              onViewDiagnosis={() => router.push('/dashboard/analysis')}
-            />
           </div>
         </div>
       </div>
