@@ -961,11 +961,11 @@ export default function StudyHistoryPage() {
             : "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1D3D80_0%,#2C53A5_54%,#4068BC_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.46)]"
         )}
       >
-        <CardContent className={cn(isMobile ? "p-5" : "p-8")}>
-          <div className={cn(isMobile ? "space-y-4" : "flex items-start justify-between gap-4")}>
-            <div className={cn(isMobile ? "space-y-4" : "space-y-3")}>
-                <div className="min-w-0 flex-1 space-y-4">
-                <div className={cn("space-y-3", isMobile ? "pb-7" : "pb-4")}>
+        <CardContent className={cn(isMobile ? "px-5 pb-5 pt-7" : "px-8 pb-8 pt-9")}>
+          <div className={cn(isMobile ? "space-y-5" : "flex items-start justify-between gap-4")}>
+            <div className={cn(isMobile ? "space-y-5" : "space-y-3")}>
+                <div className="min-w-0 flex-1 space-y-5">
+                <div className={cn("space-y-3.5", isMobile ? "pb-8" : "pb-4")}>
                 <h2
                   className={cn(
                     "font-black tracking-tight",

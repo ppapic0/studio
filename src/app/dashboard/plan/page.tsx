@@ -168,6 +168,11 @@ const RECOMMENDATION_BADGE_TONE: Record<MainPlanRecommendation['badge'], string>
   학습방법: 'border-sky-100 bg-sky-50 text-sky-700',
   동기: 'border-rose-100 bg-rose-50 text-rose-700',
 };
+const SCHEDULE_STATUS_BADGE_TONE: Record<string, string> = {
+  '등원 예정': 'border-[#FFE2C5] bg-[#FFF4E8] text-[#D86A11]',
+  휴식: 'border-[#DCE6F5] bg-[#EEF4FF] text-[#5A6F95]',
+  미정: 'border-[#E5ECF7] bg-white text-[#5A6F95]',
+};
 
 function createAwaySlot(overrides?: Partial<AttendanceAwaySlot>): AttendanceAwaySlot {
   return {
@@ -3036,55 +3041,76 @@ export default function StudyPlanPage() {
   return (
     <div className={cn("flex flex-col w-full max-w-5xl mx-auto pb-24", isMobile ? "gap-4 px-0" : "gap-6")}>
       <section className={cn("overflow-hidden rounded-[1.7rem] bg-[linear-gradient(180deg,#17326B_0%,#21448D_100%)] text-white shadow-[0_24px_56px_-34px_rgba(20,41,95,0.48)]", isMobile ? "rounded-[1.35rem]" : "rounded-[2rem]")}>
-        <div className={cn("space-y-5", isMobile ? "p-4" : "p-6")}>
-          <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-start justify-between")}>
-            <div className="min-w-0">
-              <Badge className="border-none bg-white/12 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-white shadow-none">
-                오늘의 투두리스트
-              </Badge>
-              <h2 className={cn("mt-3 font-black tracking-tight text-white", isMobile ? "text-[1.45rem]" : "text-[2rem]")}>
-                {selectedDateTitle}
-              </h2>
-              <p className={cn("mt-2 break-keep font-semibold text-white/72", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
-                오늘 해야 할 공부와 기타 일정을 먼저 적고, 끝낸 항목부터 가볍게 체크해보세요.
-              </p>
+        <div className={cn("space-y-6", isMobile ? "p-4" : "p-7")}>
+          <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)] items-start")}>
+            <div className="min-w-0 space-y-5">
+              <div className="space-y-3">
+                <Badge className="border-none bg-white/12 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-white shadow-none">
+                  오늘의 투두리스트
+                </Badge>
+                <div className="space-y-3">
+                  <h2 className={cn("font-black tracking-tight text-white", isMobile ? "text-[1.5rem] leading-[1.18]" : "text-[2.1rem] leading-[1.08]")}>
+                    {selectedDateTitle}
+                  </h2>
+                  <p className={cn("max-w-xl break-keep font-semibold text-white/78", isMobile ? "text-[12.5px] leading-6" : "text-[15px] leading-7")}>
+                    오늘 해야 할 공부와 기타 일정을 먼저 적고, 끝낸 항목부터 가볍게 체크해보세요.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[1.35rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+                <div className={cn("gap-3", isMobile ? "space-y-3" : "flex items-end justify-between")}>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">오늘 목표시간 진행</p>
+                    <p className={cn("mt-2 break-keep font-black text-white", isMobile ? "text-[1rem] leading-6" : "text-[1.05rem] leading-7")}>
+                      {studyGoalSummaryLabel}
+                    </p>
+                  </div>
+                  <div className={cn("flex items-center gap-2", isMobile ? "justify-between" : "justify-end")}>
+                    <span className="text-[11px] font-semibold text-white/60">총 계획 {formatMinutesSummary(studyTimeSummary.total)}</span>
+                    <Badge className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-black text-white shadow-none">
+                      목표 {formatMinutesSummary(recommendedDailyMinutes)}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="relative mt-4">
+                  <Progress value={planProgressPercent} className="h-3.5 bg-white/10 shadow-[inset_0_1px_2px_rgba(7,18,48,0.22)]" indicatorClassName={cn("bg-gradient-to-r", rewardGradient)} />
+                  <div className="pointer-events-none absolute inset-0 rounded-full bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.12)_50%,transparent_100%)] opacity-80" />
+                </div>
+              </div>
             </div>
-            <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-3")}>
-              <div className="rounded-[1.15rem] border border-white/10 bg-white/8 px-4 py-3">
+
+            <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]")}>
+              <div className={cn(
+                "rounded-[1.35rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.08)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_16px_32px_-26px_rgba(4,11,31,0.42)]",
+                isMobile ? "col-span-2 px-4 py-4" : "row-span-2 px-5 py-5"
+              )}>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/65">총 계획 시간</p>
-                <p className="mt-2 text-xl font-black tracking-tight text-white">{formatMinutesSummary(studyTimeSummary.total)}</p>
+                <p className={cn("mt-3 font-black tracking-tight text-white", isMobile ? "text-[1.95rem] leading-none" : "text-[2.35rem] leading-none")}>
+                  {formatMinutesSummary(studyTimeSummary.total)}
+                </p>
+                <p className={cn("mt-3 break-keep font-semibold text-white/62", isMobile ? "text-[11px] leading-5" : "text-[12px] leading-5")}>
+                  오늘 계획에 등록된 공부와 기타 일정의 총량이에요.
+                </p>
               </div>
-              <div className="rounded-[1.15rem] border border-white/10 bg-white/8 px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/65">등록 투두</p>
-                <p className="mt-2 text-xl font-black tracking-tight text-white">{checklistTasks.length}개</p>
+              <div className="rounded-[1.15rem] border border-white/10 bg-white/[0.07] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/62">등록 투두</p>
+                <p className={cn("mt-2 font-black tracking-tight text-white", isMobile ? "text-[1.5rem]" : "text-[1.6rem]")}>{checklistTasks.length}개</p>
               </div>
-              <div className={cn("rounded-[1.15rem] border border-white/10 bg-white/8 px-4 py-3", isMobile && "col-span-2")}>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/65">오늘 목표 대비</p>
-                <p className="mt-2 text-xl font-black tracking-tight text-white">{planProgressPercent}%</p>
+              <div className="rounded-[1.15rem] border border-white/10 bg-white/[0.07] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/62">오늘 목표 대비</p>
+                <p className={cn("mt-2 font-black tracking-tight text-white", isMobile ? "text-[1.5rem]" : "text-[1.6rem]")}>{planProgressPercent}%</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/65">오늘 목표시간 진행</p>
-                <p className="mt-2 break-keep text-sm font-black text-white">{studyGoalSummaryLabel}</p>
-              </div>
-              <Badge className="rounded-full border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white shadow-none">
-                목표 {formatMinutesSummary(recommendedDailyMinutes)}
-              </Badge>
-            </div>
-            <Progress value={planProgressPercent} className="mt-4 h-2.5 bg-white/10" indicatorClassName={cn("bg-gradient-to-r", rewardGradient)} />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2.5 pt-1">
             {(subjectBalanceEntries.length > 0 ? subjectBalanceEntries.slice(0, 4).map((entry) => (
-              <Badge key={entry.subjectId} className="rounded-full border-none bg-white px-3 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+              <Badge key={entry.subjectId} className="rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-black text-[#17326B] shadow-[0_8px_18px_-16px_rgba(8,20,54,0.48)]">
                 {entry.subjectLabel} {formatMinutesSummary(entry.minutes)}
               </Badge>
             )) : prioritySubjectLabels.slice(0, 4).map((label) => (
-              <Badge key={label} className="rounded-full border-none bg-white px-3 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+              <Badge key={label} className="rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-black text-[#17326B] shadow-[0_8px_18px_-16px_rgba(8,20,54,0.48)]">
                 {label}
               </Badge>
             )))}
@@ -3298,7 +3324,14 @@ export default function StudyPlanPage() {
               >
                 <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#8AA0C7]">{day.weekdayLabel}</p>
                 <p className="mt-2 text-base font-black tracking-tight text-[#17326B]">{day.dateLabel}</p>
-                <p className="mt-3 break-keep text-[10px] font-black text-[#17326B]">{day.status}</p>
+                <Badge
+                  className={cn(
+                    'mt-3 rounded-full border px-2 py-0.5 text-[8px] font-black shadow-none',
+                    SCHEDULE_STATUS_BADGE_TONE[day.status] || SCHEDULE_STATUS_BADGE_TONE['미정']
+                  )}
+                >
+                  {day.status}
+                </Badge>
                 <p className="mt-1 break-keep text-[10px] font-semibold leading-4 text-[#5A6F95]">{day.timeLabel}</p>
                 {day.hasExcursion ? (
                   <Badge className="mt-2 rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-2 py-0.5 text-[8px] font-black text-[#D86A11] shadow-none">
@@ -3313,9 +3346,17 @@ export default function StudyPlanPage() {
             <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8AA0C7]">선택한 날짜</p>
-                <p className="mt-2 text-sm font-black text-[#17326B]">
-                  {selectedDateTitle} · {selectedScheduleOverview?.status || '미정'}
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-black text-[#17326B]">{selectedDateTitle}</p>
+                  <Badge
+                    className={cn(
+                      'rounded-full border px-2.5 py-1 text-[9px] font-black shadow-none',
+                      SCHEDULE_STATUS_BADGE_TONE[selectedScheduleOverview?.status || '미정'] || SCHEDULE_STATUS_BADGE_TONE['미정']
+                    )}
+                  >
+                    {selectedScheduleOverview?.status || '미정'}
+                  </Badge>
+                </div>
                 <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
                   {selectedScheduleOverview?.timeLabel || '아직 정해진 시간이 없어요.'}
                 </p>
