@@ -570,8 +570,8 @@ export default function StudyHistoryPage() {
     if (level === 'none') return 'text-[#173A82]';
     if (level === 'warmup') return 'text-[#8F5312]';
     if (level === 'short') return 'text-[#7C4107]';
-    if (level === 'steady') return 'text-[#6A3004]';
-    return 'text-[#4E1E00]';
+    if (level === 'steady') return 'text-white';
+    return 'text-white';
   };
 
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
@@ -976,7 +976,7 @@ export default function StudyHistoryPage() {
           <div className={cn(isMobile ? "space-y-7" : "flex items-start justify-between gap-5")}>
             <div className={cn(isMobile ? "space-y-7" : "space-y-3")}>
                 <div className="min-w-0 flex-1 space-y-7">
-                <div className={cn("space-y-[1.25rem]", isMobile ? "pb-10" : "pb-5")}>
+                <div className={cn("space-y-5", isMobile ? "pb-16" : "pb-5")}>
                 <h2
                   className={cn(
                     "font-black tracking-tight",
@@ -1186,8 +1186,8 @@ export default function StudyHistoryPage() {
                                 'dashboard-number break-keep font-black leading-tight tabular-nums',
                                 isMobile
                                   ? isCompactLongTimeLabel
-                                    ? 'text-[0.8rem] tracking-[-0.04em]'
-                                    : 'text-[1rem] tracking-[-0.045em]'
+                                    ? 'text-[0.88rem] tracking-[-0.04em]'
+                                    : 'text-[1.08rem] tracking-[-0.045em]'
                                   : isCompactLongTimeLabel
                                     ? 'text-[0.95rem] tracking-[-0.04em]'
                                     : 'text-[1.15rem] tracking-[-0.05em]',
