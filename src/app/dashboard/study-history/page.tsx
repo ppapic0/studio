@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -166,11 +166,11 @@ const STUDY_HISTORY_CALENDAR_LEGEND: Array<{
   rangeLabel: string;
   swatch: string;
 }> = [
-  { level: 'none', label: '기록 없음', rangeLabel: '0시간', swatch: 'bg-white ring-[#D7E1F0]' },
-  { level: 'warmup', label: '몰입 준비', rangeLabel: '3시간 미만', swatch: 'bg-[#FFF0DA] ring-[#FFD4A0]' },
-  { level: 'short', label: '짧은 몰입', rangeLabel: '3~6시간', swatch: 'bg-[#FFD7A6] ring-[#FFB969]' },
-  { level: 'steady', label: '집중 흐름', rangeLabel: '6~9시간', swatch: 'bg-[#FFBF71] ring-[#FF9626]' },
-  { level: 'deep', label: '깊은 몰입', rangeLabel: '9시간 이상', swatch: 'bg-[#FFA23D] ring-[#E57C11]' },
+  { level: 'none', label: '기록 없음', rangeLabel: '0시간', swatch: 'bg-white ring-[#D9E1EE]' },
+  { level: 'warmup', label: '몰입 준비', rangeLabel: '3시간 미만', swatch: 'bg-[#FFF1DE] ring-[#F3C894]' },
+  { level: 'short', label: '짧은 몰입', rangeLabel: '3~6시간', swatch: 'bg-[#FFD8AC] ring-[#F4A74E]' },
+  { level: 'steady', label: '집중 흐름', rangeLabel: '6~9시간', swatch: 'bg-[#FFBA68] ring-[#EB8718]' },
+  { level: 'deep', label: '깊은 몰입', rangeLabel: '9시간 이상', swatch: 'bg-[#FF9328] ring-[#D86700]' },
 ] as const;
 
 function getStudyHistoryFlowLevel(minutes: number): StudyHistoryFlowLevel {
@@ -550,28 +550,28 @@ export default function StudyHistoryPage() {
     }
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') {
-      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,232,204,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(255,250,245,0.994)_100%)] ring-1 ring-inset ring-[#F1D8B9] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_18px_30px_-28px_rgba(122,62,16,0.1)]';
+      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,239,220,0.26),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(255,249,242,0.994)_100%)] ring-1 ring-inset ring-[#E7D0B3] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_18px_32px_-28px_rgba(122,62,16,0.1)]';
     }
     if (level === 'warmup') {
-      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,204,138,0.26),transparent_34%),linear-gradient(180deg,rgba(255,250,243,0.998)_0%,rgba(255,242,227,0.994)_100%)] ring-1 ring-inset ring-[#FFDAB3] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_20px_34px_-28px_rgba(255,138,31,0.15)]';
+      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,205,139,0.34),transparent_36%),linear-gradient(180deg,rgba(255,248,239,0.998)_0%,rgba(255,237,214,0.994)_100%)] ring-1 ring-inset ring-[#F5CB98] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_22px_36px_-28px_rgba(255,138,31,0.18)]';
     }
     if (level === 'short') {
-      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,189,104,0.3),transparent_36%),linear-gradient(180deg,rgba(255,246,235,0.998)_0%,rgba(255,229,198,0.994)_100%)] ring-1 ring-inset ring-[#FFC98D] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_22px_36px_-28px_rgba(255,138,31,0.2)]';
+      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,179,83,0.42),transparent_36%),linear-gradient(180deg,rgba(255,241,225,0.998)_0%,rgba(255,219,176,0.994)_100%)] ring-1 ring-inset ring-[#F6A84F] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_24px_38px_-28px_rgba(255,138,31,0.24)]';
     }
     if (level === 'steady') {
-      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,170,71,0.34),transparent_38%),linear-gradient(180deg,rgba(255,240,224,0.998)_0%,rgba(255,217,170,0.994)_100%)] ring-1 ring-inset ring-[#FFB96F] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_24px_40px_-28px_rgba(255,138,31,0.24)]';
+      return 'bg-[radial-gradient(circle_at_top_right,rgba(255,154,40,0.48),transparent_38%),linear-gradient(180deg,rgba(255,232,206,0.998)_0%,rgba(255,191,110,0.994)_100%)] ring-1 ring-inset ring-[#EA8619] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_26px_42px_-28px_rgba(239,124,11,0.3)]';
     }
-    return 'bg-[radial-gradient(circle_at_top_right,rgba(255,154,47,0.38),transparent_38%),linear-gradient(180deg,rgba(255,234,213,0.998)_0%,rgba(255,198,126,0.994)_100%)] ring-1 ring-inset ring-[#FF9A3F] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_28px_44px_-28px_rgba(255,138,31,0.28)]';
+    return 'bg-[radial-gradient(circle_at_top_right,rgba(255,132,20,0.54),transparent_40%),linear-gradient(180deg,rgba(255,223,190,0.998)_0%,rgba(255,145,36,0.992)_100%)] ring-1 ring-inset ring-[#D86700] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_30px_48px_-28px_rgba(216,103,0,0.34)]';
   };
 
   const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'text-slate-300';
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'text-[#173A82]';
-    if (level === 'warmup') return 'text-[#9A5B16]';
-    if (level === 'short') return 'text-[#8D4C10]';
-    if (level === 'steady') return 'text-[#7A3E10]';
-    return 'text-[#5F2A00]';
+    if (level === 'warmup') return 'text-[#8F5312]';
+    if (level === 'short') return 'text-[#7C4107]';
+    if (level === 'steady') return 'text-[#6A3004]';
+    return 'text-[#4E1E00]';
   };
 
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
@@ -616,9 +616,10 @@ export default function StudyHistoryPage() {
     if (!isCurrentMonth) return 'text-slate-300';
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'text-slate-400';
-    if (level === 'warmup') return 'text-[#9A5B16]';
-    if (level === 'short') return 'text-[#8D4C10]';
-    return 'text-[#6E3407]';
+    if (level === 'warmup') return 'text-[#985817]';
+    if (level === 'short') return 'text-[#84430A]';
+    if (level === 'steady') return 'text-[#713307]';
+    return 'text-[#5A2200]';
   };
 
   const getStudentCalendarTimeChipClass = (minutes: number, isCurrentMonth: boolean) => {
@@ -629,7 +630,7 @@ export default function StudyHistoryPage() {
     if (level === 'none') {
       return 'border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,251,0.98))] text-slate-400 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.12)]';
     }
-    return 'border-[#FFB366] bg-[linear-gradient(180deg,rgba(255,229,194,0.98),rgba(255,209,161,0.98))] text-[#7A3E10] shadow-[0_14px_24px_-18px_rgba(255,138,31,0.24)]';
+    return 'border-[#F39C34] bg-[linear-gradient(180deg,rgba(255,230,197,0.98),rgba(255,205,148,0.98))] text-[#733905] shadow-[0_16px_26px_-18px_rgba(216,103,0,0.26)]';
   };
 
   const monthTotalMinutes = useMemo(() => {
@@ -1179,7 +1180,7 @@ export default function StudyHistoryPage() {
 
                       <div className="flex flex-1 items-center justify-center">
                         {isCurrentMonth ? (
-                          <div className="flex w-full flex-col items-center justify-center gap-2 text-center">
+                          <div className="flex w-full flex-col items-center justify-center gap-2.5 text-center">
                             <span
                               className={cn(
                                 'dashboard-number break-keep font-black leading-tight tabular-nums',
@@ -1196,7 +1197,7 @@ export default function StudyHistoryPage() {
                               {studentValueLabel}
                             </span>
                             {hasPlans ? (
-                              <span className="rounded-full border border-white/70 bg-white/85 px-2 py-1 text-[9px] font-black text-[#173A82] shadow-[0_10px_20px_-18px_rgba(20,41,95,0.18)]">
+                              <span className="rounded-full border border-white/80 bg-white/92 px-2.5 py-1 text-[9px] font-black text-[#173A82] shadow-[0_12px_22px_-18px_rgba(20,41,95,0.18)]">
                                 계획 있음
                               </span>
                             ) : null}
@@ -1782,4 +1783,5 @@ const getStatusBadge = (status: string) => {
 };
 
 const UserMinus = ({ className }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" x2="16" y1="11" y2="11"/></svg>;
+
 

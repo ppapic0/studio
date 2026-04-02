@@ -616,15 +616,18 @@ function BattleStatCard({
 }) {
   const toneClass = TONE_CLASS_MAP[tone];
   return (
-    <div className="rounded-[26px] border border-[#E8D6C1] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] p-4 shadow-[0_14px_30px_rgba(20,41,95,0.08)]">
-      <div className="flex items-center justify-between">
-        <div className="text-[11px] font-black tracking-[0.2em] text-[#7784A2]">{label}</div>
-        <div className={cn('rounded-2xl border px-3 py-2', toneClass.chip)}>
-          <Icon className="h-4 w-4" />
+    <div className="relative overflow-hidden rounded-[28px] border border-[#E7D6C4] bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(255,247,237,0.96)_100%)] p-4 shadow-[0_16px_32px_rgba(20,41,95,0.08)]">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_40%,transparent_74%,rgba(255,181,100,0.06))]" />
+      <div className="relative">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[10px] font-black tracking-[0.22em] text-[#7A86A2]">{label}</div>
+          <div className={cn('rounded-[1rem] border px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]', toneClass.chip)}>
+            <Icon className="h-4 w-4" />
+          </div>
         </div>
+        <div className="mt-4 text-[2.55rem] font-black leading-none tracking-[-0.06em] text-[#132A63]">{value}</div>
+        <div className={cn('mt-3 text-[13px] font-black leading-6', toneClass.text)}>{hint}</div>
       </div>
-      <div className="mt-4 text-4xl font-black tracking-[-0.05em] text-[#132A63]">{value}</div>
-      <div className={cn('mt-2 text-sm font-bold', toneClass.text)}>{hint}</div>
     </div>
   );
 }
@@ -669,14 +672,15 @@ function MyBattleCard({
     <motion.section
       layout
       className={cn(
-        'relative overflow-hidden rounded-[34px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top,_rgba(255,191,124,0.24),_transparent_30%),linear-gradient(160deg,#FFFBF5_0%,#FFF4E6_44%,#FFE3B8_100%)] text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.12)]',
+        'relative overflow-hidden rounded-[34px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top_right,rgba(255,187,108,0.24),transparent_28%),linear-gradient(180deg,#FFF9F1_0%,#FFF4E8_48%,#FFE7C8_100%)] text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.12)]',
         isMobile ? 'p-5' : 'p-6 md:p-7'
       )}
       whileHover={{ y: -4 }}
       transition={{ type: 'spring', stiffness: 220, damping: 24 }}
     >
       <DefenseShieldEffect active={mode === 'defense' || mode === 'danger'} pressure={pressure} />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_30%,transparent_65%,rgba(255,140,40,0.08))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.82),transparent_32%,transparent_66%,rgba(255,140,40,0.08))]" />
+      <div className="pointer-events-none absolute inset-[1px] rounded-[33px] border border-white/55" />
       <div className="relative">
         <div className={cn('items-start justify-between gap-4', isMobile ? 'mb-4 space-y-4' : 'mb-5 flex flex-wrap')}>
           <div>
@@ -703,13 +707,13 @@ function MyBattleCard({
 
           <motion.div
             className={cn(
-              'rounded-[26px] border border-[#F2D3AA] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF5E8_100%)] text-right shadow-[0_18px_40px_rgba(20,41,95,0.08)]',
+              'rounded-[26px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF6EA_100%)] text-right shadow-[0_18px_40px_rgba(20,41,95,0.08)]',
               isMobile ? 'w-full px-4 py-4 text-left' : 'px-5 py-4'
             )}
             animate={{ boxShadow: ['0 0 0 rgba(255,154,56,0.1)', '0 0 30px rgba(255,154,56,0.26)', '0 0 0 rgba(255,154,56,0.1)'] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           >
-            <div className={cn('font-black text-[#7A86A2]', isMobile ? 'text-[10px] tracking-[0.16em]' : 'text-[11px] tracking-[0.24em]')}>
+            <div className={cn('font-black text-[#7A86A2]', isMobile ? 'text-[10px] tracking-[0.18em]' : 'text-[11px] tracking-[0.24em]')}>
               {mode === 'defense' ? 'DEFENSE HOLD' : 'LIVE PUSH'}
             </div>
             <div className={cn('mt-1 font-black text-[#132A63]', isMobile ? 'text-xl' : 'text-2xl')}>
@@ -1023,7 +1027,7 @@ function StandingsSidebar({
 
   return (
     <aside className={cn(
-      'rounded-[30px] border border-[#E6D2BE] bg-[linear-gradient(180deg,#FFF9F0_0%,#FFF0DB_100%)] text-[#132A63] shadow-[0_20px_48px_rgba(20,41,95,0.1)]',
+      'rounded-[30px] border border-[#E6D2BE] bg-[radial-gradient(circle_at_top_right,rgba(255,192,120,0.16),transparent_26%),linear-gradient(180deg,#FFF9F1_0%,#FFF1DE_100%)] text-[#132A63] shadow-[0_20px_48px_rgba(20,41,95,0.1)]',
       isMobile ? 'p-4' : 'p-5 md:p-6'
     )}>
       <div className={cn(isMobile ? 'mb-3' : 'mb-4')}>
@@ -1047,8 +1051,8 @@ function StandingsSidebar({
               className={cn(
                 'rounded-[22px] border shadow-[0_14px_28px_rgba(20,41,95,0.08)]',
                 entry.isViewer
-                  ? 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF4E1_0%,#FFE7BF_100%)]'
-                  : 'border-[#E8D5C1] bg-white'
+                  ? 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE8C3_100%)]'
+                  : 'border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF8EE_100%)]'
               )}
               style={isMobile ? { padding: '14px 16px' } : { padding: '16px' }}
               whileHover={{ y: -2, scale: 1.01 }}
