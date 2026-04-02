@@ -546,32 +546,32 @@ export default function StudyHistoryPage() {
 
   const getStudentCalendarCellClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) {
-      return 'border border-[#E7ECF4] bg-[linear-gradient(180deg,rgba(250,251,253,0.94)_0%,rgba(255,255,255,0.98)_100%)] opacity-[0.62] grayscale-[0.04] shadow-none';
+      return 'border border-[#E7EDF7] bg-[linear-gradient(180deg,#FAFBFE_0%,#F3F6FB_100%)] opacity-[0.54] shadow-none';
     }
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') {
-      return 'border border-[#E9DDD0] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_58%),linear-gradient(180deg,rgba(255,255,255,0.996)_0%,rgba(255,249,242,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_18px_34px_-30px_rgba(120,79,44,0.12)]';
+      return 'border border-[#E1E8F3] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(246,249,253,0.985)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_14px_26px_-24px_rgba(20,41,95,0.08)]';
     }
     if (level === 'warmup') {
-      return 'border border-[#F0DABB] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.92),transparent_56%),linear-gradient(180deg,rgba(255,252,246,0.998)_0%,rgba(255,242,224,0.994)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_18px_36px_-30px_rgba(204,142,75,0.16)]';
+      return 'border border-[#D9E4F3] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(240,245,252,0.99)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_15px_28px_-24px_rgba(20,41,95,0.1)]';
     }
     if (level === 'short') {
-      return 'border border-[#EFCFA3] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.92),transparent_54%),linear-gradient(180deg,rgba(255,249,241,0.998)_0%,rgba(255,234,204,0.994)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_20px_38px_-30px_rgba(212,139,59,0.18)]';
+      return 'border border-[#CAD9EE] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(233,240,250,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_28px_-24px_rgba(20,41,95,0.12)]';
     }
     if (level === 'steady') {
-      return 'border border-[#EAB97A] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_52%),linear-gradient(180deg,rgba(255,245,231,0.998)_0%,rgba(255,223,175,0.994)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_22px_40px_-30px_rgba(223,131,43,0.22)]';
+      return 'border border-[#B8CDEC] bg-[linear-gradient(180deg,rgba(252,254,255,0.996)_0%,rgba(223,234,249,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_32px_-24px_rgba(20,41,95,0.14)]';
     }
-    return 'border border-[#E39A49] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.88),transparent_48%),linear-gradient(180deg,rgba(255,240,218,0.998)_0%,rgba(255,213,153,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_26px_44px_-30px_rgba(206,112,25,0.24)]';
+    return 'border border-[#9DB7E5] bg-[linear-gradient(180deg,rgba(247,251,255,0.996)_0%,rgba(206,221,245,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_34px_-24px_rgba(20,41,95,0.18)]';
   };
 
   const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean) => {
-    if (!isCurrentMonth) return 'text-slate-300';
+    if (!isCurrentMonth) return 'text-[#C6CFDD]';
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'text-[#173A82]';
-    if (level === 'warmup') return 'text-[#173A82]';
-    if (level === 'short') return 'text-[#15356F]';
-    if (level === 'steady') return 'text-[#132A63]';
-    return 'text-[#102657]';
+    if (level === 'none') return 'text-[#B9C5D8]';
+    if (level === 'warmup') return 'text-[#27437F]';
+    if (level === 'short') return 'text-[#1F3C78]';
+    if (level === 'steady') return 'text-[#17356F]';
+    return 'text-[#102A63]';
   };
 
   const getStudentCalendarMetaTone = (minutes: number, isCurrentMonth: boolean) => {
@@ -634,22 +634,22 @@ export default function StudyHistoryPage() {
 
   const getStudentCalendarTimeChipClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) {
-      return 'border-[#E7ECF4] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(246,248,251,0.98))] text-slate-300 shadow-none';
+      return 'border-[#E7EDF7] bg-transparent text-transparent shadow-none';
     }
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') {
-      return 'border-[#E4E9F2] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(246,248,251,0.98))] text-slate-400 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.1)]';
+      return 'border-[#E7EDF7] bg-white/68 text-transparent shadow-none';
     }
     if (level === 'warmup') {
-      return 'border-[#EFD7B7] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,246,232,0.96))] text-[#7A4812] shadow-[0_14px_24px_-20px_rgba(181,122,58,0.16)]';
+      return 'border-[#DCE7F5] bg-white/84 text-[#27437F] shadow-[0_12px_22px_-20px_rgba(20,41,95,0.1)]';
     }
     if (level === 'short') {
-      return 'border-[#EDC99A] bg-[linear-gradient(180deg,rgba(255,252,246,0.92),rgba(255,238,214,0.98))] text-[#74400D] shadow-[0_14px_24px_-20px_rgba(193,125,52,0.18)]';
+      return 'border-[#D2E0F2] bg-white/86 text-[#1F3C78] shadow-[0_13px_22px_-20px_rgba(20,41,95,0.12)]';
     }
     if (level === 'steady') {
-      return 'border-[#E7B56E] bg-[linear-gradient(180deg,rgba(255,248,238,0.92),rgba(255,226,183,0.98))] text-[#6B3508] shadow-[0_16px_26px_-20px_rgba(213,128,38,0.2)]';
+      return 'border-[#C4D6F0] bg-white/90 text-[#17356F] shadow-[0_14px_24px_-20px_rgba(20,41,95,0.14)]';
     }
-    return 'border-[#E0963C] bg-[linear-gradient(180deg,rgba(255,244,226,0.92),rgba(255,214,155,0.98))] text-[#612A05] shadow-[0_18px_28px_-20px_rgba(206,110,21,0.22)]';
+    return 'border-[#AAC2E8] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(236,243,255,0.98))] text-[#102A63] shadow-[0_16px_26px_-20px_rgba(20,41,95,0.16)]';
   };
 
   const getStudentCalendarPlanBadgeClass = (minutes: number, isCurrentMonth: boolean) => {
@@ -1098,7 +1098,7 @@ export default function StudyHistoryPage() {
         "student-utility-card relative mx-auto w-full overflow-hidden rounded-[3rem]",
         isParent
           ? "border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] ring-1 ring-white/70 shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)]"
-          : "border border-[#E4E8F1] bg-[radial-gradient(circle_at_top_left,rgba(255,146,48,0.08),transparent_20%),radial-gradient(circle_at_top_right,rgba(20,41,95,0.06),transparent_24%),linear-gradient(180deg,#FFFEFC_0%,#F9FBFF_44%,#F6F8FD_100%)] ring-1 ring-white/80 shadow-[0_26px_58px_-48px_rgba(15,23,42,0.22)]"
+          : "border border-[#E5EBF5] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFD_100%)] ring-1 ring-white/85 shadow-[0_22px_52px_-44px_rgba(20,41,95,0.18)]"
       )}>
         <CardContent className="relative p-0">
           <div className={cn("border-b border-primary/10", isMobile ? "px-4 py-4" : "px-6 py-5")}>
@@ -1125,41 +1125,39 @@ export default function StudyHistoryPage() {
                 </div>
               </div>
             ) : (
-              <div className={cn(isMobile ? "space-y-4" : "flex items-end justify-between gap-5")}>
+              <div className={cn(isMobile ? "space-y-3" : "flex items-end justify-between gap-6")}>
                 <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#F0DCC5] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#9B6321]">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#E5EBF5] bg-[#F7FAFF] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#6D80A5]">
                     <CalendarDays className="h-3.5 w-3.5" />
-                    MONTHLY BOARD
+                    STUDY CALENDAR
                   </div>
                   <div>
-                    <h3 className={cn("font-black tracking-[-0.03em] text-[#14295F]", isMobile ? "text-[1.35rem]" : "text-[1.68rem]")}>학습 흐름</h3>
+                    <h3 className={cn("font-black tracking-[-0.03em] text-[#14295F]", isMobile ? "text-[1.3rem]" : "text-[1.62rem]")}>학습 캘린더</h3>
                     <p className={cn("mt-1 font-semibold text-[#71819C]", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
-                      공부 시간과 계획을 날짜별로 차분하게 확인해요.
+                      {isMobile ? '공부시간 중심으로 빠르게 확인해요.' : '날짜와 공부시간을 정사각형 보드로 차분하게 확인해요.'}
                     </p>
                   </div>
                 </div>
                 <div className={cn(
-                  "grid gap-1.5",
-                  isMobile ? "grid-cols-2" : "grid-cols-5"
+                  "rounded-[1.25rem] border border-[#E7EDF7] bg-[#FBFCFE] shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]",
+                  isMobile ? "px-3 py-3" : "min-w-[21rem] px-4 py-3"
                 )}>
-                  {STUDY_HISTORY_CALENDAR_LEGEND.map((item) => (
-                    <span
-                      key={item.label}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-[1.1rem] px-3 py-2 font-black shadow-[0_12px_24px_-22px_rgba(15,23,42,0.12)]",
-                        isMobile ? "text-[8px]" : "text-[9px]",
-                        getStudentLegendChipClass(item.level)
-                      )}
-                    >
-                      <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full ring-1", item.swatch)} />
-                      <span className="flex min-w-0 flex-col leading-none">
-                        <span>{item.label}</span>
-                        <span className="mt-0.5 font-bold tracking-normal text-[#7D8DA8]">
-                          {item.rangeLabel}
-                        </span>
-                      </span>
-                    </span>
-                  ))}
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#8A9AB6]">0h</span>
+                    <div className="grid flex-1 grid-cols-5 gap-1.5">
+                      {STUDY_HISTORY_CALENDAR_LEGEND.map((item) => (
+                        <div key={item.label} className="space-y-1">
+                          <span className={cn("block h-2 rounded-full", item.swatch)} />
+                          {!isMobile ? (
+                            <span className="block text-center text-[8px] font-black tracking-tight text-[#7A8BA8]">
+                              {item.rangeLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#8A9AB6]">9h+</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1172,10 +1170,10 @@ export default function StudyHistoryPage() {
                     isMobile ? "py-1.5 text-[8px]" : "py-2.5 text-[10px]",
                     isParent
                       ? "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
-                      : "rounded-full border border-[#E6EAF3] bg-white/82 text-center font-black uppercase tracking-[0.18em] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]",
+                      : "text-center font-black uppercase tracking-[0.18em]",
                     isParent
                       ? i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
-                      : i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#667AA3]"
+                      : i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#7D8FAE]"
                   )}
               >
                 {day}
@@ -1208,14 +1206,11 @@ export default function StudyHistoryPage() {
                 const studentCellClass = getStudentCalendarCellClass(minutes, isCurrentMonth);
                 const studentValueLabel = isCurrentMonth
                   ? minutes > 0
-                    ? compactTimeLabel
-                    : hasPlans
-                      ? '공부 예정'
-                      : '기록 없음'
+                    ? (isMobile ? compactTimeLabel : exactTimeLabel)
+                    : ''
                   : '';
-                const studentMetaLabel = isCurrentMonth && minutes > 0 ? (isMobile ? flowShortLabel : flowLabel) : '';
+                const studentShouldRenderTime = isCurrentMonth && minutes > 0;
                 const studentValueTone = getStudentCalendarValueTone(minutes, isCurrentMonth);
-                const studentMetaTone = getStudentCalendarMetaTone(minutes, isCurrentMonth);
 
                 return (
                   <button
@@ -1224,86 +1219,74 @@ export default function StudyHistoryPage() {
                     onClick={() => setSelectedDateForPlan(day)}
                     aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${isCurrentMonth ? `${exactTimeLabel} 학습` : '이번 달 아님'}${hasPlans ? ' · 계획 있음' : ''}`}
                     className={cn(
-                      'group relative overflow-hidden rounded-[1.7rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB66E]/40',
+                      'group relative overflow-hidden rounded-[1.45rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
                       'aspect-square',
-                      isMobile ? 'min-h-0 p-2.5' : 'p-4',
+                      isMobile ? 'min-h-0 p-2.5' : 'p-3.5',
                       studentCellClass,
-                      isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_26px_40px_-28px_rgba(126,84,40,0.22)] active:translate-y-0',
-                      isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-[#FFB66E]/55 shadow-[0_28px_46px_-28px_rgba(255,149,38,0.24)]'
+                      isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0',
+                      isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-[#FFB66E]/55 shadow-[0_22px_36px_-24px_rgba(255,149,38,0.18)]'
                     )}
                   >
-                    {isTodayCalendar ? <div className="pointer-events-none absolute inset-[1px] rounded-[1.65rem] border border-white/80" /> : null}
-                    <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-white/95" />
-                    {isCurrentMonth ? (
-                      <div className="pointer-events-none absolute inset-x-3 top-0 h-16 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.44),rgba(255,255,255,0)_72%)] opacity-90" />
-                    ) : null}
+                    {isTodayCalendar ? <div className="pointer-events-none absolute inset-[1px] rounded-[1.35rem] border border-white/88" /> : null}
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/92" />
                     {isCurrentMonth && minutes > 0 ? (
-                      <div className="pointer-events-none absolute inset-x-4 top-0 h-[3px] rounded-b-full bg-[linear-gradient(90deg,rgba(255,181,108,0.35),rgba(255,146,48,0.92),rgba(255,181,108,0.35))]" />
+                      <div className="pointer-events-none absolute inset-x-4 top-0 h-12 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.52),rgba(255,255,255,0)_72%)] opacity-90" />
+                    ) : null}
+                    {isCurrentMonth && hasPlans ? (
+                      <span className={cn(
+                        "pointer-events-none absolute rounded-full bg-[#FF8A2A] shadow-[0_0_0_3px_rgba(255,255,255,0.92)]",
+                        isMobile ? "right-2 top-2 h-1.5 w-1.5" : "right-3 top-3 h-2 w-2"
+                      )} />
                     ) : null}
 
-                    <div className="relative z-10 flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-2">
-                        <span
-                          className={cn(
-                            'inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]',
-                            isMobile ? 'min-w-[1.72rem] px-2 py-0.5 text-[10px]' : 'min-w-[2.2rem] px-2.5 py-1 text-xs',
-                            idx % 7 === 5 && isCurrentMonth
-                              ? 'border-blue-100 bg-blue-50 text-blue-700'
-                              : idx % 7 === 6 && isCurrentMonth
-                                ? 'border-rose-100 bg-rose-50 text-rose-700'
-                                : 'border-white/90 bg-white/94 text-[#173A82]',
-                            isTodayCalendar && 'border-[#FFD1A0] bg-[#FFF7EC] text-[#D96A11]'
-                          )}
-                        >
-                          {format(day, 'd')}
-                        </span>
-                        {isTodayCalendar ? (
-                          <span className="rounded-full border border-[#FFD4A7] bg-white/85 px-2 py-1 text-[9px] font-black tracking-[0.14em] text-[#C86A10] shadow-[0_10px_18px_-16px_rgba(255,138,31,0.18)]">
-                            오늘
+                    <div className={cn("relative z-10 flex h-full flex-col", isMobile ? "items-center justify-center" : "")}>
+                      {!isMobile && isCurrentMonth ? (
+                        <div className="flex items-start justify-between">
+                          <span
+                            className={cn(
+                              "dashboard-number text-[0.9rem] font-black tabular-nums tracking-[-0.04em]",
+                              idx % 7 === 5
+                                ? "text-blue-700"
+                                : idx % 7 === 6
+                                  ? "text-rose-700"
+                                  : isTodayCalendar
+                                    ? "text-[#D96A11]"
+                                    : "text-[#6E83AA]"
+                            )}
+                          >
+                            {format(day, 'd')}
                           </span>
-                        ) : (
-                          <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
-                        )}
-                      </div>
+                          <span className="h-2 w-2" aria-hidden="true" />
+                        </div>
+                      ) : null}
 
-                      <div className="mt-auto flex flex-1 flex-col justify-end">
-                        {isCurrentMonth ? (
-                          <div className={cn("flex w-full flex-col", isMobile ? "gap-2" : "gap-2.5")}>
+                      <div className={cn("flex flex-1 items-center justify-center", !isMobile && "pt-4")}>
+                        {studentShouldRenderTime ? (
+                          <div
+                            className={cn(
+                              "inline-flex max-w-full items-center justify-center rounded-[1rem] border text-center",
+                              isMobile ? "min-h-[2.55rem] w-full px-1.5 py-1.5" : "min-h-[3.55rem] w-full px-3 py-2.5",
+                              getStudentCalendarTimeChipClass(minutes, isCurrentMonth)
+                            )}
+                          >
                             <span
                               className={cn(
-                                'dashboard-number break-keep font-black leading-tight tabular-nums',
+                                "dashboard-number break-keep whitespace-normal font-black leading-[1.08] tabular-nums text-center",
                                 isMobile
                                   ? isCompactLongTimeLabel
-                                    ? 'text-[0.86rem] tracking-[-0.04em]'
-                                    : 'text-[1rem] tracking-[-0.045em]'
-                                  : isCompactLongTimeLabel
-                                    ? 'text-[1rem] tracking-[-0.04em]'
-                                    : 'text-[1.18rem] tracking-[-0.05em]',
+                                    ? "text-[0.78rem] tracking-[-0.04em]"
+                                    : "text-[0.95rem] tracking-[-0.045em]"
+                                  : isLongTimeLabel
+                                    ? "text-[0.96rem] tracking-[-0.04em]"
+                                    : "text-[1.08rem] tracking-[-0.05em]",
                                 studentValueTone
                               )}
                             >
                               {studentValueLabel}
                             </span>
-                            {studentMetaLabel ? (
-                              <span
-                                className={cn(
-                                  'max-w-full truncate font-black tracking-tight',
-                                  isMobile ? 'text-[8px]' : 'text-[10px]',
-                                  studentMetaTone
-                                )}
-                              >
-                                {studentMetaLabel}
-                              </span>
-                            ) : null}
-                            {hasPlans ? (
-                              <span className={cn(
-                                'inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[9px] font-black tracking-[0.14em]',
-                                getStudentCalendarPlanBadgeClass(minutes, isCurrentMonth)
-                              )}>
-                                계획
-                              </span>
-                            ) : null}
                           </div>
+                        ) : !isMobile && isCurrentMonth ? (
+                          <span className="text-[0.76rem] font-black tracking-[0.18em] text-[#C2CBD9]">-</span>
                         ) : null}
                       </div>
                     </div>
