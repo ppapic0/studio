@@ -49,6 +49,7 @@ import { StudyPlanSheet } from './study-plan-sheet';
 import {
   STUDY_AMOUNT_UNIT_OPTIONS,
   type AttendanceAwaySlot,
+  STUDY_PLAN_MODE_OPTIONS,
   type StudyPlanMode,
 } from './planner-constants';
 import {
@@ -1553,6 +1554,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         subjectOptions={quickSubjectOptions}
         subjectValue={newStudySubject}
         onSubjectChange={setNewStudySubject}
+        customSubjectValue={customSubjectLabel}
+        onCustomSubjectChange={setCustomSubjectLabel}
         minuteValue={newStudyMinutes}
         onMinuteChange={setNewStudyMinutes}
         taskValue={newStudyTask}
@@ -1578,6 +1581,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         onToggleTask={handleToggleTask}
         onDeleteTask={handleDeleteTask}
         onCommitActual={handleCommitStudyActualAmount}
+        modeOptions={STUDY_PLAN_MODE_OPTIONS.filter((option) => option.value === 'volume')}
       />
 
       <PlannerTemplateSheet
