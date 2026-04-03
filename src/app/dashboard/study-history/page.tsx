@@ -37,6 +37,7 @@ import {
   subMonths,
   subDays,
   getDay,
+  isAfter,
   isBefore,
   startOfDay
 } from 'date-fns';
@@ -1222,6 +1223,7 @@ export default function StudyHistoryPage() {
               const hasPlans = allPlans?.some(p => p.dateKey === dateKey);
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isTodayCalendar = isSameDay(day, new Date());
+              const isFutureCalendar = isCurrentMonth && isAfter(startOfDay(day), startOfDay(new Date()));
               const hasDeepFocus = isCurrentMonth && minutes >= STUDY_HISTORY_FLOW_THRESHOLDS.steady;
               const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
               const useParentLikeMobileCalendar = !isParent;
@@ -1231,18 +1233,26 @@ export default function StudyHistoryPage() {
               const flowShortLabel = getStudyHistoryFlowShortLabel(minutes);
               const isLongTimeLabel = exactTimeLabel.length >= 7;
               const isCompactLongTimeLabel = compactTimeLabel.length >= 5;
-              const calendarAriaTimeLabel = isCurrentMonth ? (!isParent && isMobile ? compactTimeLabel : exactTimeLabel) : '이번 달 아님';
+              const calendarAriaTimeLabel = isCurrentMonth
+                ? isFutureCalendar
+                  ? '아직 오지 않은 날짜'
+                  : !isParent && isMobile
+                    ? compactTimeLabel
+                    : exactTimeLabel
+                : '이번 달 아님';
 
               if (!isParent) {
                 const studentCellClass = getStudentCalendarCellClass(minutes, isCurrentMonth, isMobile);
                 const studentValueLabel = isCurrentMonth
-                  ? isMobile
-                    ? compactTimeLabel
-                    : minutes > 0
-                      ? exactTimeLabel
-                      : ''
+                  ? isFutureCalendar
+                    ? ''
+                    : isMobile
+                      ? compactTimeLabel
+                      : minutes > 0
+                        ? exactTimeLabel
+                        : ''
                   : '';
-                const studentShouldRenderTime = isCurrentMonth && (isMobile || minutes > 0);
+                const studentShouldRenderTime = isCurrentMonth && !isFutureCalendar && (isMobile || minutes > 0);
                 const studentValueTone = getStudentCalendarValueTone(minutes, isCurrentMonth, isMobile);
 
                 return (
@@ -1307,8 +1317,8 @@ export default function StudyHistoryPage() {
                                 "dashboard-number break-keep whitespace-normal font-black leading-[1.02] tabular-nums text-center",
                                 isMobile
                                   ? isCompactLongTimeLabel
-                                    ? "text-[0.64rem] tracking-[-0.05em]"
-                                    : "text-[0.76rem] tracking-[-0.05em]"
+                                    ? "text-[0.6rem] tracking-[-0.05em]"
+                                    : "text-[0.72rem] tracking-[-0.05em]"
                                   : isLongTimeLabel
                                     ? "text-[0.96rem] tracking-[-0.04em]"
                                     : "text-[1.08rem] tracking-[-0.05em]",
