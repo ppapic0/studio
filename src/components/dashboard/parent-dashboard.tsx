@@ -3560,44 +3560,44 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   )}
                 </div>
-                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-primary/10 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbff_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(37,99,235,0.35)] ring-1 ring-white/70">
+                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-[#F0D9BB] bg-[linear-gradient(180deg,#fffdf8_0%,#fff3e4_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(180,96,22,0.18)] ring-1 ring-white/70">
                   <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
-                  <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-white/80 bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_30px_-24px_rgba(37,99,235,0.32)]">
-                    <span className="font-black text-sm tracking-tight text-primary">{format(currentCalendarDate, 'yyyy년 M월')}</span>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/78 text-[#7D4B16] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#FFF0DD] hover:text-[#8D4A11]" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
+                  <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-[#F3DFC4] bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_14px_30px_-24px_rgba(180,96,22,0.16)]">
+                    <span className="font-black text-sm tracking-tight text-[#7D4B16]">{format(currentCalendarDate, 'yyyy년 M월')}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/70 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all hover:bg-primary/5 hover:text-primary" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/78 text-[#7D4B16] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#FFF0DD] hover:text-[#8D4A11]" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
                 </div>
               </header>
 
-              <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)] ring-1 ring-white/70">
+              <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-[#F0D9BB] bg-[radial-gradient(circle_at_top_left,rgba(255,184,101,0.16),transparent_24%),linear-gradient(180deg,#ffffff_0%,#fff8ef_100%)] shadow-[0_28px_70px_-52px_rgba(120,79,44,0.26)] ring-1 ring-white/70">
                 <CardContent className="relative p-0">
                   <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
-                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/50">월간 흐름 요약</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#9B6C3D]">월간 흐름 요약</span>
                     <div className="flex flex-wrap gap-1.5">
                       {PARENT_CALENDAR_LEGEND.map((item) => (
-                        <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/75 bg-white/92 px-2.5 py-1 text-[8px] font-black text-slate-500 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.14)] sm:text-[9px]">
+                        <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-[#EED9BF] bg-white/92 px-2.5 py-1 text-[8px] font-black text-[#7D4B16] shadow-[0_10px_22px_-20px_rgba(180,96,22,0.12)] sm:text-[9px]">
                           <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
                           {item.label}
                         </span>
                       ))}
                     </div>
                   </div>
-                  <div className={cn("grid grid-cols-7 border-b border-primary/10", isMobile ? "gap-1 px-1.5 py-1.5" : "gap-1.5 px-4 py-3")}>
+                  <div className={cn("grid grid-cols-7 border-b border-primary/10", isMobile ? "gap-1 px-1.5 py-1.5" : "gap-2 px-5 py-3.5")}>
                     {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                       <div
                         key={day}
                         className={cn(
-                          isMobile ? "py-1.5 text-[8px]" : "py-3 text-[11px]",
-                          "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
-                          i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
+                          isMobile ? "py-1.5 text-[8px]" : "rounded-[1rem] border py-2.5 text-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]",
+                          "border-[#EFDCC3] bg-[linear-gradient(180deg,#FFFDF8_0%,#FFF6EA_100%)] text-center font-black uppercase tracking-[0.18em]",
+                          i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#9B6C3D]"
                         )}
                       >
                         {day}
                       </div>
                     ))}
                   </div>
-                  <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 p-1.5" : "auto-rows-fr gap-3 p-4")}>
+                  <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 p-1.5" : "auto-rows-fr gap-3.5 p-5")}>
                     {logsLoading ? (
                       <div className="col-span-7 h-[400px] flex items-center justify-center">
                         <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
@@ -3622,8 +3622,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           onClick={() => setSelectedCalendarDate(day)}
                           aria-label={format(day, 'M월 d일 (EEEE)', { locale: ko })}
                           className={cn(
-                            "group relative flex flex-col overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
-                            isMobile ? "aspect-square min-h-0 p-1" : "min-h-[150px] p-3",
+                            "group relative flex flex-col overflow-hidden rounded-[1.35rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                            isMobile ? "aspect-square min-h-0 p-1" : "aspect-square min-h-0 p-3.5",
                             !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                             isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
                             isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
@@ -3637,7 +3637,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           )}
 
-                          <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isMobile ? "mb-auto" : "mb-2.5")}>
+                          <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isMobile ? "mb-auto" : "mb-3")}>
                             <span
                               className={cn(
                                 "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
@@ -3663,12 +3663,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             )}
                           </div>
 
-                          <div className={cn("mt-auto flex", isMobile ? "justify-center pb-1" : "justify-start pt-6")}>
+                          <div className={cn("mt-auto flex", isMobile ? "justify-center pb-1" : "justify-center px-1 pt-4")}>
                             {isCurrentMonth ? (
                               <div
                                 className={cn(
-                                  "inline-flex max-w-full flex-col items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
-                                  isMobile ? "min-w-[3rem] px-1.5 py-1.5" : "min-w-[4.65rem] px-2.5 py-1.5",
+                                  "inline-flex w-full max-w-full flex-col items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
+                                  isMobile ? "min-w-[3rem] px-1.5 py-1.5" : "min-h-[3.25rem] px-3 py-2",
                                   getParentCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                                 )}
                               >
@@ -3679,7 +3679,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                       ? isLongTimeLabel
                                         ? "text-[0.64rem] tracking-[-0.04em]"
                                         : "text-[0.72rem] tracking-[-0.06em]"
-                                      : "text-[1rem] tracking-[-0.05em]"
+                                      : isLongTimeLabel
+                                        ? "text-[0.86rem] tracking-[-0.04em]"
+                                        : "text-[1rem] tracking-[-0.05em]"
                                   )}
                                 >
                                   {exactTimeLabel}

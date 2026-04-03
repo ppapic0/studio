@@ -527,20 +527,20 @@ export default function StudyHistoryPage() {
 
   const getHeatmapColor = (minutes: number) => {
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
-    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,246,0.98)_60%,rgba(225,248,238,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.18)]';
-    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(229,252,242,0.98)_56%,rgba(214,247,233,0.98)_100%)] ring-1 ring-inset ring-teal-300/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_34px_-28px_rgba(13,148,136,0.2)]';
-    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,244,255,0.98)_50%,rgba(213,231,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.2)]';
-    return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(220,236,255,0.98)_46%,rgba(205,221,255,0.98)_100%)] ring-1 ring-inset ring-blue-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.24)]';
+    if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(255,248,239,0.995)_100%)] ring-1 ring-inset ring-[#EADAC6]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_16px_30px_-28px_rgba(180,96,22,0.08)]';
+    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(255,250,242,0.998)_0%,rgba(255,231,198,0.996)_100%)] ring-1 ring-inset ring-[#F2C98E]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_18px_32px_-28px_rgba(198,112,29,0.14)]';
+    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(255,243,222,0.998)_0%,rgba(255,201,122,0.996)_100%)] ring-1 ring-inset ring-[#EDA14E]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-28px_rgba(214,123,33,0.18)]';
+    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(255,231,188,0.998)_0%,rgba(255,162,61,0.996)_100%)] ring-1 ring-inset ring-[#E57B13]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_20px_36px_-28px_rgba(223,119,16,0.24)]';
+    return 'bg-[linear-gradient(180deg,rgba(255,214,151,0.998)_0%,rgba(255,122,22,0.998)_100%)] ring-1 ring-inset ring-[#C95A00]/95 shadow-[inset_0_1px_0_rgba(255,246,232,0.72),0_24px_42px_-26px_rgba(201,90,0,0.3)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'from-slate-200 via-slate-300 to-slate-200';
-    if (level === 'warmup') return 'from-emerald-300 via-emerald-400 to-teal-400';
-    if (level === 'short') return 'from-emerald-400 via-teal-400 to-cyan-400';
-    if (level === 'steady') return 'from-sky-400 via-blue-400 to-indigo-400';
-    return 'from-sky-500 via-blue-500 to-indigo-600';
+    if (level === 'none') return 'from-[#EADFD3] via-[#F5E6D2] to-[#EADFD3]';
+    if (level === 'warmup') return 'from-[#FFE0AE] via-[#FFD08E] to-[#FFBF67]';
+    if (level === 'short') return 'from-[#FFD391] via-[#FFB45A] to-[#FF972C]';
+    if (level === 'steady') return 'from-[#FFBE6D] via-[#FFA23D] to-[#F57C00]';
+    return 'from-[#FF9D3A] via-[#FF7A16] to-[#C95A00]';
   };
 
   const getStudentCalendarCellClass = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
@@ -564,18 +564,18 @@ export default function StudyHistoryPage() {
       return 'border border-[#C95A00] bg-[linear-gradient(180deg,rgba(255,214,151,0.998)_0%,rgba(255,122,22,0.998)_100%)] shadow-[inset_0_1px_0_rgba(255,246,232,0.72),0_20px_34px_-22px_rgba(201,90,0,0.3)]';
     }
     if (level === 'none') {
-      return 'border border-[#E1E8F3] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(246,249,253,0.985)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_14px_26px_-24px_rgba(20,41,95,0.08)]';
+      return 'border border-[#EADAC6] bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(255,248,239,0.995)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_15px_28px_-24px_rgba(180,96,22,0.08)]';
     }
     if (level === 'warmup') {
-      return 'border border-[#D9E4F3] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(240,245,252,0.99)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_15px_28px_-24px_rgba(20,41,95,0.1)]';
+      return 'border border-[#F2C98E] bg-[linear-gradient(180deg,rgba(255,250,242,0.998)_0%,rgba(255,237,212,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_16px_30px_-24px_rgba(198,112,29,0.14)]';
     }
     if (level === 'short') {
-      return 'border border-[#CAD9EE] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(233,240,250,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_28px_-24px_rgba(20,41,95,0.12)]';
+      return 'border border-[#EDA14E] bg-[linear-gradient(180deg,rgba(255,245,228,0.998)_0%,rgba(255,221,168,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_17px_30px_-24px_rgba(214,123,33,0.18)]';
     }
     if (level === 'steady') {
-      return 'border border-[#B8CDEC] bg-[linear-gradient(180deg,rgba(252,254,255,0.996)_0%,rgba(223,234,249,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_32px_-24px_rgba(20,41,95,0.14)]';
+      return 'border border-[#E57B13] bg-[linear-gradient(180deg,rgba(255,237,209,0.998)_0%,rgba(255,189,103,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_32px_-24px_rgba(223,119,16,0.22)]';
     }
-    return 'border border-[#9DB7E5] bg-[linear-gradient(180deg,rgba(247,251,255,0.996)_0%,rgba(206,221,245,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_34px_-24px_rgba(20,41,95,0.18)]';
+    return 'border border-[#C95A00] bg-[linear-gradient(180deg,rgba(255,226,179,0.998)_0%,rgba(255,140,36,0.998)_100%)] shadow-[inset_0_1px_0_rgba(255,246,232,0.76),0_20px_34px_-22px_rgba(201,90,0,0.28)]';
   };
 
   const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
@@ -584,11 +584,11 @@ export default function StudyHistoryPage() {
       return '!text-black';
     }
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'text-[#B9C5D8]';
-    if (level === 'warmup') return 'text-[#27437F]';
-    if (level === 'short') return 'text-[#1F3C78]';
-    if (level === 'steady') return 'text-[#17356F]';
-    return 'text-[#102A63]';
+    if (level === 'none') return 'text-[#A58A68]';
+    if (level === 'warmup') return 'text-[#915216]';
+    if (level === 'short') return 'text-[#84420C]';
+    if (level === 'steady') return 'text-[#6B2F06]';
+    return 'text-[#4B1F00]';
   };
 
   const getStudentCalendarMetaTone = (minutes: number, isCurrentMonth: boolean) => {
@@ -604,30 +604,31 @@ export default function StudyHistoryPage() {
   const getCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,251,0.98))] text-slate-500 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.12)]';
-    if (level === 'warmup') return 'border-emerald-200/95 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(237,251,244,0.98))] text-slate-900 shadow-[0_12px_20px_-18px_rgba(16,185,129,0.18)]';
-    if (level === 'short') return 'border-teal-200/95 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(232,251,247,0.98))] text-slate-950 shadow-[0_12px_20px_-18px_rgba(13,148,136,0.18)]';
-    if (level === 'steady') return 'border-sky-200/95 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(235,245,255,0.98))] text-[#14295F] shadow-[0_12px_20px_-18px_rgba(37,99,235,0.18)]';
-    return 'border-blue-200/95 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(229,238,255,0.98))] text-[#14295F] shadow-[0_14px_24px_-18px_rgba(20,41,95,0.2)]';
+    if (level === 'none') return 'border-[#EADAC6] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,248,239,0.98))] text-black shadow-[0_10px_18px_-18px_rgba(176,96,22,0.08)]';
+    if (level === 'warmup') return 'border-[#F2C98E] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(255,239,218,0.99))] text-black shadow-[0_12px_20px_-18px_rgba(198,112,29,0.14)]';
+    if (level === 'short') return 'border-[#EDA14E] bg-[linear-gradient(180deg,rgba(255,249,239,0.97),rgba(255,215,152,0.995))] text-black shadow-[0_12px_20px_-18px_rgba(214,123,33,0.2)]';
+    if (level === 'steady') return 'border-[#E57B13] bg-[linear-gradient(180deg,rgba(255,243,224,0.98),rgba(255,183,93,0.995))] text-black shadow-[0_14px_24px_-18px_rgba(223,119,16,0.24)]';
+    return 'border-[#C95A00] bg-[linear-gradient(180deg,rgba(255,237,206,0.98),rgba(255,138,31,0.998))] text-black shadow-[0_14px_24px_-18px_rgba(201,90,0,0.28)]';
   };
 
   const getCalendarValueTextClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'text-slate-300';
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'text-slate-500';
-    if (level === 'warmup') return 'text-slate-900';
-    if (level === 'short') return 'text-slate-950';
-    return 'text-[#14295F]';
+    if (level === 'none') return 'text-[#9A754D]';
+    if (level === 'warmup') return 'text-[#7A4314]';
+    if (level === 'short') return 'text-[#6B3308]';
+    if (level === 'steady') return 'text-[#5B2504]';
+    return 'text-[#4A1D00]';
   };
 
   const getCalendarFlowTextClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'text-slate-300';
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'text-slate-500';
-    if (level === 'warmup') return 'text-emerald-700';
-    if (level === 'short') return 'text-teal-800';
-    if (level === 'steady') return 'text-sky-800';
-    return 'text-[#14295F]';
+    if (level === 'none') return 'text-[#9A754D]';
+    if (level === 'warmup') return 'text-[#A15D20]';
+    if (level === 'short') return 'text-[#8D4A11]';
+    if (level === 'steady') return 'text-[#743608]';
+    return 'text-[#5A2400]';
   };
 
   const getStudyHistoryFlowShortLabel = (minutes: number) => {
@@ -642,7 +643,7 @@ export default function StudyHistoryPage() {
   const getCalendarStatusTextClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'text-slate-300';
     const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'text-slate-400';
+    if (level === 'none') return 'text-[#AB8D67]';
     if (level === 'warmup') return 'text-[#985817]';
     if (level === 'short') return 'text-[#84430A]';
     if (level === 'steady') return 'text-[#713307]';
@@ -670,18 +671,18 @@ export default function StudyHistoryPage() {
       return 'border-[#C95A00] bg-[linear-gradient(180deg,rgba(255,237,206,0.96),rgba(255,138,31,0.998))] shadow-[0_16px_26px_-20px_rgba(201,90,0,0.28)]';
     }
     if (level === 'none') {
-      return 'border-[#E7EDF7] bg-white/68 text-transparent shadow-none';
+      return 'border-[#EADAC6] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,248,239,0.98))] text-[#A58A68] shadow-[0_10px_18px_-18px_rgba(176,96,22,0.08)]';
     }
     if (level === 'warmup') {
-      return 'border-[#DCE7F5] bg-white/84 text-[#27437F] shadow-[0_12px_22px_-20px_rgba(20,41,95,0.1)]';
+      return 'border-[#F2C98E] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(255,239,218,0.99))] text-[#915216] shadow-[0_12px_22px_-20px_rgba(198,112,29,0.16)]';
     }
     if (level === 'short') {
-      return 'border-[#D2E0F2] bg-white/86 text-[#1F3C78] shadow-[0_13px_22px_-20px_rgba(20,41,95,0.12)]';
+      return 'border-[#EDA14E] bg-[linear-gradient(180deg,rgba(255,249,239,0.95),rgba(255,215,152,0.995))] text-[#84420C] shadow-[0_13px_22px_-20px_rgba(214,123,33,0.2)]';
     }
     if (level === 'steady') {
-      return 'border-[#C4D6F0] bg-white/90 text-[#17356F] shadow-[0_14px_24px_-20px_rgba(20,41,95,0.14)]';
+      return 'border-[#E57B13] bg-[linear-gradient(180deg,rgba(255,243,224,0.96),rgba(255,183,93,0.995))] text-[#6B2F06] shadow-[0_14px_24px_-20px_rgba(223,119,16,0.24)]';
     }
-    return 'border-[#AAC2E8] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(236,243,255,0.98))] text-[#102A63] shadow-[0_16px_26px_-20px_rgba(20,41,95,0.16)]';
+    return 'border-[#C95A00] bg-[linear-gradient(180deg,rgba(255,237,206,0.96),rgba(255,138,31,0.998))] text-[#4B1F00] shadow-[0_16px_26px_-20px_rgba(201,90,0,0.28)]';
   };
 
   const getStudentCalendarPlanBadgeClass = (minutes: number, isCurrentMonth: boolean) => {
@@ -1129,26 +1130,26 @@ export default function StudyHistoryPage() {
       <Card className={cn(
         "student-utility-card relative mx-auto w-full overflow-hidden rounded-[3rem]",
         isParent
-          ? "border border-emerald-100/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fcff_100%)] ring-1 ring-white/70 shadow-[0_28px_70px_-52px_rgba(15,23,42,0.4)]"
-          : "border border-[#E5EBF5] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFD_100%)] ring-1 ring-white/85 shadow-[0_22px_52px_-44px_rgba(20,41,95,0.18)]"
+          ? "border border-[#F0D9BB] bg-[radial-gradient(circle_at_top_left,rgba(255,184,101,0.16),transparent_24%),linear-gradient(180deg,#ffffff_0%,#fff8ef_100%)] ring-1 ring-white/70 shadow-[0_28px_70px_-52px_rgba(120,79,44,0.26)]"
+          : "border border-[#F0D9BB] bg-[radial-gradient(circle_at_top_left,rgba(255,184,101,0.12),transparent_24%),linear-gradient(180deg,#FFFFFF_0%,#FFF9F0_100%)] ring-1 ring-white/85 shadow-[0_22px_52px_-44px_rgba(180,96,22,0.16)]"
       )}>
         <CardContent className="relative p-0">
           <div className={cn("border-b border-primary/10", isMobile ? "px-4 py-4" : "px-6 py-5")}>
             {isParent ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isMobile ? "text-[#173A82]/62" : "text-primary/50")}>학습 흐름</span>
+                <span className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isMobile ? "text-[#173A82]/62" : "text-[#9B6C3D]")}>학습 흐름</span>
                 <div className="flex flex-wrap gap-1.5">
                   {STUDY_HISTORY_CALENDAR_LEGEND.map((item) => (
                     <span key={item.label} className={cn(
                       "inline-flex items-center gap-2 rounded-[1rem] px-2.5 py-1.5 font-black shadow-[0_12px_24px_-20px_rgba(15,23,42,0.16)]",
                       isMobile
                         ? "border border-[#D9E1F2] bg-white text-[#173A82] text-[8px]"
-                        : "border border-slate-200/75 bg-white/92 text-slate-700 text-[8px] sm:text-[9px]"
+                        : "border border-[#EED9BF] bg-white/92 text-[#7D4B16] text-[8px] sm:text-[9px]"
                     )}>
                       <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full ring-1", item.swatch)} />
                       <span className="flex flex-col leading-none">
                         <span>{item.label}</span>
-                        <span className="mt-0.5 font-bold tracking-normal text-[#7285AD]">
+                        <span className={cn("mt-0.5 font-bold tracking-normal", isMobile ? "text-[#7285AD]" : "text-[#AD7A48]")}>
                           {item.rangeLabel}
                         </span>
                       </span>
@@ -1166,29 +1167,25 @@ export default function StudyHistoryPage() {
                   <div>
                     <h3 className={cn("font-black tracking-[-0.03em] text-[#14295F]", isMobile ? "text-[1.3rem]" : "text-[1.62rem]")}>학습 캘린더</h3>
                     <p className={cn("mt-1 font-semibold text-[#71819C]", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
-                      {isMobile ? '공부시간 중심으로 빠르게 확인해요.' : '날짜와 공부시간을 정사각형 보드로 차분하게 확인해요.'}
+                      {isMobile ? '공부시간 중심으로 빠르게 확인해요.' : '앱처럼 한 칸씩 공부시간을 바로 읽을 수 있게 정리했어요.'}
                     </p>
                   </div>
                 </div>
                 <div className={cn(
-                  "rounded-[1.25rem] border border-[#E7EDF7] bg-[#FBFCFE] shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]",
-                  isMobile ? "px-3 py-3" : "min-w-[21rem] px-4 py-3"
+                  "rounded-[1.45rem] border border-[#F0D9BB] bg-[linear-gradient(180deg,#FFFDF8_0%,#FFF4E6_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-26px_rgba(180,96,22,0.1)]",
+                  isMobile ? "px-3 py-3" : "min-w-[24rem] px-4 py-3.5"
                 )}>
                   <div className="flex items-center gap-2.5">
-                    <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#8A9AB6]">0h</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#A06D3E]">0h</span>
                     <div className="grid flex-1 grid-cols-5 gap-1.5">
                       {STUDY_HISTORY_CALENDAR_LEGEND.map((item) => (
-                        <div key={item.label} className="space-y-1">
-                          <span className={cn("block h-2 rounded-full", item.swatch)} />
-                          {!isMobile ? (
-                            <span className="block text-center text-[8px] font-black tracking-tight text-[#7A8BA8]">
-                              {item.rangeLabel}
-                            </span>
-                          ) : null}
+                        <div key={item.label} className={cn("rounded-[1rem] border px-2 py-1.5", getStudentLegendChipClass(item.level))}>
+                          <span className={cn("mb-1 block h-2 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]", item.swatch)} />
+                          {!isMobile ? <span className="block text-center text-[8px] font-black tracking-tight">{item.rangeLabel}</span> : null}
                         </div>
                       ))}
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#8A9AB6]">9h+</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#A06D3E]">9h+</span>
                   </div>
                 </div>
               </div>
@@ -1199,13 +1196,13 @@ export default function StudyHistoryPage() {
               <div
                 key={day}
                 className={cn(
-                    isMobile ? "py-1.5 text-[8px]" : "py-2.5 text-[10px]",
+                    isMobile ? "py-1.5 text-[8px]" : "rounded-[1rem] border py-2.5 text-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]",
                     isParent
                       ? "rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
-                      : "text-center font-black uppercase tracking-[0.18em]",
+                      : "border-[#EFDCC3] bg-[linear-gradient(180deg,#FFFDF8_0%,#FFF6EA_100%)] text-center font-black uppercase tracking-[0.18em]",
                     isParent
                       ? i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-primary/60"
-                      : i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#7D8FAE]"
+                      : i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#9B6C3D]"
                   )}
               >
                 {day}
@@ -1248,12 +1245,19 @@ export default function StudyHistoryPage() {
                     ? ''
                     : isMobile
                       ? compactTimeLabel
-                      : minutes > 0
-                        ? exactTimeLabel
-                        : ''
+                      : exactTimeLabel
                   : '';
-                const studentShouldRenderTime = isCurrentMonth && !isFutureCalendar && (isMobile || minutes > 0);
+                const studentShouldRenderTime = isCurrentMonth && !isFutureCalendar;
                 const studentValueTone = getStudentCalendarValueTone(minutes, isCurrentMonth, isMobile);
+                const studentMetaLabel = isFutureCalendar
+                  ? '기록 예정'
+                  : hasPlans && minutes > 0
+                    ? `${flowLabel} · 계획 있음`
+                    : hasPlans
+                      ? '계획 있음'
+                      : minutes > 0
+                        ? flowLabel
+                        : '기록 대기';
 
                 return (
                   <button
@@ -1275,14 +1279,14 @@ export default function StudyHistoryPage() {
                     {isCurrentMonth && minutes > 0 ? (
                       <div className="pointer-events-none absolute inset-x-4 top-0 h-12 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.52),rgba(255,255,255,0)_72%)] opacity-90" />
                     ) : null}
-                    {isCurrentMonth && hasPlans ? (
+                    {isCurrentMonth && hasPlans && isMobile ? (
                       <span className={cn(
                         "pointer-events-none absolute rounded-full bg-[#FF8A2A] shadow-[0_0_0_3px_rgba(255,255,255,0.92)]",
                         isMobile ? "right-2 top-2 h-1.5 w-1.5" : "right-3 top-3 h-2 w-2"
                       )} />
                     ) : null}
 
-                    <div className={cn("relative z-10 flex h-full flex-col", isMobile ? "items-center justify-center" : "")}>
+                    <div className={cn("relative z-10 flex h-full flex-col", isMobile ? "items-center justify-center" : "justify-between")}>
                       {!isMobile && isCurrentMonth ? (
                         <div className="flex items-start justify-between">
                           <span
@@ -1299,11 +1303,22 @@ export default function StudyHistoryPage() {
                           >
                             {format(day, 'd')}
                           </span>
-                          <span className="h-2 w-2" aria-hidden="true" />
+                          {hasPlans ? (
+                            <span
+                              className={cn(
+                                "inline-flex items-center rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]",
+                                getStudentCalendarPlanBadgeClass(minutes, isCurrentMonth)
+                              )}
+                            >
+                              계획
+                            </span>
+                          ) : (
+                            <span className="h-6 w-10" aria-hidden="true" />
+                          )}
                         </div>
                       ) : null}
 
-                      <div className={cn("flex flex-1 items-center justify-center", !isMobile && "pt-4")}>
+                      <div className={cn("flex flex-1 items-center justify-center", !isMobile && "px-1 pt-4")}>
                         {studentShouldRenderTime ? (
                           <div
                             className={cn(
@@ -1332,6 +1347,14 @@ export default function StudyHistoryPage() {
                           <span className="text-[0.76rem] font-black tracking-[0.18em] text-[#C2CBD9]">-</span>
                         ) : null}
                       </div>
+
+                      {!isMobile && isCurrentMonth ? (
+                        <div className="pt-3">
+                          <div className={cn("text-[10px] font-black tracking-[0.14em]", getStudentCalendarMetaTone(minutes, isCurrentMonth))}>
+                            {studentMetaLabel}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </button>
                 );
@@ -1344,8 +1367,8 @@ export default function StudyHistoryPage() {
                   onClick={() => setSelectedDateForPlan(day)}
                   aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}${isCurrentMonth ? ' 학습' : ''}${hasPlans ? ' · 계획 있음' : ''}`}
                   className={cn(
-                    "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
-                    isMobile ? "aspect-square min-h-0 p-1.5" : "min-h-[150px] p-3",
+                    "group relative overflow-hidden rounded-[1.35rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                    isMobile ? "aspect-square min-h-0 p-1.5" : "aspect-square min-h-0 p-3.5",
                     !isCurrentMonth
                       ? isParent || useParentLikeMobileCalendar
                         ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75"
@@ -1368,7 +1391,7 @@ export default function StudyHistoryPage() {
                     </div>
                   )}
 
-                  <div className={cn("relative z-10 flex items-start justify-between gap-1.5", useParentLikeMobileCalendar ? "mb-2" : isMobile ? "mb-auto" : "mb-2.5")}>
+                  <div className={cn("relative z-10 flex items-start justify-between gap-1.5", useParentLikeMobileCalendar ? "mb-2" : isMobile ? "mb-auto" : "mb-3")}>
                     <span
                       className={cn(
                         "inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
@@ -1394,7 +1417,7 @@ export default function StudyHistoryPage() {
                     )}
                   </div>
 
-                  <div className={cn("mt-auto flex", useParentLikeMobileCalendar ? "justify-center pb-1" : isMobile ? "justify-center pb-0.5" : "justify-center pt-5")}>
+                  <div className={cn("mt-auto flex", useParentLikeMobileCalendar ? "justify-center pb-1" : isMobile ? "justify-center pb-0.5" : "justify-center px-1 pt-4")}>
                     {isCurrentMonth ? (
                       <div
                         className={cn(
@@ -1426,7 +1449,9 @@ export default function StudyHistoryPage() {
                                 ? isCompactLongTimeLabel
                                   ? "text-[0.72rem] tracking-[-0.035em]"
                                   : "text-[0.92rem] tracking-[-0.04em]"
-                                : "text-[1rem] tracking-[-0.05em]",
+                                : isLongTimeLabel
+                                  ? "text-[0.86rem] tracking-[-0.04em]"
+                                  : "text-[1rem] tracking-[-0.05em]",
                             useParentLikeMobileCalendar
                               ? minutes > 0
                                 ? "text-[#7A3E10]"
@@ -1454,7 +1479,7 @@ export default function StudyHistoryPage() {
                   </div>
 
                   {!isMobile && isCurrentMonth && !useParentLikeMobileCalendar && (
-                    <div className="pointer-events-none absolute inset-x-3 bottom-12">
+                    <div className="pointer-events-none absolute inset-x-3 bottom-4">
                       <div className={cn(
                         "text-[10px] font-black uppercase tracking-[0.16em]",
                         getCalendarStatusTextClass(minutes, isCurrentMonth)
