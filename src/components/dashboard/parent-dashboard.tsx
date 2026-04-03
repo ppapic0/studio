@@ -1146,11 +1146,11 @@ const PARENT_CALENDAR_THRESHOLDS = {
 } as const;
 
 const PARENT_CALENDAR_LEGEND = [
-  { label: '기록 없음', swatch: 'from-white via-[#FFF8EF] to-[#F6E6D1] ring-[#E7D9C8]' },
-  { label: '몰입 준비', swatch: 'from-white via-[#FFF1DE] to-[#FFDDB6] ring-[#F3C894]' },
-  { label: '짧은 몰입', swatch: 'from-white via-[#FFE6C7] to-[#FFD09A] ring-[#F4A74E]' },
-  { label: '집중 흐름', swatch: 'from-[#FFF2DD] via-[#FFD89C] to-[#FFBA68] ring-[#EB8718]' },
-  { label: '깊은 몰입', swatch: 'from-[#FFE4BC] via-[#FFB35B] to-[#FF9328] ring-[#D86700]' },
+  { label: '기록 없음', swatch: 'from-white via-[#FFF8EF] to-[#F5E6D2] ring-[#E7D7C4]' },
+  { label: '몰입 준비', swatch: 'from-white via-[#FFEFD5] to-[#FFE0AE] ring-[#F2C98E]' },
+  { label: '짧은 몰입', swatch: 'from-[#FFF5E7] via-[#FFDCA6] to-[#FFC97A] ring-[#EDA14E]' },
+  { label: '집중 흐름', swatch: 'from-[#FFE7C0] via-[#FFBE6D] to-[#FFA23D] ring-[#E57B13]' },
+  { label: '깊은 몰입', swatch: 'from-[#FFD391] via-[#FF9D3A] to-[#FF7A16] ring-[#C95A00]' },
 ] as const;
 
 function getParentCalendarFlowLevel(minutes: number): ParentCalendarFlowLevel {
@@ -2472,40 +2472,40 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const getHeatmapColor = (minutes: number) => {
     const level = getParentCalendarFlowLevel(minutes);
-    if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.996)_0%,rgba(255,247,239,0.99)_100%)] ring-1 ring-inset ring-[#F2E6D8]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_30px_-28px_rgba(180,96,22,0.08)]';
-    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(255,251,246,0.996)_0%,rgba(255,239,219,0.99)_100%)] ring-1 ring-inset ring-[#F0D2AE]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_32px_-28px_rgba(195,103,28,0.12)]';
-    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(255,247,236,0.996)_0%,rgba(255,225,186,0.992)_100%)] ring-1 ring-inset ring-[#EBBE86]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_34px_-28px_rgba(205,111,28,0.14)]';
-    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(255,240,220,0.996)_0%,rgba(255,205,138,0.992)_100%)] ring-1 ring-inset ring-[#E59F55]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(214,118,28,0.18)]';
-    return 'bg-[linear-gradient(180deg,rgba(255,229,191,0.996)_0%,rgba(255,160,63,0.992)_100%)] ring-1 ring-inset ring-[#D87917]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_24px_42px_-28px_rgba(207,102,0,0.24)]';
+    if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(255,248,239,0.995)_100%)] ring-1 ring-inset ring-[#EADAC6]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_16px_30px_-28px_rgba(180,96,22,0.08)]';
+    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(255,250,242,0.998)_0%,rgba(255,231,198,0.996)_100%)] ring-1 ring-inset ring-[#F2C98E]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_18px_32px_-28px_rgba(198,112,29,0.14)]';
+    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(255,243,222,0.998)_0%,rgba(255,201,122,0.996)_100%)] ring-1 ring-inset ring-[#EDA14E]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-28px_rgba(214,123,33,0.18)]';
+    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(255,231,188,0.998)_0%,rgba(255,162,61,0.996)_100%)] ring-1 ring-inset ring-[#E57B13]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_20px_36px_-28px_rgba(223,119,16,0.24)]';
+    return 'bg-[linear-gradient(180deg,rgba(255,214,151,0.998)_0%,rgba(255,122,22,0.998)_100%)] ring-1 ring-inset ring-[#C95A00]/95 shadow-[inset_0_1px_0_rgba(255,246,232,0.72),0_24px_42px_-26px_rgba(201,90,0,0.3)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
     const level = getParentCalendarFlowLevel(minutes);
-    if (level === 'none') return 'from-[#EADFD3] via-[#F4E8DB] to-[#EADFD3]';
-    if (level === 'warmup') return 'from-[#FFD9B0] via-[#FFBF82] to-[#FFB15C]';
-    if (level === 'short') return 'from-[#FFC98E] via-[#FFAE5A] to-[#FF972C]';
-    if (level === 'steady') return 'from-[#FFB56A] via-[#FF952E] to-[#F57C00]';
-    return 'from-[#FF9D3A] via-[#F57C00] to-[#D86700]';
+    if (level === 'none') return 'from-[#EADFD3] via-[#F5E6D2] to-[#EADFD3]';
+    if (level === 'warmup') return 'from-[#FFE0AE] via-[#FFD08E] to-[#FFBF67]';
+    if (level === 'short') return 'from-[#FFD391] via-[#FFB45A] to-[#FF972C]';
+    if (level === 'steady') return 'from-[#FFBE6D] via-[#FFA23D] to-[#F57C00]';
+    return 'from-[#FF9D3A] via-[#FF7A16] to-[#C95A00]';
   };
 
   const getParentCalendarFlowChipClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300';
     const level = getParentCalendarFlowLevel(minutes);
-    if (level === 'none') return 'border-[#EEDFD0] bg-white/92 text-[#9A754D]';
-    if (level === 'warmup') return 'border-[#EDCDA7] bg-[#FFF8EF] text-[#A15D20]';
-    if (level === 'short') return 'border-[#E7BB83] bg-[#FFF1E2] text-[#8D4A11]';
-    if (level === 'steady') return 'border-[#E39C49] bg-[#FFE4C1] text-[#743608]';
-    return 'border-[#D67614] bg-[#FFD4A0] text-[#5A2400]';
+    if (level === 'none') return 'border-[#EADAC6] bg-[#FFF8EF] text-[#9A754D]';
+    if (level === 'warmup') return 'border-[#F2C98E] bg-[#FFF0DD] text-[#A15D20]';
+    if (level === 'short') return 'border-[#EDA14E] bg-[#FFE2BD] text-[#8D4A11]';
+    if (level === 'steady') return 'border-[#E57B13] bg-[#FFC980] text-[#743608]';
+    return 'border-[#C95A00] bg-[#FFB25B] text-[#5A2400]';
   };
 
   const getParentCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
     const level = getParentCalendarFlowLevel(minutes);
-    if (level === 'none') return 'border-[#EEDFD0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,247,238,0.98))] text-[#9A754D] shadow-[0_10px_18px_-18px_rgba(176,96,22,0.08)]';
-    if (level === 'warmup') return 'border-[#EDCDA7] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(255,247,236,0.99))] text-[#8F521A] shadow-[0_12px_20px_-18px_rgba(195,103,28,0.12)]';
-    if (level === 'short') return 'border-[#E7BB83] bg-[linear-gradient(180deg,rgba(255,252,246,0.97),rgba(255,239,217,0.99))] text-[#7A400D] shadow-[0_12px_20px_-18px_rgba(205,111,28,0.14)]';
-    if (level === 'steady') return 'border-[#E39C49] bg-[linear-gradient(180deg,rgba(255,248,236,0.98),rgba(255,226,186,0.99))] text-[#633005] shadow-[0_14px_24px_-18px_rgba(214,118,28,0.16)]';
-    return 'border-[#D67614] bg-[linear-gradient(180deg,rgba(255,245,228,0.98),rgba(255,210,149,0.99))] text-[#4F2000] shadow-[0_14px_24px_-18px_rgba(207,102,0,0.2)]';
+    if (level === 'none') return 'border-[#EADAC6] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,248,239,0.98))] text-black shadow-[0_10px_18px_-18px_rgba(176,96,22,0.08)]';
+    if (level === 'warmup') return 'border-[#F2C98E] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(255,239,218,0.99))] text-black shadow-[0_12px_20px_-18px_rgba(198,112,29,0.14)]';
+    if (level === 'short') return 'border-[#EDA14E] bg-[linear-gradient(180deg,rgba(255,249,239,0.97),rgba(255,215,152,0.995))] text-black shadow-[0_12px_20px_-18px_rgba(214,123,33,0.2)]';
+    if (level === 'steady') return 'border-[#E57B13] bg-[linear-gradient(180deg,rgba(255,243,224,0.98),rgba(255,183,93,0.995))] text-black shadow-[0_14px_24px_-18px_rgba(223,119,16,0.24)]';
+    return 'border-[#C95A00] bg-[linear-gradient(180deg,rgba(255,237,206,0.98),rgba(255,138,31,0.998))] text-black shadow-[0_14px_24px_-18px_rgba(201,90,0,0.28)]';
   };
 
   const announcementNotifications = useMemo<ParentNotificationItem[]>(() => {

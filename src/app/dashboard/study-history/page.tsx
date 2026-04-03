@@ -166,11 +166,11 @@ const STUDY_HISTORY_CALENDAR_LEGEND: Array<{
   rangeLabel: string;
   swatch: string;
 }> = [
-  { level: 'none', label: '기록 없음', rangeLabel: '0시간', swatch: 'bg-white ring-[#D9E1EE]' },
-  { level: 'warmup', label: '몰입 준비', rangeLabel: '3시간 미만', swatch: 'bg-[#FFF1DE] ring-[#F3C894]' },
-  { level: 'short', label: '짧은 몰입', rangeLabel: '3~6시간', swatch: 'bg-[#FFD8AC] ring-[#F4A74E]' },
-  { level: 'steady', label: '집중 흐름', rangeLabel: '6~9시간', swatch: 'bg-[#FFBA68] ring-[#EB8718]' },
-  { level: 'deep', label: '깊은 몰입', rangeLabel: '9시간 이상', swatch: 'bg-[#FF9328] ring-[#D86700]' },
+  { level: 'none', label: '기록 없음', rangeLabel: '0시간', swatch: 'bg-[#FFF8EF] ring-[#E7D7C4]' },
+  { level: 'warmup', label: '몰입 준비', rangeLabel: '3시간 미만', swatch: 'bg-[#FFE7C6] ring-[#F5C98F]' },
+  { level: 'short', label: '짧은 몰입', rangeLabel: '3~6시간', swatch: 'bg-[#FFC97A] ring-[#EEA24E]' },
+  { level: 'steady', label: '집중 흐름', rangeLabel: '6~9시간', swatch: 'bg-[#FFA23D] ring-[#E57B13]' },
+  { level: 'deep', label: '깊은 몰입', rangeLabel: '9시간 이상', swatch: 'bg-[#FF7A16] ring-[#C95A00]' },
 ] as const;
 
 function getStudyHistoryFlowLevel(minutes: number): StudyHistoryFlowLevel {
@@ -549,18 +549,18 @@ export default function StudyHistoryPage() {
     const level = getStudyHistoryFlowLevel(minutes);
     if (isMobileView) {
       if (level === 'none') {
-        return 'border border-[#F2E6D8] bg-[linear-gradient(180deg,rgba(255,255,255,0.996)_0%,rgba(255,247,239,0.99)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_14px_26px_-24px_rgba(180,96,22,0.08)]';
+        return 'border border-[#EADAC6] bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(255,248,239,0.995)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_14px_26px_-24px_rgba(180,96,22,0.08)]';
       }
       if (level === 'warmup') {
-        return 'border border-[#F0D2AE] bg-[linear-gradient(180deg,rgba(255,251,246,0.996)_0%,rgba(255,239,219,0.99)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_15px_28px_-24px_rgba(195,103,28,0.12)]';
+        return 'border border-[#F2C98E] bg-[linear-gradient(180deg,rgba(255,250,242,0.998)_0%,rgba(255,231,198,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_16px_30px_-24px_rgba(198,112,29,0.14)]';
       }
       if (level === 'short') {
-        return 'border border-[#EBBE86] bg-[linear-gradient(180deg,rgba(255,247,236,0.996)_0%,rgba(255,225,186,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_16px_28px_-24px_rgba(205,111,28,0.14)]';
+        return 'border border-[#EDA14E] bg-[linear-gradient(180deg,rgba(255,243,222,0.998)_0%,rgba(255,201,122,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_17px_30px_-24px_rgba(214,123,33,0.18)]';
       }
       if (level === 'steady') {
-        return 'border border-[#E59F55] bg-[linear-gradient(180deg,rgba(255,240,220,0.996)_0%,rgba(255,205,138,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-24px_rgba(214,118,28,0.18)]';
+        return 'border border-[#E57B13] bg-[linear-gradient(180deg,rgba(255,231,188,0.998)_0%,rgba(255,162,61,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_32px_-24px_rgba(223,119,16,0.24)]';
       }
-      return 'border border-[#D87917] bg-[linear-gradient(180deg,rgba(255,229,191,0.996)_0%,rgba(255,160,63,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_20px_34px_-24px_rgba(207,102,0,0.24)]';
+      return 'border border-[#C95A00] bg-[linear-gradient(180deg,rgba(255,214,151,0.998)_0%,rgba(255,122,22,0.998)_100%)] shadow-[inset_0_1px_0_rgba(255,246,232,0.72),0_20px_34px_-22px_rgba(201,90,0,0.3)]';
     }
     if (level === 'none') {
       return 'border border-[#E1E8F3] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(246,249,253,0.985)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_14px_26px_-24px_rgba(20,41,95,0.08)]';
@@ -579,14 +579,10 @@ export default function StudyHistoryPage() {
 
   const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
     if (!isCurrentMonth) return 'text-[#C6CFDD]';
-    const level = getStudyHistoryFlowLevel(minutes);
     if (isMobileView) {
-      if (level === 'none') return 'text-[#A07349]';
-      if (level === 'warmup') return 'text-[#8F521A]';
-      if (level === 'short') return 'text-[#7A400D]';
-      if (level === 'steady') return 'text-[#633005]';
-      return 'text-[#4F2000]';
+      return 'text-black';
     }
+    const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'text-[#B9C5D8]';
     if (level === 'warmup') return 'text-[#27437F]';
     if (level === 'short') return 'text-[#1F3C78]';
@@ -659,18 +655,18 @@ export default function StudyHistoryPage() {
     const level = getStudyHistoryFlowLevel(minutes);
     if (isMobileView) {
       if (level === 'none') {
-        return 'border-[#EEDFD0] bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(255,247,238,0.96))] shadow-[0_10px_18px_-18px_rgba(176,96,22,0.08)]';
+        return 'border-[#EADAC6] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,248,239,0.98))] shadow-[0_10px_18px_-18px_rgba(176,96,22,0.08)]';
       }
       if (level === 'warmup') {
-        return 'border-[#EDCDA7] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,247,236,0.98))] shadow-[0_12px_22px_-20px_rgba(195,103,28,0.14)]';
+        return 'border-[#F2C98E] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(255,239,218,0.99))] shadow-[0_12px_22px_-20px_rgba(198,112,29,0.16)]';
       }
       if (level === 'short') {
-        return 'border-[#E8BB80] bg-[linear-gradient(180deg,rgba(255,252,246,0.92),rgba(255,239,217,0.99))] shadow-[0_13px_22px_-20px_rgba(205,111,28,0.16)]';
+        return 'border-[#EDA14E] bg-[linear-gradient(180deg,rgba(255,249,239,0.95),rgba(255,215,152,0.995))] shadow-[0_13px_22px_-20px_rgba(214,123,33,0.2)]';
       }
       if (level === 'steady') {
-        return 'border-[#E39A47] bg-[linear-gradient(180deg,rgba(255,248,236,0.94),rgba(255,226,186,0.99))] shadow-[0_14px_24px_-20px_rgba(214,118,28,0.18)]';
+        return 'border-[#E57B13] bg-[linear-gradient(180deg,rgba(255,243,224,0.96),rgba(255,183,93,0.995))] shadow-[0_14px_24px_-20px_rgba(223,119,16,0.24)]';
       }
-      return 'border-[#D67614] bg-[linear-gradient(180deg,rgba(255,245,228,0.96),rgba(255,210,149,0.99))] shadow-[0_16px_26px_-20px_rgba(207,102,0,0.2)]';
+      return 'border-[#C95A00] bg-[linear-gradient(180deg,rgba(255,237,206,0.96),rgba(255,138,31,0.998))] shadow-[0_16px_26px_-20px_rgba(201,90,0,0.28)]';
     }
     if (level === 'none') {
       return 'border-[#E7EDF7] bg-white/68 text-transparent shadow-none';
