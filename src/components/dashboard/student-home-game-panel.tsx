@@ -461,7 +461,7 @@ export function StudentHomeGamePanel({
   todayPointLabel: string;
   completionLabel: string;
   streakLabel: string;
-  heroMessage: string;
+  heroMessage: string | null;
   totalMinutesLabel: string;
   growthLabel: string;
   growthPercent: number;
@@ -547,7 +547,7 @@ export function StudentHomeGamePanel({
               <h2 className={cn("font-aggro-display break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
                 오늘도 성장한 하루
               </h2>
-              <p className="surface-caption text-sm font-semibold">{heroMessage}</p>
+              {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
             </div>
 
             <div className={cn("surface-chip surface-chip--dark px-3 py-2 shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)]", isMobile ? "self-start" : "")}>

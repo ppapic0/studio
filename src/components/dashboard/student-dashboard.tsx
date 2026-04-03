@@ -2061,7 +2061,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return '트랙 위를 달리고 있어요';
     }
     if (totalMinutesCount > 0) return '오늘도 성장한 하루였어요';
-    return '오늘의 트랙을 시작해 보세요';
+    return null;
   })();
 
   // yesterday comparison percentage
