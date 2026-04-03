@@ -1127,7 +1127,9 @@ function SubjectStudyChartDialog({
 function formatMinutes(minutes: number) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return `${h}:${m.toString().padStart(2, '0')}`;
+  if (minutes <= 0) return '0m';
+  if (h <= 0) return `${m}m`;
+  return `${h}h ${m}m`;
 }
 
 function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록') {
@@ -1135,17 +1137,36 @@ function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록')
   return format(value, 'HH:mm');
 }
 
+type ParentCalendarFlowLevel = 'none' | 'warmup' | 'short' | 'steady' | 'deep';
+
+const PARENT_CALENDAR_THRESHOLDS = {
+  warmup: 180,
+  short: 360,
+  steady: 540,
+} as const;
+
 const PARENT_CALENDAR_LEGEND = [
-  { label: '기록 없음', swatch: 'from-white via-slate-50 to-slate-100 ring-slate-200/90' },
-  { label: '짧은 학습', swatch: 'from-white via-emerald-100 to-emerald-200 ring-emerald-300/90' },
-  { label: '집중 흐름', swatch: 'from-white via-teal-100 to-cyan-200 ring-teal-300/90' },
-  { label: '깊은 몰입', swatch: 'from-white via-sky-100 to-indigo-200 ring-blue-300/90' },
+  { label: '기록 없음', swatch: 'from-white via-[#FFF8EF] to-[#F6E6D1] ring-[#E7D9C8]' },
+  { label: '몰입 준비', swatch: 'from-white via-[#FFF1DE] to-[#FFDDB6] ring-[#F3C894]' },
+  { label: '짧은 몰입', swatch: 'from-white via-[#FFE6C7] to-[#FFD09A] ring-[#F4A74E]' },
+  { label: '집중 흐름', swatch: 'from-[#FFF2DD] via-[#FFD89C] to-[#FFBA68] ring-[#EB8718]' },
+  { label: '깊은 몰입', swatch: 'from-[#FFE4BC] via-[#FFB35B] to-[#FF9328] ring-[#D86700]' },
 ] as const;
 
+function getParentCalendarFlowLevel(minutes: number): ParentCalendarFlowLevel {
+  if (minutes <= 0) return 'none';
+  if (minutes < PARENT_CALENDAR_THRESHOLDS.warmup) return 'warmup';
+  if (minutes < PARENT_CALENDAR_THRESHOLDS.short) return 'short';
+  if (minutes < PARENT_CALENDAR_THRESHOLDS.steady) return 'steady';
+  return 'deep';
+}
+
 function getParentCalendarFlowLabel(minutes: number) {
-  if (minutes <= 0) return '기록 없음';
-  if (minutes < 60) return '짧은 학습';
-  if (minutes < 300) return '집중 흐름';
+  const level = getParentCalendarFlowLevel(minutes);
+  if (level === 'none') return '기록 없음';
+  if (level === 'warmup') return '몰입 준비';
+  if (level === 'short') return '짧은 몰입';
+  if (level === 'steady') return '집중 흐름';
   return '깊은 몰입';
 }
 
@@ -2450,37 +2471,41 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [currentCalendarDate]);
 
   const getHeatmapColor = (minutes: number) => {
-    if (minutes === 0) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.98)_100%)] ring-1 ring-inset ring-slate-200/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_30px_-28px_rgba(15,23,42,0.12)]';
-    if (minutes < 60) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,253,246,0.98)_60%,rgba(225,248,238,0.98)_100%)] ring-1 ring-inset ring-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-28px_rgba(16,185,129,0.18)]';
-    if (minutes < 180) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(229,252,242,0.98)_56%,rgba(214,247,233,0.98)_100%)] ring-1 ring-inset ring-emerald-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_34px_-28px_rgba(13,148,136,0.22)]';
-    if (minutes < 300) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(223,250,246,0.98)_52%,rgba(210,243,246,0.98)_100%)] ring-1 ring-inset ring-teal-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(14,165,233,0.22)]';
-    if (minutes < 480) return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(227,244,255,0.98)_50%,rgba(213,231,255,0.98)_100%)] ring-1 ring-inset ring-sky-300/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_22px_38px_-28px_rgba(37,99,235,0.22)]';
-    return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(220,236,255,0.98)_46%,rgba(205,221,255,0.98)_100%)] ring-1 ring-inset ring-blue-300/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_24px_42px_-28px_rgba(20,41,95,0.24)]';
+    const level = getParentCalendarFlowLevel(minutes);
+    if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.996)_0%,rgba(255,247,239,0.99)_100%)] ring-1 ring-inset ring-[#F2E6D8]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_30px_-28px_rgba(180,96,22,0.08)]';
+    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(255,251,246,0.996)_0%,rgba(255,239,219,0.99)_100%)] ring-1 ring-inset ring-[#F0D2AE]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_32px_-28px_rgba(195,103,28,0.12)]';
+    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(255,247,236,0.996)_0%,rgba(255,225,186,0.992)_100%)] ring-1 ring-inset ring-[#EBBE86]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_34px_-28px_rgba(205,111,28,0.14)]';
+    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(255,240,220,0.996)_0%,rgba(255,205,138,0.992)_100%)] ring-1 ring-inset ring-[#E59F55]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_36px_-28px_rgba(214,118,28,0.18)]';
+    return 'bg-[linear-gradient(180deg,rgba(255,229,191,0.996)_0%,rgba(255,160,63,0.992)_100%)] ring-1 ring-inset ring-[#D87917]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_24px_42px_-28px_rgba(207,102,0,0.24)]';
   };
 
   const getCalendarAccentClass = (minutes: number) => {
-    if (minutes === 0) return 'from-slate-200 via-slate-300 to-slate-200';
-    if (minutes < 60) return 'from-emerald-300 via-emerald-400 to-teal-400';
-    if (minutes < 180) return 'from-emerald-400 via-teal-400 to-cyan-400';
-    if (minutes < 300) return 'from-teal-400 via-cyan-400 to-sky-400';
-    if (minutes < 480) return 'from-sky-400 via-blue-400 to-indigo-400';
-    return 'from-sky-500 via-blue-500 to-indigo-600';
+    const level = getParentCalendarFlowLevel(minutes);
+    if (level === 'none') return 'from-[#EADFD3] via-[#F4E8DB] to-[#EADFD3]';
+    if (level === 'warmup') return 'from-[#FFD9B0] via-[#FFBF82] to-[#FFB15C]';
+    if (level === 'short') return 'from-[#FFC98E] via-[#FFAE5A] to-[#FF972C]';
+    if (level === 'steady') return 'from-[#FFB56A] via-[#FF952E] to-[#F57C00]';
+    return 'from-[#FF9D3A] via-[#F57C00] to-[#D86700]';
   };
 
   const getParentCalendarFlowChipClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300';
-    if (minutes === 0) return 'border-slate-200 bg-white/95 text-slate-500';
-    if (minutes < 60) return 'border-emerald-200/95 bg-white/95 text-emerald-700';
-    if (minutes < 300) return 'border-teal-300/95 bg-white/95 text-teal-800';
-    return 'border-sky-300/95 bg-white/95 text-[#14295F]';
+    const level = getParentCalendarFlowLevel(minutes);
+    if (level === 'none') return 'border-[#EEDFD0] bg-white/92 text-[#9A754D]';
+    if (level === 'warmup') return 'border-[#EDCDA7] bg-[#FFF8EF] text-[#A15D20]';
+    if (level === 'short') return 'border-[#E7BB83] bg-[#FFF1E2] text-[#8D4A11]';
+    if (level === 'steady') return 'border-[#E39C49] bg-[#FFE4C1] text-[#743608]';
+    return 'border-[#D67614] bg-[#FFD4A0] text-[#5A2400]';
   };
 
   const getParentCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
-    if (minutes === 0) return 'border-slate-200/90 bg-white/96 text-slate-500';
-    if (minutes < 60) return 'border-emerald-300/95 bg-white text-slate-900';
-    if (minutes < 300) return 'border-teal-300/95 bg-white text-slate-950';
-    return 'border-sky-300/95 bg-white text-[#14295F]';
+    const level = getParentCalendarFlowLevel(minutes);
+    if (level === 'none') return 'border-[#EEDFD0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,247,238,0.98))] text-[#9A754D] shadow-[0_10px_18px_-18px_rgba(176,96,22,0.08)]';
+    if (level === 'warmup') return 'border-[#EDCDA7] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(255,247,236,0.99))] text-[#8F521A] shadow-[0_12px_20px_-18px_rgba(195,103,28,0.12)]';
+    if (level === 'short') return 'border-[#E7BB83] bg-[linear-gradient(180deg,rgba(255,252,246,0.97),rgba(255,239,217,0.99))] text-[#7A400D] shadow-[0_12px_20px_-18px_rgba(205,111,28,0.14)]';
+    if (level === 'steady') return 'border-[#E39C49] bg-[linear-gradient(180deg,rgba(255,248,236,0.98),rgba(255,226,186,0.99))] text-[#633005] shadow-[0_14px_24px_-18px_rgba(214,118,28,0.16)]';
+    return 'border-[#D67614] bg-[linear-gradient(180deg,rgba(255,245,228,0.98),rgba(255,210,149,0.99))] text-[#4F2000] shadow-[0_14px_24px_-18px_rgba(207,102,0,0.2)]';
   };
 
   const announcementNotifications = useMemo<ParentNotificationItem[]>(() => {
@@ -3583,7 +3608,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const hasPlans = weeklyPlans?.some((plan) => plan.dateKey === dateKey);
                       const isCurrentMonth = isSameMonth(day, currentCalendarDate);
                       const isTodayCalendar = isSameDay(day, new Date());
-                      const hasDeepFocus = isCurrentMonth && minutes >= 180;
+                      const flowLevel = getParentCalendarFlowLevel(minutes);
+                      const hasDeepFocus = isCurrentMonth && flowLevel === 'deep';
                       const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
                       const flowLabel = getParentCalendarFlowLabel(minutes);
                       const exactTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';

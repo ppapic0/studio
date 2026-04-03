@@ -516,14 +516,12 @@ export default function StudyHistoryPage() {
     return `${hours}시간 ${mins}분`;
   };
 
-  const formatCompactCalendarMinutesLabel = (minutes: number) => {
-    if (minutes <= 0) return '기록 없음';
+  const formatMobileCalendarMinutesLabel = (minutes: number) => {
+    if (minutes <= 0) return '0m';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    if (hours <= 0) return `${mins}분`;
-    if (mins === 0) return `${hours}시간`;
-    if (mins < 10) return `${hours}시간 ${mins}분`;
-    return `${hours}시간 ${mins}분`;
+    if (hours <= 0) return `${mins}m`;
+    return `${hours}h ${mins}m`;
   };
 
   const getHeatmapColor = (minutes: number) => {
@@ -544,11 +542,26 @@ export default function StudyHistoryPage() {
     return 'from-sky-500 via-blue-500 to-indigo-600';
   };
 
-  const getStudentCalendarCellClass = (minutes: number, isCurrentMonth: boolean) => {
+  const getStudentCalendarCellClass = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
     if (!isCurrentMonth) {
       return 'border border-[#E7EDF7] bg-[linear-gradient(180deg,#FAFBFE_0%,#F3F6FB_100%)] opacity-[0.54] shadow-none';
     }
     const level = getStudyHistoryFlowLevel(minutes);
+    if (isMobileView) {
+      if (level === 'none') {
+        return 'border border-[#F2E6D8] bg-[linear-gradient(180deg,rgba(255,255,255,0.996)_0%,rgba(255,247,239,0.99)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_14px_26px_-24px_rgba(180,96,22,0.08)]';
+      }
+      if (level === 'warmup') {
+        return 'border border-[#F0D2AE] bg-[linear-gradient(180deg,rgba(255,251,246,0.996)_0%,rgba(255,239,219,0.99)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_15px_28px_-24px_rgba(195,103,28,0.12)]';
+      }
+      if (level === 'short') {
+        return 'border border-[#EBBE86] bg-[linear-gradient(180deg,rgba(255,247,236,0.996)_0%,rgba(255,225,186,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_16px_28px_-24px_rgba(205,111,28,0.14)]';
+      }
+      if (level === 'steady') {
+        return 'border border-[#E59F55] bg-[linear-gradient(180deg,rgba(255,240,220,0.996)_0%,rgba(255,205,138,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_18px_32px_-24px_rgba(214,118,28,0.18)]';
+      }
+      return 'border border-[#D87917] bg-[linear-gradient(180deg,rgba(255,229,191,0.996)_0%,rgba(255,160,63,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_20px_34px_-24px_rgba(207,102,0,0.24)]';
+    }
     if (level === 'none') {
       return 'border border-[#E1E8F3] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(246,249,253,0.985)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_14px_26px_-24px_rgba(20,41,95,0.08)]';
     }
@@ -564,9 +577,16 @@ export default function StudyHistoryPage() {
     return 'border border-[#9DB7E5] bg-[linear-gradient(180deg,rgba(247,251,255,0.996)_0%,rgba(206,221,245,0.992)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_20px_34px_-24px_rgba(20,41,95,0.18)]';
   };
 
-  const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean) => {
+  const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
     if (!isCurrentMonth) return 'text-[#C6CFDD]';
     const level = getStudyHistoryFlowLevel(minutes);
+    if (isMobileView) {
+      if (level === 'none') return 'text-[#A07349]';
+      if (level === 'warmup') return 'text-[#8F521A]';
+      if (level === 'short') return 'text-[#7A400D]';
+      if (level === 'steady') return 'text-[#633005]';
+      return 'text-[#4F2000]';
+    }
     if (level === 'none') return 'text-[#B9C5D8]';
     if (level === 'warmup') return 'text-[#27437F]';
     if (level === 'short') return 'text-[#1F3C78]';
@@ -632,11 +652,26 @@ export default function StudyHistoryPage() {
     return 'text-[#5A2200]';
   };
 
-  const getStudentCalendarTimeChipClass = (minutes: number, isCurrentMonth: boolean) => {
+  const getStudentCalendarTimeChipClass = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
     if (!isCurrentMonth) {
       return 'border-[#E7EDF7] bg-transparent text-transparent shadow-none';
     }
     const level = getStudyHistoryFlowLevel(minutes);
+    if (isMobileView) {
+      if (level === 'none') {
+        return 'border-[#EEDFD0] bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(255,247,238,0.96))] shadow-[0_10px_18px_-18px_rgba(176,96,22,0.08)]';
+      }
+      if (level === 'warmup') {
+        return 'border-[#EDCDA7] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,247,236,0.98))] shadow-[0_12px_22px_-20px_rgba(195,103,28,0.14)]';
+      }
+      if (level === 'short') {
+        return 'border-[#E8BB80] bg-[linear-gradient(180deg,rgba(255,252,246,0.92),rgba(255,239,217,0.99))] shadow-[0_13px_22px_-20px_rgba(205,111,28,0.16)]';
+      }
+      if (level === 'steady') {
+        return 'border-[#E39A47] bg-[linear-gradient(180deg,rgba(255,248,236,0.94),rgba(255,226,186,0.99))] shadow-[0_14px_24px_-20px_rgba(214,118,28,0.18)]';
+      }
+      return 'border-[#D67614] bg-[linear-gradient(180deg,rgba(255,245,228,0.96),rgba(255,210,149,0.99))] shadow-[0_16px_26px_-20px_rgba(207,102,0,0.2)]';
+    }
     if (level === 'none') {
       return 'border-[#E7EDF7] bg-white/68 text-transparent shadow-none';
     }
@@ -1195,29 +1230,31 @@ export default function StudyHistoryPage() {
               const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
               const useParentLikeMobileCalendar = !isParent;
               const exactTimeLabel = isCurrentMonth ? formatCalendarMinutesLabel(minutes) : '--';
-              const compactTimeLabel = isCurrentMonth ? formatCompactCalendarMinutesLabel(minutes) : '--';
+              const compactTimeLabel = isCurrentMonth ? formatMobileCalendarMinutesLabel(minutes) : '--';
               const flowLabel = getStudyHistoryFlowLabel(minutes);
               const flowShortLabel = getStudyHistoryFlowShortLabel(minutes);
               const isLongTimeLabel = exactTimeLabel.length >= 7;
-              const isCompactLongTimeLabel = compactTimeLabel.length >= 8;
-              const flowLevel = getStudyHistoryFlowLevel(minutes);
+              const isCompactLongTimeLabel = compactTimeLabel.length >= 5;
+              const calendarAriaTimeLabel = isCurrentMonth ? (!isParent && isMobile ? compactTimeLabel : exactTimeLabel) : '이번 달 아님';
 
               if (!isParent) {
-                const studentCellClass = getStudentCalendarCellClass(minutes, isCurrentMonth);
+                const studentCellClass = getStudentCalendarCellClass(minutes, isCurrentMonth, isMobile);
                 const studentValueLabel = isCurrentMonth
-                  ? minutes > 0
-                    ? (isMobile ? compactTimeLabel : exactTimeLabel)
-                    : ''
+                  ? isMobile
+                    ? compactTimeLabel
+                    : minutes > 0
+                      ? exactTimeLabel
+                      : ''
                   : '';
-                const studentShouldRenderTime = isCurrentMonth && minutes > 0;
-                const studentValueTone = getStudentCalendarValueTone(minutes, isCurrentMonth);
+                const studentShouldRenderTime = isCurrentMonth && (isMobile || minutes > 0);
+                const studentValueTone = getStudentCalendarValueTone(minutes, isCurrentMonth, isMobile);
 
                 return (
                   <button
                     key={dateKey}
                     type="button"
                     onClick={() => setSelectedDateForPlan(day)}
-                    aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${isCurrentMonth ? `${exactTimeLabel} 학습` : '이번 달 아님'}${hasPlans ? ' · 계획 있음' : ''}`}
+                    aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}${isCurrentMonth ? ' 학습' : ''}${hasPlans ? ' · 계획 있음' : ''}`}
                     className={cn(
                       'group relative overflow-hidden rounded-[1.45rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
                       'aspect-square',
@@ -1266,7 +1303,7 @@ export default function StudyHistoryPage() {
                             className={cn(
                               "inline-flex max-w-full items-center justify-center rounded-[1rem] border text-center",
                               isMobile ? "min-h-[2.55rem] w-full px-1.5 py-1.5" : "min-h-[3.55rem] w-full px-3 py-2.5",
-                              getStudentCalendarTimeChipClass(minutes, isCurrentMonth)
+                              getStudentCalendarTimeChipClass(minutes, isCurrentMonth, isMobile)
                             )}
                           >
                             <span
@@ -1299,7 +1336,7 @@ export default function StudyHistoryPage() {
                   key={dateKey}
                   type="button"
                   onClick={() => setSelectedDateForPlan(day)}
-                  aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${isCurrentMonth ? `${exactTimeLabel} 학습` : '이번 달 아님'}${hasPlans ? ' · 계획 있음' : ''}`}
+                  aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}${isCurrentMonth ? ' 학습' : ''}${hasPlans ? ' · 계획 있음' : ''}`}
                   className={cn(
                     "group relative overflow-hidden rounded-[1.25rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                     isMobile ? "aspect-square min-h-0 p-1.5" : "min-h-[150px] p-3",
@@ -1308,7 +1345,7 @@ export default function StudyHistoryPage() {
                         ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75"
                         : "bg-[linear-gradient(180deg,rgba(248,250,252,0.92)_0%,rgba(255,255,255,0.98)_100%)] opacity-[0.52] grayscale-[0.05] ring-1 ring-[#DCE5F4]/85"
                       : useParentLikeMobileCalendar
-                        ? getStudentCalendarCellClass(minutes, isCurrentMonth)
+                        ? getStudentCalendarCellClass(minutes, isCurrentMonth, isMobile)
                         : getHeatmapColor(minutes),
                     isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
                     isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-primary/35 shadow-[0_20px_40px_-22px_rgba(37,99,235,0.22)]"
@@ -1364,7 +1401,7 @@ export default function StudyHistoryPage() {
                               ? "min-h-[3.15rem] rounded-[1rem] px-3 py-2"
                               : "min-w-[4.65rem] px-2.5 py-1.5",
                           useParentLikeMobileCalendar
-                            ? getStudentCalendarTimeChipClass(minutes, isCurrentMonth)
+                            ? getStudentCalendarTimeChipClass(minutes, isCurrentMonth, isMobile)
                             : getCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                         )}
                       >
