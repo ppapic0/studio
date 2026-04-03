@@ -1043,35 +1043,8 @@ export default function StudyHistoryPage() {
             : "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1D3D80_0%,#2C53A5_54%,#4068BC_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.46)]"
         )}
       >
-        <CardContent className={cn(isMobile ? "px-5 pb-7 pt-24" : "px-8 pb-9 pt-10")}>
-          <div className={cn(isMobile ? "space-y-7" : "flex items-start justify-between gap-5")}>
-            <div className={cn(isMobile ? "space-y-7" : "space-y-3")}>
-                <div className="min-w-0 flex-1 space-y-7">
-                <div className={cn("space-y-5", isMobile ? "pb-8" : "pb-5")}>
-                <h2
-                  className={cn(
-                    "font-black tracking-tight",
-                    isMobile ? "text-[1.52rem] leading-[1.18] text-white" : "text-[2.1rem] leading-[1.1] text-white"
-                  )}
-                >
-                  {isParent ? '이번 달 학습 기록을 빠르게 확인해요' : '이번 달 기록과 포인트 흐름을 한눈에 봐요'}
-                </h2>
-                <p
-                  className={cn(
-                    "max-w-2xl break-keep font-semibold",
-                    isMobile ? "text-[13px] leading-7 text-white/82" : "text-sm leading-6 text-white/86"
-                  )}
-                >
-                  {isParent
-                    ? (isMobile ? '오늘과 7일 누적, 이번 달 학습 흐름부터 바로 확인해요.' : '자녀의 오늘 공부시간, 최근 7일 누적, 이번 달 총 학습 시간을 먼저 보고 날짜별 기록을 자세히 확인해보세요.')
-                  : (isMobile ? '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록 흐름까지 이어서 확인해요.' : '오늘 공부시간과 최근 7일 누적을 먼저 보고, 날짜별 기록과 포인트 상자 흐름까지 이어서 확인할 수 있어요.')}
-                </p>
-              </div>
-              </div>
-            </div>
-          </div>
-
-            <div className={cn("grid", isMobile ? "mt-8 grid-cols-3 gap-3" : "mt-10 md:grid-cols-3 gap-3")}>
+        <CardContent className={cn(isMobile ? "px-5 pb-7 pt-8" : "px-8 pb-9 pt-8")}>
+          <div className={cn("grid", isMobile ? "grid-cols-3 gap-3" : "md:grid-cols-3 gap-3")}>
             {[
               {
                 label: '이번 달 총 공부시간',
