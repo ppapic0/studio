@@ -1,7 +1,5 @@
 import { ArrowRight, LogIn, Smartphone, Users } from 'lucide-react';
 
-import { buildMarketingEntryHref } from '@/lib/marketing-links';
-
 export function EntryGatewaySection() {
   return (
     <section id="intro" className="bg-white pb-10 pt-3 sm:pb-14">
@@ -56,7 +54,7 @@ export function EntryGatewaySection() {
             </a>
 
             <a
-              href={buildMarketingEntryHref('experience', { placement: 'gateway_experience', mode: 'student' })}
+              href="/go/experience?placement=gateway_experience"
               className="group app-depth-card premium-surface-button overflow-hidden p-5 sm:p-6"
             >
               <div className="flex items-start justify-between gap-4">

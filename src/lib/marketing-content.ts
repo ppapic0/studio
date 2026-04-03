@@ -1,6 +1,4 @@
-﻿import { buildMarketingEntryHref } from '@/lib/marketing-links';
-
-export type MarketingNavItem = {
+﻿export type MarketingNavItem = {
   label: string;
   href: string;
 };
@@ -461,7 +459,7 @@ export const marketingContent: MarketingContent = {
         insightTitle: '학생 화면은 다음 행동이 보여야 합니다',
         insightDescription:
           '학생에게는 많은 정보보다 지금 무엇을 해야 하는지가 먼저 보여야 합니다. 트랙 학생 화면은 확인보다 실행이 앞서도록 구조를 잡습니다.',
-        ctaHref: buildMarketingEntryHref('login', { placement: 'experience_student', mode: 'student' }),
+        ctaHref: '/go/login?placement=experience_student',
         ctaLabel: '학생 로그인 보기',
       },
       {
@@ -490,7 +488,7 @@ export const marketingContent: MarketingContent = {
         insightTitle: '학부모 화면은 빠른 확인이 먼저입니다',
         insightDescription:
           '학부모에게는 깊은 탐색보다 현재 상태를 짧은 시간 안에 읽을 수 있는 구조가 더 중요합니다. 출결, 공부 흐름, 리포트를 같은 문맥으로 연결해 보여줍니다.',
-        ctaHref: buildMarketingEntryHref('login', { placement: 'experience_parent', mode: 'parent' }),
+        ctaHref: '/go/login?placement=experience_parent',
         ctaLabel: '학부모 로그인 보기',
       },
     ],
@@ -547,7 +545,7 @@ export const marketingContent: MarketingContent = {
         headline: '학생은 오늘 해야 할 행동부터 바로 확인합니다',
         summary: '루틴, 누적 공부시간, 피드백을 한 화면에서 읽고 바로 다음 행동으로 이어가는 학생용 흐름입니다.',
         checkpoints: ['오늘 루틴', '누적 공부시간', '피드백 반영', '다음 행동'],
-        href: buildMarketingEntryHref('experience', { placement: 'app_preview_student', mode: 'student' }),
+        href: '/go/experience?placement=app_preview_student',
         label: '학생 모드 체험',
       },
       {
@@ -555,7 +553,7 @@ export const marketingContent: MarketingContent = {
         headline: '학부모는 현재 상태와 흔들리는 구간을 먼저 읽습니다',
         summary: '출결, 주간 흐름, 날짜별 기록, 리포트를 같은 문맥으로 확인하는 학부모용 흐름입니다.',
         checkpoints: ['실시간 상태', '주간 흐름', '날짜별 기록', '리포트 확인'],
-        href: buildMarketingEntryHref('experience', { placement: 'app_preview_parent', mode: 'parent' }),
+        href: '/go/experience?placement=app_preview_parent',
         label: '학부모 모드 체험',
       },
       {
@@ -563,7 +561,7 @@ export const marketingContent: MarketingContent = {
         headline: '운영자는 먼저 개입할 학생부터 우선순위로 봅니다',
         summary: '하락 추세, 미제출, 상담과 전후 변화를 연결해 개입 순서를 빠르게 정하는 운영용 흐름입니다.',
         checkpoints: ['하락 추세', '미제출 확인', '개입 우선순위', '전후 비교'],
-        href: buildMarketingEntryHref('experience', { placement: 'app_preview_admin', mode: 'admin' }),
+        href: '/go/experience?placement=app_preview_admin',
         label: '운영자 화면 보기',
       },
     ],
