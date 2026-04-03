@@ -2653,9 +2653,25 @@ export default function StudyPlanPage() {
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey || !selectedDateKey) return;
-    if (resolveStudyPlanMode(item) === 'volume') return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
     const nextState = !item.done;
+
+    if (resolveStudyPlanMode(item) === 'volume') {
+      if (!nextState) {
+        await updateDoc(itemRef, {
+          actualAmount: 0,
+          done: false,
+          completedAt: null,
+          completedWithinPlannedTime: null,
+          completionOvertimeMinutes: null,
+          updatedAt: serverTimestamp(),
+        });
+        return;
+      }
+
+      await handleCommitStudyActualAmount(item, Math.max(0, item.targetAmount || 0));
+      return;
+    }
 
     if (!nextState) {
       await updateDoc(itemRef, {
