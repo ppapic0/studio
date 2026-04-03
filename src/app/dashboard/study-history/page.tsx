@@ -1041,7 +1041,7 @@ export default function StudyHistoryPage() {
             : "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1D3D80_0%,#2C53A5_54%,#4068BC_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.46)]"
         )}
       >
-        <CardContent className={cn(isMobile ? "px-5 pb-7 pt-16" : "px-8 pb-9 pt-10")}>
+        <CardContent className={cn(isMobile ? "px-5 pb-7 pt-24" : "px-8 pb-9 pt-10")}>
           <div className={cn(isMobile ? "space-y-7" : "flex items-start justify-between gap-5")}>
             <div className={cn(isMobile ? "space-y-7" : "space-y-3")}>
                 <div className="min-w-0 flex-1 space-y-7">
