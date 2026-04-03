@@ -665,9 +665,9 @@ export const marketingContent: MarketingContent = {
         tone: 'orange',
       },
       {
-        title: '트랙 웹앱으로 학습현황 피드백',
-        body: '학습계획에 대한 공부흐름을 진단하고 파악',
-        secondaryBody: '학생 및 부모와 연동되어 확인가능',
+        title: '트랙 러닝시스템으로 학습현황 실시간 체크 및 피드백',
+        body: '학습 계획 기반으로 공부 흐름 분석',
+        secondaryBody: '학생의 학습데이터를 학생, 학부모 실시간 확인가능',
         tone: 'slate',
       },
       {

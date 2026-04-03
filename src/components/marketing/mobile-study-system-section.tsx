@@ -84,12 +84,56 @@ function renderPrimaryPanel(
   return <div key={section.title}>{panelBody}</div>;
 }
 
+function renderSecondaryPanel(
+  section: MarketingContent['mobileStudySystem']['sections'][number],
+) {
+  const Icon = sectionIcons[1] ?? ChartColumnBig;
+  const panelBody = (
+    <article className="relative overflow-hidden rounded-[2rem] border border-[#DCE7FF] bg-white p-5 shadow-[0_24px_48px_rgba(20,41,95,0.10)]">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -right-8 top-0 h-28 w-28 rounded-full bg-[rgba(20,41,95,0.06)] blur-3xl" />
+      </div>
+
+      <div className="relative space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2">
+            <span className="inline-flex rounded-full bg-[#14295F] px-3 py-1 text-[10px] font-black tracking-[0.18em] text-white">
+              SECTION 02
+            </span>
+            <h3 className="break-keep text-[1.7rem] font-black leading-[1.12] text-[#14295F]">
+              {section.title}
+            </h3>
+          </div>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EEF3FF] text-[#14295F]">
+            <Icon className="h-5 w-5" />
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          <p className="break-keep text-[1rem] font-bold leading-[1.7] text-[#1F3D7A]">{section.body}</p>
+          {section.secondaryBody ? (
+            <p className="break-keep text-[0.96rem] font-semibold leading-[1.72] text-[#425A75]">
+              {section.secondaryBody}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+
+  return <div key={section.title}>{panelBody}</div>;
+}
+
 function renderPanel(
   section: MarketingContent['mobileStudySystem']['sections'][number],
   index: number,
 ) {
   if (index === 0) {
     return renderPrimaryPanel(section);
+  }
+
+  if (index === 1) {
+    return renderSecondaryPanel(section);
   }
 
   const Icon = sectionIcons[index] ?? Sparkles;
