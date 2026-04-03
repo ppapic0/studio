@@ -1035,16 +1035,8 @@ export default function StudyHistoryPage() {
 
       {isMobile && <StudentTrackSubnav className="mx-1" />}
 
-      <Card
-        className={cn(
-          "student-utility-card overflow-hidden rounded-[2.5rem]",
-          isMobile
-            ? "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1B3878_0%,#2B54A8_54%,#3D68BF_100%)] text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.42)]"
-            : "border border-white/14 bg-[radial-gradient(circle_at_top_right,rgba(255,184,101,0.24),transparent_22%),linear-gradient(135deg,#1D3D80_0%,#2C53A5_54%,#4068BC_100%)] text-white shadow-[0_32px_70px_-42px_rgba(20,41,95,0.46)]"
-        )}
-      >
-        <CardContent className={cn(isMobile ? "px-5 pb-7 pt-8" : "px-8 pb-9 pt-8")}>
-          <div className={cn("grid", isMobile ? "grid-cols-3 gap-3" : "md:grid-cols-3 gap-3")}>
+      <div className="w-full">
+        <div className={cn("grid", isMobile ? "grid-cols-3 gap-3" : "md:grid-cols-3 gap-3")}>
             {[
               {
                 label: '이번 달 총 공부시간',
@@ -1096,9 +1088,8 @@ export default function StudyHistoryPage() {
                 </p>
               </div>
             ))}
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <Card className={cn(
         "student-utility-card relative mx-auto w-full overflow-hidden rounded-[3rem]",
