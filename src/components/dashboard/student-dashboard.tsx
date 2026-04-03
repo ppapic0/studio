@@ -214,6 +214,15 @@ function formatHeroSessionTimer(totalSecs: number) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+function formatStudyDurationWithSeconds(totalSecs: number) {
+  const safe = Math.max(0, Math.floor(totalSecs));
+  const hours = Math.floor(safe / 3600);
+  const mins = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  if (hours > 0) return `${hours}시간 ${mins}분 ${secs.toString().padStart(2, '0')}초`;
+  return `${mins}분 ${secs.toString().padStart(2, '0')}초`;
+}
+
 function formatMinutesToKorean(minutes: number): string {
   const safe = Math.max(0, Math.round(minutes));
   const hours = Math.floor(safe / 60);
@@ -2147,6 +2156,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const ownEntry = validRankEntries.find((entry) => entry.studentId === user?.uid);
     return Number(ownEntry?.value || 0);
   }, [user?.uid, validRankEntries]);
+  const liveRankSessionSeconds = isTimerActive ? localSeconds : 0;
+  const dailyStudyRankDisplaySeconds = Math.max(0, dailyStudyRankMinutes * 60 + liveRankSessionSeconds);
+  const weeklyStudyRankDisplaySeconds = Math.max(0, weeklyStudyRankMinutes * 60 + liveRankSessionSeconds);
+  const monthlyStudyRankDisplaySeconds = Math.max(0, monthlyStudyRankMinutes * 60 + liveRankSessionSeconds);
 
   const homeRankMap = useMemo(() => {
     const dailyTop = validDailyRankEntries.slice(0, 3).map((entry, index) => ({
@@ -2177,27 +2190,54 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         rank: dailyStudyRank,
         minutes: dailyStudyRankMinutes,
         badge: rankSnapshotLoading ? '집계 중' : dailyStudyRank > 0 ? `오늘 ${dailyStudyRank}위` : '집계 준비중',
-        caption: dailyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, dailyStudyRankMinutes))} 누적` : '오늘 기록이 쌓이면 바로 보여요',
+        caption: dailyStudyRankDisplaySeconds > 0
+          ? isTimerActive
+            ? `${formatStudyDurationWithSeconds(dailyStudyRankDisplaySeconds)} 누적`
+            : `${formatStudyMinutes(Math.max(0, dailyStudyRankMinutes))} 누적`
+          : '오늘 기록이 쌓이면 바로 보여요',
+        description: isTimerActive
+          ? '지금 공부 중인 시간이 랭킹 누적에 바로 반영되고 있어요.'
+          : '공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.',
         preview: dailyTop,
         isLoading: rankSnapshotLoading,
+        isLive: isTimerActive,
+        liveBadge: isTimerActive ? `LIVE ${formatHeroSessionTimer(localSeconds)}` : null,
       },
       weekly: {
         title: '주간 랭킹',
         rank: weeklyStudyRank,
         minutes: weeklyStudyRankMinutes,
         badge: rankSnapshotLoading ? '집계 중' : weeklyStudyRank > 0 ? `이번 주 ${weeklyStudyRank}위` : '집계 준비중',
-        caption: weeklyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, weeklyStudyRankMinutes))} 누적` : '이번 주 기록이 쌓이면 보여요',
+        caption: weeklyStudyRankDisplaySeconds > 0
+          ? isTimerActive
+            ? `${formatStudyDurationWithSeconds(weeklyStudyRankDisplaySeconds)} 누적`
+            : `${formatStudyMinutes(Math.max(0, weeklyStudyRankMinutes))} 누적`
+          : '이번 주 기록이 쌓이면 보여요',
+        description: isTimerActive
+          ? '현재 세션 시간이 주간 누적에도 바로 합산되고 있어요.'
+          : '공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.',
         preview: weeklyTop,
         isLoading: rankSnapshotLoading,
+        isLive: isTimerActive,
+        liveBadge: isTimerActive ? `LIVE ${formatHeroSessionTimer(localSeconds)}` : null,
       },
       monthly: {
         title: '월간 랭킹',
         rank: monthlyStudyRank,
         minutes: monthlyStudyRankMinutes,
         badge: isRankContextLoading ? '집계 중' : monthlyStudyRank > 0 ? `이번 달 ${monthlyStudyRank}위` : '집계 준비중',
-        caption: monthlyStudyRankMinutes > 0 ? `${formatStudyMinutes(Math.max(0, monthlyStudyRankMinutes))} 누적` : '이번 달 공부시간이 쌓이면 순위가 보여요',
+        caption: monthlyStudyRankDisplaySeconds > 0
+          ? isTimerActive
+            ? `${formatStudyDurationWithSeconds(monthlyStudyRankDisplaySeconds)} 누적`
+            : `${formatStudyMinutes(Math.max(0, monthlyStudyRankMinutes))} 누적`
+          : '이번 달 공부시간이 쌓이면 순위가 보여요',
+        description: isTimerActive
+          ? '이번 세션까지 포함한 월간 누적 시간이 초 단위로 갱신되고 있어요.'
+          : '공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.',
         preview: monthlyTop,
         isLoading: isRankContextLoading,
+        isLive: isTimerActive,
+        liveBadge: isTimerActive ? `LIVE ${formatHeroSessionTimer(localSeconds)}` : null,
       },
     } satisfies Record<RankRange, {
       title: string;
@@ -2205,20 +2245,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       minutes: number;
       badge: string;
       caption: string;
+      description?: string;
       preview: Array<{ rank: number; name: string; schoolName: string | null; minutes: number }>;
       isLoading: boolean;
+      isLive?: boolean;
+      liveBadge?: string | null;
     }>;
   }, [
     dailyStudyRank,
+    dailyStudyRankDisplaySeconds,
     dailyStudyRankMinutes,
     isRankContextLoading,
+    isTimerActive,
+    localSeconds,
     monthlyStudyRank,
+    monthlyStudyRankDisplaySeconds,
     monthlyStudyRankMinutes,
     rankSnapshotLoading,
     validDailyRankEntries,
     validRankEntries,
     validWeeklyRankEntries,
     weeklyStudyRank,
+    weeklyStudyRankDisplaySeconds,
     weeklyStudyRankMinutes,
   ]);
   const selectedHomeRank = homeRankMap[selectedRankRange];

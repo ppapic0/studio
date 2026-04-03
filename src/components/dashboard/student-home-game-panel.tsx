@@ -51,8 +51,11 @@ export type StudentHomeRankState = {
   minutes: number;
   badge: string;
   caption: string;
+  description?: string;
   preview: Array<{ rank: number; name: string; schoolName: string | null; minutes: number }>;
   isLoading: boolean;
+  isLive?: boolean;
+  liveBadge?: string | null;
 };
 
 function formatMini(minutes: number) {
@@ -520,6 +523,8 @@ export function StudentHomeGamePanel({
     : selectedHomeRank.rank > 0
       ? `${selectedHomeRank.rank}위`
       : "집계 준비중";
+  const rankDescription = selectedHomeRank.description || "공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.";
+  const rankLiveBadge = selectedHomeRank.isLive ? selectedHomeRank.liveBadge || "LIVE" : null;
 
   return (
     <>
@@ -796,9 +801,12 @@ export function StudentHomeGamePanel({
                 }
               }}
               className="student-utility-card relative w-full overflow-hidden rounded-[1.72rem] border border-[rgba(241,205,160,0.84)] bg-[radial-gradient(circle_at_top_right,rgba(255,183,100,0.2),transparent_30%),linear-gradient(180deg,rgba(255,253,248,0.99)_0%,rgba(255,246,232,0.97)_52%,rgba(255,241,221,0.95)_100%)] p-4 text-left shadow-[0_24px_44px_-30px_rgba(17,39,88,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(20,41,95,0.14)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+              style={{ animation: "leaderboard-card-breathe 5.8s ease-in-out infinite" }}
             >
               <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,transparent,rgba(255,150,56,0.88),transparent)]" />
-              <div className="pointer-events-none absolute -right-10 -top-9 h-24 w-24 rounded-full bg-[rgba(255,184,104,0.2)] blur-3xl" />
+              <div className="pointer-events-none absolute -left-24 top-0 h-full w-20 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.42),transparent)] opacity-70 animate-[leaderboard-bar-shimmer_4.4s_linear_infinite]" />
+              <div className="pointer-events-none absolute -right-10 -top-9 h-24 w-24 rounded-full bg-[rgba(255,184,104,0.2)] blur-3xl animate-[hero-orb-drift_8s_ease-in-out_infinite]" />
+              <div className="pointer-events-none absolute left-10 top-24 h-16 w-16 rounded-full bg-[rgba(20,41,95,0.1)] blur-2xl animate-[hero-orb-drift_9.4s_ease-in-out_infinite]" style={{ animationDelay: "1.2s" }} />
               <div className="relative">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -810,6 +818,12 @@ export function StudentHomeGamePanel({
                       <div className="inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-[rgba(255,249,240,0.92)] px-2.5 py-1.5 text-[10px] font-black text-[rgba(20,41,95,0.78)] shadow-[0_10px_22px_-18px_rgba(20,41,95,0.16)]">
                         {selectedHomeRank.badge}
                       </div>
+                      {rankLiveBadge ? (
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,122,22,0.28)] bg-[rgba(255,122,22,0.12)] px-2.5 py-1.5 text-[10px] font-black text-[#B95A0B] shadow-[0_10px_22px_-18px_rgba(255,122,22,0.32)]">
+                          <span className="h-2 w-2 rounded-full bg-[#FF7A16] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
+                          {rankLiveBadge}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-end gap-2.5">
@@ -829,7 +843,7 @@ export function StudentHomeGamePanel({
                     </div>
 
                     <div className="mt-2 max-w-[15.5rem] text-[11px] font-semibold leading-5 text-[rgba(20,41,95,0.66)]">
-                      공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.
+                      {rankDescription}
                     </div>
                   </div>
 
@@ -865,11 +879,14 @@ export function StudentHomeGamePanel({
                   {rankPreview.length > 0 ? (
                     <>
                       {featuredRankEntry ? (
-                        <div className="relative overflow-hidden rounded-[1.38rem] border border-[rgba(240,202,151,0.92)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,246,227,0.94))] px-4 py-4 shadow-[0_18px_34px_-26px_rgba(20,41,95,0.18)]">
+                        <div
+                          className="relative overflow-hidden rounded-[1.38rem] border border-[rgba(240,202,151,0.92)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,246,227,0.94))] px-4 py-4 shadow-[0_18px_34px_-26px_rgba(20,41,95,0.18)]"
+                          style={{ animation: "leaderboard-card-breathe 6.8s ease-in-out infinite" }}
+                        >
                           <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,transparent,rgba(255,150,56,0.92),transparent)]" />
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="inline-flex items-center rounded-full border border-[rgba(240,202,151,0.74)] bg-white/84 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-[#9A5B12]">
+                              <div className="inline-flex items-center rounded-full border border-[rgba(240,202,151,0.74)] bg-white/84 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-[#9A5B12]" style={{ animation: "leaderboard-crown-float 2.8s ease-in-out infinite" }}>
                                 1위
                               </div>
                               <div className="font-aggro-display mt-3 truncate text-[1.38rem] font-black tracking-[-0.04em] text-[#14295F]">
@@ -879,7 +896,7 @@ export function StudentHomeGamePanel({
                                 {formatSchoolLabel(featuredRankEntry.schoolName)}
                               </div>
                             </div>
-                            <div className="shrink-0 rounded-full border border-[rgba(240,202,151,0.74)] bg-white/86 px-3 py-1.5 text-[11px] font-black text-[#C86A10] shadow-[0_12px_24px_-18px_rgba(255,150,56,0.24)]">
+                            <div className="shrink-0 rounded-full border border-[rgba(240,202,151,0.74)] bg-white/86 px-3 py-1.5 text-[11px] font-black text-[#C86A10] shadow-[0_12px_24px_-18px_rgba(255,150,56,0.24)]" style={{ animation: "leaderboard-crown-float 3.4s ease-in-out infinite" }}>
                               {formatMini(featuredRankEntry.minutes)}
                             </div>
                           </div>
@@ -892,6 +909,7 @@ export function StudentHomeGamePanel({
                             <div
                               key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
                               className="rounded-[1.22rem] border border-[rgba(229,216,200,0.96)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,249,241,0.9))] px-3 py-3.5 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.14)]"
+                              style={{ animation: "leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both", animationDelay: `${entry.rank * 90}ms` }}
                             >
                               <div className="inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-white/88 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[rgba(20,41,95,0.68)]">
                                 {entry.rank}위
@@ -938,10 +956,12 @@ export function StudentHomeGamePanel({
                 }
               }}
               className="surface-card surface-card--highlight relative w-full overflow-hidden rounded-[1.65rem] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(14,28,56,0.18)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+              style={{ animation: "leaderboard-card-breathe 6.2s ease-in-out infinite" }}
             >
               <div className="pointer-events-none absolute inset-0">
-                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/18 blur-2xl" />
-                <div className="absolute -left-8 bottom-2 h-24 w-24 rounded-full bg-[rgba(255,255,255,0.12)] blur-2xl" />
+                <div className="absolute -left-24 top-0 h-full w-20 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.26),transparent)] opacity-70 animate-[leaderboard-bar-shimmer_4.8s_linear_infinite]" />
+                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/18 blur-2xl animate-[hero-orb-drift_8.8s_ease-in-out_infinite]" />
+                <div className="absolute -left-8 bottom-2 h-24 w-24 rounded-full bg-[rgba(255,255,255,0.12)] blur-2xl animate-[hero-orb-drift_10.2s_ease-in-out_infinite]" style={{ animationDelay: "1.4s" }} />
               </div>
               <div className="relative flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
@@ -953,6 +973,12 @@ export function StudentHomeGamePanel({
                     <div className="inline-flex rounded-full border border-[rgba(255,255,255,0.38)] bg-[rgba(255,248,236,0.56)] px-2.5 py-1 text-[10px] font-black text-[rgba(14,28,56,0.72)] shadow-[0_10px_24px_-18px_rgba(14,28,56,0.28)]">
                       {selectedHomeRank.badge}
                     </div>
+                    {rankLiveBadge ? (
+                      <div className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,122,22,0.22)] bg-[rgba(255,122,22,0.12)] px-2.5 py-1 text-[10px] font-black text-[rgba(168,88,17,0.92)] shadow-[0_10px_24px_-18px_rgba(255,122,22,0.28)]">
+                        <span className="h-2 w-2 rounded-full bg-[#FF7A16] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
+                        {rankLiveBadge}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="mt-3 flex flex-wrap items-end gap-3">
                     <div className="font-aggro-display text-[1.55rem] font-black tracking-tight text-[#14295F]">
@@ -963,7 +989,7 @@ export function StudentHomeGamePanel({
                     </div>
                   </div>
                   <div className="mt-2 text-[11px] font-semibold text-[rgba(14,28,56,0.68)]">
-                    공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.
+                    {rankDescription}
                   </div>
                 </div>
                 <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.2)] shadow-[0_14px_28px_-20px_rgba(14,28,56,0.28)]">
@@ -1003,6 +1029,7 @@ export function StudentHomeGamePanel({
                           ? "border-[rgba(255,138,31,0.28)] bg-[linear-gradient(180deg,rgba(255,251,244,0.96),rgba(255,239,214,0.84))]"
                           : "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(180deg,rgba(255,249,240,0.88),rgba(255,255,255,0.72))]",
                       )}
+                      style={{ animation: "leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both", animationDelay: `${entry.rank * 90}ms` }}
                     >
                       <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[11px] font-black text-[#14295F] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.3)]">
                         {entry.rank === 1 ? <Crown className="h-4 w-4 text-[var(--accent-orange)]" /> : `#${entry.rank}`}
