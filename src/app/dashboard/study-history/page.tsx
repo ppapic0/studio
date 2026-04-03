@@ -1298,17 +1298,17 @@ export default function StudyHistoryPage() {
                           <div
                             className={cn(
                               "inline-flex max-w-full items-center justify-center rounded-[1rem] border text-center",
-                              isMobile ? "min-h-[2.55rem] w-full px-1.5 py-1.5" : "min-h-[3.55rem] w-full px-3 py-2.5",
+                              isMobile ? "min-h-[2.35rem] w-full px-1 py-1.25" : "min-h-[3.55rem] w-full px-3 py-2.5",
                               getStudentCalendarTimeChipClass(minutes, isCurrentMonth, isMobile)
                             )}
                           >
                             <span
                               className={cn(
-                                "dashboard-number break-keep whitespace-normal font-black leading-[1.08] tabular-nums text-center",
+                                "dashboard-number break-keep whitespace-normal font-black leading-[1.02] tabular-nums text-center",
                                 isMobile
                                   ? isCompactLongTimeLabel
-                                    ? "text-[0.78rem] tracking-[-0.04em]"
-                                    : "text-[0.95rem] tracking-[-0.045em]"
+                                    ? "text-[0.64rem] tracking-[-0.05em]"
+                                    : "text-[0.76rem] tracking-[-0.05em]"
                                   : isLongTimeLabel
                                     ? "text-[0.96rem] tracking-[-0.04em]"
                                     : "text-[1.08rem] tracking-[-0.05em]",
