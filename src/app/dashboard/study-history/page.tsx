@@ -1068,11 +1068,11 @@ export default function StudyHistoryPage() {
                 key={item.label}
                 className={cn(
                   isMobile
-                    ? "min-w-0 overflow-hidden rounded-[1.55rem] border border-white/18 bg-[linear-gradient(180deg,rgba(36,67,136,0.42),rgba(70,109,195,0.62))] px-4 py-[1.05rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_18px_36px_-28px_rgba(0,0,0,0.28)] backdrop-blur-xl"
-                    : "min-w-0 overflow-hidden rounded-[1.8rem] border border-white/18 bg-[linear-gradient(180deg,rgba(34,64,129,0.38),rgba(72,110,192,0.58))] px-5 py-[1.15rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_18px_36px_-28px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+                    ? "min-w-0 overflow-hidden rounded-[1.55rem] border border-[#2D4E92] bg-[linear-gradient(180deg,#102756_0%,#17326B_56%,#1D3D80_100%)] px-4 py-[1.05rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_20px_38px_-28px_rgba(9,18,46,0.52)]"
+                    : "min-w-0 overflow-hidden rounded-[1.8rem] border border-[#274683] bg-[linear-gradient(180deg,#0F2350_0%,#17326B_54%,#1F468F_100%)] px-5 py-[1.15rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_22px_40px_-28px_rgba(9,18,46,0.54)]"
                 )}
               >
-                <p className={cn("font-black uppercase tracking-[0.18em] text-[#FFD089]", isMobile ? "text-[8px]" : "text-[10px]")}>
+                <p className={cn("font-black uppercase tracking-[0.18em] text-white/72", isMobile ? "text-[8px]" : "text-[10px]")}>
                   {isMobile ? item.mobileLabel : item.label}
                 </p>
                 <div className={cn("flex items-end gap-2", isMobile ? "mt-3.5" : "mt-3")}>
@@ -1083,7 +1083,7 @@ export default function StudyHistoryPage() {
                     {item.value}
                   </span>
                 </div>
-                <p className={cn("break-keep font-semibold text-white/92", isMobile ? "mt-2.5 text-[9px] leading-[1.2rem]" : "mt-2.5 text-xs leading-5")}>
+                <p className={cn("break-keep font-semibold text-white/84", isMobile ? "mt-2.5 text-[9px] leading-[1.2rem]" : "mt-2.5 text-xs leading-5")}>
                   {isMobile ? item.mobileNote : item.note}
                 </p>
               </div>
