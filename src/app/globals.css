@@ -1280,7 +1280,7 @@ select {
   }
 
   .student-analysis-shell .analysis-tab-trigger[data-state="active"] {
-    color: #ffffff;
+    color: #17326b;
     background:
       linear-gradient(135deg, #ffb34f 0%, #ff8a1f 42%, #ff7312 100%);
     box-shadow:
@@ -1324,6 +1324,16 @@ select {
     --text-on-dark-muted: #8da0bf;
     --accent-orange-soft: #d86a11;
     color: #17326b;
+  }
+
+  .student-analysis-shell [class~="text-white"],
+  .student-analysis-shell [class^="text-white"],
+  .student-analysis-shell [class*=" text-white"] {
+    color: #17326b !important;
+  }
+
+  .student-analysis-shell [class*="text-white/"] {
+    color: #5f7299 !important;
   }
 
   .student-analysis-shell .surface-card.on-dark.surface-card--primary,

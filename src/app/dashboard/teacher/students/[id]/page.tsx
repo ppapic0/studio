@@ -3357,7 +3357,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     return (
                     <div key={log.id} className={cn("rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm", isAnalysisPresentation && "analysis-record-card")}>
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <Badge className="font-black text-[10px] rounded-full bg-primary text-white">{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
+                        <Badge className={cn(
+                          "font-black text-[10px] rounded-full",
+                          isAnalysisPresentation
+                            ? "border border-[#F1DDC7] bg-[#FFF4E5] text-[#17326B] shadow-none"
+                            : "bg-primary text-white"
+                        )}>{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
                         <Badge
                           variant="outline"
                           className={cn(
@@ -3424,10 +3429,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       <Dialog open={isAvgStudyModalOpen} onOpenChange={setIsAvgStudyModalOpen}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+          <div className={cn(
+            "px-6 py-5",
+            isAnalysisPresentation
+              ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFEBCF_100%)] text-[#17326B]"
+              : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
+          )}>
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">과거 7일 학습세션</DialogTitle>
-              <DialogDescription className="text-white/80 font-semibold">
+              <DialogDescription className={cn("font-semibold", isAnalysisPresentation ? "text-[#5F7299]" : "text-white/80")}>
                 날짜별 공부시간 세션을 확인하고 필요 시 수동 보정할 수 있습니다.
               </DialogDescription>
             </DialogHeader>
@@ -3513,10 +3523,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       <Dialog open={isRhythmGuideModalOpen} onOpenChange={setIsRhythmGuideModalOpen}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
-          <div className="bg-gradient-to-r from-[#0f2359] to-[#1d3f8c] px-6 py-5 text-white">
+          <div className={cn(
+            "px-6 py-5",
+            isAnalysisPresentation
+              ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE5C4_100%)] text-[#17326B]"
+              : "bg-gradient-to-r from-[#0f2359] to-[#1d3f8c] text-white"
+          )}>
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">평균 공부 리듬 그래프</DialogTitle>
-              <DialogDescription className="text-white/80 font-semibold">
+              <DialogDescription className={cn("font-semibold", isAnalysisPresentation ? "text-[#5F7299]" : "text-white/80")}>
                 최근 {RANGE_MAP[focusedChartView]}일 공부시간 흐름과 리듬 점수 계산식을 함께 보여줍니다.
               </DialogDescription>
             </DialogHeader>
@@ -3605,12 +3620,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         }}
       >
         <DialogContent className="rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col sm:max-w-xl max-h-[90vh]">
-          <div className="bg-purple-600 p-10 text-white relative shrink-0">
+          <div className={cn(
+            "p-10 relative shrink-0",
+            isAnalysisPresentation
+              ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE3BF_100%)] text-[#17326B]"
+              : "bg-purple-600 text-white"
+          )}>
             <Zap className="absolute top-0 right-0 p-8 h-32 w-32 opacity-20 rotate-12" />
             <DialogHeader>
               <div className="flex justify-between items-center">
-                <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest whitespace-nowrap">성장 지표 관리</Badge>
-                {!isEditStats && canEditGrowthData && <Button variant="ghost" size="sm" onClick={() => setIsEditStats(true)} className="text-white hover:bg-white/10 gap-2 h-8 rounded-lg font-black text-xs"><Settings2 className="h-3.5 w-3.5" /> 수동 보정</Button>}
+                <Badge className={cn(
+                  "border-none font-black text-[10px] px-2.5 py-0.5 uppercase tracking-widest whitespace-nowrap",
+                  isAnalysisPresentation ? "bg-[#FFF1DE] text-[#17326B]" : "bg-white/20 text-white"
+                )}>성장 지표 관리</Badge>
+                {!isEditStats && canEditGrowthData && <Button variant="ghost" size="sm" onClick={() => setIsEditStats(true)} className={cn(
+                  "gap-2 h-8 rounded-lg font-black text-xs",
+                  isAnalysisPresentation ? "text-[#17326B] hover:bg-[#17326B]/5" : "text-white hover:bg-white/10"
+                )}><Settings2 className="h-3.5 w-3.5" /> 수동 보정</Button>}
               </div>
               <DialogTitle className="text-3xl font-black tracking-tighter">성장 및 스킬 마스터 관리</DialogTitle>
             </DialogHeader>
@@ -3712,7 +3738,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="rounded-[2.5rem] sm:max-w-md p-0 overflow-hidden border-none shadow-2xl">
-          <div className="bg-primary p-10 text-white"><DialogTitle className="text-3xl font-black tracking-tighter">프로필 수정</DialogTitle></div>
+          <div className={cn(
+            "p-10",
+            isAnalysisPresentation
+              ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE7CB_100%)] text-[#17326B]"
+              : "bg-primary text-white"
+          )}><DialogTitle className="text-3xl font-black tracking-tighter">프로필 수정</DialogTitle></div>
           <div className="p-8 space-y-4 bg-white">
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">이름</Label><Input value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="rounded-xl h-12 border-2 font-bold" /></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">소속 반</Label><Select value={editForm.className || 'none'} onValueChange={(value) => setEditForm({ ...editForm, className: value === 'none' ? '' : value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="none" className="font-bold">미배정</SelectItem>{availableClasses.map((className) => <SelectItem key={className} value={className} className="font-bold">{className}</SelectItem>)}</SelectContent></Select></div>
