@@ -45,6 +45,7 @@ import StudentDetailPage from '../teacher/students/[id]/page';
 import { StudentDetailPresentationProvider } from '@/components/dashboard/student-detail-presentation-mode';
 
 type ToneKey = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose';
+type AnalysisTab = 'growth' | 'full';
 
 const TONE_STYLES: Record<ToneKey, { chip: string; text: string; bar: string; ring: string; soft: string }> = {
   blue: {
@@ -329,6 +330,19 @@ function MiniGrowthBars({
   data: Array<{ label: string; totalMinutes: number }>;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const mixGrowthTone = (progress: number) => {
+    const clamped = Math.max(0, Math.min(1, progress));
+    const orange = [255, 122, 22] as const;
+    const navy = [20, 41, 95] as const;
+    const mixed = orange.map((channel, index) => Math.round(channel + (navy[index] - channel) * clamped));
+    return {
+      solid: `rgb(${mixed[0]}, ${mixed[1]}, ${mixed[2]})`,
+      glow: `rgba(${mixed[0]}, ${mixed[1]}, ${mixed[2]}, ${0.24 + clamped * 0.22})`,
+      chip: `linear-gradient(135deg, rgba(${mixed[0]}, ${mixed[1]}, ${mixed[2]}, ${0.18 + clamped * 0.16}) 0%, rgba(${mixed[0]}, ${mixed[1]}, ${mixed[2]}, ${0.3 + clamped * 0.26}) 100%)`,
+      border: `rgba(${mixed[0]}, ${mixed[1]}, ${mixed[2]}, ${0.42 + clamped * 0.28})`,
+      shadow: `rgba(${mixed[0]}, ${mixed[1]}, ${mixed[2]}, ${0.2 + clamped * 0.22})`,
+    };
+  };
   const max = Math.max(...data.map((item) => item.totalMinutes), 1);
   const yTicks = Array.from(new Set([max, Math.round(max / 2), 0])).sort((a, b) => b - a);
   const chartHeight = 92;
@@ -340,7 +354,14 @@ function MiniGrowthBars({
     const x = paddingX + stepX * index;
     const progress = max > 0 ? day.totalMinutes / max : 0;
     const y = baseLineY - progress * (chartHeight - 28);
-    return { ...day, x, y: Number.isFinite(y) ? y : baseLineY };
+    return {
+      ...day,
+      x,
+      y: Number.isFinite(y) ? y : baseLineY,
+      progress,
+      tone: mixGrowthTone(progress),
+      hourLabel: `${Math.max(0, Math.round(day.totalMinutes / 60))}h`,
+    };
   });
   const linePath = points
     .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
@@ -352,7 +373,7 @@ function MiniGrowthBars({
       <div className="flex h-[7.85rem] flex-col justify-between pb-[2rem] pt-1 text-right">
         {yTicks.map((tick) => (
           <span key={tick} className="text-[10px] font-black text-[var(--text-on-dark-soft)]">
-            {compactSessionLabel(tick)}
+            {tick === 0 ? '0h' : compactSessionLabel(tick)}
           </span>
         ))}
       </div>
@@ -362,8 +383,14 @@ function MiniGrowthBars({
         <div className="pl-3">
           <div className="relative h-[5.8rem]">
             {activePoint ? (
-              <div className="pointer-events-none absolute right-0 top-0 z-20 rounded-[1rem] border border-[#F0DDC8] bg-white/95 px-3 py-2 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.35)]">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#64779C]">{activePoint.label}</p>
+              <div
+                className="pointer-events-none absolute right-0 top-0 z-20 rounded-[1rem] border bg-white/95 px-3 py-2"
+                style={{
+                  borderColor: activePoint.tone.border,
+                  boxShadow: `0 18px 32px -24px ${activePoint.tone.shadow}`,
+                }}
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: activePoint.tone.solid }}>{activePoint.label}</p>
                 <p className="mt-1 text-sm font-black text-[#14295F]">{minutesToLabel(activePoint.totalMinutes)}</p>
               </div>
             ) : null}
@@ -375,9 +402,9 @@ function MiniGrowthBars({
             >
               <defs>
                 <linearGradient id="mini-growth-line" x1="0%" x2="100%" y1="0%" y2="0%">
-                  <stop offset="0%" stopColor="#FFD36D" />
-                  <stop offset="55%" stopColor="#FFB347" />
-                  <stop offset="100%" stopColor="#FF7A00" />
+                  <stop offset="0%" stopColor="#FF7A16" />
+                  <stop offset="48%" stopColor="#FFB347" />
+                  <stop offset="100%" stopColor="#14295F" />
                 </linearGradient>
                 <filter id="mini-growth-glow" x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="3.5" result="blur" />
@@ -426,8 +453,8 @@ function MiniGrowthBars({
                   onFocus={() => setActiveIndex(index)}
                   onClick={() => setActiveIndex(index)}
                 >
-                  <circle cx={point.x} cy={point.y} fill="rgba(255,122,0,0.22)" r={activeIndex === index ? 11 : 8.5} />
-                  <circle cx={point.x} cy={point.y} fill="#FFB347" r={activeIndex === index ? 6.2 : 5.5} />
+                  <circle cx={point.x} cy={point.y} fill={point.tone.glow} r={activeIndex === index ? 11 : 8.5} />
+                  <circle cx={point.x} cy={point.y} fill={point.tone.solid} r={activeIndex === index ? 6.2 : 5.5} />
                   <circle cx={point.x} cy={point.y} fill="#FFF4D8" r={activeIndex === index ? 2.8 : 2.2} />
                 </g>
               ))}
@@ -435,7 +462,7 @@ function MiniGrowthBars({
           </div>
 
           <div className="mt-2 grid grid-cols-7 gap-2">
-          {data.map((day, index) => (
+          {points.map((day, index) => (
             <button
               key={day.label}
               type="button"
@@ -449,8 +476,15 @@ function MiniGrowthBars({
               style={{ transitionDelay: `${index * 50}ms` }}
             >
               <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
-              <p className="text-[11px] font-black text-[var(--text-on-dark)]">
-                {day.totalMinutes > 0 ? `${Math.round(day.totalMinutes / 60)}h` : '--'}
+              <p
+                className="rounded-full border px-2 py-1 text-[11px] font-black text-white"
+                style={{
+                  background: day.tone.chip,
+                  borderColor: day.tone.border,
+                  boxShadow: `0 12px 22px -18px ${day.tone.shadow}`,
+                }}
+              >
+                {day.hourLabel}
               </p>
             </button>
           ))}
@@ -539,6 +573,8 @@ export default function AnalysisTrackPage() {
   const firestore = useFirestore();
   const selfParams = useMemo(() => Promise.resolve({ id: user?.uid ?? '' }), [user?.uid]);
   const isMobile = viewMode === 'mobile';
+  const [activeTab, setActiveTab] = useState<AnalysisTab>('growth');
+  const growthTabMatchesDesktop = !isMobile || activeTab === 'growth';
 
   const studyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid || !activeMembership) return null;
@@ -833,8 +869,8 @@ export default function AnalysisTrackPage() {
     [insight.trend, kpi.studyDays, kpi.weekDiffPct, sessionMetrics]
   );
   const visibleDungeonCards = useMemo(
-    () => (isMobile ? dungeonCards.filter((card) => card.unlocked) : dungeonCards),
-    [dungeonCards, isMobile]
+    () => (growthTabMatchesDesktop ? dungeonCards : dungeonCards.filter((card) => card.unlocked)),
+    [dungeonCards, growthTabMatchesDesktop]
   );
 
   if (!user) {
@@ -845,46 +881,36 @@ export default function AnalysisTrackPage() {
     );
   }
 
-  const mobilePanelClass = 'rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,246,236,0.93)_100%)] shadow-[0_18px_38px_-34px_rgba(191,115,31,0.16)]';
-  const mobileMiniCardClass = 'rounded-[1.2rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.76)_0%,rgba(255,248,240,0.72)_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]';
-  const mobileHeroStatCardClass = 'rounded-[1.28rem] border border-[#F0DDC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,246,237,0.94)_100%)] p-4 shadow-[0_18px_34px_-30px_rgba(191,115,31,0.18)]';
-  const mobileSummaryPanelClass = 'rounded-[1.45rem] border border-[#F0DDC9] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,244,232,0.95)_100%)] p-4 shadow-[0_18px_36px_-32px_rgba(191,115,31,0.18)]';
-  const mobileMiniLabelClass = 'text-[10px] font-black uppercase tracking-[0.18em] text-[#9C7C5B]';
-  const mobileMiniValueClass = 'mt-2 text-lg font-black text-[#17326B]';
-  const mobileMiniMetaClass = 'mt-1 text-sm font-semibold text-[#526B93]';
-
   return (
-    <div className={cn(isMobile ? 'bg-[linear-gradient(180deg,#FFFDF9_0%,#FFF4E8_100%)] pb-24 space-y-4' : 'student-night-page pb-24 space-y-6')}>
+    <div className={cn(
+      growthTabMatchesDesktop ? 'student-night-page pb-24' : 'bg-[linear-gradient(180deg,#FFFDF9_0%,#FFF4E8_100%)] pb-24',
+      isMobile ? 'space-y-4' : 'space-y-6'
+    )}>
       {isMobile && <StudentTrackSubnav />}
 
-      <Tabs defaultValue="growth" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AnalysisTab)} className="space-y-4">
         <TabsList className={cn(
           'grid w-full grid-cols-2 rounded-[1.5rem] p-1.5',
-          isMobile
-            ? 'gap-1.5 border border-[#F0DDC9] bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF2E5_100%)] shadow-[0_16px_34px_-28px_rgba(191,115,31,0.18)]'
-            : 'gap-2 border border-white/12 bg-white/[0.08] shadow-[0_18px_42px_-32px_rgba(0,0,0,0.42)]'
+          growthTabMatchesDesktop
+            ? 'gap-2 border border-white/12 bg-white/[0.08] shadow-[0_18px_42px_-32px_rgba(0,0,0,0.42)]'
+            : 'gap-1.5 border border-[#F0DDC9] bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF2E5_100%)] shadow-[0_16px_34px_-28px_rgba(191,115,31,0.18)]'
         )}>
           <TabsTrigger value="growth" className={cn(
             'rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626] data-[state=active]:text-white',
-            isMobile ? 'text-[#6B5676] hover:text-[#17326B]' : 'text-[var(--text-on-dark-soft)] hover:text-white'
+            growthTabMatchesDesktop ? 'text-[var(--text-on-dark-soft)] hover:text-white' : 'text-[#6B5676] hover:text-[#17326B]'
           )}>
             <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> 성장 맵
           </TabsTrigger>
           <TabsTrigger value="full" className={cn(
             'rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626] data-[state=active]:text-white',
-            isMobile ? 'text-[#6B5676] hover:text-[#17326B]' : 'text-[var(--text-on-dark-soft)] hover:text-white'
+            growthTabMatchesDesktop ? 'text-[var(--text-on-dark-soft)] hover:text-white' : 'text-[#6B5676] hover:text-[#17326B]'
           )}>
             <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> 전체 분석
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="growth" className="mt-0 space-y-4">
-          <section className={cn(
-            'overflow-hidden rounded-[2.2rem] px-5 py-5',
-            isMobile
-              ? 'border border-[#F0DDC7] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,245,234,0.96)_100%)] shadow-[0_26px_54px_-36px_rgba(191,115,31,0.24)]'
-              : 'surface-card surface-card--primary on-dark'
-          )}>
+          <section className="surface-card surface-card--primary on-dark overflow-hidden rounded-[2.2rem] px-5 py-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Badge variant="dark" className="px-3 py-1 text-[10px] shadow-none">GROWTH TRACK</Badge>
@@ -896,18 +922,18 @@ export default function AnalysisTrackPage() {
             <div className={cn('mt-5 grid gap-5', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]')}>
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <p className={cn('text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight', isMobile ? 'text-[#17326B]' : 'text-white')}>{displayName}</p>
+                  <p className="text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight text-white">{displayName}</p>
                   <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">🔥 {playerTitle}</Badge>
                 </div>
-                <p className={cn('mt-2 text-sm font-semibold', isMobile ? 'text-[#526B93]' : 'surface-caption')}>오늘도 성장한 하루를 만드는 중이에요.</p>
+                <p className="surface-caption mt-2 text-sm font-semibold">오늘도 성장한 하루를 만드는 중이에요.</p>
 
                 <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-2')}>
-                  <div className={cn(isMobile ? mobileHeroStatCardClass : 'surface-card surface-card--light rounded-[1.2rem] px-4 py-4')}>
+                  <div className="surface-card surface-card--light rounded-[1.2rem] px-4 py-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">오늘 상태</p>
                     <p className="mt-2 text-2xl font-black text-[var(--text-primary)]">{minutesToCompactLabel(todayMinutes)}</p>
                     <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">{minutesToCompactLabel(heroGoalMinutes)} 목표</p>
                   </div>
-                  <div className={cn(isMobile ? mobileHeroStatCardClass : 'surface-card surface-card--ivory rounded-[1.2rem] px-4 py-4')}>
+                  <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">상승 폭</p>
                     <p className="mt-2 text-2xl font-black text-[var(--accent-orange)]">{signedPercent(kpi.weekDiffPct)}</p>
                     <p className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">지난 주 대비</p>
@@ -920,15 +946,15 @@ export default function AnalysisTrackPage() {
                   <QuestStatBar label="계획 완수율" value={completionHp} accent="emerald" />
                 </div>
 
-                <div className={cn('mt-5 rounded-[1.4rem] p-4', isMobile ? mobileSummaryPanelClass : 'surface-card surface-card--ghost on-dark')}>
+                <div className="surface-card surface-card--ghost on-dark mt-5 rounded-[1.4rem] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', isMobile ? 'text-[#9C7C5B]' : 'text-[var(--text-on-dark-muted)]')}>오늘 상태</p>
-                      <p className={cn('mt-2 text-lg font-black', isMobile ? 'text-[#17326B]' : 'text-white')}>🔥 집중 중 (LIVE)</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">오늘 상태</p>
+                      <p className="mt-2 text-lg font-black text-white">🔥 집중 중 (LIVE)</p>
                     </div>
                     <p className="text-sm font-black text-[var(--accent-orange-soft)]">{heroProgress}% 성장</p>
                   </div>
-                  <div className={cn('mt-3 rounded-full p-1', isMobile ? 'bg-[#F6E7D4]' : 'bg-white/10')}>
+                  <div className="mt-3 rounded-full bg-white/10 p-1">
                     <div
                       className="relative h-3 rounded-full bg-[linear-gradient(90deg,#FFD36D_0%,#FFB347_34%,#FF7A00_64%,#69CBFF_100%)]"
                       style={{ width: `${heroProgress}%`, transition: 'width 800ms ease-out' }}
@@ -936,19 +962,19 @@ export default function AnalysisTrackPage() {
                       <div className="absolute inset-y-0 w-12 animate-pulse bg-white/30 blur-sm" />
                     </div>
                   </div>
-                  <div className={cn('mt-3 flex items-center justify-between gap-3 text-sm font-semibold', isMobile ? 'text-[#6B5676]' : 'text-[var(--text-on-dark-soft)]')}>
+                  <div className="mt-3 flex items-center justify-between gap-3 text-sm font-semibold text-[var(--text-on-dark-soft)]">
                     <span>{minutesToCompactLabel(todayMinutes)} / {minutesToCompactLabel(heroGoalMinutes)}</span>
                     <span>{heroProgress >= 100 ? '오늘 목표 도달' : `${Math.max(0, heroGoalMinutes - todayMinutes)}분 남음`}</span>
                   </div>
                 </div>
               </div>
 
-              <div className={cn('rounded-[1.8rem] p-4', isMobile ? mobileSummaryPanelClass : 'surface-card surface-card--secondary on-dark')}>
+              <div className="surface-card surface-card--secondary on-dark rounded-[1.8rem] p-4">
                 <p className="surface-kicker text-[10px]">WEEKLY SUMMARY</p>
-                <h2 className={cn('mt-3 text-[1.35rem] font-black tracking-tight', isMobile ? 'text-[#17326B]' : 'text-white')}>이번 주 성장 요약</h2>
+                <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">이번 주 성장 요약</h2>
                 <div className="mt-4 space-y-2.5">
                   {weeklySummaryLines.map((line) => (
-                    <p key={line} className={cn('text-sm font-semibold leading-6', isMobile ? 'text-[#526B93]' : 'surface-caption')}>
+                    <p key={line} className="surface-caption text-sm font-semibold leading-6">
                       {line}
                     </p>
                   ))}
@@ -957,13 +983,13 @@ export default function AnalysisTrackPage() {
             </div>
           </section>
 
-          <section className={cn('rounded-[2rem] p-5', isMobile ? mobilePanelClass : 'surface-card surface-card--secondary on-dark')}>
+          <section className="surface-card surface-card--secondary on-dark rounded-[2rem] p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">GROWTH MAP</Badge>
-                <h2 className={cn('mt-3 text-[1.35rem] font-black tracking-tight', isMobile ? 'text-[#17326B]' : 'text-white')}>이번 주 성장 맵</h2>
+                <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">이번 주 성장 맵</h2>
               </div>
-              <div className={cn(isMobile ? `${mobileMiniCardClass} text-right` : 'surface-card surface-card--ivory rounded-[1.2rem] px-4 py-3 text-right')}>
+              <div className="surface-card surface-card--ivory rounded-[1.2rem] px-4 py-3 text-right">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">최고 성장</p>
                 <p className="mt-1 text-lg font-black text-[var(--text-primary)]">{shortDateLabel(bestDay.dateKey)}</p>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">{minutesToLabel(bestDay.totalMinutes)}</p>
@@ -982,7 +1008,7 @@ export default function AnalysisTrackPage() {
                 eyebrow={card.eyebrow}
                 insight={card.insight}
                 unlocked={card.unlocked}
-                lightMode={isMobile}
+                lightMode={false}
                 previewHint={card.previewHint}
                 preview={
                   card.id === 'density' ? (
@@ -1036,8 +1062,8 @@ export default function AnalysisTrackPage() {
                 }
               >
                 {card.id === 'focus' ? (
-                    <div className="space-y-4">
-                    <div className={cn('rounded-[1.35rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--ghost on-dark')}>
+                  <div className="space-y-4">
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <ResponsiveContainer width="100%" height={isMobile ? 180 : 260}>
                         <ComposedChart data={chartData} margin={{ top: 12, right: 14, left: isMobile ? 18 : 12, bottom: 4 }}>
                           <defs>
@@ -1063,58 +1089,48 @@ export default function AnalysisTrackPage() {
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
-                    {isMobile ? (
-                      <div className="grid gap-3">
-                        <div className={mobileMiniCardClass}><p className={mobileMiniLabelClass}>최고 몰입일</p><p className={mobileMiniValueClass}>{shortDateLabel(bestDay.dateKey)}</p><p className={mobileMiniMetaClass}>{minutesToLabel(bestDay.totalMinutes)}</p></div>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{minutesToLabel(bestDay.totalMinutes)}</p></div>
-                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">위험 구간</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백일 존재' : '안정 흐름'}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight.improve}</p></div>
-                        <div className="rounded-[1.2rem] border border-[#FFD7B4] bg-[#FFF1DE] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 전략</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 루틴 강화</p><p className="mt-1 text-sm font-semibold text-[#28478F]">계획트랙으로 연결</p></div>
-                      </div>
-                    )}
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{minutesToLabel(bestDay.totalMinutes)}</p></div>
+                      <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">위험 구간</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백일 존재' : '안정 흐름'}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight.improve}</p></div>
+                      <div className="rounded-[1.2rem] border border-[#FFD7B4] bg-[#FFF1DE] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 전략</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 루틴 강화</p><p className="mt-1 text-sm font-semibold text-[#28478F]">계획트랙으로 연결</p></div>
+                    </div>
                   </div>
                 ) : card.id === 'density' ? (
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3')}>
                     {sessionCards.map((item) => (
-                      <div key={item.label} className={cn(isMobile ? mobileMiniCardClass : 'surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && item.label === '평균 길이' && 'col-span-2')}>
-                        <p className={isMobile ? mobileMiniLabelClass : 'text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]'}>{item.label}</p>
-                        <p className={isMobile ? mobileMiniValueClass : 'mt-2 text-lg font-black text-white'}>{item.value}</p>
-                        <p className={isMobile ? mobileMiniMetaClass : 'mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]'}>{item.meta}</p>
+                      <div key={item.label} className={cn('surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && item.label === '평균 길이' && 'col-span-2')}>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">{item.label}</p>
+                        <p className="mt-2 text-lg font-black text-white">{item.value}</p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{item.meta}</p>
                       </div>
                     ))}
                   </div>
                 ) : card.id === 'rhythm' ? (
                   <div className="space-y-4">
-                    <div className={cn('rounded-[1.35rem] p-4', isMobile ? mobilePanelClass : 'surface-card surface-card--ghost on-dark')}>
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} />
                     </div>
-                    {isMobile ? (
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">연속 유지</p><p className="mt-2 text-lg font-black text-white">{kpi.maxStreak}일</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">루틴 최고 기록</p></div>
+                      <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">코치 해석</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구 필요' : '리듬 안정화'}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight.improve}</p></div>
                       <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
-                    ) : (
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">연속 유지</p><p className="mt-2 text-lg font-black text-white">{kpi.maxStreak}일</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">루틴 최고 기록</p></div>
-                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">코치 해석</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구 필요' : '리듬 안정화'}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight.improve}</p></div>
-                        <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 ) : (
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3')}>
-                    <div className={cn(isMobile ? mobileMiniCardClass : 'surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && 'col-span-2')}>
-                      <p className={isMobile ? mobileMiniLabelClass : 'text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]'}>현재 상태</p>
-                      <p className={isMobile ? mobileMiniValueClass : 'mt-2 text-lg font-black text-white'}>{sessionMetrics.total >= 10 ? '시간대 비교 가능' : '기본 흐름 확인 중'}</p>
-                      <p className={isMobile ? mobileMiniMetaClass : 'mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]'}>
+                    <div className={cn('surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && 'col-span-2')}>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">현재 상태</p>
+                      <p className="mt-2 text-lg font-black text-white">{sessionMetrics.total >= 10 ? '시간대 비교 가능' : '기본 흐름 확인 중'}</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">
                         {sessionMetrics.total >= 10
                           ? '오전과 오후 중 어디서 더 오래 버티는지 함께 보고 있어요.'
                           : '세션이 더 쌓일수록 오전/오후 효율 판단이 더 선명해져요.'}
                       </p>
                     </div>
-                    <div className={isMobile ? mobileMiniCardClass : 'surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4'}>
-                      <p className={isMobile ? mobileMiniLabelClass : 'text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]'}>수집된 세션</p>
-                      <p className={isMobile ? mobileMiniValueClass : 'mt-2 text-lg font-black text-white'}>{sessionMetrics.total}회</p>
-                      <p className={isMobile ? mobileMiniMetaClass : 'mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]'}>
+                    <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">수집된 세션</p>
+                      <p className="mt-2 text-lg font-black text-white">{sessionMetrics.total}회</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">
                         최근 14일 기준 평균 {minutesToLabel(sessionMetrics.avgDurationMinutes)} 세션
                       </p>
                     </div>
@@ -1135,7 +1151,6 @@ export default function AnalysisTrackPage() {
             ))}
           </section>
 
-          {!isMobile ? (
           <section className="surface-card surface-card--secondary on-dark rounded-[2rem] p-5 shadow-[0_24px_52px_-34px_rgba(0,0,0,0.56)]">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
@@ -1145,7 +1160,6 @@ export default function AnalysisTrackPage() {
               </div>
             </div>
           </section>
-          ) : null}
         </TabsContent>
 
         <TabsContent value="full" className="mt-0">
