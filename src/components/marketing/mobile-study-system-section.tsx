@@ -36,10 +36,62 @@ const toneStyles = {
 
 const sectionIcons = [Target, ChartColumnBig, ClipboardList, Sparkles] as const;
 
+function renderPrimaryPanel(
+  section: MarketingContent['mobileStudySystem']['sections'][number],
+) {
+  const panelBody = (
+    <article className="relative overflow-hidden rounded-[2.2rem] border border-[#FF9A47]/18 bg-[linear-gradient(180deg,rgba(255,122,22,0.2)_0%,rgba(255,122,22,0.1)_100%)] p-6 shadow-[0_28px_56px_rgba(2,10,29,0.26)]">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -right-10 top-0 h-32 w-32 rounded-full bg-[rgba(255,122,22,0.18)] blur-3xl" />
+        <div className="absolute left-[-10%] top-[20%] h-24 w-24 rounded-full bg-[rgba(255,214,169,0.18)] blur-3xl" />
+      </div>
+
+      <div className="relative space-y-5">
+        <div className="flex justify-center">
+          <div className="w-full max-w-[16.75rem] rounded-[1.8rem] bg-white px-5 py-4 text-center shadow-[0_24px_44px_rgba(20,41,95,0.12)]">
+            <span className="inline-flex rounded-full bg-[#14295F] px-4 py-1.5 text-[12px] font-black tracking-[0.2em] text-white">
+              SECTION 01
+            </span>
+            <p className="mt-4 break-keep text-[1.18rem] font-black leading-[1.45] text-[#14295F]">
+              {section.body}
+            </p>
+            <div className="mt-4 flex justify-center pt-1">
+              <span className="inline-flex items-center gap-2 text-[14px] font-black text-[#14295F]">
+                트랙러닝시스템 보러가기
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 text-center">
+          <h3 className="break-keep text-[2rem] font-black leading-[1.08] tracking-[-0.04em] text-white">
+            {section.title}
+          </h3>
+        </div>
+      </div>
+    </article>
+  );
+
+  if (section.href) {
+    return (
+      <Link key={section.title} href={section.href} className="block">
+        {panelBody}
+      </Link>
+    );
+  }
+
+  return <div key={section.title}>{panelBody}</div>;
+}
+
 function renderPanel(
   section: MarketingContent['mobileStudySystem']['sections'][number],
   index: number,
 ) {
+  if (index === 0) {
+    return renderPrimaryPanel(section);
+  }
+
   const Icon = sectionIcons[index] ?? Sparkles;
   const tone = toneStyles[section.tone];
   const panelBody = (
@@ -103,7 +155,7 @@ function renderPanel(
         {section.href ? (
           <div className="pt-1">
             <span className="inline-flex items-center gap-2 text-[13px] font-black text-white">
-              트랙 시스템 보러가기
+              트랙러닝시스템 보러가기
               <ArrowRight className="h-4 w-4" />
             </span>
           </div>

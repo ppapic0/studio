@@ -659,7 +659,7 @@ export const marketingContent: MarketingContent = {
     },
     sections: [
       {
-        title: '트랙 웹앱을 통해 학습 방향성 설정',
+        title: '독자개발한 트랙러닝시스템을 통해 학습 방향성 설정',
         body: '오늘의 학습계획을 작성하고 실천',
         href: '/experience',
         tone: 'orange',
