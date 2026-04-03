@@ -126,21 +126,7 @@ function renderPanel(
 export function MobileStudySystemSection({ content }: MobileStudySystemSectionProps) {
   return (
     <section className="bg-[#07142F] px-4 py-8 text-white sm:hidden">
-      <div className="mx-auto max-w-[28rem] space-y-4">
-        <article className="overflow-hidden rounded-[2.25rem] border border-white/8 bg-[linear-gradient(180deg,#0C1E47_0%,#08142F_100%)] p-6 shadow-[0_28px_56px_rgba(2,8,22,0.4)]">
-          <div className="space-y-4">
-            <span className="inline-flex rounded-full border border-[#FF9A47]/30 bg-[#FF7A16]/12 px-3 py-1 text-[10px] font-black tracking-[0.2em] text-[#FFB878]">
-              {content.intro.eyebrow}
-            </span>
-            <h2 className="break-keep text-[2.2rem] font-black leading-[1.02] tracking-[-0.05em] text-white">
-              {content.intro.title}
-            </h2>
-            <p className="break-keep text-[0.98rem] font-semibold leading-[1.82] text-white/76">
-              {content.intro.description}
-            </p>
-          </div>
-        </article>
-
+      <div className="mx-auto max-w-[28rem]">
         <div className="space-y-4">
           {content.sections.map((section, index) => renderPanel(section, index))}
         </div>
