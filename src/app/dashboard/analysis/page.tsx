@@ -811,6 +811,7 @@ export default function AnalysisTrackPage() {
     (best, item) => (item.totalMinutes > best.totalMinutes ? item : best),
     weeklyData[0] || { dateKey: format(new Date(), 'yyyy-MM-dd'), label: '오늘', shortLabel: '오늘', totalMinutes: 0, avgMinutes: 0 }
   );
+  const hasBlankDays = useMemo(() => chartData.some((item) => item.totalMinutes === 0), [chartData]);
   const weeklySummaryLines = useMemo(() => {
     const blankDays = weeklyData.filter((item) => item.totalMinutes === 0).length;
     return [
@@ -1089,10 +1090,10 @@ export default function AnalysisTrackPage() {
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-3')}>
                       <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">최고 몰입일</p><p className="mt-2 text-lg font-black text-white">{shortDateLabel(bestDay.dateKey)}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{minutesToLabel(bestDay.totalMinutes)}</p></div>
-                      <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">위험 구간</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백일 존재' : '안정 흐름'}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight.improve}</p></div>
-                      <div className="rounded-[1.2rem] border border-[#FFD7B4] bg-[#FFF1DE] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 전략</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 루틴 강화</p><p className="mt-1 text-sm font-semibold text-[#28478F]">계획트랙으로 연결</p></div>
+                      <div className={cn('surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4', isMobile && 'order-3 col-span-2')}><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">위험 구간</p><p className="mt-2 text-lg font-black text-white">{hasBlankDays ? '공백일 존재' : '안정 흐름'}</p><p className="mt-1 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">{isMobile ? (hasBlankDays ? '공백일을 먼저 줄여보세요.' : '지금 흐름을 유지해보세요.') : insight.improve}</p></div>
+                      <div className={cn('rounded-[1.2rem] border border-[#FFD7B4] bg-[#FFF1DE] p-4', isMobile && 'order-2')}><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 전략</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 루틴 강화</p><p className="mt-1 text-sm font-semibold text-[#28478F]">계획트랙으로 연결</p></div>
                     </div>
                   </div>
                 ) : card.id === 'density' ? (
