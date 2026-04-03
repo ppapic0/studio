@@ -47,11 +47,13 @@ const mockRank: StudentHomeRankState = {
   badge: 'TOP 5',
   caption: '이번 주 누적 집중 23시간',
   preview: [
-    { rank: 1, name: '민서', minutes: 1820 },
-    { rank: 2, name: '수현', minutes: 1705 },
-    { rank: 3, name: '서준', minutes: 1490 },
+    { rank: 1, studentId: 'mock-1', name: '민서', schoolName: '청담고', minutes: 1820, baseMinutes: 1820, displaySeconds: 109215, isLive: true },
+    { rank: 2, studentId: 'mock-2', name: '수현', schoolName: '대진여고', minutes: 1705, baseMinutes: 1705, displaySeconds: 102300, isLive: false },
+    { rank: 3, studentId: 'mock-3', name: '서준', schoolName: '중앙고', minutes: 1490, baseMinutes: 1490, displaySeconds: 89400, isLive: false },
   ],
   isLoading: false,
+  isLive: true,
+  liveBadge: 'LIVE 0:15',
 };
 
 export default function UiAuditPage() {

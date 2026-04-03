@@ -45,6 +45,17 @@ export type StudentHomeRewardBox = {
   reward?: number;
 };
 
+export type StudentHomeRankPreviewEntry = {
+  rank: number;
+  studentId: string | null;
+  name: string;
+  schoolName: string | null;
+  minutes: number;
+  baseMinutes: number;
+  displaySeconds?: number;
+  isLive?: boolean;
+};
+
 export type StudentHomeRankState = {
   title: string;
   rank: number;
@@ -52,19 +63,61 @@ export type StudentHomeRankState = {
   badge: string;
   caption: string;
   description?: string;
-  preview: Array<{ rank: number; name: string; schoolName: string | null; minutes: number }>;
+  preview: StudentHomeRankPreviewEntry[];
   isLoading: boolean;
   isLive?: boolean;
   liveBadge?: string | null;
 };
 
-function formatMini(minutes: number) {
-  const safeMinutes = Math.max(0, Math.round(minutes));
-  const hours = Math.floor(safeMinutes / 60);
-  const mins = safeMinutes % 60;
-  if (hours <= 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}.${Math.round((mins / 60) * 10)}h`;
+function formatRankPreviewSeconds(totalSeconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const mins = Math.floor((safeSeconds % 3600) / 60);
+  const secs = safeSeconds % 60;
+  if (hours === 0 && mins === 0 && secs === 0) return "0h 0m 0s";
+  if (hours > 0) return `${hours}h ${mins}m ${secs.toString().padStart(2, "0")}s`;
+  return `${mins}m ${secs.toString().padStart(2, "0")}s`;
+}
+
+function getRankPreviewSeconds(entry: StudentHomeRankPreviewEntry) {
+  if (typeof entry.displaySeconds === "number" && Number.isFinite(entry.displaySeconds)) {
+    return Math.max(0, Math.floor(entry.displaySeconds));
+  }
+  return Math.max(0, Math.round((entry.baseMinutes ?? entry.minutes) * 60));
+}
+
+function RankPreviewTimeBadge({
+  entry,
+  compact = false,
+  className,
+}: {
+  entry: StudentHomeRankPreviewEntry;
+  compact?: boolean;
+  className?: string;
+}) {
+  const label = formatRankPreviewSeconds(getRankPreviewSeconds(entry));
+
+  return (
+    <div className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className, entry.isLive && "leaderboard-live-chip")}>
+      {entry.isLive ? (
+        <span
+          className={cn(
+            "rounded-full bg-[#FF7A16] shadow-[0_0_0_3px_rgba(255,122,22,0.12)] leaderboard-live-dot",
+            compact ? "h-1.5 w-1.5" : "h-2 w-2"
+          )}
+        />
+      ) : null}
+      <span
+        key={`${entry.rank}-${label}`}
+        className={cn(
+          "inline-flex items-center whitespace-nowrap",
+          entry.isLive && "leaderboard-live-time leaderboard-ticker-item"
+        )}
+      >
+        {label}
+      </span>
+    </div>
+  );
 }
 
 function formatMaskedStudentName(name?: string | null) {
@@ -881,7 +934,7 @@ export function StudentHomeGamePanel({
                       {featuredRankEntry ? (
                         <div
                           className="relative overflow-hidden rounded-[1.38rem] border border-[rgba(240,202,151,0.92)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,246,227,0.94))] px-4 py-4 shadow-[0_18px_34px_-26px_rgba(20,41,95,0.18)]"
-                          style={{ animation: "leaderboard-card-breathe 6.8s ease-in-out infinite" }}
+                          style={{ animation: "leaderboard-card-breathe 4.8s ease-in-out infinite" }}
                         >
                           <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,transparent,rgba(255,150,56,0.92),transparent)]" />
                           <div className="flex items-start justify-between gap-3">
@@ -896,9 +949,10 @@ export function StudentHomeGamePanel({
                                 {formatSchoolLabel(featuredRankEntry.schoolName)}
                               </div>
                             </div>
-                            <div className="shrink-0 rounded-full border border-[rgba(240,202,151,0.74)] bg-white/86 px-3 py-1.5 text-[11px] font-black text-[#C86A10] shadow-[0_12px_24px_-18px_rgba(255,150,56,0.24)]" style={{ animation: "leaderboard-crown-float 3.4s ease-in-out infinite" }}>
-                              {formatMini(featuredRankEntry.minutes)}
-                            </div>
+                            <RankPreviewTimeBadge
+                              entry={featuredRankEntry}
+                              className="shrink-0 rounded-full border border-[rgba(240,202,151,0.74)] bg-white/86 px-3 py-1.5 text-[10px] font-black text-[#C86A10] shadow-[0_12px_24px_-18px_rgba(255,150,56,0.24)]"
+                            />
                           </div>
                         </div>
                       ) : null}
@@ -909,7 +963,12 @@ export function StudentHomeGamePanel({
                             <div
                               key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
                               className="rounded-[1.22rem] border border-[rgba(229,216,200,0.96)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,249,241,0.9))] px-3 py-3.5 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.14)]"
-                              style={{ animation: "leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both", animationDelay: `${entry.rank * 90}ms` }}
+                              style={{
+                                animation: entry.isLive
+                                  ? `leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both, leaderboard-card-breathe 4.2s ease-in-out ${entry.rank * 0.14}s infinite`
+                                  : "leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both",
+                                animationDelay: `${entry.rank * 90}ms`
+                              }}
                             >
                               <div className="inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-white/88 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[rgba(20,41,95,0.68)]">
                                 {entry.rank}위
@@ -920,9 +979,11 @@ export function StudentHomeGamePanel({
                               <div className="mt-1 min-h-[1.15rem] truncate text-[10px] font-bold leading-4 text-[rgba(20,41,95,0.62)]">
                                 {formatSchoolLabel(entry.schoolName)}
                               </div>
-                              <div className="mt-3 inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-[rgba(255,251,246,0.96)] px-2.5 py-1 text-[11px] font-black text-[#C86A10]">
-                                {formatMini(entry.minutes)}
-                              </div>
+                              <RankPreviewTimeBadge
+                                entry={entry}
+                                compact
+                                className="mt-3 inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-[rgba(255,251,246,0.96)] px-2.5 py-1 text-[10px] font-black text-[#C86A10]"
+                              />
                             </div>
                           ))}
                         </div>
@@ -956,7 +1017,7 @@ export function StudentHomeGamePanel({
                 }
               }}
               className="surface-card surface-card--highlight relative w-full overflow-hidden rounded-[1.65rem] p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(14,28,56,0.18)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-              style={{ animation: "leaderboard-card-breathe 6.2s ease-in-out infinite" }}
+              style={{ animation: "leaderboard-card-breathe 5s ease-in-out infinite" }}
             >
               <div className="pointer-events-none absolute inset-0">
                 <div className="absolute -left-24 top-0 h-full w-20 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.26),transparent)] opacity-70 animate-[leaderboard-bar-shimmer_4.8s_linear_infinite]" />
@@ -1029,7 +1090,12 @@ export function StudentHomeGamePanel({
                           ? "border-[rgba(255,138,31,0.28)] bg-[linear-gradient(180deg,rgba(255,251,244,0.96),rgba(255,239,214,0.84))]"
                           : "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(180deg,rgba(255,249,240,0.88),rgba(255,255,255,0.72))]",
                       )}
-                      style={{ animation: "leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both", animationDelay: `${entry.rank * 90}ms` }}
+                      style={{
+                        animation: entry.isLive
+                          ? `leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both, leaderboard-card-breathe 4.4s ease-in-out ${entry.rank * 0.12}s infinite`
+                          : "leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both",
+                        animationDelay: `${entry.rank * 90}ms`
+                      }}
                     >
                       <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[11px] font-black text-[#14295F] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.3)]">
                         {entry.rank === 1 ? <Crown className="h-4 w-4 text-[var(--accent-orange)]" /> : `#${entry.rank}`}
@@ -1040,9 +1106,11 @@ export function StudentHomeGamePanel({
                       <div className="mt-1 min-h-[1.1rem] truncate text-[10px] font-bold leading-4 tracking-[0.02em] text-[rgba(20,41,95,0.82)]">
                         {formatSchoolLabel(entry.schoolName)}
                       </div>
-                      <div className="mt-2 inline-flex rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] px-2.5 py-1 text-[11px] font-black text-[var(--accent-orange)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]">
-                        {formatMini(entry.minutes)}
-                      </div>
+                      <RankPreviewTimeBadge
+                        entry={entry}
+                        compact
+                        className="mt-2 inline-flex rounded-full border border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] px-2.5 py-1 text-[10px] font-black text-[var(--accent-orange)] shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]"
+                      />
                     </div>
                   ))
                 ) : (

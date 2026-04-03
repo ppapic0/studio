@@ -80,6 +80,7 @@ import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer'
 import {
   StudentHomeGamePanel,
   type StudentHomeQuest,
+  type StudentHomeRankPreviewEntry,
   type StudentHomeRankState,
   type StudentHomeRewardBox,
 } from '@/components/dashboard/student-home-game-panel';
@@ -223,6 +224,11 @@ function formatStudyDurationWithSeconds(totalSecs: number) {
   return `${mins}분 ${secs.toString().padStart(2, '0')}초`;
 }
 
+function toTimestampMillis(value?: Timestamp | null) {
+  if (!value || typeof value.toMillis !== 'function') return 0;
+  return value.toMillis();
+}
+
 function formatMinutesToKorean(minutes: number): string {
   const safe = Math.max(0, Math.round(minutes));
   const hours = Math.floor(safe / 60);
@@ -276,6 +282,27 @@ function getSeatActivityRank(status?: AttendanceCurrent['status'] | null): numbe
   if (status === 'away' || status === 'break') return 1;
   if (status === 'absent') return 3;
   return 2;
+}
+
+function pickPreferredAttendanceCurrentRecord(entries: AttendanceCurrent[]): AttendanceCurrent | null {
+  if (!entries.length) return null;
+
+  return [...entries].sort((a, b) => {
+    const rankDiff = getSeatActivityRank(a.status) - getSeatActivityRank(b.status);
+    if (rankDiff !== 0) return rankDiff;
+
+    const checkInPresenceDiff = Number(Boolean(b.lastCheckInAt)) - Number(Boolean(a.lastCheckInAt));
+    if (checkInPresenceDiff !== 0) return checkInPresenceDiff;
+
+    return toTimestampMillis(b.updatedAt) - toTimestampMillis(a.updatedAt);
+  })[0] ?? null;
+}
+
+function getLiveAttendanceSeconds(attendance: AttendanceCurrent | null | undefined, nowMs: number) {
+  if (!attendance?.status || !ACTIVE_ATTENDANCE_STATUSES.includes(attendance.status)) return 0;
+  const startedAtMs = toTimestampMillis(attendance.lastCheckInAt);
+  if (startedAtMs <= 0) return 0;
+  return Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
 }
 
 function pickPreferredSeatDoc<T extends { data: () => AttendanceCurrent | undefined }>(docs: T[]): T | null {
@@ -1080,6 +1107,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
+  const [rankPreviewNowMs, setRankPreviewNowMs] = useState(() => Date.now());
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const actionLockAtRef = useRef<number | null>(null);
   const isMobile = viewMode === 'mobile';
@@ -1241,6 +1269,24 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent');
   }, [firestore, activeMembership?.id]);
   const { data: attendanceCurrent, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive });
+  const attendanceCurrentByStudent = useMemo(() => {
+    const bucket = new Map<string, AttendanceCurrent[]>();
+
+    (attendanceCurrent || []).forEach((entry) => {
+      const studentId = typeof entry.studentId === 'string' ? entry.studentId.trim() : '';
+      if (!studentId || isSyntheticStudentId(studentId)) return;
+
+      const current = bucket.get(studentId) || [];
+      current.push(entry);
+      bucket.set(studentId, current);
+    });
+
+    return new Map(
+      Array.from(bucket.entries())
+        .map(([studentId, entries]) => [studentId, pickPreferredAttendanceCurrentRecord(entries)] as const)
+        .filter((entry): entry is readonly [string, AttendanceCurrent] => Boolean(entry[1]))
+    );
+  }, [attendanceCurrent]);
 
   useEffect(() => {
     if (!isActive || typeof window === 'undefined') return;
@@ -2162,27 +2208,32 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const monthlyStudyRankDisplaySeconds = Math.max(0, monthlyStudyRankMinutes * 60 + liveRankSessionSeconds);
 
   const homeRankMap = useMemo(() => {
-    const dailyTop = validDailyRankEntries.slice(0, 3).map((entry, index) => ({
-      rank: index + 1,
-      name: entry.displayNameSnapshot || '학생',
-      schoolName: entry.schoolNameSnapshot || null,
-      minutes: Number(entry.value || 0),
-    }));
-    const weeklyTop = validWeeklyRankEntries.slice(0, 3).map((entry, index) => ({
-      rank: index + 1,
-      name: entry.displayNameSnapshot || '학생',
-      schoolName: entry.schoolNameSnapshot || null,
-      minutes: Number(entry.value || 0),
-    }));
-    const monthlyTop = [...validRankEntries]
-      .sort((a, b) => Number(b.value || 0) - Number(a.value || 0))
-      .slice(0, 3)
-      .map((entry, index) => ({
-        rank: index + 1,
-        name: entry.displayNameSnapshot || '학생',
-        schoolName: entry.schoolNameSnapshot || null,
-        minutes: Number(entry.value || 0),
-      }));
+    const buildRankPreview = (entries: StudentRankingSnapshot['daily']): StudentHomeRankPreviewEntry[] =>
+      entries.slice(0, 3).map((entry, index) => {
+        const studentId = typeof entry.studentId === 'string' ? entry.studentId : null;
+        const baseMinutes = Math.max(0, Number(entry.value || 0));
+        const isSelfLive = Boolean(studentId && studentId === user?.uid && isTimerActive);
+        const liveSeconds = isSelfLive
+          ? localSeconds
+          : getLiveAttendanceSeconds(studentId ? attendanceCurrentByStudent.get(studentId) : null, rankPreviewNowMs);
+
+        return {
+          rank: Number(entry.rank || index + 1),
+          studentId,
+          name: entry.displayNameSnapshot || '학생',
+          schoolName: entry.schoolNameSnapshot || null,
+          minutes: baseMinutes,
+          baseMinutes,
+          displaySeconds: Math.max(0, baseMinutes * 60 + liveSeconds),
+          isLive: isSelfLive || liveSeconds > 0,
+        };
+      });
+
+    const dailyTop = buildRankPreview(validDailyRankEntries);
+    const weeklyTop = buildRankPreview(validWeeklyRankEntries);
+    const monthlyTop = buildRankPreview(
+      [...validRankEntries].sort((a, b) => Number(b.value || 0) - Number(a.value || 0))
+    );
 
     return {
       daily: {
@@ -2246,12 +2297,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       badge: string;
       caption: string;
       description?: string;
-      preview: Array<{ rank: number; name: string; schoolName: string | null; minutes: number }>;
+      preview: StudentHomeRankPreviewEntry[];
       isLoading: boolean;
       isLive?: boolean;
       liveBadge?: string | null;
     }>;
   }, [
+    attendanceCurrentByStudent,
     dailyStudyRank,
     dailyStudyRankDisplaySeconds,
     dailyStudyRankMinutes,
@@ -2261,7 +2313,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     monthlyStudyRank,
     monthlyStudyRankDisplaySeconds,
     monthlyStudyRankMinutes,
+    rankPreviewNowMs,
     rankSnapshotLoading,
+    user?.uid,
     validDailyRankEntries,
     validRankEntries,
     validWeeklyRankEntries,
@@ -2270,6 +2324,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     weeklyStudyRankMinutes,
   ]);
   const selectedHomeRank = homeRankMap[selectedRankRange];
+  const hasExternalLiveRankPreview = useMemo(
+    () => selectedHomeRank.preview.some((entry) => entry.isLive && entry.studentId && entry.studentId !== user?.uid),
+    [selectedHomeRank.preview, user?.uid]
+  );
+
+  useEffect(() => {
+    if (!hasExternalLiveRankPreview) return;
+
+    setRankPreviewNowMs(Date.now());
+    const intervalId = window.setInterval(() => {
+      setRankPreviewNowMs(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [hasExternalLiveRankPreview, selectedRankRange]);
   const todayPointStatus = useMemo(
     () => ((progress?.dailyPointStatus?.[todayKey] || {}) as Record<string, any>),
     [progress?.dailyPointStatus, todayKey]

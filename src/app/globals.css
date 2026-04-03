@@ -4819,6 +4819,30 @@ select {
   animation: leaderboard-card-breathe 2.6s ease-in-out infinite;
 }
 
+.leaderboard-live-chip {
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 12px 24px -18px rgba(255, 122, 22, 0.18),
+    inset 0 1px 0 rgba(255,255,255,0.72);
+  animation: leaderboard-live-chip-breathe 1.8s ease-in-out infinite;
+}
+
+.leaderboard-live-chip::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -2.1rem;
+  width: 2.2rem;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: leaderboard-bar-shimmer 1.6s linear infinite;
+  opacity: 0.72;
+}
+
+.leaderboard-live-time {
+  animation: leaderboard-live-time-pulse 1.1s ease-in-out infinite;
+  transform-origin: center;
+}
+
 .leaderboard-my-row {
   animation: leaderboard-card-breathe 2.8s ease-in-out infinite;
 }
@@ -4921,9 +4945,36 @@ select {
   }
 }
 
+@keyframes leaderboard-live-chip-breathe {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow:
+      0 12px 24px -18px rgba(255, 122, 22, 0.16),
+      inset 0 1px 0 rgba(255,255,255,0.72);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.03);
+    box-shadow:
+      0 16px 28px -18px rgba(255, 122, 22, 0.24),
+      0 0 20px rgba(255, 179, 71, 0.14),
+      inset 0 1px 0 rgba(255,255,255,0.82);
+  }
+}
+
 @keyframes leaderboard-bar-shimmer {
   0% { transform: translateX(0); }
   100% { transform: translateX(16rem); }
+}
+
+@keyframes leaderboard-live-time-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
 }
 
 @keyframes leaderboard-marker-bounce {
@@ -4969,6 +5020,9 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .leaderboard-live-dot,
   .leaderboard-live-glow,
+  .leaderboard-live-chip,
+  .leaderboard-live-chip::after,
+  .leaderboard-live-time,
   .leaderboard-my-row,
   .leaderboard-ticker-item,
   .leaderboard-race-fill::after,
