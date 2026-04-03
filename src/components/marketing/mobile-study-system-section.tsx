@@ -488,6 +488,20 @@ function renderPanel(
 
         <div className="space-y-2.5">
           <p className={`break-keep text-[1rem] font-semibold leading-[1.7] ${tone.accent}`}>{section.body}</p>
+          {section.detailPoints?.length ? (
+            <div className="space-y-2.5 pt-1">
+              {section.detailPoints.map((point, pointIndex) => (
+                <div key={point} className="flex items-start gap-3 rounded-[1.15rem] border border-white/10 bg-white/[0.06] px-3.5 py-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-black text-[#14295F]">
+                    {pointIndex + 1}
+                  </span>
+                  <p className="break-keep pt-0.5 text-[0.92rem] font-semibold leading-[1.65] text-white/82">
+                    {point}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {section.secondaryBody ? (
             <p className="break-keep text-[0.96rem] font-semibold leading-[1.72] text-white/72">{section.secondaryBody}</p>
           ) : null}

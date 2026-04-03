@@ -135,6 +135,7 @@ export type MobileStudySystemSection = {
   title: string;
   body: string;
   secondaryBody?: string;
+  detailPoints?: string[];
   href?: string;
   image?: string;
   alt?: string;
@@ -671,9 +672,12 @@ export const marketingContent: MarketingContent = {
         tone: 'slate',
       },
       {
-        title:
-          '더프리미엄 모의고사와 시대인재 서바이벌 프로, 이감, 한수 모의고사를 통한 문제경험 및 실전 감각 향상',
-        body: '대치동에 가지 않아도 동일한 컨텐츠 유료 이용가능',
+        title: '트랙 전용 방화벽으로 몰입환경 조성',
+        body: '네트워크 집중모드',
+        detailPoints: [
+          '학습시간에는 필요한 학습 사이트만 열어 집중 흐름 유지',
+          '유튜브, 게임, SNS 등의 불필요한 접속을 와이파이 방화벽으로 차단',
+        ],
         tone: 'navy',
       },
       {
