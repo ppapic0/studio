@@ -260,7 +260,7 @@ export const marketingContent: MarketingContent = {
     slogan: '학생의 성장 궤적을 함께 그립니다',
     heroTitle: '공부는 방향이 중요합니다.\n성장의 길,\n트랙에서\n시작됩니다.',
     heroDescription:
-      '빈틈없는 관리 시스템으로 스스로 공부하는 습관을 형성합니다.',
+      '빈틈없는 관리시스템으로 <br> 스스로 공부하는 습관을 형성합니다.',
     logoFull: '/track-logo-full.png',
     logoMark: '/track-logo-mark.png',
     heroBackground: '',

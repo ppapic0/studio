@@ -34,6 +34,10 @@ function getHeroTokens(line: string, lineIndex: number): HeroToken[] {
 
 export function HeroSection({ brand }: HeroSectionProps) {
   const heroTitleLines = brand.heroTitle.split('\n');
+  const heroDescriptionLines = brand.heroDescription
+    .split(/<br\s*\/?>|\n/g)
+    .map((line) => line.trim())
+    .filter(Boolean);
   const mobileHeroLines = [
     '공부는 방향이 중요합니다.',
     '성장의 길,',
@@ -353,7 +357,11 @@ export function HeroSection({ brand }: HeroSectionProps) {
                 </h1>
               </div>
               <p className="hero-copy-enter mx-auto max-w-[21rem] break-keep px-1 text-[14px] font-semibold leading-[1.8] text-white/[0.82] sm:max-w-[40rem] sm:px-2 sm:text-[16.5px]">
-                {brand.heroDescription}
+                {heroDescriptionLines.map((line, index) => (
+                  <span key={`${line}-${index}`} className="block">
+                    {line}
+                  </span>
+                ))}
               </p>
             </div>
           </div>
