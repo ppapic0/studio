@@ -3597,7 +3597,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     ))}
                   </div>
-                  <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 p-1.5" : "auto-rows-fr gap-3.5 p-5")}>
+                  <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 px-1.5 pb-1.5 pt-3" : "auto-rows-fr gap-3.5 px-5 pb-5 pt-6")}>
                     {logsLoading ? (
                       <div className="col-span-7 h-[400px] flex items-center justify-center">
                         <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />

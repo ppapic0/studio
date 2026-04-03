@@ -1209,7 +1209,7 @@ export default function StudyHistoryPage() {
               </div>
             ))}
           </div>
-          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-2 p-3" : "auto-rows-fr gap-3.5 p-5")}>
+          <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-2 px-3 pb-3 pt-4.5" : "auto-rows-fr gap-3.5 px-5 pb-5 pt-6")}>
             {logsLoading ? (
               <div className="col-span-7 h-[400px] flex items-center justify-center">
                 <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />

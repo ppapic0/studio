@@ -130,8 +130,10 @@ function getRankRangeLabel(range: RankRange) {
 }
 
 function getRankEntryStatusLabel(entry: StudentHomeRankPreviewEntry) {
-  if (entry.isLive) return "공부중";
-  if (getRankPreviewSeconds(entry) > 0) return "휴식중";
+  const previewSeconds = getRankPreviewSeconds(entry);
+  const baseSeconds = Math.max(0, Math.round((entry.baseMinutes ?? entry.minutes) * 60));
+  if (entry.isLive || previewSeconds > baseSeconds) return "공부중";
+  if (previewSeconds > 0) return "휴식중";
   return "대기중";
 }
 
