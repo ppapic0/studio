@@ -383,15 +383,15 @@ function StatAnalysisCard({
                 'min-w-0 break-keep',
                 isMobile
                   ? 'font-sans text-[13px] font-black leading-[1.2] tracking-[-0.02em] text-[#17326B]'
-                  : 'font-black uppercase text-[10px] tracking-[0.22em] text-[var(--text-on-dark-muted)]'
+                  : 'font-black uppercase text-[10px] tracking-[0.22em] text-[#4B6397]'
               )}
             >
               {title}
             </CardTitle>
-            <div className={cn('mt-3 font-black tracking-tight break-keep text-[var(--text-on-dark)]', isMobile ? 'text-[1.3rem] leading-tight' : 'text-[1.7rem]')}>
+            <div className={cn('mt-3 font-black tracking-tight break-keep text-[#17326B]', isMobile ? 'text-[1.3rem] leading-tight' : 'text-[1.7rem]')}>
               {value}
             </div>
-            <p className={cn('font-semibold mt-1 break-keep text-[var(--text-on-dark-soft)]', isMobile ? 'text-[10px] leading-5' : 'text-[11px] leading-5')}>
+            <p className={cn('mt-1 font-semibold break-keep text-[#3E5488]', isMobile ? 'text-[10px] leading-5' : 'text-[11px] leading-5')}>
               {subValue}
             </p>
           </div>
@@ -404,7 +404,7 @@ function StatAnalysisCard({
             <span className={cn('bg-gradient-to-r', tone.bar)} style={{ width: `${Math.max(0, Math.min(100, Math.round(progress)))}%` }} />
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-on-dark-muted)]">Insight Rail</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#4B6397]">Insight Rail</span>
             <span className={cn('text-[10px] font-black', tone.text)}>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
           </div>
         </CardContent>
