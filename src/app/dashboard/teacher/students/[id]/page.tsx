@@ -371,7 +371,7 @@ function StatAnalysisCard({
     return (
       <Card
         className={cn(
-          'analysis-premium-card surface-card surface-card--secondary on-dark min-w-0 overflow-hidden rounded-[1.5rem] border-none transition-all',
+          'analysis-premium-card surface-card surface-card--secondary on-dark min-w-0 h-full overflow-hidden rounded-[1.5rem] border-none transition-all',
           onClick && 'cursor-pointer active:scale-[0.985]'
         )}
         onClick={onClick}
@@ -2038,7 +2038,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-4", isAnalysisPresentation && 'analysis-summary-rail')}>
+      <section className={cn("grid gap-3 lg:gap-4", isMobile ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4", isAnalysisPresentation && 'analysis-summary-rail')}>
         <StatAnalysisCard
           title="평균 공부시간"
           value={minutesToLabel(avgStudyMinutes)}
