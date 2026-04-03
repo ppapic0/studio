@@ -1,6 +1,7 @@
 import type { MarketingContent } from '@/lib/marketing-content';
 import { adminDb } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
+import { buildMarketingEntryHref } from '@/lib/marketing-links';
 import { unstable_noStore as noStore } from 'next/cache';
 
 import { ConsultForm } from './consult-form';
@@ -191,7 +192,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                   웹앱 로그인
                 </a>
                 <a
-                  href="/go/experience?placement=consult_section"
+                  href={buildMarketingEntryHref('experience', { placement: 'consult_section', mode: 'student' })}
                   className="premium-cta premium-cta-ghost brand-cta-float h-12 w-full px-6 text-sm sm:w-auto"
                 >
                   웹앱 체험하기

@@ -1,5 +1,6 @@
 import Image from 'next/image';
 
+import { buildMarketingEntryHref } from '@/lib/marketing-links';
 import type { MarketingContent } from '@/lib/marketing-content';
 
 type MarketingFooterProps = {
@@ -38,7 +39,10 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
               <a href="/go/login?placement=footer" className="premium-cta premium-cta-ghost h-10 px-4 text-xs sm:w-auto">
                 웹앱 로그인
               </a>
-              <a href="/go/experience?placement=footer" className="premium-cta premium-cta-ghost h-10 px-4 text-xs sm:w-auto">
+              <a
+                href={buildMarketingEntryHref('experience', { placement: 'footer', mode: 'student' })}
+                className="premium-cta premium-cta-ghost h-10 px-4 text-xs sm:w-auto"
+              >
                 웹앱 체험
               </a>
             </div>

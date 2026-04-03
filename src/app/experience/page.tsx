@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, ChevronLeft, Smartphone, Users } from 'lucide-react';
+import { ArrowRight, BarChart3, ChevronLeft, Smartphone, Users, type LucideIcon } from 'lucide-react';
 
 import { DataAnalyticsPreviewSection } from '@/components/marketing/data-analytics-preview-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
@@ -9,11 +9,13 @@ import { MarketingPageTracker } from '@/components/marketing/marketing-page-trac
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { SectionHeading } from '@/components/marketing/section-heading';
 import type { MarketingContent } from '@/lib/marketing-content';
+import { buildExperiencePageHref, buildMarketingEntryHref, normalizeExperienceMode, type ExperienceMode } from '@/lib/marketing-links';
 import { marketingContent } from '@/lib/marketing-content';
 
 type ExperienceSection = MarketingContent['experienceShowcase']['sections'][number];
 type ExperienceFrame = ExperienceSection['primaryScreen'];
 type ExperienceTone = 'student' | 'parent';
+type ExperiencePageSearchParams = Promise<{ mode?: string | string[] | undefined }>;
 
 const koreanMockProgram = {
   eyebrow: 'KOREAN PRACTICE FLOW',
@@ -90,13 +92,137 @@ const toneStyleMap: Record<
   },
 };
 
+const experienceModeOrder: ExperienceMode[] = ['student', 'parent', 'admin'];
+
+const experienceModeCards: Record<
+  ExperienceMode,
+  {
+    eyebrow: string;
+    title: string;
+    description: string;
+    note: string;
+    icon: LucideIcon;
+    iconWrap: string;
+    chipClass: string;
+    panelClass: string;
+    activePanelClass: string;
+  }
+> = {
+  student: {
+    eyebrow: 'STUDENT MODE',
+    title: '학생 모드',
+    description: '해야 할 일과 실행 흐름이 먼저 보이도록 정리합니다.',
+    note: '오늘 할 일 · 루틴 · 피드백',
+    icon: Smartphone,
+    iconWrap: 'bg-[#EEF3FF] text-[#14295F]',
+    chipClass: 'border-[#14295F]/10 bg-[#F4F8FF] text-[#14295F]',
+    panelClass: 'border-[#14295F]/10 bg-[#F9FBFF]',
+    activePanelClass: 'border-[#14295F]/18 bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)] shadow-[0_18px_34px_rgba(20,41,95,0.10)]',
+  },
+  parent: {
+    eyebrow: 'PARENT MODE',
+    title: '학부모 모드',
+    description: '짧게 확인해도 변화 흐름과 상태가 먼저 보입니다.',
+    note: '출결 · 공부 흐름 · 리포트',
+    icon: Users,
+    iconWrap: 'bg-[#FFF3E8] text-[#FF7A16]',
+    chipClass: 'border-[#FF7A16]/12 bg-[#FFF5ED] text-[#B55200]',
+    panelClass: 'border-[#FF7A16]/12 bg-[#FFF9F3]',
+    activePanelClass: 'border-[#FF7A16]/20 bg-[linear-gradient(180deg,#FFF9F2_0%,#FFF2E6_100%)] shadow-[0_18px_34px_rgba(255,122,22,0.12)]',
+  },
+  admin: {
+    eyebrow: 'ADMIN MODE',
+    title: '운영자 모드',
+    description: '누적 데이터와 개입 우선순위를 먼저 읽도록 연결합니다.',
+    note: '그래프 · 위험 신호 · 개입 순서',
+    icon: BarChart3,
+    iconWrap: 'bg-[#EEF3FF] text-[#14295F]',
+    chipClass: 'border-[#14295F]/10 bg-white text-[#14295F]',
+    panelClass: 'border-[#D8E5FF] bg-white',
+    activePanelClass: 'border-[#14295F]/18 bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] shadow-[0_18px_34px_rgba(20,41,95,0.10)]',
+  },
+};
+
+const experienceFocusCopy: Record<
+  ExperienceMode,
+  {
+    eyebrow: string;
+    title: string;
+    description: string;
+  }
+> = {
+  student: {
+    eyebrow: 'STUDENT FIRST',
+    title: '학생이 바로 실행할 수 있는 흐름을 먼저 보여줍니다.',
+    description: '학생 모드에서는 오늘 할 일과 루틴, 피드백이 먼저 보이도록 학생 화면을 상단에 배치했습니다.',
+  },
+  parent: {
+    eyebrow: 'PARENT FIRST',
+    title: '학부모가 짧은 확인만으로도 현재 상태를 읽게 정렬했습니다.',
+    description: '학부모 모드에서는 출결과 공부시간, 리포트 흐름을 먼저 보도록 학부모 화면을 가장 먼저 보여줍니다.',
+  },
+  admin: {
+    eyebrow: 'ADMIN FIRST',
+    title: '운영자 관점에서는 누적 데이터와 개입 신호가 먼저 보여야 합니다.',
+    description: '운영자 모드를 선택하면 데이터 분석 섹션을 먼저 올려서 어떤 학생을 먼저 봐야 하는지 읽는 흐름으로 바꿉니다.',
+  },
+};
+
 function resolveTone(mode: string): ExperienceTone {
   return mode === '학부모 모드' ? 'parent' : 'student';
+}
+
+function getOrderedSections(sections: ExperienceSection[], selectedMode: ExperienceMode) {
+  const tonePriority: ExperienceTone[] =
+    selectedMode === 'parent' ? ['parent', 'student'] : ['student', 'parent'];
+
+  return [...sections].sort(
+    (left, right) =>
+      tonePriority.indexOf(resolveTone(left.mode)) -
+      tonePriority.indexOf(resolveTone(right.mode)),
+  );
 }
 
 function ModeIcon({ mode }: { mode: string }) {
   const Icon = mode === '학부모 모드' ? Users : Smartphone;
   return <Icon className="h-5 w-5" />;
+}
+
+function ModeSwitchCard({
+  mode,
+  active,
+}: {
+  mode: ExperienceMode;
+  active: boolean;
+}) {
+  const card = experienceModeCards[mode];
+  const Icon = card.icon;
+
+  return (
+    <Link
+      href={buildExperiencePageHref(mode)}
+      aria-current={active ? 'page' : undefined}
+      className={`group rounded-[1.45rem] border px-5 py-5 transition-all duration-200 ${active ? card.activePanelClass : card.panelClass}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${card.iconWrap}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${card.chipClass}`}>
+          {active ? '현재 보기' : '이 모드 보기'}
+        </span>
+      </div>
+
+      <p className="mt-4 text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">{card.eyebrow}</p>
+      <p className="mt-2 break-keep text-[1.12rem] font-black leading-[1.32] text-[#14295F]">{card.title}</p>
+      <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.72] text-[#4D627B]">{card.description}</p>
+
+      <div className="mt-4 inline-flex items-center gap-2 text-[12px] font-black text-[#14295F]">
+        <span>{card.note}</span>
+        <ArrowRight className={`h-3.5 w-3.5 transition-transform duration-200 ${active ? 'translate-x-0.5' : 'group-hover:translate-x-1'}`} />
+      </div>
+    </Link>
+  );
 }
 
 function ScreenshotCard({
@@ -269,8 +395,17 @@ function LargeProductPlaceholder({
   );
 }
 
-export default function ExperiencePage() {
+export default async function ExperiencePage({
+  searchParams,
+}: {
+  searchParams: ExperiencePageSearchParams;
+}) {
   const experienceShowcase = marketingContent.experienceShowcase;
+  const params = await searchParams;
+  const selectedMode = normalizeExperienceMode(params.mode);
+  const orderedSections = getOrderedSections(experienceShowcase.sections, selectedMode);
+  const showDataFirst = selectedMode === 'admin';
+  const focusCopy = experienceFocusCopy[selectedMode];
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#F8F5EF_0%,#FFFFFF_18%,#F7F9FD_100%)] text-[#14295F]">
@@ -289,7 +424,10 @@ export default function ExperiencePage() {
             홍보 페이지로 돌아가기
           </Link>
           <Link
-            href="/go/login?placement=experience_header"
+            href={buildMarketingEntryHref('login', {
+              placement: 'experience_header',
+              mode: selectedMode,
+            })}
             className="inline-flex items-center gap-2 rounded-full bg-[#FF7A16] px-4 py-2 text-[13px] font-black text-white shadow-[0_14px_24px_rgba(255,122,22,0.26)] transition-transform hover:-translate-y-0.5"
           >
             실제 로그인
@@ -300,44 +438,53 @@ export default function ExperiencePage() {
         <ScrollReveal className="mt-7">
           <section className="relative overflow-hidden rounded-[2.6rem] border border-[#14295F]/10 bg-white px-6 py-7 shadow-[0_28px_64px_rgba(20,41,95,0.10)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(20,41,95,0.05),transparent_24%),radial-gradient(circle_at_92%_10%,rgba(255,122,22,0.10),transparent_24%)]" />
-            <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-8">
+            <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)] lg:gap-8">
               <div>
                 <SectionHeading
                   eyebrow="ACTUAL WEB APP"
                   title={experienceShowcase.heading}
                   description={experienceShowcase.description}
                 />
+
+                <div className="mt-6 rounded-[1.55rem] border border-[#14295F]/10 bg-[#F9FBFF] px-5 py-5">
+                  <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">{focusCopy.eyebrow}</p>
+                  <p className="mt-3 break-keep text-[1.08rem] font-black leading-[1.42] text-[#14295F]">
+                    {focusCopy.title}
+                  </p>
+                  <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.76] text-[#4D627B]">
+                    {focusCopy.description}
+                  </p>
+                </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF] px-5 py-5">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[#14295F]/52">STUDENT VIEW</p>
-                  <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
-                    학생이 더 효율적으로 움직이도록 해야 할 일과 실행 흐름이 먼저 보입니다.
-                  </p>
-                </div>
-                <div className="rounded-[1.45rem] border border-[#FF7A16]/12 bg-[#FFF9F3] px-5 py-5">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[#B55200]/70">PARENT VIEW</p>
-                  <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
-                    학부모는 짧은 확인만으로도 변화 흐름과 학습 흥미까지 읽을 수 있어야 합니다.
-                  </p>
-                </div>
+              <div id="app-mode" className="grid gap-3 md:grid-cols-3 lg:grid-cols-1">
+                {experienceModeOrder.map((mode) => (
+                  <ModeSwitchCard key={mode} mode={mode} active={selectedMode === mode} />
+                ))}
               </div>
             </div>
           </section>
         </ScrollReveal>
 
+        {showDataFirst ? (
+          <ScrollReveal className="mt-8">
+            <DataAnalyticsPreviewSection showNextView={false} />
+          </ScrollReveal>
+        ) : null}
+
         <div className="mt-8 space-y-6 sm:space-y-7">
-          {experienceShowcase.sections.map((section, index) => (
+          {orderedSections.map((section, index) => (
             <ScrollReveal key={section.mode} delay={index * 80}>
               <ExperienceSectionBlock section={section} reverse={index % 2 === 1} />
             </ScrollReveal>
           ))}
         </div>
 
-        <ScrollReveal className="mt-8">
-          <DataAnalyticsPreviewSection showNextView={false} />
-        </ScrollReveal>
+        {!showDataFirst ? (
+          <ScrollReveal className="mt-8">
+            <DataAnalyticsPreviewSection showNextView={false} />
+          </ScrollReveal>
+        ) : null}
 
         <ScrollReveal className="mt-8">
           <section className="relative overflow-hidden rounded-[2.25rem] border border-[#FF7A16]/14 bg-white px-6 py-7 shadow-[0_24px_58px_rgba(20,41,95,0.08)] sm:px-8 sm:py-8">

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { ArrowRight, BarChart3, GraduationCap, ShieldCheck, Trophy } from 'lucide-react';
 
+import { buildExperiencePageHref } from '@/lib/marketing-links';
+
 import { SectionHeading } from './section-heading';
 import { StaggerChildren } from './stagger-children';
 
@@ -32,7 +34,7 @@ const pageDestinations = [
   {
     eyebrow: 'WEB APP',
     title: '트랙 시스템',
-    href: '/experience',
+    href: buildExperiencePageHref('student'),
     meta: '학생 · 학부모 · 데이터',
     highlights: ['학생 모드', '학부모 모드', '데이터'],
     icon: BarChart3,
