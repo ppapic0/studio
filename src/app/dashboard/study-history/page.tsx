@@ -580,7 +580,7 @@ export default function StudyHistoryPage() {
   const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
     if (!isCurrentMonth) return 'text-[#C6CFDD]';
     if (isMobileView) {
-      return 'text-black';
+      return '!text-black';
     }
     const level = getStudyHistoryFlowLevel(minutes);
     if (level === 'none') return 'text-[#B9C5D8]';
