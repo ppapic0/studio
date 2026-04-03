@@ -120,87 +120,19 @@ function RankPreviewTimeBadge({
   );
 }
 
-function formatMaskedStudentName(name?: string | null) {
+function formatRankStudentName(name?: string | null) {
   const source = typeof name === "string" ? name.trim() : "";
-  if (!source) return "학생";
-
-  const chars = Array.from(source);
-  if (chars.length <= 1) return chars[0];
-  if (chars.length === 2) return `${chars[0]}*`;
-
-  const middleIndex = Math.floor(chars.length / 2);
-  return chars.map((char, index) => (index === middleIndex ? "*" : char)).join("");
-}
-
-function formatSchoolLabel(schoolName?: string | null) {
-  const source = typeof schoolName === "string" ? schoolName.trim() : "";
-  return source || "학교 미지정";
+  return source || "학생";
 }
 
 function getRankRangeLabel(range: RankRange) {
   return range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간";
 }
 
-function getRankEntryProgressPercent(entry: StudentHomeRankPreviewEntry, leaderSeconds: number) {
-  if (leaderSeconds <= 0) return entry.rank === 1 ? 100 : 18;
-  const ratio = getRankPreviewSeconds(entry) / leaderSeconds;
-  return Math.max(entry.rank === 1 ? 100 : 18, Math.min(100, ratio * 100));
-}
-
-function getBattleProgressPercent({
-  currentSeconds,
-  leaderSeconds,
-  isRanked,
-  isLoading,
-}: {
-  currentSeconds: number;
-  leaderSeconds: number;
-  isRanked: boolean;
-  isLoading: boolean;
-}) {
-  if (isLoading) return 68;
-  if (leaderSeconds <= 0) return isRanked ? 100 : currentSeconds > 0 ? 28 : 10;
-  const ratio = currentSeconds / leaderSeconds;
-  return Math.max(isRanked ? 12 : 18, Math.min(100, ratio * 100));
-}
-
-function getBattleGapLabel({
-  currentSeconds,
-  leaderSeconds,
-  isLoading,
-}: {
-  currentSeconds: number;
-  leaderSeconds: number;
-  isLoading: boolean;
-}) {
-  if (isLoading) return "배틀 매칭 중";
-  if (leaderSeconds <= 0) {
-    return currentSeconds > 0 ? `${formatRankPreviewSeconds(currentSeconds)} 누적` : "첫 기록 대기";
-  }
-  if (currentSeconds >= leaderSeconds) return "현재 선두권";
-  return `선두까지 ${formatRankPreviewSeconds(leaderSeconds - currentSeconds)}`;
-}
-
-function getBattleStatusLabel(rankState: StudentHomeRankState, range: RankRange) {
-  const rangeLabel = getRankRangeLabel(range);
-  if (rankState.isLoading) return `${rangeLabel} 집계 중`;
-  if (rankState.rank <= 0) return `${rangeLabel} 배틀 입장`;
-  if (rankState.rank === 1) return "챔피언 방어 중";
-  if (rankState.rank <= 3) return "포디움 경쟁 중";
-  if (rankState.rank <= 10) return "TOP 10 추격 중";
-  return "상위권 추격 중";
-}
-
-function getRankStageLabel(rank: number) {
-  if (rank === 1) return "CHAMPION";
-  if (rank === 2) return "RIVAL 02";
-  return "RIVAL 03";
-}
-
-function getRankStageKicker(rank: number) {
-  if (rank === 1) return "Boss lane";
-  if (rank === 2) return "Hot seat";
-  return "Catch up";
+function getRankEntryStatusLabel(entry: StudentHomeRankPreviewEntry) {
+  if (entry.isLive) return "공부중";
+  if (getRankPreviewSeconds(entry) > 0) return "휴식중";
+  return "대기중";
 }
 
 function RewardCountUp({ value }: { value: number }) {
@@ -635,31 +567,18 @@ export function StudentHomeGamePanel({
   });
   const hasMoreReadyBoxes = boxes.filter((box) => box.state === "ready").length > 1;
   const rankPreview = selectedHomeRank.preview.slice(0, 3);
-  const featuredRankEntry = rankPreview[0] ?? null;
-  const secondaryRankEntries = rankPreview.slice(1, 3);
-  const rankDisplayLabel = selectedHomeRank.isLoading
-    ? "집계 중..."
-    : selectedHomeRank.rank > 0
-      ? `${selectedHomeRank.rank}위`
-      : "집계 준비중";
-  const rankDescription = selectedHomeRank.description || "공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.";
   const rankLiveBadge = selectedHomeRank.isLive ? selectedHomeRank.liveBadge || "LIVE" : null;
   const selectedRangeLabel = getRankRangeLabel(selectedRankRange);
-  const leaderSeconds = featuredRankEntry ? getRankPreviewSeconds(featuredRankEntry) : 0;
-  const myBattleSeconds = Math.max(0, Math.round((selectedHomeRank.minutes || 0) * 60));
-  const battleProgress = getBattleProgressPercent({
-    currentSeconds: myBattleSeconds,
-    leaderSeconds,
-    isRanked: selectedHomeRank.rank > 0,
-    isLoading: selectedHomeRank.isLoading,
-  });
-  const battleGapLabel = getBattleGapLabel({
-    currentSeconds: myBattleSeconds,
-    leaderSeconds,
-    isLoading: selectedHomeRank.isLoading,
-  });
-  const battleStatusLabel = getBattleStatusLabel(selectedHomeRank, selectedRankRange);
-  const battleXpLabel = myBattleSeconds > 0 ? formatRankPreviewSeconds(myBattleSeconds) : "0m 00s";
+  const rankSummaryTitle = selectedHomeRank.isLoading
+    ? `${selectedRangeLabel} 랭킹 집계 중`
+    : rankPreview.length > 0
+      ? `${selectedRangeLabel} 상위 3명`
+      : `${selectedRangeLabel} 랭킹 대기`;
+  const rankSummaryDescription = selectedHomeRank.isLoading
+    ? "지금 순위를 불러오고 있어요."
+    : rankPreview.length > 0
+      ? "1등부터 3등까지만 간단하게 보여줘요."
+      : "공부를 시작하면 여기에 순위가 표시돼요.";
 
   return (
     <>
@@ -951,87 +870,25 @@ export function StudentHomeGamePanel({
                         <Swords className="h-3.5 w-3.5 text-[#FFB347]" />
                         Arena Rank
                       </div>
-                      <div className="inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-white/78 px-2.5 py-1.5 text-[10px] font-black text-[rgba(20,41,95,0.78)] shadow-[0_10px_22px_-18px_rgba(20,41,95,0.16)]">
-                        {selectedRangeLabel} 시즌
-                      </div>
                       {rankLiveBadge ? (
                         <div className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,122,22,0.28)] bg-[rgba(255,122,22,0.12)] px-2.5 py-1.5 text-[10px] font-black text-[#B95A0B] shadow-[0_10px_22px_-18px_rgba(255,122,22,0.32)]">
                           <span className="h-2 w-2 rounded-full bg-[#FF7A16] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
                           {rankLiveBadge}
                         </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(20,41,95,0.08)] bg-[rgba(255,249,240,0.92)] px-2.5 py-1.5 text-[10px] font-black text-[rgba(20,41,95,0.78)] shadow-[0_10px_22px_-18px_rgba(20,41,95,0.16)]">
-                          <Sparkles className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
-                          Reward On
-                        </div>
-                      )}
+                      ) : null}
                     </div>
-
-                    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                      <div className="min-w-0">
-                        <div
-                          className={cn(
-                            "font-aggro-display text-[#14295F]",
-                            selectedHomeRank.rank > 0
-                              ? "text-[2.9rem] font-black leading-[0.84] tracking-[-0.06em]"
-                              : "text-[1.62rem] font-black leading-[1.02] tracking-[-0.03em]",
-                          )}
-                        >
-                          {rankDisplayLabel}
-                        </div>
-                        <div className="mt-2 inline-flex max-w-full rounded-full border border-[rgba(242,208,164,0.84)] bg-white/82 px-3 py-1.5 text-[11px] font-black leading-4 text-[rgba(20,41,95,0.82)] shadow-[0_12px_24px_-18px_rgba(17,39,88,0.16)]">
-                          {selectedHomeRank.caption}
-                        </div>
-                        <div className="mt-2 max-w-[15rem] text-[11px] font-semibold leading-5 text-[rgba(20,41,95,0.66)]">
-                          {rankDescription}
-                        </div>
+                    <div className="mt-3">
+                      <div className="font-aggro-display text-[1.32rem] font-black tracking-tight text-[#14295F]">
+                        {rankSummaryTitle}
                       </div>
-
-                      <div className="shrink-0 rounded-[1.15rem] border border-[rgba(20,41,95,0.1)] bg-[linear-gradient(135deg,#14295F_0%,#214B94_100%)] px-3 py-3 text-white shadow-[0_18px_28px_-22px_rgba(20,41,95,0.48)]">
-                        <div className="text-[9px] font-black uppercase tracking-[0.22em] text-white/64">battle xp</div>
-                        <div className="mt-1 text-[1.05rem] font-black leading-none">{battleXpLabel}</div>
-                        <div className="mt-1 text-[10px] font-semibold text-white/74">
-                          {rankLiveBadge ? "실시간 반영중" : "누적 시간"}
-                        </div>
+                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[rgba(20,41,95,0.66)]">
+                        {rankSummaryDescription}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[rgba(20,41,95,0.1)] bg-white/78 shadow-[0_16px_30px_-22px_rgba(17,39,88,0.22)]">
                     <ChevronRight className="h-4 w-4 text-[rgba(20,41,95,0.58)]" />
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-[1.32rem] border border-[rgba(20,41,95,0.12)] bg-[linear-gradient(135deg,rgba(20,41,95,0.98),rgba(31,73,145,0.94))] p-3.5 text-white shadow-[0_20px_36px_-26px_rgba(20,41,95,0.56)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/68">
-                      <Target className="h-3.5 w-3.5 text-[#FFB347]" />
-                      Battle Status
-                    </div>
-                    <div className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-black text-white">
-                      {battleStatusLabel}
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-end justify-between gap-3">
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">
-                        Next objective
-                      </div>
-                      <div className="mt-1 text-[1.02rem] font-black tracking-tight text-white">{battleGapLabel}</div>
-                    </div>
-                    <div className="rounded-full border border-[rgba(255,177,76,0.28)] bg-[rgba(255,177,76,0.14)] px-3 py-1.5 text-[10px] font-black text-[#FFE3B6]">
-                      {selectedHomeRank.badge}
-                    </div>
-                  </div>
-                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/12">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,#FFD37F_0%,#FF9B33_56%,#FF6B00_100%)] shadow-[0_10px_18px_-14px_rgba(255,138,31,0.84)]"
-                      style={{ width: `${battleProgress}%` }}
-                    />
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-[10px] font-black text-white/70">
-                    <span>{selectedRangeLabel} 배틀 진행도</span>
-                    <span>{Math.round(battleProgress)}%</span>
                   </div>
                 </div>
 
@@ -1058,125 +915,69 @@ export function StudentHomeGamePanel({
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(20,41,95,0.08)] bg-white/82 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[rgba(20,41,95,0.74)] shadow-[0_12px_24px_-18px_rgba(17,39,88,0.16)]">
-                      <Crown className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
-                      Top 3 Arena
-                    </div>
-                    <div className="text-[10px] font-black text-[rgba(20,41,95,0.58)]">보상 랭킹 미리보기</div>
-                  </div>
-
+                <div className="mt-4 space-y-2.5">
                   {rankPreview.length > 0 ? (
-                    <>
-                      {featuredRankEntry ? (
-                        <div
-                          className="relative overflow-hidden rounded-[1.42rem] border border-[rgba(20,41,95,0.12)] bg-[linear-gradient(135deg,#132A63_0%,#173B86_58%,#FF8A1F_148%)] px-4 py-4 text-white shadow-[0_24px_44px_-28px_rgba(20,41,95,0.42)]"
-                          style={{ animation: "leaderboard-card-breathe 4.8s ease-in-out infinite" }}
-                        >
-                          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,transparent,rgba(255,211,127,0.92),transparent)]" />
-                          <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-white/10 blur-3xl" />
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div
-                                className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-white"
-                                style={{ animation: "leaderboard-crown-float 2.8s ease-in-out infinite" }}
-                              >
-                                <Crown className="h-3.5 w-3.5 text-[#FFD37F]" />
-                                {getRankStageLabel(featuredRankEntry.rank)}
-                              </div>
-                              <div className="font-aggro-display mt-3 truncate text-[1.46rem] font-black tracking-[-0.04em] text-white">
-                                {formatMaskedStudentName(featuredRankEntry.name)}
-                              </div>
-                              <div className="mt-1 truncate text-[11px] font-semibold text-white/72">
-                                {formatSchoolLabel(featuredRankEntry.schoolName)}
-                              </div>
-                            </div>
-                            <RankPreviewTimeBadge
-                              entry={featuredRankEntry}
-                              className="shrink-0 rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[10px] font-black text-[#FFE3B6] shadow-[0_12px_24px_-18px_rgba(0,0,0,0.24)]"
-                            />
-                          </div>
-                          <div className="mt-4 flex items-center justify-between gap-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">
-                              {getRankStageKicker(featuredRankEntry.rank)}
-                            </div>
-                            <div className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-[10px] font-black text-[#FFE3B6]">
-                              1위 보스
-                            </div>
-                          </div>
-                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                            <div className="h-full w-full rounded-full bg-[linear-gradient(90deg,#FFD37F_0%,#FF9B33_56%,#FF6B00_100%)]" />
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {secondaryRankEntries.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2.5">
-                          {secondaryRankEntries.map((entry) => (
-                            <div
-                              key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
-                              className="rounded-[1.22rem] border border-[rgba(229,216,200,0.96)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,249,241,0.9))] px-3 py-3.5 shadow-[0_16px_28px_-24px_rgba(20,41,95,0.14)]"
-                              style={{
-                                animation: entry.isLive
-                                  ? `leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both, leaderboard-card-breathe 4.2s ease-in-out ${entry.rank * 0.14}s infinite`
-                                  : "leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both",
-                                animationDelay: `${entry.rank * 90}ms`
-                              }}
+                    rankPreview.map((entry) => (
+                      <div
+                        key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
+                        className={cn(
+                          "rounded-[1.18rem] border px-3.5 py-3 shadow-[0_14px_26px_-22px_rgba(17,39,88,0.14)]",
+                          entry.rank === 1
+                            ? "border-[rgba(20,41,95,0.1)] bg-[linear-gradient(135deg,#14295F_0%,#214B94_100%)] text-white"
+                            : "border-[rgba(20,41,95,0.08)] bg-white/88 text-[#14295F]"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex items-center gap-2.5">
+                            <span
+                              className={cn(
+                                "inline-flex min-w-[3rem] items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-black",
+                                entry.rank === 1
+                                  ? "bg-white/14 text-[#FFE3B6]"
+                                  : "bg-[rgba(20,41,95,0.06)] text-[rgba(20,41,95,0.74)]"
+                              )}
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(20,41,95,0.08)] bg-[rgba(20,41,95,0.05)] px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[rgba(20,41,95,0.68)]">
-                                  {entry.rank === 2 ? (
-                                    <Flame className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
-                                  ) : (
-                                    <Target className="h-3.5 w-3.5 text-[#254F9C]" />
-                                  )}
-                                  {getRankStageLabel(entry.rank)}
-                                </div>
-                                <span className="text-[10px] font-black text-[rgba(20,41,95,0.48)]">#{entry.rank}</span>
+                              {entry.rank}등
+                            </span>
+                            <div className="min-w-0">
+                              <div className={cn(
+                                "truncate text-[14px] font-black tracking-tight",
+                                entry.rank === 1 ? "text-white" : "text-[#14295F]"
+                              )}>
+                                {formatRankStudentName(entry.name)}
                               </div>
-                              <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#14295F]">
-                                {formatMaskedStudentName(entry.name)}
-                              </div>
-                              <div className="mt-1 min-h-[1.15rem] truncate text-[10px] font-bold leading-4 text-[rgba(20,41,95,0.62)]">
-                                {formatSchoolLabel(entry.schoolName)}
-                              </div>
-                              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(20,41,95,0.08)]">
-                                <div
-                                  className={cn(
-                                    "h-full rounded-full",
-                                    entry.rank === 2
-                                      ? "bg-[linear-gradient(90deg,#FFB347_0%,#FF7A16_100%)]"
-                                      : "bg-[linear-gradient(90deg,#254F9C_0%,#5D8AE3_100%)]",
-                                  )}
-                                  style={{ width: `${getRankEntryProgressPercent(entry, leaderSeconds)}%` }}
-                                />
-                              </div>
-                              <div className="mt-2 flex items-center justify-between gap-2">
-                                <span className="text-[10px] font-black text-[rgba(20,41,95,0.56)]">
-                                  {getRankStageKicker(entry.rank)}
-                                </span>
-                                <RankPreviewTimeBadge
-                                  entry={entry}
-                                  compact
-                                  className="inline-flex rounded-full border border-[rgba(20,41,95,0.08)] bg-[rgba(255,251,246,0.96)] px-2.5 py-1 text-[10px] font-black text-[#C86A10]"
-                                />
+                              <div className={cn(
+                                "mt-0.5 text-[11px] font-bold",
+                                entry.rank === 1
+                                  ? entry.isLive
+                                    ? "text-[#FFE3B6]"
+                                    : "text-white/72"
+                                  : entry.isLive
+                                    ? "text-[#D56F10]"
+                                    : "text-[rgba(20,41,95,0.56)]"
+                              )}>
+                                {getRankEntryStatusLabel(entry)}
                               </div>
                             </div>
-                          ))}
+                          </div>
+                          <RankPreviewTimeBadge
+                            entry={entry}
+                            compact
+                            className={cn(
+                              "shrink-0 rounded-full border px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_20px_-18px_rgba(17,39,88,0.18)]",
+                              entry.rank === 1
+                                ? "border-white/12 bg-white/10 text-[#FFE3B6]"
+                                : "border-[rgba(20,41,95,0.08)] bg-[rgba(255,249,240,0.92)] text-[#B95A0B]"
+                            )}
+                          />
                         </div>
-                      ) : null}
-                    </>
+                      </div>
+                    ))
                   ) : (
-                    <div className="rounded-[1.32rem] border border-dashed border-[rgba(20,41,95,0.14)] bg-[linear-gradient(180deg,rgba(255,255,255,0.86),rgba(255,248,236,0.68))] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(240,202,151,0.74)] bg-white/84 text-[var(--accent-orange)] shadow-[0_14px_24px_-20px_rgba(17,39,88,0.16)]">
-                        <Crown className="h-4.5 w-4.5" />
-                      </div>
-                      <div className="font-aggro-display mt-3 text-[1rem] font-black tracking-[-0.03em] text-[#14295F]">
-                        아직 표시할 랭킹이 없어요.
-                      </div>
+                    <div className="rounded-[1.2rem] border border-dashed border-[rgba(20,41,95,0.14)] bg-white/76 px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <div className="text-sm font-black text-[#14295F]">아직 표시할 랭킹이 없어요.</div>
                       <div className="mt-1 text-[11px] font-semibold leading-5 text-[rgba(20,41,95,0.64)]">
-                        오늘 공부를 시작하면 여기에 경쟁 순위가 바로 보입니다.
+                        공부를 시작하면 상위 3명이 여기 표시됩니다.
                       </div>
                     </div>
                   )}
@@ -1210,74 +1011,24 @@ export function StudentHomeGamePanel({
                         <Swords className="h-3.5 w-3.5 text-[#FFB347]" />
                         Arena Rank
                       </div>
-                      <div className="inline-flex rounded-full border border-[rgba(255,255,255,0.38)] bg-[rgba(255,248,236,0.56)] px-2.5 py-1 text-[10px] font-black text-[rgba(14,28,56,0.72)] shadow-[0_10px_24px_-18px_rgba(14,28,56,0.28)]">
-                        {selectedRangeLabel} 시즌
-                      </div>
                       {rankLiveBadge ? (
                         <div className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,122,22,0.22)] bg-[rgba(255,122,22,0.12)] px-2.5 py-1 text-[10px] font-black text-[rgba(168,88,17,0.92)] shadow-[0_10px_24px_-18px_rgba(255,122,22,0.28)]">
                           <span className="h-2 w-2 rounded-full bg-[#FF7A16] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
                           {rankLiveBadge}
                         </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.38)] bg-[rgba(255,248,236,0.56)] px-2.5 py-1 text-[10px] font-black text-[rgba(14,28,56,0.72)] shadow-[0_10px_24px_-18px_rgba(14,28,56,0.28)]">
-                          <Sparkles className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
-                          Reward On
-                        </div>
-                      )}
+                      ) : null}
                     </div>
-                    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                      <div className="min-w-0">
-                        <div className="font-aggro-display text-[1.62rem] font-black tracking-tight text-[#14295F]">
-                          {rankDisplayLabel}
-                        </div>
-                        <div className="mt-2 inline-flex rounded-full border border-[rgba(255,255,255,0.34)] bg-[rgba(255,255,255,0.22)] px-3 py-1 text-[11px] font-black text-[rgba(14,28,56,0.84)] shadow-[0_12px_28px_-20px_rgba(14,28,56,0.35)]">
-                          {selectedHomeRank.caption}
-                        </div>
-                        <div className="mt-2 text-[11px] font-semibold text-[rgba(14,28,56,0.68)]">
-                          {rankDescription}
-                        </div>
+                    <div className="mt-3">
+                      <div className="font-aggro-display text-[1.32rem] font-black tracking-tight text-[#14295F]">
+                        {rankSummaryTitle}
                       </div>
-                      <div className="shrink-0 rounded-[1.12rem] border border-[rgba(14,28,56,0.12)] bg-[linear-gradient(135deg,rgba(14,28,56,0.96),rgba(27,59,128,0.92))] px-3 py-3 text-white shadow-[0_16px_28px_-18px_rgba(14,28,56,0.52)]">
-                        <div className="text-[9px] font-black uppercase tracking-[0.22em] text-white/64">battle xp</div>
-                        <div className="mt-1 text-[1rem] font-black leading-none">{battleXpLabel}</div>
-                        <div className="mt-1 text-[10px] font-semibold text-white/74">
-                          {rankLiveBadge ? "실시간 반영중" : "누적 시간"}
-                        </div>
+                      <div className="mt-1 text-[11px] font-semibold text-[rgba(14,28,56,0.68)]">
+                        {rankSummaryDescription}
                       </div>
                     </div>
                   </div>
                   <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.2)] shadow-[0_14px_28px_-20px_rgba(14,28,56,0.28)]">
                     <ChevronRight className="h-4 w-4 text-[rgba(14,28,56,0.62)]" />
-                  </div>
-                </div>
-                <div className="mt-4 rounded-[1.18rem] border border-[rgba(255,255,255,0.2)] bg-[linear-gradient(135deg,rgba(14,28,56,0.98),rgba(27,59,128,0.92))] p-3.5 text-white shadow-[0_18px_30px_-22px_rgba(14,28,56,0.56)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/66">
-                      <Target className="h-3.5 w-3.5 text-[#FFB347]" />
-                      Battle Status
-                    </div>
-                    <div className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-[10px] font-black text-white">
-                      {battleStatusLabel}
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-end justify-between gap-3">
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">Next objective</div>
-                      <div className="mt-1 text-[1rem] font-black tracking-tight text-white">{battleGapLabel}</div>
-                    </div>
-                    <div className="rounded-full border border-[rgba(255,177,76,0.24)] bg-[rgba(255,177,76,0.14)] px-3 py-1 text-[10px] font-black text-[#FFE3B6]">
-                      {selectedHomeRank.badge}
-                    </div>
-                  </div>
-                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/12">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,#FFD37F_0%,#FF9B33_56%,#FF6B00_100%)] shadow-[0_10px_18px_-14px_rgba(255,138,31,0.84)]"
-                      style={{ width: `${battleProgress}%` }}
-                    />
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-[10px] font-black text-white/72">
-                    <span>{selectedRangeLabel} 배틀 진행도</span>
-                    <span>{Math.round(battleProgress)}%</span>
                   </div>
                 </div>
                 <div className="relative mt-4 rounded-[1.1rem] border border-[rgba(255,255,255,0.24)] bg-[rgba(255,255,255,0.14)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
@@ -1302,129 +1053,71 @@ export function StudentHomeGamePanel({
                     ))}
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.32)] bg-[rgba(255,248,236,0.42)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[rgba(14,28,56,0.74)]">
-                      <Crown className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
-                      Top 3 Arena
-                    </div>
-                    <div className="text-[10px] font-black text-[rgba(14,28,56,0.56)]">보상 랭킹 미리보기</div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    {rankPreview.length > 0 ? (
-                      rankPreview.map((entry) => (
-                        <div
-                          key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
-                          className={cn(
-                            "rounded-[1.2rem] border px-2.5 py-3.5 shadow-[0_18px_34px_-28px_rgba(0,0,0,0.42)]",
-                            entry.rank === 1
-                              ? "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(135deg,#132A63_0%,#173B86_58%,#FF8A1F_148%)] text-white"
-                              : "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(180deg,rgba(255,249,240,0.88),rgba(255,255,255,0.72))]",
-                          )}
-                          style={{
-                            animation: entry.isLive
-                              ? `leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both, leaderboard-card-breathe 4.4s ease-in-out ${entry.rank * 0.12}s infinite`
-                              : "leaderboard-ticker-rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both",
-                            animationDelay: `${entry.rank * 90}ms`
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div
+                <div className="mt-4 space-y-2.5">
+                  {rankPreview.length > 0 ? (
+                    rankPreview.map((entry) => (
+                      <div
+                        key={`${selectedRankRange}-${entry.rank}-${entry.name}`}
+                        className={cn(
+                          "rounded-[1.18rem] border px-3.5 py-3 shadow-[0_14px_26px_-22px_rgba(17,39,88,0.14)]",
+                          entry.rank === 1
+                            ? "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(135deg,#132A63_0%,#173B86_58%,#FF8A1F_148%)] text-white"
+                            : "border-[rgba(14,28,56,0.12)] bg-[linear-gradient(180deg,rgba(255,249,240,0.88),rgba(255,255,255,0.72))] text-[#14295F]"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex items-center gap-2.5">
+                            <span
                               className={cn(
-                                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.16em]",
+                                "inline-flex min-w-[3rem] items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-black",
                                 entry.rank === 1
-                                  ? "border-white/12 bg-white/10 text-white"
-                                  : "border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.52)] text-[#14295F]",
+                                  ? "bg-white/12 text-[#FFE3B6]"
+                                  : "bg-[rgba(14,28,56,0.06)] text-[rgba(14,28,56,0.74)]"
                               )}
                             >
-                              {entry.rank === 1 ? (
-                                <Crown className="h-3.5 w-3.5 text-[#FFD37F]" />
-                              ) : entry.rank === 2 ? (
-                                <Flame className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
-                              ) : (
-                                <Target className="h-3.5 w-3.5 text-[#254F9C]" />
-                              )}
-                              {getRankStageLabel(entry.rank)}
+                              {entry.rank}등
+                            </span>
+                            <div className="min-w-0">
+                              <div className={cn(
+                                "truncate text-[14px] font-black tracking-tight",
+                                entry.rank === 1 ? "text-white" : "text-[#14295F]"
+                              )}>
+                                {formatRankStudentName(entry.name)}
+                              </div>
+                              <div className={cn(
+                                "mt-0.5 text-[11px] font-bold",
+                                entry.rank === 1
+                                  ? entry.isLive
+                                    ? "text-[#FFE3B6]"
+                                    : "text-white/72"
+                                  : entry.isLive
+                                    ? "text-[#D56F10]"
+                                    : "text-[rgba(14,28,56,0.56)]"
+                              )}>
+                                {getRankEntryStatusLabel(entry)}
+                              </div>
                             </div>
-                            <span
-                              className={cn(
-                                "text-[10px] font-black",
-                                entry.rank === 1 ? "text-white/72" : "text-[rgba(20,41,95,0.48)]",
-                              )}
-                            >
-                              #{entry.rank}
-                            </span>
                           </div>
-                          <div
+                          <RankPreviewTimeBadge
+                            entry={entry}
                             className={cn(
-                              "mt-3 break-keep text-[14px] font-black tracking-tight",
-                              entry.rank === 1 ? "text-white" : "text-[rgba(20,41,95,0.96)]",
+                              "shrink-0 rounded-full border px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]",
+                              entry.rank === 1
+                                ? "border-white/12 bg-white/10 text-[#FFE3B6]"
+                                : "border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] text-[var(--accent-orange)]"
                             )}
-                          >
-                            {formatMaskedStudentName(entry.name)}
-                          </div>
-                          <div
-                            className={cn(
-                              "mt-1 min-h-[1.1rem] truncate text-[10px] font-bold leading-4 tracking-[0.02em]",
-                              entry.rank === 1 ? "text-white/72" : "text-[rgba(20,41,95,0.82)]",
-                            )}
-                          >
-                            {formatSchoolLabel(entry.schoolName)}
-                          </div>
-                          <div
-                            className={cn(
-                              "mt-3 h-2 overflow-hidden rounded-full",
-                              entry.rank === 1 ? "bg-white/12" : "bg-[rgba(14,28,56,0.08)]",
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                "h-full rounded-full",
-                                entry.rank === 1
-                                  ? "bg-[linear-gradient(90deg,#FFD37F_0%,#FF9B33_56%,#FF6B00_100%)]"
-                                  : entry.rank === 2
-                                    ? "bg-[linear-gradient(90deg,#FFB347_0%,#FF7A16_100%)]"
-                                    : "bg-[linear-gradient(90deg,#254F9C_0%,#5D8AE3_100%)]",
-                              )}
-                              style={{ width: `${getRankEntryProgressPercent(entry, leaderSeconds)}%` }}
-                            />
-                          </div>
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <span
-                              className={cn(
-                                "text-[10px] font-black",
-                                entry.rank === 1 ? "text-white/72" : "text-[rgba(20,41,95,0.56)]",
-                              )}
-                            >
-                              {getRankStageKicker(entry.rank)}
-                            </span>
-                            <RankPreviewTimeBadge
-                              entry={entry}
-                              compact
-                              className={cn(
-                                "inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black shadow-[0_10px_24px_-20px_rgba(14,28,56,0.28)]",
-                                entry.rank === 1
-                                  ? "border-white/12 bg-white/10 text-[#FFE3B6]"
-                                  : "border-[rgba(14,28,56,0.08)] bg-[rgba(255,255,255,0.74)] text-[var(--accent-orange)]",
-                              )}
-                            />
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="col-span-3 rounded-[1.25rem] border border-dashed border-[rgba(14,28,56,0.18)] bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,248,236,0.18))] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]">
-                        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(14,28,56,0.14)] bg-[rgba(255,255,255,0.36)] text-[var(--accent-orange)] shadow-[0_14px_26px_-22px_rgba(14,28,56,0.3)]">
-                          <Crown className="h-4.5 w-4.5" />
-                        </div>
-                        <div className="mt-3 text-sm font-black text-[rgba(14,28,56,0.88)]">
-                          아직 표시할 랭킹이 없어요.
-                        </div>
-                        <div className="mt-1 text-[11px] font-semibold leading-5 text-[rgba(14,28,56,0.66)]">
-                          오늘 공부를 시작하면 여기에 경쟁 순위가 바로 보입니다.
+                          />
                         </div>
                       </div>
-                    )}
-                  </div>
+                    ))
+                  ) : (
+                    <div className="rounded-[1.2rem] border border-dashed border-[rgba(14,28,56,0.18)] bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,248,236,0.18))] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]">
+                      <div className="text-sm font-black text-[rgba(14,28,56,0.88)]">아직 표시할 랭킹이 없어요.</div>
+                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[rgba(14,28,56,0.66)]">
+                        공부를 시작하면 상위 3명이 여기 표시됩니다.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
