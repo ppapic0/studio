@@ -1326,6 +1326,26 @@ select {
     color: #14295f;
   }
 
+  .student-analysis-shell .surface-card.on-dark :is(
+    [data-slot="card-title"],
+    [data-slot="card-description"],
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    span
+  ):not(.analysis-warm-badge):not(.analysis-soft-badge):not(.analysis-subchip) {
+    color: #14295f !important;
+  }
+
+  .student-analysis-shell .surface-card.on-dark .text-\[var\(--text-on-dark-soft\)\],
+  .student-analysis-shell .surface-card.on-dark .text-\[var\(--text-on-dark-muted\)\] {
+    color: #365183 !important;
+  }
+
   .student-analysis-shell [class~="text-white"],
   .student-analysis-shell [class^="text-white"],
   .student-analysis-shell [class*=" text-white"] {
