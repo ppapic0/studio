@@ -236,7 +236,7 @@ function AnalyticsPreviewCard({
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F3F7FF] text-[#14295F]">
             <Icon className="h-3.5 w-3.5" />
           </span>
-          <p className={`break-keep font-black text-[#14295F] ${compact ? 'text-[0.78rem] leading-[1.3]' : 'text-[0.92rem] leading-[1.35]'}`}>{title}</p>
+          <p className={`font-aggro-display break-keep font-black tracking-[-0.03em] text-[#14295F] ${compact ? 'text-[0.78rem] leading-[1.3]' : 'text-[0.92rem] leading-[1.35]'}`}>{title}</p>
         </div>
         <span className={`inline-flex rounded-full border px-2 py-0.5 font-black ${compact ? 'text-[9px]' : 'text-[9.5px]'} ${
           badge.includes('상승') ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
@@ -378,7 +378,7 @@ function renderPrimaryPanel(
         </div>
 
         <div className="space-y-3 text-center">
-          <h3 className="break-keep text-[2rem] font-black leading-[1.08] tracking-[-0.04em] text-white">
+          <h3 className="font-aggro-display break-keep text-[2rem] font-black leading-[1.08] tracking-[-0.04em] text-white">
             {section.title}
           </h3>
         </div>
@@ -413,7 +413,7 @@ function renderSecondaryPanel(
             <span className="inline-flex rounded-full bg-[#14295F] px-3 py-1 text-[10px] font-black tracking-[0.18em] text-white">
               SECTION 02
             </span>
-            <h3 className="break-keep text-[1.7rem] font-black leading-[1.12] text-[#14295F]">
+            <h3 className="font-aggro-display break-keep text-[1.7rem] font-black leading-[1.12] tracking-[-0.03em] text-[#14295F]">
               {section.title}
             </h3>
           </div>
@@ -477,7 +477,7 @@ function renderPanel(
             <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black tracking-[0.18em] ${tone.badge}`}>
               SECTION {String(index + 1).padStart(2, '0')}
             </span>
-            <h3 className="break-keep text-[1.7rem] font-black leading-[1.08] text-white">
+            <h3 className="font-aggro-display break-keep text-[1.7rem] font-black leading-[1.08] tracking-[-0.03em] text-white">
               {section.title}
             </h3>
           </div>
@@ -514,7 +514,7 @@ function renderPanel(
                 <span className="inline-flex rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-white/68">
                   APP PREVIEW
                 </span>
-                <p className="break-keep text-[1.35rem] font-black leading-[1.2] text-white">실제 앱 화면 예정</p>
+                <p className="font-aggro-display break-keep text-[1.35rem] font-black leading-[1.2] tracking-[-0.03em] text-white">실제 앱 화면 예정</p>
                 <p className="break-keep text-[0.88rem] font-semibold leading-[1.7] text-white/60">
                   포인트와 상벌점 운영이 어떻게 보이는지
                   <br />

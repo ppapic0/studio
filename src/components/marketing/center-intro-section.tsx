@@ -32,7 +32,7 @@ export function CenterIntroSection() {
                 </span>
                 <div>
                   <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/50">CENTER POINT</p>
-                  <p className="mt-1 break-keep text-[0.98rem] font-black leading-[1.34] text-[#14295F]">{title}</p>
+                  <p className="font-aggro-display mt-1 break-keep text-[0.98rem] font-black leading-[1.34] tracking-[-0.03em] text-[#14295F]">{title}</p>
                 </div>
               </div>
               <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.7] text-[#53687F]">{detail}</p>

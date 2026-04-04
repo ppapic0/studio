@@ -19,7 +19,7 @@ export function MockExamProgramSection({ mockExamProgram }: MockExamProgramSecti
     <section className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-white shadow-[0_22px_52px_rgba(20,41,95,0.08)]">
       <div className="px-6 py-7 sm:px-8 sm:py-8">
         <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">SECTION 03</p>
-        <h2 className="mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] text-[#14295F]">
+        <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] tracking-[-0.03em] text-[#14295F]">
           {mockExamProgram.title}
         </h2>
 
@@ -27,7 +27,7 @@ export function MockExamProgramSection({ mockExamProgram }: MockExamProgramSecti
           <div className="relative flex min-h-[9.5rem] items-center justify-center px-6 py-6">
             <div className="absolute inset-x-0 top-1/2 h-10 -translate-y-1/2 bg-[#E8DCCB]/72" />
             <div className="relative flex h-36 w-36 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_30%,#FFE6CA_0%,#F4C896_100%)] px-6 text-center shadow-[0_18px_40px_rgba(201,150,92,0.28)]">
-              <p className="whitespace-pre-line break-keep text-[0.98rem] font-black leading-[1.35] text-[#14295F]">
+              <p className="font-aggro-display whitespace-pre-line break-keep text-[0.98rem] font-black leading-[1.35] tracking-[-0.03em] text-[#14295F]">
                 {mockExamProgram.spotlight}
               </p>
             </div>
@@ -48,7 +48,7 @@ export function MockExamProgramSection({ mockExamProgram }: MockExamProgramSecti
                     <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">
                       PROGRAM {String(index + 1).padStart(2, '0')}
                     </p>
-                    <h3 className="mt-3 break-keep text-[1rem] font-black leading-[1.34] text-[#14295F]">
+                    <h3 className="font-aggro-display mt-3 break-keep text-[1rem] font-black leading-[1.34] tracking-[-0.03em] text-[#14295F]">
                       {program.title}
                     </h3>
                   </div>
