@@ -3800,7 +3800,7 @@ export default function StudyPlanPage() {
         onSetTodayAbsent={handleSetTodayAbsent}
         onResetToday={() => void handleResetTodaySchedule()}
         hasSelectedWeekdayTemplate={hasSelectedWeekdayTemplate}
-        selectedWeekdayLabel={matchingWeekdayLabel}
+        selectedDateWeekdayLabel={matchingWeekdayLabel}
         onApplySelectedWeekdayTemplateToToday={handleApplySelectedWeekdayTemplateToToday}
         selectedWeekdays={selectedRecurringWeekdays}
         onToggleWeekday={handleToggleRecurringWeekday}

@@ -67,7 +67,7 @@ type AttendanceScheduleSheetProps = {
   onSetTodayAbsent: () => void;
   onResetToday: () => void;
   hasSelectedWeekdayTemplate: boolean;
-  selectedWeekdayLabel: string;
+  selectedDateWeekdayLabel: string;
   onApplySelectedWeekdayTemplateToToday: () => void;
   selectedWeekdays: number[];
   onToggleWeekday: (weekday: number) => void;
@@ -296,7 +296,7 @@ export function AttendanceScheduleSheet({
   onSetTodayAbsent,
   onResetToday,
   hasSelectedWeekdayTemplate,
-  selectedWeekdayLabel,
+  selectedDateWeekdayLabel,
   onApplySelectedWeekdayTemplateToToday,
   selectedWeekdays,
   onToggleWeekday,
@@ -345,6 +345,7 @@ export function AttendanceScheduleSheet({
       .map((option) => option.label)
       .join(', ');
   };
+  const selectedWeekdaysLabel = formatWeekdaySummary(selectedWeekdays);
 
   const hasUnsavedChanges =
     open &&
@@ -567,7 +568,7 @@ export function AttendanceScheduleSheet({
                     {selectedDayMeta?.hasSchedule
                       ? '기본 일정 대신 이 날짜에만 별도 설정이 적용되고 있어요.'
                       : hasSelectedWeekdayTemplate
-                        ? `${selectedWeekdayLabel} 기본값이 이 날짜에도 적용돼요.`
+                        ? `${selectedDateWeekdayLabel} 기본값이 이 날짜에도 적용돼요.`
                         : '이 날짜는 아직 저장된 기본 일정이나 예외가 없어요.'}
                   </p>
                 </div>
@@ -592,7 +593,7 @@ export function AttendanceScheduleSheet({
                 <div className="rounded-[1.35rem] border border-emerald-200 bg-emerald-50 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-[11px] font-black text-emerald-700">{selectedWeekdayLabel} 기본 일정이 있어요</p>
+                      <p className="text-[11px] font-black text-emerald-700">{selectedDateWeekdayLabel} 기본 일정이 있어요</p>
                       <p className="mt-1 text-[11px] font-semibold leading-5 text-emerald-700/80">
                         예외를 지우거나 다시 불러오면 기본 일정 상태로 되돌릴 수 있어요.
                       </p>
@@ -696,7 +697,7 @@ export function AttendanceScheduleSheet({
                   </Button>
                 </div>
                 <div className="mt-3 rounded-[1rem] border border-[#E4ECF9] bg-[#F9FBFF] px-3 py-2 text-[11px] font-semibold text-[#5F739F]">
-                  저장 대상: <span className="font-black text-[#17326B]">{selectedWeekdays.length > 0 ? `매주 ${selectedWeekdayLabel}` : '요일을 먼저 선택해 주세요'}</span>
+                  저장 대상: <span className="font-black text-[#17326B]">{selectedWeekdays.length > 0 ? `매주 ${selectedWeekdaysLabel}` : '요일을 먼저 선택해 주세요'}</span>
                 </div>
               </div>
 
