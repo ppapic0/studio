@@ -4,7 +4,6 @@ import { ConsultSection } from '@/components/marketing/consult-section';
 import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
 import { FeedbackManagementSection } from '@/components/marketing/feedback-management-section';
 import { HeroGallerySection } from '@/components/marketing/hero-gallery-section';
-import { HomeOpsSection } from '@/components/marketing/home-ops-section';
 import { HeroSection } from '@/components/marketing/hero-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
@@ -12,7 +11,6 @@ import { MarketingLaunchNoticeModal } from '@/components/marketing/marketing-lau
 import { MobileStudySystemSection } from '@/components/marketing/mobile-study-system-section';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
-import { PageGatewaySection } from '@/components/marketing/page-gateway-section';
 import { PointRewardSection } from '@/components/marketing/point-reward-section';
 import { ResultsSection } from '@/components/marketing/results-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
@@ -64,12 +62,6 @@ export default async function HomePage() {
           </ScrollReveal>
           <ScrollReveal>
             <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
-          </ScrollReveal>
-          <ScrollReveal>
-            <HomeOpsSection />
-          </ScrollReveal>
-          <ScrollReveal>
-            <PageGatewaySection />
           </ScrollReveal>
         </>
       )}
