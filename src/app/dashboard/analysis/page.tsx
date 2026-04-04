@@ -379,7 +379,10 @@ function MiniGrowthBars({
       </div>
 
       <div className="relative">
-        <div className="pointer-events-none absolute bottom-[2rem] top-1 left-0 w-px rounded-full bg-[rgba(20,41,95,0.12)]" />
+        <div
+          className="pointer-events-none absolute bottom-[2rem] top-1 left-0 w-px rounded-full"
+          style={{ background: 'var(--chart-grid)' }}
+        />
         <div className="pl-3">
           <div className="relative h-[5.8rem]">
             {activePoint ? (
@@ -425,7 +428,7 @@ function MiniGrowthBars({
                     x2={chartWidth - paddingX}
                     y1={y}
                     y2={y}
-                    stroke="rgba(20,41,95,0.12)"
+                    stroke="var(--chart-grid)"
                     strokeWidth="1"
                     strokeDasharray={tick === 0 ? '0' : '4 5'}
                   />
@@ -554,6 +557,7 @@ function GraphDungeonCard({
 
       <div className={cn(
         'analysis-chart-stage mt-4 rounded-[1.35rem] px-3 py-3',
+        !lightMode && 'analysis-growth-canvas',
         lightMode
           ? 'border border-[#F2E2D1] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,248,240,0.9)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]'
           : ''
@@ -1068,7 +1072,7 @@ export default function AnalysisTrackPage() {
               >
                 {card.id === 'focus' ? (
                   <div className="space-y-4">
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
+                    <div className="surface-card surface-card--ghost on-dark analysis-growth-canvas rounded-[1.35rem] p-4">
                       <ResponsiveContainer width="100%" height={isMobile ? 180 : 260}>
                         <ComposedChart data={chartData} margin={{ top: 12, right: 14, left: isMobile ? 18 : 12, bottom: 4 }}>
                           <defs>
@@ -1112,7 +1116,7 @@ export default function AnalysisTrackPage() {
                   </div>
                 ) : card.id === 'rhythm' ? (
                   <div className="space-y-4">
-                    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
+                    <div className="surface-card surface-card--ghost on-dark analysis-growth-canvas rounded-[1.35rem] p-4">
                       <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} />
                     </div>
                     <div className="grid gap-3">
