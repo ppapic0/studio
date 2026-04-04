@@ -520,7 +520,13 @@ export default function StudyHistoryPage() {
   };
 
   const formatMobileCalendarMinutesLabel = (minutes: number) => {
-    return formatHourMinuteCompact(minutes);
+    const safeMinutes = Math.max(0, minutes);
+    const hours = Math.floor(safeMinutes / 60);
+    const mins = safeMinutes % 60;
+
+    if (hours <= 0) return `${mins}m`;
+    if (mins === 0) return `${hours}h`;
+    return `${hours}h${mins}m`;
   };
 
   const getHeatmapColor = (minutes: number) => {
@@ -1147,6 +1153,7 @@ export default function StudyHistoryPage() {
               const flowShortLabel = getStudyHistoryFlowShortLabel(minutes);
               const isLongTimeLabel = exactTimeLabel.length >= 7;
               const isCompactLongTimeLabel = compactTimeLabel.length >= 5;
+              const isCompactVeryLongTimeLabel = compactTimeLabel.length >= 6;
               const calendarAriaTimeLabel = isCurrentMonth
                 ? isFutureCalendar
                   ? '아직 오지 않은 날짜'
@@ -1185,7 +1192,7 @@ export default function StudyHistoryPage() {
                     className={cn(
                       'group relative overflow-hidden rounded-[1.45rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
                       'aspect-square',
-                      isMobile ? 'min-h-0 p-2.5' : 'p-3.5',
+                      isMobile ? 'min-h-0 p-1.5' : 'p-3.5',
                       studentCellClass,
                       isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0',
                       isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-[#FFB66E]/55 shadow-[0_22px_36px_-24px_rgba(255,149,38,0.18)]'
@@ -1235,15 +1242,17 @@ export default function StudyHistoryPage() {
                         </div>
                       ) : null}
 
-                      <div className={cn("flex flex-1 items-center justify-center", !isMobile && "px-1 pt-4")}>
+                      <div className={cn("flex flex-1 items-center justify-center", isMobile ? "px-0.5" : "px-1 pt-4")}>
                         {studentShouldRenderTime ? (
                           <span
                             className={cn(
-                              "dashboard-number break-keep whitespace-normal font-black leading-[1.02] tabular-nums text-center",
+                              "dashboard-number block max-w-full font-black leading-none tabular-nums text-center",
                               isMobile
-                                ? isCompactLongTimeLabel
-                                  ? "text-[0.76rem] tracking-[-0.05em]"
-                                  : "text-[0.9rem] tracking-[-0.05em]"
+                                ? isCompactVeryLongTimeLabel
+                                  ? "text-[0.64rem] tracking-[-0.075em]"
+                                  : isCompactLongTimeLabel
+                                    ? "text-[0.74rem] tracking-[-0.065em]"
+                                    : "text-[0.86rem] tracking-[-0.055em]"
                                 : isLongTimeLabel
                                   ? "text-[1rem] tracking-[-0.04em]"
                                   : "text-[1.16rem] tracking-[-0.05em]",
