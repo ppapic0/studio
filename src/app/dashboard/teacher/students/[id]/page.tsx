@@ -1845,6 +1845,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     ? 'analysis-tab-trigger min-w-0 rounded-[1rem] font-black text-xs gap-1.5 px-3 py-2.5'
     : 'min-w-0 rounded-xl font-black text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5 px-2';
   const detailChartCardClass = cn('overflow-hidden rounded-[1.65rem] border border-slate-200 bg-white', isAnalysisPresentation && 'analysis-chart-stage analysis-chart-stage--warm border-none');
+  const detailGrowthChartCardClass = cn(detailChartCardClass, isAnalysisPresentation && 'analysis-growth-card');
   const detailChartHeaderClass = cn('relative z-10', isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4');
   const detailChartContentClass = cn('relative z-10 pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5');
   const detailChartPanelClass = cn(
@@ -1858,6 +1859,26 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const detailBadgeClass = isAnalysisPresentation
     ? 'analysis-detail-badge'
     : 'rounded-full border-[#dbe7ff] bg-white/84 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]';
+  const detailGrowthPeriodBadgeClass = cn(
+    'rounded-full text-[10px] font-black',
+    isAnalysisPresentation
+      ? 'analysis-growth-period-badge'
+      : 'border-[#dbe7ff] bg-white/82 text-[#5c6e97]'
+  );
+  const detailGrowthAccentPeriodBadgeClass = cn(
+    'rounded-full text-[10px] font-black',
+    isAnalysisPresentation
+      ? 'analysis-growth-period-badge analysis-growth-period-badge--accent'
+      : 'border-[#ffe1c5] bg-white/82 text-[#d86a11]'
+  );
+  const detailGrowthTitleClass = cn(
+    'break-keep font-black tracking-tight',
+    isAnalysisPresentation ? 'text-[var(--text-on-dark)]' : 'text-[#14295F]'
+  );
+  const detailGrowthDescriptionClass = cn(
+    'mt-1 font-semibold',
+    isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : 'text-[#5c6e97]'
+  );
   const detailInsightBandClass = cn(
     'mt-3 rounded-[1.15rem] px-3.5 py-3',
     isAnalysisPresentation ? 'analysis-signal-band' : 'border border-slate-200 bg-slate-50/85'
@@ -2515,16 +2536,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
           {!isMobile && (
           <div className="grid gap-4">
-            <Card className={detailChartCardClass}>
+            <Card className={detailGrowthChartCardClass}>
               <CardHeader className={detailChartHeaderClass}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className={detailBadgeClass}>Growth Radar</Badge>
-                      <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white/82 text-[10px] font-black text-[#5c6e97]">최근 6주</Badge>
+                      <Badge variant="outline" className={detailGrowthPeriodBadgeClass}>최근 6주</Badge>
                     </div>
-                    <CardTitle className="mt-3 break-keep text-[clamp(1rem,1.45vw,1.28rem)] font-black tracking-tight text-[#14295F]">주간 학습시간 성장률</CardTitle>
-                    <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">막대는 주간 누적 학습시간, 리듬선은 전주 대비 성장률이에요.</CardDescription>
+                    <CardTitle className={cn('mt-3 text-[clamp(1rem,1.45vw,1.28rem)]', detailGrowthTitleClass)}>주간 학습시간 성장률</CardTitle>
+                    <CardDescription className={cn('text-sm leading-6', detailGrowthDescriptionClass)}>막대는 주간 누적 학습시간, 리듬선은 전주 대비 성장률이에요.</CardDescription>
                   </div>
                   <div className={detailMetricChipClass}>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">이번 주 성장</p>
@@ -2582,16 +2603,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            <Card className={detailChartCardClass}>
+            <Card className={detailGrowthChartCardClass}>
               <CardHeader className={detailChartHeaderClass}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className={detailBadgeClass}>Daily Pace</Badge>
-                      <Badge variant="outline" className="rounded-full border-[#ffe1c5] bg-white/82 text-[10px] font-black text-[#d86a11]">{dailyGrowthWindowLabel}</Badge>
+                      <Badge variant="outline" className={detailGrowthAccentPeriodBadgeClass}>{dailyGrowthWindowLabel}</Badge>
                     </div>
-                    <CardTitle className="mt-3 break-keep text-[clamp(1rem,1.45vw,1.28rem)] font-black tracking-tight text-[#14295F]">일자별 학습시간 성장률</CardTitle>
-                    <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">최근 42일 중 선택한 7일 구간의 평균 공부시간과 성장률을 같이 봅니다.</CardDescription>
+                    <CardTitle className={cn('mt-3 text-[clamp(1rem,1.45vw,1.28rem)]', detailGrowthTitleClass)}>일자별 학습시간 성장률</CardTitle>
+                    <CardDescription className={cn('text-sm leading-6', detailGrowthDescriptionClass)}>최근 42일 중 선택한 7일 구간의 평균 공부시간과 성장률을 같이 봅니다.</CardDescription>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className={detailMetricChipClass}>
@@ -2837,17 +2858,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           {isMobile ? (
             <>
               <div className="grid gap-4">
-                <Card className={detailChartCardClass}>
+                <Card className={detailGrowthChartCardClass}>
                   <CardHeader className={detailChartHeaderClass}>
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge className={detailBadgeClass}>Growth Radar</Badge>
-                        <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white/82 text-[10px] font-black text-[#5c6e97]">최근 6주</Badge>
+                        <Badge variant="outline" className={detailGrowthPeriodBadgeClass}>최근 6주</Badge>
                       </div>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <CardTitle className="break-keep text-[1rem] font-black tracking-tight text-[#14295F]">주간 학습시간 성장률</CardTitle>
-                          <CardDescription className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">막대는 주간 누적 학습시간, 리듬선은 전주 대비 성장률이에요.</CardDescription>
+                          <CardTitle className={cn('text-[1rem]', detailGrowthTitleClass)}>주간 학습시간 성장률</CardTitle>
+                          <CardDescription className={cn('text-[12px] leading-5', detailGrowthDescriptionClass)}>막대는 주간 누적 학습시간, 리듬선은 전주 대비 성장률이에요.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">이번 주</p>
@@ -2905,17 +2926,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className={detailChartCardClass}>
+                <Card className={detailGrowthChartCardClass}>
                   <CardHeader className={detailChartHeaderClass}>
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge className={detailBadgeClass}>Daily Pace</Badge>
-                        <Badge variant="outline" className="rounded-full border-[#ffe1c5] bg-white/82 text-[10px] font-black text-[#d86a11]">{dailyGrowthWindowLabel}</Badge>
+                        <Badge variant="outline" className={detailGrowthAccentPeriodBadgeClass}>{dailyGrowthWindowLabel}</Badge>
                       </div>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <CardTitle className="break-keep text-[1rem] font-black tracking-tight text-[#14295F]">일자별 학습시간 성장률</CardTitle>
-                          <CardDescription className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">선택한 7일 구간의 평균 공부시간과 성장률을 같이 봅니다.</CardDescription>
+                          <CardTitle className={cn('text-[1rem]', detailGrowthTitleClass)}>일자별 학습시간 성장률</CardTitle>
+                          <CardDescription className={cn('text-[12px] leading-5', detailGrowthDescriptionClass)}>선택한 7일 구간의 평균 공부시간과 성장률을 같이 봅니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최근 7일</p>
