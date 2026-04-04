@@ -2265,7 +2265,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         >
           {isAnalysisPresentation ? (
             <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]')}>
-              <Card className="analysis-premium-card analysis-full-board-card surface-card surface-card--secondary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none">
+              <Card className={cn(
+                "analysis-premium-card analysis-full-board-card analysis-focus-kpi-board surface-card surface-card--secondary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none",
+                isMobile && "analysis-focus-kpi-board--compact"
+              )}>
                 <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
                   <div className={cn(isMobile ? "flex flex-col items-stretch gap-3" : "flex items-start justify-between gap-3")}>
                     <div className="min-w-0">
@@ -2286,62 +2289,63 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </CardDescription>
                     </div>
                     <div className={cn(
-                      "surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 shadow-none",
+                      "analysis-focus-kpi-summary surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 shadow-none",
                       isMobile ? "flex items-center justify-between gap-3 px-3.5 py-2.5 text-left" : "px-3 py-2 text-right"
                     )}>
                       <p className={cn(
-                        "text-[10px] font-black uppercase tracking-[0.2em]",
+                        "analysis-focus-kpi-summary-label text-[10px] font-black uppercase tracking-[0.2em]",
                         isAnalysisPresentation ? "text-[#6A7EA7]" : "text-[var(--text-on-dark-muted)]"
                       )}>
                         이번 주 포인트
                       </p>
-                      <p className={cn("font-aggro-display font-black text-[#D86A11]", isMobile ? "text-base whitespace-nowrap" : "mt-1 text-sm")}>
+                      <p className={cn("analysis-focus-kpi-summary-value font-aggro-display font-black text-[#D86A11]", isMobile ? "text-base whitespace-nowrap" : "mt-1 text-sm")}>
                         {focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className={cn("relative z-10 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
-                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                  <div className={cn("analysis-focus-kpi-grid grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-2")}>
                     {focusKpiCards.map(({ key, label, value, helper, note, Icon, iconClass, panelClass, chipClass, meterClass, meterValue }) => (
                       <div
                         key={key}
                         className={cn(
-                          "min-w-0 overflow-hidden rounded-[1.35rem] border px-4 py-4",
+                          "analysis-focus-kpi-card min-w-0 overflow-hidden rounded-[1.35rem] border px-4 py-4",
+                          isMobile && "analysis-focus-kpi-card--compact",
                           isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : panelClass
                         )}
                       >
-                        <div className="space-y-3">
-                          <div className="flex items-start justify-between gap-3">
+                        <div className="analysis-focus-kpi-card-body space-y-3">
+                          <div className="analysis-focus-kpi-card-top flex items-start justify-between gap-3">
                             <span className={cn(
-                              "inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]",
+                              "analysis-focus-kpi-card-chip inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]",
                               isAnalysisPresentation ? analysisSubChipClass : chipClass,
                               isMobile && "max-w-[calc(100%-3.5rem)] whitespace-normal leading-4"
                             )}>
                               {label}
                             </span>
-                            <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] shadow-none", isAnalysisPresentation ? analysisIconBubbleClass : "border border-white/12 bg-white/10")}>
-                              <Icon className={cn("h-5 w-5", iconClass)} />
+                            <div className={cn("analysis-focus-kpi-card-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] shadow-none", isAnalysisPresentation ? analysisIconBubbleClass : "border border-white/12 bg-white/10")}>
+                              <Icon className={cn("analysis-focus-kpi-card-icon-svg h-5 w-5", iconClass)} />
                             </div>
                           </div>
                         </div>
                         <p className={cn(
-                          "mt-3 break-keep font-black tracking-tight",
+                          "analysis-focus-kpi-card-value mt-3 break-keep font-black tracking-tight",
                           isAnalysisPresentation ? "text-[#17326B]" : "text-[var(--text-on-dark)]",
-                          isMobile ? "text-[clamp(2rem,8vw,2.55rem)] leading-[0.95] whitespace-nowrap" : "text-[clamp(1.25rem,3.2vw,1.8rem)]"
+                          isMobile ? "text-[clamp(2rem,8vw,2.55rem)] leading-[0.95]" : "text-[clamp(1.25rem,3.2vw,1.8rem)]"
                         )}>
                           {value}
                         </p>
-                        <div className="mt-3 space-y-1.5">
+                        <div className="analysis-focus-kpi-card-copy mt-3 space-y-1.5">
                           <p className={cn(
-                            "text-[11px] font-semibold leading-5 break-keep",
+                            "analysis-focus-kpi-card-helper text-[11px] font-semibold leading-5 break-keep",
                             isAnalysisPresentation ? "text-[#5F7299]" : "text-[var(--text-on-dark-soft)]"
                           )}>
                             {helper}
                           </p>
-                          <p className="text-[11px] font-black break-keep text-[var(--accent-orange-soft)]">{note}</p>
+                          <p className="analysis-focus-kpi-card-note text-[11px] font-black break-keep text-[var(--accent-orange-soft)]">{note}</p>
                         </div>
-                        <div className={cn("mt-4 h-1.5 overflow-hidden rounded-full", isAnalysisPresentation ? analysisMeterTrackClass : "bg-white/12")}>
+                        <div className={cn("analysis-focus-kpi-card-meter mt-4 h-1.5 overflow-hidden rounded-full", isAnalysisPresentation ? analysisMeterTrackClass : "bg-white/12")}>
                           <div className={cn("h-full rounded-full bg-gradient-to-r", meterClass)} style={{ width: `${meterValue}%` }} />
                         </div>
                       </div>
