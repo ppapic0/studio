@@ -3108,33 +3108,6 @@ export default function StudyPlanPage() {
                 </div>
               </div>
             </div>
-
-            <div className={cn(
-              "mt-4 rounded-[1.25rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.06)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]",
-              isMobile ? "p-3.5" : "p-4"
-            )}>
-              <div className={cn("grid gap-2.5", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-                <div className="rounded-[1rem] border border-white/10 bg-white/[0.07] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                  <p className="student-aggro-kicker text-[9px] text-white/64">총 계획 시간</p>
-                  <p className={cn("font-aggro-display mt-2 font-black tracking-[-0.04em] text-white", isMobile ? "text-[1.22rem]" : "text-[1.5rem]")}>
-                    {formatMinutesSummary(studyTimeSummary.total)}
-                  </p>
-                </div>
-                <div className="rounded-[1rem] border border-white/10 bg-white/[0.07] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                  <p className="student-aggro-kicker text-[9px] text-white/64">등록 투두</p>
-                  <p className={cn("font-aggro-display mt-2 font-black tracking-[-0.04em] text-white", isMobile ? "text-[1.22rem]" : "text-[1.5rem]")}>
-                    {checklistTasks.length}개
-                  </p>
-                </div>
-                <div className="rounded-[1rem] border border-[#FFB665]/18 bg-[linear-gradient(180deg,rgba(255,187,108,0.14)_0%,rgba(255,255,255,0.08)_100%)] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-                  <p className="student-aggro-kicker text-[9px] text-white/64">오늘 목표 대비</p>
-                  <p className={cn("font-aggro-display mt-2 font-black tracking-[-0.04em] text-[#FFD6A1]", isMobile ? "text-[1.22rem]" : "text-[1.5rem]")}>
-                    {planProgressPercent}%
-                  </p>
-                </div>
-              </div>
-            </div>
-
             <div className={cn(
               "mt-4 rounded-[1.25rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.05)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]",
               isMobile ? "px-4 py-4" : "px-4 py-4"
