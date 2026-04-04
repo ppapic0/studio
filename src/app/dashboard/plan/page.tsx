@@ -1467,10 +1467,6 @@ export default function StudyPlanPage() {
     () => weeklyScheduleOverview.find((item) => item.dateKey === format(tomorrowDate, 'yyyy-MM-dd')) || null,
     [tomorrowDate, weeklyScheduleOverview]
   );
-  const selectedScheduleOverview = useMemo(
-    () => weeklyScheduleOverview.find((item) => item.dateKey === selectedDateKey) || null,
-    [selectedDateKey, weeklyScheduleOverview]
-  );
   const needsTomorrowSchedule = Boolean(
     tomorrowScheduleOverview &&
     tomorrowScheduleOverview.status === '미정'
@@ -3467,36 +3463,6 @@ export default function StudyPlanPage() {
             ))}
           </div>
 
-          <div className="rounded-[1.15rem] border border-[#E6EDF8] bg-[#F8FBFF] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
-              <div className="min-w-0">
-                <p className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.18em] text-[#8AA0C7]">선택한 날짜</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <p className="font-aggro-display text-[1.02rem] font-black text-[#17326B]">{selectedDateTitle}</p>
-                  <Badge
-                    className={cn(
-                      'student-aggro-body rounded-full border px-2.5 py-1 text-[9px] font-black shadow-none',
-                      SCHEDULE_STATUS_BADGE_TONE[selectedScheduleOverview?.status || '미정'] || SCHEDULE_STATUS_BADGE_TONE['미정']
-                    )}
-                  >
-                    {selectedScheduleOverview?.status || '미정'}
-                  </Badge>
-                </div>
-                <p className="student-aggro-body mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
-                  {selectedScheduleOverview?.timeLabel || '아직 정해진 시간이 없어요.'}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="secondary"
-                className={cn("student-aggro-body rounded-xl border border-[#17326B]/10 bg-[#17326B] font-black text-white hover:bg-[#102756]", isMobile ? "h-10 w-full text-[11px]" : "h-10 px-4 text-xs")}
-                onClick={() => openAttendanceSheetForDate(selectedDate, 'today')}
-                disabled={isPast}
-              >
-                이 날짜만 수정
-              </Button>
-            </div>
-          </div>
         </div>
       </section>
 
