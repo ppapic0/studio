@@ -1,15 +1,15 @@
 const appFlowCards = [
   {
-    title: '학습 현황 확인',
-    description: '계획, 실행, 공부시간, 누적흐름이 앱에 남아 지금 상태를 바로 읽을 수 있습니다.',
+    title: '학습현황 확인',
+    description: '계획부터 실행까지 누적된 학습데이터가 앱에 기록되어 현재 상태를 실시간으로 파악할 수 있습니다.',
   },
   {
-    title: '피드백 연결',
-    description: '학생별로 흔들린 지점을 바로 확인하고 피드백까지 이어 철저하게 관리합니다.',
+    title: '학습의 피드백',
+    description: '학생별 취약 구간을 앱상에서 파악해 즉각적인 피드백과 학습 관리로 바로 연결합니다.',
   },
   {
     title: '학부모 확인',
-    description: '학부모도 짧은 확인만으로 학생의 학습 흐름과 현재 상태를 파악할 수 있습니다.',
+    description: '학생의 학습데이터를 학부모용 앱을 통해 실시간으로 확인할 수 있습니다.',
   },
 ] as const;
 
@@ -43,17 +43,14 @@ export function FeedbackManagementSection() {
         <div className="order-1 px-6 py-7 sm:px-8 sm:py-8 lg:order-2">
           <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">SECTION 02</p>
           <h2 className="mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] text-[#14295F]">
-            트랙 웹앱으로 학습 현황과
+            자체 개발한 트랙 러닝시스템으로
             <br />
-            피드백까지 체계적으로, 철저히
+            학습 현황을 실시간 체크 및
             <br />
-            관리합니다
+            피드백
           </h2>
-          <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.86] text-[#425A75]">
-            학생의 공부 흐름과 피드백이 따로 놀지 않도록 앱에서 바로 연결합니다. 학생은 무엇을 해야 하는지 분명하게 보고, 학부모는 현재 상태와 변화 방향을 빠르게 파악할 수 있도록 설계합니다.
-          </p>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 space-y-3">
             {appFlowCards.map((card) => (
               <article key={card.title} className="rounded-[1.3rem] border border-[#14295F]/8 bg-[#F9FBFF] px-4 py-4">
                 <p className="text-[10px] font-black tracking-[0.16em] text-[#FF7A16]">SYSTEM FLOW</p>
