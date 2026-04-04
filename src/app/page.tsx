@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 
 import { ConsultSection } from '@/components/marketing/consult-section';
 import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
+import { FeedbackManagementSection } from '@/components/marketing/feedback-management-section';
 import { HeroGallerySection } from '@/components/marketing/hero-gallery-section';
 import { HomeOpsSection } from '@/components/marketing/home-ops-section';
 import { HeroSection } from '@/components/marketing/hero-section';
@@ -37,6 +38,11 @@ export default async function HomePage() {
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
       <CenterOverviewStack className="pt-8 sm:pt-10 lg:pt-12" />
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
+        <ScrollReveal>
+          <FeedbackManagementSection />
+        </ScrollReveal>
+      </div>
       {isMobile ? (
         <MobileStudySystemSection content={marketingContent.mobileStudySystem} />
       ) : (

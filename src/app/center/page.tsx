@@ -9,27 +9,13 @@ import {
 } from 'lucide-react';
 
 import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
+import { FeedbackManagementSection } from '@/components/marketing/feedback-management-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StaggerChildren } from '@/components/marketing/stagger-children';
 import { marketingContent } from '@/lib/marketing-content';
-
-const appFlowCards = [
-  {
-    title: '학습 현황 확인',
-    description: '계획, 실행, 공부시간, 누적 흐름이 앱에 남아 지금 상태를 바로 읽을 수 있습니다.',
-  },
-  {
-    title: '피드백 연결',
-    description: '학생별로 흔들린 지점을 바로 확인하고 피드백까지 이어 철저하게 관리합니다.',
-  },
-  {
-    title: '학부모 확인',
-    description: '학부모도 짧은 확인만으로 학생의 학습 흐름과 현재 상태를 파악할 수 있습니다.',
-  },
-] as const;
 
 const mockPrograms = [
   {
@@ -125,38 +111,7 @@ export default function CenterPage() {
 
       <div className="mx-auto mt-10 w-full max-w-7xl space-y-8 px-4 sm:space-y-10 sm:px-6 lg:px-8">
         <ScrollReveal>
-            <section className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-white shadow-[0_22px_52px_rgba(20,41,95,0.08)]">
-              <div className="grid gap-0 lg:grid-cols-[1.02fr_0.98fr]">
-                <div className="order-2 border-t border-[#14295F]/8 bg-[linear-gradient(180deg,#FFF9F2_0%,#FFFFFF_100%)] px-6 py-7 sm:px-8 sm:py-8 lg:order-1 lg:border-r lg:border-t-0">
-                  <MediaPlaceholder
-                    eyebrow="APP LINKED MANAGEMENT"
-                    title="학습 현황 · 피드백 화면 예정"
-                    description="학생별 계획, 실행, 학습 현황과 피드백이 바로 연결되는 앱 화면을 여기에 반영합니다."
-                    mode="warm"
-                  />
-                </div>
-
-                <div className="order-1 px-6 py-7 sm:px-8 sm:py-8 lg:order-2">
-                  <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">SECTION 02</p>
-                  <h2 className="mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] text-[#14295F]">
-                    트랙 웹앱으로 학습 현황과 피드백까지 체계적으로, 철저히 관리합니다
-                  </h2>
-                  <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.86] text-[#425A75]">
-                    학생의 공부 흐름과 피드백이 따로 놀지 않도록 앱에서 바로 연결합니다. 학생은 무엇을 해야 하는지 분명하게 보고, 학부모는 현재 상태와 변화 방향을 빠르게 파악할 수 있도록 설계합니다.
-                  </p>
-
-                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                    {appFlowCards.map((card) => (
-                      <article key={card.title} className="rounded-[1.3rem] border border-[#14295F]/8 bg-[#F9FBFF] px-4 py-4">
-                        <p className="text-[10px] font-black tracking-[0.16em] text-[#FF7A16]">SYSTEM FLOW</p>
-                        <h3 className="mt-3 break-keep text-[0.98rem] font-black leading-[1.36] text-[#14295F]">{card.title}</h3>
-                        <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-[#53687F]">{card.description}</p>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
+          <FeedbackManagementSection />
         </ScrollReveal>
 
         <ScrollReveal>
