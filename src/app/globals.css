@@ -1326,241 +1326,189 @@ select {
     color: #14295f;
   }
 
-  .student-analysis-shell .surface-card.on-dark :is(
-    [data-slot="card-title"],
-    [data-slot="card-description"],
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6,
-    p,
-    span
-  ):not(.analysis-warm-badge):not(.analysis-soft-badge):not(.analysis-subchip) {
-    color: #14295f !important;
-  }
-
-  .student-analysis-shell .surface-card.on-dark .text-\[var\(--text-on-dark-soft\)\],
-  .student-analysis-shell .surface-card.on-dark .text-\[var\(--text-on-dark-muted\)\] {
-    color: #365183 !important;
-  }
-
-  .student-analysis-shell [class~="text-white"],
-  .student-analysis-shell [class^="text-white"],
-  .student-analysis-shell [class*=" text-white"] {
-    color: #17326b !important;
-  }
-
-  .student-analysis-shell [class*="text-white/"] {
-    color: #365183 !important;
-  }
-
-  .student-analysis-shell .surface-card.on-dark.surface-card--primary,
-  .student-analysis-shell .surface-card.on-dark.surface-card--secondary {
-    border: 1px solid rgba(255, 138, 31, 0.14) !important;
-    background:
-      radial-gradient(circle at top right, rgba(255,186,111,0.2), transparent 24%),
-      radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 32%),
-      linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(255,247,239,0.96) 100%) !important;
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.96) inset,
-      0 -1px 0 0 rgba(255,138,31,0.04) inset,
-      0 18px 34px -28px rgba(20,41,95,0.16),
-      0 26px 46px -38px rgba(255,138,31,0.16) !important;
-  }
-
-  .student-analysis-shell .surface-card.on-dark.surface-card--ghost {
-    border: 1px solid rgba(255, 138, 31, 0.12) !important;
-    background:
-      radial-gradient(circle at top right, rgba(255,186,111,0.14), transparent 22%),
-      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,250,245,0.94) 100%) !important;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.96),
-      0 12px 24px -24px rgba(20,41,95,0.12) !important;
-  }
-
-  .student-analysis-shell .analysis-chart-stage,
-  .student-analysis-shell .analysis-chart-stage--warm {
-    border-color: rgba(20, 41, 95, 0.1);
-    background:
-      radial-gradient(circle at top left, rgba(255,255,255,0.96), transparent 34%),
-      linear-gradient(180deg, rgba(255,255,255,0.995) 0%, rgba(255,255,255,0.985) 100%);
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.99) inset,
-      0 -1px 0 0 rgba(20,41,95,0.04) inset,
-      0 18px 34px -28px rgba(20,41,95,0.16),
-      0 26px 48px -40px rgba(20,41,95,0.12);
-  }
-
-  .student-analysis-shell .analysis-growth-card {
-    --text-on-dark: #f3f7ff;
+  .analysis-growth-overview,
+  .analysis-growth-map,
+  .analysis-growth-action-panel,
+  .student-analysis-shell {
+    --text-on-dark: #f4f7ff;
     --text-on-dark-soft: rgba(240, 247, 255, 0.78);
     --text-on-dark-muted: rgba(240, 247, 255, 0.58);
-    border: 1px solid rgba(92, 136, 220, 0.28) !important;
+    --chart-axis: rgba(244, 248, 255, 0.9);
+    --chart-grid: rgba(244, 248, 255, 0.18);
+    --chart-tooltip-bg: rgba(7, 18, 45, 0.98);
+    --chart-tooltip-border: rgba(255, 255, 255, 0.14);
+  }
+
+  .analysis-growth-overview,
+  .analysis-growth-map,
+  .analysis-growth-action-panel {
+    position: relative;
+    overflow: hidden;
+    transition: transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out;
+    border: 1px solid rgba(110, 150, 235, 0.24);
     background:
-      radial-gradient(circle at top left, rgba(255, 179, 79, 0.08), transparent 22%),
-      radial-gradient(circle at top right, rgba(108, 176, 255, 0.18), transparent 28%),
-      linear-gradient(180deg, rgba(33, 57, 109, 0.985) 0%, rgba(14, 27, 61, 0.985) 100%) !important;
+      radial-gradient(circle at top left, rgba(90, 136, 255, 0.18), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 138, 31, 0.08), transparent 24%),
+      linear-gradient(180deg, rgba(24, 47, 104, 0.99) 0%, rgba(12, 26, 61, 0.985) 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 24px 46px -30px rgba(0, 0, 0, 0.56),
-      0 0 0 1px rgba(110, 162, 255, 0.06) !important;
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 28px 56px -38px rgba(2, 8, 24, 0.68),
+      0 0 0 1px rgba(112, 170, 255, 0.04);
   }
 
-  .student-analysis-shell .analysis-growth-period-badge {
-    border: 1px solid rgba(181, 206, 255, 0.2);
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(240, 247, 255, 0.8);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  .analysis-growth-summary-card,
+  .analysis-growth-module-shell {
+    position: relative;
+    overflow: hidden;
+    transition: transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out;
+    border: 1px solid rgba(128, 164, 241, 0.18);
+    background:
+      radial-gradient(circle at top left, rgba(90, 136, 255, 0.14), transparent 30%),
+      linear-gradient(180deg, rgba(20, 40, 90, 0.96) 0%, rgba(11, 24, 57, 0.95) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 22px 44px -34px rgba(0, 0, 0, 0.56);
   }
 
-  .student-analysis-shell .analysis-growth-period-badge--accent {
-    border-color: rgba(255, 179, 79, 0.28);
-    background: rgba(255, 150, 38, 0.12);
+  .analysis-growth-summary-card--soft {
+    background:
+      radial-gradient(circle at top right, rgba(255, 138, 31, 0.1), transparent 26%),
+      linear-gradient(180deg, rgba(17, 37, 84, 0.95) 0%, rgba(11, 23, 54, 0.95) 100%);
+  }
+
+  .analysis-growth-kicker {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 187, 120, 0.22);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.42rem 0.85rem;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
     color: #ffbe72;
   }
 
-  .student-analysis-shell .analysis-growth-canvas {
-    --chart-axis: rgba(240, 247, 255, 0.86);
-    --chart-grid: rgba(240, 247, 255, 0.12);
-    --chart-tooltip-bg: rgba(9, 18, 46, 0.96);
-    --chart-tooltip-border: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(110, 162, 255, 0.18) !important;
-    background:
-      radial-gradient(circle at top left, rgba(112, 170, 255, 0.22), transparent 30%),
-      radial-gradient(circle at bottom right, rgba(255, 179, 79, 0.08), transparent 28%),
-      linear-gradient(180deg, rgba(31, 63, 132, 0.985) 0%, rgba(20, 43, 95, 0.985) 54%, rgba(11, 24, 58, 0.985) 100%) !important;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 18px 36px -28px rgba(0, 0, 0, 0.62),
-      0 0 0 1px rgba(110, 162, 255, 0.06) !important;
+  .analysis-growth-date {
+    font-size: 0.72rem;
+    font-weight: 900;
+    color: rgba(240, 247, 255, 0.76);
   }
 
-  .student-analysis-shell .analysis-overview-canvas {
-    border: 1px solid rgba(255, 138, 31, 0.12);
-    background:
-      radial-gradient(circle at top left, rgba(255, 192, 120, 0.06), transparent 24%),
-      linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0.995) 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.98),
-      0 24px 46px -40px rgba(20,41,95,0.16),
-      0 28px 54px -42px rgba(255,138,31,0.12);
-  }
-
-  .student-analysis-shell .analysis-detail-panel {
-    border: 1px solid rgba(255, 138, 31, 0.12);
-    background:
-      linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,249,243,0.96) 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.94),
-      0 16px 28px -24px rgba(20,41,95,0.12);
-  }
-
-  .student-analysis-shell .analysis-metric-chip {
-    border: 1px solid rgba(255, 138, 31, 0.18);
-    background: linear-gradient(180deg, rgba(255,250,243,0.96) 0%, rgba(255,235,208,0.92) 100%);
-    color: #17326b;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.96),
-      0 14px 28px -24px rgba(255,138,31,0.24);
-  }
-
-  .student-analysis-shell .analysis-detail-badge {
-    border: 1px solid rgba(255, 138, 31, 0.16);
-    background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,245,231,0.94) 100%);
-    color: #c86a10;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.96),
-      0 12px 24px -20px rgba(255,138,31,0.18);
-  }
-
-  .student-analysis-shell .analysis-warm-badge {
-    border: 1px solid rgba(255, 138, 31, 0.22);
-    background: linear-gradient(180deg, rgba(255,248,235,0.98) 0%, rgba(255,228,191,0.96) 100%);
-    color: #c86a10;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.94),
-      0 14px 28px -22px rgba(255,138,31,0.24);
-  }
-
-  .student-analysis-shell .analysis-soft-badge {
+  .analysis-growth-highlight-card,
+  .analysis-growth-light-card,
+  .analysis-kpi-card,
+  .analysis-health-card {
+    position: relative;
+    overflow: hidden;
+    transition: transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out;
     border: 1px solid rgba(214, 225, 245, 0.92);
-    background: rgba(255,255,255,0.94);
-    color: #14295f;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.96),
-      0 12px 22px -20px rgba(20,41,95,0.12);
-  }
-
-  .student-analysis-shell .analysis-subchip {
-    border: 1px solid rgba(214, 225, 245, 0.9);
-    background: rgba(255,255,255,0.96);
-    color: #4b6397;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.96);
-  }
-
-  .student-analysis-shell .analysis-icon-bubble {
-    border: 1px solid rgba(255, 138, 31, 0.12);
     background:
-      linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,246,236,0.94) 100%);
-  }
-
-  .student-analysis-shell .analysis-meter-track {
-    background: rgba(20, 41, 95, 0.08);
-    box-shadow: inset 0 1px 1px rgba(20,41,95,0.08);
-  }
-
-  .student-analysis-shell .analysis-action-button {
-    border-color: rgba(255, 138, 31, 0.22);
-    color: #17326b;
-    background:
-      linear-gradient(180deg, rgba(255,248,237,0.98) 0%, rgba(255,228,194,0.96) 100%);
+      linear-gradient(180deg, rgba(249, 251, 255, 0.99) 0%, rgba(238, 244, 255, 0.98) 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.92),
-      0 16px 28px -24px rgba(255,138,31,0.28);
+      inset 0 1px 0 rgba(255, 255, 255, 0.96),
+      0 18px 34px -28px rgba(20, 41, 95, 0.2);
   }
 
-  .student-analysis-shell .analysis-record-card,
-  .student-analysis-shell .analysis-dual-lane-card {
-    transition:
-      transform 180ms ease-out,
-      border-color 180ms ease-out,
-      box-shadow 180ms ease-out;
+  .analysis-growth-light-card--accent {
+    border-color: rgba(255, 138, 31, 0.18);
+    background:
+      linear-gradient(180deg, rgba(255, 248, 237, 0.99) 0%, rgba(255, 238, 214, 0.98) 100%);
+  }
+
+  .analysis-kpi-card::after {
+    display: none;
+  }
+
+  .analysis-growth-rail-track {
+    height: 0.62rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06);
+  }
+
+  .analysis-growth-progress-bar {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #ffd36d 0%, #ffb347 35%, #ff7a16 100%);
+    box-shadow: 0 0 16px rgba(255, 160, 67, 0.28);
+  }
+
+  .analysis-growth-canvas {
+    --chart-axis: rgba(244, 248, 255, 0.9);
+    --chart-grid: rgba(244, 248, 255, 0.18);
+    --chart-tooltip-bg: rgba(7, 18, 45, 0.98);
+    --chart-tooltip-border: rgba(255, 255, 255, 0.14);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(110, 162, 255, 0.18);
+    background:
+      radial-gradient(circle at top left, rgba(112, 170, 255, 0.2), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(255, 179, 79, 0.08), transparent 28%),
+      linear-gradient(180deg, rgba(22, 47, 104, 0.985) 0%, rgba(14, 33, 78, 0.985) 55%, rgba(8, 19, 47, 0.985) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 18px 36px -28px rgba(0, 0, 0, 0.58),
+      0 0 0 1px rgba(110, 162, 255, 0.06);
+  }
+
+  .analysis-growth-module-shell--pending {
+    border-style: dashed;
+    opacity: 0.88;
+  }
+
+  .analysis-growth-state-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.34rem 0.7rem;
+    font-size: 0.66rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  .analysis-growth-state-chip--ready {
+    border: 1px solid rgba(255, 187, 120, 0.22);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(244, 248, 255, 0.84);
+  }
+
+  .analysis-growth-state-chip--pending {
+    border: 1px solid rgba(181, 206, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(240, 247, 255, 0.62);
+  }
+
+  .analysis-ring-shell {
+    box-shadow:
+      0 18px 30px -24px rgba(20, 41, 95, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  }
+
+  .analysis-ring-core {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 248, 255, 0.98) 100%);
   }
 
   @media (hover: hover) {
-    .analysis-card:hover,
+    .analysis-growth-overview:hover,
+    .analysis-growth-map:hover,
+    .analysis-growth-action-panel:hover,
+    .analysis-growth-module-shell:hover,
     .analysis-kpi-card:hover,
-    .analysis-chart-stage:hover,
-    .analysis-health-card:hover,
-    .analysis-record-card:hover,
-    .analysis-dual-lane-card:hover,
-    .analysis-profile-shell:hover {
+    .analysis-health-card:hover {
       transform: translateY(-2px);
       box-shadow:
-        0 1px 0 0 rgba(255,255,255,0.98) inset,
-        0 -1px 0 0 rgba(20,41,95,0.04) inset,
-        0 14px 28px -20px rgba(20,41,95,0.24),
-        0 28px 52px -34px rgba(20,41,95,0.22);
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 24px 48px -34px rgba(4, 10, 32, 0.56);
     }
 
     .analysis-tab-trigger:hover {
       color: #14295f;
       transform: translateY(-1px);
-    }
-
-    .analysis-action-button:hover {
-      transform: translateY(-1px);
-      border-color: rgba(255, 138, 31, 0.34);
-      color: #17326b;
-      background:
-        linear-gradient(180deg, rgba(255,241,219,0.98) 0%, rgba(255,217,171,0.96) 100%);
-    }
-
-    .student-analysis-shell .analysis-record-card:hover,
-    .student-analysis-shell .analysis-dual-lane-card:hover {
-      border-color: rgba(20, 41, 95, 0.18);
     }
 
     .marketing-card,
