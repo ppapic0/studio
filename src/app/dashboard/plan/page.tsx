@@ -498,6 +498,10 @@ export default function StudyPlanPage() {
   const [extraAwayPlans, setExtraAwayPlans] = useState<AttendanceAwaySlot[]>([]);
   const [isScheduleAbsent, setIsScheduleAbsent] = useState(false);
   const [scheduleNote, setScheduleNote] = useState('');
+  const [scheduleSaveFeedback, setScheduleSaveFeedback] = useState<null | {
+    title: string;
+    description: string;
+  }>(null);
   const [isAttendanceScheduleSheetOpen, setIsAttendanceScheduleSheetOpen] = useState(false);
   const [attendanceSheetInitialTab, setAttendanceSheetInitialTab] = useState<'today' | 'weekday' | 'saved'>('today');
   const [expandedRecommendationIds, setExpandedRecommendationIds] = useState<string[]>([]);
@@ -523,6 +527,12 @@ export default function StudyPlanPage() {
   const [goalTargetHoursDraft, setGoalTargetHoursDraft] = useState('');
   const [goalTargetMinutesDraft, setGoalTargetMinutesDraft] = useState('');
   const [isGoalTargetSaving, setIsGoalTargetSaving] = useState(false);
+
+  useEffect(() => {
+    if (!scheduleSaveFeedback) return;
+    const timeout = window.setTimeout(() => setScheduleSaveFeedback(null), 4500);
+    return () => window.clearTimeout(timeout);
+  }, [scheduleSaveFeedback]);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -2447,7 +2457,7 @@ export default function StudyPlanPage() {
         recommendedStudyMinutes: scheduleRecommendationPrefill?.recommendedDailyStudyMinutes || null,
         recommendedWeeklyDays: scheduleRecommendationPrefill?.recommendedWeeklyDays || null,
       });
-      toast({
+      setScheduleSaveFeedback({
         title: '날짜별 일정 저장 완료',
         description: '선택한 날짜의 등하원·외출 일정을 저장했어요.',
       });
@@ -2478,7 +2488,7 @@ export default function StudyPlanPage() {
         },
         note: scheduleNote,
       });
-      toast({
+      setScheduleSaveFeedback({
         title: '미등원 일정 저장 완료',
         description: '선택한 날짜를 미등원 일정으로 저장했어요.',
       });
@@ -2504,10 +2514,11 @@ export default function StudyPlanPage() {
       applyAttendanceDraftToState(EMPTY_ATTENDANCE_SCHEDULE_DRAFT);
       setScheduleNote('');
       clearSchedulePrefillCache();
-      toast({
+      setScheduleSaveFeedback({
         title: '이 날짜 일정 초기화',
         description: '저장된 날짜별 일정을 비웠어요.',
       });
+      setIsAttendanceScheduleSheetOpen(false);
     } catch {
       toast({
         variant: 'destructive',
@@ -2594,10 +2605,12 @@ export default function StudyPlanPage() {
         { merge: true }
       );
       await batch.commit();
-      toast({
-        title: '정기 루틴 저장 완료',
-        description: `매주 ${selectedRecurringWeekdayLabel}에 적용할 기본값을 저장했어요.`,
+      setScheduleSaveFeedback({
+        title: '주간 기본 일정 저장 완료',
+        description: `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장했어요.`,
       });
+      setAttendanceSheetInitialTab('weekday');
+      setIsAttendanceScheduleSheetOpen(false);
       return true;
     } catch {
       toast({
@@ -3400,6 +3413,18 @@ export default function StudyPlanPage() {
           {needsTomorrowSchedule ? (
             <div className="rounded-[1.15rem] border border-[#FFD7B5] bg-[#FFF4E8] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
               <p className="font-aggro-display text-[1rem] font-black text-[#17326B]">내일 독서실 일정이 아직 없어요. 오늘 미리 정해두면 좋아요.</p>
+            </div>
+          ) : null}
+
+          {scheduleSaveFeedback ? (
+            <div className="rounded-[1.15rem] border border-[#D5E3FA] bg-[linear-gradient(180deg,#F6F9FF_0%,#FFFFFF_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_16px_28px_-24px_rgba(20,41,95,0.12)]">
+              <p className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.18em] text-[#2F5AC7]">저장 완료</p>
+              <p className="font-aggro-display mt-2 break-keep text-[1rem] font-black text-[#17326B]">
+                {scheduleSaveFeedback.title}
+              </p>
+              <p className="student-aggro-body mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                {scheduleSaveFeedback.description}
+              </p>
             </div>
           ) : null}
 
