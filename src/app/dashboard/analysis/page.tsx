@@ -180,7 +180,7 @@ function AnalysisKpiCard({
   const progressValue = clampPercent(progress);
 
   return (
-    <div className={cn('analysis-kpi-card rounded-[1.5rem] p-4 md:p-5 bg-gradient-to-br', toneStyles.soft)}>
+    <div className={cn('analysis-kpi-card rounded-[1.5rem] p-4 bg-gradient-to-br', toneStyles.soft)}>
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6478a5]">{title}</p>
@@ -493,7 +493,7 @@ function GraphDungeonCard({
   return (
     <section
       className={cn(
-        'analysis-growth-module-shell rounded-[1.9rem] p-4 md:p-5',
+        'analysis-growth-module-shell rounded-[1.9rem] p-4',
         !unlocked && 'analysis-growth-module-shell--pending',
         className
       )}
@@ -879,8 +879,8 @@ export default function AnalysisTrackPage() {
         </TabsList>
 
         <TabsContent value="growth" className="mt-0 space-y-4">
-          <section className="analysis-growth-overview rounded-[2.25rem] px-5 py-5 md:px-6 md:py-6">
-            <div className={cn('grid gap-5', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]')}>
+          <section className={cn('analysis-growth-overview rounded-[2.25rem]', isMobile ? 'px-5 py-5' : 'px-6 py-6')}>
+            <div className={cn('grid gap-5', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]')}>
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="analysis-growth-kicker">성장 리포트</span>
@@ -892,7 +892,7 @@ export default function AnalysisTrackPage() {
                   <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">{statusSummary}</p>
                 </div>
 
-                <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'sm:grid-cols-2')}>
+                <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
                   <div className="analysis-growth-highlight-card rounded-[1.35rem] px-4 py-4">
                     <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6a7da6]">오늘 학습</p>
                     <p className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-[#14295F]', isMobile ? 'text-[1.35rem] leading-[1.08]' : 'text-[clamp(1.35rem,2vw,2rem)] leading-[1.04]')}>{minutesToCompactLabel(todayMinutes)}</p>
@@ -916,7 +916,7 @@ export default function AnalysisTrackPage() {
                   </div>
                 </div>
 
-                <div className="analysis-growth-summary-card analysis-growth-summary-card--soft rounded-[1.55rem] p-4 md:p-5">
+                <div className={cn('analysis-growth-summary-card analysis-growth-summary-card--soft rounded-[1.55rem]', isMobile ? 'p-4' : 'p-5')}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">현재 상태</p>
@@ -959,7 +959,7 @@ export default function AnalysisTrackPage() {
               </div>
             </div>
 
-            <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-4')}>
+            <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
               {kpiCards.map((item) => (
                 <AnalysisKpiCard
                   key={item.title}
@@ -975,8 +975,8 @@ export default function AnalysisTrackPage() {
             </div>
           </section>
 
-          <section className="analysis-growth-map rounded-[2rem] p-5 md:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <section className={cn('analysis-growth-map rounded-[2rem]', isMobile ? 'p-5' : 'p-6')}>
+            <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'flex-row items-start justify-between')}>
               <div>
                 <span className="analysis-growth-kicker">주간 성장 흐름</span>
                 <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>지난 7일 집중 흐름</h2>
@@ -988,17 +988,17 @@ export default function AnalysisTrackPage() {
                 <p className="mt-1 text-[12px] font-semibold text-[#5c6e97]">{minutesToLabel(bestDay.totalMinutes)}</p>
               </div>
             </div>
-            <div className="analysis-growth-canvas mt-5 rounded-[1.55rem] px-4 py-4 md:px-5 md:py-5">
+            <div className={cn('analysis-growth-canvas mt-5 rounded-[1.55rem]', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
               <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} compact={isMobile} />
             </div>
           </section>
 
           <section className="student-analysis-shell">
-            <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-2')}>
+            <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
               {visibleDungeonCards.map((card) => (
                 <GraphDungeonCard
                   key={card.id}
-                  className={cn(!isMobile && (card.id === 'focus' || card.id === 'slot') && 'md:col-span-2')}
+                  className={cn(!isMobile && (card.id === 'focus' || card.id === 'slot') && 'col-span-2')}
                   title={card.title}
                   eyebrow={card.eyebrow}
                   insight={card.insight}
@@ -1083,7 +1083,7 @@ export default function AnalysisTrackPage() {
                           </ComposedChart>
                         </ResponsiveContainer>
                       </div>
-                      <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
+                      <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
                         <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최고 집중일</p>
                           <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
@@ -1102,7 +1102,7 @@ export default function AnalysisTrackPage() {
                       </div>
                     </div>
                   ) : card.id === 'density' ? (
-                    <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
+                    <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
                       {sessionCards.map((item) => (
                         <SessionMetricCard
                           key={item.label}
@@ -1122,7 +1122,7 @@ export default function AnalysisTrackPage() {
                       <div className="analysis-growth-canvas rounded-[1.45rem] p-4">
                         <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} compact={isMobile} />
                       </div>
-                      <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-2')}>
+                      <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
                         <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">연속 기록</p>
                           <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">{kpi.maxStreak}일</p>
@@ -1133,7 +1133,7 @@ export default function AnalysisTrackPage() {
                           <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">오전 8시 루틴</p>
                           <p className="mt-1 text-sm font-semibold text-[#37507F]">잘 이어지는 시간대를 3일 연속 고정해보세요.</p>
                         </div>
-                        <div className={cn('analysis-growth-light-card rounded-[1.2rem] p-4', !isMobile && 'md:col-span-2')}>
+                        <div className={cn('analysis-growth-light-card rounded-[1.2rem] p-4', !isMobile && 'col-span-2')}>
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">코치 해석</p>
                           <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구가 먼저예요' : '리듬이 안정되고 있어요'}</p>
                           <p className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">{insight.improve}</p>
@@ -1141,7 +1141,7 @@ export default function AnalysisTrackPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
+                    <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
                       <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">현재 상태</p>
                         <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>{sessionMetrics.total >= 10 ? '시간대 비교가 가능해요' : '기본 흐름을 먼저 보는 단계예요'}</p>
@@ -1174,14 +1174,14 @@ export default function AnalysisTrackPage() {
             </div>
           </section>
 
-          <section className="analysis-growth-action-panel rounded-[2rem] p-5 md:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
+          <section className={cn('analysis-growth-action-panel rounded-[2rem]', isMobile ? 'p-5' : 'p-6')}>
+            <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'flex-wrap items-start justify-between')}>
+              <div className={cn('min-w-0', !isMobile && 'flex-1 basis-[16rem]')}>
                 <span className="analysis-growth-kicker">다음 추천</span>
                 <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>분석을 바로 계획으로 연결하세요</h2>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">지금 확인한 흐름을 다음 주 기본 계획에 바로 옮기면 유지력이 더 좋아집니다.</p>
               </div>
-              <div className="analysis-growth-light-card analysis-growth-light-card--accent rounded-[1.25rem] p-4 md:min-w-[18rem]">
+              <div className={cn('analysis-growth-light-card analysis-growth-light-card--accent rounded-[1.25rem] p-4', isMobile ? 'w-full min-w-0' : 'min-w-0 max-w-[22rem] flex-[0_1_20rem]')}>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">바로 실행할 한 가지</p>
                 <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>
                   {hasBlankDays ? '공백일을 줄이는 루틴부터 고정하세요' : '잘되는 시간대를 계획 첫 블록에 고정하세요'}
