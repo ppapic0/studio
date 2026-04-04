@@ -379,7 +379,7 @@ function MiniGrowthBars({
       </div>
 
       <div className="relative">
-        <div className="pointer-events-none absolute bottom-[2rem] top-1 left-0 w-px rounded-full bg-white/20" />
+        <div className="pointer-events-none absolute bottom-[2rem] top-1 left-0 w-px rounded-full bg-[rgba(20,41,95,0.12)]" />
         <div className="pl-3">
           <div className="relative h-[5.8rem]">
             {activePoint ? (
@@ -425,7 +425,7 @@ function MiniGrowthBars({
                     x2={chartWidth - paddingX}
                     y1={y}
                     y2={y}
-                    stroke="rgba(255,255,255,0.12)"
+                    stroke="rgba(20,41,95,0.12)"
                     strokeWidth="1"
                     strokeDasharray={tick === 0 ? '0' : '4 5'}
                   />
@@ -471,13 +471,13 @@ function MiniGrowthBars({
               onClick={() => setActiveIndex(index)}
               className={cn(
                 'flex flex-col items-center gap-2 rounded-[0.8rem] px-1 py-1 text-center transition-all duration-300',
-                activeIndex === index ? 'bg-white/12' : 'bg-transparent'
+                activeIndex === index ? 'bg-[#EEF4FF]' : 'bg-transparent'
               )}
               style={{ transitionDelay: `${index * 50}ms` }}
             >
               <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
               <p
-                className="rounded-full border px-2 py-1 text-[11px] font-black text-white"
+                className="rounded-full border px-2 py-1 text-[11px] font-black text-[#17326B]"
                 style={{
                   background: day.tone.chip,
                   borderColor: day.tone.border,
@@ -553,10 +553,10 @@ function GraphDungeonCard({
       </div>
 
       <div className={cn(
-        'mt-4 rounded-[1.35rem] px-3 py-3',
+        'analysis-chart-stage mt-4 rounded-[1.35rem] px-3 py-3',
         lightMode
           ? 'border border-[#F2E2D1] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,248,240,0.9)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]'
-          : 'border border-white/12 bg-white/[0.08]'
+          : ''
       )}>
         {preview}
         <p className={cn('mt-3 text-right text-[11px] font-semibold', lightMode ? 'text-[#7A6B5A]' : 'text-[var(--text-on-dark-soft)]')}>{previewHint}</p>
@@ -1005,7 +1005,7 @@ export default function AnalysisTrackPage() {
             </div>
           </section>
 
-          <section className="space-y-4">
+          <section className="student-analysis-shell space-y-4">
             {visibleDungeonCards.map((card) => (
               <GraphDungeonCard
                 key={card.id}
