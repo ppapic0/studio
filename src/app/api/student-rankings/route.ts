@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
 
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
 
@@ -105,12 +106,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'forbidden' }, { status: 403 });
     }
 
-    const today = new Date();
-    const todayKey = format(today, 'yyyy-MM-dd');
-    const monthKey = format(today, 'yyyy-MM');
+    const nowKst = toKstDate();
+    const dailyRankWindow = getDailyRankWindowState(nowKst);
+    const todayKey = dailyRankWindow.competitionDateKey;
+    const monthKey = format(nowKst, 'yyyy-MM');
     const weekDateKeys = eachDayOfInterval({
-      start: startOfWeek(today, { weekStartsOn: 1 }),
-      end: today,
+      start: startOfWeek(nowKst, { weekStartsOn: 1 }),
+      end: nowKst,
     }).map((date) => format(date, 'yyyy-MM-dd'));
 
     const membersSnapPromise = adminDb

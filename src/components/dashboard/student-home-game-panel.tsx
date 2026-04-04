@@ -28,6 +28,12 @@ type BoxState = "locked" | "charging" | "ready" | "opened";
 type BoxRarity = "common" | "rare" | "epic";
 type BoxStage = "idle" | "shake" | "burst" | "revealed";
 
+const BOX_RARITY_LABELS: Record<BoxRarity, string> = {
+  common: "커먼",
+  rare: "레어",
+  epic: "에픽",
+};
+
 export type StudentHomeQuest = {
   id: string;
   title: string;
@@ -285,10 +291,11 @@ function InventorySlot({
   onSelect: (hour: number) => void;
   isFresh?: boolean;
 }) {
+  const isRolledBox = box.state === "ready" || box.state === "opened";
   const rarityClass =
-    box.rarity === "epic"
+    isRolledBox && box.rarity === "epic"
       ? "point-track-slot--epic"
-      : box.rarity === "rare"
+      : isRolledBox && box.rarity === "rare"
         ? "point-track-slot--rare"
         : "point-track-slot--common";
 
@@ -311,14 +318,14 @@ function InventorySlot({
         <span
           className={cn(
             "rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]",
-            box.rarity === "epic"
+            isRolledBox && box.rarity === "epic"
               ? "border-violet-300/30 bg-violet-300/18 text-violet-100"
-              : box.rarity === "rare"
+              : isRolledBox && box.rarity === "rare"
                 ? "border-orange-300/30 bg-orange-300/18 text-orange-100"
                 : "border-sky-200/24 bg-sky-200/14 text-sky-100",
           )}
         >
-          {box.rarity}
+          {isRolledBox ? BOX_RARITY_LABELS[box.rarity] : "랜덤"}
         </span>
         {box.state === "ready" ? (
           <Sparkles className="h-3.5 w-3.5 text-orange-100" />
@@ -578,9 +585,11 @@ export function StudentHomeGamePanel({
       : `${selectedRangeLabel} 랭킹 대기`;
   const rankSummaryDescription = selectedHomeRank.isLoading
     ? "지금 순위를 불러오고 있어요."
-    : rankPreview.length > 0
-      ? "1등부터 3등까지만 간단하게 보여줘요."
-      : "공부를 시작하면 여기에 순위가 표시돼요.";
+    : selectedHomeRank.description?.trim()
+      ? selectedHomeRank.description.trim()
+      : rankPreview.length > 0
+        ? "1등부터 3등까지만 간단하게 보여줘요."
+        : "공부를 시작하면 여기에 순위가 표시돼요.";
 
   return (
     <>

@@ -10,15 +10,35 @@ export const NAVY_REWARD_THEME = {
 } as const;
 
 export const STUDY_BOX_REWARD_CURVE: Record<number, readonly [number, number]> = {
-  1: [10, 20],
-  2: [15, 25],
-  3: [20, 30],
-  4: [25, 35],
-  5: [30, 40],
-  6: [35, 45],
-  7: [40, 50],
-  8: [45, 55],
+  1: [5, 10],
+  2: [8, 13],
+  3: [10, 15],
+  4: [13, 18],
+  5: [15, 20],
+  6: [18, 23],
+  7: [20, 25],
+  8: [23, 28],
 };
+
+export type StudyBoxRarity = "common" | "rare" | "epic";
+
+const STUDY_BOX_RARITY_MULTIPLIER: Record<StudyBoxRarity, number> = {
+  common: 1,
+  rare: 1.25,
+  epic: 1.6,
+};
+
+const EARLY_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: number }> = [
+  { rarity: "common", weight: 80 },
+  { rarity: "rare", weight: 17 },
+  { rarity: "epic", weight: 3 },
+];
+
+const LATE_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: number }> = [
+  { rarity: "common", weight: 60 },
+  { rarity: "rare", weight: 30 },
+  { rarity: "epic", weight: 10 },
+];
 
 const FORTUNE_MESSAGES = [
   '오늘은 차분하게 시작해도 끝이 강해지는 날이에요.',
@@ -33,11 +53,33 @@ const FORTUNE_MESSAGES = [
 
 export type StudyBoxReward = {
   milestone: number;
+  rarity: StudyBoxRarity;
   minReward: number;
   maxReward: number;
   awardedPoints: number;
   multiplier: number;
 };
+
+export function getStudyBoxRarityWeights(milestone: number) {
+  return milestone >= 5 ? LATE_STUDY_BOX_RARITY_WEIGHTS : EARLY_STUDY_BOX_RARITY_WEIGHTS;
+}
+
+export function getStudyBoxFallbackRarity(milestone: number): StudyBoxRarity {
+  return milestone >= 5 ? "rare" : "common";
+}
+
+export function rollStudyBoxRarity(milestone: number): StudyBoxRarity {
+  const weights = getStudyBoxRarityWeights(milestone);
+  const rolled = Math.random() * weights.reduce((sum, entry) => sum + entry.weight, 0);
+  let cursor = 0;
+
+  for (const entry of weights) {
+    cursor += entry.weight;
+    if (rolled < cursor) return entry.rarity;
+  }
+
+  return weights.at(-1)?.rarity ?? "common";
+}
 
 export function getSkillRewardMultiplier(stats?: GrowthProgress['stats']) {
   if (!stats) return 1;
@@ -65,12 +107,14 @@ export function getAvailableStudyBoxMilestones(totalMinutes: number, claimedStud
 
 export function rollStudyBoxReward(milestone: number, stats?: GrowthProgress['stats']): StudyBoxReward {
   const [baseMin, baseMax] = STUDY_BOX_REWARD_CURVE[milestone] || STUDY_BOX_REWARD_CURVE[1];
-  const multiplier = getSkillRewardMultiplier(stats);
+  const rarity = rollStudyBoxRarity(milestone);
+  const multiplier = getSkillRewardMultiplier(stats) * STUDY_BOX_RARITY_MULTIPLIER[rarity];
   const minReward = Math.max(1, Math.round(baseMin * multiplier));
   const maxReward = Math.max(minReward, Math.round(baseMax * multiplier));
   const awardedPoints = Math.floor(Math.random() * (maxReward - minReward + 1)) + minReward;
   return {
     milestone,
+    rarity,
     minReward,
     maxReward,
     awardedPoints,

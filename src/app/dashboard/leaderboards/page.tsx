@@ -24,6 +24,11 @@ import {
   type StudentRankEntry,
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
+import {
+  formatStudentRankRewardSummary,
+  getDailyRankWindowState,
+  getStudentRankRewardTiers,
+} from '@/lib/student-ranking-policy';
 import { cn } from '@/lib/utils';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
@@ -168,6 +173,10 @@ function formatGapLabel(minutes: number) {
   const mins = safe % 60;
   if (mins === 0) return `${hours}시간`;
   return `${hours}시간 ${mins}분`;
+}
+
+function getBattleTrackLabel(range: RankRange) {
+  return range === 'daily' ? '일간 TRACK' : range === 'weekly' ? '주간 TRACK' : '월간 TRACK';
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -435,13 +444,23 @@ function HeroBattleHeader({
   range,
   onRangeChange,
   activeMessage,
+  isLive = true,
+  statusLabel,
+  subtitleOverride,
   isMobile = false,
 }: {
   range: RankRange;
   onRangeChange: (next: RankRange) => void;
   activeMessage: string;
+  isLive?: boolean;
+  statusLabel?: string;
+  subtitleOverride?: string;
   isMobile?: boolean;
 }) {
+  const heroBadgeLabel = isLive ? 'LIVE BATTLE' : 'WAITING TRACK';
+  const heroStatusLabel = statusLabel || (isLive ? 'LIVE' : '집계 대기');
+  const heroSubtitle = subtitleOverride || RANGE_META[range].subtitle;
+
   if (isMobile) {
     return (
       <section className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-[#132A63]')}>
@@ -451,14 +470,14 @@ function HeroBattleHeader({
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3.5 py-2 text-[10px] font-black tracking-[0.18em] text-[#BA6815]">
               <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
-              LIVE BATTLE
+              {heroBadgeLabel}
             </div>
             <div>
               <h1 className="max-w-[8.5ch] text-[2.35rem] font-aggro-display font-black leading-[0.94] tracking-[-0.05em] text-[#132A63]">
                 {RANGE_META[range].title}
               </h1>
               <p className="student-aggro-body mt-3 max-w-[18rem] text-[14px] text-[#5B7098]">
-                {RANGE_META[range].subtitle}
+                {heroSubtitle}
               </p>
             </div>
           </div>
@@ -474,7 +493,7 @@ function HeroBattleHeader({
               </p>
             </div>
             <div className="shrink-0 rounded-full border border-[#F2C78F] bg-white/80 px-2.5 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
-              LIVE
+              {heroStatusLabel}
             </div>
           </div>
 
@@ -498,7 +517,7 @@ function HeroBattleHeader({
             isMobile ? 'mb-3 px-3.5 py-2 text-[11px] font-black tracking-[0.18em]' : 'mb-4 px-4 py-2 text-xs font-black tracking-[0.28em]'
           )}>
             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
-            LIVE BATTLE
+            {heroBadgeLabel}
           </div>
           <h1 className={cn(
             'font-aggro-display font-black tracking-[-0.05em] text-[#132A63]',
@@ -510,7 +529,7 @@ function HeroBattleHeader({
             'student-aggro-body max-w-2xl text-[#5B7098]',
             isMobile ? 'mt-3 text-base leading-8' : 'mt-3 text-sm leading-7 md:text-base'
           )}>
-            {RANGE_META[range].subtitle}
+            {heroSubtitle}
           </p>
           <div className={cn(
             'max-w-2xl rounded-[24px] border border-[#EDD4BD] bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,249,240,0.92))] backdrop-blur-xl shadow-[0_18px_40px_rgba(20,41,95,0.08)]',
@@ -728,6 +747,7 @@ function MyBattleCard({
   viewer,
   top,
   below,
+  range,
   mode,
   pressure,
   rewardState,
@@ -736,6 +756,7 @@ function MyBattleCard({
   viewer: BattleEntry;
   top: BattleEntry | null;
   below: BattleEntry | null;
+  range: RankRange;
   mode: BattleMode;
   pressure: PressureLevel;
   rewardState: RewardState;
@@ -861,7 +882,7 @@ function MyBattleCard({
             </div>
             <div className={cn('gap-3', isMobile ? 'space-y-3' : 'flex flex-wrap items-end')}>
               <div>
-                <div className={cn('font-black text-[#7A86A2]', isMobile ? 'text-[10px] tracking-[0.15em]' : 'text-[11px] tracking-[0.22em]')}>일간 LIVE TRACK</div>
+                <div className={cn('font-black text-[#7A86A2]', isMobile ? 'text-[10px] tracking-[0.15em]' : 'text-[11px] tracking-[0.22em]')}>{getBattleTrackLabel(range)}</div>
                 <div className={cn('mt-2 font-black leading-none tracking-[-0.06em] text-[#132A63]', isMobile ? 'text-[3.4rem]' : 'text-6xl')}>
                   #{viewer.rank}
                 </div>
@@ -1480,14 +1501,20 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
 }
 
 function RewardCard({
+  range,
   rewardState,
   rewardTitle,
   viewerRank,
+  waitingMessage,
 }: {
+  range: RankRange;
   rewardState: RewardState;
   rewardTitle: string;
   viewerRank: number;
+  waitingMessage?: string | null;
 }) {
+  const rewardTiers = getStudentRankRewardTiers(range);
+
   return (
     <motion.section
       className="relative overflow-hidden rounded-[30px] border border-[#FFB861]/22 bg-[linear-gradient(165deg,#FFF5E4_0%,#FFE7BF_48%,#FFD79A_100%)] p-5 text-[#162D63] shadow-[0_26px_60px_rgba(255,164,68,0.18)] md:p-6"
@@ -1502,12 +1529,14 @@ function RewardCard({
             {rewardTitle}
           </div>
           <h3 className="text-3xl font-black tracking-[-0.05em] text-[#102657]">
-            {rewardState.minutesToReward}분 더 하면 {rewardState.currentReward} 오픈
+            {waitingMessage ? formatStudentRankRewardSummary(range) : `${rewardState.minutesToReward}분 더 하면 ${rewardState.currentReward} 오픈`}
           </h3>
           <p className="mt-2 text-sm font-semibold leading-6 text-[#5E4B2D]">
-            {viewerRank === 1
-              ? '지금 밀어붙이면 선두 보상을 지키면서 상자까지 동시에 챙길 수 있어요.'
-              : '지금 한 번 더 압박하면 보상 상자와 상위권 진입을 동시에 노릴 수 있어요.'}
+            {waitingMessage
+              ? waitingMessage
+              : viewerRank === 1
+                ? '지금 밀어붙이면 선두 보상을 지키면서 상자까지 동시에 챙길 수 있어요.'
+                : '지금 한 번 더 압박하면 보상 상자와 상위권 진입을 동시에 노릴 수 있어요.'}
           </p>
         </div>
         <motion.div
@@ -1539,12 +1568,54 @@ function RewardCard({
           <div className="text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">상자 보상</div>
           <div className="mt-2 text-2xl font-black text-[#132A63]">{rewardState.currentReward}</div>
         </div>
-        <div className="rounded-[22px] border border-[#F0C86E]/80 bg-white/75 p-4">
-          <div className="text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">1위 달성 시</div>
-          <div className="mt-2 text-2xl font-black text-[#132A63]">{rewardState.nextReward}</div>
-        </div>
+        {rewardTiers.map((tier) => (
+          <div key={`${range}-${tier.rank}`} className="rounded-[22px] border border-[#F0C86E]/80 bg-white/75 p-4">
+            <div className="text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">{tier.rank}위 보상</div>
+            <div className="mt-2 text-2xl font-black text-[#132A63]">{tier.points.toLocaleString()}P</div>
+          </div>
+        ))}
       </div>
     </motion.section>
+  );
+}
+
+function DailyWaitingCard({
+  windowLabel,
+  nextOpensAtLabel,
+}: {
+  windowLabel: string;
+  nextOpensAtLabel: string;
+}) {
+  return (
+    <section className="student-utility-card relative overflow-hidden rounded-[30px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top_left,rgba(255,187,108,0.18),transparent_28%),linear-gradient(180deg,#FFF9F1_0%,#FFF5EA_48%,#FFECD8_100%)] p-5 text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.1)] md:p-6">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,rgba(255,255,255,0.76),transparent_36%,transparent_74%,rgba(255,165,78,0.08))]" />
+      <div className="relative space-y-4">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/82 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#BA6815]">
+          <Clock3 className="h-4 w-4" />
+          일간 랭킹 집계 대기
+        </div>
+        <div>
+          <h2 className="font-aggro-display text-[2rem] font-black leading-[0.95] tracking-[-0.05em] text-[#132A63] md:text-[2.4rem]">
+            오픈 시간에만
+            <br />
+            랭킹 트랙이 열려요
+          </h2>
+          <p className="student-aggro-body mt-3 max-w-2xl text-sm leading-7 text-[#5B7098] md:text-base">
+            {windowLabel} 동안만 일간 순위가 실시간으로 집계됩니다. 지금은 대기 상태라서 다음 오픈 시간에 다시 LIVE로 전환돼요.
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-[22px] border border-[#ECD3B6] bg-white/82 p-4 shadow-[0_14px_28px_rgba(20,41,95,0.06)]">
+            <div className="text-[11px] font-black tracking-[0.18em] text-[#A16B0E]">다음 오픈</div>
+            <div className="mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-[#132A63]">{nextOpensAtLabel}</div>
+          </div>
+          <div className="rounded-[22px] border border-[#ECD3B6] bg-white/82 p-4 shadow-[0_14px_28px_rgba(20,41,95,0.06)]">
+            <div className="text-[11px] font-black tracking-[0.18em] text-[#A16B0E]">일간 보상</div>
+            <div className="mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-[#132A63]">1위 500P</div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1806,12 +1877,27 @@ export default function RankingBattlePage() {
   const [logs, setLogs] = useState<LiveLog[]>([]);
   const [floatingEvents, setFloatingEvents] = useState<FloatingEvent[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now());
 
   const entriesRef = useRef<BattleEntry[]>([]);
 
   useEffect(() => {
     entriesRef.current = battleEntries;
   }, [battleEntries]);
+
+  useEffect(() => {
+    setClockNowMs(Date.now());
+    const intervalId = window.setInterval(() => {
+      setClockNowMs(Date.now());
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const dailyRankWindow = useMemo(
+    () => getDailyRankWindowState(new Date(clockNowMs)),
+    [clockNowMs]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1864,7 +1950,7 @@ export default function RankingBattlePage() {
   }, [baseEntries, viewerId]);
 
   useEffect(() => {
-    if (!battleEntries.length) return;
+    if (!battleEntries.length || (range === 'daily' && !dailyRankWindow.isLive)) return;
 
     const intervalId = window.setInterval(() => {
       const outcome = simulateBattleTick(entriesRef.current, viewerId);
@@ -1875,7 +1961,7 @@ export default function RankingBattlePage() {
     }, LIVE_TICK_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [battleEntries.length, viewerId, range]);
+  }, [battleEntries.length, dailyRankWindow.isLive, viewerId, range]);
 
   useEffect(() => {
     if (!floatingEvents.length) return;
@@ -1897,6 +1983,7 @@ export default function RankingBattlePage() {
   const mode = viewer ? getBattleMode(viewer.rank, diffAbove, diffBelow) : 'chase';
   const pressure = viewer ? getPressureLevel(viewer.rank, diffAbove, diffBelow) : 'stable';
   const rewardState = buildRewardState(viewer?.value ?? 0);
+  const isDailyWaiting = range === 'daily' && !dailyRankWindow.isLive;
   const recommendations = useMemo(
     () => (viewer ? buildMainRecommendations({ viewer, top, below, logs }) : []),
     [viewer, top, below, logs]
@@ -1959,13 +2046,59 @@ export default function RankingBattlePage() {
     ]);
   }
 
-  if (loading && !viewer) {
+  if (loading && !viewer && !isDailyWaiting) {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,195,122,0.16),_transparent_24%),linear-gradient(180deg,#FFFDF9_0%,#FFF3E4_100%)] px-4 py-8 text-[#132A63]">
         <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center rounded-[32px] border border-[#E7D3C0] bg-white/92 shadow-[0_28px_80px_rgba(20,41,95,0.08)]">
           <div className="flex items-center gap-3 text-lg font-bold text-[#64779C]">
             <Loader2 className="h-5 w-5 animate-spin" />
             경쟁 전장을 불러오는 중입니다.
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (isDailyWaiting) {
+    return (
+      <main className={cn(
+        'student-font-shell',
+        'bg-[radial-gradient(circle_at_top,_rgba(255,186,106,0.18),_transparent_22%),linear-gradient(180deg,#FFFCF8_0%,#FFF3E4_100%)] text-[#132A63]',
+        isMobile ? 'min-h-0 px-0 py-0' : 'min-h-screen px-4 py-6 md:px-6 md:py-8'
+      )}>
+        <div className={cn('mx-auto', isMobile ? 'max-w-none space-y-4' : 'max-w-7xl space-y-5')}>
+          <HeroBattleHeader
+            range={range}
+            onRangeChange={handleRangeChange}
+            activeMessage={`다음 오픈 ${dailyRankWindow.nextOpensAtLabel}부터 일간 랭킹이 다시 LIVE로 열려요.`}
+            isLive={false}
+            statusLabel="집계 대기"
+            subtitleOverride={`${dailyRankWindow.windowLabel} 동안만 일간 경쟁이 열립니다.`}
+            isMobile={isMobile}
+          />
+
+          {fetchError ? (
+            <div className="rounded-[24px] border border-[#FFB15B]/30 bg-[#FFF4E5] px-4 py-3 text-sm font-semibold text-[#9A5B12]">
+              {fetchError}
+            </div>
+          ) : null}
+
+          <div className={cn(isMobile ? 'space-y-4' : 'grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]')}>
+            <div className="space-y-5">
+              <DailyWaitingCard
+                windowLabel={dailyRankWindow.windowLabel}
+                nextOpensAtLabel={dailyRankWindow.nextOpensAtLabel}
+              />
+            </div>
+            <div className="space-y-5">
+              <RewardCard
+                range={range}
+                rewardState={rewardState}
+                rewardTitle={RANGE_META[range].rewardTitle}
+                viewerRank={viewer?.rank ?? 0}
+                waitingMessage={`다음 오픈 ${dailyRankWindow.nextOpensAtLabel} · ${formatStudentRankRewardSummary(range)}`}
+              />
+            </div>
           </div>
         </div>
       </main>
@@ -1981,7 +2114,14 @@ export default function RankingBattlePage() {
       isMobile ? 'min-h-0 px-0 py-0' : 'min-h-screen px-4 py-6 md:px-6 md:py-8'
     )}>
       <div className={cn('mx-auto', isMobile ? 'max-w-none space-y-4' : 'max-w-7xl space-y-5')}>
-        <HeroBattleHeader range={range} onRangeChange={handleRangeChange} activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]} isMobile={isMobile} />
+        <HeroBattleHeader
+          range={range}
+          onRangeChange={handleRangeChange}
+          activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]}
+          isLive
+          statusLabel="LIVE"
+          isMobile={isMobile}
+        />
 
         {fetchError ? (
           <div className="rounded-[24px] border border-[#FFB15B]/30 bg-[#FFF4E5] px-4 py-3 text-sm font-semibold text-[#9A5B12]">
@@ -1992,15 +2132,27 @@ export default function RankingBattlePage() {
         {isMobile ? (
           <div className="space-y-4">
             <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
-            <MyBattleCard viewer={viewer} top={top} below={below} mode={mode} pressure={pressure} rewardState={rewardState} isMobile />
+            <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} rewardState={rewardState} isMobile />
+            <RewardCard
+              range={range}
+              rewardState={rewardState}
+              rewardTitle={RANGE_META[range].rewardTitle}
+              viewerRank={viewer.rank}
+            />
           </div>
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
             <div className="space-y-5">
-              <MyBattleCard viewer={viewer} top={top} below={below} mode={mode} pressure={pressure} rewardState={rewardState} />
+              <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} rewardState={rewardState} />
             </div>
             <div className="space-y-5">
               <StandingsSidebar leaders={liveLeaders} viewer={viewer} />
+              <RewardCard
+                range={range}
+                rewardState={rewardState}
+                rewardTitle={RANGE_META[range].rewardTitle}
+                viewerRank={viewer.rank}
+              />
             </div>
           </div>
         )}

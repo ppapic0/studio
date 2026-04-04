@@ -29,7 +29,13 @@ import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
-import { getAvailableStudyBoxMilestones, getClaimedStudyBoxes, rollStudyBoxReward, type StudyBoxReward } from '@/lib/student-rewards';
+import {
+  getAvailableStudyBoxMilestones,
+  getClaimedStudyBoxes,
+  getStudyBoxFallbackRarity,
+  rollStudyBoxReward,
+  type StudyBoxReward,
+} from '@/lib/student-rewards';
 import { GrowthProgress, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -48,17 +54,6 @@ type RewardBox = {
 type FloatingGain = {
   key: number;
   amount: number;
-};
-
-const BOX_RARITIES: Record<number, BoxRarity> = {
-  1: 'common',
-  2: 'common',
-  3: 'common',
-  4: 'rare',
-  5: 'rare',
-  6: 'rare',
-  7: 'epic',
-  8: 'epic',
 };
 
 const RARITY_LABELS: Record<BoxRarity, string> = {
@@ -183,10 +178,12 @@ function coerceStudyBoxRewards(dayStatus: Record<string, any>): StudyBoxReward[]
       const maxReward = Number(entry?.maxReward);
       const awardedPoints = Number(entry?.awardedPoints);
       const multiplier = Number(entry?.multiplier ?? 1);
+      const rarity = entry?.rarity;
       if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
       if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
       return {
         milestone,
+        rarity: rarity === 'epic' || rarity === 'rare' || rarity === 'common' ? rarity : getStudyBoxFallbackRarity(milestone),
         minReward,
         maxReward,
         awardedPoints,
@@ -227,7 +224,7 @@ function buildRewardBoxes({
       id: `point-box-${hour}`,
       hour,
       state,
-      rarity: BOX_RARITIES[hour] || 'common',
+      rarity: rewardByHour.get(hour)?.rarity || getStudyBoxFallbackRarity(hour),
       reward: rewardByHour.get(hour)?.awardedPoints,
     } satisfies RewardBox;
   });
@@ -357,10 +354,11 @@ function InventorySlot({
   chargingPercent?: number;
   isFresh?: boolean;
 }) {
+  const isRolledBox = box.state === 'ready' || box.state === 'opened';
   const rarityClass =
-    box.rarity === 'epic'
+    isRolledBox && box.rarity === 'epic'
       ? 'point-track-slot--epic'
-      : box.rarity === 'rare'
+      : isRolledBox && box.rarity === 'rare'
         ? 'point-track-slot--rare'
         : 'point-track-slot--common';
 
@@ -383,14 +381,14 @@ function InventorySlot({
         <span
           className={cn(
             'rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]',
-            box.rarity === 'epic'
+            isRolledBox && box.rarity === 'epic'
               ? 'border-violet-300/30 bg-violet-300/18 text-violet-100'
-              : box.rarity === 'rare'
+              : isRolledBox && box.rarity === 'rare'
                 ? 'border-orange-300/30 bg-orange-300/18 text-orange-100'
                 : 'border-sky-200/24 bg-sky-200/14 text-sky-100'
           )}
         >
-          {RARITY_LABELS[box.rarity]}
+          {isRolledBox ? RARITY_LABELS[box.rarity] : '랜덤'}
         </span>
         {box.state === 'ready' ? (
           <Star className="h-3.5 w-3.5 text-orange-100" />

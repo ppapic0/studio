@@ -97,6 +97,7 @@ import {
   formatStudyMinutesShort,
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
+  getStudyBoxFallbackRarity,
   rollStudyBoxReward,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
@@ -105,6 +106,10 @@ import {
   fetchStudentRankingSnapshot,
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
+import {
+  formatStudentRankRewardSummary,
+  getDailyRankWindowState,
+} from '@/lib/student-ranking-policy';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
@@ -714,6 +719,12 @@ function PointHistoryDialog({
             <div className="space-y-2">
               {sortedDates.map(([date, data]) => {
                 const studyBoxes = Array.isArray(data.claimedStudyBoxes) ? data.claimedStudyBoxes.length : 0;
+                const dailyRankRewardAmount = Math.max(0, Number(data.dailyRankRewardAmount || data.dailyTopRewardAmount || 0));
+                const dailyRankRewardRank = Math.max(0, Number(data.dailyRankRewardRank || (dailyRankRewardAmount > 0 ? 1 : 0)));
+                const weeklyRankRewardAmount = Math.max(0, Number(data.weeklyRankRewardAmount || 0));
+                const weeklyRankRewardRank = Math.max(0, Number(data.weeklyRankRewardRank || 0));
+                const monthlyRankRewardAmount = Math.max(0, Number(data.monthlyRankRewardAmount || 0));
+                const monthlyRankRewardRank = Math.max(0, Number(data.monthlyRankRewardRank || 0));
 
                 return (
                   <div key={date} className="bg-white p-4 rounded-xl border border-primary/10 flex items-center justify-between">
@@ -724,7 +735,21 @@ function PointHistoryDialog({
                         {data.plan && <Badge variant="outline" className="bg-emerald-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">계획</Badge>}
                         {data.routine && <Badge variant="outline" className="bg-amber-500 text-white border-none font-black text-[8px] px-1.5 py-0.5">루틴</Badge>}
                         {studyBoxes > 0 && <Badge variant="outline" className="bg-[#14295F] text-white border-none font-black text-[8px] px-1.5 py-0.5">상자 {studyBoxes}</Badge>}
-                        {data.dailyTopRewardAmount ? <Badge variant="outline" className="bg-violet-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">일간 1위</Badge> : null}
+                        {dailyRankRewardAmount > 0 ? (
+                          <Badge variant="outline" className="bg-violet-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">
+                            일간 {dailyRankRewardRank || 1}위
+                          </Badge>
+                        ) : null}
+                        {weeklyRankRewardAmount > 0 ? (
+                          <Badge variant="outline" className="bg-fuchsia-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">
+                            주간 {weeklyRankRewardRank}위
+                          </Badge>
+                        ) : null}
+                        {monthlyRankRewardAmount > 0 ? (
+                          <Badge variant="outline" className="bg-rose-600 text-white border-none font-black text-[8px] px-1.5 py-0.5">
+                            월간 {monthlyRankRewardRank}위
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
                     <div className="text-right">
@@ -909,23 +934,25 @@ function MiniBestStudySparkline({
 function coerceStudyBoxRewards(dayStatus: Record<string, any>) {
   const raw = Array.isArray(dayStatus.studyBoxRewards) ? dayStatus.studyBoxRewards : [];
   return raw
-    .map((entry) => {
+    .map((entry): StudyBoxReward | null => {
       const milestone = Number(entry?.milestone);
       const minReward = Number(entry?.minReward);
       const maxReward = Number(entry?.maxReward);
       const awardedPoints = Number(entry?.awardedPoints);
       const multiplier = Number(entry?.multiplier ?? 1);
+      const rarity = entry?.rarity;
       if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
       if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
       return {
         milestone,
+        rarity: rarity === 'epic' || rarity === 'rare' || rarity === 'common' ? rarity : getStudyBoxFallbackRarity(milestone),
         minReward,
         maxReward,
         awardedPoints,
         multiplier: Number.isFinite(multiplier) ? multiplier : 1,
       };
     })
-    .filter((entry): entry is { milestone: number; minReward: number; maxReward: number; awardedPoints: number; multiplier: number } => Boolean(entry))
+    .filter((entry): entry is StudyBoxReward => Boolean(entry))
     .sort((a, b) => a.milestone - b.milestone);
 }
 
@@ -937,12 +964,6 @@ function coerceOpenedStudyBoxes(dayStatus: Record<string, any>) {
     .sort((a, b) => a - b);
 }
 
-function getStudyBoxRarity(hour: number): 'common' | 'rare' | 'epic' {
-  if (hour >= 7) return 'epic';
-  if (hour >= 4) return 'rare';
-  return 'common';
-}
-
 function buildRewardBoxes({
   earnedHours,
   claimedHours,
@@ -952,7 +973,7 @@ function buildRewardBoxes({
   earnedHours: number;
   claimedHours: number[];
   openedHours: number[];
-  rewardByHour: Map<number, { awardedPoints: number }>;
+  rewardByHour: Map<number, StudyBoxReward>;
 }): StudentHomeRewardBox[] {
   const claimedSet = new Set(claimedHours);
   const openedSet = new Set(openedHours);
@@ -973,7 +994,7 @@ function buildRewardBoxes({
       id: `home-box-${hour}`,
       hour,
       state,
-      rarity: getStudyBoxRarity(hour),
+      rarity: rewardByHour.get(hour)?.rarity || getStudyBoxFallbackRarity(hour),
       reward: rewardByHour.get(hour)?.awardedPoints,
     };
   });
@@ -2156,6 +2177,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const validDailyRankEntries = rankSnapshot.daily;
   const validWeeklyRankEntries = rankSnapshot.weekly;
+  const dailyRankWindow = useMemo(
+    () => getDailyRankWindowState(new Date(rankPreviewNowMs)),
+    [rankPreviewNowMs]
+  );
 
   const dailyStudyRank = useMemo(() => {
     if (!user || validDailyRankEntries.length === 0) return 0;
@@ -2208,14 +2233,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const monthlyStudyRankDisplaySeconds = Math.max(0, monthlyStudyRankMinutes * 60 + liveRankSessionSeconds);
 
   const homeRankMap = useMemo(() => {
-    const buildRankPreview = (entries: StudentRankingSnapshot['daily']): StudentHomeRankPreviewEntry[] =>
+    const buildRankPreview = (
+      entries: StudentRankingSnapshot['daily'],
+      allowLiveTrack = true
+    ): StudentHomeRankPreviewEntry[] =>
       entries.slice(0, 3).map((entry, index) => {
         const studentId = typeof entry.studentId === 'string' ? entry.studentId : null;
         const baseMinutes = Math.max(0, Number(entry.value || 0));
-        const isSelfLive = Boolean(studentId && studentId === user?.uid && isTimerActive);
+        const isSelfLive = Boolean(allowLiveTrack && studentId && studentId === user?.uid && isTimerActive);
         const liveSeconds = isSelfLive
           ? localSeconds
-          : getLiveAttendanceSeconds(studentId ? attendanceCurrentByStudent.get(studentId) : null, rankPreviewNowMs);
+          : allowLiveTrack
+            ? getLiveAttendanceSeconds(studentId ? attendanceCurrentByStudent.get(studentId) : null, rankPreviewNowMs)
+            : 0;
 
         return {
           rank: Number(entry.rank || index + 1),
@@ -2229,7 +2259,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         };
       });
 
-    const dailyTop = buildRankPreview(validDailyRankEntries);
+    const dailyTop = dailyRankWindow.isLive ? buildRankPreview(validDailyRankEntries, true) : [];
     const weeklyTop = buildRankPreview(validWeeklyRankEntries);
     const monthlyTop = buildRankPreview(
       [...validRankEntries].sort((a, b) => Number(b.value || 0) - Number(a.value || 0))
@@ -2240,19 +2270,27 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         title: '일간 랭킹',
         rank: dailyStudyRank,
         minutes: dailyStudyRankMinutes,
-        badge: rankSnapshotLoading ? '집계 중' : dailyStudyRank > 0 ? `오늘 ${dailyStudyRank}위` : '집계 준비중',
-        caption: dailyStudyRankDisplaySeconds > 0
-          ? isTimerActive
-            ? `${formatStudyDurationWithSeconds(dailyStudyRankDisplaySeconds)} 누적`
-            : `${formatStudyMinutes(Math.max(0, dailyStudyRankMinutes))} 누적`
-          : '오늘 기록이 쌓이면 바로 보여요',
-        description: isTimerActive
-          ? '지금 공부 중인 시간이 랭킹 누적에 바로 반영되고 있어요.'
-          : '공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.',
+        badge: rankSnapshotLoading
+          ? '집계 중'
+          : dailyRankWindow.isLive
+            ? dailyStudyRank > 0
+              ? `오늘 ${dailyStudyRank}위`
+              : '집계 준비중'
+            : '집계 대기',
+        caption: dailyRankWindow.isLive
+          ? dailyStudyRankDisplaySeconds > 0
+            ? isTimerActive
+              ? `${formatStudyDurationWithSeconds(dailyStudyRankDisplaySeconds)} 누적`
+              : `${formatStudyMinutes(Math.max(0, dailyStudyRankMinutes))} 누적`
+            : '오늘 기록이 쌓이면 바로 보여요'
+          : `다음 오픈 ${dailyRankWindow.nextOpensAtLabel}`,
+        description: dailyRankWindow.isLive
+          ? `${dailyRankWindow.windowLabel} · ${formatStudentRankRewardSummary('daily')}`
+          : `${dailyRankWindow.windowLabel} · ${formatStudentRankRewardSummary('daily')}`,
         preview: dailyTop,
         isLoading: rankSnapshotLoading,
-        isLive: isTimerActive,
-        liveBadge: isTimerActive ? `LIVE ${formatHeroSessionTimer(localSeconds)}` : null,
+        isLive: dailyRankWindow.isLive,
+        liveBadge: dailyRankWindow.isLive ? (isTimerActive ? `LIVE ${formatHeroSessionTimer(localSeconds)}` : 'LIVE') : null,
       },
       weekly: {
         title: '주간 랭킹',
@@ -2264,9 +2302,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             ? `${formatStudyDurationWithSeconds(weeklyStudyRankDisplaySeconds)} 누적`
             : `${formatStudyMinutes(Math.max(0, weeklyStudyRankMinutes))} 누적`
           : '이번 주 기록이 쌓이면 보여요',
-        description: isTimerActive
-          ? '현재 세션 시간이 주간 누적에도 바로 합산되고 있어요.'
-          : '공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.',
+        description: `${formatStudentRankRewardSummary('weekly')} 지급`,
         preview: weeklyTop,
         isLoading: rankSnapshotLoading,
         isLive: isTimerActive,
@@ -2282,9 +2318,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             ? `${formatStudyDurationWithSeconds(monthlyStudyRankDisplaySeconds)} 누적`
             : `${formatStudyMinutes(Math.max(0, monthlyStudyRankMinutes))} 누적`
           : '이번 달 공부시간이 쌓이면 순위가 보여요',
-        description: isTimerActive
-          ? '이번 세션까지 포함한 월간 누적 시간이 초 단위로 갱신되고 있어요.'
-          : '공부 흐름이 쌓이면 상위권 경쟁이 바로 열려요.',
+        description: `${formatStudentRankRewardSummary('monthly')} 지급`,
         preview: monthlyTop,
         isLoading: isRankContextLoading,
         isLive: isTimerActive,
@@ -2322,6 +2356,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     weeklyStudyRank,
     weeklyStudyRankDisplaySeconds,
     weeklyStudyRankMinutes,
+    dailyRankWindow,
   ]);
   const selectedHomeRank = homeRankMap[selectedRankRange];
   const hasExternalLiveRankPreview = useMemo(
@@ -2330,12 +2365,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   );
 
   useEffect(() => {
-    if (!hasExternalLiveRankPreview) return;
-
     setRankPreviewNowMs(Date.now());
     const intervalId = window.setInterval(() => {
       setRankPreviewNowMs(Date.now());
-    }, 1000);
+    }, hasExternalLiveRankPreview ? 1000 : 30000);
 
     return () => window.clearInterval(intervalId);
   }, [hasExternalLiveRankPreview, selectedRankRange]);
@@ -2392,7 +2425,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, []);
 
   const rewardByHour = useMemo(() => {
-    const map = new Map<number, { awardedPoints: number }>();
+    const map = new Map<number, StudyBoxReward>();
     syncedRewardEntries.forEach((entry) => {
       map.set(entry.milestone, entry);
     });

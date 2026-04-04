@@ -4279,12 +4279,14 @@ export const ensureCurrentUserMemberships = functions
       repairedCenterIds.add(centerId);
     }
 
-    return {
+  return {
       ok: true,
       centerIds: Array.from(repairedCenterIds),
       repairedCount: repairedCenterIds.size,
     };
   });
+
+export { scheduledRankingRewardSettlement } from "./rankingRewardSettlement";
 
 function buildFallbackStudyPlan(profile: Record<string, any>) {
   const weakSubject = Array.isArray(profile.weakSubjects) && profile.weakSubjects.length > 0
