@@ -50,7 +50,7 @@ export function PointRewardSection() {
             학습 동기와 흥미를 끌어올립니다
           </h2>
           <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.86] text-[#425A75]">
-            공부시간, 계획 완수 등 구체적인 실행을 포인트로 반영하고 상벌점 제도로 기준을 세워 학생이 스스로 동기와 흥미를 유지할 수 있도록 합니다. 학습 동기를 단단하게 만드는 장치까지 함께 설계합니다.
+            공부시간, 계획완수 등 구체적인 실행을 포인트로 반영하고, 흥미를 유지할 수 있도록 돕습니다. 학습 동선을 단단하게 만드는 장치까지 트랙이 설계합니다.
           </p>
 
           <div className="mt-6 grid gap-3">
