@@ -348,6 +348,8 @@ function StatAnalysisCard({
   title,
   value,
   subValue,
+  compactTitle,
+  compactSubValue,
   icon: Icon,
   colorClass,
   isMobile,
@@ -358,6 +360,8 @@ function StatAnalysisCard({
   title: string;
   value: string;
   subValue: string;
+  compactTitle?: string;
+  compactSubValue?: string;
   icon: any;
   colorClass: string;
   isMobile: boolean;
@@ -367,20 +371,23 @@ function StatAnalysisCard({
 }) {
   const tone = getPresentationTone(colorClass);
   const isCompactAnalysisKpi = presentationMode === 'student-analysis' && isMobile;
+  const displayedTitle = isCompactAnalysisKpi ? compactTitle ?? title : title;
+  const displayedSubValue = isCompactAnalysisKpi ? compactSubValue ?? subValue : subValue;
+  const displayedValue = isCompactAnalysisKpi ? value.replace(/\s+/g, '\n') : value;
 
   if (presentationMode === 'student-analysis') {
     return (
       <Card
         className={cn(
           'analysis-premium-card analysis-full-kpi-card surface-card surface-card--secondary on-dark min-w-0 h-full overflow-hidden border-none transition-all',
-          isCompactAnalysisKpi ? 'rounded-[1.2rem]' : 'rounded-[1.5rem]',
+          isCompactAnalysisKpi ? 'analysis-full-kpi-card--compact rounded-[1.2rem]' : 'rounded-[1.5rem]',
           onClick && 'cursor-pointer active:scale-[0.985]'
         )}
         onClick={onClick}
       >
-        <div className={cn('pointer-events-none absolute inset-x-0 top-0 bg-[radial-gradient(circle_at_top_left,rgba(126,164,255,0.18),transparent_68%)]', isCompactAnalysisKpi ? 'h-14' : 'h-20')} />
-        <div className={cn('pointer-events-none absolute rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.8)_0%,rgba(255,255,255,0)_72%)] opacity-70 blur-2xl', isCompactAnalysisKpi ? 'right-2 top-2 h-10 w-10' : 'right-3 top-3 h-16 w-16')} />
-        <CardHeader className={cn('relative z-10 pb-2 flex items-start justify-between', isCompactAnalysisKpi ? 'gap-1.5 px-2.5 pt-2.5' : isMobile ? 'gap-2 px-4 pt-4 flex-row' : 'px-5 pt-5 flex-row')}>
+        <div className={cn('analysis-kpi-card-glow-primary pointer-events-none absolute inset-x-0 top-0 bg-[radial-gradient(circle_at_top_left,rgba(126,164,255,0.18),transparent_68%)]', isCompactAnalysisKpi ? 'h-14' : 'h-20')} />
+        <div className={cn('analysis-kpi-card-glow-secondary pointer-events-none absolute rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.8)_0%,rgba(255,255,255,0)_72%)] opacity-70 blur-2xl', isCompactAnalysisKpi ? 'right-2 top-2 h-10 w-10' : 'right-3 top-3 h-16 w-16')} />
+        <CardHeader className={cn('analysis-kpi-card-header relative z-10 pb-2 flex items-start justify-between', isCompactAnalysisKpi ? 'gap-1.5 px-2.5 pt-2.5' : isMobile ? 'gap-2 px-4 pt-4 flex-row' : 'px-5 pt-5 flex-row')}>
           <div className="min-w-0">
             <div
               className={cn(
@@ -393,26 +400,26 @@ function StatAnalysisCard({
                     : 'text-[10px] uppercase tracking-[0.18em]'
               )}
             >
-              {title}
+              {displayedTitle}
             </div>
-            <div className={cn('analysis-kpi-card-value dashboard-number font-aggro-display font-black tracking-tight break-keep text-[#17326B]', isCompactAnalysisKpi ? 'mt-2 text-[0.95rem] leading-[0.95]' : isMobile ? 'mt-3 text-[1.9rem] leading-[0.92]' : 'mt-3 text-[1.85rem]')}>
-              {value}
+            <div className={cn('analysis-kpi-card-value dashboard-number font-aggro-display font-black tracking-tight break-keep text-[#17326B]', isCompactAnalysisKpi ? 'mt-2 whitespace-pre-line text-[0.95rem] leading-[0.95]' : isMobile ? 'mt-3 text-[1.9rem] leading-[0.92]' : 'mt-3 text-[1.85rem]')}>
+              {displayedValue}
             </div>
-            <p className={cn('analysis-kpi-card-subvalue font-semibold break-keep text-[#3E5488]', isCompactAnalysisKpi ? 'mt-1 text-[8px] leading-[1.3] line-clamp-2' : isMobile ? 'mt-1 text-[10px] leading-5' : 'mt-1 text-[11px] leading-5')}>
-              {subValue}
+            <p className={cn('analysis-kpi-card-subvalue font-semibold break-keep text-[#3E5488]', isCompactAnalysisKpi ? 'mt-1 text-[8px] leading-[1.3]' : isMobile ? 'mt-1 text-[10px] leading-5' : 'mt-1 text-[11px] leading-5')}>
+              {displayedSubValue}
             </p>
           </div>
           <div className={cn('analysis-kpi-card-icon flex shrink-0 items-center justify-center shadow-none', isCompactAnalysisKpi ? 'h-8 w-8 rounded-[0.9rem]' : 'rounded-[1rem] px-3 py-2')}>
             <Icon className={cn(isCompactAnalysisKpi ? 'h-3 w-3' : isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4', tone.text)} />
           </div>
         </CardHeader>
-        <CardContent className={cn('relative z-10', isCompactAnalysisKpi ? 'px-2.5 pb-2.5 pt-0' : isMobile ? 'px-4 pb-4 pt-0' : 'px-5 pb-5 pt-0')}>
+        <CardContent className={cn('analysis-kpi-card-content relative z-10', isCompactAnalysisKpi ? 'px-2.5 pb-2.5 pt-0' : isMobile ? 'px-4 pb-4 pt-0' : 'px-5 pb-5 pt-0')}>
           <div className="analysis-kpi-track">
             <span className={cn('bg-gradient-to-r', tone.bar)} style={{ width: `${Math.max(0, Math.min(100, Math.round(progress)))}%` }} />
           </div>
-          <div className={cn('flex items-center justify-between gap-2', isCompactAnalysisKpi ? 'mt-1.5' : 'mt-2')}>
-            {!isCompactAnalysisKpi ? <span className="analysis-kpi-card-meta text-[10px] font-black uppercase tracking-[0.16em] text-[#4B6397]">Insight Rail</span> : <span className="analysis-kpi-card-meta text-[8px] font-black uppercase tracking-[0.1em] text-[#6b7ea5]">Rail</span>}
-            <span className={cn(isCompactAnalysisKpi ? 'text-[8px]' : 'text-[10px]', 'font-black', tone.text)}>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
+          <div className={cn('analysis-kpi-card-meta-row flex items-center gap-2', isCompactAnalysisKpi ? 'mt-1 justify-end' : 'mt-2 justify-between')}>
+            {!isCompactAnalysisKpi ? <span className="analysis-kpi-card-meta analysis-kpi-card-meta-label text-[10px] font-black uppercase tracking-[0.16em] text-[#4B6397]">Insight Rail</span> : null}
+            <span className={cn('analysis-kpi-card-progress font-black', isCompactAnalysisKpi ? 'text-[8px]' : 'text-[10px]', tone.text)}>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
           </div>
         </CardContent>
       </Card>
@@ -2087,6 +2094,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           title="평균 공부시간"
           value={minutesToLabel(avgStudyMinutes)}
           subValue={`최근 ${RANGE_MAP[focusedChartView]}일 기준`}
+          compactTitle="공부시간"
+          compactSubValue={`${RANGE_MAP[focusedChartView]}일 기준`}
           icon={Clock3}
           colorClass="text-blue-500"
           isMobile={isMobile}
@@ -2098,6 +2107,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           title="평균 공부 리듬"
           value={`${rhythmScore}점`}
           subValue="실제 공부시간 분산 기반 안정성"
+          compactTitle="공부리듬"
+          compactSubValue="분산 안정성"
           icon={TrendingUp}
           colorClass="text-emerald-500"
           isMobile={isMobile}
@@ -2109,6 +2120,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           title="계획 완수율"
           value={`${avgCompletionRate}%`}
           subValue="학습 할 일 완료율"
+          compactTitle="완수율"
+          compactSubValue="할 일 완료율"
           icon={CheckCircle2}
           colorClass="text-amber-500"
           isMobile={isMobile}
@@ -2119,6 +2132,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           title="상담 진행도"
           value={`${studentReservations.filter((item) => item.status === 'done').length}/${studentReservations.length}`}
           subValue="완료 상담 / 전체 상담"
+          compactTitle="상담"
+          compactSubValue="완료/전체 상담"
           icon={MessageSquare}
           colorClass="text-rose-500"
           isMobile={isMobile}
