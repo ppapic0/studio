@@ -292,29 +292,23 @@ export function StudyComposerCard({
                 />
               ) : null}
 
-              <div className="mt-3 rounded-[1.1rem] border border-[#D7E1F2] bg-[#F8FAFF] p-2.5">
-                <div className={cn('flex gap-2', isMobile ? 'flex-col items-start' : 'items-center justify-between')}>
-                  <button
-                    type="button"
-                    disabled={disabled || isSubmitting}
-                    onClick={() => {
-                      const nextValue = !showOptionalMinutes;
-                      setShowOptionalMinutes(nextValue);
-                      onEnableVolumeMinutesChange(nextValue);
-                    }}
-                    className={cn(
-                      'rounded-full border px-3 py-1.5 text-[10px] font-black transition-all',
-                      showOptionalMinutes
-                        ? 'border-[#14295F] bg-[#14295F] text-white'
-                        : 'border-[#D7E1F2] bg-white text-[#355185]'
-                    )}
-                  >
-                    예상 시간(선택)
-                  </button>
-                  <p className="text-[11px] font-semibold text-[#6E83AB]">
-                    시간은 나중에 대략 적어도 괜찮아요.
-                  </p>
-                </div>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  disabled={disabled || isSubmitting}
+                  onClick={() => {
+                    const nextValue = !showOptionalMinutes;
+                    setShowOptionalMinutes(nextValue);
+                    onEnableVolumeMinutesChange(nextValue);
+                  }}
+                  className={cn(
+                    'text-[11px] font-black transition-colors',
+                    showOptionalMinutes ? 'text-[#14295F]' : 'text-[#5C73A0]',
+                    !disabled && !isSubmitting && 'hover:text-[#14295F]'
+                  )}
+                >
+                  {showOptionalMinutes ? '예상 시간 숨기기' : '예상 시간 추가'}
+                </button>
                 {showOptionalMinutes ? (
                   <div className="mt-2 flex items-center gap-2">
                     <Input
