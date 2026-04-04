@@ -376,35 +376,36 @@ function StatAnalysisCard({
         )}
         onClick={onClick}
       >
-        <CardHeader className={cn('pb-2 flex flex-row items-start justify-between', isMobile ? 'gap-2 px-4 pt-4' : 'px-5 pt-5')}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top_left,rgba(126,164,255,0.18),transparent_68%)]" />
+        <div className="pointer-events-none absolute right-3 top-3 h-16 w-16 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.8)_0%,rgba(255,255,255,0)_72%)] opacity-70 blur-2xl" />
+        <CardHeader className={cn('relative z-10 pb-2 flex flex-row items-start justify-between', isMobile ? 'gap-2 px-4 pt-4' : 'px-5 pt-5')}>
           <div className="min-w-0">
-            <CardTitle
+            <div
               className={cn(
-                'min-w-0 break-keep',
-                isMobile
-                  ? 'font-aggro-display text-[13px] font-black leading-[1.2] tracking-[-0.02em] text-[#17326B]'
-                  : 'font-aggro-display uppercase text-[10px] font-black tracking-[0.22em] text-[#4B6397]'
+                'analysis-kpi-card-label inline-flex max-w-full items-center rounded-full border px-2.5 py-1 font-black break-keep',
+                tone.chip,
+                isMobile ? 'text-[10px] leading-4 tracking-[0.08em]' : 'text-[10px] uppercase tracking-[0.18em]'
               )}
             >
               {title}
-            </CardTitle>
-            <div className={cn('font-aggro-display mt-3 font-black tracking-tight break-keep text-[#17326B]', isMobile ? 'text-[1.3rem] leading-tight' : 'text-[1.7rem]')}>
+            </div>
+            <div className={cn('analysis-kpi-card-value dashboard-number mt-3 font-aggro-display font-black tracking-tight break-keep text-[#17326B]', isMobile ? 'text-[1.9rem] leading-[0.92]' : 'text-[1.85rem]')}>
               {value}
             </div>
-            <p className={cn('mt-1 font-semibold break-keep text-[#3E5488]', isMobile ? 'text-[10px] leading-5' : 'text-[11px] leading-5')}>
+            <p className={cn('analysis-kpi-card-subvalue mt-1 font-semibold break-keep text-[#3E5488]', isMobile ? 'text-[10px] leading-5' : 'text-[11px] leading-5')}>
               {subValue}
             </p>
           </div>
-          <div className="surface-chip surface-chip--dark rounded-[1rem] px-3 py-2 shadow-none">
+          <div className="analysis-kpi-card-icon rounded-[1rem] px-3 py-2 shadow-none">
             <Icon className={cn(isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4', tone.text)} />
           </div>
         </CardHeader>
-        <CardContent className={cn(isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+        <CardContent className={cn('relative z-10', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
           <div className="analysis-kpi-track">
             <span className={cn('bg-gradient-to-r', tone.bar)} style={{ width: `${Math.max(0, Math.min(100, Math.round(progress)))}%` }} />
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#4B6397]">Insight Rail</span>
+            <span className="analysis-kpi-card-meta text-[10px] font-black uppercase tracking-[0.16em] text-[#4B6397]">Insight Rail</span>
             <span className={cn('text-[10px] font-black', tone.text)}>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
           </div>
         </CardContent>
