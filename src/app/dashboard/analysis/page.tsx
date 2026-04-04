@@ -183,8 +183,8 @@ function AnalysisKpiCard({
     <div className={cn('analysis-kpi-card rounded-[1.5rem] p-4 md:p-5 bg-gradient-to-br', toneStyles.soft)}>
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6478a5]">{title}</p>
-          <p className="mt-3 break-keep text-[clamp(1.15rem,1.7vw,1.85rem)] font-black tracking-tight text-[#14295F]">
+          <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6478a5]">{title}</p>
+          <p className="font-aggro-display mt-3 break-keep text-[clamp(1.08rem,1.55vw,1.72rem)] font-black tracking-[-0.03em] text-[#14295F]">
             {value}
           </p>
           <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">{meta}</p>
@@ -200,11 +200,11 @@ function AnalysisKpiCard({
         <div className="flex items-center justify-between gap-3">
           <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8090b4]">기준 대비</span>
           {delta ? (
-            <span className={cn('text-[10px] font-black', delta.startsWith('-') ? 'text-rose-500' : toneStyles.text)}>
+            <span className={cn('font-aggro-display text-[10px] font-black', delta.startsWith('-') ? 'text-rose-500' : toneStyles.text)}>
               {delta}
             </span>
           ) : (
-            <span className="text-[10px] font-black text-[#5c6e97]">{progressValue}%</span>
+            <span className="font-aggro-display text-[10px] font-black text-[#5c6e97]">{progressValue}%</span>
           )}
         </div>
       </div>
@@ -238,8 +238,8 @@ function SessionMetricCard({
     <div className={cn('analysis-health-card rounded-[1.35rem] p-4 bg-gradient-to-br', toneStyles.soft)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#6a7ea8]">{label}</p>
-          <p className="mt-2 break-keep text-[clamp(1rem,1.5vw,1.7rem)] font-black tracking-tight text-[#14295F]">
+          <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7ea8]">{label}</p>
+          <p className="font-aggro-display mt-2 break-keep text-[clamp(0.98rem,1.4vw,1.55rem)] font-black tracking-[-0.03em] text-[#14295F]">
             {value}
           </p>
           <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">{meta}</p>
@@ -253,7 +253,7 @@ function SessionMetricCard({
             <div className="analysis-ring-core h-full w-full">
               <div className="text-center">
                 <Icon className={cn('mx-auto h-3.5 w-3.5', toneStyles.text)} />
-                <p className={cn('text-sm font-black', toneStyles.text)}>
+                <p className={cn('font-aggro-display text-sm font-black tracking-[-0.03em]', toneStyles.text)}>
                   {ringDisplay || (value.includes('%') ? value.replace('%', '') : compactSessionLabel(progress))}
                 </p>
               </div>
@@ -273,7 +273,7 @@ function SessionMetricCard({
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8090b4]">진행도</span>
-            <span className={cn('text-[10px] font-black', toneStyles.text)}>{ringValue}%</span>
+            <span className={cn('font-aggro-display text-[10px] font-black', toneStyles.text)}>{ringValue}%</span>
           </div>
         </div>
       ) : null}
@@ -301,7 +301,7 @@ function QuestStatBar({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[12px] font-semibold text-[var(--text-on-dark-soft)]">{label}</span>
-        <span className="text-[11px] font-black text-white">{clampPercent(value)}%</span>
+        <span className="font-aggro-display text-[11px] font-black text-white">{clampPercent(value)}%</span>
       </div>
       <div className="analysis-growth-rail-track">
         <div
@@ -315,8 +315,10 @@ function QuestStatBar({
 
 function MiniGrowthBars({
   data,
+  compact = false,
 }: {
   data: Array<{ label: string; totalMinutes: number }>;
+  compact?: boolean;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const mixGrowthTone = (progress: number) => {
@@ -334,8 +336,8 @@ function MiniGrowthBars({
   };
   const max = Math.max(...data.map((item) => item.totalMinutes), 1);
   const yTicks = Array.from(new Set([max, Math.round(max / 2), 0])).sort((a, b) => b - a);
-  const chartHeight = 92;
-  const chartWidth = Math.max(220, data.length * 38);
+  const chartHeight = compact ? 88 : 92;
+  const chartWidth = Math.max(compact ? 204 : 220, data.length * (compact ? 34 : 38));
   const paddingX = 14;
   const stepX = data.length > 1 ? (chartWidth - paddingX * 2) / (data.length - 1) : 0;
   const baseLineY = chartHeight - 12;
@@ -358,9 +360,9 @@ function MiniGrowthBars({
 
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3">
-      <div className="flex h-[7.85rem] flex-col justify-between pb-[1.4rem] pt-1 text-right">
+      <div className={cn('flex flex-col justify-between pt-1 text-right', compact ? 'h-[7.1rem] pb-[1.15rem]' : 'h-[7.85rem] pb-[1.4rem]')}>
         {yTicks.map((tick) => (
-          <span key={tick} className="text-[10px] font-black text-[var(--text-on-dark-soft)]">
+          <span key={tick} className={cn('font-aggro-display font-black text-[var(--text-on-dark-soft)]', compact ? 'text-[9px]' : 'text-[10px]')}>
             {tick === 0 ? '0h' : compactSessionLabel(tick)}
           </span>
         ))}
@@ -368,11 +370,11 @@ function MiniGrowthBars({
 
       <div className="relative">
         <div
-          className="pointer-events-none absolute bottom-[1.4rem] top-1 left-0 w-px rounded-full"
+          className={cn('pointer-events-none absolute top-1 left-0 w-px rounded-full', compact ? 'bottom-[1.15rem]' : 'bottom-[1.4rem]')}
           style={{ background: 'var(--chart-grid)' }}
         />
         <div className="pl-3">
-          <div className="relative h-[5.8rem]">
+          <div className={cn('relative', compact ? 'h-[5.35rem]' : 'h-[5.8rem]')}>
             {activePoint ? (
               <div
                 className="pointer-events-none absolute right-0 top-0 z-20 rounded-[1rem] border bg-white/95 px-3 py-2"
@@ -381,8 +383,8 @@ function MiniGrowthBars({
                   boxShadow: `0 18px 32px -24px ${activePoint.tone.shadow}`,
                 }}
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: activePoint.tone.solid }}>{activePoint.label}</p>
-                <p className="mt-1 text-sm font-black text-[#14295F]">{minutesToLabel(activePoint.totalMinutes)}</p>
+                <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: activePoint.tone.solid }}>{activePoint.label}</p>
+                <p className={cn('font-aggro-display mt-1 font-black tracking-[-0.03em] text-[#14295F]', compact ? 'text-[12px]' : 'text-sm')}>{minutesToLabel(activePoint.totalMinutes)}</p>
               </div>
             ) : null}
             <svg
@@ -444,7 +446,7 @@ function MiniGrowthBars({
             </svg>
           </div>
 
-          <div className="mt-2 grid grid-cols-7 gap-2">
+          <div className={cn('grid grid-cols-7', compact ? 'mt-1 gap-1' : 'mt-2 gap-2')}>
             {points.map((day, index) => (
               <button
                 key={day.label}
@@ -453,12 +455,13 @@ function MiniGrowthBars({
                 onFocus={() => setActiveIndex(index)}
                 onClick={() => setActiveIndex(index)}
                 className={cn(
-                  'flex items-center justify-center rounded-[0.8rem] px-1 py-1 text-center transition-colors duration-200',
+                  'flex items-center justify-center rounded-[0.8rem] text-center transition-colors duration-200',
+                  compact ? 'px-0.5 py-0.5' : 'px-1 py-1',
                   activeIndex === index ? 'bg-white/10' : 'bg-transparent'
                 )}
                 style={{ transitionDelay: `${index * 40}ms` }}
               >
-                <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
+                <p className={cn('font-aggro-display font-black text-[var(--text-on-dark-soft)]', compact ? 'text-[9px]' : 'text-[10px]')}>{day.label}</p>
               </button>
             ))}
           </div>
@@ -507,7 +510,7 @@ function GraphDungeonCard({
                 {unlocked ? '데이터 충분' : <><Lock className="h-3 w-3" /> 기록 대기</>}
               </span>
             </div>
-            <h3 className="mt-3 text-[1.2rem] font-black tracking-tight text-white">{title}</h3>
+            <h3 className="font-aggro-display mt-3 break-keep text-[1.2rem] font-black tracking-[-0.03em] text-white">{title}</h3>
             <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight}</p>
           </div>
         </div>
@@ -858,7 +861,7 @@ export default function AnalysisTrackPage() {
             : 'gap-1.5 border border-[#F0DDC9] bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF2E5_100%)] shadow-[0_16px_34px_-28px_rgba(191,115,31,0.18)]'
         )}>
           <TabsTrigger value="growth" className={cn(
-            'rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626]',
+            'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626]',
             growthTabMatchesDesktop
               ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white'
               : 'data-[state=active]:text-[#17326B] text-[#6B5676] hover:text-[#17326B]'
@@ -866,7 +869,7 @@ export default function AnalysisTrackPage() {
             <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> 성장 맵
           </TabsTrigger>
           <TabsTrigger value="full" className={cn(
-            'rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626]',
+            'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626]',
             growthTabMatchesDesktop
               ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white'
               : 'data-[state=active]:text-[#17326B] text-[#6B5676] hover:text-[#17326B]'
@@ -885,23 +888,24 @@ export default function AnalysisTrackPage() {
                 </div>
 
                 <div className="max-w-2xl">
-                  <h1 className="text-[clamp(1.45rem,2.6vw,2.4rem)] font-black tracking-tight text-white">이번 주 성장 요약</h1>
+                  <h1 className={cn('font-aggro-display break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.65rem] leading-[1.08]' : 'text-[clamp(1.65rem,2.6vw,2.48rem)] leading-[1.04]')}>이번 주 성장 요약</h1>
                   <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">{statusSummary}</p>
                 </div>
 
                 <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'sm:grid-cols-2')}>
                   <div className="analysis-growth-highlight-card rounded-[1.35rem] px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">오늘 학습</p>
-                    <p className="mt-3 text-[clamp(1.35rem,2vw,2rem)] font-black tracking-tight text-[#14295F]">{minutesToCompactLabel(todayMinutes)}</p>
+                    <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6a7da6]">오늘 학습</p>
+                    <p className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-[#14295F]', isMobile ? 'text-[1.35rem] leading-[1.08]' : 'text-[clamp(1.35rem,2vw,2rem)] leading-[1.04]')}>{minutesToCompactLabel(todayMinutes)}</p>
                     <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
                       {todayMinutes > 0 ? `${minutesToCompactLabel(heroGoalMinutes)} 목표 중 ${heroProgress}% 진행` : `오늘 목표 ${minutesToCompactLabel(heroGoalMinutes)}`}
                     </p>
                   </div>
 
                   <div className="analysis-growth-highlight-card rounded-[1.35rem] px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">주간 변화</p>
+                    <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6a7da6]">주간 변화</p>
                     <p className={cn(
-                      'mt-3 text-[clamp(1.35rem,2vw,2rem)] font-black tracking-tight',
+                      'font-aggro-display mt-3 break-keep font-black tracking-[-0.04em]',
+                      isMobile ? 'text-[1.35rem] leading-[1.08]' : 'text-[clamp(1.35rem,2vw,2rem)] leading-[1.04]',
                       kpi.weekDiffPct >= 0 ? 'text-[#FF8A1F]' : 'text-[#d14c75]'
                     )}>
                       {signedPercent(kpi.weekDiffPct)}
@@ -916,11 +920,11 @@ export default function AnalysisTrackPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">현재 상태</p>
-                      <p className="mt-2 text-lg font-black text-white">
+                      <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-white', isMobile ? 'text-[1.02rem] leading-6' : 'text-lg leading-7')}>
                         {heroProgress >= 100 ? '오늘 목표를 달성했어요' : `${remainingGoalMinutes}분 더 채우면 오늘 목표예요`}
                       </p>
                     </div>
-                    <p className="text-sm font-black text-[#FFBE72]">{minutesToCompactLabel(todayMinutes)} / {minutesToCompactLabel(heroGoalMinutes)}</p>
+                    <p className={cn('font-aggro-display break-keep font-black tracking-[-0.03em] text-[#FFBE72]', isMobile ? 'text-[12px]' : 'text-sm')}>{minutesToCompactLabel(todayMinutes)} / {minutesToCompactLabel(heroGoalMinutes)}</p>
                   </div>
                   <div className="analysis-growth-rail-track mt-3">
                     <div className="analysis-growth-progress-bar" style={{ width: `${heroProgress}%` }} />
@@ -937,11 +941,11 @@ export default function AnalysisTrackPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="analysis-growth-kicker">이번 주 요약</p>
-                    <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">흐름을 빠르게 읽어보세요</h2>
+                    <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>흐름을 빠르게 읽어보세요</h2>
                   </div>
                   <div className="analysis-growth-light-card rounded-[1.15rem] px-4 py-3 text-right">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최고 집중일</p>
-                    <p className="mt-1 text-lg font-black text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
+                    <p className="font-aggro-display mt-1 text-lg font-black tracking-[-0.03em] text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
                     <p className="mt-1 text-[12px] font-semibold text-[#5c6e97]">{minutesToLabel(bestDay.totalMinutes)}</p>
                   </div>
                 </div>
@@ -955,7 +959,7 @@ export default function AnalysisTrackPage() {
               </div>
             </div>
 
-            <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-4')}>
+            <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-4')}>
               {kpiCards.map((item) => (
                 <AnalysisKpiCard
                   key={item.title}
@@ -975,17 +979,17 @@ export default function AnalysisTrackPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <span className="analysis-growth-kicker">주간 성장 흐름</span>
-                <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">지난 7일 집중 흐름</h2>
+                <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>지난 7일 집중 흐름</h2>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">주간 누적 공부시간이 어떻게 움직였는지 한 번에 볼 수 있어요.</p>
               </div>
               <div className="analysis-growth-light-card rounded-[1.2rem] px-4 py-3 text-right">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최고 집중일</p>
-                <p className="mt-1 text-lg font-black text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
+                <p className="font-aggro-display mt-1 text-lg font-black tracking-[-0.03em] text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
                 <p className="mt-1 text-[12px] font-semibold text-[#5c6e97]">{minutesToLabel(bestDay.totalMinutes)}</p>
               </div>
             </div>
             <div className="analysis-growth-canvas mt-5 rounded-[1.55rem] px-4 py-4 md:px-5 md:py-5">
-              <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} />
+              <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} compact={isMobile} />
             </div>
           </section>
 
@@ -1082,17 +1086,17 @@ export default function AnalysisTrackPage() {
                       <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
                         <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최고 집중일</p>
-                          <p className="mt-2 text-lg font-black text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
+                          <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
                           <p className="mt-1 text-sm font-semibold text-[#5c6e97]">{minutesToLabel(bestDay.totalMinutes)}</p>
                         </div>
                         <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">주의 구간</p>
-                          <p className="mt-2 text-lg font-black text-[#14295F]">{hasBlankDays ? '공백일이 있어요' : '흐름이 안정적이에요'}</p>
+                          <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>{hasBlankDays ? '공백일이 있어요' : '흐름이 안정적이에요'}</p>
                           <p className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">{isMobile ? (hasBlankDays ? '공백일을 먼저 줄여보세요.' : '지금 흐름을 유지해보세요.') : insight.improve}</p>
                         </div>
                         <div className="analysis-growth-light-card analysis-growth-light-card--accent rounded-[1.2rem] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 연결</p>
-                          <p className="mt-2 text-lg font-black text-[#14295F]">오전 루틴 강화</p>
+                          <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>오전 루틴 강화</p>
                           <p className="mt-1 text-sm font-semibold text-[#37507F]">계획트랙 첫 블록에 잘되는 시간을 고정해보세요.</p>
                         </div>
                       </div>
@@ -1116,22 +1120,22 @@ export default function AnalysisTrackPage() {
                   ) : card.id === 'rhythm' ? (
                     <div className="space-y-4">
                       <div className="analysis-growth-canvas rounded-[1.45rem] p-4">
-                        <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} />
+                        <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} compact={isMobile} />
                       </div>
                       <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-2')}>
                         <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">연속 기록</p>
-                          <p className="mt-2 text-lg font-black text-[#14295F]">{kpi.maxStreak}일</p>
+                          <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">{kpi.maxStreak}일</p>
                           <p className="mt-1 text-sm font-semibold text-[#5c6e97]">루틴 유지 최고 기록</p>
                         </div>
                         <div className="analysis-growth-light-card analysis-growth-light-card--accent rounded-[1.2rem] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">추천 루틴</p>
-                          <p className="mt-2 text-lg font-black text-[#14295F]">오전 8시 루틴</p>
+                          <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">오전 8시 루틴</p>
                           <p className="mt-1 text-sm font-semibold text-[#37507F]">잘 이어지는 시간대를 3일 연속 고정해보세요.</p>
                         </div>
                         <div className={cn('analysis-growth-light-card rounded-[1.2rem] p-4', !isMobile && 'md:col-span-2')}>
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">코치 해석</p>
-                          <p className="mt-2 text-lg font-black text-[#14295F]">{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구가 먼저예요' : '리듬이 안정되고 있어요'}</p>
+                          <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구가 먼저예요' : '리듬이 안정되고 있어요'}</p>
                           <p className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">{insight.improve}</p>
                         </div>
                       </div>
@@ -1140,7 +1144,7 @@ export default function AnalysisTrackPage() {
                     <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
                       <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">현재 상태</p>
-                        <p className="mt-2 text-lg font-black text-[#14295F]">{sessionMetrics.total >= 10 ? '시간대 비교가 가능해요' : '기본 흐름을 먼저 보는 단계예요'}</p>
+                        <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>{sessionMetrics.total >= 10 ? '시간대 비교가 가능해요' : '기본 흐름을 먼저 보는 단계예요'}</p>
                         <p className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">
                           {sessionMetrics.total >= 10
                             ? '오전과 오후 중 어디서 더 오래 버티는지 함께 보고 있어요.'
@@ -1149,12 +1153,12 @@ export default function AnalysisTrackPage() {
                       </div>
                       <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">수집된 세션</p>
-                        <p className="mt-2 text-lg font-black text-[#14295F]">{sessionMetrics.total}회</p>
+                        <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">{sessionMetrics.total}회</p>
                         <p className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">최근 14일 기준 평균 {minutesToLabel(sessionMetrics.avgDurationMinutes)} 세션</p>
                       </div>
                       <div className="analysis-growth-light-card analysis-growth-light-card--accent rounded-[1.2rem] p-4">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">코치 메모</p>
-                        <p className="mt-2 text-lg font-black text-[#14295F]">
+                        <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>
                           {sessionMetrics.total >= 10 ? '집중이 잘 되는 시간대를 붙잡아보세요' : '지금은 꾸준히 기록을 쌓는 게 먼저예요'}
                         </p>
                         <p className="mt-1 text-sm font-semibold leading-6 text-[#37507F]">
@@ -1174,12 +1178,12 @@ export default function AnalysisTrackPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <span className="analysis-growth-kicker">다음 추천</span>
-                <h2 className="mt-3 text-[1.35rem] font-black tracking-tight text-white">분석을 바로 계획으로 연결하세요</h2>
+                <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>분석을 바로 계획으로 연결하세요</h2>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">지금 확인한 흐름을 다음 주 기본 계획에 바로 옮기면 유지력이 더 좋아집니다.</p>
               </div>
               <div className="analysis-growth-light-card analysis-growth-light-card--accent rounded-[1.25rem] p-4 md:min-w-[18rem]">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">바로 실행할 한 가지</p>
-                <p className="mt-2 text-lg font-black text-[#14295F]">
+                <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>
                   {hasBlankDays ? '공백일을 줄이는 루틴부터 고정하세요' : '잘되는 시간대를 계획 첫 블록에 고정하세요'}
                 </p>
                 <p className="mt-1 text-sm font-semibold leading-6 text-[#37507F]">

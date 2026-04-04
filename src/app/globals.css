@@ -1387,6 +1387,7 @@ select {
     font-weight: 900;
     letter-spacing: 0.18em;
     text-transform: uppercase;
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
     color: #ffbe72;
   }
 
@@ -1402,6 +1403,7 @@ select {
   .analysis-health-card {
     position: relative;
     overflow: hidden;
+    min-width: 0;
     transition: transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out;
     border: 1px solid rgba(214, 225, 245, 0.92);
     background:
@@ -1468,6 +1470,7 @@ select {
     font-size: 0.66rem;
     font-weight: 900;
     letter-spacing: 0.08em;
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
   }
 
   .analysis-growth-state-chip--ready {
@@ -1491,6 +1494,37 @@ select {
   .analysis-ring-core {
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 248, 255, 0.98) 100%);
+  }
+
+  .analysis-growth-overview :where(h1, h2),
+  .analysis-growth-map :where(h2),
+  .analysis-growth-action-panel :where(h2),
+  .analysis-growth-module-shell :where(h3) {
+    word-break: keep-all;
+  }
+
+  .analysis-growth-light-card,
+  .analysis-growth-highlight-card,
+  .analysis-kpi-card,
+  .analysis-health-card,
+  .analysis-growth-summary-card,
+  .analysis-growth-module-shell {
+    word-break: keep-all;
+  }
+
+  @media (max-width: 480px) {
+    .analysis-growth-overview,
+    .analysis-growth-map,
+    .analysis-growth-action-panel,
+    .analysis-growth-summary-card,
+    .analysis-growth-module-shell,
+    .analysis-growth-light-card,
+    .analysis-growth-highlight-card,
+    .analysis-kpi-card,
+    .analysis-health-card,
+    .analysis-growth-canvas {
+      border-radius: 1.5rem;
+    }
   }
 
   @media (hover: hover) {
