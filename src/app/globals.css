@@ -1594,6 +1594,163 @@ select {
     }
   }
 
+  .analysis-full-shell {
+    --analysis-full-panel-border: rgba(110, 150, 235, 0.22);
+    --analysis-full-panel-bg:
+      radial-gradient(circle at top left, rgba(90, 136, 255, 0.18), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 138, 31, 0.08), transparent 24%),
+      linear-gradient(180deg, rgba(24, 47, 104, 0.99) 0%, rgba(12, 26, 61, 0.985) 100%);
+    --analysis-full-panel-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 28px 56px -38px rgba(2, 8, 24, 0.68),
+      0 0 0 1px rgba(112, 170, 255, 0.04);
+    --analysis-full-inset-border: rgba(214, 225, 245, 0.92);
+    --analysis-full-inset-bg: linear-gradient(180deg, rgba(249, 251, 255, 0.99) 0%, rgba(238, 244, 255, 0.98) 100%);
+    --analysis-full-inset-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.96),
+      0 18px 34px -28px rgba(20, 41, 95, 0.2);
+  }
+
+  .analysis-full-shell .analysis-profile-shell,
+  .analysis-full-shell .analysis-full-board-card,
+  .analysis-full-shell .analysis-full-section-card,
+  .analysis-full-shell .analysis-chart-stage,
+  .analysis-full-shell .analysis-full-mini-stat-card,
+  .analysis-full-shell .analysis-full-conclusion-card {
+    border: 1px solid var(--analysis-full-panel-border) !important;
+    background: var(--analysis-full-panel-bg) !important;
+    box-shadow: var(--analysis-full-panel-shadow) !important;
+  }
+
+  .analysis-full-shell .analysis-profile-shell::after,
+  .analysis-full-shell .analysis-chart-stage::after,
+  .analysis-full-shell .analysis-pulse-dot {
+    animation: none !important;
+  }
+
+  .analysis-full-shell .analysis-profile-shell::after,
+  .analysis-full-shell .analysis-chart-stage::after {
+    display: none;
+  }
+
+  .analysis-full-shell .analysis-tab-rail {
+    border-color: rgba(110, 150, 235, 0.2);
+    background:
+      radial-gradient(circle at top left, rgba(90, 136, 255, 0.14), transparent 28%),
+      linear-gradient(180deg, rgba(22, 43, 97, 0.96) 0%, rgba(11, 24, 57, 0.96) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 20px 40px -30px rgba(4, 10, 32, 0.56);
+  }
+
+  .analysis-full-shell .analysis-tab-trigger {
+    color: rgba(240, 247, 255, 0.78);
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+  }
+
+  .analysis-full-shell .analysis-tab-trigger[data-state="active"] {
+    color: #17326b;
+    background: linear-gradient(135deg, #ffb34f 0%, #ff8a1f 42%, #ff7312 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.24),
+      0 16px 28px -22px rgba(255,138,31,0.42),
+      0 0 0 1px rgba(255,255,255,0.18);
+  }
+
+  .analysis-full-shell .surface-card--primary.on-dark,
+  .analysis-full-shell .surface-card--secondary.on-dark,
+  .analysis-full-shell .analysis-full-section-card,
+  .analysis-full-shell .analysis-chart-stage,
+  .analysis-full-shell .analysis-full-mini-stat-card,
+  .analysis-full-shell .analysis-full-conclusion-card {
+    --text-on-dark: #f4f7ff;
+    --text-on-dark-soft: rgba(240, 247, 255, 0.78);
+    --text-on-dark-muted: rgba(240, 247, 255, 0.58);
+    color: #f4f7ff;
+  }
+
+  .analysis-full-shell .analysis-full-kpi-card,
+  .analysis-full-shell .surface-card--ghost.on-dark,
+  .analysis-full-shell .analysis-record-card,
+  .analysis-full-shell .analysis-dual-lane-card,
+  .analysis-full-shell .analysis-detail-panel,
+  .analysis-full-shell .analysis-full-conclusion-panel,
+  .analysis-full-shell .analysis-full-highlight-panel,
+  .analysis-full-shell .analysis-metric-chip {
+    border: 1px solid var(--analysis-full-inset-border) !important;
+    background: var(--analysis-full-inset-bg) !important;
+    box-shadow: var(--analysis-full-inset-shadow) !important;
+    color: #17326b !important;
+  }
+
+  .analysis-full-shell .analysis-detail-panel {
+    background: linear-gradient(180deg, rgba(247, 249, 253, 0.98) 0%, rgba(238, 243, 251, 0.98) 100%) !important;
+  }
+
+  .analysis-full-shell .analysis-metric-chip,
+  .analysis-full-shell .analysis-detail-badge,
+  .analysis-full-shell .analysis-growth-period-badge {
+    border-color: rgba(214, 225, 245, 0.92);
+  }
+
+  .analysis-full-shell .analysis-warm-badge {
+    border: 1px solid rgba(255, 187, 120, 0.22);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffbe72;
+  }
+
+  .analysis-full-shell .analysis-soft-badge {
+    border: 1px solid rgba(181, 206, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(240, 247, 255, 0.82);
+  }
+
+  .analysis-full-shell .analysis-subchip {
+    border: 1px solid rgba(214, 225, 245, 0.92);
+    background: linear-gradient(180deg, rgba(247, 249, 253, 0.99) 0%, rgba(238, 243, 251, 0.98) 100%);
+    color: #5c6e97;
+  }
+
+  .analysis-full-shell .analysis-icon-bubble {
+    border: 1px solid rgba(214, 225, 245, 0.92);
+    background: linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(244,248,255,0.98) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.98),
+      0 14px 28px -24px rgba(20,41,95,0.18);
+  }
+
+  .analysis-full-shell .analysis-meter-track {
+    background: rgba(20, 41, 95, 0.08);
+    box-shadow: inset 0 1px 1px rgba(20,41,95,0.08);
+  }
+
+  .analysis-full-shell [data-slot="card-title"] {
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+    letter-spacing: -0.03em;
+  }
+
+  .analysis-full-shell [data-slot="card-description"] {
+    font-family: "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+  }
+
+  .analysis-full-shell .analysis-full-chart-stack,
+  .analysis-full-shell .analysis-full-tab-panel {
+    min-width: 0;
+  }
+
+  @media (hover: hover) {
+    .analysis-full-shell .analysis-full-section-card:hover,
+    .analysis-full-shell .analysis-chart-stage:hover,
+    .analysis-full-shell .analysis-full-mini-stat-card:hover,
+    .analysis-full-shell .analysis-full-board-card:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 24px 48px -34px rgba(4, 10, 32, 0.56),
+        0 0 0 1px rgba(112, 170, 255, 0.06) !important;
+    }
+  }
+
   /* ───────────────────────────────────────────────
      Premium CTA Button System
   ─────────────────────────────────────────────── */
