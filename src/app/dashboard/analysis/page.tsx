@@ -1115,10 +1115,12 @@ export default function AnalysisTrackPage() {
                     <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] p-4">
                       <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} />
                     </div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">연속 유지</p><p className="mt-2 text-lg font-black text-white">{kpi.maxStreak}일</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">루틴 최고 기록</p></div>
+                    <div className="grid gap-3">
+                      <div className="grid gap-3 grid-cols-2">
+                        <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">연속 유지</p><p className="mt-2 text-lg font-black text-white">{kpi.maxStreak}일</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">루틴 최고 기록</p></div>
+                        <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
+                      </div>
                       <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">코치 해석</p><p className="mt-2 text-lg font-black text-white">{chartData.some((item) => item.totalMinutes === 0) ? '공백 복구 필요' : '리듬 안정화'}</p><p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight.improve}</p></div>
-                      <div className="rounded-[1.2rem] border border-emerald-200 bg-[#EAF9F2] p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0F8A5F]">추천 액션</p><p className="mt-2 text-lg font-black text-[#17326B]">오전 8시 루틴</p><p className="mt-1 text-sm font-semibold text-[#2C5B7E]">3일 연속 도전</p></div>
                     </div>
                   </div>
                 ) : (
