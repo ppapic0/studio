@@ -8,18 +8,13 @@ import {
 } from 'lucide-react';
 
 import { CenterIntroSection } from '@/components/marketing/center-intro-section';
+import { FocusFirewallSection } from '@/components/marketing/focus-firewall-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StaggerChildren } from '@/components/marketing/stagger-children';
 import { marketingContent } from '@/lib/marketing-content';
-
-const focusHighlights = [
-  '자습 시간에는 학습에 필요한 연결만 남깁니다.',
-  '학생이 흔들리기 쉬운 접속은 와이파이에서 먼저 정리합니다.',
-  '허용 사이트 기준도 학생 흐름에 맞춰 세밀하게 관리합니다.',
-] as const;
 
 const appFlowCards = [
   {
@@ -131,38 +126,7 @@ export default function CenterPage() {
 
         <div className="mt-10 space-y-8 sm:space-y-10">
           <ScrollReveal>
-            <section className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-white shadow-[0_22px_52px_rgba(20,41,95,0.08)]">
-              <div className="grid gap-0 lg:grid-cols-[0.96fr_1.04fr]">
-                <div className="px-6 py-7 sm:px-8 sm:py-8">
-                  <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">SECTION 01</p>
-                  <h2 className="mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] text-[#14295F]">
-                    트랙 웹앱으로 학습에 필요한 연결만 남기는 집중 환경을 설정합니다
-                  </h2>
-                  <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.86] text-[#425A75]">
-                    자습 시간에는 공부에 필요한 연결만 남기고, 흔들리는 접속은 와이파이에서 먼저 정리합니다. 억지 통제가 아니라 학생이 오래 집중할 수 있는 안정적인 학습 환경을 만드는 방식입니다.
-                  </p>
-
-                  <div className="mt-6 space-y-3">
-                    {focusHighlights.map((item, index) => (
-                      <div key={item} className="flex items-start gap-3 rounded-[1.15rem] border border-[#14295F]/8 bg-[#F8FBFF] px-4 py-3">
-                        <span className="mt-[1px] inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#14295F] text-[10px] font-black text-white">
-                          {index + 1}
-                        </span>
-                        <p className="break-keep text-[13px] font-semibold leading-[1.7] text-[#53687F]">{item}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-[#14295F]/8 bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] px-6 py-7 sm:px-8 sm:py-8 lg:border-l lg:border-t-0">
-                  <MediaPlaceholder
-                    eyebrow="WEB APP CONTROL"
-                    title="허용 사이트 설정 화면 예정"
-                    description="실제 웹앱에서 학습 시간 허용 사이트와 집중 환경 설정이 반영되는 화면을 여기에 연결합니다."
-                  />
-                </div>
-              </div>
-            </section>
+            <FocusFirewallSection />
           </ScrollReveal>
 
           <ScrollReveal>
