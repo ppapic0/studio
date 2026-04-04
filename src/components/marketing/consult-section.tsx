@@ -190,12 +190,6 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                 >
                   웹앱 로그인
                 </a>
-                <a
-                  href="/go/experience?placement=consult_section"
-                  className="premium-cta premium-cta-ghost brand-cta-float h-12 w-full px-6 text-sm sm:w-auto"
-                >
-                  웹앱 체험하기
-                </a>
               </div>
             </div>
           </div>

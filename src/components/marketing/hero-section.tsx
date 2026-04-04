@@ -376,12 +376,6 @@ export function HeroSection({ brand }: HeroSectionProps) {
             >
               상담 문의하기
             </a>
-            <a
-              href="/go/experience?placement=hero_experience"
-              className="premium-cta premium-cta-ghost h-12 w-full justify-center px-7 text-[14px] sm:w-auto sm:min-w-[11rem]"
-            >
-              웹앱 체험하기
-            </a>
           </div>
 
           <p
