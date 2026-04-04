@@ -3042,11 +3042,6 @@ export default function StudyPlanPage() {
     : isPast
       ? '지난 날짜 투두리스트'
       : '선택한 날짜 투두리스트';
-  const selectedDateHeroDescription = isToday
-    ? '오늘 해야 할 공부와 기타 일정을 먼저 적고, 끝낸 항목부터 가볍게 체크해보세요.'
-    : isPast
-      ? '지난 날짜 계획과 완료 기록을 다시 보면서 공부 흐름을 점검해보세요.'
-      : '다가올 하루의 공부와 기타 일정을 미리 정리하고, 준비를 차분하게 맞춰보세요.';
 
   if (!isStudent) {
     return <div className="flex items-center justify-center h-[400px] px-4"><Card className="max-w-md w-full rounded-[2.5rem] border-none shadow-2xl"><CardHeader className="text-center"><CardTitle className="font-black text-2xl tracking-tighter">학생 전용 페이지</CardTitle><CardDescription className="font-bold">학생 계정으로 로그인해야 학습 계획을 관리할 수 있습니다.</CardDescription></CardHeader></Card></div>;
@@ -3087,9 +3082,6 @@ export default function StudyPlanPage() {
                     <h2 className={cn("font-aggro-display break-keep font-black tracking-[-0.04em] text-white", isMobile ? "text-[1.65rem] leading-[1.08]" : "text-[2.35rem] leading-[1.03]")}>
                       {selectedDateTitle}
                     </h2>
-                    <p className={cn("student-aggro-body mt-3 max-w-xl break-keep text-white/76", isMobile ? "text-[12.5px] leading-6" : "text-[15px] leading-7")}>
-                      {selectedDateHeroDescription}
-                    </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Button
