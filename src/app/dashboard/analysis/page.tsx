@@ -349,7 +349,6 @@ function MiniGrowthBars({
       y: Number.isFinite(y) ? y : baseLineY,
       progress,
       tone: mixGrowthTone(progress),
-      hourLabel: `${Math.max(0, Math.round(day.totalMinutes / 60))}h`,
     };
   });
   const linePath = points
@@ -359,7 +358,7 @@ function MiniGrowthBars({
 
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3">
-      <div className="flex h-[7.85rem] flex-col justify-between pb-[2rem] pt-1 text-right">
+      <div className="flex h-[7.85rem] flex-col justify-between pb-[1.4rem] pt-1 text-right">
         {yTicks.map((tick) => (
           <span key={tick} className="text-[10px] font-black text-[var(--text-on-dark-soft)]">
             {tick === 0 ? '0h' : compactSessionLabel(tick)}
@@ -369,7 +368,7 @@ function MiniGrowthBars({
 
       <div className="relative">
         <div
-          className="pointer-events-none absolute bottom-[2rem] top-1 left-0 w-px rounded-full"
+          className="pointer-events-none absolute bottom-[1.4rem] top-1 left-0 w-px rounded-full"
           style={{ background: 'var(--chart-grid)' }}
         />
         <div className="pl-3">
@@ -454,22 +453,12 @@ function MiniGrowthBars({
                 onFocus={() => setActiveIndex(index)}
                 onClick={() => setActiveIndex(index)}
                 className={cn(
-                  'flex flex-col items-center gap-2 rounded-[0.8rem] px-1 py-1 text-center transition-colors duration-200',
+                  'flex items-center justify-center rounded-[0.8rem] px-1 py-1 text-center transition-colors duration-200',
                   activeIndex === index ? 'bg-white/10' : 'bg-transparent'
                 )}
                 style={{ transitionDelay: `${index * 40}ms` }}
               >
                 <p className="text-[10px] font-black text-[var(--text-on-dark-soft)]">{day.label}</p>
-                <p
-                  className="rounded-full border px-2 py-1 text-[10px] font-black text-white/92"
-                  style={{
-                    background: day.tone.chip,
-                    borderColor: day.tone.border,
-                    boxShadow: `0 10px 20px -18px ${day.tone.shadow}`,
-                  }}
-                >
-                  {day.hourLabel}
-                </p>
               </button>
             ))}
           </div>
