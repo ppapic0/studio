@@ -3445,7 +3445,7 @@ export default function StudyPlanPage() {
                 <p className="font-aggro-display mt-2 text-base font-black tracking-[-0.03em] text-[#17326B]">{day.dateLabel}</p>
                 <Badge
                   className={cn(
-                    'student-aggro-body mt-3 rounded-full border px-2 py-0.5 text-[8px] font-black shadow-none',
+                    'student-aggro-body mt-3 inline-flex min-h-[1.2rem] max-w-full items-center justify-center rounded-full border px-1.5 py-0 text-center text-[7px] font-black leading-none tracking-[-0.02em] shadow-none',
                     SCHEDULE_STATUS_BADGE_TONE[day.status] || SCHEDULE_STATUS_BADGE_TONE['미정']
                   )}
                 >
