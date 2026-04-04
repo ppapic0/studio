@@ -519,6 +519,10 @@ export default function StudyPlanPage() {
   const [completionOvertimeMinutes, setCompletionOvertimeMinutes] = useState('10');
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
   const [isCompletionSubmitting, setIsCompletionSubmitting] = useState(false);
+  const [isGoalTargetDialogOpen, setIsGoalTargetDialogOpen] = useState(false);
+  const [goalTargetHoursDraft, setGoalTargetHoursDraft] = useState('');
+  const [goalTargetMinutesDraft, setGoalTargetMinutesDraft] = useState('');
+  const [isGoalTargetSaving, setIsGoalTargetSaving] = useState(false);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -1089,6 +1093,65 @@ export default function StudyPlanPage() {
     });
   }, [routineOnboardingState?.presentedAt, studentProfileRef, toast, userProfileRef]);
 
+  const handleSaveGoalTarget = useCallback(async () => {
+    if (!studentProfileRef) {
+      toast({
+        variant: 'destructive',
+        title: '목표시간을 저장할 수 없어요',
+        description: '학생 정보가 준비된 뒤에 다시 시도해 주세요.',
+      });
+      return;
+    }
+
+    const parsedHours = Number(goalTargetHoursDraft.trim() === '' ? '0' : goalTargetHoursDraft);
+    const parsedMinutes = Number(goalTargetMinutesDraft.trim() === '' ? '0' : goalTargetMinutesDraft);
+    const hasInvalidHour = !Number.isInteger(parsedHours) || parsedHours < 0 || parsedHours > 24;
+    const hasInvalidMinute = !Number.isInteger(parsedMinutes) || parsedMinutes < 0 || parsedMinutes > 59;
+
+    if (hasInvalidHour || hasInvalidMinute) {
+      toast({
+        variant: 'destructive',
+        title: '시간 형식을 다시 확인해 주세요',
+        description: '시간은 0~24, 분은 0~59 사이로 입력할 수 있어요.',
+      });
+      return;
+    }
+
+    const nextTargetMinutes = parsedHours * 60 + parsedMinutes;
+    if (nextTargetMinutes < 30 || nextTargetMinutes > 24 * 60) {
+      toast({
+        variant: 'destructive',
+        title: '목표시간 범위를 확인해 주세요',
+        description: '하루 목표시간은 최소 30분부터 설정할 수 있어요.',
+      });
+      return;
+    }
+
+    setIsGoalTargetSaving(true);
+
+    try {
+      await updateDoc(studentProfileRef, {
+        targetDailyMinutes: nextTargetMinutes,
+        targetDailyMinutesSource: 'manual',
+        updatedAt: serverTimestamp(),
+      });
+      toast({
+        title: '목표시간을 수정했어요',
+        description: `이제 하루 목표가 ${formatMinutesSummary(nextTargetMinutes)}으로 적용돼요.`,
+      });
+      setIsGoalTargetDialogOpen(false);
+    } catch (error: any) {
+      logHandledClientIssue('[plan-track] save goal target failed', error);
+      toast({
+        variant: 'destructive',
+        title: '목표시간 저장 실패',
+        description: typeof error?.message === 'string' ? error.message : '목표시간을 저장하지 못했습니다.',
+      });
+    } finally {
+      setIsGoalTargetSaving(false);
+    }
+  }, [goalTargetHoursDraft, goalTargetMinutesDraft, studentProfileRef, toast]);
+
   useEffect(() => {
     const fallbackArrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
     const fallbackDismissal = scheduleItems.find((item) => item.title.startsWith('하원 예정: '));
@@ -1312,12 +1375,20 @@ export default function StudyPlanPage() {
     }),
     [checklistTasks]
   );
-  const recommendedDailyMinutes = useMemo(() => {
-    const mapped = effectiveRoutineProfile?.answers?.dailyStudyHours
-      ? DAILY_STUDY_MINUTES_MAP[effectiveRoutineProfile.answers.dailyStudyHours]
-      : 0;
-    return mapped || studentProfile?.targetDailyMinutes || 240;
-  }, [effectiveRoutineProfile?.answers?.dailyStudyHours, studentProfile?.targetDailyMinutes]);
+  const routineSuggestedDailyMinutes = effectiveRoutineProfile?.answers?.dailyStudyHours
+    ? DAILY_STUDY_MINUTES_MAP[effectiveRoutineProfile.answers.dailyStudyHours] || 0
+    : 0;
+  const hasManualTargetDailyMinutes =
+    studentProfile?.targetDailyMinutesSource === 'manual' && Number(studentProfile?.targetDailyMinutes || 0) > 0;
+  const recommendedDailyMinutes = hasManualTargetDailyMinutes
+    ? studentProfile?.targetDailyMinutes || 240
+    : routineSuggestedDailyMinutes || studentProfile?.targetDailyMinutes || 240;
+  const openGoalTargetDialog = useCallback(() => {
+    const currentTargetMinutes = Math.max(30, recommendedDailyMinutes || 240);
+    setGoalTargetHoursDraft(String(Math.floor(currentTargetMinutes / 60)));
+    setGoalTargetMinutesDraft(String(currentTargetMinutes % 60));
+    setIsGoalTargetDialogOpen(true);
+  }, [recommendedDailyMinutes]);
   const planProgressPercent = recommendedDailyMinutes > 0
     ? Math.min(100, Math.round((studyTimeSummary.total / recommendedDailyMinutes) * 100))
     : 0;
@@ -3121,9 +3192,16 @@ export default function StudyPlanPage() {
                 </div>
                 <div className={cn("flex items-center gap-2", isMobile ? "justify-between" : "justify-end")}>
                   <span className="student-aggro-body text-[11px] font-black text-white/64">총 계획 {formatMinutesSummary(studyTimeSummary.total)}</span>
-                  <Badge className="student-aggro-body rounded-full border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white shadow-none">
-                    목표 {formatMinutesSummary(recommendedDailyMinutes)}
-                  </Badge>
+                  <button
+                    type="button"
+                    onClick={openGoalTargetDialog}
+                    className="student-aggro-body inline-flex items-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white shadow-none transition hover:bg-white/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    aria-label="목표 시간 수정"
+                    disabled={isGoalTargetSaving}
+                  >
+                    <span>목표 {formatMinutesSummary(recommendedDailyMinutes)}</span>
+                    <PencilLine className="h-3 w-3" />
+                  </button>
                 </div>
               </div>
               <div className="relative mt-4">
@@ -3419,6 +3497,103 @@ export default function StudyPlanPage() {
           </div>
         </div>
       </section>
+
+      <Dialog
+        open={isGoalTargetDialogOpen}
+        onOpenChange={(open) => {
+          if (isGoalTargetSaving) return;
+          setIsGoalTargetDialogOpen(open);
+        }}
+      >
+        <DialogContent className="w-[min(92vw,28rem)] rounded-[1.8rem] border border-[#E5ECF7] bg-white p-0 shadow-[0_24px_60px_-30px_rgba(20,41,95,0.32)]">
+          <div className="rounded-t-[1.8rem] bg-[linear-gradient(180deg,#17326B_0%,#21448D_100%)] px-6 py-5 text-white">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-xl font-black tracking-tight text-white">
+                하루 목표시간 수정
+              </DialogTitle>
+              <DialogDescription className="mt-1 break-keep text-[12px] font-semibold leading-5 text-white/72">
+                {routineSuggestedDailyMinutes > 0
+                  ? `루틴 추천은 ${formatMinutesSummary(routineSuggestedDailyMinutes)}이에요. 여기서 학생 기준으로 직접 조절할 수 있어요.`
+                  : '오늘 계획 흐름에 맞게 하루 목표시간을 직접 설정할 수 있어요.'}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleSaveGoalTarget();
+            }}
+          >
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-[1.15rem] border border-[#E6EDF8] bg-[#F8FBFF] px-4 py-4">
+                <p className="text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                  현재 적용 중인 목표는 {formatMinutesSummary(recommendedDailyMinutes)}이에요.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-[1.15rem] border border-[#E6EDF8] bg-white px-4 py-4">
+                  <Label htmlFor="goal-target-hours" className="text-[12px] font-black text-[#17326B]">
+                    시간
+                  </Label>
+                  <Input
+                    id="goal-target-hours"
+                    type="number"
+                    min={0}
+                    max={24}
+                    inputMode="numeric"
+                    value={goalTargetHoursDraft}
+                    onChange={(event) => setGoalTargetHoursDraft(event.target.value)}
+                    className="mt-2 h-12 rounded-[1rem] border-[#DCE6F5] bg-[#FCFDFF] text-base font-black text-[#17326B]"
+                  />
+                </div>
+                <div className="rounded-[1.15rem] border border-[#E6EDF8] bg-white px-4 py-4">
+                  <Label htmlFor="goal-target-minutes" className="text-[12px] font-black text-[#17326B]">
+                    분
+                  </Label>
+                  <Input
+                    id="goal-target-minutes"
+                    type="number"
+                    min={0}
+                    max={59}
+                    inputMode="numeric"
+                    value={goalTargetMinutesDraft}
+                    onChange={(event) => setGoalTargetMinutesDraft(event.target.value)}
+                    className="mt-2 h-12 rounded-[1rem] border-[#DCE6F5] bg-[#FCFDFF] text-base font-black text-[#17326B]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="flex-col gap-2 border-t border-[#EEF3FB] bg-[#FCFDFF] px-6 py-4 sm:flex-col">
+              <Button
+                type="submit"
+                disabled={isGoalTargetSaving}
+                className={cn('h-12 w-full rounded-[1rem] font-black text-white bg-gradient-to-r', rewardGradient)}
+              >
+                {isGoalTargetSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    저장 중
+                  </>
+                ) : (
+                  '목표시간 저장'
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isGoalTargetSaving}
+                onClick={() => setIsGoalTargetDialogOpen(false)}
+                className="h-11 w-full rounded-[1rem] border-[#D6E1F3] font-black text-[#17326B]"
+              >
+                취소
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={isCompletionDialogOpen}

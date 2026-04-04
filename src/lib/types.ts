@@ -107,6 +107,7 @@ export interface StudentProfile {
   roomSeatNo?: number;
   seatZone?: string;
   targetDailyMinutes: number;
+  targetDailyMinutesSource?: 'default' | 'routine' | 'manual';
   parentUids: string[];
   createdAt: Timestamp;
   parentLinkCode?: string;
