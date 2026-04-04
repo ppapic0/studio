@@ -1446,8 +1446,8 @@ export default function StudyPlanPage() {
       const timeLabel = plannedArrival && plannedDeparture
         ? `${plannedArrival} · ${plannedDeparture}`
         : isRestDay
-          ? '휴식'
-          : '미정';
+          ? '이날은 등원하지 않아요.'
+          : '';
 
       return {
         date: day,
@@ -3455,7 +3455,9 @@ export default function StudyPlanPage() {
                 >
                   {day.status}
                 </Badge>
-                <p className="student-aggro-body mt-1 break-keep text-[10px] font-semibold leading-4 text-[#5A6F95]">{day.timeLabel}</p>
+                {day.timeLabel ? (
+                  <p className="student-aggro-body mt-1 break-keep text-[10px] font-semibold leading-4 text-[#5A6F95]">{day.timeLabel}</p>
+                ) : null}
                 {day.hasExcursion ? (
                   <Badge className="student-aggro-body mt-2 rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-2 py-0.5 text-[8px] font-black text-[#D86A11] shadow-none">
                     외출
