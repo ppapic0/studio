@@ -1428,9 +1428,9 @@ select {
     --chart-tooltip-border: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(110, 162, 255, 0.18) !important;
     background:
-      radial-gradient(circle at top left, rgba(108, 176, 255, 0.18), transparent 30%),
-      radial-gradient(circle at top right, rgba(255, 179, 79, 0.14), transparent 24%),
-      linear-gradient(180deg, rgba(28, 58, 120, 0.98) 0%, rgba(12, 26, 60, 0.97) 100%) !important;
+      radial-gradient(circle at top left, rgba(112, 170, 255, 0.22), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(255, 179, 79, 0.08), transparent 28%),
+      linear-gradient(180deg, rgba(31, 63, 132, 0.985) 0%, rgba(20, 43, 95, 0.985) 54%, rgba(11, 24, 58, 0.985) 100%) !important;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.1),
       0 18px 36px -28px rgba(0, 0, 0, 0.62),
