@@ -11,6 +11,7 @@ import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingLaunchNoticeModal } from '@/components/marketing/marketing-launch-notice-modal';
 import { MobileStudySystemSection } from '@/components/marketing/mobile-study-system-section';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
+import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
 import { PageGatewaySection } from '@/components/marketing/page-gateway-section';
 import { ResultsSection } from '@/components/marketing/results-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
@@ -41,6 +42,11 @@ export default async function HomePage() {
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
         <ScrollReveal>
           <FeedbackManagementSection />
+        </ScrollReveal>
+      </div>
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
+        <ScrollReveal>
+          <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
         </ScrollReveal>
       </div>
       {isMobile ? (

@@ -213,6 +213,7 @@ export type MarketingContent = {
     eyebrow: string;
     title: string;
     description: string;
+    spotlight: string;
     highlights: string[];
     programs: MockExamProgramCard[];
   };
@@ -628,9 +629,10 @@ export const marketingContent: MarketingContent = {
   },
   mockExamProgram: {
     eyebrow: 'REAL MOCK EXAM PROGRAM',
-    title: '대치동까지 가지 않아도, 트랙에서 실전 모의고사 체계를 바로 경험합니다',
+    title: '매월 실시하는 모의고사 실시로 실전 감각 향상',
     description:
       '매달 더프리미엄 모의고사와, 시대인재 서바이벌 프로 모의고사를 포함한 실전 모의 운영과 국어는 이감, 한수 모의고사까지 연결해 학습 상태를 점검합니다. 멀리 이동하지 않아도 실전 감각과 대응력을 기를 수 있습니다.',
+    spotlight: '대치동에\n가지 않아도\n동일한 콘텐츠\n유료 이용 가능',
     highlights: ['매달 더프 실시', '이감 점검', '한수 점검', '서바이벌 프로 실시'],
     programs: [
       {

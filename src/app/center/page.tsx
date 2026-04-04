@@ -1,11 +1,7 @@
 import Link from 'next/link';
 import {
   ArrowRight,
-  BookOpenCheck,
-  CircleGauge,
-  MessageSquareText,
   Sparkles,
-  Trophy,
 } from 'lucide-react';
 
 import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
@@ -13,28 +9,9 @@ import { FeedbackManagementSection } from '@/components/marketing/feedback-manag
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
+import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
-import { StaggerChildren } from '@/components/marketing/stagger-children';
 import { marketingContent } from '@/lib/marketing-content';
-
-const mockPrograms = [
-  {
-    title: '더프리미엄 모의고사',
-    description: '현재 위치를 확인하고 성적표와 함께 시간 운영, 기본 대응력을 점검합니다.',
-  },
-  {
-    title: '이감',
-    description: '실전 국어 흐름 안에서 낯선 지문 대응력과 시간 배분을 확인합니다.',
-  },
-  {
-    title: '한수',
-    description: '평가원 감각이 흐트러지지 않도록 국어 실전 루틴을 유지하며 점검합니다.',
-  },
-  {
-    title: '시대인재 서바이벌 프로',
-    description: '상위권 실전 난이도까지 대비해 시험장에서 흔들리지 않는 대응력을 만듭니다.',
-  },
-] as const;
 
 const motivationCards = [
   {
@@ -115,44 +92,7 @@ export default function CenterPage() {
         </ScrollReveal>
 
         <ScrollReveal>
-            <section className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-white shadow-[0_22px_52px_rgba(20,41,95,0.08)]">
-              <div className="grid gap-0 lg:grid-cols-[0.98fr_1.02fr]">
-                <div className="px-6 py-7 sm:px-8 sm:py-8">
-                  <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">SECTION 03</p>
-                  <h2 className="mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] text-[#14295F]">
-                    대치동까지 가지 않아도, 트랙에서 실전 모의고사 체계를 바로 경험합니다
-                  </h2>
-                  <p className="mt-5 break-keep text-[15px] font-semibold leading-[1.86] text-[#425A75]">
-                    더프리미엄과 시대인재 서바이벌 프로 모의고사, 국어 이감과 한수까지 연결해 학생별 상태를 점검합니다. 시험을 치는 것에서 끝내지 않고, 결과 입력 후 상담까지 체계적으로 이어 철저하게 관리합니다.
-                  </p>
-
-                  <div className="mt-6 flex flex-wrap gap-2.5">
-                    {['더프리미엄', '이감', '한수', '서바이벌 프로'].map((item) => (
-                      <span key={item} className="rounded-full border border-[#FF7A16]/14 bg-[#FFF5EC] px-3 py-1.5 text-[11px] font-black text-[#B55200]">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-[#14295F]/8 bg-[linear-gradient(180deg,#FFF8F0_0%,#FFFFFF_100%)] px-6 py-7 sm:px-8 sm:py-8 lg:border-l lg:border-t-0">
-                  <StaggerChildren className="grid gap-3 sm:grid-cols-2" stagger={80}>
-                    {mockPrograms.map((program, index) => (
-                      <article key={program.title} className="rounded-[1.35rem] border border-[#FF7A16]/10 bg-white px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.06)]">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">PROGRAM {String(index + 1).padStart(2, '0')}</p>
-                          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#14295F] text-white">
-                            {index === 0 ? <CircleGauge className="h-4 w-4" /> : index === 1 ? <BookOpenCheck className="h-4 w-4" /> : index === 2 ? <MessageSquareText className="h-4 w-4" /> : <Trophy className="h-4 w-4" />}
-                          </span>
-                        </div>
-                        <h3 className="mt-3 break-keep text-[1rem] font-black leading-[1.34] text-[#14295F]">{program.title}</h3>
-                        <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.7] text-[#53687F]">{program.description}</p>
-                      </article>
-                    ))}
-                  </StaggerChildren>
-                </div>
-              </div>
-            </section>
+          <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
         </ScrollReveal>
 
         <ScrollReveal>

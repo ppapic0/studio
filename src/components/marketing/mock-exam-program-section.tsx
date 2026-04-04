@@ -16,77 +16,54 @@ const programIcons: Record<string, LucideIcon> = {
 
 export function MockExamProgramSection({ mockExamProgram }: MockExamProgramSectionProps) {
   return (
-    <section
-      id="mock-exam-program"
-      className="scroll-mt-28 pb-12 pt-0 sm:pb-20 sm:pt-0"
-      style={{ background: 'linear-gradient(180deg, #f7f9fd 0%, #ffffff 100%)' }}
-    >
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <article className="brand-sheen-panel relative overflow-hidden rounded-[1.7rem] border border-[#FF7A16]/12 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(255,245,238,0.98)_100%)] px-5 py-6 shadow-[0_22px_54px_rgba(20,41,95,0.08)] sm:rounded-[2rem] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-[-4%] top-[12%] h-28 w-28 rounded-full bg-[#FFD3AF]/26 blur-3xl sm:h-36 sm:w-36" />
-            <div className="absolute right-[4%] top-[8%] h-40 w-40 rounded-full bg-[#FFB878]/16 blur-[90px] sm:h-56 sm:w-56" />
-            <div className="absolute right-[18%] bottom-[-18%] h-52 w-52 rounded-full border border-[#14295F]/8" />
-            <div className="absolute left-[34%] top-[30%] hidden h-px w-[26%] border-t border-dashed border-[#FF7A16]/18 lg:block" />
-          </div>
+    <section className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-white shadow-[0_22px_52px_rgba(20,41,95,0.08)]">
+      <div className="px-6 py-7 sm:px-8 sm:py-8">
+        <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">SECTION 03</p>
+        <h2 className="mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] text-[#14295F]">
+          {mockExamProgram.title}
+        </h2>
 
-          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-8">
-            <div className="max-w-3xl">
-              <span className="eyebrow-badge">{mockExamProgram.eyebrow}</span>
-              <h2 className="mt-4 break-keep text-[clamp(1.65rem,7vw,3rem)] font-black leading-[1.1] text-[#14295F]">
-                {mockExamProgram.title}
-              </h2>
-              <p className="mt-4 break-keep text-[14px] font-semibold leading-[1.85] text-[#4E627A] sm:text-[15.5px]">
-                {mockExamProgram.description}
+        <div className="mt-6 overflow-hidden rounded-[1.55rem] border border-[#E8D9C8] bg-[linear-gradient(180deg,#F5EDE1_0%,#FFF8F1_100%)]">
+          <div className="relative flex min-h-[9.5rem] items-center justify-center px-6 py-6">
+            <div className="absolute inset-x-0 top-1/2 h-10 -translate-y-1/2 bg-[#E8DCCB]/72" />
+            <div className="relative flex h-36 w-36 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_30%,#FFE6CA_0%,#F4C896_100%)] px-6 text-center shadow-[0_18px_40px_rgba(201,150,92,0.28)]">
+              <p className="whitespace-pre-line break-keep text-[0.98rem] font-black leading-[1.35] text-[#14295F]">
+                {mockExamProgram.spotlight}
               </p>
-
-              <div className="mt-5 flex flex-wrap gap-2.5">
-                {mockExamProgram.highlights.map((item) => (
-                  <span
-                    key={item}
-                    className="inline-flex items-center rounded-full border border-[#FF7A16]/14 bg-white/92 px-3 py-1.5 text-[11px] font-black text-[#C45A00] shadow-[0_8px_18px_rgba(255,122,22,0.08)]"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              {mockExamProgram.programs.map((program, index) => {
-                const Icon = programIcons[program.title] ?? Target;
-
-                return (
-                  <article
-                    key={program.title}
-                    className="brand-sheen-panel relative overflow-hidden rounded-[1.2rem] border border-[#14295F]/10 bg-white/94 p-4 shadow-[0_14px_30px_rgba(20,41,95,0.06)] sm:rounded-[1.35rem] sm:p-5"
-                  >
-                    <div className="brand-glow-drift absolute right-[-12%] top-[-8%] h-20 w-20 rounded-full bg-[#FFB878]/12 blur-3xl" />
-                    <div className="relative">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-[9px] font-black tracking-[0.18em] text-[#FF7A16]">
-                            PROGRAM 0{index + 1}
-                          </p>
-                          <h3 className="mt-2 break-keep text-[1rem] font-black leading-[1.2] text-[#14295F] sm:text-[1.08rem]">
-                            {program.title}
-                          </h3>
-                        </div>
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#14295F]/7 text-[#14295F]">
-                          <Icon className="h-4.5 w-4.5" />
-                        </span>
-                      </div>
-
-                      <p className="mt-4 break-keep text-[12.5px] font-semibold leading-[1.72] text-[#5A6E85] sm:text-[13px]">
-                        {program.summary}
-                      </p>
-                    </div>
-                  </article>
-                );
-              })}
             </div>
           </div>
-        </article>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          {mockExamProgram.programs.map((program, index) => {
+            const Icon = programIcons[program.title] ?? Target;
+
+            return (
+              <article
+                key={program.title}
+                className="rounded-[1.35rem] border border-[#14295F]/8 bg-white px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.06)]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">
+                      PROGRAM {String(index + 1).padStart(2, '0')}
+                    </p>
+                    <h3 className="mt-3 break-keep text-[1rem] font-black leading-[1.34] text-[#14295F]">
+                      {program.title}
+                    </h3>
+                  </div>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#14295F] text-white">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                </div>
+
+                <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.7] text-[#53687F]">
+                  {program.summary}
+                </p>
+              </article>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
