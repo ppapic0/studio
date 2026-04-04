@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, Trash2 } from 'lucide-react';
+import { ChevronDown, Trash2, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -214,6 +214,16 @@ export function PlanItemCard({
                       className="h-7 rounded-full px-3 text-[10px] font-black"
                     >
                       절반
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={onDelete}
+                      aria-label="계획 삭제"
+                      className="h-7 w-7 rounded-full border border-white/10 bg-white/[0.06] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12] hover:text-white"
+                    >
+                      <X className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       type="button"

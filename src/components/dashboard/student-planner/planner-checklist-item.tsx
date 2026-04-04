@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, Clock3, GripHorizontal, Trash2 } from 'lucide-react';
+import { ChevronDown, Clock3, GripHorizontal, Trash2, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -225,6 +225,19 @@ export function PlannerChecklistItem({
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" variant="dark" onClick={() => onCommitActual(0)} className="h-8 rounded-full text-[10px] font-black">0</Button>
                   <Button type="button" variant="dark" onClick={() => onCommitActual(Math.max(1, Math.round((task.targetAmount || 0) / 2)))} className="h-8 rounded-full text-[10px] font-black">절반</Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete();
+                    }}
+                    aria-label="계획 삭제"
+                    className="h-8 w-8 rounded-full border border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.14] hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                   <Button type="button" variant="dark" onClick={() => onCommitActual(Math.max(0, task.targetAmount || 0))} className="h-8 rounded-full text-[10px] font-black">완료</Button>
                   <div className="flex items-center gap-2 rounded-full bg-white/[0.1] px-2 py-1.5">
                     <Input
