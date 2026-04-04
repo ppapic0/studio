@@ -1,8 +1,7 @@
 import { headers } from 'next/headers';
 
 import { ConsultSection } from '@/components/marketing/consult-section';
-import { CenterIntroSection } from '@/components/marketing/center-intro-section';
-import { FocusFirewallSection } from '@/components/marketing/focus-firewall-section';
+import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
 import { HeroGallerySection } from '@/components/marketing/hero-gallery-section';
 import { HomeOpsSection } from '@/components/marketing/home-ops-section';
 import { HeroSection } from '@/components/marketing/hero-section';
@@ -37,16 +36,7 @@ export default async function HomePage() {
       <MarketingLaunchNoticeModal notice={marketingContent.launchNotice} />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
-      <ScrollReveal>
-        <div className="mx-auto w-full max-w-7xl px-4 pt-8 sm:px-6 sm:pt-10 lg:px-8 lg:pt-12">
-          <CenterIntroSection />
-        </div>
-      </ScrollReveal>
-      <ScrollReveal>
-        <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
-          <FocusFirewallSection />
-        </div>
-      </ScrollReveal>
+      <CenterOverviewStack className="pt-8 sm:pt-10 lg:pt-12" />
       {isMobile ? (
         <MobileStudySystemSection content={marketingContent.mobileStudySystem} />
       ) : (

@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import {
   ArrowRight,
+  BookOpenCheck,
   CircleGauge,
   MessageSquareText,
-  ShieldCheck,
+  Sparkles,
   Trophy,
 } from 'lucide-react';
 
-import { CenterIntroSection } from '@/components/marketing/center-intro-section';
-import { FocusFirewallSection } from '@/components/marketing/focus-firewall-section';
+import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
@@ -119,17 +119,12 @@ export default function CenterPage() {
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
+      </div>
 
-        <ScrollReveal className="mt-7">
-          <CenterIntroSection />
-        </ScrollReveal>
+      <CenterOverviewStack className="mt-7" />
 
-        <div className="mt-10 space-y-8 sm:space-y-10">
-          <ScrollReveal>
-            <FocusFirewallSection />
-          </ScrollReveal>
-
-          <ScrollReveal>
+      <div className="mx-auto mt-10 w-full max-w-7xl space-y-8 px-4 sm:space-y-10 sm:px-6 lg:px-8">
+        <ScrollReveal>
             <section className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-white shadow-[0_22px_52px_rgba(20,41,95,0.08)]">
               <div className="grid gap-0 lg:grid-cols-[1.02fr_0.98fr]">
                 <div className="order-2 border-t border-[#14295F]/8 bg-[linear-gradient(180deg,#FFF9F2_0%,#FFFFFF_100%)] px-6 py-7 sm:px-8 sm:py-8 lg:order-1 lg:border-r lg:border-t-0">
@@ -162,9 +157,9 @@ export default function CenterPage() {
                 </div>
               </div>
             </section>
-          </ScrollReveal>
+        </ScrollReveal>
 
-          <ScrollReveal>
+        <ScrollReveal>
             <section className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-white shadow-[0_22px_52px_rgba(20,41,95,0.08)]">
               <div className="grid gap-0 lg:grid-cols-[0.98fr_1.02fr]">
                 <div className="px-6 py-7 sm:px-8 sm:py-8">
@@ -203,9 +198,9 @@ export default function CenterPage() {
                 </div>
               </div>
             </section>
-          </ScrollReveal>
+        </ScrollReveal>
 
-          <ScrollReveal>
+        <ScrollReveal>
             <section className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-white shadow-[0_22px_52px_rgba(20,41,95,0.08)]">
               <div className="grid gap-0 lg:grid-cols-[1.02fr_0.98fr]">
                 <div className="order-2 border-t border-[#14295F]/8 bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] px-6 py-7 sm:px-8 sm:py-8 lg:order-1 lg:border-r lg:border-t-0">
@@ -241,9 +236,9 @@ export default function CenterPage() {
                 </div>
               </div>
             </section>
-          </ScrollReveal>
+        </ScrollReveal>
 
-          <ScrollReveal>
+        <ScrollReveal>
             <section className="relative overflow-hidden rounded-[2.1rem] border border-[#14295F]/10 bg-white px-6 py-7 text-center shadow-[0_20px_46px_rgba(20,41,95,0.08)] sm:px-8">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,122,22,0.10),transparent_32%)]" />
               <div className="relative mx-auto max-w-3xl">
@@ -264,8 +259,7 @@ export default function CenterPage() {
                 </div>
               </div>
             </section>
-          </ScrollReveal>
-        </div>
+        </ScrollReveal>
       </div>
 
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
