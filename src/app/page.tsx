@@ -13,6 +13,7 @@ import { MobileStudySystemSection } from '@/components/marketing/mobile-study-sy
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
 import { PageGatewaySection } from '@/components/marketing/page-gateway-section';
+import { PointRewardSection } from '@/components/marketing/point-reward-section';
 import { ResultsSection } from '@/components/marketing/results-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StickyConsultCTA } from '@/components/marketing/sticky-consult-cta';
@@ -47,6 +48,11 @@ export default async function HomePage() {
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
         <ScrollReveal>
           <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
+        </ScrollReveal>
+      </div>
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
+        <ScrollReveal>
+          <PointRewardSection />
         </ScrollReveal>
       </div>
       {isMobile ? (
