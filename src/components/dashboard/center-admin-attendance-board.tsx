@@ -184,7 +184,9 @@ export function CenterAdminAttendanceBoard({
                         <span
                           className={cn(
                             'inline-flex max-w-full items-center justify-center rounded-full border border-black/5 bg-white/80 font-black tracking-tight whitespace-nowrap text-slate-700 shadow-sm',
-                            compact ? 'mt-1 px-1.5 py-0.5 text-[8px] leading-none' : 'mt-1.5 px-2 py-0.5 text-[9px] leading-none'
+                            compact
+                              ? 'mt-1 px-1 py-0.5 text-[7px] leading-none'
+                              : 'mt-1.5 px-1.5 py-0.5 text-[8px] leading-none'
                           )}
                         >
                           {compactStudyTimeLabel}
