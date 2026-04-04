@@ -209,11 +209,6 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
 
         <div className="order-1 lg:order-2">
           <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {section.secondaryScreens.map((screen) => (
-              <ScreenshotCard key={`${section.mode}-${screen.title}`} screen={screen} tone={tone} />
-            ))}
-          </div>
         </div>
       </div>
     </article>
