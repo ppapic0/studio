@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 
 import { ConsultSection } from '@/components/marketing/consult-section';
+import { CenterIntroSection } from '@/components/marketing/center-intro-section';
 import { HeroGallerySection } from '@/components/marketing/hero-gallery-section';
 import { HomeOpsSection } from '@/components/marketing/home-ops-section';
 import { HeroSection } from '@/components/marketing/hero-section';
@@ -36,7 +37,9 @@ export default async function HomePage() {
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
       <ScrollReveal>
-        <PageGatewaySection />
+        <div className="mx-auto w-full max-w-7xl px-4 pt-8 sm:px-6 sm:pt-10 lg:px-8 lg:pt-12">
+          <CenterIntroSection />
+        </div>
       </ScrollReveal>
       {isMobile ? (
         <MobileStudySystemSection content={marketingContent.mobileStudySystem} />
@@ -50,6 +53,9 @@ export default async function HomePage() {
           </ScrollReveal>
           <ScrollReveal>
             <HomeOpsSection />
+          </ScrollReveal>
+          <ScrollReveal>
+            <PageGatewaySection />
           </ScrollReveal>
         </>
       )}
