@@ -3741,11 +3741,7 @@ export default function StudyPlanPage() {
         isMobile={isMobile}
         isSubmitting={isSubmitting}
         isPast={isPast}
-        selectedDateLabel={selectedDateSheetLabel}
-        totalCount={studyTasks.length}
         completedCount={completedStudyCount}
-        remainingCount={remainingStudyTasks.length}
-        goalSummaryLabel={studyGoalSummaryLabel}
         subjectOptions={planSubjectOptions}
         subjectValue={newStudySubject}
         onSubjectChange={setNewStudySubject}

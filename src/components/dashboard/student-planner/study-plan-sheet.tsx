@@ -44,11 +44,7 @@ type StudyPlanSheetProps = {
   isMobile: boolean;
   isSubmitting: boolean;
   isPast: boolean;
-  selectedDateLabel: string;
-  totalCount: number;
   completedCount: number;
-  remainingCount: number;
-  goalSummaryLabel: string;
   subjectOptions: SubjectOption[];
   subjectValue: string;
   onSubjectChange: (value: string) => void;
@@ -122,11 +118,7 @@ export function StudyPlanSheet({
   isMobile,
   isSubmitting,
   isPast,
-  selectedDateLabel,
-  totalCount,
   completedCount,
-  remainingCount,
-  goalSummaryLabel,
   subjectOptions,
   subjectValue,
   onSubjectChange,
@@ -174,7 +166,7 @@ export function StudyPlanSheet({
       setIsStudySectionOpen(false);
       setIsPersonalSectionOpen(false);
     }
-  }, [open, selectedDateLabel]);
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,75 +203,40 @@ export function StudyPlanSheet({
             isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'max-h-[calc(88dvh-9rem)] p-5'
           )}
         >
-          <div className="rounded-[1.5rem] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.04)_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.42)]">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFB36B]">
-                  입력 헤더
-                </p>
-                <p className="mt-1 break-keep text-base font-black tracking-tight text-white">
-                  {isPast ? '이 날짜는 보기 전용이에요.' : '새 계획을 먼저 쓰기 편한 화면으로 정리했어요.'}
-                </p>
-                <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-                  {isPast
-                    ? '기존 계획은 아래 접힘 섹션에서 확인할 수 있어요.'
-                    : '기존 목록은 접어두고, 새 계획 작성만 먼저 끝낼 수 있게 구성했어요.'}
-                </p>
-              </div>
-              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] shadow-none">
-                {selectedDateLabel}
-              </Badge>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <div className="rounded-full border border-white/10 bg-white/[0.08] px-3 py-1.5 text-[11px] font-black text-white">
-                남은 계획 {remainingCount}개
-              </div>
-              <div className="rounded-full border border-white/10 bg-white/[0.08] px-3 py-1.5 text-[11px] font-black text-white">
-                완료 {completedCount}/{totalCount}
-              </div>
-              <div className="rounded-full border border-[#FFB36B]/22 bg-[#FF7A16]/12 px-3 py-1.5 text-[11px] font-black text-[#FFB36B]">
-                오늘 목표 {goalSummaryLabel}
-              </div>
-            </div>
-          </div>
-
           {!isPast ? (
-            <div className="mt-4">
-              <StudyComposerCard
-                title="새 계획 작성"
-                description="과목, 목표, 할 일을 순서대로 짧게 적고 바로 추가해보세요."
-                subjectOptions={subjectOptions}
-                subjectValue={subjectValue}
-                onSubjectChange={onSubjectChange}
-                customSubjectValue={customSubjectValue}
-                onCustomSubjectChange={onCustomSubjectChange}
-                studyModeValue={studyModeValue}
-                onStudyModeChange={onStudyModeChange}
-                minuteValue={minuteValue}
-                onMinuteChange={onMinuteChange}
-                amountValue={amountValue}
-                onAmountChange={onAmountChange}
-                amountUnitValue={amountUnitValue}
-                onAmountUnitChange={onAmountUnitChange}
-                customAmountUnitValue={customAmountUnitValue}
-                onCustomAmountUnitChange={onCustomAmountUnitChange}
-                enableVolumeMinutes={enableVolumeMinutes}
-                onEnableVolumeMinutesChange={onEnableVolumeMinutesChange}
-                taskValue={taskValue}
-                onTaskChange={onTaskChange}
-                onSubmit={onSubmit}
-                isSubmitting={isSubmitting}
-                isMobile={isMobile}
-                isRecentLoading={isRecentLoading}
-                recentOptions={recentOptions}
-                onPrefillRecent={onPrefillRecent}
-                onOpenRecentSheet={onOpenRecentSheet}
-                activeRecentTitle={activeRecentTitle}
-                onResetRecentPrefill={onResetRecentPrefill}
-                modeOptions={modeOptions}
-              />
-            </div>
+            <StudyComposerCard
+              title="새 계획 작성"
+              description="과목, 목표, 할 일을 순서대로 짧게 적고 바로 추가해보세요."
+              subjectOptions={subjectOptions}
+              subjectValue={subjectValue}
+              onSubjectChange={onSubjectChange}
+              customSubjectValue={customSubjectValue}
+              onCustomSubjectChange={onCustomSubjectChange}
+              studyModeValue={studyModeValue}
+              onStudyModeChange={onStudyModeChange}
+              minuteValue={minuteValue}
+              onMinuteChange={onMinuteChange}
+              amountValue={amountValue}
+              onAmountChange={onAmountChange}
+              amountUnitValue={amountUnitValue}
+              onAmountUnitChange={onAmountUnitChange}
+              customAmountUnitValue={customAmountUnitValue}
+              onCustomAmountUnitChange={onCustomAmountUnitChange}
+              enableVolumeMinutes={enableVolumeMinutes}
+              onEnableVolumeMinutesChange={onEnableVolumeMinutesChange}
+              taskValue={taskValue}
+              onTaskChange={onTaskChange}
+              onSubmit={onSubmit}
+              isSubmitting={isSubmitting}
+              isMobile={isMobile}
+              isRecentLoading={isRecentLoading}
+              recentOptions={recentOptions}
+              onPrefillRecent={onPrefillRecent}
+              onOpenRecentSheet={onOpenRecentSheet}
+              activeRecentTitle={activeRecentTitle}
+              onResetRecentPrefill={onResetRecentPrefill}
+              modeOptions={modeOptions}
+            />
           ) : null}
 
           <Collapsible open={isStudySectionOpen} onOpenChange={setIsStudySectionOpen}>

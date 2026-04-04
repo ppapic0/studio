@@ -1546,11 +1546,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         isMobile={isMobile}
         isSubmitting={isSubmitting}
         isPast={isPast}
-        selectedDateLabel={selectedDateLabel}
-        totalCount={studyTasks.length}
         completedCount={completedStudyCount}
-        remainingCount={Math.max(0, studyTasks.length - completedStudyCount)}
-        goalSummaryLabel={studyGoalSummaryLabel}
         subjectOptions={quickSubjectOptions}
         subjectValue={newStudySubject}
         onSubjectChange={setNewStudySubject}
