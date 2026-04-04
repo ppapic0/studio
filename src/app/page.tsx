@@ -35,6 +35,9 @@ export default async function HomePage() {
       <MarketingLaunchNoticeModal notice={marketingContent.launchNotice} />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
+      <ScrollReveal>
+        <PageGatewaySection />
+      </ScrollReveal>
       {isMobile ? (
         <MobileStudySystemSection content={marketingContent.mobileStudySystem} />
       ) : (
@@ -47,9 +50,6 @@ export default async function HomePage() {
           </ScrollReveal>
           <ScrollReveal>
             <HomeOpsSection />
-          </ScrollReveal>
-          <ScrollReveal>
-            <PageGatewaySection />
           </ScrollReveal>
         </>
       )}

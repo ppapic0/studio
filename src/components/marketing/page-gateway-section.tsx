@@ -6,18 +6,6 @@ import { StaggerChildren } from './stagger-children';
 
 const pageDestinations = [
   {
-    eyebrow: 'RESULTS',
-    title: '합격 실적',
-    href: '/results',
-    meta: '실제 성적표 포함',
-    highlights: ['합격 결과', '상승 사례', '실제 성적표'],
-    icon: Trophy,
-    cardClass: 'border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)]',
-    iconClass: 'bg-[#14295F] text-white',
-    chipClass: 'border-[#14295F]/10 bg-white/90 text-[#14295F]',
-    footerClass: 'border-[#14295F]/10 bg-white/90 text-[#14295F]',
-  },
-  {
     eyebrow: 'CENTER',
     title: '센터 소개',
     href: '/center',
@@ -28,6 +16,18 @@ const pageDestinations = [
     iconClass: 'bg-[#FFF1E4] text-[#FF7A16]',
     chipClass: 'border-[#FF7A16]/12 bg-white/90 text-[#B55200]',
     footerClass: 'border-[#FF7A16]/12 bg-white/92 text-[#B55200]',
+  },
+  {
+    eyebrow: 'RESULTS',
+    title: '합격 실적',
+    href: '/results',
+    meta: '실제 성적표 포함',
+    highlights: ['합격 결과', '상승 사례', '실제 성적표'],
+    icon: Trophy,
+    cardClass: 'border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)]',
+    iconClass: 'bg-[#14295F] text-white',
+    chipClass: 'border-[#14295F]/10 bg-white/90 text-[#14295F]',
+    footerClass: 'border-[#14295F]/10 bg-white/90 text-[#14295F]',
   },
   {
     eyebrow: 'WEB APP',
