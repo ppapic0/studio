@@ -194,7 +194,7 @@ function AnalysisKpiCard({
     <div className={cn('analysis-kpi-card rounded-[1.5rem] p-4 md:p-5 bg-gradient-to-br', toneStyles.soft)}>
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#6478a5]">{title}</p>
+          <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.2em] text-[#6478a5]">{title}</p>
           <p className="mt-3 break-keep text-[clamp(1.15rem,1.7vw,1.85rem)] font-black tracking-tight text-[#14295F]">
             {value}
           </p>
@@ -927,7 +927,7 @@ export default function AnalysisTrackPage() {
             <div className={cn('mt-5 grid gap-5', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]')}>
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight text-white">{displayName}</p>
+                  <p className="font-aggro-display text-[clamp(1.35rem,2.4vw,2.2rem)] font-black tracking-tight text-white">{displayName}</p>
                   <Badge variant="secondary" className="px-3 py-1 text-[10px] shadow-none">🔥 {playerTitle}</Badge>
                 </div>
                 <p className="surface-caption mt-2 text-sm font-semibold">오늘도 성장한 하루를 만드는 중이에요.</p>
