@@ -162,6 +162,7 @@ function ScreenshotCard({
 function ExperienceSectionBlock({ section, reverse = false }: { section: ExperienceSection; reverse?: boolean }) {
   const tone = resolveTone(section.mode);
   const style = toneStyleMap[tone];
+  const showStudentScreenSet = section.mode === '학생 모드' && section.secondaryScreens.length >= 2;
 
   return (
     <article className={`relative overflow-hidden rounded-[2.35rem] border p-5 shadow-[0_24px_58px_rgba(20,41,95,0.10)] sm:p-7 lg:p-8 ${style.sectionCard}`}>
@@ -208,7 +209,19 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
         </div>
 
         <div className="order-1 lg:order-2">
-          <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
+          {showStudentScreenSet ? (
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] md:items-center">
+              <div className="space-y-4">
+                <ScreenshotCard screen={section.primaryScreen} tone={tone} />
+                <ScreenshotCard screen={section.secondaryScreens[0]!} tone={tone} />
+              </div>
+              <div className="md:pt-16">
+                <ScreenshotCard screen={section.secondaryScreens[1]!} tone={tone} />
+              </div>
+            </div>
+          ) : (
+            <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
+          )}
         </div>
       </div>
     </article>
