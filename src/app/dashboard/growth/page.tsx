@@ -235,12 +235,14 @@ function RewardHeroChest({
   stage,
   label,
   intense = false,
+  rarity,
   onClick,
 }: {
   state: 'ready' | 'charging';
   stage?: BoxStage;
   label: string;
   intense?: boolean;
+  rarity?: BoxRarity | null;
   onClick?: () => void;
 }) {
   return (
@@ -252,6 +254,8 @@ function RewardHeroChest({
         'point-track-hero-box',
         state === 'ready' ? 'point-track-hero-box--ready' : 'point-track-hero-box--charging',
         intense && 'point-track-hero-box--intense',
+        rarity === 'rare' && 'point-track-hero-box--rare',
+        rarity === 'epic' && 'point-track-hero-box--epic',
         stage === 'shake' && 'point-track-hero-box--shake',
         stage === 'burst' && 'point-track-hero-box--burst',
         stage === 'revealed' && 'point-track-hero-box--revealed'
@@ -997,7 +1001,13 @@ export default function GrowthPage() {
 
       <Dialog open={isVaultOpen} onOpenChange={handleVaultChange}>
         <DialogContent className="w-[min(92vw,24rem)] overflow-hidden rounded-[2rem] border-none bg-[linear-gradient(180deg,#14295F_0%,#0d1c45_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.78)]">
-          <div className="point-track-modal-shell">
+          <div
+            className={cn(
+              'point-track-modal-shell',
+              selectedBox?.rarity === 'rare' && 'point-track-modal-shell--rare',
+              selectedBox?.rarity === 'epic' && 'point-track-modal-shell--epic',
+            )}
+          >
             <DialogHeader className="px-5 pb-0 pt-5">
               <DialogTitle className="text-left text-xl font-black tracking-tight text-white">포인트 상자 오픈</DialogTitle>
               <DialogDescription className="text-left text-sm font-bold text-[var(--text-on-dark-soft)]">
@@ -1006,11 +1016,18 @@ export default function GrowthPage() {
             </DialogHeader>
 
             <div className="px-5 pb-5 pt-4">
-              <div className="point-track-modal-stage">
+              <div
+                className={cn(
+                  'point-track-modal-stage',
+                  selectedBox?.rarity === 'rare' && 'point-track-modal-stage--rare',
+                  selectedBox?.rarity === 'epic' && 'point-track-modal-stage--epic',
+                )}
+              >
                 <RewardHeroChest
                   state={selectedBox?.state === 'ready' ? 'ready' : 'charging'}
                   stage={boxStage}
                   intense={selectedBox?.state === 'ready'}
+                  rarity={selectedBox?.rarity ?? null}
                   label={selectedBox ? `${selectedBox.hour}시간 상자` : '상자'}
                   onClick={selectedBox?.state === 'ready' ? handleRevealBox : undefined}
                 />

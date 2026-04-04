@@ -170,12 +170,14 @@ function RewardHeroChest({
   state,
   stage,
   intense,
+  rarity,
   label,
   onClick,
 }: {
   state: "ready" | "charging";
   stage?: BoxStage;
   intense?: boolean;
+  rarity?: BoxRarity | null;
   label: string;
   onClick?: () => void;
 }) {
@@ -188,6 +190,8 @@ function RewardHeroChest({
         "point-track-hero-box",
         state === "ready" ? "point-track-hero-box--ready" : "point-track-hero-box--charging",
         intense && "point-track-hero-box--intense",
+        rarity === "rare" && "point-track-hero-box--rare",
+        rarity === "epic" && "point-track-hero-box--epic",
         stage === "shake" && "point-track-hero-box--shake",
         stage === "burst" && "point-track-hero-box--burst",
         stage === "revealed" && "point-track-hero-box--revealed",
@@ -393,14 +397,26 @@ function RewardModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="point-track-modal-shell w-[min(92vw,26rem)] overflow-hidden rounded-[2rem] border-none bg-transparent p-0 text-white shadow-none">
+      <DialogContent
+        className={cn(
+          "point-track-modal-shell w-[min(92vw,26rem)] overflow-hidden rounded-[2rem] border-none bg-transparent p-0 text-white shadow-none",
+          selectedBox?.rarity === "rare" && "point-track-modal-shell--rare",
+          selectedBox?.rarity === "epic" && "point-track-modal-shell--epic",
+        )}
+      >
         <div className="p-5">
           <DialogHeader>
             <DialogTitle className="text-left text-xl font-black tracking-tight">
               {revealedReward !== null ? "보상 획득" : "상자 열기"}
             </DialogTitle>
           </DialogHeader>
-          <div className="point-track-modal-stage mt-4 text-center">
+          <div
+            className={cn(
+              "point-track-modal-stage mt-4 text-center",
+              selectedBox?.rarity === "rare" && "point-track-modal-stage--rare",
+              selectedBox?.rarity === "epic" && "point-track-modal-stage--epic",
+            )}
+          >
             <div className="point-track-modal-particles">
               {Array.from({ length: 7 }).map((_, index) => (
                 <span
@@ -418,6 +434,7 @@ function RewardModal({
               state="ready"
               intense={boxStage === "shake" || boxStage === "burst" || boxStage === "revealed"}
               stage={boxStage}
+              rarity={selectedBox?.rarity ?? null}
               label={`${selectedBox?.hour || 0}시간 상자`}
               onClick={revealedReward === null ? onReveal : undefined}
             />
