@@ -2,7 +2,6 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BookOpenCheck,
-  ChevronLeft,
   CircleGauge,
   MessageSquareText,
   ShieldCheck,
@@ -120,14 +119,7 @@ export default function CenterPage() {
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
 
       <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-white px-4 py-2 text-[13px] font-black text-[#14295F] shadow-[0_10px_24px_rgba(20,41,95,0.06)]"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            홈으로 돌아가기
-          </Link>
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <Link
             href="/#consult"
             className="inline-flex items-center gap-2 rounded-full bg-[#FF7A16] px-4 py-2 text-[13px] font-black text-white shadow-[0_14px_24px_rgba(255,122,22,0.26)] transition-transform hover:-translate-y-0.5"
@@ -145,13 +137,19 @@ export default function CenterPage() {
                 <SectionHeading
                   eyebrow="CENTER INTRO"
                   title="트랙의 센터 소개"
-                  description="공간만 보여주는 것이 아니라, 집중 환경 설정부터 앱 연동 관리, 실전 모의고사 운영, 동기 설계까지 한 페이지에서 정리했습니다."
                 />
+                <p className="mt-4 max-w-2xl break-keep text-[15px] font-bold leading-[1.82] text-[#2c3f58] sm:text-[15.5px]">
+                  공간만 제공하는 것이 아니라
+                  <br />
+                  집중력 최적화, 앱 연동 관리, 실전모의고사 및
+                  <br />
+                  포인트, 벌점제도로 학습동기를 높입니다.
+                </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 {[
-                  { icon: Wifi, title: '학습 집중 환경', detail: '허용 사이트 중심 와이파이 운영' },
+                  { icon: Wifi, title: '학습 집중 환경/휴대폰 수거 관리', detail: '허용 사이트 중심 와이파이 운영' },
                   { icon: Smartphone, title: '앱 연동 관리', detail: '현황과 피드백을 바로 연결' },
                   { icon: BookOpenCheck, title: '실전 모의 운영', detail: '더프리미엄 · 이감 · 한수 · 서바이벌 프로' },
                   { icon: Sparkles, title: '동기 설계', detail: '포인트와 상벌점으로 학습 흥미 유지' },
