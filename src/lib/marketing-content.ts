@@ -485,9 +485,9 @@ export const marketingContent: MarketingContent = {
     screens: webAppShowcaseScreens,
   },
   experienceShowcase: {
-    heading: '트랙이 자체 개발한 웹앱으로 학습 효율과 흥미를 함께 높입니다',
+    heading: '트랙이 자체 개발한 러닝시스템으로 학습 효율과 흥미를 함께 높입니다',
     description:
-      '학생은 더 분명하게 실행하고, 학부모는 더 빠르게 흐름을 확인할 수 있도록 트랙에서 직접 설계한 웹앱입니다.',
+      '학생은 더 분명하게 실행하고, 학부모는 더 빠르게 흐름을 확인할 수 있도록 트랙에서 직접 설계한 러닝시스템입니다.',
     sections: experienceShowcaseSections,
     footerNote: '실제 스크린샷은 순차 반영 예정입니다.',
     closingTitle: '트랙은 실제 데이터로 엄밀하게 관리합니다.',

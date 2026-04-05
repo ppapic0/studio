@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, ChevronLeft, Smartphone, Users } from 'lucide-react';
+import { ArrowRight, Smartphone, Users } from 'lucide-react';
 
 import { DataAnalyticsPreviewSection } from '@/components/marketing/data-analytics-preview-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
@@ -290,14 +290,7 @@ export default function ExperiencePage() {
       <div className="pointer-events-none fixed inset-x-0 top-0 h-[26rem] bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.12),transparent_44%),radial-gradient(circle_at_22%_10%,rgba(20,41,95,0.08),transparent_28%)]" />
 
       <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-white px-4 py-2 text-[13px] font-black text-[#14295F] shadow-[0_10px_24px_rgba(20,41,95,0.06)]"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            홍보 페이지로 돌아가기
-          </Link>
+        <div className="flex justify-end">
           <Link
             href="/go/login?placement=experience_header"
             className="inline-flex items-center gap-2 rounded-full bg-[#FF7A16] px-4 py-2 text-[13px] font-black text-white shadow-[0_14px_24px_rgba(255,122,22,0.26)] transition-transform hover:-translate-y-0.5"
@@ -313,7 +306,7 @@ export default function ExperiencePage() {
             <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-8">
               <div>
                 <SectionHeading
-                  eyebrow="ACTUAL WEB APP"
+                  eyebrow="ACTUAL LEARNING SYSTEM"
                   title={experienceShowcase.heading}
                   description={experienceShowcase.description}
                 />
