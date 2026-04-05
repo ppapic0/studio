@@ -8,6 +8,11 @@ type MarketingFooterProps = {
 };
 
 export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
+  const footerHourLines = footer.hours
+    .split(/<br\s*\/?>/i)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
   return (
     <footer
       style={{
@@ -47,7 +52,13 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
           >
             <p className="text-sm font-semibold text-white/60">{footer.phone}</p>
             <p className="break-keep text-sm font-semibold text-white/60">{footer.location}</p>
-            <p className="text-sm font-semibold text-white/60">{footer.hours}</p>
+            <div className="space-y-1.5">
+              {footerHourLines.map((line) => (
+                <p key={line} className="break-keep text-sm font-semibold text-white/60">
+                  {line}
+                </p>
+              ))}
+            </div>
           </div>
         </div>
 

@@ -38,7 +38,10 @@ async function getWaitlistCount(): Promise<number> {
 
 export async function ConsultSection({ consult, trustMetrics }: ConsultSectionProps) {
   const waitlistCount = await getWaitlistCount();
-  const hourLines = consult.hoursLine.split(' · ').map((item) => item.trim());
+  const hourLines = consult.hoursLine
+    .split(/<br\s*\/?>/i)
+    .map((item) => item.trim())
+    .filter(Boolean);
   const infoCards = [
     { label: 'CONTACT', value: consult.contactLine, mobileSpanClass: '' },
     { label: 'LOCATION', value: consult.locationLine, mobileSpanClass: 'col-span-2' },
@@ -161,7 +164,7 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
                         {hourLines.map((line) => (
                           <p
                             key={line}
-                            className="whitespace-nowrap text-[11px] font-black leading-[1.35] tracking-[-0.03em] text-white sm:text-[1.05rem] sm:leading-relaxed sm:tracking-normal"
+                            className="break-keep text-[11px] font-black leading-[1.5] tracking-[-0.03em] text-white sm:text-[1.05rem] sm:leading-relaxed sm:tracking-normal"
                           >
                             {line}
                           </p>

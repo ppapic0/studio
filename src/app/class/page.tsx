@@ -135,7 +135,10 @@ const mobileContactLayoutClass: Record<string, string> = {
 
 export default async function ClassPage() {
   const waitlistCount = await getWaitlistCount();
-  const hourLines = marketingContent.consult.hoursLine.split(' · ').map((item) => item.trim());
+  const hourLines = marketingContent.consult.hoursLine
+    .split(/<br\s*\/?>/i)
+    .map((item) => item.trim())
+    .filter(Boolean);
   return (
     <main className="min-h-screen bg-white pb-24 text-slate-900 sm:pb-0">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
@@ -600,7 +603,7 @@ export default async function ClassPage() {
                           {hourLines.map((line) => (
                             <p
                               key={line}
-                              className="whitespace-nowrap text-[11px] font-black leading-[1.35] tracking-[-0.03em] text-white sm:text-[1.05rem] sm:leading-relaxed sm:tracking-normal"
+                              className="break-keep text-[11px] font-black leading-[1.5] tracking-[-0.03em] text-white sm:text-[1.05rem] sm:leading-relaxed sm:tracking-normal"
                             >
                               {line}
                             </p>
