@@ -2574,9 +2574,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardTitle className={cn('mt-3 text-[clamp(1rem,1.45vw,1.28rem)]', detailGrowthTitleClass)}>주간 학습시간 성장률</CardTitle>
                     <CardDescription className={cn('text-sm leading-6', detailGrowthDescriptionClass)}>주간 누적 학습시간과 전주 대비 변화를 함께 읽습니다.</CardDescription>
                   </div>
-                  <div className={detailMetricChipClass}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">이번 주 성장</p>
-                    <p className={cn('mt-1 text-lg font-black tracking-tight', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                  <div className={cn(detailMetricChipClass, 'flex min-h-[4.6rem] min-w-[5.6rem] flex-col items-center justify-center px-3 py-2.5 text-center')}>
+                    <p className="text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em] text-[#6a7da6]">이번 주 성장</p>
+                    <p className={cn('mt-1 text-lg font-black leading-none tracking-tight', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                       {formatSignedPercent(latestWeeklyLearningGrowthPercent)}
                     </p>
                   </div>
@@ -2928,9 +2928,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardTitle className={cn('font-aggro-display text-[1rem]', detailGrowthTitleClass)}>주간 학습시간 성장률</CardTitle>
                           <CardDescription className={cn('text-[12px] leading-5', detailGrowthDescriptionClass)}>주간 누적 학습시간과 전주 대비 변화를 함께 읽습니다.</CardDescription>
                         </div>
-                        <div className={detailMetricChipClass}>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">이번 주</p>
-                          <p className={cn('mt-1 text-base font-black tracking-tight', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                        <div className={cn(detailMetricChipClass, 'flex min-h-[4.4rem] min-w-[5.2rem] flex-col items-center justify-center px-3 py-2.5 text-center')}>
+                          <p className="text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em] text-[#6a7da6]">이번 주 성장</p>
+                          <p className={cn('mt-1 text-base font-black leading-none tracking-tight', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                             {formatSignedPercent(latestWeeklyLearningGrowthPercent)}
                           </p>
                         </div>
