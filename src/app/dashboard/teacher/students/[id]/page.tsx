@@ -1868,7 +1868,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     isAnalysisPresentation ? 'analysis-detail-panel border-none' : 'border-slate-100'
   );
   const detailMetricChipClass = isAnalysisPresentation
-    ? 'analysis-metric-chip'
+    ? 'analysis-metric-chip flex min-h-[4.9rem] min-w-[5.8rem] flex-col items-center justify-center gap-1 px-3 py-3 text-center'
     : 'rounded-[1rem] border border-[#dbe7ff] bg-white/82 px-3 py-2 shadow-[0_14px_30px_-28px_rgba(20,41,95,0.42)]';
   const detailBadgeClass = isAnalysisPresentation
     ? 'analysis-detail-badge'
@@ -1899,6 +1899,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const analysisChartTickSoftColor = isAnalysisPresentation ? '#f4f8ff' : '#7b8dab';
   const analysisChipPrimaryTextClass = isAnalysisPresentation ? 'text-[#f4f8ff]' : 'text-[#14295F]';
   const analysisChipSecondaryTextClass = isAnalysisPresentation ? 'text-white/80' : 'text-[#5c6e97]';
+  const analysisChipLabelClass = cn('text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em]', analysisReadableMutedTextClass);
+  const analysisChipSubLabelClass = cn('text-[11px] font-semibold leading-[1.2]', analysisChipSecondaryTextClass);
   const detailInsightBandClass = cn(
     'mt-3 rounded-[1.15rem] px-3.5 py-3',
     isAnalysisPresentation ? 'analysis-signal-band' : 'border border-slate-200 bg-slate-50/85'
@@ -2581,7 +2583,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className={cn('text-sm leading-6', detailGrowthDescriptionClass)}>주간 누적 학습시간과 전주 대비 변화를 함께 읽습니다.</CardDescription>
                   </div>
                   <div className={cn(detailMetricChipClass, 'flex min-h-[4.6rem] min-w-[5.6rem] flex-col items-center justify-center px-3 py-2.5 text-center')}>
-                    <p className={cn("text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em]", analysisReadableMutedTextClass)}>이번 주 성장</p>
+                    <p className={analysisChipLabelClass}>이번 주 성장</p>
                     <p className={cn('mt-1 text-lg font-black leading-none tracking-tight', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                       {formatSignedPercent(latestWeeklyLearningGrowthPercent)}
                     </p>
@@ -2649,7 +2651,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className={detailMetricChipClass}>
-                      <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>최근 7일</p>
+                      <p className={analysisChipLabelClass}>최근 7일</p>
                       <p className={cn('mt-1 text-lg font-black tracking-tight', latestDailyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                         {formatSignedPercent(latestDailyLearningGrowthPercent)}
                       </p>
@@ -2723,9 +2725,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className={cn('mt-1 text-sm font-semibold leading-6', detailGrowthDescriptionClass)}>시작 시간 흔들림을 점수로 바꿔 리듬 안정성을 봅니다.</CardDescription>
                   </div>
                   <div className={detailMetricChipClass}>
-                    <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>평균 / 최신</p>
+                    <p className={analysisChipLabelClass}>평균 / 최신</p>
                     <p className="mt-1 text-lg font-black tracking-tight text-[#0f8f65]">{averageRhythmScore}점</p>
-                    <p className={cn("text-[11px] font-semibold", analysisChipSecondaryTextClass)}>최신 {latestRhythmScore}점</p>
+                    <p className={analysisChipSubLabelClass}>최신 {latestRhythmScore}점</p>
                   </div>
                 </div>
               </CardHeader>
@@ -2783,7 +2785,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className={cn('mt-1 text-sm font-semibold leading-6', detailGrowthDescriptionClass)}>시작과 종료 시각으로 생활 리듬을 비교합니다.</CardDescription>
                   </div>
                   <div className={detailMetricChipClass}>
-                    <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>마지막 기록</p>
+                    <p className={analysisChipLabelClass}>마지막 기록</p>
                     <p className={cn("mt-1 text-sm font-black tracking-tight", analysisChipPrimaryTextClass)}>{latestStartEndSnapshot.start} 시작</p>
                     <p className="text-sm font-black tracking-tight text-[#7d4ed8]">{latestStartEndSnapshot.end} 종료</p>
                   </div>
@@ -2839,7 +2841,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className={cn('mt-1 text-sm font-semibold leading-6', detailGrowthDescriptionClass)}>외출이 집중 흐름을 얼마나 끊는지 확인합니다.</CardDescription>
                   </div>
                   <div className={detailMetricChipClass}>
-                    <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>평균 외출</p>
+                    <p className={analysisChipLabelClass}>평균 외출</p>
                     <p className="mt-1 text-lg font-black tracking-tight text-[#dc4b74]">{averageAwayMinutes}분</p>
                   </div>
                 </div>
@@ -2935,7 +2937,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('text-[12px] leading-5', detailGrowthDescriptionClass)}>주간 누적 학습시간과 전주 대비 변화를 함께 읽습니다.</CardDescription>
                         </div>
                         <div className={cn(detailMetricChipClass, 'flex min-h-[4.4rem] min-w-[5.2rem] flex-col items-center justify-center px-3 py-2.5 text-center')}>
-                          <p className={cn("text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em]", analysisReadableMutedTextClass)}>이번 주 성장</p>
+                          <p className={analysisChipLabelClass}>이번 주 성장</p>
                           <p className={cn('mt-1 text-base font-black leading-none tracking-tight', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                             {formatSignedPercent(latestWeeklyLearningGrowthPercent)}
                           </p>
@@ -3003,7 +3005,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('text-[12px] leading-5', detailGrowthDescriptionClass)}>선택한 7일 구간의 평균 공부시간과 변화 폭을 같이 봅니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
-                          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>최근 7일</p>
+                          <p className={analysisChipLabelClass}>최근 7일</p>
                           <p className={cn('mt-1 text-base font-black tracking-tight', latestDailyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                             {formatSignedPercent(latestDailyLearningGrowthPercent)}
                           </p>
@@ -3080,9 +3082,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('mt-1 text-[12px] font-semibold leading-5', detailGrowthDescriptionClass)}>시작 시간 흔들림을 점수로 바꿔 리듬 안정성을 봅니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
-                          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>평균 / 최신</p>
+                          <p className={analysisChipLabelClass}>평균 / 최신</p>
                           <p className="mt-1 text-base font-black tracking-tight text-[#0f8f65]">{averageRhythmScore}점</p>
-                          <p className={cn("text-[11px] font-semibold", analysisChipSecondaryTextClass)}>최신 {latestRhythmScore}점</p>
+                          <p className={analysisChipSubLabelClass}>최신 {latestRhythmScore}점</p>
                         </div>
                       </div>
                     </div>
@@ -3142,7 +3144,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('mt-1 text-[12px] font-semibold leading-5', detailGrowthDescriptionClass)}>시작과 종료 시각으로 생활 리듬을 비교합니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
-                          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>마지막 기록</p>
+                          <p className={analysisChipLabelClass}>마지막 기록</p>
                           <p className={cn("mt-1 text-[11px] font-black tracking-tight", analysisChipPrimaryTextClass)}>{latestStartEndSnapshot.start} 시작</p>
                           <p className="text-[11px] font-black tracking-tight text-[#7d4ed8]">{latestStartEndSnapshot.end} 종료</p>
                         </div>
@@ -3200,7 +3202,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('mt-1 text-[12px] font-semibold leading-5', detailGrowthDescriptionClass)}>외출이 집중 흐름을 얼마나 끊는지 확인합니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
-                          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>평균 외출</p>
+                          <p className={analysisChipLabelClass}>평균 외출</p>
                           <p className="mt-1 text-base font-black tracking-tight text-[#dc4b74]">{averageAwayMinutes}분</p>
                         </div>
                       </div>
