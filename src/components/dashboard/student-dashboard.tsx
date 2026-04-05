@@ -2164,18 +2164,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const mDisplay = totalMinutesCount % 60;
   const isJacob = user?.email === 'jacob444@naver.com';
 
-  // dynamic hero message based on study state
-  const heroMessage = (() => {
-    if (isTimerActive) {
-      if (totalMinutesCount >= 360) return '6시간 돌파! 오늘의 챔피언';
-      if (totalMinutesCount >= 240) return '놀라운 집중력이에요';
-      if (totalMinutesCount >= 120) return '좋은 흐름을 이어가세요';
-      return '트랙 위를 달리고 있어요';
-    }
-    if (totalMinutesCount > 0) return '오늘도 성장한 하루였어요';
-    return null;
-  })();
-
   // yesterday comparison percentage
   const studyVsYesterday = (() => {
     const yMin = logMinutesByDateKey.get(yesterdayKey) || 0;
@@ -2834,7 +2822,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         todayPointLabel={`🔥 ${todayPointAmount} / ${PLAN_TRACK_DAILY_POINT_CAP} pt`}
         completionLabel={`${todayPlanRate}% 완료`}
         streakLabel={`${plannerStreakDays}일 연속`}
-        heroMessage={heroMessage}
+        heroMessage={null}
         totalMinutesLabel={formatMinutesToKorean(totalMinutesCount)}
         growthLabel={`${formatMinutesMini(totalMinutesCount)} / ${formatMinutesMini(growthGoalMinutes)}`}
         growthPercent={growthPercent}
