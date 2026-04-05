@@ -264,15 +264,17 @@ const experienceShowcaseSections: ExperienceShowcaseSection[] = [
       '매일, 매주, 매월 쌓인 데이터를 한눈에 확인 가능합니다.',
     highlights: ['오늘 할 일', '루틴 확인', '공부시간', '피드백 반영'],
     primaryScreen: {
-      title: '학생 모드 대표화면',
-      caption: '오늘 해야 할 일과 루틴, 공부 흐름을 가장 먼저 읽는 대표 화면입니다.',
-      alt: '학생 모드 대표 스크린샷 예정 자리',
+      title: '학생 모드 성장 요약 화면',
+      caption: '이번 주 누적 공부 흐름과 성장 지표를 한 번에 읽는 학생 대표 화면입니다.',
+      image: '/marketing/app-evidence/student-weekly-growth-summary-capture.png',
+      alt: '학생 모드 이번 주 성장 요약 실제 화면',
     },
     secondaryScreens: [
       {
         title: '오늘 할 일 · 루틴 화면',
-        caption: '막연하게 시작하지 않도록 오늘 할 일과 루틴을 바로 확인하는 화면입니다.',
-        alt: '학생 모드 오늘 할 일과 루틴 스크린샷 예정 자리',
+        caption: '오늘의 할 일과 주간 계획을 함께 확인하며 바로 실행으로 이어지는 화면입니다.',
+        image: '/marketing/app-evidence/student-daily-routine-planner-capture.png',
+        alt: '학생 모드 오늘 할 일과 루틴 실제 화면',
       },
       {
         title: '공부시간 · 피드백 화면',

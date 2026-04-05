@@ -223,8 +223,14 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
                 </span>
               ))}
             </div>
-
           </div>
+
+          {showStudentSummaryCard ? (
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <ScreenshotCard screen={section.primaryScreen} tone={tone} />
+              <ScreenshotCard screen={section.secondaryScreens[0]!} tone={tone} />
+            </div>
+          ) : null}
         </div>
 
         {!hideStudentScreenSet ? <div className="order-1 lg:order-2">
