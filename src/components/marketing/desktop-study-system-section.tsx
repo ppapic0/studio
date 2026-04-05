@@ -66,10 +66,10 @@ const sectionSurfaceStyles = {
   dark: {
     section: 'bg-[#14295F]',
     title: 'text-white',
-    body: 'text-white/82',
-    secondary: 'text-white/72',
-    chip: 'border-white/12 bg-white/10 text-white',
-    button: 'border-white/16 bg-white/10 text-white hover:bg-white/16',
+    body: 'text-white/[0.82]',
+    secondary: 'text-white/[0.72]',
+    chip: 'border-white/[0.12] bg-white/10 text-white',
+    button: 'border-white/[0.16] bg-white/10 text-white hover:bg-white/[0.16]',
   },
 } as const;
 
@@ -85,14 +85,14 @@ function DesktopStudySystemPreview({
   const tone = toneStyles[section.tone];
   const previewSurface = isDark
     ? {
-        panel: 'border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.04)_100%)]',
-        card: 'border-white/12 bg-white/10 backdrop-blur-sm',
-        subtleCard: 'border-white/10 bg-white/8 backdrop-blur-sm',
-        label: 'text-white/58',
+        panel: 'border-white/[0.12] bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.04)_100%)]',
+        card: 'border-white/[0.12] bg-white/10 backdrop-blur-sm',
+        subtleCard: 'border-white/10 bg-white/[0.08] backdrop-blur-sm',
+        label: 'text-white/[0.58]',
         title: 'text-white',
-        body: 'text-white/74',
-        chip: 'border-white/12 bg-white/10 text-white',
-        count: 'border border-white/16 bg-white/12 text-white',
+        body: 'text-white/[0.74]',
+        chip: 'border-white/[0.12] bg-white/10 text-white',
+        count: 'border border-white/[0.16] bg-white/[0.12] text-white',
       }
     : {
         panel: tone.panel,
@@ -223,7 +223,7 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
           const isDarkSection = index % 2 === 1;
           const surface = sectionSurfaceStyles[isDarkSection ? 'dark' : 'light'];
           const iconClass = isDarkSection ? 'bg-white/10 text-white' : tone.icon;
-          const badgeClass = isDarkSection ? 'border border-white/14 bg-white/10 text-white' : tone.badge;
+          const badgeClass = isDarkSection ? 'border border-white/[0.14] bg-white/10 text-white' : tone.badge;
 
           return (
             <div key={section.title} className={`${surface.section} py-16 lg:py-20`}>

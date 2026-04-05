@@ -41,7 +41,7 @@ export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps
           <p
             className={cn(
               'mt-4 max-w-2xl break-keep text-[15px] font-bold leading-[1.82] sm:text-[15.5px]',
-              isDark ? 'text-white/82' : 'text-[#2c3f58]',
+              isDark ? 'text-white/[0.82]' : 'text-[#2c3f58]',
             )}
           >
             <span className="block">공간만 제공하는 것이 아니라</span>
@@ -58,7 +58,7 @@ export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps
                 'px-4 py-4',
                 isCard &&
                   (isDark
-                    ? 'rounded-[1.45rem] border border-white/12 bg-white/8 backdrop-blur-sm'
+                    ? 'rounded-[1.45rem] border border-white/[0.12] bg-white/[0.08] backdrop-blur-sm'
                     : 'rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF]'),
                 isFlat && 'rounded-none border-none bg-transparent px-0 py-0 shadow-none backdrop-blur-none',
               )}
@@ -67,17 +67,17 @@ export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps
                 <span
                   className={cn(
                     'flex h-10 w-10 items-center justify-center rounded-2xl',
-                    isDark ? 'bg-white/12 text-white' : 'bg-[#14295F] text-white',
+                    isDark ? 'bg-white/[0.12] text-white' : 'bg-[#14295F] text-white',
                   )}
                 >
                   <Icon className="h-4.5 w-4.5" />
                 </span>
                 <div>
-                  <p className={cn('text-[10px] font-black tracking-[0.16em]', isDark ? 'text-white/55' : 'text-[#14295F]/50')}>CENTER POINT</p>
+                  <p className={cn('text-[10px] font-black tracking-[0.16em]', isDark ? 'text-white/[0.55]' : 'text-[#14295F]/50')}>CENTER POINT</p>
                   <p className={cn('font-aggro-display mt-1 break-keep text-[0.98rem] font-black leading-[1.34] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>{title}</p>
                 </div>
               </div>
-              <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/74' : 'text-[#53687F]')}>{detail}</p>
+              <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/[0.74]' : 'text-[#53687F]')}>{detail}</p>
             </div>
           ))}
         </div>

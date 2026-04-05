@@ -35,7 +35,7 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
 
         <div className={cn('mt-6 overflow-hidden rounded-[1.55rem] border', isDark ? 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.04)_100%)]' : 'border-[#E8D9C8] bg-[linear-gradient(180deg,#F5EDE1_0%,#FFF8F1_100%)]')}>
           <div className="relative flex min-h-[9.5rem] items-center justify-center px-6 py-6">
-            <div className={cn('absolute inset-x-0 top-1/2 h-10 -translate-y-1/2', isDark ? 'bg-white/8' : 'bg-[#E8DCCB]/72')} />
+            <div className={cn('absolute inset-x-0 top-1/2 h-10 -translate-y-1/2', isDark ? 'bg-white/[0.08]' : 'bg-[#E8DCCB]/72')} />
             <div className={cn('relative flex h-36 w-36 items-center justify-center rounded-full px-6 text-center shadow-[0_18px_40px_rgba(201,150,92,0.28)]', isDark ? 'bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.08)_100%)]' : 'bg-[radial-gradient(circle_at_30%_30%,#FFE6CA_0%,#F4C896_100%)]')}>
               <p className={cn('font-aggro-display whitespace-pre-line break-keep text-[0.98rem] font-black leading-[1.35] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>
                 {mockExamProgram.spotlight}
@@ -51,23 +51,23 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
             return (
               <article
                 key={program.title}
-                className={cn('rounded-[1.35rem] border px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.06)]', isDark ? 'border-white/10 bg-white/8 backdrop-blur-sm' : 'border-[#14295F]/8 bg-white')}
+                className={cn('rounded-[1.35rem] border px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.06)]', isDark ? 'border-white/10 bg-white/[0.08] backdrop-blur-sm' : 'border-[#14295F]/8 bg-white')}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className={cn('text-[10px] font-black tracking-[0.18em]', isDark ? 'text-white/58' : 'text-[#FF7A16]')}>
+                    <p className={cn('text-[10px] font-black tracking-[0.18em]', isDark ? 'text-white/[0.58]' : 'text-[#FF7A16]')}>
                       PROGRAM {String(index + 1).padStart(2, '0')}
                     </p>
                     <h3 className={cn('font-aggro-display mt-3 break-keep text-[1rem] font-black leading-[1.34] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>
                       {program.title}
                     </h3>
                   </div>
-                  <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-white', isDark ? 'bg-white/12' : 'bg-[#14295F]')}>
+                  <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-white', isDark ? 'bg-white/[0.12]' : 'bg-[#14295F]')}>
                     <Icon className="h-4 w-4" />
                   </span>
                 </div>
 
-                <p className={cn('mt-2 break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/74' : 'text-[#53687F]')}>
+                <p className={cn('mt-2 break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/[0.74]' : 'text-[#53687F]')}>
                   {program.summary}
                 </p>
               </article>

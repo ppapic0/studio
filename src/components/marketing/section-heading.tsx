@@ -21,7 +21,7 @@ export function SectionHeading({ eyebrow, title, description, light = false }: S
       {description ? (
         <p
           className={`mt-4 max-w-2xl break-keep text-[15px] font-bold leading-[1.82] sm:text-[15.5px] ${
-            light ? "text-white/85" : "text-[#2c3f58]"
+    light ? "text-white/[0.85]" : "text-[#2c3f58]"
           }`}
         >
           {description}
