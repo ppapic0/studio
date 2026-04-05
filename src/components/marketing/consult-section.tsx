@@ -16,7 +16,6 @@ const mobileTrustMetricMap: Record<string, { label: string; value: string }> = {
   '학생이 얻는 변화': { label: '변화', value: '습관' },
   '빠른 개입 구조': { label: '개입', value: '즉시' },
   '학부모 확인': { label: '확인', value: '안심' },
-  '국어 수업 연동': { label: '국어', value: '실전' },
 };
 
 async function getWaitlistCount(): Promise<number> {
