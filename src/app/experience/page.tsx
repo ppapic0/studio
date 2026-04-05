@@ -162,9 +162,11 @@ function ScreenshotCard({
 function ExperienceSectionBlock({ section, reverse = false }: { section: ExperienceSection; reverse?: boolean }) {
   const tone = resolveTone(section.mode);
   const style = toneStyleMap[tone];
+  const hasPrimaryScreenImage = Boolean(section.primaryScreen.image);
   const showStudentScreenSet = section.mode === '학생 모드' && section.secondaryScreens.length >= 2;
   const hideStudentScreenSet = section.mode === '학생 모드' && showStudentScreenSet;
   const showStudentSummaryCard = hideStudentScreenSet;
+  const showScreenColumn = !hideStudentScreenSet && hasPrimaryScreenImage;
 
   return (
     <article className={`relative overflow-hidden rounded-[2.35rem] border p-5 shadow-[0_24px_58px_rgba(20,41,95,0.10)] sm:p-7 lg:p-8 ${style.sectionCard}`}>
@@ -173,12 +175,12 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
 
       <div
         className={`relative grid gap-6 lg:gap-8 ${
-          hideStudentScreenSet
+          hideStudentScreenSet || !showScreenColumn
             ? 'lg:grid-cols-1'
             : `lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] ${reverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`
         }`}
       >
-        <div className={`order-2 flex flex-col lg:order-1 ${hideStudentScreenSet ? 'mx-auto w-full max-w-3xl' : ''}`}>
+        <div className={`order-2 flex flex-col lg:order-1 ${hideStudentScreenSet || !showScreenColumn ? 'mx-auto w-full max-w-3xl' : ''}`}>
           <div
             className={
               showStudentSummaryCard
@@ -233,7 +235,7 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
           ) : null}
         </div>
 
-        {!hideStudentScreenSet ? <div className="order-1 lg:order-2">
+        {showScreenColumn ? <div className="order-1 lg:order-2">
           {showStudentScreenSet ? (
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] md:items-center">
               <div className="space-y-4">
