@@ -1343,9 +1343,11 @@ export default function StudyHistoryPage() {
                             "dashboard-number block whitespace-nowrap tabular-nums leading-none text-center",
                             isMobile
                               ? useParentLikeMobileCalendar
-                                ? isCompactLongTimeLabel
-                                  ? "text-[0.66rem] tracking-[-0.045em]"
-                                  : "text-[0.82rem] tracking-[-0.04em]"
+                                ? isCompactVeryLongTimeLabel
+                                  ? "text-[0.58rem] tracking-[-0.06em]"
+                                  : isCompactLongTimeLabel
+                                    ? "text-[0.64rem] tracking-[-0.05em]"
+                                    : "text-[0.78rem] tracking-[-0.04em]"
                                 : isLongTimeLabel
                                   ? "text-[0.68rem] tracking-[-0.035em]"
                                   : "text-[0.82rem] tracking-[-0.045em]"
