@@ -53,6 +53,25 @@ const previewTitles = [
   '포인트 · 상벌점 화면 예정',
 ] as const;
 
+const sectionSurfaceStyles = {
+  light: {
+    section: 'bg-white',
+    title: 'text-[#14295F]',
+    body: 'text-[#425A75]',
+    secondary: 'text-[#425A75]',
+    chip: 'border-[#14295F]/10 bg-white/88 text-[#14295F]',
+    button: 'border-[#14295F]/12 bg-white text-[#14295F] hover:border-[#14295F]/22 hover:bg-[#F7FAFF]',
+  },
+  dark: {
+    section: 'bg-[#14295F]',
+    title: 'text-white',
+    body: 'text-white/82',
+    secondary: 'text-white/72',
+    chip: 'border-white/12 bg-white/10 text-white',
+    button: 'border-white/16 bg-white text-[#14295F] hover:bg-[#F7FAFF]',
+  },
+} as const;
+
 function DesktopStudySystemPreview({
   section,
   index,
@@ -160,32 +179,31 @@ function DesktopStudySystemPreview({
 
 export function DesktopStudySystemSection({ content }: DesktopStudySystemSectionProps) {
   return (
-    <section
-      className="hidden py-14 sm:block sm:py-16 lg:py-20"
-      style={{ background: 'linear-gradient(180deg, #F7F9FD 0%, #FFFFFF 100%)' }}
-    >
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center [&_.eyebrow-badge]:mx-auto">
-          <SectionHeading
-            eyebrow={content.intro.eyebrow}
-            title={content.intro.title}
-            description={content.intro.description}
-          />
+    <section className="hidden sm:block">
+      <div className="bg-white py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center [&_.eyebrow-badge]:mx-auto">
+            <SectionHeading
+              eyebrow={content.intro.eyebrow}
+              title={content.intro.title}
+              description={content.intro.description}
+            />
+          </div>
         </div>
+      </div>
 
-        <div className="mt-12 space-y-6 lg:space-y-8">
-          {content.sections.map((section, index) => {
-            const Icon = sectionIcons[index] ?? Sparkles;
-            const tone = toneStyles[section.tone];
+      <div>
+        {content.sections.map((section, index) => {
+          const Icon = sectionIcons[index] ?? Sparkles;
+          const tone = toneStyles[section.tone];
+          const surface = sectionSurfaceStyles[index % 2 === 1 ? 'dark' : 'light'];
 
-            return (
-              <article
-                key={section.title}
-                className={`relative overflow-hidden rounded-[2.4rem] border px-6 py-8 shadow-[0_22px_52px_rgba(20,41,95,0.08)] sm:px-8 sm:py-10 lg:px-10 lg:py-12 ${tone.shell}`}
-              >
-                <div className={`pointer-events-none absolute left-1/2 top-0 h-44 w-44 -translate-x-1/2 rounded-full blur-[110px] ${tone.glow}`} />
+          return (
+            <div key={section.title} className={`${surface.section} py-16 lg:py-20`}>
+              <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="relative">
-                  <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
+                  <div className={`pointer-events-none absolute left-1/2 top-0 h-44 w-44 -translate-x-1/2 rounded-full blur-[110px] ${tone.glow}`} />
+                  <div className="relative mx-auto flex max-w-4xl flex-col items-center text-center">
                     <div className="flex items-center gap-3">
                       <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone.icon}`}>
                         <Icon className="h-5 w-5" />
@@ -195,14 +213,14 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                       </span>
                     </div>
 
-                    <h3 className="font-aggro-display mt-6 break-keep text-[clamp(1.7rem,3vw,2.65rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
+                    <h3 className={`font-aggro-display mt-6 break-keep text-[clamp(1.7rem,3vw,2.65rem)] font-black leading-[1.08] tracking-[-0.03em] ${surface.title}`}>
                       {section.title}
                     </h3>
-                    <p className={`mt-5 max-w-3xl break-keep text-[15px] font-semibold leading-[1.84] ${tone.body}`}>
+                    <p className={`mt-5 max-w-3xl break-keep text-[15px] font-semibold leading-[1.84] ${surface.body}`}>
                       {section.body}
                     </p>
                     {section.secondaryBody ? (
-                      <p className={`mt-3 max-w-3xl break-keep text-[14px] font-semibold leading-[1.8] ${tone.body}`}>
+                      <p className={`mt-3 max-w-3xl break-keep text-[14px] font-semibold leading-[1.8] ${surface.secondary}`}>
                         {section.secondaryBody}
                       </p>
                     ) : null}
@@ -212,7 +230,7 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                         {section.detailPoints.map((point) => (
                           <span
                             key={point}
-                            className="inline-flex rounded-full border border-[#14295F]/10 bg-white/88 px-3 py-1.5 text-[11px] font-black text-[#14295F]"
+                            className={`inline-flex rounded-full border px-3 py-1.5 text-[11px] font-black ${surface.chip}`}
                           >
                             {point}
                           </span>
@@ -224,7 +242,7 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                       <div className="mt-6">
                         <Link
                           href={section.href}
-                          className="inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-white px-5 py-2.5 text-[13px] font-black text-[#14295F] transition-colors hover:border-[#14295F]/22 hover:bg-[#F7FAFF]"
+                          className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-black transition-colors ${surface.button}`}
                         >
                           자세히 보기
                           <ArrowRight className="h-4 w-4" />
@@ -237,11 +255,10 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                     <DesktopStudySystemPreview section={section} index={index} />
                   </div>
                 </div>
-              </article>
-            );
-          })}
-
-        </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
