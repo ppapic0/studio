@@ -13,7 +13,7 @@ export function CoreValuesSection({ valueCards }: CoreValuesSectionProps) {
         <SectionHeading
           eyebrow="Core Value"
           title="한눈에 보이는 트랙의 차이"
-          description="관리형 스터디센터 중심, 수능 국어 수업 별도 선택, 학부모 실시간 확인, 데이터 기반 운영 구조를 한 흐름으로 묶었습니다."
+          description="루틴 중심 운영, 별도 수업 선택, 실시간 학습 확인, 데이터 기반 운영 구조를 한 흐름으로 묶었습니다."
         />
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2">

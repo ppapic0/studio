@@ -2,7 +2,7 @@
 
 ## ⛔ 절대 규칙 (위반 금지)
 
-- 여기서는 **앱 모드만 변경**하고, **웹 모드(홍보/랜딩 페이지)는 변경하지 않음**
+- **앱 모드 수정은 바로 진행 가능**하며, **웹 모드(홍보/랜딩 페이지)를 수정해야 할 때는 반드시 사용자에게 먼저 질문하고 명시적 승인을 받은 뒤 진행**
 - `handleStudyStartStop`의 `disabled={isProcessingAction}`과 `onClick` 연결 절대 변경 금지
 - 탭 `value` 문자열(`home` / `studyDetail` / `data` / `communication` / `billing`) 변경 금지 — URL sync + Firebase 로그와 연동됨
 - `isMobile`은 `useAppContext()`에서 가져온 AppContext 값 사용 — CSS `sm:` 브레이크포인트로 대체 불가

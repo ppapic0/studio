@@ -328,7 +328,7 @@ const webAppShowcaseScreens: WebAppShowcaseScreen[] = experienceShowcaseSections
 
 export const marketingContent: MarketingContent = {
   brand: {
-    name: '트랙 관리형 스터디센터 · 트랙 국어학원',
+    name: '트랙 스터디센터',
     slogan: '학생의 성장 궤적을 함께 그립니다',
     heroTitle: '공부는 방향이 중요합니다.\n성장의 길,\n트랙에서\n시작됩니다.',
     heroDescription:
@@ -364,8 +364,8 @@ export const marketingContent: MarketingContent = {
       description: '독서, 평가원, 사설 모의고사 흐름을 그룹 수업으로 정리합니다.',
     },
     {
-      title: '학부모 앱 확인',
-      description: '출결, 공부시간, 리포트, 수납 상태를 앱에서 바로 확인합니다.',
+      title: '실시간 학습 확인',
+      description: '출결, 공부시간, 리포트, 수납 상태를 한 흐름으로 빠르게 확인합니다.',
     },
     {
       title: '데이터 기반 관리',
@@ -458,8 +458,8 @@ export const marketingContent: MarketingContent = {
         description: '출입과 공부시간이 자동으로 쌓여 학생의 루틴과 몰입 흐름을 확인할 수 있습니다.',
       },
       {
-        title: '학부모 앱 연동',
-        description: '학부모는 앱에서 출결, 학습 현황, 리포트, 결제 상태를 실시간으로 확인할 수 있습니다.',
+        title: '실시간 학습 확인',
+        description: '출결, 학습 현황, 리포트, 결제 상태를 한 흐름으로 빠르게 확인할 수 있습니다.',
       },
       {
         title: '상시 모의고사 운영',

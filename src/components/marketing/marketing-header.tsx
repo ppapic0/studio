@@ -9,7 +9,7 @@ type MarketingHeaderProps = {
 };
 
 export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
-  const mobileBrandLines = ['트랙 스터디센터', '트랙 국어학원'];
+  const mobileBrandLines = ['트랙 스터디센터'];
 
   return (
     <header

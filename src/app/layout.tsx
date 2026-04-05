@@ -19,10 +19,10 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "트랙 관리형 스터디센터/트랙 국어학원",
-  applicationName: "트랙 관리형 스터디센터/트랙 국어학원",
+  title: "트랙 스터디센터",
+  applicationName: "트랙 스터디센터",
   description:
-    "관리형 스터디센터 중심 운영, 수능 국어 그룹 수업, 학부모 앱과 학생 웹앱이 연결된 트랙의 학습 관리 시스템입니다.",
+    "학생의 학습 흐름과 피드백을 한곳에서 확인하는 트랙의 학습 관리 시스템입니다.",
   manifest: "/manifest.webmanifest?v=20260405",
   icons: {
     icon: [
