@@ -124,6 +124,8 @@ export interface StudentProfile {
     title: string;
     date: string; // yyyy-MM-dd
   }>;
+  goalPathType?: 'school' | 'job';
+  goalPathLabel?: string;
   studyRoutineOnboarding?: RoutineOnboardingState;
   studyRoutineProfile?: UserStudyProfile;
   studyRoutineWorkspace?: RoutineWorkspaceState;

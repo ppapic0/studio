@@ -519,6 +519,11 @@ export function StudentHomeGamePanel({
   growthDeltaPercent,
   pointBalance,
   todayPointGain,
+  homeFocusExamLabel,
+  homeFocusExamTitle,
+  homeGoalLabel,
+  homeGoalTypeLabel,
+  onOpenFocusEditor,
   dailyPointStatus,
   quests,
   questGain,
@@ -566,6 +571,11 @@ export function StudentHomeGamePanel({
   growthDeltaPercent: number;
   pointBalance: number;
   todayPointGain: number;
+  homeFocusExamLabel: string;
+  homeFocusExamTitle: string;
+  homeGoalLabel: string;
+  homeGoalTypeLabel: string;
+  onOpenFocusEditor: () => void;
   dailyPointStatus?: GrowthProgress["dailyPointStatus"];
   quests: StudentHomeQuest[];
   questGain: { id: string; key: number; amount: number } | null;
@@ -640,16 +650,32 @@ export function StudentHomeGamePanel({
               {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
             </div>
 
-            <div className={cn("surface-chip surface-chip--dark px-3 py-2 shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)]", isMobile ? "self-start" : "")}>
-              <div className="flex items-center gap-2 text-[11px] font-black text-white">
-                <CalendarDays className="h-3.5 w-3.5 text-white" />
-                <span>{todayPointLabel}</span>
-                <span className="text-[var(--text-on-dark-soft)]">|</span>
-                <span>{completionLabel}</span>
-                <span className="text-[var(--text-on-dark-soft)]">|</span>
-                <span>{streakLabel}</span>
+            <button
+              type="button"
+              onClick={onOpenFocusEditor}
+              title={`${todayPointLabel} · ${completionLabel} · ${streakLabel}`}
+              className={cn(
+                "surface-chip surface-chip--dark min-w-[15rem] px-3 py-2.5 text-left shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/28",
+                isMobile ? "w-full self-stretch" : ""
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/72">
+                    <CalendarDays className="h-3.5 w-3.5 text-white" />
+                    {homeFocusExamLabel}
+                  </div>
+                  <div className="mt-1 truncate text-[13px] font-black text-white">{homeFocusExamTitle}</div>
+                  <div className="mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/72">
+                    <Sparkles className="h-3.5 w-3.5 text-white" />
+                    {homeGoalTypeLabel}
+                  </div>
+                  <div className="mt-1 truncate text-[12px] font-black text-white/92">{homeGoalLabel}</div>
+                </div>
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-white/72" />
               </div>
-            </div>
+              <span className="sr-only">{todayPointLabel} {completionLabel} {streakLabel}</span>
+            </button>
           </div>
 
           <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-[1.35fr_0.95fr]")}>

@@ -1143,6 +1143,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [isExamSaving, setIsExamSaving] = useState(false);
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
+  const [goalPathTypeDraft, setGoalPathTypeDraft] = useState<'school' | 'job'>('school');
+  const [goalPathLabelDraft, setGoalPathLabelDraft] = useState('');
   const [selectedRankRange, setSelectedRankRange] = useState<RankRange>('daily');
   const [rankSnapshot, setRankSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [rankSnapshotLoading, setRankSnapshotLoading] = useState(false);
@@ -1195,6 +1197,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     setExamDrafts(normalizeExamCountdowns(studentProfile?.examCountdowns));
   }, [studentProfile?.examCountdowns]);
+  useEffect(() => {
+    setGoalPathTypeDraft(studentProfile?.goalPathType === 'job' ? 'job' : 'school');
+    setGoalPathLabelDraft(studentProfile?.goalPathLabel || '');
+  }, [studentProfile?.goalPathLabel, studentProfile?.goalPathType]);
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -1448,6 +1454,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         return aSort - bSort;
       });
   }, [studentProfile?.examCountdowns]);
+  const configuredExamCountdowns = useMemo(
+    () => examCountdowns.filter((item) => item.title.trim().length > 0 && item.date.trim().length > 0),
+    [examCountdowns]
+  );
+  const primaryExamCountdown = useMemo(
+    () => configuredExamCountdowns.find((item) => item.daysLeft !== null && item.daysLeft >= 0) ?? configuredExamCountdowns[0] ?? null,
+    [configuredExamCountdowns]
+  );
+  const homeFocusExamLabel = primaryExamCountdown?.dLabel || '시험 미설정';
+  const homeFocusExamTitle = primaryExamCountdown?.title || '준비 중인 시험을 추가해보세요';
+  const homeGoalTypeLabel = studentProfile?.goalPathType === 'job' ? '희망 직업' : '희망 학교';
+  const homeGoalLabel = studentProfile?.goalPathLabel?.trim() || `${homeGoalTypeLabel}를 입력해보세요`;
 
   const subjectProgress = useMemo(() => {
     const bucket = new Map<string, { total: number; done: number }>();
@@ -2115,21 +2133,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         studentProfileRef,
         {
           examCountdowns: payload,
+          goalPathType: goalPathTypeDraft,
+          goalPathLabel: goalPathLabelDraft.trim(),
           updatedAt: serverTimestamp(),
         },
         { merge: true },
       );
 
       toast({
-        title: '시험 디데이 설정 완료',
-        description: '개인 시험 일정이 저장되었습니다.',
+        title: '시험/목표 설정 완료',
+        description: '시험 디데이와 희망 학교·직업 정보가 저장되었습니다.',
       });
       setIsExamDialogOpen(false);
     } catch (error) {
       logHandledClientIssue('[student-dashboard] save exam countdowns failed', error);
       toast({
         variant: 'destructive',
-        title: '시험 설정 저장 실패',
+        title: '시험/목표 설정 저장 실패',
         description: '잠시 후 다시 시도해주세요.',
       });
     } finally {
@@ -2835,6 +2855,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         growthDeltaPercent={studyVsYesterday}
         pointBalance={homePointBalance}
         todayPointGain={todayPointAmount}
+        homeFocusExamLabel={homeFocusExamLabel}
+        homeFocusExamTitle={homeFocusExamTitle}
+        homeGoalLabel={homeGoalLabel}
+        homeGoalTypeLabel={homeGoalTypeLabel}
+        onOpenFocusEditor={() => setIsExamDialogOpen(true)}
         dailyPointStatus={progress?.dailyPointStatus}
         quests={homeQuestList}
         questGain={questGain}
@@ -2861,11 +2886,39 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         <DialogContent className={cn("flex max-h-[85vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0", isMobile ? "" : "sm:w-full sm:max-w-lg")}>
           <div className="bg-primary p-5 text-white">
             <DialogHeader>
-              <DialogTitle className="text-xl font-black tracking-tight">시험 디데이 설정</DialogTitle>
-              <DialogDescription className="text-white/80">모의고사와 내신 일정을 여기서 바로 수정할 수 있어요.</DialogDescription>
+              <DialogTitle className="text-xl font-black tracking-tight">시험 디데이 / 진로 목표</DialogTitle>
+              <DialogDescription className="text-white/80">시험 일정과 희망 학교 또는 직업을 등록해두면 학생 홈 상단에서 바로 확인할 수 있어요.</DialogDescription>
             </DialogHeader>
           </div>
           <div className="space-y-3 overflow-y-auto bg-white p-4 sm:p-5">
+            <div className="rounded-2xl border border-primary/10 bg-slate-50/70 p-4">
+              <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[132px_minmax(0,1fr)]")}>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-[#17326B]">목표 종류</Label>
+                  <Select value={goalPathTypeDraft} onValueChange={(value) => setGoalPathTypeDraft(value as 'school' | 'job')}>
+                    <SelectTrigger className="h-10 rounded-xl border-primary/15 bg-white font-bold">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="school">희망 학교</SelectItem>
+                      <SelectItem value="job">희망 직업</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-[#17326B]">
+                    {goalPathTypeDraft === 'job' ? '희망 직업' : '희망 학교'}
+                  </Label>
+                  <Input
+                    value={goalPathLabelDraft}
+                    onChange={(event) => setGoalPathLabelDraft(event.target.value)}
+                    placeholder={goalPathTypeDraft === 'job' ? '예: 교사, 검사, 개발자' : '예: 경희대학교 국어국문학과'}
+                    className="h-10 rounded-xl border-primary/15 font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+
             {examDrafts.map((item, index) => (
               <div key={item.id} className={cn("grid items-center gap-2", isMobile ? "grid-cols-1" : "grid-cols-[1fr_132px_auto]")}>
                 <Input

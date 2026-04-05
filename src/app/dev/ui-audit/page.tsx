@@ -137,6 +137,11 @@ export default function UiAuditPage() {
           todayStudyLabel="12시간 10분"
           pointBalance={4280}
           todayPointGain={413}
+          homeFocusExamLabel="D-18"
+          homeFocusExamTitle="4월 전국연합 모의고사"
+          homeGoalLabel="경희대학교 국어국문학과"
+          homeGoalTypeLabel="희망 학교"
+          onOpenFocusEditor={() => undefined}
           quests={[
             { id: 'quest-1', title: '영어 독해 2지문 완료', reward: 18, done: true, subjectLabel: '영어', timeLabel: '25m' },
             { id: 'quest-2', title: '수학 오답 15문제 정리', reward: 24, done: false, subjectLabel: '수학', timeLabel: '50m' },
