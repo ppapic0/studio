@@ -19,27 +19,28 @@ const programIcons: Record<string, LucideIcon> = {
 export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: MockExamProgramSectionProps) {
   const isCard = surface === 'card';
   const isDark = surface === 'flat-dark';
-  const moonTone = isDark
+  const spotlightTone = isDark
     ? {
-        panel: 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.04)_100%)]',
-        mist: 'bg-[radial-gradient(ellipse_at_center,rgba(211,226,255,0.18)_0%,rgba(154,188,255,0.10)_38%,rgba(94,125,194,0.06)_58%,transparent_80%)]',
-        halo: 'bg-[radial-gradient(circle,rgba(154,188,255,0.28)_0%,rgba(154,188,255,0.16)_34%,rgba(154,188,255,0.06)_54%,transparent_76%)]',
-        orbit: 'border-white/[0.18]',
-        body: 'border-white/[0.16] bg-[radial-gradient(circle_at_30%_26%,rgba(255,255,255,0.96)_0%,rgba(222,234,255,0.32)_20%,rgba(110,145,214,0.30)_58%,rgba(45,69,121,0.80)_100%)]',
-        shade: 'bg-[radial-gradient(circle_at_72%_54%,rgba(10,23,52,0.26)_0%,rgba(10,23,52,0.14)_36%,transparent_74%)]',
-        highlight: 'bg-[radial-gradient(circle,rgba(255,255,255,0.62)_0%,rgba(255,255,255,0.14)_62%,transparent_100%)]',
-        speck: 'bg-white/[0.76] shadow-[0_0_14px_rgba(255,255,255,0.42)]',
+        panel: 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)]',
+        beam: 'bg-[linear-gradient(90deg,transparent_0%,rgba(194,214,255,0.08)_18%,rgba(229,237,255,0.22)_50%,rgba(194,214,255,0.08)_82%,transparent_100%)]',
+        aura: 'bg-[radial-gradient(circle,rgba(201,219,255,0.18)_0%,rgba(112,140,198,0.11)_46%,transparent_78%)]',
+        plaqueShell:
+          'border-white/[0.16] bg-white/[0.08] shadow-[0_20px_46px_rgba(7,16,43,0.34)] backdrop-blur-sm',
+        plaqueCore:
+          'border-white/[0.16] bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(164,188,235,0.11)_48%,rgba(255,255,255,0.04)_100%)]',
+        glint: 'bg-[linear-gradient(180deg,rgba(255,255,255,0.36)_0%,rgba(255,255,255,0.02)_100%)]',
+        divider: 'bg-white/[0.12]',
         text: 'text-white',
       }
     : {
-        panel: 'border-[#DDE8FF] bg-[linear-gradient(180deg,#F6FAFF_0%,#EEF4FF_100%)]',
-        mist: 'bg-[radial-gradient(ellipse_at_center,rgba(223,235,255,0.95)_0%,rgba(210,226,255,0.62)_34%,rgba(190,211,245,0.30)_58%,transparent_82%)]',
-        halo: 'bg-[radial-gradient(circle,rgba(167,198,255,0.26)_0%,rgba(167,198,255,0.14)_38%,rgba(167,198,255,0.05)_56%,transparent_78%)]',
-        orbit: 'border-[#D6E3FB]',
-        body: 'border-[#D3E2FF] bg-[radial-gradient(circle_at_30%_24%,rgba(255,255,255,1)_0%,rgba(243,248,255,0.96)_26%,rgba(214,228,255,0.88)_58%,rgba(171,194,236,0.76)_100%)]',
-        shade: 'bg-[radial-gradient(circle_at_72%_54%,rgba(97,124,172,0.15)_0%,rgba(97,124,172,0.08)_38%,transparent_74%)]',
-        highlight: 'bg-[radial-gradient(circle,rgba(255,255,255,1)_0%,rgba(255,255,255,0.46)_56%,transparent_100%)]',
-        speck: 'bg-[#A8BFE7]/90 shadow-[0_0_12px_rgba(149,179,232,0.34)]',
+        panel: 'border-[#DDE8FF] bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)]',
+        beam: 'bg-[linear-gradient(90deg,transparent_0%,rgba(205,221,247,0.34)_20%,rgba(242,246,255,0.94)_50%,rgba(205,221,247,0.34)_80%,transparent_100%)]',
+        aura: 'bg-[radial-gradient(circle,rgba(220,232,255,0.80)_0%,rgba(192,211,245,0.34)_48%,transparent_78%)]',
+        plaqueShell:
+          'border-[#D6E3FB] bg-white/90 shadow-[0_20px_40px_rgba(20,41,95,0.10)] backdrop-blur-sm',
+        plaqueCore: 'border-[#D9E5FB] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(237,244,255,0.94)_100%)]',
+        glint: 'bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,255,255,0.12)_100%)]',
+        divider: 'bg-[#D7E4FB]',
         text: 'text-[#18356F]',
       };
 
@@ -56,30 +57,25 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
           {mockExamProgram.title}
         </h2>
 
-        <div className={cn('mt-6 overflow-hidden rounded-[1.55rem] border', moonTone.panel)}>
-          <div className="relative flex min-h-[10.75rem] items-center justify-center overflow-hidden px-6 py-7">
-            <div className={cn('pointer-events-none absolute inset-x-[4%] top-1/2 h-[4.4rem] -translate-y-1/2 rounded-full blur-[24px]', moonTone.mist)} />
-            <div className={cn('pointer-events-none absolute left-[24%] top-[28%] h-1.5 w-1.5 rounded-full', moonTone.speck)} />
-            <div className={cn('pointer-events-none absolute right-[26%] top-[30%] h-1 w-1 rounded-full', moonTone.speck)} />
-            <div className={cn('pointer-events-none absolute right-[31%] bottom-[30%] h-1.5 w-1.5 rounded-full', moonTone.speck)} />
+        <div className={cn('mt-6 overflow-hidden rounded-[1.55rem] border', spotlightTone.panel)}>
+          <div className="relative flex min-h-[11rem] items-center justify-center overflow-hidden px-5 py-7 sm:min-h-[12rem] sm:px-8">
+            <div className={cn('pointer-events-none absolute inset-x-[4%] top-1/2 h-[4.8rem] -translate-y-1/2 rounded-full blur-[22px]', spotlightTone.beam)} />
+            <div className={cn('pointer-events-none absolute h-[8.5rem] w-[15rem] rounded-full blur-[34px] sm:h-[9rem] sm:w-[16rem]', spotlightTone.aura)} />
 
-            <div className={cn('pointer-events-none absolute h-[11.75rem] w-[11.75rem] rounded-full blur-[46px]', moonTone.halo)} />
-
-            <div className="relative flex h-[10.25rem] w-[10.25rem] items-center justify-center rounded-full text-center">
-              <div className={cn('absolute inset-0 rounded-full border', moonTone.orbit)} />
-              <div
-                className={cn(
-                  'absolute inset-[0.6rem] rounded-full border shadow-[0_24px_50px_rgba(34,67,129,0.24)]',
-                  moonTone.body,
-                )}
-              />
-              <div className={cn('pointer-events-none absolute inset-[1rem] rounded-full', moonTone.shade)} />
-              <div className={cn('pointer-events-none absolute left-[25%] top-[18%] h-[24%] w-[34%] rounded-full blur-[10px]', moonTone.highlight)} />
+            <div
+              className={cn(
+                'relative flex min-h-[11rem] w-[8.9rem] items-center justify-center rounded-[2rem] border p-2 text-center sm:min-h-[11.75rem] sm:w-[9.75rem] sm:rounded-[2.2rem]',
+                spotlightTone.plaqueShell,
+              )}
+            >
+              <div className={cn('absolute inset-[0.52rem] rounded-[1.55rem] border sm:rounded-[1.7rem]', spotlightTone.plaqueCore)} />
+              <div className={cn('pointer-events-none absolute left-[1.15rem] right-[1.15rem] top-[1.05rem] h-px', spotlightTone.divider)} />
+              <div className={cn('pointer-events-none absolute inset-x-[18%] top-[0.9rem] h-[26%] rounded-full blur-[14px]', spotlightTone.glint)} />
 
               <p
                 className={cn(
-                  'font-aggro-display relative max-w-[5.9rem] whitespace-pre-line break-keep text-[1.02rem] font-black leading-[1.32] tracking-[-0.03em]',
-                  moonTone.text,
+                  'font-aggro-display relative max-w-[6.9rem] whitespace-pre-line break-keep text-[1.12rem] font-black leading-[1.25] tracking-[-0.03em] sm:text-[1.2rem]',
+                  spotlightTone.text,
                 )}
               >
                 {mockExamProgram.spotlight}
