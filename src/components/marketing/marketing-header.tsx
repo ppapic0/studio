@@ -67,13 +67,6 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
             <span className="sm:hidden">로그인</span>
             <span className="hidden sm:inline">웹앱 로그인</span>
           </a>
-          <a
-            href="/go/experience?placement=header"
-            className="premium-cta premium-cta-primary h-8 min-w-[4rem] whitespace-nowrap px-2.5 text-[10.5px] font-extrabold tracking-[-0.01em] [text-shadow:0_1px_1px_rgba(0,0,0,0.28)] sm:h-10 sm:min-w-0 sm:px-5 sm:text-[13.5px]"
-          >
-            <span className="sm:hidden">체험</span>
-            <span className="hidden sm:inline">웹앱 체험</span>
-          </a>
         </div>
       </div>
 
