@@ -2845,10 +2845,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         onSelectRankRange={setSelectedRankRange}
         selectedHomeRank={selectedHomeRank as StudentHomeRankState}
         onOpenLeaderboard={() => router.push(`/dashboard/leaderboards?range=${selectedRankRange}`)}
-        boxes={homeRewardBoxes}
-        chargingLabel={`${formatTimer(nextBoxSecondsLeft)} 남음`}
-        chargingPercent={nextBoxProgressPercent}
-        freshReadyHours={freshReadyHours}
         isVaultOpen={isVaultOpen}
         onVaultChange={handleVaultChange}
         selectedBox={selectedHomeBox}

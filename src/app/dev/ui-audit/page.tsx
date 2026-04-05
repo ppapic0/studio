@@ -150,10 +150,6 @@ export default function UiAuditPage() {
           onSelectRankRange={() => undefined}
           selectedHomeRank={mockRank}
           onOpenLeaderboard={() => undefined}
-          boxes={mockBoxes}
-          chargingLabel="14분 10초 남음"
-          chargingPercent={76}
-          freshReadyHours={[2]}
           isVaultOpen={vaultOpen}
           onVaultChange={setVaultOpen}
           selectedBox={mockBoxes[1]}

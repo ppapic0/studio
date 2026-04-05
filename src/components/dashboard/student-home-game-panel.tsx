@@ -282,94 +282,6 @@ function QuestRow({
   );
 }
 
-function InventorySlot({
-  box,
-  chargingLabel,
-  chargingPercent,
-  onSelect,
-  isFresh,
-}: {
-  box: StudentHomeRewardBox;
-  chargingLabel?: string;
-  chargingPercent?: number;
-  onSelect: (hour: number) => void;
-  isFresh?: boolean;
-}) {
-  const isRolledBox = box.state === "ready" || box.state === "opened";
-  const rarityClass =
-    isRolledBox && box.rarity === "epic"
-      ? "point-track-slot--epic"
-      : isRolledBox && box.rarity === "rare"
-        ? "point-track-slot--rare"
-        : "point-track-slot--common";
-
-  return (
-    <button
-      type="button"
-      disabled={box.state !== "ready"}
-      onClick={() => onSelect(box.hour)}
-      className={cn(
-        "point-track-slot",
-        rarityClass,
-        box.state === "ready" && "point-track-slot--ready",
-        box.state === "charging" && "point-track-slot--charging",
-        box.state === "opened" && "point-track-slot--opened",
-        box.state === "locked" && "point-track-slot--locked",
-        isFresh && "point-track-slot--fresh",
-      )}
-    >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span
-          className={cn(
-            "rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]",
-            isRolledBox && box.rarity === "epic"
-              ? "border-violet-300/30 bg-violet-300/18 text-violet-100"
-              : isRolledBox && box.rarity === "rare"
-                ? "border-orange-300/30 bg-orange-300/18 text-orange-100"
-                : "border-sky-200/24 bg-sky-200/14 text-sky-100",
-          )}
-        >
-          {isRolledBox ? BOX_RARITY_LABELS[box.rarity] : "랜덤"}
-        </span>
-        {box.state === "ready" ? (
-          <Sparkles className="h-3.5 w-3.5 text-orange-100" />
-        ) : box.state === "locked" ? (
-          <Lock className="h-3.5 w-3.5 text-[var(--text-on-dark-soft)]" />
-        ) : null}
-      </div>
-      <div className="point-track-slot__box">
-        <div className="point-track-slot__lid" />
-        <div className="point-track-slot__lock" />
-      </div>
-      <div className="mt-3">
-        <div className="text-[11px] font-black tracking-tight text-white">{box.hour}시간 상자</div>
-        {box.state === "charging" ? (
-          <>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="point-track-slot__meter-fill"
-                style={{ width: `${Math.max(4, Math.min(100, chargingPercent || 0))}%` }}
-              />
-            </div>
-            <div className="mt-1 text-[10px] font-black text-[var(--text-on-dark-soft)]">{chargingLabel}</div>
-          </>
-        ) : (
-          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-on-dark-soft)]">
-            <span>
-              {box.state === "opened"
-                ? `+${box.reward || 0}P`
-                : box.state === "ready"
-                  ? "READY"
-                  : "LOCK"}
-            </span>
-            <span>{box.state === "opened" ? "완료" : box.state === "ready" ? "열기" : "잠김"}</span>
-          </div>
-        )}
-      </div>
-    </button>
-  );
-}
-
 function RewardModal({
   open,
   onOpenChange,
@@ -523,10 +435,6 @@ export function StudentHomeGamePanel({
   onSelectRankRange,
   selectedHomeRank,
   onOpenLeaderboard,
-  boxes,
-  chargingLabel,
-  chargingPercent,
-  freshReadyHours,
   isVaultOpen,
   onVaultChange,
   selectedBox,
@@ -572,10 +480,6 @@ export function StudentHomeGamePanel({
   onSelectRankRange: (range: RankRange) => void;
   selectedHomeRank: StudentHomeRankState;
   onOpenLeaderboard: () => void;
-  boxes: StudentHomeRewardBox[];
-  chargingLabel: string;
-  chargingPercent: number;
-  freshReadyHours: number[];
   isVaultOpen: boolean;
   onVaultChange: (open: boolean) => void;
   selectedBox: StudentHomeRewardBox | null;
@@ -591,7 +495,7 @@ export function StudentHomeGamePanel({
     const label = minutes >= 60 ? `${Math.max(1, Math.round(minutes / 60))}h` : `${minutes}m`;
     return { id: `trend-mark-${index}`, label };
   });
-  const hasMoreReadyBoxes = boxes.filter((box) => box.state === "ready").length > 1;
+  const hasMoreReadyBoxes = totalAvailableBoxes > 1;
   const rankPreview = selectedHomeRank.preview.slice(0, 3);
   const rankLiveBadge = selectedHomeRank.isLive ? selectedHomeRank.liveBadge || "LIVE" : null;
   const selectedRangeLabel = getRankRangeLabel(selectedRankRange);
@@ -1150,35 +1054,6 @@ export function StudentHomeGamePanel({
               </div>
             </div>
           )}
-        </div>
-      </section>
-
-      <section className="surface-card surface-card--secondary on-dark mt-3 rounded-[1.65rem] p-4 text-white">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="surface-kicker text-[10px]">reward vault</div>
-            <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">상자 보관함</h3>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-9 rounded-full px-3 text-[11px] font-black text-[var(--text-on-dark-soft)] hover:bg-white/8 hover:text-white"
-            onClick={() => onOpenMainBox()}
-          >
-            모두 보기 <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </div>
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
-          {boxes.map((box) => (
-            <InventorySlot
-              key={box.id}
-              box={box}
-              chargingLabel={chargingLabel}
-              chargingPercent={chargingPercent}
-              onSelect={onOpenMainBox}
-              isFresh={freshReadyHours.includes(box.hour)}
-            />
-          ))}
         </div>
       </section>
 
