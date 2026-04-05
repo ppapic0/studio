@@ -3251,15 +3251,6 @@ export default function StudyPlanPage() {
                   <p className="student-aggro-body mt-2 break-keep text-[12px] font-semibold leading-5 text-white/70">
                     첫 공부 블록이나 기타 일정 하나만 적어도 충분해요. 오늘 바로 시작할 수 있는 것부터 가볍게 넣어보세요.
                   </p>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="student-aggro-body mt-4 h-10 rounded-[1rem] border border-white/12 bg-white px-5 font-black text-[#17326B] shadow-[0_10px_24px_-18px_rgba(6,14,36,0.45)] hover:bg-[#FFF4E8]"
-                    onClick={() => openStudyPlanSheet()}
-                    disabled={isPast}
-                  >
-                    첫 블록 추가
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
