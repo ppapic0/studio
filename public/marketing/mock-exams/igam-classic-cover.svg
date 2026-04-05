@@ -1,0 +1,22 @@
+<svg width="720" height="1080" viewBox="0 0 720 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="1080" fill="#F7EEDF"/>
+  <rect x="62" y="44" width="116" height="116" fill="#5D6788"/>
+  <text x="120" y="92" text-anchor="middle" fill="white" font-size="24" font-family="Arial, sans-serif" font-weight="700">2027</text>
+  <text x="120" y="128" text-anchor="middle" fill="white" font-size="26" font-family="Arial, sans-serif" font-weight="700">수능 대비</text>
+  <g transform="translate(110 484) rotate(-20)">
+    <text x="0" y="0" fill="#F18B28" font-size="160" font-family="Arial, sans-serif" font-weight="900">이감</text>
+  </g>
+  <g transform="translate(242 678) rotate(-20)">
+    <text x="0" y="0" fill="#273267" font-size="170" font-family="Arial, sans-serif" font-weight="900">클래식</text>
+  </g>
+  <path d="M188 434L646 352" stroke="#8A8A8A" stroke-width="18" stroke-linecap="round"/>
+  <path d="M116 688L676 624" stroke="#273267" stroke-width="18" stroke-linecap="round"/>
+  <text x="76" y="882" fill="#394A7A" font-size="18" font-family="Arial, sans-serif" font-weight="700">최신 7개년 평가원 기출 전 문항 수록</text>
+  <path d="M74 900L420 900" stroke="#98A3BC" stroke-width="2"/>
+  <text x="74" y="948" fill="#FF5E7F" font-size="14" font-family="Arial, sans-serif" font-weight="700">이감 클래식</text>
+  <text x="208" y="948" fill="#FF7A16" font-size="14" font-family="Arial, sans-serif" font-weight="700">OX 지문 풀이보기</text>
+  <text x="402" y="948" fill="#FF5E7F" font-size="14" font-family="Arial, sans-serif" font-weight="700">파트별 학습법</text>
+  <text x="560" y="948" fill="#6E6E6E" font-size="14" font-family="Arial, sans-serif" font-weight="700">자세한 학습법</text>
+  <text x="534" y="958" fill="#545454" font-size="20" font-family="Arial, sans-serif" font-weight="700">국어 영역</text>
+  <text x="550" y="1012" fill="#F18B28" font-size="76" font-family="Arial, sans-serif" font-weight="900">독서</text>
+</svg>

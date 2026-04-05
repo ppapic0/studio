@@ -19,25 +19,36 @@ const programIcons: Record<string, LucideIcon> = {
 
 const mockExamProofImages = [
   {
-    src: '/marketing/proof/june-score-sheet-proof-v6.jpg',
-    alt: '6월 모의평가 성적통지표 실제 이미지',
-    label: '6월 모의평가',
+    src: '/marketing/mock-exams/duf-premium-cover.svg',
+    alt: '더프리미엄 모의고사 표지 이미지',
+    label: '더프리미엄',
   },
   {
-    src: '/marketing/proof/september-score-sheet-proof-v6.jpg',
-    alt: '9월 모의평가 성적통지표 실제 이미지',
-    label: '9월 모의평가',
+    src: '/marketing/mock-exams/hansu-cover.svg',
+    alt: '한수 모의고사 표지 이미지',
+    label: '한수',
   },
   {
-    src: '/marketing/proof/csat-score-sheet-proof-v6.jpg',
-    alt: '수능 성적통지표 실제 이미지',
-    label: '수능 성적표',
+    src: '/marketing/mock-exams/igam-season-cover.svg',
+    alt: '이감 국어 모의고사 시즌1 표지 이미지',
+    label: '이감 시즌',
+  },
+  {
+    src: '/marketing/mock-exams/igam-classic-cover.svg',
+    alt: '이감 클래식 독서 표지 이미지',
+    label: '이감 클래식',
+  },
+  {
+    src: '/marketing/mock-exams/survival-cover.svg',
+    alt: '시대인재 서바이벌 표지 이미지',
+    label: '서바이벌',
   },
 ] as const;
 
 export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: MockExamProgramSectionProps) {
   const isCard = surface === 'card';
   const isDark = surface === 'flat-dark';
+  const proofCycleDuration = mockExamProofImages.length * 4.8;
   const spotlightTone = isDark
     ? {
         panel: 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)]',
@@ -112,7 +123,7 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
               <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-14 bg-gradient-to-r sm:w-20', isDark ? 'from-[#1A3471] via-[#1A3471]/50 to-transparent' : 'from-white via-white/60 to-transparent')} />
               <div className={cn('pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l sm:w-20', isDark ? 'from-[#1A3471] via-[#1A3471]/55 to-transparent' : 'from-white via-white/55 to-transparent')} />
               <div className={cn('pointer-events-none absolute inset-x-5 top-3 flex items-center justify-between text-[10px] font-black tracking-[0.18em] sm:inset-x-6', isDark ? 'text-white/72' : 'text-[#5C7396]')}>
-                <span>REAL PROOF</span>
+                <span>MOCK EXAM COVERS</span>
                 <span className={cn('rounded-full px-2 py-1 text-[9px]', isDark ? 'bg-white/10 text-white/78' : 'bg-[#EDF3FF] text-[#5C7396]')}>
                   자동 순환
                 </span>
@@ -175,7 +186,7 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
         .mock-exam-proof-card {
           opacity: 0;
           transform: translateX(32px) scale(0.94);
-          animation: mock-exam-proof-cycle 14.4s ease-in-out infinite;
+          animation: mock-exam-proof-cycle ${proofCycleDuration}s ease-in-out infinite;
         }
 
         @keyframes mock-exam-proof-cycle {
