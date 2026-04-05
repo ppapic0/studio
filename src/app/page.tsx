@@ -1,9 +1,11 @@
 import { headers } from 'next/headers';
 
 import { ConsultSection } from '@/components/marketing/consult-section';
+import { CenterIntroSection } from '@/components/marketing/center-intro-section';
 import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
 import { DesktopStudySystemSection } from '@/components/marketing/desktop-study-system-section';
 import { FeedbackManagementSection } from '@/components/marketing/feedback-management-section';
+import { FocusFirewallSection } from '@/components/marketing/focus-firewall-section';
 import { HeroSection } from '@/components/marketing/hero-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
@@ -36,28 +38,67 @@ export default async function HomePage() {
       <MarketingLaunchNoticeModal notice={marketingContent.launchNotice} />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
-      <CenterOverviewStack className="pt-8 sm:pt-10 lg:pt-12" />
-      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
-        <ScrollReveal>
-          <FeedbackManagementSection />
-        </ScrollReveal>
-      </div>
-      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
-        <ScrollReveal>
-          <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
-        </ScrollReveal>
-      </div>
-      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
-        <ScrollReveal>
-          <PointRewardSection />
-        </ScrollReveal>
-      </div>
       {isMobile ? (
-        <MobileStudySystemSection content={marketingContent.mobileStudySystem} />
+        <>
+          <CenterOverviewStack className="pt-8 sm:pt-10 lg:pt-12" />
+          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
+            <ScrollReveal>
+              <FeedbackManagementSection />
+            </ScrollReveal>
+          </div>
+          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
+            <ScrollReveal>
+              <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} />
+            </ScrollReveal>
+          </div>
+          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
+            <ScrollReveal>
+              <PointRewardSection />
+            </ScrollReveal>
+          </div>
+          <MobileStudySystemSection content={marketingContent.mobileStudySystem} />
+        </>
       ) : (
-        <ScrollReveal>
-          <DesktopStudySystemSection content={marketingContent.mobileStudySystem} />
-        </ScrollReveal>
+        <>
+          <section className="bg-white pt-8 sm:pt-10 lg:pt-12">
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+              <ScrollReveal>
+                <CenterIntroSection surface="flat-light" />
+              </ScrollReveal>
+            </div>
+          </section>
+          <section className="bg-[#14295F] py-14 lg:py-18">
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+              <ScrollReveal>
+                <FocusFirewallSection surface="flat-dark" />
+              </ScrollReveal>
+            </div>
+          </section>
+          <section className="bg-white py-14 lg:py-18">
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+              <ScrollReveal>
+                <FeedbackManagementSection surface="flat-light" />
+              </ScrollReveal>
+            </div>
+          </section>
+          <section className="bg-[#14295F] py-14 lg:py-18">
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+              <ScrollReveal>
+                <MockExamProgramSection mockExamProgram={marketingContent.mockExamProgram} surface="flat-dark" />
+              </ScrollReveal>
+            </div>
+          </section>
+          <section className="bg-white py-14 lg:py-18">
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+              <ScrollReveal>
+                <PointRewardSection surface="flat-light" />
+              </ScrollReveal>
+            </div>
+          </section>
+          <ScrollReveal>
+            <DesktopStudySystemSection content={marketingContent.mobileStudySystem} />
+          </ScrollReveal>
+        </>
       )}
       <ScrollReveal>
         <ConsultSection consult={marketingContent.consult} trustMetrics={marketingContent.appSystem.trustMetrics} />

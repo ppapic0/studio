@@ -1,5 +1,7 @@
 import { BookOpenCheck, Smartphone, Sparkles, Wifi } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
+
 import { SectionHeading } from './section-heading';
 
 const centerIntroPoints = [
@@ -9,14 +11,38 @@ const centerIntroPoints = [
   { icon: Sparkles, title: '상벌점 제도 운영', detail: '엄격한 규정과 체계적인 관리로 학습 분위기 조성' },
 ] as const;
 
-export function CenterIntroSection() {
+type CenterIntroSectionProps = {
+  surface?: 'card' | 'flat-light' | 'flat-dark';
+};
+
+export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps) {
+  const isCard = surface === 'card';
+  const isDark = surface === 'flat-dark';
+
   return (
-    <section className="relative overflow-hidden rounded-[2.7rem] border border-[#14295F]/10 bg-white px-6 py-7 shadow-[0_28px_64px_rgba(20,41,95,0.10)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_18%,rgba(20,41,95,0.06),transparent_24%),radial-gradient(circle_at_92%_8%,rgba(255,122,22,0.10),transparent_24%)]" />
+    <section
+      className={cn(
+        'relative overflow-hidden px-6 py-7 sm:px-8 sm:py-8 lg:px-10 lg:py-10',
+        isCard && 'rounded-[2.7rem] border border-[#14295F]/10 bg-white shadow-[0_28px_64px_rgba(20,41,95,0.10)]',
+      )}
+    >
+      <div
+        className={cn(
+          'absolute inset-0',
+          isDark
+            ? 'bg-[radial-gradient(circle_at_14%_18%,rgba(255,255,255,0.08),transparent_24%),radial-gradient(circle_at_92%_8%,rgba(255,122,22,0.16),transparent_24%)]'
+            : 'bg-[radial-gradient(circle_at_14%_18%,rgba(20,41,95,0.06),transparent_24%),radial-gradient(circle_at_92%_8%,rgba(255,122,22,0.10),transparent_24%)]',
+        )}
+      />
       <div className="relative grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-end">
         <div>
-          <SectionHeading eyebrow="CENTER INTRO" title="트랙의 센터 소개" />
-          <p className="mt-4 max-w-2xl break-keep text-[15px] font-bold leading-[1.82] text-[#2c3f58] sm:text-[15.5px]">
+          <SectionHeading eyebrow="CENTER INTRO" title="트랙의 센터 소개" light={isDark} />
+          <p
+            className={cn(
+              'mt-4 max-w-2xl break-keep text-[15px] font-bold leading-[1.82] sm:text-[15.5px]',
+              isDark ? 'text-white/82' : 'text-[#2c3f58]',
+            )}
+          >
             <span className="block">공간만 제공하는 것이 아니라</span>
             <span className="block">집중력 최적화, 앱 연동 관리, 실전모의고사 및</span>
             <span className="block">포인트, 벌점제도로 학습동기를 높입니다.</span>
@@ -25,17 +51,28 @@ export function CenterIntroSection() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           {centerIntroPoints.map(({ icon: Icon, title, detail }) => (
-            <div key={title} className="rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF] px-4 py-4">
+            <div
+              key={title}
+              className={cn(
+                'rounded-[1.45rem] border px-4 py-4',
+                isDark ? 'border-white/12 bg-white/8 backdrop-blur-sm' : 'border-[#14295F]/10 bg-[#F9FBFF]',
+              )}
+            >
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#14295F] text-white">
+                <span
+                  className={cn(
+                    'flex h-10 w-10 items-center justify-center rounded-2xl',
+                    isDark ? 'bg-white/12 text-white' : 'bg-[#14295F] text-white',
+                  )}
+                >
                   <Icon className="h-4.5 w-4.5" />
                 </span>
                 <div>
-                  <p className="text-[10px] font-black tracking-[0.16em] text-[#14295F]/50">CENTER POINT</p>
-                  <p className="font-aggro-display mt-1 break-keep text-[0.98rem] font-black leading-[1.34] tracking-[-0.03em] text-[#14295F]">{title}</p>
+                  <p className={cn('text-[10px] font-black tracking-[0.16em]', isDark ? 'text-white/55' : 'text-[#14295F]/50')}>CENTER POINT</p>
+                  <p className={cn('font-aggro-display mt-1 break-keep text-[0.98rem] font-black leading-[1.34] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>{title}</p>
                 </div>
               </div>
-              <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.7] text-[#53687F]">{detail}</p>
+              <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/74' : 'text-[#53687F]')}>{detail}</p>
             </div>
           ))}
         </div>

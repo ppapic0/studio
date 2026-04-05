@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight, ChartColumnBig, ClipboardList, ShieldCheck, Sparkles, Target } from 'lucide-react';
 
 import type { MarketingContent } from '@/lib/marketing-content';
+import { cn } from '@/lib/utils';
 
 import { SectionHeading } from './section-heading';
 
@@ -75,25 +76,48 @@ const sectionSurfaceStyles = {
 function DesktopStudySystemPreview({
   section,
   index,
+  isDark,
 }: {
   section: MarketingContent['mobileStudySystem']['sections'][number];
   index: number;
+  isDark: boolean;
 }) {
   const tone = toneStyles[section.tone];
+  const previewSurface = isDark
+    ? {
+        panel: 'border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.04)_100%)]',
+        card: 'border-white/12 bg-white/10 backdrop-blur-sm',
+        subtleCard: 'border-white/10 bg-white/8 backdrop-blur-sm',
+        label: 'text-white/58',
+        title: 'text-white',
+        body: 'text-white/74',
+        chip: 'border-white/12 bg-white/10 text-white',
+        count: 'bg-white text-[#14295F]',
+      }
+    : {
+        panel: tone.panel,
+        card: 'border-white/70 bg-white/88',
+        subtleCard: 'border-[#14295F]/8 bg-white/88',
+        label: 'text-[#FF7A16]',
+        title: 'text-[#14295F]',
+        body: 'text-[#53687F]',
+        chip: 'border-[#6050A8]/10 bg-white/88 text-[#4B3B97]',
+        count: 'bg-[#14295F] text-white',
+      };
 
   if (index === 0) {
     return (
-      <div className={`relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)] ${tone.panel}`}>
+      <div className={cn('relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)]', previewSurface.panel)}>
         <div className={`pointer-events-none absolute -right-8 top-4 h-24 w-24 rounded-full blur-3xl ${tone.glow}`} />
-        <div className="relative rounded-[1.5rem] border border-white/70 bg-white/88 p-6 shadow-[0_14px_32px_rgba(20,41,95,0.08)]">
-          <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">TODAY FLOW</p>
-          <p className="font-aggro-display mt-4 break-keep text-[1.35rem] font-black leading-[1.2] tracking-[-0.03em] text-[#14295F]">
+        <div className={cn('relative rounded-[1.5rem] border p-6 shadow-[0_14px_32px_rgba(20,41,95,0.08)]', previewSurface.card)}>
+          <p className={cn('text-[10px] font-black tracking-[0.18em]', previewSurface.label)}>TODAY FLOW</p>
+          <p className={cn('font-aggro-display mt-4 break-keep text-[1.35rem] font-black leading-[1.2] tracking-[-0.03em]', previewSurface.title)}>
             {section.body}
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {['계획 작성', '실행 체크', '흐름 확인'].map((item) => (
-              <div key={item} className="rounded-[1rem] border border-[#14295F]/8 bg-[#F8FBFF] px-3 py-3 text-center">
-                <p className="font-aggro-display text-[0.92rem] font-black tracking-[-0.03em] text-[#14295F]">{item}</p>
+              <div key={item} className={cn('rounded-[1rem] border px-3 py-3 text-center', previewSurface.subtleCard)}>
+                <p className={cn('font-aggro-display text-[0.92rem] font-black tracking-[-0.03em]', previewSurface.title)}>{item}</p>
               </div>
             ))}
           </div>
@@ -112,12 +136,12 @@ function DesktopStudySystemPreview({
     return (
       <div className="grid gap-3">
         {flowCards.map((card) => (
-          <article key={card.title} className={`rounded-[1.35rem] border px-5 py-4 shadow-[0_14px_30px_rgba(20,41,95,0.06)] ${tone.panel}`}>
-            <p className="text-[10px] font-black tracking-[0.16em] text-[#FF7A16]">SYSTEM FLOW</p>
-            <p className="font-aggro-display mt-3 break-keep text-[1rem] font-black leading-[1.32] tracking-[-0.03em] text-[#14295F]">
+          <article key={card.title} className={cn('rounded-[1.35rem] border px-5 py-4 shadow-[0_14px_30px_rgba(20,41,95,0.06)]', previewSurface.panel)}>
+            <p className={cn('text-[10px] font-black tracking-[0.16em]', previewSurface.label)}>SYSTEM FLOW</p>
+            <p className={cn('font-aggro-display mt-3 break-keep text-[1rem] font-black leading-[1.32] tracking-[-0.03em]', previewSurface.title)}>
               {card.title}
             </p>
-            <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.7] text-[#53687F]">{card.body}</p>
+            <p className={cn('mt-2 break-keep text-[13px] font-semibold leading-[1.7]', previewSurface.body)}>{card.body}</p>
           </article>
         ))}
       </div>
@@ -126,20 +150,20 @@ function DesktopStudySystemPreview({
 
   if (index === 2) {
     return (
-      <div className={`relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)] ${tone.panel}`}>
+      <div className={cn('relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)]', previewSurface.panel)}>
         <div className={`pointer-events-none absolute -left-8 bottom-0 h-24 w-24 rounded-full blur-3xl ${tone.glow}`} />
         <div className="relative">
-          <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">FIREWALL CONTROL</p>
-          <p className="font-aggro-display mt-4 break-keep text-[1.25rem] font-black leading-[1.24] tracking-[-0.03em] text-[#14295F]">
+          <p className={cn('text-[10px] font-black tracking-[0.18em]', previewSurface.label)}>FIREWALL CONTROL</p>
+          <p className={cn('font-aggro-display mt-4 break-keep text-[1.25rem] font-black leading-[1.24] tracking-[-0.03em]', previewSurface.title)}>
             {previewTitles[index]}
           </p>
           <div className="mt-5 space-y-3">
             {section.detailPoints?.map((point, pointIndex) => (
-              <div key={point} className="flex items-start gap-3 rounded-[1.1rem] border border-[#14295F]/8 bg-white/88 px-4 py-3">
-                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#14295F] text-[10px] font-black text-white">
+              <div key={point} className={cn('flex items-start gap-3 rounded-[1.1rem] border px-4 py-3', previewSurface.subtleCard)}>
+                <span className={cn('inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black', previewSurface.count)}>
                   {pointIndex + 1}
                 </span>
-                <p className="break-keep text-[13px] font-semibold leading-[1.68] text-[#53687F]">{point}</p>
+                <p className={cn('break-keep text-[13px] font-semibold leading-[1.68]', previewSurface.body)}>{point}</p>
               </div>
             ))}
           </div>
@@ -149,26 +173,26 @@ function DesktopStudySystemPreview({
   }
 
   return (
-    <div className={`relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)] ${tone.panel}`}>
+    <div className={cn('relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)]', previewSurface.panel)}>
       <div className={`pointer-events-none absolute -right-8 top-2 h-24 w-24 rounded-full blur-3xl ${tone.glow}`} />
       <div className="relative">
         <div className="flex flex-wrap gap-2">
           {['포인트', '상벌점', '동기 유지'].map((item) => (
             <span
               key={item}
-              className="inline-flex rounded-full border border-[#6050A8]/10 bg-white/88 px-3 py-1.5 text-[11px] font-black text-[#4B3B97]"
+              className={cn('inline-flex rounded-full border px-3 py-1.5 text-[11px] font-black', previewSurface.chip)}
             >
               {item}
             </span>
           ))}
         </div>
 
-        <div className="mt-5 rounded-[1.5rem] border border-white/70 bg-white/88 px-6 py-8 text-center shadow-[0_14px_32px_rgba(20,41,95,0.08)]">
-          <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">REAL CAPTURE READY</p>
-          <p className="font-aggro-display mt-4 break-keep text-[1.25rem] font-black leading-[1.24] tracking-[-0.03em] text-[#14295F]">
+        <div className={cn('mt-5 rounded-[1.5rem] border px-6 py-8 text-center shadow-[0_14px_32px_rgba(20,41,95,0.08)]', previewSurface.card)}>
+          <p className={cn('text-[10px] font-black tracking-[0.18em]', previewSurface.label)}>REAL CAPTURE READY</p>
+          <p className={cn('font-aggro-display mt-4 break-keep text-[1.25rem] font-black leading-[1.24] tracking-[-0.03em]', previewSurface.title)}>
             {section.alt ?? previewTitles[index]}
           </p>
-          <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.72] text-[#53687F]">
+          <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.72]', previewSurface.body)}>
             포인트와 상벌점 운영 흐름이 실제 앱 화면으로 반영될 자리를 미리 구성했습니다.
           </p>
         </div>
@@ -252,7 +276,7 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                   </div>
 
                   <div className="mx-auto mt-8 max-w-5xl lg:mt-10">
-                    <DesktopStudySystemPreview section={section} index={index} />
+                    <DesktopStudySystemPreview section={section} index={index} isDark={index % 2 === 1} />
                   </div>
                 </div>
               </div>
