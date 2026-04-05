@@ -23,7 +23,8 @@ export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps
   return (
     <section
       className={cn(
-        'relative overflow-hidden px-6 py-7 sm:px-8 sm:py-8 lg:px-10 lg:py-10',
+        'relative overflow-hidden px-6 sm:px-8 lg:px-10',
+        isFlat ? 'py-10 sm:py-12 lg:py-14' : 'py-7 sm:py-8 lg:py-10',
         isCard && 'rounded-[2.7rem] border border-[#14295F]/10 bg-white shadow-[0_28px_64px_rgba(20,41,95,0.10)]',
       )}
     >
@@ -35,7 +36,7 @@ export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps
             : 'bg-[radial-gradient(circle_at_14%_18%,rgba(20,41,95,0.06),transparent_24%),radial-gradient(circle_at_92%_8%,rgba(255,122,22,0.10),transparent_24%)]',
         )}
       />
-      <div className="relative grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-end">
+      <div className={cn('relative grid lg:grid-cols-[1.02fr_0.98fr] lg:items-end', isFlat ? 'gap-8 lg:gap-10' : 'gap-6')}>
         <div>
           <SectionHeading eyebrow="CENTER INTRO" title="트랙의 센터 소개" light={isDark} />
           <p
