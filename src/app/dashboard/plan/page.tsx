@@ -48,6 +48,7 @@ import {
   query, 
   where, 
   getDocs,
+  getDoc,
   addDoc, 
   updateDoc, 
   doc, 
@@ -1140,11 +1141,29 @@ export default function StudyPlanPage() {
     setIsGoalTargetSaving(true);
 
     try {
-      await updateDoc(studentProfileRef, {
-        targetDailyMinutes: nextTargetMinutes,
-        targetDailyMinutesSource: 'manual',
-        updatedAt: serverTimestamp(),
-      });
+      const studentProfileSnapshot = await getDoc(studentProfileRef);
+
+      if (studentProfileSnapshot.exists()) {
+        await updateDoc(studentProfileRef, {
+          targetDailyMinutes: nextTargetMinutes,
+          targetDailyMinutesSource: 'manual',
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await setDoc(studentProfileRef, {
+          id: user?.uid || '',
+          name: studentProfile?.name || activeMembership?.displayName || user?.displayName || '학생',
+          schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
+          grade: studentProfile?.grade || '학년 미정',
+          seatNo: studentProfile?.seatNo || 0,
+          parentUids: studentProfile?.parentUids || [],
+          targetDailyMinutes: nextTargetMinutes,
+          targetDailyMinutesSource: 'manual',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+
       toast({
         title: '목표시간을 수정했어요',
         description: `이제 하루 목표가 ${formatMinutesSummary(nextTargetMinutes)}으로 적용돼요.`,
@@ -1160,7 +1179,21 @@ export default function StudyPlanPage() {
     } finally {
       setIsGoalTargetSaving(false);
     }
-  }, [goalTargetHoursDraft, goalTargetMinutesDraft, studentProfileRef, toast]);
+  }, [
+    activeMembership?.displayName,
+    goalTargetHoursDraft,
+    goalTargetMinutesDraft,
+    studentProfile?.grade,
+    studentProfile?.name,
+    studentProfile?.parentUids,
+    studentProfile?.schoolName,
+    studentProfile?.seatNo,
+    studentProfileRef,
+    toast,
+    user?.displayName,
+    user?.uid,
+    userProfile?.schoolName,
+  ]);
 
   useEffect(() => {
     const fallbackArrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));

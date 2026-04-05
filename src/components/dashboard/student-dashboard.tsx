@@ -2465,7 +2465,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const readyBoxes = homeRewardBoxes.filter((box) => box.state === 'ready');
   const selectedHomeBox = selectedBoxHour ? homeRewardBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
 
-  const growthGoalMinutes = 600;
+  const growthGoalMinutes = Math.max(30, Number(studentProfile?.targetDailyMinutes || 600));
   const growthPercent = Math.min(100, (liveTodayMinutes / growthGoalMinutes) * 100);
   const weeklyBestDay = useMemo(() => {
     const best = studyTimeTrend.reduce<{ date: string; minutes: number } | null>((current, item) => {
@@ -2816,7 +2816,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         streakLabel={`${plannerStreakDays}일 연속`}
         heroMessage={heroMessage}
         totalMinutesLabel={formatMinutesToKorean(totalMinutesCount)}
-        growthLabel={`${formatMinutesMini(totalMinutesCount)} / 10h`}
+        growthLabel={`${formatMinutesMini(totalMinutesCount)} / ${formatMinutesMini(growthGoalMinutes)}`}
         growthPercent={growthPercent}
         growthDeltaLabel={`어제 대비 ${studyVsYesterday >= 0 ? '+' : ''}${studyVsYesterday}%`}
         primaryActionLabel={isTimerActive ? '공부 종료하기' : '집중 시작하기'}
