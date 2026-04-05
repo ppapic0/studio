@@ -53,13 +53,6 @@ export function FeedbackManagementSection({ surface = 'card', titleBreakMode = '
                   </div>
                   <p className={cn('mt-5 text-[11px] font-black tracking-[0.22em]', isDark ? 'text-white/[0.48]' : 'text-[#FF7A16]')}>REAL CAPTURE READY</p>
                   <p className={cn('font-aggro-display mt-3 break-keep text-[1.15rem] font-black leading-[1.35] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>학습 현황 · 피드백 실제 화면</p>
-                  <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.75]', isDark ? 'text-white/[0.74]' : 'text-[#506680]')}>
-                    학생별 계획, 실행, 학습 현황과 피드백이
-                    <br />
-                    한 화면 안에서 자연스럽게
-                    <br />
-                    이어지는 구조를 보여줍니다.
-                  </p>
                 </div>
               </div>
             </div>
