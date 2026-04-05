@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import type { LucideIcon } from 'lucide-react';
 import { BookOpenText, Crosshair, Gauge, Target } from 'lucide-react';
 
@@ -15,6 +16,24 @@ const programIcons: Record<string, LucideIcon> = {
   '한수': Gauge,
   '시대인재 서바이벌 프로': Crosshair,
 };
+
+const mockExamProofImages = [
+  {
+    src: '/marketing/proof/june-score-sheet-proof-v6.jpg',
+    alt: '6월 모의평가 성적통지표 실제 이미지',
+    label: '6월 모의평가',
+  },
+  {
+    src: '/marketing/proof/september-score-sheet-proof-v6.jpg',
+    alt: '9월 모의평가 성적통지표 실제 이미지',
+    label: '9월 모의평가',
+  },
+  {
+    src: '/marketing/proof/csat-score-sheet-proof-v6.jpg',
+    alt: '수능 성적통지표 실제 이미지',
+    label: '수능 성적표',
+  },
+] as const;
 
 export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: MockExamProgramSectionProps) {
   const isCard = surface === 'card';
@@ -58,28 +77,62 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
         </h2>
 
         <div className={cn('mt-6 overflow-hidden rounded-[1.55rem] border', spotlightTone.panel)}>
-          <div className="relative flex min-h-[11rem] items-center justify-center overflow-hidden px-5 py-7 sm:min-h-[12rem] sm:px-8">
+          <div className="relative grid min-h-[11rem] gap-5 overflow-hidden px-5 py-7 sm:min-h-[12rem] sm:px-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-8">
             <div className={cn('pointer-events-none absolute inset-x-[4%] top-1/2 h-[4.8rem] -translate-y-1/2 rounded-full blur-[22px]', spotlightTone.beam)} />
-            <div className={cn('pointer-events-none absolute h-[8.5rem] w-[15rem] rounded-full blur-[34px] sm:h-[9rem] sm:w-[16rem]', spotlightTone.aura)} />
+            <div className={cn('pointer-events-none absolute left-[18%] h-[8.5rem] w-[15rem] rounded-full blur-[34px] sm:h-[9rem] sm:w-[16rem]', spotlightTone.aura)} />
+
+            <div className="relative flex justify-center lg:justify-start">
+              <div
+                className={cn(
+                  'relative flex min-h-[11rem] w-[8.9rem] items-center justify-center rounded-[2rem] border p-2 text-center sm:min-h-[11.75rem] sm:w-[9.75rem] sm:rounded-[2.2rem]',
+                  spotlightTone.plaqueShell,
+                )}
+              >
+                <div className={cn('absolute inset-[0.52rem] rounded-[1.55rem] border sm:rounded-[1.7rem]', spotlightTone.plaqueCore)} />
+                <div className={cn('pointer-events-none absolute left-[1.15rem] right-[1.15rem] top-[1.05rem] h-px', spotlightTone.divider)} />
+                <div className={cn('pointer-events-none absolute inset-x-[18%] top-[0.9rem] h-[26%] rounded-full blur-[14px]', spotlightTone.glint)} />
+
+                <p
+                  className={cn(
+                    'font-aggro-display relative max-w-[6.9rem] whitespace-pre-line break-keep text-[1.12rem] font-black leading-[1.25] tracking-[-0.03em] sm:text-[1.2rem]',
+                    spotlightTone.text,
+                  )}
+                >
+                  {mockExamProgram.spotlight}
+                </p>
+              </div>
+            </div>
 
             <div
               className={cn(
-                'relative flex min-h-[11rem] w-[8.9rem] items-center justify-center rounded-[2rem] border p-2 text-center sm:min-h-[11.75rem] sm:w-[9.75rem] sm:rounded-[2.2rem]',
-                spotlightTone.plaqueShell,
+                'relative h-[13.5rem] overflow-hidden rounded-[1.45rem] border p-3 sm:h-[15rem] sm:rounded-[1.7rem] sm:p-4',
+                isDark ? 'border-white/12 bg-white/[0.04]' : 'border-[#D6E3FB] bg-white/75',
               )}
             >
-              <div className={cn('absolute inset-[0.52rem] rounded-[1.55rem] border sm:rounded-[1.7rem]', spotlightTone.plaqueCore)} />
-              <div className={cn('pointer-events-none absolute left-[1.15rem] right-[1.15rem] top-[1.05rem] h-px', spotlightTone.divider)} />
-              <div className={cn('pointer-events-none absolute inset-x-[18%] top-[0.9rem] h-[26%] rounded-full blur-[14px]', spotlightTone.glint)} />
+              <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-14 bg-gradient-to-r sm:w-20', isDark ? 'from-[#1A3471] via-[#1A3471]/50 to-transparent' : 'from-white via-white/60 to-transparent')} />
+              <div className={cn('pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l sm:w-20', isDark ? 'from-[#1A3471] via-[#1A3471]/55 to-transparent' : 'from-white via-white/55 to-transparent')} />
+              <div className={cn('pointer-events-none absolute inset-x-5 top-3 flex items-center justify-between text-[10px] font-black tracking-[0.18em] sm:inset-x-6', isDark ? 'text-white/72' : 'text-[#5C7396]')}>
+                <span>REAL PROOF</span>
+                <span className={cn('rounded-full px-2 py-1 text-[9px]', isDark ? 'bg-white/10 text-white/78' : 'bg-[#EDF3FF] text-[#5C7396]')}>
+                  자동 순환
+                </span>
+              </div>
 
-              <p
-                className={cn(
-                  'font-aggro-display relative max-w-[6.9rem] whitespace-pre-line break-keep text-[1.12rem] font-black leading-[1.25] tracking-[-0.03em] sm:text-[1.2rem]',
-                  spotlightTone.text,
-                )}
-              >
-                {mockExamProgram.spotlight}
-              </p>
+              {mockExamProofImages.map((image, index) => (
+                <div
+                  key={image.src}
+                  className={cn(
+                    'mock-exam-proof-card absolute inset-y-6 right-3 left-[18%] overflow-hidden rounded-[1.15rem] border shadow-[0_18px_40px_rgba(15,27,58,0.20)] sm:inset-y-7 sm:right-4 sm:left-[22%] sm:rounded-[1.35rem]',
+                    isDark ? 'border-white/16 bg-white/[0.08]' : 'border-[#D7E4FB] bg-white',
+                  )}
+                  style={{ animationDelay: `${index * 4.8}s` }}
+                >
+                  <div className="absolute left-3 top-3 z-10 rounded-full bg-[#14295F]/86 px-3 py-1 text-[9px] font-black tracking-[0.14em] text-white backdrop-blur-sm sm:left-4 sm:top-4 sm:text-[10px]">
+                    {image.label}
+                  </div>
+                  <Image src={image.src} alt={image.alt} fill sizes="(min-width: 1024px) 32vw, 70vw" className="object-cover object-center" />
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -118,6 +171,36 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
           })}
         </div>
       </div>
+      <style jsx>{`
+        .mock-exam-proof-card {
+          opacity: 0;
+          transform: translateX(32px) scale(0.94);
+          animation: mock-exam-proof-cycle 14.4s ease-in-out infinite;
+        }
+
+        @keyframes mock-exam-proof-cycle {
+          0% {
+            opacity: 0;
+            transform: translateX(32px) scale(0.94);
+          }
+          8% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+          28% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+          36% {
+            opacity: 0;
+            transform: translateX(-22px) scale(0.98);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(-22px) scale(0.98);
+          }
+        }
+      `}</style>
     </section>
   );
 }
