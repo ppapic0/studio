@@ -69,7 +69,7 @@ const sectionSurfaceStyles = {
     body: 'text-white/82',
     secondary: 'text-white/72',
     chip: 'border-white/12 bg-white/10 text-white',
-    button: 'border-white/16 bg-white text-[#14295F] hover:bg-[#F7FAFF]',
+    button: 'border-white/16 bg-white/10 text-white hover:bg-white/16',
   },
 } as const;
 
@@ -92,7 +92,7 @@ function DesktopStudySystemPreview({
         title: 'text-white',
         body: 'text-white/74',
         chip: 'border-white/12 bg-white/10 text-white',
-        count: 'bg-white text-[#14295F]',
+        count: 'border border-white/16 bg-white/12 text-white',
       }
     : {
         panel: tone.panel,
@@ -220,7 +220,10 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
         {content.sections.map((section, index) => {
           const Icon = sectionIcons[index] ?? Sparkles;
           const tone = toneStyles[section.tone];
-          const surface = sectionSurfaceStyles[index % 2 === 1 ? 'dark' : 'light'];
+          const isDarkSection = index % 2 === 1;
+          const surface = sectionSurfaceStyles[isDarkSection ? 'dark' : 'light'];
+          const iconClass = isDarkSection ? 'bg-white/10 text-white' : tone.icon;
+          const badgeClass = isDarkSection ? 'border border-white/14 bg-white/10 text-white' : tone.badge;
 
           return (
             <div key={section.title} className={`${surface.section} py-16 lg:py-20`}>
@@ -229,10 +232,10 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                   <div className={`pointer-events-none absolute left-1/2 top-0 h-44 w-44 -translate-x-1/2 rounded-full blur-[110px] ${tone.glow}`} />
                   <div className="relative mx-auto flex max-w-4xl flex-col items-center text-center">
                     <div className="flex items-center gap-3">
-                      <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone.icon}`}>
+                      <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${iconClass}`}>
                         <Icon className="h-5 w-5" />
                       </span>
-                      <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black tracking-[0.18em] ${tone.badge}`}>
+                      <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black tracking-[0.18em] ${badgeClass}`}>
                         SECTION {String(index + 1).padStart(2, '0')}
                       </span>
                     </div>
@@ -276,7 +279,7 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                   </div>
 
                   <div className="mx-auto mt-8 max-w-5xl lg:mt-10">
-                    <DesktopStudySystemPreview section={section} index={index} isDark={index % 2 === 1} />
+                    <DesktopStudySystemPreview section={section} index={index} isDark={isDarkSection} />
                   </div>
                 </div>
               </div>

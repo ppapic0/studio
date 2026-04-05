@@ -39,7 +39,12 @@ export function FocusFirewallSection({ surface = 'card' }: FocusFirewallSectionP
                   isDark ? 'border-white/10 bg-white/8 backdrop-blur-sm' : 'border-[#14295F]/8 bg-[#F8FBFF]',
                 )}
               >
-                <span className={cn('mt-[1px] inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black', isDark ? 'bg-white text-[#14295F]' : 'bg-[#14295F] text-white')}>
+                <span
+                  className={cn(
+                    'mt-[1px] inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black',
+                    isDark ? 'border border-white/16 bg-white/12 text-white' : 'bg-[#14295F] text-white',
+                  )}
+                >
                   {index + 1}
                 </span>
                 <p className={cn('break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/78' : 'text-[#53687F]')}>{item}</p>
