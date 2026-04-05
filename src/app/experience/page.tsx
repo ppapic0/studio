@@ -224,25 +224,6 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
               ))}
             </div>
 
-            {!showStudentSummaryCard ? (
-              <div className={`mt-6 rounded-[1.5rem] border px-5 py-5 ${style.insight}`}>
-                <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">WHAT THIS SCREEN HELPS YOU READ</p>
-                <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">{section.insightTitle}</p>
-                <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.8] text-[#4C627B]">{section.insightDescription}</p>
-              </div>
-            ) : null}
-
-            {section.mode !== '학부모 모드' && !showStudentSummaryCard ? (
-              <div className="mt-6">
-                <Link
-                  href={section.ctaHref}
-                  className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-black transition-colors ${style.textButton}`}
-                >
-                  {section.ctaLabel}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            ) : null}
           </div>
         </div>
 
