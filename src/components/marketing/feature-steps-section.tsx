@@ -77,7 +77,7 @@ export function FeatureStepsSection() {
             <div className="mt-4 flex items-center justify-between rounded-xl border border-[#14295F]/8 bg-[#14295F]/4 px-4 py-3">
               <div className="pr-2">
                 <p className="break-keep text-[12px] font-black leading-[1.45] text-[#14295F]">
-                  학기중 오후 5:00 ~ 다음날 오전 1:00 · 방학중 오전 8:30 ~ 다음날 오전 1:00 · N수생 별도 운영시간 운영
+                  학기중 평일 오후 5:00 ~ 다음날 오전 1:00 · 학기중 토요일·일요일/방학중 오전 8:00 ~ 다음날 오전 1:00 · N수생 별도 운영시간 운영
                 </p>
               </div>
               <ArrowRight className="h-4 w-4 text-[#14295F]/30 transition-all group-hover:translate-x-0.5 group-hover:text-[#14295F]/60" />
