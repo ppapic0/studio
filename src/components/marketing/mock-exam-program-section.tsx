@@ -51,11 +51,14 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
             return (
               <article
                 key={program.title}
-                className={cn('rounded-[1.35rem] border px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.06)]', isDark ? 'border-white/10 bg-white/[0.08] backdrop-blur-sm' : 'border-[#14295F]/8 bg-white')}
+                className={cn(
+                  'rounded-[1.35rem] border px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.06)]',
+                  isDark ? 'border-white/10 bg-white/[0.08] text-white backdrop-blur-sm' : 'border-[#14295F]/8 bg-white',
+                )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className={cn('text-[10px] font-black tracking-[0.18em]', isDark ? 'text-white/[0.58]' : 'text-[#FF7A16]')}>
+                    <p className={cn('text-[10px] font-black tracking-[0.18em]', isDark ? 'text-white/[0.78]' : 'text-[#FF7A16]')}>
                       PROGRAM {String(index + 1).padStart(2, '0')}
                     </p>
                     <h3 className={cn('font-aggro-display mt-3 break-keep text-[1rem] font-black leading-[1.34] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>
@@ -67,7 +70,7 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
                   </span>
                 </div>
 
-                <p className={cn('mt-2 break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/[0.74]' : 'text-[#53687F]')}>
+                <p className={cn('mt-2 break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/[0.9]' : 'text-[#53687F]')}>
                   {program.summary}
                 </p>
               </article>
