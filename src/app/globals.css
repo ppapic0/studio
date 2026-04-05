@@ -1332,7 +1332,7 @@ select {
   .student-analysis-shell {
     --text-on-dark: #f4f7ff;
     --text-on-dark-soft: rgba(240, 247, 255, 0.78);
-    --text-on-dark-muted: rgba(240, 247, 255, 0.58);
+    --text-on-dark-muted: rgba(240, 247, 255, 0.92);
     --chart-axis: rgba(244, 248, 255, 0.9);
     --chart-grid: rgba(244, 248, 255, 0.18);
     --chart-tooltip-bg: rgba(7, 18, 45, 0.98);
@@ -1665,7 +1665,7 @@ select {
   .analysis-full-shell .analysis-full-conclusion-card {
     --text-on-dark: #f4f7ff;
     --text-on-dark-soft: rgba(240, 247, 255, 0.78);
-    --text-on-dark-muted: rgba(240, 247, 255, 0.58);
+    --text-on-dark-muted: rgba(240, 247, 255, 0.92);
     color: #f4f7ff;
   }
 
@@ -1926,20 +1926,25 @@ select {
     border-color: rgba(214, 225, 245, 0.92);
   }
 
+  .analysis-full-shell .analysis-detail-badge,
+  .analysis-full-shell .analysis-growth-period-badge {
+    color: var(--text-on-dark-muted) !important;
+  }
+
   .analysis-full-shell .analysis-metric-chip {
     position: relative;
     isolation: isolate;
     overflow: hidden;
     min-width: 4.9rem;
-    border: 1px solid rgba(196, 211, 239, 0.94) !important;
+    border: 1px solid rgba(214, 225, 245, 0.18) !important;
     border-radius: 1.05rem;
     background:
-      radial-gradient(circle at top left, rgba(255, 170, 94, 0.22), transparent 42%),
-      linear-gradient(180deg, rgba(247, 250, 255, 0.98) 0%, rgba(232, 239, 251, 0.96) 100%) !important;
+      radial-gradient(circle at top left, rgba(255, 170, 94, 0.2), transparent 40%),
+      linear-gradient(180deg, rgba(40, 63, 126, 0.98) 0%, rgba(19, 36, 79, 0.98) 100%) !important;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.98),
-      0 16px 28px -24px rgba(20, 41, 95, 0.36),
-      0 10px 18px -18px rgba(255, 122, 22, 0.4) !important;
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 16px 28px -24px rgba(6, 13, 36, 0.56),
+      0 10px 18px -18px rgba(255, 122, 22, 0.28) !important;
   }
 
   .analysis-full-shell .analysis-metric-chip::after {
@@ -1958,7 +1963,7 @@ select {
   }
 
   .analysis-full-shell .analysis-metric-chip p:first-child {
-    color: #7387b1 !important;
+    color: var(--text-on-dark-muted) !important;
   }
 
   .analysis-full-shell .analysis-warm-badge {
@@ -1970,7 +1975,7 @@ select {
   .analysis-full-shell .analysis-soft-badge {
     border: 1px solid rgba(181, 206, 255, 0.14);
     background: rgba(255, 255, 255, 0.06);
-    color: rgba(240, 247, 255, 0.82);
+    color: var(--text-on-dark-muted);
   }
 
   .analysis-full-shell .analysis-subchip {

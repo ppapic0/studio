@@ -1893,6 +1893,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     'mt-1 font-semibold',
     isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : 'text-[#5c6e97]'
   );
+  const analysisReadableMutedTextClass = isAnalysisPresentation ? 'text-[#f4f8ff]' : 'text-[#6a7da6]';
+  const analysisReadableSoftTextClass = isAnalysisPresentation ? 'text-white/90' : 'text-[var(--text-on-dark-muted)]';
+  const analysisChartTickColor = isAnalysisPresentation ? '#f4f8ff' : '#6a7da6';
+  const analysisChartTickSoftColor = isAnalysisPresentation ? '#f4f8ff' : '#7b8dab';
+  const analysisChipPrimaryTextClass = isAnalysisPresentation ? 'text-[#f4f8ff]' : 'text-[#14295F]';
+  const analysisChipSecondaryTextClass = isAnalysisPresentation ? 'text-white/80' : 'text-[#5c6e97]';
   const detailInsightBandClass = cn(
     'mt-3 rounded-[1.15rem] px-3.5 py-3',
     isAnalysisPresentation ? 'analysis-signal-band' : 'border border-slate-200 bg-slate-50/85'
@@ -2226,7 +2232,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <p className={cn("text-[11px] font-black tracking-[0.12em] uppercase", isAnalysisPresentation && "text-[var(--text-on-dark-muted)]")}>{signal.title}</p>
+                      <p className={cn("text-[11px] font-black tracking-[0.12em] uppercase", analysisReadableSoftTextClass)}>{signal.title}</p>
                       <p className={cn(
                         "text-lg font-black tracking-tight",
                         isAnalysisPresentation && (signal.key === 'sms'
@@ -2294,7 +2300,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     )}>
                       <p className={cn(
                         "analysis-focus-kpi-summary-label text-[10px] font-black uppercase tracking-[0.2em]",
-                        isAnalysisPresentation ? "text-[#6A7EA7]" : "text-[var(--text-on-dark-muted)]"
+                        analysisReadableSoftTextClass
                       )}>
                         이번 주 포인트
                       </p>
@@ -2397,7 +2403,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         </div>
                         <p className={cn(
                           "mt-3 text-[10px] font-black uppercase tracking-[0.18em]",
-                          isAnalysisPresentation ? "text-[#6A7EA7]" : "text-[var(--text-on-dark-muted)]"
+                          analysisReadableSoftTextClass
                         )}>
                           {label}
                         </p>
@@ -2421,7 +2427,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       <div key={key} className="surface-card surface-card--ghost on-dark rounded-[1.2rem] border border-white/10 px-3.5 py-3 shadow-none">
                         <p className={cn(
                           "text-[10px] font-black uppercase tracking-[0.18em]",
-                          isAnalysisPresentation ? "text-[#6A7EA7]" : "text-[var(--text-on-dark-muted)]"
+                          analysisReadableSoftTextClass
                         )}>
                           {label}
                         </p>
@@ -2575,7 +2581,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className={cn('text-sm leading-6', detailGrowthDescriptionClass)}>주간 누적 학습시간과 전주 대비 변화를 함께 읽습니다.</CardDescription>
                   </div>
                   <div className={cn(detailMetricChipClass, 'flex min-h-[4.6rem] min-w-[5.6rem] flex-col items-center justify-center px-3 py-2.5 text-center')}>
-                    <p className="text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em] text-[#6a7da6]">이번 주 성장</p>
+                    <p className={cn("text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em]", analysisReadableMutedTextClass)}>이번 주 성장</p>
                     <p className={cn('mt-1 text-lg font-black leading-none tracking-tight', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                       {formatSignedPercent(latestWeeklyLearningGrowthPercent)}
                     </p>
@@ -2596,9 +2602,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                          <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} tickMargin={8} />
-                          <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} width={38} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                          <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 10, fontWeight: 800, fill: '#7b8dab' }} tickLine={false} axisLine={false} width={34} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
+                          <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} />
+                          <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={38} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                          <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickSoftColor }} tickLine={false} axisLine={false} width={34} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
@@ -2643,7 +2649,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className={detailMetricChipClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최근 7일</p>
+                      <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>최근 7일</p>
                       <p className={cn('mt-1 text-lg font-black tracking-tight', latestDailyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                         {formatSignedPercent(latestDailyLearningGrowthPercent)}
                       </p>
@@ -2669,9 +2675,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} tickMargin={8} interval={0} />
-                          <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} width={38} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                          <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 10, fontWeight: 800, fill: '#7b8dab' }} tickLine={false} axisLine={false} width={36} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} interval={0} />
+                          <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={38} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                          <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickSoftColor }} tickLine={false} axisLine={false} width={36} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
@@ -2717,9 +2723,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className={cn('mt-1 text-sm font-semibold leading-6', detailGrowthDescriptionClass)}>시작 시간 흔들림을 점수로 바꿔 리듬 안정성을 봅니다.</CardDescription>
                   </div>
                   <div className={detailMetricChipClass}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">평균 / 최신</p>
+                    <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>평균 / 최신</p>
                     <p className="mt-1 text-lg font-black tracking-tight text-[#0f8f65]">{averageRhythmScore}점</p>
-                    <p className="text-[11px] font-semibold text-[#5c6e97]">최신 {latestRhythmScore}점</p>
+                    <p className={cn("text-[11px] font-semibold", analysisChipSecondaryTextClass)}>최신 {latestRhythmScore}점</p>
                   </div>
                 </div>
               </CardHeader>
@@ -2734,8 +2740,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                      <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} axisLine={false} tickLine={false} tickMargin={8} interval={1} />
-                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} axisLine={false} tickLine={false} width={30} domain={[0, 100]} />
+                      <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} axisLine={false} tickLine={false} tickMargin={8} interval={1} />
+                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} axisLine={false} tickLine={false} width={30} domain={[0, 100]} />
                       <Tooltip
                         content={(
                           <AnalysisTrendTooltip
@@ -2777,8 +2783,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className={cn('mt-1 text-sm font-semibold leading-6', detailGrowthDescriptionClass)}>시작과 종료 시각으로 생활 리듬을 비교합니다.</CardDescription>
                   </div>
                   <div className={detailMetricChipClass}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">마지막 기록</p>
-                    <p className="mt-1 text-sm font-black tracking-tight text-[#14295F]">{latestStartEndSnapshot.start} 시작</p>
+                    <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>마지막 기록</p>
+                    <p className={cn("mt-1 text-sm font-black tracking-tight", analysisChipPrimaryTextClass)}>{latestStartEndSnapshot.start} 시작</p>
                     <p className="text-sm font-black tracking-tight text-[#7d4ed8]">{latestStartEndSnapshot.end} 종료</p>
                   </div>
                 </div>
@@ -2788,8 +2794,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <ResponsiveContainer width="100%" height={248}>
                     <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                      <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
-                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} width={42} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
+                      <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
+                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={42} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
                       <Tooltip
                         content={(
                           <AnalysisTrendTooltip
@@ -2833,7 +2839,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <CardDescription className={cn('mt-1 text-sm font-semibold leading-6', detailGrowthDescriptionClass)}>외출이 집중 흐름을 얼마나 끊는지 확인합니다.</CardDescription>
                   </div>
                   <div className={detailMetricChipClass}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">평균 외출</p>
+                    <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>평균 외출</p>
                     <p className="mt-1 text-lg font-black tracking-tight text-[#dc4b74]">{averageAwayMinutes}분</p>
                   </div>
                 </div>
@@ -2850,8 +2856,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                      <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
-                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} width={34} tickFormatter={(value) => `${value}m`} />
+                      <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
+                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={34} tickFormatter={(value) => `${value}m`} />
                       <Tooltip
                         content={(
                           <AnalysisTrendTooltip
@@ -2929,7 +2935,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('text-[12px] leading-5', detailGrowthDescriptionClass)}>주간 누적 학습시간과 전주 대비 변화를 함께 읽습니다.</CardDescription>
                         </div>
                         <div className={cn(detailMetricChipClass, 'flex min-h-[4.4rem] min-w-[5.2rem] flex-col items-center justify-center px-3 py-2.5 text-center')}>
-                          <p className="text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em] text-[#6a7da6]">이번 주 성장</p>
+                          <p className={cn("text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em]", analysisReadableMutedTextClass)}>이번 주 성장</p>
                           <p className={cn('mt-1 text-base font-black leading-none tracking-tight', latestWeeklyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                             {formatSignedPercent(latestWeeklyLearningGrowthPercent)}
                           </p>
@@ -2951,9 +2957,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                                 </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                              <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} tickMargin={8} />
-                              <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} width={34} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                              <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: '#7b8dab' }} tickLine={false} axisLine={false} width={30} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
+                              <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} />
+                              <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={34} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                              <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: analysisChartTickSoftColor }} tickLine={false} axisLine={false} width={30} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
                               <Tooltip
                                 content={(
                                   <AnalysisTrendTooltip
@@ -2997,7 +3003,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('text-[12px] leading-5', detailGrowthDescriptionClass)}>선택한 7일 구간의 평균 공부시간과 변화 폭을 같이 봅니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최근 7일</p>
+                          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>최근 7일</p>
                           <p className={cn('mt-1 text-base font-black tracking-tight', latestDailyLearningGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
                             {formatSignedPercent(latestDailyLearningGrowthPercent)}
                           </p>
@@ -3028,9 +3034,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                                 </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                              <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
-                              <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} width={34} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                              <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: '#7b8dab' }} tickLine={false} axisLine={false} width={30} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                              <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
+                              <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={34} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                              <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: analysisChartTickSoftColor }} tickLine={false} axisLine={false} width={30} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
                               <Tooltip
                                 content={(
                                   <AnalysisTrendTooltip
@@ -3074,9 +3080,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('mt-1 text-[12px] font-semibold leading-5', detailGrowthDescriptionClass)}>시작 시간 흔들림을 점수로 바꿔 리듬 안정성을 봅니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">평균 / 최신</p>
+                          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>평균 / 최신</p>
                           <p className="mt-1 text-base font-black tracking-tight text-[#0f8f65]">{averageRhythmScore}점</p>
-                          <p className="text-[11px] font-semibold text-[#5c6e97]">최신 {latestRhythmScore}점</p>
+                          <p className={cn("text-[11px] font-semibold", analysisChipSecondaryTextClass)}>최신 {latestRhythmScore}점</p>
                         </div>
                       </div>
                     </div>
@@ -3092,8 +3098,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} axisLine={false} tickLine={false} tickMargin={8} interval={1} />
-                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} axisLine={false} tickLine={false} width={26} domain={[0, 100]} />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} axisLine={false} tickLine={false} tickMargin={8} interval={1} />
+                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} axisLine={false} tickLine={false} width={26} domain={[0, 100]} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
@@ -3136,8 +3142,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('mt-1 text-[12px] font-semibold leading-5', detailGrowthDescriptionClass)}>시작과 종료 시각으로 생활 리듬을 비교합니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">마지막 기록</p>
-                          <p className="mt-1 text-[11px] font-black tracking-tight text-[#14295F]">{latestStartEndSnapshot.start} 시작</p>
+                          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>마지막 기록</p>
+                          <p className={cn("mt-1 text-[11px] font-black tracking-tight", analysisChipPrimaryTextClass)}>{latestStartEndSnapshot.start} 시작</p>
                           <p className="text-[11px] font-black tracking-tight text-[#7d4ed8]">{latestStartEndSnapshot.end} 종료</p>
                         </div>
                       </div>
@@ -3148,8 +3154,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       <ResponsiveContainer width="100%" height={220}>
                         <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 8, right: 6, left: -12, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
-                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} width={40} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
+                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={40} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
@@ -3194,7 +3200,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <CardDescription className={cn('mt-1 text-[12px] font-semibold leading-5', detailGrowthDescriptionClass)}>외출이 집중 흐름을 얼마나 끊는지 확인합니다.</CardDescription>
                         </div>
                         <div className={detailMetricChipClass}>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">평균 외출</p>
+                          <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", analysisReadableMutedTextClass)}>평균 외출</p>
                           <p className="mt-1 text-base font-black tracking-tight text-[#dc4b74]">{averageAwayMinutes}분</p>
                         </div>
                       </div>
@@ -3212,8 +3218,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
-                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
-                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} tickLine={false} axisLine={false} width={28} tickFormatter={(value) => `${value}m`} />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
+                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={28} tickFormatter={(value) => `${value}m`} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
