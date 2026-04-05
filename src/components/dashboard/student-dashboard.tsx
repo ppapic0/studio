@@ -1146,6 +1146,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [selectedRankRange, setSelectedRankRange] = useState<RankRange>('daily');
   const [rankSnapshot, setRankSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [rankSnapshotLoading, setRankSnapshotLoading] = useState(false);
+  const hasHydratedRankSnapshotRef = useRef(false);
   const studyBoxClaimKeyRef = useRef<string | null>(null);
   const homeBoxTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const homeLiveClaimKeyRef = useRef<string | null>(null);
@@ -1308,6 +1309,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         .filter((entry): entry is readonly [string, AttendanceCurrent] => Boolean(entry[1]))
     );
   }, [attendanceCurrent]);
+  const rankAttendanceRefreshKey = useMemo(
+    () =>
+      Array.from(attendanceCurrentByStudent.entries())
+        .map(([studentId, entry]) => `${studentId}:${entry.status || 'unknown'}:${toTimestampMillis(entry.lastCheckInAt)}`)
+        .sort()
+        .join('|'),
+    [attendanceCurrentByStudent]
+  );
 
   useEffect(() => {
     if (!isActive || typeof window === 'undefined') return;
@@ -1331,12 +1340,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (!user || !activeMembership || !isActive) {
       setRankSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
+      setRankSnapshotLoading(false);
+      hasHydratedRankSnapshotRef.current = false;
       return;
     }
 
     let cancelled = false;
     const run = async () => {
-      setRankSnapshotLoading(true);
+      const shouldShowLoading = !hasHydratedRankSnapshotRef.current;
+      if (shouldShowLoading) {
+        setRankSnapshotLoading(true);
+      }
+
       try {
         const nextSnapshot = await fetchStudentRankingSnapshot({
           centerId: activeMembership.id,
@@ -1344,13 +1359,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         });
         if (!cancelled) {
           setRankSnapshot(nextSnapshot);
+          hasHydratedRankSnapshotRef.current = true;
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && !hasHydratedRankSnapshotRef.current) {
           setRankSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
         }
       } finally {
-        if (!cancelled) setRankSnapshotLoading(false);
+        if (!cancelled && shouldShowLoading) setRankSnapshotLoading(false);
       }
     };
 
@@ -1358,7 +1374,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [activeMembership?.id, isActive, user]);
+  }, [activeMembership?.id, isActive, rankAttendanceRefreshKey, selectedRankRange, user]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;

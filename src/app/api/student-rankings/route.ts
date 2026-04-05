@@ -24,6 +24,67 @@ const EMPTY_SNAPSHOT: StudentRankingSnapshot = {
   monthly: [],
 };
 
+const ACTIVE_LIVE_RANK_STATUSES = new Set(['studying', 'away', 'break']);
+
+function getAttendanceStatusRank(value: unknown) {
+  if (value === 'studying') return 0;
+  if (value === 'away' || value === 'break') return 1;
+  if (value === 'absent') return 3;
+  return 2;
+}
+
+function toTimestampMillis(value: unknown) {
+  if (value && typeof value === 'object') {
+    if ('toMillis' in value && typeof value.toMillis === 'function') {
+      return Number(value.toMillis());
+    }
+    if ('toDate' in value && typeof value.toDate === 'function') {
+      return value.toDate().getTime();
+    }
+  }
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+
+function toKstDateKeyFromTimestamp(value: unknown) {
+  if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+    return format(toKstDate(value.toDate()), 'yyyy-MM-dd');
+  }
+  if (value instanceof Date) {
+    return format(toKstDate(value), 'yyyy-MM-dd');
+  }
+  return '';
+}
+
+function pickPreferredAttendanceRecord(records: Record<string, unknown>[]) {
+  if (!records.length) return null;
+
+  return [...records].sort((left, right) => {
+    const statusRankDiff = getAttendanceStatusRank(left.status) - getAttendanceStatusRank(right.status);
+    if (statusRankDiff !== 0) return statusRankDiff;
+
+    const checkInPresenceDiff = Number(Boolean(right.lastCheckInAt)) - Number(Boolean(left.lastCheckInAt));
+    if (checkInPresenceDiff !== 0) return checkInPresenceDiff;
+
+    return toTimestampMillis(right.updatedAt) - toTimestampMillis(left.updatedAt);
+  })[0] ?? null;
+}
+
+function getLiveAttendanceMinutes(attendance: Record<string, unknown>, nowMs: number) {
+  const status = typeof attendance.status === 'string' ? attendance.status : '';
+  if (!ACTIVE_LIVE_RANK_STATUSES.has(status)) return 0;
+
+  const startedAtMs = toTimestampMillis(attendance.lastCheckInAt);
+  if (startedAtMs <= 0) return 0;
+
+  return Math.max(1, Math.ceil((nowMs - startedAtMs) / 60000));
+}
+
+function addRankMinutes(target: Map<string, number>, studentId: string, minutes: number) {
+  if (minutes <= 0) return;
+  target.set(studentId, (target.get(studentId) || 0) + minutes);
+}
+
 function normalizeMembershipStatus(value: unknown) {
   if (typeof value !== 'string') return 'active';
   const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -130,15 +191,19 @@ export async function GET(request: NextRequest) {
       .orderBy('value', 'desc')
       .limit(400)
       .get();
+    const attendanceSnapPromise = adminDb
+      .collection(`centers/${centerId}/attendanceCurrent`)
+      .get();
     const weeklySnapPromises = weekDateKeys.map((dateKey) =>
       adminDb.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()
     );
 
-    const [membersSnap, studentsSnap, dailySnap, monthlySnap, ...weeklySnaps] = await Promise.all([
+    const [membersSnap, studentsSnap, dailySnap, monthlySnap, attendanceSnap, ...weeklySnaps] = await Promise.all([
       membersSnapPromise,
       studentsSnapPromise,
       dailySnapPromise,
       monthlySnapPromise,
+      attendanceSnapPromise,
       ...weeklySnapPromises,
     ]);
 
@@ -206,36 +271,73 @@ export async function GET(request: NextRequest) {
       schoolNameSnapshot: null,
     };
 
-    const dailyEntries = applyCompetitionRanks(
-      dailySnap.docs
-        .map((docSnap) => {
-          const data = docSnap.data() as Record<string, unknown>;
-          const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
-          const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
-          if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return null;
-          const profile = getProfile(studentId);
-          return {
-            id: studentId,
-            studentId,
-            displayNameSnapshot: profile.displayNameSnapshot,
-            classNameSnapshot: profile.classNameSnapshot,
-            schoolNameSnapshot: profile.schoolNameSnapshot,
-            value,
-          };
-        })
-        .filter((entry): entry is Omit<RankEntry, 'rank'> => Boolean(entry))
-    );
-
     const weeklyTotals = new Map<string, number>();
+    const dailyTotals = new Map<string, number>();
+
+    dailySnap.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
+      const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
+      if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+      addRankMinutes(dailyTotals, studentId, value);
+    });
+
     weeklySnaps.forEach((snapshot) => {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
         const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
         const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
         if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
-        weeklyTotals.set(studentId, (weeklyTotals.get(studentId) || 0) + value);
+        addRankMinutes(weeklyTotals, studentId, value);
       });
     });
+
+    const nowMs = Date.now();
+    const weekDateKeySet = new Set(weekDateKeys);
+    const attendanceBuckets = new Map<string, Record<string, unknown>[]>();
+
+    attendanceSnap.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      const studentId = typeof data.studentId === 'string' ? data.studentId : '';
+      if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId)) return;
+
+      const current = attendanceBuckets.get(studentId) || [];
+      current.push(data);
+      attendanceBuckets.set(studentId, current);
+    });
+
+    attendanceBuckets.forEach((records, studentId) => {
+      const selectedRecord = pickPreferredAttendanceRecord(records);
+      if (!selectedRecord) return;
+
+      const liveMinutes = getLiveAttendanceMinutes(selectedRecord, nowMs);
+      if (liveMinutes <= 0) return;
+
+      const liveDateKey = toKstDateKeyFromTimestamp(selectedRecord.lastCheckInAt);
+      if (!liveDateKey) return;
+
+      if (liveDateKey === todayKey) {
+        addRankMinutes(dailyTotals, studentId, liveMinutes);
+      }
+
+      if (weekDateKeySet.has(liveDateKey)) {
+        addRankMinutes(weeklyTotals, studentId, liveMinutes);
+      }
+    });
+
+    const dailyEntries = applyCompetitionRanks(
+      Array.from(dailyTotals.entries()).map(([studentId, value]) => {
+        const profile = getProfile(studentId);
+        return {
+          id: studentId,
+          studentId,
+          displayNameSnapshot: profile.displayNameSnapshot,
+          classNameSnapshot: profile.classNameSnapshot,
+          schoolNameSnapshot: profile.schoolNameSnapshot,
+          value,
+        };
+      })
+    );
 
     const weeklyEntries = applyCompetitionRanks(
       Array.from(weeklyTotals.entries()).map(([studentId, value]) => {
