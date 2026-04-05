@@ -259,9 +259,9 @@ export type MarketingContent = {
 const experienceShowcaseSections: ExperienceShowcaseSection[] = [
   {
     mode: '학생 모드',
-    title: '학생은 오늘 해야 할 일과 공부 흐름을 한 화면에서 확인합니다',
+    title: '오늘의 학습계획부터\n학습 실행까지의 흐름을\n러닝시스템으로 관리합니다.',
     summary:
-      '오늘의 학습계획부터 학습실행까지의 흐름을 트랙 러닝시스템으로 관리합니다.',
+      '매일, 매주, 매월 쌓인 데이터를 한눈에 확인 가능합니다.',
     highlights: ['오늘 할 일', '루틴 확인', '공부시간', '피드백 반영'],
     primaryScreen: {
       title: '학생 모드 대표화면',

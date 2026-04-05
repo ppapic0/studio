@@ -164,6 +164,7 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
   const style = toneStyleMap[tone];
   const showStudentScreenSet = section.mode === '학생 모드' && section.secondaryScreens.length >= 2;
   const hideStudentScreenSet = section.mode === '학생 모드' && showStudentScreenSet;
+  const showStudentSummaryCard = hideStudentScreenSet;
 
   return (
     <article className={`relative overflow-hidden rounded-[2.35rem] border p-5 shadow-[0_24px_58px_rgba(20,41,95,0.10)] sm:p-7 lg:p-8 ${style.sectionCard}`}>
@@ -178,43 +179,71 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
         }`}
       >
         <div className={`order-2 flex flex-col lg:order-1 ${hideStudentScreenSet ? 'mx-auto w-full max-w-3xl' : ''}`}>
-          <div className="flex items-center gap-3">
-            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${style.iconWrap}`}>
-              <ModeIcon mode={section.mode} />
+          <div
+            className={
+              showStudentSummaryCard
+                ? 'rounded-[2rem] border border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EFF4FF_100%)] px-5 py-5 shadow-[0_20px_44px_rgba(20,41,95,0.06)] sm:px-6 sm:py-6'
+                : ''
+            }
+          >
+            <div className="flex items-center gap-3">
+              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${style.iconWrap}`}>
+                <ModeIcon mode={section.mode} />
+              </div>
+              <p className={`text-[12px] font-black tracking-[0.14em] ${style.label}`}>{section.mode}</p>
             </div>
-            <p className={`text-[12px] font-black tracking-[0.14em] ${style.label}`}>{section.mode}</p>
-          </div>
 
-          <h2 className="mt-5 break-keep text-[clamp(1.7rem,3.6vw,2.4rem)] font-black leading-[1.14] text-[#14295F]">
-            {section.title}
-          </h2>
-          <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.9] text-[#40556F]">{section.summary}</p>
+            <h2
+              className={`mt-5 break-keep text-[#14295F] ${
+                showStudentSummaryCard
+                  ? 'font-aggro-display text-[clamp(1.85rem,4.2vw,2.7rem)] leading-[1.08] tracking-[-0.04em]'
+                  : 'text-[clamp(1.7rem,3.6vw,2.4rem)] font-black leading-[1.14]'
+              }`}
+            >
+              {section.title.split('\n').map((line, index) => (
+                <span key={`${section.mode}-title-${index}`} className="block">
+                  {line}
+                </span>
+              ))}
+            </h2>
+            <p
+              className={`mt-4 break-keep ${
+                showStudentSummaryCard
+                  ? 'max-w-[26rem] text-[15px] font-semibold leading-[1.72] text-[#506680]'
+                  : 'text-[15px] font-semibold leading-[1.9] text-[#40556F]'
+              }`}
+            >
+              {section.summary}
+            </p>
 
-          <div className="mt-5 flex flex-wrap gap-2.5">
-            {section.highlights.map((item) => (
-              <span key={`${section.mode}-${item}`} className={`rounded-full border px-3 py-1.5 text-[11px] font-black ${style.chip}`}>
-                {item}
-              </span>
-            ))}
-          </div>
-
-          <div className={`mt-6 rounded-[1.5rem] border px-5 py-5 ${style.insight}`}>
-            <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">WHAT THIS SCREEN HELPS YOU READ</p>
-            <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">{section.insightTitle}</p>
-            <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.8] text-[#4C627B]">{section.insightDescription}</p>
-          </div>
-
-          {section.mode !== '학부모 모드' ? (
-            <div className="mt-6">
-              <Link
-                href={section.ctaHref}
-                className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-black transition-colors ${style.textButton}`}
-              >
-                {section.ctaLabel}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              {section.highlights.map((item) => (
+                <span key={`${section.mode}-${item}`} className={`rounded-full border px-3 py-1.5 text-[11px] font-black ${style.chip}`}>
+                  {item}
+                </span>
+              ))}
             </div>
-          ) : null}
+
+            {!showStudentSummaryCard ? (
+              <div className={`mt-6 rounded-[1.5rem] border px-5 py-5 ${style.insight}`}>
+                <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">WHAT THIS SCREEN HELPS YOU READ</p>
+                <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">{section.insightTitle}</p>
+                <p className="mt-2 break-keep text-[13.5px] font-semibold leading-[1.8] text-[#4C627B]">{section.insightDescription}</p>
+              </div>
+            ) : null}
+
+            {section.mode !== '학부모 모드' && !showStudentSummaryCard ? (
+              <div className="mt-6">
+                <Link
+                  href={section.ctaHref}
+                  className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-black transition-colors ${style.textButton}`}
+                >
+                  {section.ctaLabel}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {!hideStudentScreenSet ? <div className="order-1 lg:order-2">
