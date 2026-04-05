@@ -9,7 +9,11 @@ type MarketingHeaderProps = {
 };
 
 export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
-  const mobileBrandLines = ['트랙 스터디센터'];
+  const mobileBrandLines = brand.name
+    .split('/')
+    .map((line, index, lines) => `${line.trim()}${index < lines.length - 1 ? ' /' : ''}`)
+    .filter(Boolean);
+  const englishBrandLabel = 'MANAGED STUDY CENTER / KOREAN ACADEMY';
 
   return (
     <header
@@ -38,11 +42,11 @@ export function MarketingHeader({ brand, nav }: MarketingHeaderProps) {
                 </span>
               ))}
             </div>
-            <span className="hidden truncate text-[0.78rem] font-bold leading-[1.18] text-white sm:block sm:text-[1.02rem] lg:text-[1.05rem]">
+            <span className="hidden max-w-[18rem] break-keep text-[0.72rem] font-bold leading-[1.18] text-white sm:block sm:text-[0.86rem] lg:max-w-[22rem] lg:text-[0.92rem]">
               {brand.name}
             </span>
-            <span className="hidden text-[9.5px] font-black tracking-[0.18em] text-white/50 md:block">
-              MANAGED STUDY CENTER
+            <span className="hidden text-[8px] font-black tracking-[0.12em] text-white/50 md:block lg:text-[8.5px]">
+              {englishBrandLabel}
             </span>
           </div>
         </Link>

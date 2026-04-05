@@ -329,7 +329,7 @@ const webAppShowcaseScreens: WebAppShowcaseScreen[] = experienceShowcaseSections
 
 export const marketingContent: MarketingContent = {
   brand: {
-    name: '트랙 스터디센터',
+    name: '트랙 관리형 스터디센터/ 트랙 국어학원',
     slogan: '학생의 성장 궤적을 함께 그립니다',
     heroTitle: '공부는 방향이 중요합니다.\n성장의 길,\n트랙에서\n시작됩니다.',
     heroDescription:
