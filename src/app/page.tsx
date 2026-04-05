@@ -3,7 +3,6 @@ import { headers } from 'next/headers';
 import { ConsultSection } from '@/components/marketing/consult-section';
 import { CenterIntroSection } from '@/components/marketing/center-intro-section';
 import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
-import { DesktopStudySystemSection } from '@/components/marketing/desktop-study-system-section';
 import { FeedbackManagementSection } from '@/components/marketing/feedback-management-section';
 import { FocusFirewallSection } from '@/components/marketing/focus-firewall-section';
 import { HeroSection } from '@/components/marketing/hero-section';
@@ -95,9 +94,6 @@ export default async function HomePage() {
               </ScrollReveal>
             </div>
           </section>
-          <ScrollReveal>
-            <DesktopStudySystemSection content={marketingContent.mobileStudySystem} />
-          </ScrollReveal>
         </>
       )}
       <ScrollReveal>
