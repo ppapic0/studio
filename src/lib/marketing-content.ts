@@ -349,7 +349,7 @@ export const marketingContent: MarketingContent = {
     secondaryLabel: '오늘 하루 보지 않기',
   },
   nav: [
-    { label: '센터 소개', href: '/center' },
+    { label: '홈', href: '/center' },
     { label: '트랙 러닝시스템', href: '/experience' },
     { label: '합격 실적', href: '/results' },
     { label: '국어 수업', href: '/class' },
