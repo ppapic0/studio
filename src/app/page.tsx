@@ -2,8 +2,8 @@ import { headers } from 'next/headers';
 
 import { ConsultSection } from '@/components/marketing/consult-section';
 import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
+import { DesktopStudySystemSection } from '@/components/marketing/desktop-study-system-section';
 import { FeedbackManagementSection } from '@/components/marketing/feedback-management-section';
-import { HeroGallerySection } from '@/components/marketing/hero-gallery-section';
 import { HeroSection } from '@/components/marketing/hero-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
@@ -12,7 +12,6 @@ import { MobileStudySystemSection } from '@/components/marketing/mobile-study-sy
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
 import { PointRewardSection } from '@/components/marketing/point-reward-section';
-import { ResultsSection } from '@/components/marketing/results-section';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StickyConsultCTA } from '@/components/marketing/sticky-consult-cta';
 import { marketingContent } from '@/lib/marketing-content';
@@ -56,14 +55,9 @@ export default async function HomePage() {
       {isMobile ? (
         <MobileStudySystemSection content={marketingContent.mobileStudySystem} />
       ) : (
-        <>
-          <ScrollReveal>
-            <HeroGallerySection />
-          </ScrollReveal>
-          <ScrollReveal>
-            <ResultsSection outcomes={marketingContent.outcomes} successStory={marketingContent.successStory} />
-          </ScrollReveal>
-        </>
+        <ScrollReveal>
+          <DesktopStudySystemSection content={marketingContent.mobileStudySystem} />
+        </ScrollReveal>
       )}
       <ScrollReveal>
         <ConsultSection consult={marketingContent.consult} trustMetrics={marketingContent.appSystem.trustMetrics} />

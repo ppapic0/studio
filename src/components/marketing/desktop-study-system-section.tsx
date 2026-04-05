@@ -1,0 +1,247 @@
+import Link from 'next/link';
+import { ArrowRight, ChartColumnBig, ClipboardList, ShieldCheck, Sparkles, Target } from 'lucide-react';
+
+import type { MarketingContent } from '@/lib/marketing-content';
+
+import { SectionHeading } from './section-heading';
+
+type DesktopStudySystemSectionProps = {
+  content: MarketingContent['mobileStudySystem'];
+};
+
+const sectionIcons = [Target, ChartColumnBig, ShieldCheck, Sparkles] as const;
+
+const toneStyles = {
+  navy: {
+    shell: 'border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)]',
+    panel: 'border-[#D9E7FF] bg-[linear-gradient(180deg,#F9FBFF_0%,#EEF5FF_100%)]',
+    badge: 'bg-[#EEF3FF] text-[#14295F]',
+    icon: 'bg-[#14295F] text-white',
+    body: 'text-[#425A75]',
+    glow: 'bg-[#8CB7FF]/18',
+  },
+  slate: {
+    shell: 'border-[#DCE5F6] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)]',
+    panel: 'border-[#D9E7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F3F7FF_100%)]',
+    badge: 'bg-[#EEF3FF] text-[#14295F]',
+    icon: 'bg-[#EEF3FF] text-[#14295F]',
+    body: 'text-[#425A75]',
+    glow: 'bg-[#8CB7FF]/14',
+  },
+  orange: {
+    shell: 'border-[#FFD9BF] bg-[linear-gradient(180deg,#FFF9F2_0%,#FFFFFF_100%)]',
+    panel: 'border-[#FFD8BF] bg-[linear-gradient(180deg,#FFF8F0_0%,#FFF3E8_100%)]',
+    badge: 'bg-[#FFF3E8] text-[#B55200]',
+    icon: 'bg-[#FF7A16] text-white',
+    body: 'text-[#5A4A3F]',
+    glow: 'bg-[#FFB878]/20',
+  },
+  violet: {
+    shell: 'border-[#E3DBFF] bg-[linear-gradient(180deg,#FBFAFF_0%,#FFFFFF_100%)]',
+    panel: 'border-[#E5DCFF] bg-[linear-gradient(180deg,#FCFBFF_0%,#F2EEFF_100%)]',
+    badge: 'bg-[#F2EEFF] text-[#4B3B97]',
+    icon: 'bg-[#14295F] text-white',
+    body: 'text-[#564D7C]',
+    glow: 'bg-[#BBAEFF]/18',
+  },
+} as const;
+
+const previewTitles = [
+  '학습 방향 설정 흐름',
+  '실시간 체크 · 피드백 흐름',
+  '허용사이트 설정 화면 예정',
+  '포인트 · 상벌점 화면 예정',
+] as const;
+
+function DesktopStudySystemPreview({
+  section,
+  index,
+}: {
+  section: MarketingContent['mobileStudySystem']['sections'][number];
+  index: number;
+}) {
+  const tone = toneStyles[section.tone];
+
+  if (index === 0) {
+    return (
+      <div className={`relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)] ${tone.panel}`}>
+        <div className={`pointer-events-none absolute -right-8 top-4 h-24 w-24 rounded-full blur-3xl ${tone.glow}`} />
+        <div className="relative rounded-[1.5rem] border border-white/70 bg-white/88 p-6 shadow-[0_14px_32px_rgba(20,41,95,0.08)]">
+          <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">TODAY FLOW</p>
+          <p className="font-aggro-display mt-4 break-keep text-[1.35rem] font-black leading-[1.2] tracking-[-0.03em] text-[#14295F]">
+            {section.body}
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {['계획 작성', '실행 체크', '흐름 확인'].map((item) => (
+              <div key={item} className="rounded-[1rem] border border-[#14295F]/8 bg-[#F8FBFF] px-3 py-3 text-center">
+                <p className="font-aggro-display text-[0.92rem] font-black tracking-[-0.03em] text-[#14295F]">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (index === 1) {
+    const flowCards = [
+      { title: '학습현황 확인', body: section.body },
+      { title: '학습의 피드백', body: section.secondaryBody ?? '학생별 취약 구간과 피드백 연결 흐름을 빠르게 읽습니다.' },
+      { title: '학부모 확인', body: '학생과 학부모가 같은 데이터를 각자의 화면에서 실시간으로 확인합니다.' },
+    ];
+
+    return (
+      <div className="grid gap-3">
+        {flowCards.map((card) => (
+          <article key={card.title} className={`rounded-[1.35rem] border px-5 py-4 shadow-[0_14px_30px_rgba(20,41,95,0.06)] ${tone.panel}`}>
+            <p className="text-[10px] font-black tracking-[0.16em] text-[#FF7A16]">SYSTEM FLOW</p>
+            <p className="font-aggro-display mt-3 break-keep text-[1rem] font-black leading-[1.32] tracking-[-0.03em] text-[#14295F]">
+              {card.title}
+            </p>
+            <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.7] text-[#53687F]">{card.body}</p>
+          </article>
+        ))}
+      </div>
+    );
+  }
+
+  if (index === 2) {
+    return (
+      <div className={`relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)] ${tone.panel}`}>
+        <div className={`pointer-events-none absolute -left-8 bottom-0 h-24 w-24 rounded-full blur-3xl ${tone.glow}`} />
+        <div className="relative">
+          <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">FIREWALL CONTROL</p>
+          <p className="font-aggro-display mt-4 break-keep text-[1.25rem] font-black leading-[1.24] tracking-[-0.03em] text-[#14295F]">
+            {previewTitles[index]}
+          </p>
+          <div className="mt-5 space-y-3">
+            {section.detailPoints?.map((point, pointIndex) => (
+              <div key={point} className="flex items-start gap-3 rounded-[1.1rem] border border-[#14295F]/8 bg-white/88 px-4 py-3">
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#14295F] text-[10px] font-black text-white">
+                  {pointIndex + 1}
+                </span>
+                <p className="break-keep text-[13px] font-semibold leading-[1.68] text-[#53687F]">{point}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative overflow-hidden rounded-[1.9rem] border p-5 shadow-[0_20px_44px_rgba(20,41,95,0.08)] ${tone.panel}`}>
+      <div className={`pointer-events-none absolute -right-8 top-2 h-24 w-24 rounded-full blur-3xl ${tone.glow}`} />
+      <div className="relative">
+        <div className="flex flex-wrap gap-2">
+          {['포인트', '상벌점', '동기 유지'].map((item) => (
+            <span
+              key={item}
+              className="inline-flex rounded-full border border-[#6050A8]/10 bg-white/88 px-3 py-1.5 text-[11px] font-black text-[#4B3B97]"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-[1.5rem] border border-white/70 bg-white/88 px-6 py-8 text-center shadow-[0_14px_32px_rgba(20,41,95,0.08)]">
+          <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">REAL CAPTURE READY</p>
+          <p className="font-aggro-display mt-4 break-keep text-[1.25rem] font-black leading-[1.24] tracking-[-0.03em] text-[#14295F]">
+            {section.alt ?? previewTitles[index]}
+          </p>
+          <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.72] text-[#53687F]">
+            포인트와 상벌점 운영 흐름이 실제 앱 화면으로 반영될 자리를 미리 구성했습니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DesktopStudySystemSection({ content }: DesktopStudySystemSectionProps) {
+  return (
+    <section
+      className="hidden py-14 sm:block sm:py-16 lg:py-20"
+      style={{ background: 'linear-gradient(180deg, #F7F9FD 0%, #FFFFFF 100%)' }}
+    >
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl text-center [&_.eyebrow-badge]:mx-auto">
+          <SectionHeading
+            eyebrow={content.intro.eyebrow}
+            title={content.intro.title}
+            description={content.intro.description}
+          />
+        </div>
+
+        <div className="mt-10 space-y-5 lg:space-y-6">
+          {content.sections.map((section, index) => {
+            const Icon = sectionIcons[index] ?? Sparkles;
+            const tone = toneStyles[section.tone];
+            const reverse = index % 2 === 1;
+
+            return (
+              <article
+                key={section.title}
+                className={`relative overflow-hidden rounded-[2.25rem] border p-6 shadow-[0_22px_52px_rgba(20,41,95,0.08)] sm:p-7 lg:p-8 ${tone.shell}`}
+              >
+                <div className={`pointer-events-none absolute ${reverse ? 'left-[-4%] top-[20%]' : 'right-[-4%] top-[14%]'} h-40 w-40 rounded-full blur-[110px] ${tone.glow}`} />
+                <div className={`relative grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-8 ${reverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`}>
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone.icon}`}>
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black tracking-[0.18em] ${tone.badge}`}>
+                        SECTION {String(index + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    <h3 className="font-aggro-display mt-5 break-keep text-[clamp(1.6rem,2.7vw,2.3rem)] font-black leading-[1.1] tracking-[-0.03em] text-[#14295F]">
+                      {section.title}
+                    </h3>
+                    <p className={`mt-4 break-keep text-[15px] font-semibold leading-[1.84] ${tone.body}`}>
+                      {section.body}
+                    </p>
+                    {section.secondaryBody ? (
+                      <p className={`mt-3 break-keep text-[14px] font-semibold leading-[1.8] ${tone.body}`}>
+                        {section.secondaryBody}
+                      </p>
+                    ) : null}
+
+                    {section.detailPoints?.length ? (
+                      <div className="mt-5 flex flex-wrap gap-2.5">
+                        {section.detailPoints.map((point) => (
+                          <span
+                            key={point}
+                            className="inline-flex rounded-full border border-[#14295F]/10 bg-white/88 px-3 py-1.5 text-[11px] font-black text-[#14295F]"
+                          >
+                            {point}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {section.href ? (
+                      <div className="mt-6">
+                        <Link
+                          href={section.href}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#14295F]/12 bg-white px-5 py-2.5 text-[13px] font-black text-[#14295F] transition-colors hover:border-[#14295F]/22 hover:bg-[#F7FAFF]"
+                        >
+                          자세히 보기
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <DesktopStudySystemPreview section={section} index={index} />
+                </div>
+              </article>
+            );
+          })}
+
+        </div>
+      </div>
+    </section>
+  );
+}
