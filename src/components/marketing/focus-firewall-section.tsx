@@ -24,7 +24,9 @@ export function FocusFirewallSection({ surface = 'card' }: FocusFirewallSectionP
         <div className="px-6 py-7 sm:px-8 sm:py-8">
           <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">SECTION 01</p>
           <h2 className={cn('font-aggro-display mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>
-            트랙 전용 방화벽으로 몰입환경 조성
+            트랙 전용 방화벽으로
+            <br />
+            몰입환경 조성
           </h2>
           <p className={cn('mt-5 break-keep text-[15px] font-semibold leading-[1.86]', isDark ? 'text-white/[0.82]' : 'text-[#425A75]')}>
             학습 전용 네트워크 기준을 먼저 세워 불필요한 접속은 차단하고, 필요한 사이트만 열어 학생의 집중 흐름을 안정적으로 끌어올립니다.
