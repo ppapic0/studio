@@ -52,7 +52,7 @@ export default async function HomePage() {
           </div>
           <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
             <ScrollReveal>
-              <PointRewardSection />
+              <PointRewardSection titleBreakMode="app" />
             </ScrollReveal>
           </div>
           <MobileStudySystemSection content={marketingContent.mobileStudySystem} />

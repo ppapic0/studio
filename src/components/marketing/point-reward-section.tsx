@@ -19,11 +19,13 @@ const motivationCards = [
 
 type PointRewardSectionProps = {
   surface?: 'card' | 'flat-light' | 'flat-dark';
+  titleBreakMode?: 'default' | 'app';
 };
 
-export function PointRewardSection({ surface = 'card' }: PointRewardSectionProps) {
+export function PointRewardSection({ surface = 'card', titleBreakMode = 'default' }: PointRewardSectionProps) {
   const isCard = surface === 'card';
   const isDark = surface === 'flat-dark';
+  const isAppTitle = titleBreakMode === 'app';
 
   return (
     <section
@@ -61,7 +63,15 @@ export function PointRewardSection({ surface = 'card' }: PointRewardSectionProps
           <h2 className={cn('font-aggro-display mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>
             학생별 포인트와 상벌점 제도로
             <br />
-            학습 동기와 흥미를 끌어올립니다
+            학습 동기와 흥미를
+            {isAppTitle ? (
+              <>
+                <br />
+                끌어올립니다
+              </>
+            ) : (
+              <> 끌어올립니다</>
+            )}
           </h2>
           <p className={cn('mt-5 break-keep text-[15px] font-semibold leading-[1.86]', isDark ? 'text-white/[0.82]' : 'text-[#425A75]')}>
             공부시간, 계획완수 등 구체적인 실행을 포인트로 반영하고, 흥미를 유지할 수 있도록 돕습니다. 학습 동선을 단단하게 만드는 장치까지 트랙이 설계합니다.
