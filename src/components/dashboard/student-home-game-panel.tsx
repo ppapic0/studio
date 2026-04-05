@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   Check,
@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { GrowthProgress } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type RankRange = "daily" | "weekly" | "monthly";
@@ -398,6 +399,99 @@ function RewardModal({
   );
 }
 
+function formatPointHistoryDateLabel(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map((value) => Number(value));
+  if ([year, month, day].every((value) => Number.isFinite(value) && value > 0)) {
+    return `${month}/${day}`;
+  }
+  return dateKey;
+}
+
+function PointHistoryModal({
+  open,
+  onOpenChange,
+  dailyPointStatus,
+  isMobile,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  dailyPointStatus?: GrowthProgress["dailyPointStatus"];
+  isMobile: boolean;
+}) {
+  const sortedDates = useMemo(() => {
+    if (!dailyPointStatus) return [];
+    return Object.entries(dailyPointStatus)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 30);
+  }, [dailyPointStatus]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={cn("max-w-[26rem] overflow-hidden rounded-[2rem] border-[#DCE5F8] bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.18),transparent_26%),linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-0 text-[#17326B] shadow-[0_28px_60px_-30px_rgba(19,50,107,0.24)]", isMobile ? "w-[min(94vw,26rem)]" : "")}>
+        <div className={cn("border-b border-[#E4ECFA] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,250,255,0.96))]", isMobile ? "px-5 py-5" : "px-6 py-6")}>
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-[1.35rem] font-black tracking-tight text-[#17326B]">일자별 포인트 기록</DialogTitle>
+          </DialogHeader>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">최근 30일 동안 하루에 몇 포인트를 얻었는지 한눈에 확인할 수 있어요.</p>
+        </div>
+
+        <div className={cn("max-h-[26rem] space-y-2 overflow-y-auto bg-[#F7FAFF] custom-scrollbar", isMobile ? "px-4 py-4" : "px-5 py-5")}>
+          {sortedDates.length === 0 ? (
+            <div className="rounded-[1.4rem] border border-dashed border-[#D8E4F8] bg-white/85 px-4 py-10 text-center">
+              <div className="text-sm font-black text-[#17326B]">아직 포인트 기록이 없어요.</div>
+              <div className="mt-1 text-[11px] font-semibold text-[#6B7EA8]">공부를 시작하거나 보상을 받으면 여기에 일자별 내역이 쌓입니다.</div>
+            </div>
+          ) : (
+            sortedDates.map(([date, data]) => {
+              const pointAmount = Math.max(0, Number(data?.dailyPointAmount || 0));
+              const studyBoxes = Array.isArray(data?.claimedStudyBoxes) ? data.claimedStudyBoxes.length : 0;
+              const dailyRankRewardAmount = Math.max(0, Number(data?.dailyRankRewardAmount || data?.dailyTopRewardAmount || 0));
+              const dailyRankRewardRank = Math.max(0, Number(data?.dailyRankRewardRank || (dailyRankRewardAmount > 0 ? 1 : 0)));
+              const weeklyRankRewardAmount = Math.max(0, Number(data?.weeklyRankRewardAmount || 0));
+              const weeklyRankRewardRank = Math.max(0, Number(data?.weeklyRankRewardRank || 0));
+              const monthlyRankRewardAmount = Math.max(0, Number(data?.monthlyRankRewardAmount || 0));
+              const monthlyRankRewardRank = Math.max(0, Number(data?.monthlyRankRewardRank || 0));
+
+              return (
+                <div key={date} className="rounded-[1.3rem] border border-[#E1EAF8] bg-white/90 px-4 py-3 shadow-[0_18px_34px_-26px_rgba(19,50,107,0.18)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7EA8]">
+                        {formatPointHistoryDateLabel(date)}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {data?.attendance ? <Badge variant="outline" className="border-none bg-[#4F8CFF] px-2 py-1 text-[9px] font-black text-white">출석</Badge> : null}
+                        {(data?.plan || data?.planTrackCompleted) ? <Badge variant="outline" className="border-none bg-[#11A868] px-2 py-1 text-[9px] font-black text-white">계획</Badge> : null}
+                        {data?.routine ? <Badge variant="outline" className="border-none bg-[#FF9B24] px-2 py-1 text-[9px] font-black text-white">루틴</Badge> : null}
+                        {studyBoxes > 0 ? <Badge variant="outline" className="border-none bg-[#14295F] px-2 py-1 text-[9px] font-black text-white">상자 {studyBoxes}</Badge> : null}
+                        {dailyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-violet-600 px-2 py-1 text-[9px] font-black text-white">일간 {dailyRankRewardRank || 1}위</Badge> : null}
+                        {weeklyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-fuchsia-600 px-2 py-1 text-[9px] font-black text-white">주간 {weeklyRankRewardRank}위</Badge> : null}
+                        {monthlyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-rose-600 px-2 py-1 text-[9px] font-black text-white">월간 {monthlyRankRewardRank}위</Badge> : null}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="dashboard-number text-lg font-black tracking-tight text-[#17326B]">
+                        +{pointAmount.toLocaleString()}P
+                      </div>
+                      <div className="mt-1 text-[10px] font-semibold text-[#6B7EA8]">하루 획득 포인트</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t border-[#E4ECFA] bg-white px-4 py-4">
+          <Button type="button" variant="outline" className="h-11 w-full rounded-[1rem] border-[#D8E4F8] font-black text-[#17326B]" onClick={() => onOpenChange(false)}>
+            닫기
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function StudentHomeGamePanel({
   isMobile,
   dateLabel,
@@ -424,6 +518,7 @@ export function StudentHomeGamePanel({
   todayStudyLabel,
   pointBalance,
   todayPointGain,
+  dailyPointStatus,
   quests,
   questGain,
   pendingQuestIds = [],
@@ -469,6 +564,7 @@ export function StudentHomeGamePanel({
   todayStudyLabel: string;
   pointBalance: number;
   todayPointGain: number;
+  dailyPointStatus?: GrowthProgress["dailyPointStatus"];
   quests: StudentHomeQuest[];
   questGain: { id: string; key: number; amount: number } | null;
   pendingQuestIds?: string[];
@@ -496,6 +592,7 @@ export function StudentHomeGamePanel({
     return { id: `trend-mark-${index}`, label };
   });
   const hasMoreReadyBoxes = totalAvailableBoxes > 1;
+  const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false);
   const rankPreview = selectedHomeRank.preview.slice(0, 3);
   const rankLiveBadge = selectedHomeRank.isLive ? selectedHomeRank.liveBadge || "LIVE" : null;
   const selectedRangeLabel = getRankRangeLabel(selectedRankRange);
@@ -715,14 +812,21 @@ export function StudentHomeGamePanel({
                 </div>
                 <div className="font-aggro-display mt-2 text-xl font-black text-[var(--text-primary)]">{todayStudyLabel}</div>
               </div>
-              <div className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3">
+              <button
+                type="button"
+                onClick={() => setIsPointHistoryOpen(true)}
+                className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3 text-left transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,122,22,0.28)]"
+              >
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                   <Wallet className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
                   포인트
                 </div>
                 <div className="font-aggro-display mt-2 text-xl font-black text-[var(--text-primary)]">{pointBalance.toLocaleString()}P</div>
-                <div className="mt-1 text-[11px] font-black text-[var(--accent-orange)]">오늘 +{todayPointGain}P</div>
-              </div>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <div className="text-[11px] font-black text-[var(--accent-orange)]">오늘 +{todayPointGain}P</div>
+                  <ChevronRight className="h-4 w-4 text-[var(--accent-orange)]" />
+                </div>
+              </button>
             </div>
               <div className="mt-4">
                 <div className="flex items-center justify-between gap-3">
@@ -1058,6 +1162,13 @@ export function StudentHomeGamePanel({
       </section>
 
       </div>
+
+      <PointHistoryModal
+        open={isPointHistoryOpen}
+        onOpenChange={setIsPointHistoryOpen}
+        dailyPointStatus={dailyPointStatus}
+        isMobile={isMobile}
+      />
 
       <RewardModal
         open={isVaultOpen}

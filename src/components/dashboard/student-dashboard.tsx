@@ -2834,6 +2834,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         todayStudyLabel={formatMinutesToKorean(totalMinutesCount)}
         pointBalance={homePointBalance}
         todayPointGain={todayPointAmount}
+        dailyPointStatus={progress?.dailyPointStatus}
         quests={homeQuestList}
         questGain={questGain}
         pendingQuestIds={pendingQuestIds}
