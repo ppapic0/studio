@@ -13,7 +13,7 @@ const motivationCards = [
   },
   {
     title: '학생 동기 유도',
-    description: '학생이 스스로 동기와 흥미를 유지할 수 있도록 앱 안에서 꾸준히 자극을 줍니다.',
+    description: '지속적인 피드백으로 학생 스스로 공부하는 힘을 키워줍니다.',
   },
 ] as const;
 
