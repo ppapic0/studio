@@ -5605,32 +5605,3 @@ select {
   }
 }
 
-/* Mock exam proof image carousel animation */
-.mock-exam-proof-card {
-  opacity: 0;
-  transform: translateX(32px) scale(0.94);
-  animation: mock-exam-proof-cycle var(--proof-cycle-duration, 24s) ease-in-out infinite;
-}
-
-@keyframes mock-exam-proof-cycle {
-  0% {
-    opacity: 0;
-    transform: translateX(32px) scale(0.94);
-  }
-  8% {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-  28% {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-  36% {
-    opacity: 0;
-    transform: translateX(-22px) scale(0.98);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-22px) scale(0.98);
-  }
-}
