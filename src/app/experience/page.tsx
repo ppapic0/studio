@@ -15,43 +15,6 @@ type ExperienceSection = MarketingContent['experienceShowcase']['sections'][numb
 type ExperienceFrame = ExperienceSection['primaryScreen'];
 type ExperienceTone = 'student' | 'parent';
 
-const koreanMockProgram = {
-  eyebrow: 'KOREAN PRACTICE FLOW',
-  title: '이감 · 한수 모의고사까지 같은 흐름 안에서 이어서 점검합니다',
-  description:
-    '앱 안에서 공부시간과 계획 실행 흐름을 확인하는 데서 끝나지 않고, 국어는 이감과 한수 모의고사까지 연결해 실전 감각과 현재 대응 상태를 함께 점검합니다.',
-  chips: ['이감 실전 점검', '한수 실전 점검', '실전 감각 유지', '국어 대응력 확인'],
-  points: [
-    {
-      title: '이감',
-      summary: '실전 수능 감도에 맞춘 지문 흐름 안에서 현재 대응력을 빠르게 점검합니다.',
-    },
-    {
-      title: '한수',
-      summary: '평가원 감각이 흐트러지지 않도록 실전 루틴 안에서 안정적인 대응을 반복합니다.',
-    },
-  ],
-};
-
-const motivationProgram = {
-  eyebrow: 'MOTIVATION SYSTEM',
-  title: '공부시간과 계획 완수도 결국 동기 설계 안에서 관리합니다',
-  description:
-    '트랙은 공부시간, 계획 완수, 실행 흐름을 포인트 제도와 상벌점 제도로 연결해 학생들이 학습 동기와 흥미를 꾸준히 유지하도록 운영합니다.',
-  chips: ['공부시간 포인트', '계획 완수 반영', '상벌점 운영', '동기 유지 설계'],
-  bulletPoints: [
-    '공부시간과 계획 완수율이 누적 포인트로 반영됩니다.',
-    '지속적인 실행은 보상으로, 흐트러진 루틴은 상벌점으로 바로 연결됩니다.',
-    '학생이 스스로 움직이도록 동기와 운영 기준을 함께 설계합니다.',
-  ],
-  screen: {
-    title: '포인트 · 상벌점 운영 화면',
-    caption: '오늘의 성장, 퀘스트, 포인트와 상벌점 흐름을 한 화면에서 확인하는 실제 앱 화면입니다.',
-    alt: '포인트와 상벌점 운영 실제 앱 화면',
-    image: '/marketing/app-evidence/point-reward-dashboard-capture.png',
-  },
-};
-
 const toneStyleMap: Record<
   ExperienceTone,
   {
@@ -255,55 +218,6 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
   );
 }
 
-function LargeProductPlaceholder({
-  title,
-  caption,
-  image,
-  alt,
-}: {
-  title: string;
-  caption: string;
-  image?: string;
-  alt: string;
-}) {
-  return (
-    <div className="overflow-hidden rounded-[2rem] border border-[#14295F]/10 bg-white p-4 shadow-[0_20px_44px_rgba(20,41,95,0.08)] sm:p-5">
-      <div className="relative overflow-hidden rounded-[1.7rem] border border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF3FF_100%)] p-4 sm:p-5">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_58%)]" />
-        <div className="absolute -left-10 bottom-10 h-28 w-28 rounded-full bg-[#8CB7FF]/16 blur-3xl" />
-        <div className="absolute -right-8 top-8 h-28 w-28 rounded-full bg-[#FFB878]/18 blur-3xl" />
-
-        <div className="relative flex items-center justify-center">
-          <div className="relative w-full overflow-hidden rounded-[2rem] border border-[#14295F]/12 bg-white shadow-[0_26px_54px_rgba(20,41,95,0.12)]">
-            <div className="aspect-[13/9] w-full">
-              {image ? (
-                <Image src={image} alt={alt} fill sizes="(max-width: 1024px) 100vw, 42vw" className="object-contain bg-white" />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                  <span className="rounded-full border border-[#14295F]/10 bg-white/78 px-3 py-1 text-[10px] font-black tracking-[0.14em] text-[#14295F]/56 backdrop-blur">
-                    실제 앱 사진 예정
-                  </span>
-                  <p className="mt-4 break-keep text-[1rem] font-black leading-[1.45] text-[#14295F]">
-                    포인트와 상벌점이 보이는
-                    <br />
-                    앱 화면이 이 자리에 반영됩니다.
-                  </p>
-                  <p className="mt-2 break-keep text-[12px] font-semibold leading-[1.7] text-[#5B7088]">{caption}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <p className="text-[0.98rem] font-black leading-[1.4] text-[#14295F]">{title}</p>
-        <p className="mt-2 break-keep text-[13px] font-semibold leading-[1.72] text-[#51667D]">{caption}</p>
-      </div>
-    </div>
-  );
-}
-
 export default function ExperiencePage() {
   const experienceShowcase = marketingContent.experienceShowcase;
 
@@ -369,94 +283,6 @@ export default function ExperiencePage() {
 
         <ScrollReveal className="mt-8">
           <DataAnalyticsPreviewSection showNextView={false} />
-        </ScrollReveal>
-
-        <ScrollReveal className="mt-8">
-          <section className="relative overflow-hidden rounded-[2.25rem] border border-[#FF7A16]/14 bg-white px-6 py-7 shadow-[0_24px_58px_rgba(20,41,95,0.08)] sm:px-8 sm:py-8">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.10),transparent_30%),radial-gradient(circle_at_left,rgba(20,41,95,0.05),transparent_32%)]" />
-            <div className="relative grid gap-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-start">
-              <div>
-                <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">{koreanMockProgram.eyebrow}</p>
-                <h2 className="mt-4 break-keep text-[clamp(1.55rem,3vw,2.2rem)] font-black leading-[1.18] text-[#14295F]">
-                  {koreanMockProgram.title}
-                </h2>
-                <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.9] text-[#40556F]">
-                  {koreanMockProgram.description}
-                </p>
-                <div className="mt-5 flex flex-wrap gap-2.5">
-                  {koreanMockProgram.chips.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-[#FF7A16]/12 bg-[#FFF3E8] px-3 py-1.5 text-[11px] font-black text-[#B55200]"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                {koreanMockProgram.points.map((item, index) => (
-                  <article
-                    key={item.title}
-                    className="overflow-hidden rounded-[1.8rem] border border-[#14295F]/10 bg-white px-5 py-5 shadow-[0_20px_44px_rgba(20,41,95,0.06)]"
-                  >
-                    <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">{`PROGRAM 0${index + 1}`}</p>
-                    <p className="mt-4 break-keep text-[1.1rem] font-black leading-[1.3] text-[#14295F]">{item.title}</p>
-                    <p className="mt-3 break-keep text-[13.5px] font-semibold leading-[1.82] text-[#4D627C]">
-                      {item.summary}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </section>
-        </ScrollReveal>
-
-        <ScrollReveal className="mt-6">
-          <section className="relative overflow-hidden rounded-[2.25rem] border border-[#14295F]/10 bg-white px-6 py-7 shadow-[0_24px_58px_rgba(20,41,95,0.08)] sm:px-8 sm:py-8">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.06),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(255,122,22,0.10),transparent_22%)]" />
-            <div className="relative grid gap-6 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:items-start">
-              <div>
-                <p className="text-[11px] font-black tracking-[0.18em] text-[#FF7A16]">{motivationProgram.eyebrow}</p>
-                <h2 className="mt-4 break-keep text-[clamp(1.55rem,3vw,2.2rem)] font-black leading-[1.18] text-[#14295F]">
-                  {motivationProgram.title}
-                </h2>
-                <p className="mt-4 break-keep text-[15px] font-semibold leading-[1.9] text-[#40556F]">
-                  {motivationProgram.description}
-                </p>
-
-                <div className="mt-5 flex flex-wrap gap-2.5">
-                  {motivationProgram.chips.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-[#14295F]/12 bg-[#EEF3FF] px-3 py-1.5 text-[11px] font-black text-[#14295F]"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="mt-6 space-y-3">
-                  {motivationProgram.bulletPoints.map((item) => (
-                    <div
-                      key={item}
-                      className="rounded-[1.25rem] border border-[#14295F]/10 bg-[#F8FBFF] px-4 py-3 text-[13.5px] font-semibold leading-[1.75] text-[#4C627B]"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <LargeProductPlaceholder
-                title={motivationProgram.screen.title}
-                caption={motivationProgram.screen.caption}
-                image={motivationProgram.screen.image}
-                alt={motivationProgram.screen.alt}
-              />
-            </div>
-          </section>
         </ScrollReveal>
 
         <ScrollReveal className="mt-8">
