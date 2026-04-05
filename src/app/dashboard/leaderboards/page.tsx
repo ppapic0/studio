@@ -6,7 +6,6 @@ import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import {
   Clock3,
   Crown,
-  Gift,
   Loader2,
   ShieldAlert,
   Sparkles,
@@ -25,9 +24,7 @@ import {
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
 import {
-  formatStudentRankRewardSummary,
   getDailyRankWindowState,
-  getStudentRankRewardTiers,
 } from '@/lib/student-ranking-policy';
 import { cn } from '@/lib/utils';
 
@@ -58,10 +55,7 @@ type FloatingEvent = {
 };
 
 type RewardState = {
-  progress: number;
   minutesToReward: number;
-  currentReward: string;
-  nextReward: string;
 };
 
 type RecommendationTone = 'plan' | 'review' | 'balance' | 'method' | 'mindset';
@@ -81,25 +75,22 @@ const HERO_ROTATE_MS = 3600;
 
 const RANGE_META: Record<
   RankRange,
-  { label: string; title: string; subtitle: string; rewardTitle: string }
+  { label: string; title: string; subtitle: string }
 > = {
   daily: {
     label: '일간',
     title: '오늘의 추월전',
     subtitle: '지금 쌓는 공부시간이 오늘 순위를 바로 흔듭니다.',
-    rewardTitle: '오늘 배틀 보상',
   },
   weekly: {
     label: '주간',
     title: '실시간 경쟁 랭킹',
     subtitle: '이번 주 전장을 누가 밀고 있는지 한눈에 보세요.',
-    rewardTitle: '주간 배틀 보상',
   },
   monthly: {
     label: '월간',
     title: '라이브 배틀 리더보드',
     subtitle: '장기전으로 끌고 가는 상위권 경쟁 흐름을 확인하세요.',
-    rewardTitle: '월간 시즌 보상',
   },
 };
 
@@ -255,13 +246,9 @@ function getPressureLevel(rank: number, diffAbove: number, diffBelow: number): P
 
 function buildRewardState(viewerValue: number): RewardState {
   const cycle = 90;
-  const progress = clamp(Math.round(((viewerValue % cycle) / cycle) * 100), 8, 100);
   const minutesToReward = cycle - (viewerValue % cycle || cycle);
   return {
-    progress,
     minutesToReward,
-    currentReward: '상자 +1',
-    nextReward: '20,000P',
   };
 }
 
@@ -1500,85 +1487,6 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
   );
 }
 
-function RewardCard({
-  range,
-  rewardState,
-  rewardTitle,
-  viewerRank,
-  waitingMessage,
-}: {
-  range: RankRange;
-  rewardState: RewardState;
-  rewardTitle: string;
-  viewerRank: number;
-  waitingMessage?: string | null;
-}) {
-  const rewardTiers = getStudentRankRewardTiers(range);
-
-  return (
-    <motion.section
-      className="relative overflow-hidden rounded-[30px] border border-[#FFB861]/22 bg-[linear-gradient(165deg,#FFF5E4_0%,#FFE7BF_48%,#FFD79A_100%)] p-5 text-[#162D63] shadow-[0_26px_60px_rgba(255,164,68,0.18)] md:p-6"
-      animate={{ boxShadow: ['0 24px 60px rgba(255,164,68,0.16)', '0 28px 84px rgba(255,164,68,0.28)', '0 24px 60px rgba(255,164,68,0.16)'] }}
-      transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-    >
-      <div className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-[#FFB55A]/25 blur-3xl" />
-      <div className="relative flex items-start justify-between gap-4">
-        <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0C86E] bg-white/75 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">
-            <Sparkles className="h-4 w-4" />
-            {rewardTitle}
-          </div>
-          <h3 className="text-3xl font-black tracking-[-0.05em] text-[#102657]">
-            {waitingMessage ? formatStudentRankRewardSummary(range) : `${rewardState.minutesToReward}분 더 하면 ${rewardState.currentReward} 오픈`}
-          </h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-[#5E4B2D]">
-            {waitingMessage
-              ? waitingMessage
-              : viewerRank === 1
-                ? '지금 밀어붙이면 선두 보상을 지키면서 상자까지 동시에 챙길 수 있어요.'
-                : '지금 한 번 더 압박하면 보상 상자와 상위권 진입을 동시에 노릴 수 있어요.'}
-          </p>
-        </div>
-        <motion.div
-          className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-[#F0C86E] bg-white/88 text-[#C86A10]"
-          animate={{ rotate: [0, 4, -4, 0], scale: [1, 1.04, 1] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <Gift className="h-8 w-8" />
-        </motion.div>
-      </div>
-
-      <div className="mt-5">
-        <div className="mb-2 flex items-center justify-between text-sm font-black text-[#8B5A19]">
-          <span>다음 보상 진행도</span>
-          <span>{rewardState.progress}%</span>
-        </div>
-        <div className="relative h-4 overflow-hidden rounded-full bg-white/75">
-          <motion.div className="h-full rounded-full bg-[linear-gradient(90deg,#FF9631_0%,#FFB85B_48%,#FFD895_100%)]" style={{ width: `${rewardState.progress}%` }} transition={{ duration: 0.6, ease: 'easeOut' }} />
-          <motion.div
-            className="absolute inset-y-0 left-0 w-24 rounded-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.7),transparent)]"
-            animate={{ x: ['-10%', '120%'] }}
-            transition={{ duration: 1.9, repeat: Infinity, ease: 'linear' }}
-          />
-        </div>
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-[22px] border border-[#F0C86E]/80 bg-white/75 p-4">
-          <div className="text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">상자 보상</div>
-          <div className="mt-2 text-2xl font-black text-[#132A63]">{rewardState.currentReward}</div>
-        </div>
-        {rewardTiers.map((tier) => (
-          <div key={`${range}-${tier.rank}`} className="rounded-[22px] border border-[#F0C86E]/80 bg-white/75 p-4">
-            <div className="text-[11px] font-black tracking-[0.2em] text-[#A16B0E]">{tier.rank}위 보상</div>
-            <div className="mt-2 text-2xl font-black text-[#132A63]">{tier.points.toLocaleString()}P</div>
-          </div>
-        ))}
-      </div>
-    </motion.section>
-  );
-}
-
 function DailyWaitingCard({
   windowLabel,
   nextOpensAtLabel,
@@ -2090,15 +1998,6 @@ export default function RankingBattlePage() {
                 nextOpensAtLabel={dailyRankWindow.nextOpensAtLabel}
               />
             </div>
-            <div className="space-y-5">
-              <RewardCard
-                range={range}
-                rewardState={rewardState}
-                rewardTitle={RANGE_META[range].rewardTitle}
-                viewerRank={viewer?.rank ?? 0}
-                waitingMessage={`다음 오픈 ${dailyRankWindow.nextOpensAtLabel} · ${formatStudentRankRewardSummary(range)}`}
-              />
-            </div>
           </div>
         </div>
       </main>
@@ -2133,12 +2032,6 @@ export default function RankingBattlePage() {
           <div className="space-y-4">
             <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
             <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} rewardState={rewardState} isMobile />
-            <RewardCard
-              range={range}
-              rewardState={rewardState}
-              rewardTitle={RANGE_META[range].rewardTitle}
-              viewerRank={viewer.rank}
-            />
           </div>
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
@@ -2147,12 +2040,6 @@ export default function RankingBattlePage() {
             </div>
             <div className="space-y-5">
               <StandingsSidebar leaders={liveLeaders} viewer={viewer} />
-              <RewardCard
-                range={range}
-                rewardState={rewardState}
-                rewardTitle={RANGE_META[range].rewardTitle}
-                viewerRank={viewer.rank}
-              />
             </div>
           </div>
         )}
