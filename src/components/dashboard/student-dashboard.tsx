@@ -2832,6 +2832,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         isNearNextBox={isNearNextBox}
         arrivalCount={homeArrivalCount}
         todayStudyLabel={formatMinutesToKorean(totalMinutesCount)}
+        growthDeltaPercent={studyVsYesterday}
         pointBalance={homePointBalance}
         todayPointGain={todayPointAmount}
         dailyPointStatus={progress?.dailyPointStatus}

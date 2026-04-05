@@ -5,7 +5,6 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
-  Clock3,
   Crown,
   Flame,
   Gift,
@@ -15,6 +14,7 @@ import {
   Swords,
   Target,
   Timer,
+  TrendingUp,
   Wallet,
 } from "lucide-react";
 
@@ -516,6 +516,7 @@ export function StudentHomeGamePanel({
   isNearNextBox,
   arrivalCount,
   todayStudyLabel,
+  growthDeltaPercent,
   pointBalance,
   todayPointGain,
   dailyPointStatus,
@@ -562,6 +563,7 @@ export function StudentHomeGamePanel({
   isNearNextBox: boolean;
   arrivalCount: number;
   todayStudyLabel: string;
+  growthDeltaPercent: number;
   pointBalance: number;
   todayPointGain: number;
   dailyPointStatus?: GrowthProgress["dailyPointStatus"];
@@ -807,10 +809,17 @@ export function StudentHomeGamePanel({
             <div className="grid grid-cols-2 gap-3">
               <div className="surface-card surface-card--light rounded-[1.15rem] px-3 py-3">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-                  <Clock3 className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
-                  오늘
+                  <TrendingUp className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
+                  성장률
                 </div>
-                <div className="font-aggro-display mt-2 text-xl font-black text-[var(--text-primary)]">{todayStudyLabel}</div>
+                <div className={cn(
+                  "font-aggro-display mt-2 text-xl font-black tracking-tight",
+                  growthDeltaPercent >= 0 ? "text-emerald-600" : "text-rose-500"
+                )}>
+                  {growthDeltaPercent >= 0 ? "+" : ""}
+                  {growthDeltaPercent}%
+                </div>
+                <div className="mt-1 text-[11px] font-black text-[var(--text-secondary)]">어제 대비 · 오늘 {todayStudyLabel}</div>
               </div>
               <button
                 type="button"
