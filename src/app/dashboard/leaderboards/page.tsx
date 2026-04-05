@@ -166,6 +166,16 @@ function formatGapLabel(minutes: number) {
   return `${hours}시간 ${mins}분`;
 }
 
+function maskLeaderboardStudentName(name: string) {
+  const normalized = name.trim();
+  if (!normalized || normalized === '나' || normalized.includes('*')) return normalized;
+
+  const chars = Array.from(normalized);
+  if (chars.length <= 1) return normalized;
+  if (chars.length === 2) return `${chars[0]}*`;
+  return `${chars[0]}*${chars[chars.length - 1]}`;
+}
+
 function getBattleTrackLabel(range: RankRange) {
   return range === 'daily' ? '일간 TRACK' : range === 'weekly' ? '주간 TRACK' : '월간 TRACK';
 }
@@ -191,19 +201,19 @@ function buildFallbackEntries(range: RankRange, viewerId: string) {
     daily: [
       { id: 'fallback-top', studentId: 'rival-top', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 288, rank: 1 },
       { id: 'fallback-viewer', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 252, rank: 2, isViewer: true },
-      { id: 'fallback-rival', studentId: 'rival-under', displayNameSnapshot: '이*윤', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 234, rank: 3 },
+      { id: 'fallback-rival', studentId: 'rival-under', displayNameSnapshot: '이*은', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 234, rank: 3 },
       { id: 'fallback-4', studentId: 'rival-4', displayNameSnapshot: '박*준', classNameSnapshot: null, schoolNameSnapshot: '대성고등학교', value: 214, rank: 4 },
     ],
     weekly: [
       { id: 'fallback-top-w', studentId: 'rival-top-w', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 1740, rank: 1 },
       { id: 'fallback-viewer-w', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 1620, rank: 2, isViewer: true },
-      { id: 'fallback-rival-w', studentId: 'rival-under-w', displayNameSnapshot: '이*윤', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 1512, rank: 3 },
+      { id: 'fallback-rival-w', studentId: 'rival-under-w', displayNameSnapshot: '이*은', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 1512, rank: 3 },
       { id: 'fallback-4-w', studentId: 'rival-4-w', displayNameSnapshot: '정*현', classNameSnapshot: null, schoolNameSnapshot: '중동고등학교', value: 1420, rank: 4 },
     ],
     monthly: [
       { id: 'fallback-top-m', studentId: 'rival-top-m', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 7360, rank: 1 },
       { id: 'fallback-viewer-m', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 6840, rank: 2, isViewer: true },
-      { id: 'fallback-rival-m', studentId: 'rival-under-m', displayNameSnapshot: '이*윤', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 6410, rank: 3 },
+      { id: 'fallback-rival-m', studentId: 'rival-under-m', displayNameSnapshot: '이*은', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 6410, rank: 3 },
       { id: 'fallback-4-m', studentId: 'rival-4-m', displayNameSnapshot: '박*준', classNameSnapshot: null, schoolNameSnapshot: '대성고등학교', value: 6180, rank: 4 },
     ],
   };
@@ -1155,7 +1165,7 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
                   {entry.rank}위 LIVE
                 </div>
                 <div className="mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
-                  {entry.displayNameSnapshot}
+                  {maskLeaderboardStudentName(entry.displayNameSnapshot)}
                 </div>
                 <div className="mt-1 truncate text-xs font-semibold text-[#6E7893]">
                   {formatSchoolName(entry.schoolNameSnapshot)}
@@ -1241,7 +1251,7 @@ function StandingsSidebar({
                     <Crown className="h-3.5 w-3.5" />
                   </div>
                   <div className="font-aggro-display mt-3 truncate text-[1.45rem] font-black tracking-[-0.04em] text-[#132A63]">
-                    {topLeader.displayNameSnapshot}
+                    {maskLeaderboardStudentName(topLeader.displayNameSnapshot)}
                   </div>
                   <div className="mt-1 truncate text-[12px] font-semibold text-[#6E7893]">
                     {formatSchoolName(topLeader.schoolNameSnapshot)}
@@ -1294,7 +1304,7 @@ function StandingsSidebar({
                       ) : null}
                     </div>
                     <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
-                      {entry.displayNameSnapshot}
+                      {maskLeaderboardStudentName(entry.displayNameSnapshot)}
                     </div>
                     <div className="mt-1 truncate text-[11px] font-semibold text-[#6E7893]">
                       {formatSchoolName(entry.schoolNameSnapshot)}
@@ -1373,7 +1383,7 @@ function StandingsSidebar({
                       ) : null}
                     </div>
                     <div className="font-aggro-display mt-2 truncate text-base font-black tracking-[-0.03em] text-[#132A63]">
-                      {entry.displayNameSnapshot}
+                      {maskLeaderboardStudentName(entry.displayNameSnapshot)}
                     </div>
                     <div className="mt-0.5 truncate text-[12px] font-semibold text-[#6E7893]">
                       {formatSchoolName(entry.schoolNameSnapshot)}
@@ -1395,7 +1405,7 @@ function StandingsSidebar({
                         {entry.rank === 1 ? <Crown className="h-3.5 w-3.5" /> : null}
                       </div>
                       <div className="font-aggro-display mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
-                        {entry.displayNameSnapshot}
+                        {maskLeaderboardStudentName(entry.displayNameSnapshot)}
                       </div>
                       <div className="mt-1 truncate text-xs font-semibold text-[#6E7893]">
                         {formatSchoolName(entry.schoolNameSnapshot)}
