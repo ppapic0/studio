@@ -323,13 +323,17 @@ export default function ExperiencePage() {
                 <div className="rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF] px-5 py-5">
                   <p className="text-[11px] font-black tracking-[0.18em] text-[#14295F]/52">STUDENT VIEW</p>
                   <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
-                    학생이 더 효율적으로 움직이도록 해야 할 일과 실행 흐름이 먼저 보입니다.
+                    학습관리 시스템 운영으로 오늘의 계획이
+                    <br />
+                    실천으로 이어지고 기록이 누적됩니다.
                   </p>
                 </div>
                 <div className="rounded-[1.45rem] border border-[#FF7A16]/12 bg-[#FFF9F3] px-5 py-5">
                   <p className="text-[11px] font-black tracking-[0.18em] text-[#B55200]/70">PARENT VIEW</p>
                   <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
-                    학부모는 짧은 확인만으로도 변화 흐름과 학습 흥미까지 읽을 수 있어야 합니다.
+                    학생의 학습데이터를 실시간으로 확인 가능한
+                    <br />
+                    학부모용 웹앱을 제공합니다.
                   </p>
                 </div>
               </div>
