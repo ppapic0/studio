@@ -173,20 +173,19 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
           />
         </div>
 
-        <div className="mt-10 space-y-5 lg:space-y-6">
+        <div className="mt-12 space-y-6 lg:space-y-8">
           {content.sections.map((section, index) => {
             const Icon = sectionIcons[index] ?? Sparkles;
             const tone = toneStyles[section.tone];
-            const reverse = index % 2 === 1;
 
             return (
               <article
                 key={section.title}
-                className={`relative overflow-hidden rounded-[2.25rem] border p-6 shadow-[0_22px_52px_rgba(20,41,95,0.08)] sm:p-7 lg:p-8 ${tone.shell}`}
+                className={`relative overflow-hidden rounded-[2.4rem] border px-6 py-8 shadow-[0_22px_52px_rgba(20,41,95,0.08)] sm:px-8 sm:py-10 lg:px-10 lg:py-12 ${tone.shell}`}
               >
-                <div className={`pointer-events-none absolute ${reverse ? 'left-[-4%] top-[20%]' : 'right-[-4%] top-[14%]'} h-40 w-40 rounded-full blur-[110px] ${tone.glow}`} />
-                <div className={`relative grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-8 ${reverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`}>
-                  <div>
+                <div className={`pointer-events-none absolute left-1/2 top-0 h-44 w-44 -translate-x-1/2 rounded-full blur-[110px] ${tone.glow}`} />
+                <div className="relative">
+                  <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
                     <div className="flex items-center gap-3">
                       <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone.icon}`}>
                         <Icon className="h-5 w-5" />
@@ -196,20 +195,20 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                       </span>
                     </div>
 
-                    <h3 className="font-aggro-display mt-5 break-keep text-[clamp(1.6rem,2.7vw,2.3rem)] font-black leading-[1.1] tracking-[-0.03em] text-[#14295F]">
+                    <h3 className="font-aggro-display mt-6 break-keep text-[clamp(1.7rem,3vw,2.65rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
                       {section.title}
                     </h3>
-                    <p className={`mt-4 break-keep text-[15px] font-semibold leading-[1.84] ${tone.body}`}>
+                    <p className={`mt-5 max-w-3xl break-keep text-[15px] font-semibold leading-[1.84] ${tone.body}`}>
                       {section.body}
                     </p>
                     {section.secondaryBody ? (
-                      <p className={`mt-3 break-keep text-[14px] font-semibold leading-[1.8] ${tone.body}`}>
+                      <p className={`mt-3 max-w-3xl break-keep text-[14px] font-semibold leading-[1.8] ${tone.body}`}>
                         {section.secondaryBody}
                       </p>
                     ) : null}
 
                     {section.detailPoints?.length ? (
-                      <div className="mt-5 flex flex-wrap gap-2.5">
+                      <div className="mt-5 flex flex-wrap justify-center gap-2.5">
                         {section.detailPoints.map((point) => (
                           <span
                             key={point}
@@ -234,7 +233,9 @@ export function DesktopStudySystemSection({ content }: DesktopStudySystemSection
                     ) : null}
                   </div>
 
-                  <DesktopStudySystemPreview section={section} index={index} />
+                  <div className="mx-auto mt-8 max-w-5xl lg:mt-10">
+                    <DesktopStudySystemPreview section={section} index={index} />
+                  </div>
                 </div>
               </article>
             );
