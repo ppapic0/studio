@@ -163,14 +163,21 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
   const tone = resolveTone(section.mode);
   const style = toneStyleMap[tone];
   const showStudentScreenSet = section.mode === '학생 모드' && section.secondaryScreens.length >= 2;
+  const hideStudentScreenSet = section.mode === '학생 모드' && showStudentScreenSet;
 
   return (
     <article className={`relative overflow-hidden rounded-[2.35rem] border p-5 shadow-[0_24px_58px_rgba(20,41,95,0.10)] sm:p-7 lg:p-8 ${style.sectionCard}`}>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.8),transparent_32%)]" />
       <div className={`absolute ${reverse ? 'left-[-4%] top-[18%]' : 'right-[-4%] top-[14%]'} h-44 w-44 rounded-full blur-[120px] ${style.glow}`} />
 
-      <div className={`relative grid gap-6 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:gap-8 ${reverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`}>
-        <div className="order-2 flex flex-col lg:order-1">
+      <div
+        className={`relative grid gap-6 lg:gap-8 ${
+          hideStudentScreenSet
+            ? 'lg:grid-cols-1'
+            : `lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] ${reverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`
+        }`}
+      >
+        <div className={`order-2 flex flex-col lg:order-1 ${hideStudentScreenSet ? 'mx-auto w-full max-w-3xl' : ''}`}>
           <div className="flex items-center gap-3">
             <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${style.iconWrap}`}>
               <ModeIcon mode={section.mode} />
@@ -210,7 +217,7 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
           ) : null}
         </div>
 
-        <div className="order-1 lg:order-2">
+        {!hideStudentScreenSet ? <div className="order-1 lg:order-2">
           {showStudentScreenSet ? (
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] md:items-center">
               <div className="space-y-4">
@@ -224,7 +231,7 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
           ) : (
             <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
           )}
-        </div>
+        </div> : null}
       </div>
     </article>
   );
