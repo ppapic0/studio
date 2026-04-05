@@ -679,7 +679,8 @@ export const marketingContent: MarketingContent = {
       {
         title: '확실한 벌점제도로 학습 분위기 관리와 포인트 제도를 운영하여 학습 흥미 유발',
         body: '벌점과 포인트를 함께 운영해 학습 집중도와 지속성을 동시에 높입니다.',
-        alt: '모바일 학습관리 시스템 실제 앱 화면 예정 자리',
+        image: '/marketing/app-evidence/point-reward-dashboard-capture.png',
+        alt: '포인트와 상벌점 운영 실제 앱 화면',
         tone: 'violet',
       },
     ],

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, ChartColumnBig, ClipboardList, ShieldCheck, Sparkles, Target } from 'lucide-react';
 
@@ -187,15 +188,33 @@ function DesktopStudySystemPreview({
           ))}
         </div>
 
-        <div className={cn('mt-5 rounded-[1.5rem] border px-6 py-8 text-center shadow-[0_14px_32px_rgba(20,41,95,0.08)]', previewSurface.card)}>
-          <p className={cn('text-[10px] font-black tracking-[0.18em]', previewSurface.label)}>REAL CAPTURE READY</p>
-          <p className={cn('font-aggro-display mt-4 break-keep text-[1.25rem] font-black leading-[1.24] tracking-[-0.03em]', previewSurface.title)}>
-            {section.alt ?? previewTitles[index]}
-          </p>
-          <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.72]', previewSurface.body)}>
-            포인트와 상벌점 운영 흐름이 실제 앱 화면으로 반영될 자리를 미리 구성했습니다.
-          </p>
-        </div>
+        {section.image ? (
+          <div className={cn('mt-5 rounded-[1.5rem] border p-3 shadow-[0_14px_32px_rgba(20,41,95,0.08)]', previewSurface.card)}>
+            <div className="relative aspect-[590/653] w-full overflow-hidden rounded-[1.2rem] border border-white/60 bg-white/90">
+              <Image
+                src={section.image}
+                alt={section.alt ?? previewTitles[index]}
+                fill
+                sizes="(max-width: 1024px) 100vw, 44vw"
+                className="object-contain object-center"
+              />
+            </div>
+            <p className={cn('mt-4 text-[10px] font-black tracking-[0.18em]', previewSurface.label)}>ACTUAL USER SCREEN</p>
+            <p className={cn('font-aggro-display mt-2 break-keep text-[1.1rem] font-black leading-[1.24] tracking-[-0.03em]', previewSurface.title)}>
+              {section.alt ?? previewTitles[index]}
+            </p>
+          </div>
+        ) : (
+          <div className={cn('mt-5 rounded-[1.5rem] border px-6 py-8 text-center shadow-[0_14px_32px_rgba(20,41,95,0.08)]', previewSurface.card)}>
+            <p className={cn('text-[10px] font-black tracking-[0.18em]', previewSurface.label)}>REAL CAPTURE READY</p>
+            <p className={cn('font-aggro-display mt-4 break-keep text-[1.25rem] font-black leading-[1.24] tracking-[-0.03em]', previewSurface.title)}>
+              {section.alt ?? previewTitles[index]}
+            </p>
+            <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.72]', previewSurface.body)}>
+              포인트와 상벌점 운영 흐름이 실제 앱 화면으로 반영될 자리를 미리 구성했습니다.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

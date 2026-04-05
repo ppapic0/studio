@@ -46,9 +46,9 @@ const motivationProgram = {
   ],
   screen: {
     title: '포인트 · 상벌점 운영 화면',
-    caption: '포인트 누적, 계획 완수, 상벌점 흐름을 한 화면에서 확인하는 앱 스크린샷 자리입니다.',
-    alt: '포인트와 상벌점 운영 화면 스크린샷 예정 자리',
-    image: undefined as string | undefined,
+    caption: '오늘의 성장, 퀘스트, 포인트와 상벌점 흐름을 한 화면에서 확인하는 실제 앱 화면입니다.',
+    alt: '포인트와 상벌점 운영 실제 앱 화면',
+    image: '/marketing/app-evidence/point-reward-dashboard-capture.png',
   },
 };
 

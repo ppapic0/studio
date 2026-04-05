@@ -1,6 +1,9 @@
+import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+
+const pointRewardCaptureSrc = '/marketing/app-evidence/point-reward-dashboard-capture.png';
 
 const motivationCards = [
   {
@@ -40,19 +43,25 @@ export function PointRewardSection({ surface = 'card', titleBreakMode = 'default
             <div className={cn('pointer-events-none absolute inset-0', isDark ? 'bg-[radial-gradient(circle_at_70%_18%,rgba(255,255,255,0.10),transparent_30%)]' : 'bg-[radial-gradient(circle_at_70%_18%,rgba(140,183,255,0.14),transparent_30%)]')} />
             <div className="relative">
               <p className={cn('text-[10px] font-black tracking-[0.18em]', isDark ? 'text-white/[0.58]' : 'text-[#14295F]/55')}>POINT · REWARD SYSTEM</p>
-              <div className={cn('mt-4 flex min-h-[270px] items-center justify-center rounded-[1.6rem] border px-6 py-10 text-center sm:min-h-[320px]', isDark ? 'border-dashed border-white/[0.12] bg-white/[0.06]' : 'border-dashed border-[#14295F]/12 bg-white/82')}>
-                <div className="max-w-[220px]">
-                  <div className={cn('mx-auto h-16 w-16 rounded-[1.5rem] border shadow-[0_14px_30px_rgba(20,41,95,0.08)]', isDark ? 'border-white/[0.14] bg-white/10' : 'border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F6F9FF_100%)]')} />
-                  <p className={cn('mt-6 text-[11px] font-black tracking-[0.22em]', isDark ? 'text-white/[0.48]' : 'text-[#14295F]/42')}>REAL CAPTURE READY</p>
-                  <p className={cn('font-aggro-display mt-3 break-keep text-[1.15rem] font-black leading-[1.35] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>포인트 · 상벌점 화면 예정</p>
-                  <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.75]', isDark ? 'text-white/[0.74]' : 'text-[#506680]')}>
-                    공부시간, 계획 완수, 포인트와 상벌점이
-                    <br />
-                    어떻게 보이는지 실제 앱 화면이 여기에
-                    <br />
-                    반영됩니다.
-                  </p>
+              <div className={cn('mt-4 rounded-[1.6rem] border p-3 sm:p-4', isDark ? 'border-white/[0.12] bg-white/[0.06]' : 'border-[#14295F]/12 bg-white/82')}>
+                <div className={cn('relative mx-auto aspect-[590/653] w-full max-w-[590px] overflow-hidden rounded-[1.35rem] border shadow-[0_18px_40px_rgba(20,41,95,0.16)]', isDark ? 'border-white/[0.14] bg-[#0E2152]' : 'border-[#D9E7FF] bg-[#EEF3FF]')}>
+                  <Image
+                    src={pointRewardCaptureSrc}
+                    alt="포인트와 상벌점 운영 실제 앱 화면"
+                    fill
+                    sizes="(min-width: 1024px) 28vw, (min-width: 640px) 70vw, 88vw"
+                    className="object-contain object-center"
+                  />
                 </div>
+                <p className={cn('mt-4 text-center text-[11px] font-black tracking-[0.22em]', isDark ? 'text-white/[0.48]' : 'text-[#14295F]/42')}>ACTUAL USER SCREEN</p>
+                <p className={cn('font-aggro-display mt-2 text-center break-keep text-[1.05rem] font-black leading-[1.35] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>포인트 · 상벌점 실제 화면</p>
+                <p className={cn('mt-2 text-center break-keep text-[13px] font-semibold leading-[1.75]', isDark ? 'text-white/[0.74]' : 'text-[#506680]')}>
+                  오늘의 성장, 퀘스트, 포인트, 보상과
+                  <br />
+                  상벌점 흐름이 한 화면에서 이어지도록
+                  <br />
+                  설계한 실제 운영 화면입니다.
+                </p>
               </div>
             </div>
           </div>
