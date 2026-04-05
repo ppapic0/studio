@@ -44,8 +44,8 @@ export function FeedbackManagementSection({ surface = 'card', titleBreakMode = '
                 <div className="mx-auto max-w-[290px]">
                   <div className={cn('relative mx-auto aspect-[284/439] overflow-hidden rounded-[1.7rem] border shadow-[0_20px_44px_rgba(20,41,95,0.16)]', isDark ? 'border-white/[0.16] bg-[#0E2152]' : 'border-[#14295F]/10 bg-[#F7FAFF]')}>
                     <Image
-                      src="/marketing/app-evidence/study-feedback-dashboard-preview.svg"
-                      alt="학습 현황과 피드백이 한 화면에서 보이는 앱 프리뷰"
+                      src="/marketing/app-evidence/study-feedback-dashboard-capture.png"
+                      alt="학습 현황과 피드백이 한 화면에서 보이는 실제 앱 화면"
                       fill
                       sizes="(min-width: 640px) 290px, 82vw"
                       className="object-contain object-center"
