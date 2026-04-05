@@ -35,9 +35,6 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
               <a href="/#consult" className="premium-cta premium-cta-primary h-10 px-4 text-xs sm:w-auto">
                 상담 문의
               </a>
-              <a href="/go/login?placement=footer" className="premium-cta premium-cta-ghost h-10 px-4 text-xs sm:w-auto">
-                웹앱 로그인
-              </a>
             </div>
           </div>
 
