@@ -19,27 +19,27 @@ const programIcons: Record<string, LucideIcon> = {
 
 const mockExamProofImages = [
   {
-    src: '/marketing/mock-exams/duf-premium-cover.svg',
+    src: '/marketing/mock-exams/duf-premium-cover.png',
     alt: '더프리미엄 모의고사 표지 이미지',
     label: '더프리미엄',
   },
   {
-    src: '/marketing/mock-exams/hansu-cover.svg',
+    src: '/marketing/mock-exams/hansu-cover.png',
     alt: '한수 모의고사 표지 이미지',
     label: '한수',
   },
   {
-    src: '/marketing/mock-exams/igam-season-cover.svg',
+    src: '/marketing/mock-exams/igam-season-cover.png',
     alt: '이감 국어 모의고사 시즌1 표지 이미지',
     label: '이감 시즌',
   },
   {
-    src: '/marketing/mock-exams/igam-classic-cover.svg',
+    src: '/marketing/mock-exams/igam-classic-cover.png',
     alt: '이감 클래식 독서 표지 이미지',
     label: '이감 클래식',
   },
   {
-    src: '/marketing/mock-exams/survival-cover.svg',
+    src: '/marketing/mock-exams/survival-cover.png',
     alt: '시대인재 서바이벌 표지 이미지',
     label: '서바이벌',
   },
@@ -141,7 +141,9 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
                   <div className="absolute left-3 top-3 z-10 rounded-full bg-[#14295F]/86 px-3 py-1 text-[9px] font-black tracking-[0.14em] text-white backdrop-blur-sm sm:left-4 sm:top-4 sm:text-[10px]">
                     {image.label}
                   </div>
-                  <Image src={image.src} alt={image.alt} fill sizes="(min-width: 1024px) 32vw, 70vw" className="object-cover object-center" />
+                  <div className="absolute inset-3 overflow-hidden rounded-[0.95rem] sm:inset-4 sm:rounded-[1.1rem]">
+                    <Image src={image.src} alt={image.alt} fill sizes="(min-width: 1024px) 24vw, 54vw" className="object-contain object-center" />
+                  </div>
                 </div>
               ))}
             </div>
