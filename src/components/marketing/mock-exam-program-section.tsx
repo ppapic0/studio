@@ -19,6 +19,29 @@ const programIcons: Record<string, LucideIcon> = {
 export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: MockExamProgramSectionProps) {
   const isCard = surface === 'card';
   const isDark = surface === 'flat-dark';
+  const moonTone = isDark
+    ? {
+        panel: 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.04)_100%)]',
+        mist: 'bg-[radial-gradient(ellipse_at_center,rgba(211,226,255,0.18)_0%,rgba(154,188,255,0.10)_38%,rgba(94,125,194,0.06)_58%,transparent_80%)]',
+        halo: 'bg-[radial-gradient(circle,rgba(154,188,255,0.28)_0%,rgba(154,188,255,0.16)_34%,rgba(154,188,255,0.06)_54%,transparent_76%)]',
+        orbit: 'border-white/[0.18]',
+        body: 'border-white/[0.16] bg-[radial-gradient(circle_at_30%_26%,rgba(255,255,255,0.96)_0%,rgba(222,234,255,0.32)_20%,rgba(110,145,214,0.30)_58%,rgba(45,69,121,0.80)_100%)]',
+        shade: 'bg-[radial-gradient(circle_at_72%_54%,rgba(10,23,52,0.26)_0%,rgba(10,23,52,0.14)_36%,transparent_74%)]',
+        highlight: 'bg-[radial-gradient(circle,rgba(255,255,255,0.62)_0%,rgba(255,255,255,0.14)_62%,transparent_100%)]',
+        speck: 'bg-white/[0.76] shadow-[0_0_14px_rgba(255,255,255,0.42)]',
+        text: 'text-white',
+      }
+    : {
+        panel: 'border-[#DDE8FF] bg-[linear-gradient(180deg,#F6FAFF_0%,#EEF4FF_100%)]',
+        mist: 'bg-[radial-gradient(ellipse_at_center,rgba(223,235,255,0.95)_0%,rgba(210,226,255,0.62)_34%,rgba(190,211,245,0.30)_58%,transparent_82%)]',
+        halo: 'bg-[radial-gradient(circle,rgba(167,198,255,0.26)_0%,rgba(167,198,255,0.14)_38%,rgba(167,198,255,0.05)_56%,transparent_78%)]',
+        orbit: 'border-[#D6E3FB]',
+        body: 'border-[#D3E2FF] bg-[radial-gradient(circle_at_30%_24%,rgba(255,255,255,1)_0%,rgba(243,248,255,0.96)_26%,rgba(214,228,255,0.88)_58%,rgba(171,194,236,0.76)_100%)]',
+        shade: 'bg-[radial-gradient(circle_at_72%_54%,rgba(97,124,172,0.15)_0%,rgba(97,124,172,0.08)_38%,transparent_74%)]',
+        highlight: 'bg-[radial-gradient(circle,rgba(255,255,255,1)_0%,rgba(255,255,255,0.46)_56%,transparent_100%)]',
+        speck: 'bg-[#A8BFE7]/90 shadow-[0_0_12px_rgba(149,179,232,0.34)]',
+        text: 'text-[#18356F]',
+      };
 
   return (
     <section
@@ -33,54 +56,30 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
           {mockExamProgram.title}
         </h2>
 
-        <div className={cn('mt-6 overflow-hidden rounded-[1.55rem] border', isDark ? 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.04)_100%)]' : 'border-[#DDE8FF] bg-[linear-gradient(180deg,#F5F9FF_0%,#EDF4FF_100%)]')}>
-          <div className="relative flex min-h-[10rem] items-center justify-center px-6 py-6">
-            <div className={cn('absolute inset-x-0 top-1/2 h-10 -translate-y-1/2', isDark ? 'bg-white/[0.08]' : 'bg-[#E7F0FF]/82')} />
-            <div
-              className={cn(
-                'pointer-events-none absolute h-44 w-44 rounded-full blur-[42px]',
-                isDark
-                  ? 'bg-[radial-gradient(circle,rgba(154,188,255,0.28)_0%,rgba(154,188,255,0.16)_36%,transparent_74%)]'
-                  : 'bg-[radial-gradient(circle,rgba(167,198,255,0.28)_0%,rgba(167,198,255,0.14)_38%,transparent_76%)]',
-              )}
-            />
+        <div className={cn('mt-6 overflow-hidden rounded-[1.55rem] border', moonTone.panel)}>
+          <div className="relative flex min-h-[10.75rem] items-center justify-center overflow-hidden px-6 py-7">
+            <div className={cn('pointer-events-none absolute inset-x-[4%] top-1/2 h-[4.4rem] -translate-y-1/2 rounded-full blur-[24px]', moonTone.mist)} />
+            <div className={cn('pointer-events-none absolute left-[24%] top-[28%] h-1.5 w-1.5 rounded-full', moonTone.speck)} />
+            <div className={cn('pointer-events-none absolute right-[26%] top-[30%] h-1 w-1 rounded-full', moonTone.speck)} />
+            <div className={cn('pointer-events-none absolute right-[31%] bottom-[30%] h-1.5 w-1.5 rounded-full', moonTone.speck)} />
 
-            <div className="relative flex h-[9.5rem] w-[9.5rem] items-center justify-center rounded-full px-6 text-center">
+            <div className={cn('pointer-events-none absolute h-[11.75rem] w-[11.75rem] rounded-full blur-[46px]', moonTone.halo)} />
+
+            <div className="relative flex h-[10.25rem] w-[10.25rem] items-center justify-center rounded-full text-center">
+              <div className={cn('absolute inset-0 rounded-full border', moonTone.orbit)} />
               <div
                 className={cn(
-                  'absolute inset-0 rounded-full border shadow-[0_24px_48px_rgba(40,82,150,0.22)]',
-                  isDark
-                    ? 'border-white/[0.18] bg-[radial-gradient(circle_at_28%_22%,rgba(255,255,255,0.34)_0%,rgba(214,228,255,0.20)_18%,rgba(122,156,222,0.18)_52%,rgba(70,99,162,0.34)_100%)]'
-                    : 'border-[#D3E2FF] bg-[radial-gradient(circle_at_28%_22%,rgba(255,255,255,0.92)_0%,rgba(240,247,255,0.88)_24%,rgba(205,223,255,0.82)_58%,rgba(154,185,235,0.72)_100%)]',
+                  'absolute inset-[0.6rem] rounded-full border shadow-[0_24px_50px_rgba(34,67,129,0.24)]',
+                  moonTone.body,
                 )}
               />
-              <div
-                className={cn(
-                  'absolute inset-[0.38rem] rounded-full border',
-                  isDark ? 'border-white/[0.22]' : 'border-white/[0.7]',
-                )}
-              />
-              <div
-                className={cn(
-                  'pointer-events-none absolute left-[18%] top-[14%] h-[26%] w-[48%] rounded-full blur-[7px]',
-                  isDark
-                    ? 'bg-[radial-gradient(circle,rgba(255,255,255,0.54)_0%,rgba(255,255,255,0.18)_62%,transparent_100%)]'
-                    : 'bg-[radial-gradient(circle,rgba(255,255,255,0.98)_0%,rgba(255,255,255,0.46)_58%,transparent_100%)]',
-                )}
-              />
-              <div
-                className={cn(
-                  'pointer-events-none absolute inset-x-[19%] bottom-[13%] h-[18%] rounded-full blur-[10px]',
-                  isDark
-                    ? 'bg-[radial-gradient(circle_at_50%_0%,rgba(10,23,52,0.24),transparent_72%)]'
-                    : 'bg-[radial-gradient(circle_at_50%_0%,rgba(72,103,150,0.16),transparent_74%)]',
-                )}
-              />
+              <div className={cn('pointer-events-none absolute inset-[1rem] rounded-full', moonTone.shade)} />
+              <div className={cn('pointer-events-none absolute left-[25%] top-[18%] h-[24%] w-[34%] rounded-full blur-[10px]', moonTone.highlight)} />
 
               <p
                 className={cn(
-                  'font-aggro-display relative max-w-[5.6rem] whitespace-pre-line break-keep text-[1.02rem] font-black leading-[1.32] tracking-[-0.03em]',
-                  isDark ? 'text-white' : 'text-[#18356F]',
+                  'font-aggro-display relative max-w-[5.9rem] whitespace-pre-line break-keep text-[1.02rem] font-black leading-[1.32] tracking-[-0.03em]',
+                  moonTone.text,
                 )}
               >
                 {mockExamProgram.spotlight}
