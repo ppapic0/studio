@@ -89,35 +89,13 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
         </h2>
 
         <div className={cn('mt-6 overflow-hidden rounded-[1.55rem] border', spotlightTone.panel)}>
-          <div className="relative grid min-h-[11rem] gap-5 overflow-hidden px-5 py-7 sm:min-h-[12rem] sm:px-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-8">
+          <div className="relative min-h-[11rem] overflow-hidden px-5 py-7 sm:min-h-[12rem] sm:px-8">
             <div className={cn('pointer-events-none absolute inset-x-[4%] top-1/2 h-[4.8rem] -translate-y-1/2 rounded-full blur-[22px]', spotlightTone.beam)} />
             <div className={cn('pointer-events-none absolute left-[18%] h-[8.5rem] w-[15rem] rounded-full blur-[34px] sm:h-[9rem] sm:w-[16rem]', spotlightTone.aura)} />
 
-            <div className="relative flex justify-center lg:justify-start">
-              <div
-                className={cn(
-                  'relative flex min-h-[11rem] w-[8.9rem] items-center justify-center rounded-[2rem] border p-2 text-center sm:min-h-[11.75rem] sm:w-[9.75rem] sm:rounded-[2.2rem]',
-                  spotlightTone.plaqueShell,
-                )}
-              >
-                <div className={cn('absolute inset-[0.52rem] rounded-[1.55rem] border sm:rounded-[1.7rem]', spotlightTone.plaqueCore)} />
-                <div className={cn('pointer-events-none absolute left-[1.15rem] right-[1.15rem] top-[1.05rem] h-px', spotlightTone.divider)} />
-                <div className={cn('pointer-events-none absolute inset-x-[18%] top-[0.9rem] h-[26%] rounded-full blur-[14px]', spotlightTone.glint)} />
-
-                <p
-                  className={cn(
-                    'font-aggro-display relative max-w-[6.9rem] whitespace-pre-line break-keep text-[1.12rem] font-black leading-[1.25] tracking-[-0.03em] sm:text-[1.2rem]',
-                    spotlightTone.text,
-                  )}
-                >
-                  {mockExamProgram.spotlight}
-                </p>
-              </div>
-            </div>
-
             <div
               className={cn(
-                'relative h-[13.5rem] overflow-hidden rounded-[1.45rem] border p-3 sm:h-[15rem] sm:rounded-[1.7rem] sm:p-4',
+                'relative mx-auto h-[13.5rem] w-full max-w-[34rem] overflow-hidden rounded-[1.45rem] border p-3 sm:h-[15rem] sm:rounded-[1.7rem] sm:p-4',
                 isDark ? 'border-white/12 bg-white/[0.04]' : 'border-[#D6E3FB] bg-white/75',
               )}
               style={{ '--proof-cycle-duration': `${proofCycleDuration}s` } as React.CSSProperties}
