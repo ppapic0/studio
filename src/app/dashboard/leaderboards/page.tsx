@@ -1519,7 +1519,7 @@ function DailyWaitingCard({
             랭킹 트랙이 열려요
           </h2>
           <p className="student-aggro-body mt-3 max-w-2xl text-sm leading-7 text-[#5B7098] md:text-base">
-            {windowLabel} 동안만 일간 순위가 실시간으로 집계됩니다. 지금은 대기 상태라서 다음 오픈 시간에 다시 LIVE로 전환돼요.
+            {windowLabel}에 공부한 기록만 일간 순위에 실시간 반영됩니다. 지금은 대기 상태라서 다음 오픈 시간에 다시 LIVE로 전환돼요.
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
@@ -1991,7 +1991,7 @@ export default function RankingBattlePage() {
             activeMessage={`다음 오픈 ${dailyRankWindow.nextOpensAtLabel}부터 일간 랭킹이 다시 LIVE로 열려요.`}
             isLive={false}
             statusLabel="집계 대기"
-            subtitleOverride={`${dailyRankWindow.windowLabel} 동안만 일간 경쟁이 열립니다.`}
+            subtitleOverride={`${dailyRankWindow.windowLabel}에 공부한 기록만 일간 경쟁에 반영됩니다.`}
             isMobile={isMobile}
           />
 

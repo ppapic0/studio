@@ -2309,8 +2309,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             : '오늘 기록이 쌓이면 바로 보여요'
           : `다음 오픈 ${dailyRankWindow.nextOpensAtLabel}`,
         description: dailyRankWindow.isLive
-          ? `${dailyRankWindow.windowLabel} · ${formatStudentRankRewardSummary('daily')}`
-          : `${dailyRankWindow.windowLabel} · ${formatStudentRankRewardSummary('daily')}`,
+          ? `${dailyRankWindow.windowLabel} 공부 기록만 반영 · ${formatStudentRankRewardSummary('daily')}`
+          : `${dailyRankWindow.windowLabel} 공부 기록만 반영 · ${formatStudentRankRewardSummary('daily')}`,
         preview: dailyTop,
         isLoading: rankSnapshotLoading,
         isLive: dailyRankWindow.isLive,
