@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { BookOpenText, ChevronLeft, ChevronRight, Crosshair, Gauge, Target } from 'lucide-react';
 
@@ -48,6 +48,10 @@ const mockExamProofImages = [
   },
 ] as const;
 
+function getWrappedProofIndex(currentIndex: number, step: number) {
+  return (currentIndex + step + mockExamProofImages.length) % mockExamProofImages.length;
+}
+
 export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: MockExamProgramSectionProps) {
   const isCard = surface === 'card';
   const isDark = surface === 'flat-dark';
@@ -71,8 +75,7 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
         count: 'bg-white/10 text-white/78',
         dotIdle: 'bg-white/24',
         dotActive: 'bg-white',
-        frame: 'border-white/12 bg-white/[0.04]',
-        imageShell: 'border-white/16 bg-white/[0.08]',
+        card: 'border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.03)_100%)]',
         label: 'bg-[#14295F]/86 text-white',
       }
     : {
@@ -80,18 +83,25 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
         count: 'bg-[#EDF3FF] text-[#5C7396]',
         dotIdle: 'bg-[#C8D7F2]',
         dotActive: 'bg-[#2F63E3]',
-        frame: 'border-[#D6E3FB] bg-white/75',
-        imageShell: 'border-[#D7E4FB] bg-white',
+        card: 'border-[#D6E3FB] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(243,247,255,0.86)_100%)]',
         label: 'bg-[#14295F]/86 text-white',
       };
 
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setActiveProofIndex((currentIndex) => getWrappedProofIndex(currentIndex, 1));
+    }, 3200);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const moveProofIndex = (direction: 'prev' | 'next') => {
-    setActiveProofIndex((currentIndex) => {
-      if (direction === 'prev') {
-        return currentIndex === 0 ? mockExamProofImages.length - 1 : currentIndex - 1;
-      }
-      return currentIndex === mockExamProofImages.length - 1 ? 0 : currentIndex + 1;
-    });
+    const step = direction === 'prev' ? -1 : 1;
+    setActiveProofIndex((currentIndex) => getWrappedProofIndex(currentIndex, step));
   };
 
   return (
@@ -107,91 +117,84 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
           {mockExamProgram.title}
         </h2>
 
-        <div className={cn('mt-6 overflow-hidden rounded-[1.55rem] border', spotlightTone.panel)}>
-          <div className="relative min-h-[11rem] overflow-hidden px-5 py-7 sm:min-h-[12rem] sm:px-8">
-            <div className={cn('pointer-events-none absolute inset-x-[4%] top-1/2 h-[4.8rem] -translate-y-1/2 rounded-full blur-[22px]', spotlightTone.beam)} />
-            <div className={cn('pointer-events-none absolute left-[18%] h-[8.5rem] w-[15rem] rounded-full blur-[34px] sm:h-[9rem] sm:w-[16rem]', spotlightTone.aura)} />
+        <div
+          className={cn(
+            'relative mt-6 overflow-hidden rounded-[1.7rem] border px-5 pb-14 pt-6 sm:px-8 sm:pb-16 sm:pt-7',
+            spotlightTone.panel,
+            controlTone.card,
+          )}
+        >
+          <div className={cn('pointer-events-none absolute inset-x-[6%] top-1/2 h-[4.8rem] -translate-y-1/2 rounded-full blur-[22px]', spotlightTone.beam)} />
+          <div className={cn('pointer-events-none absolute left-[18%] top-[18%] h-[8.5rem] w-[15rem] rounded-full blur-[34px] sm:h-[9rem] sm:w-[16rem]', spotlightTone.aura)} />
+          <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-14 bg-gradient-to-r sm:w-20', isDark ? 'from-[#1A3471]/85 via-[#1A3471]/45 to-transparent' : 'from-white via-white/55 to-transparent')} />
+          <div className={cn('pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l sm:w-20', isDark ? 'from-[#1A3471]/85 via-[#1A3471]/45 to-transparent' : 'from-white via-white/55 to-transparent')} />
 
-            <div
-              className={cn(
-                'relative mx-auto h-[13.5rem] w-full max-w-[34rem] overflow-hidden rounded-[1.45rem] border p-3 sm:h-[15rem] sm:rounded-[1.7rem] sm:p-4',
-                controlTone.frame,
-              )}
-            >
-              <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-14 bg-gradient-to-r sm:w-20', isDark ? 'from-[#1A3471] via-[#1A3471]/50 to-transparent' : 'from-white via-white/60 to-transparent')} />
-              <div className={cn('pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l sm:w-20', isDark ? 'from-[#1A3471] via-[#1A3471]/55 to-transparent' : 'from-white via-white/55 to-transparent')} />
-              <div className={cn('pointer-events-none absolute inset-x-5 top-3 flex items-center justify-between text-[10px] font-black tracking-[0.18em] sm:inset-x-6', isDark ? 'text-white/72' : 'text-[#5C7396]')}>
-                <span>MOCK EXAM COVERS</span>
-                <span className={cn('rounded-full px-2 py-1 text-[9px]', controlTone.count)}>
-                  {`${String(activeProofIndex + 1).padStart(2, '0')} / ${String(mockExamProofImages.length).padStart(2, '0')}`}
-                </span>
+          <div className={cn('pointer-events-none absolute inset-x-5 top-3 flex items-center justify-between text-[10px] font-black tracking-[0.18em] sm:inset-x-6 sm:top-4', isDark ? 'text-white/72' : 'text-[#5C7396]')}>
+            <span>MOCK EXAM COVERS</span>
+            <span className={cn('rounded-full px-2 py-1 text-[9px]', controlTone.count)}>
+              {`${String(activeProofIndex + 1).padStart(2, '0')} / ${String(mockExamProofImages.length).padStart(2, '0')}`}
+            </span>
+          </div>
+
+          <div className="relative flex min-h-[12.5rem] items-center justify-center sm:min-h-[14.5rem]">
+            <div className={cn('pointer-events-none absolute left-1/2 top-1/2 h-[11rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[48px] sm:h-[13rem] sm:w-[13rem]', spotlightTone.aura)} />
+            <div className="relative flex h-[10.8rem] w-full max-w-[16rem] items-center justify-center sm:h-[13rem] sm:max-w-[19rem]">
+              <div className={cn('absolute left-0 top-0 z-10 rounded-full px-3 py-1 text-[9px] font-black tracking-[0.14em] backdrop-blur-sm sm:text-[10px]', controlTone.label)}>
+                {activeProofImage.label}
               </div>
-
-              <div
+              <Image
                 key={activeProofImage.src}
+                src={activeProofImage.src}
+                alt={activeProofImage.alt}
+                fill
+                sizes="(min-width: 1024px) 24vw, 54vw"
+                className="object-contain object-center drop-shadow-[0_26px_30px_rgba(15,27,58,0.22)] transition-all duration-500"
+              />
+            </div>
+
+            <div className="absolute inset-x-0 top-1/2 z-20 flex -translate-y-1/2 items-center justify-between">
+              <button
+                type="button"
+                onClick={() => moveProofIndex('prev')}
+                aria-label="이전 모의고사 표지 보기"
                 className={cn(
-                  'absolute inset-y-6 left-12 right-12 overflow-hidden rounded-[1.15rem] border shadow-[0_18px_40px_rgba(15,27,58,0.20)] transition-all duration-300 sm:inset-y-7 sm:left-16 sm:right-16 sm:rounded-[1.35rem]',
-                  controlTone.imageShell,
+                  'inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_12px_24px_rgba(20,41,95,0.14)] transition-colors sm:h-11 sm:w-11',
+                  controlTone.button,
                 )}
               >
-                <div className={cn('absolute left-3 top-3 z-10 rounded-full px-3 py-1 text-[9px] font-black tracking-[0.14em] backdrop-blur-sm sm:left-4 sm:top-4 sm:text-[10px]', controlTone.label)}>
-                  {activeProofImage.label}
-                </div>
-                <div className="absolute inset-3 overflow-hidden rounded-[0.95rem] sm:inset-4 sm:rounded-[1.1rem]">
-                  <Image
-                    src={activeProofImage.src}
-                    alt={activeProofImage.alt}
-                    fill
-                    sizes="(min-width: 1024px) 24vw, 54vw"
-                    className="object-contain object-center"
-                  />
-                </div>
-              </div>
-
-              <div className="absolute inset-x-3 top-1/2 z-20 flex -translate-y-1/2 items-center justify-between sm:inset-x-4">
-                <button
-                  type="button"
-                  onClick={() => moveProofIndex('prev')}
-                  aria-label="이전 모의고사 표지 보기"
-                  className={cn(
-                    'inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_12px_24px_rgba(20,41,95,0.14)] transition-colors sm:h-11 sm:w-11',
-                    controlTone.button,
-                  )}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveProofIndex('next')}
-                  aria-label="다음 모의고사 표지 보기"
-                  className={cn(
-                    'inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_12px_24px_rgba(20,41,95,0.14)] transition-colors sm:h-11 sm:w-11',
-                    controlTone.button,
-                  )}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="absolute inset-x-0 bottom-4 z-20 flex items-center justify-center gap-2 sm:bottom-5">
-                {mockExamProofImages.map((image, index) => (
-                  <button
-                    key={image.src}
-                    type="button"
-                    onClick={() => setActiveProofIndex(index)}
-                    aria-label={`${image.label} 표지 보기`}
-                    className="inline-flex h-5 w-5 items-center justify-center"
-                  >
-                    <span
-                      className={cn(
-                        'h-2.5 rounded-full transition-all duration-200',
-                        index === activeProofIndex ? `w-7 ${controlTone.dotActive}` : `w-2.5 ${controlTone.dotIdle}`,
-                      )}
-                    />
-                  </button>
-                ))}
-              </div>
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => moveProofIndex('next')}
+                aria-label="다음 모의고사 표지 보기"
+                className={cn(
+                  'inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_12px_24px_rgba(20,41,95,0.14)] transition-colors sm:h-11 sm:w-11',
+                  controlTone.button,
+                )}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
+          </div>
+
+          <div className="absolute inset-x-0 bottom-4 z-20 flex items-center justify-center gap-2 sm:bottom-5">
+            {mockExamProofImages.map((image, index) => (
+              <button
+                key={image.src}
+                type="button"
+                onClick={() => setActiveProofIndex(index)}
+                aria-label={`${image.label} 표지 보기`}
+                className="inline-flex h-5 w-5 items-center justify-center"
+              >
+                <span
+                  className={cn(
+                    'h-2.5 rounded-full transition-all duration-200',
+                    index === activeProofIndex ? `w-7 ${controlTone.dotActive}` : `w-2.5 ${controlTone.dotIdle}`,
+                  )}
+                />
+              </button>
+            ))}
           </div>
         </div>
 
