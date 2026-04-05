@@ -18,6 +18,7 @@ type CenterIntroSectionProps = {
 export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps) {
   const isCard = surface === 'card';
   const isDark = surface === 'flat-dark';
+  const isFlat = !isCard;
 
   return (
     <section
@@ -49,13 +50,17 @@ export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className={cn('grid sm:grid-cols-2', isFlat ? 'gap-x-5 gap-y-6' : 'gap-3')}>
           {centerIntroPoints.map(({ icon: Icon, title, detail }) => (
             <div
               key={title}
               className={cn(
-                'rounded-[1.45rem] border px-4 py-4',
-                isDark ? 'border-white/12 bg-white/8 backdrop-blur-sm' : 'border-[#14295F]/10 bg-[#F9FBFF]',
+                'px-4 py-4',
+                isCard &&
+                  (isDark
+                    ? 'rounded-[1.45rem] border border-white/12 bg-white/8 backdrop-blur-sm'
+                    : 'rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF]'),
+                isFlat && 'rounded-none border-none bg-transparent px-0 py-0 shadow-none backdrop-blur-none',
               )}
             >
               <div className="flex items-center gap-3">
