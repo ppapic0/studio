@@ -754,8 +754,7 @@ export const marketingContent: MarketingContent = {
   },
   consult: {
     heading: '방문 상담 · 입학 문의',
-    description:
-      '관리형 스터디센터 이용부터 수능 국어 수업 선택 여부까지, 학생 상황에 맞는 시작 경로를 안내합니다.',
+    description: '',
     contactLine: '상담 문의: 접수 후 순차연락',
     locationLine: '위치: 경기 용인시 기흥구 동백중앙로 283 B동 9층 906호, 907호',
     hoursLine: '학기중 평일 오후 5:00 ~ 다음날 오전 1:00 · 학기중 토요일·일요일/방학중 오전 8:00 ~ 다음날 오전 1:00 · N수생 별도 운영시간 운영',
