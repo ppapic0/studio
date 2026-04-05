@@ -1897,6 +1897,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const analysisReadableSoftTextClass = isAnalysisPresentation ? 'text-white/90' : 'text-[var(--text-on-dark-muted)]';
   const analysisChartTickColor = isAnalysisPresentation ? '#f4f8ff' : '#6a7da6';
   const analysisChartTickSoftColor = isAnalysisPresentation ? '#f4f8ff' : '#7b8dab';
+  const analysisChartGridColor = isAnalysisPresentation ? 'rgba(244, 248, 255, 0.34)' : '#f2f2f2';
+  const analysisStudyTrendStrokeColor = isAnalysisPresentation ? '#f4f8ff' : 'hsl(var(--primary))';
   const analysisChipPrimaryTextClass = isAnalysisPresentation ? 'text-[#f4f8ff]' : 'text-[#14295F]';
   const analysisChipSecondaryTextClass = isAnalysisPresentation ? 'text-white/80' : 'text-[#5c6e97]';
   const analysisChipLabelClass = cn('text-[10px] font-black uppercase leading-[1.2] tracking-[0.18em]', analysisReadableMutedTextClass);
@@ -3282,8 +3284,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <Card className={cn("lg:col-span-8 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden", isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> 공부시간 추이</CardTitle>
-                      <CardDescription className="font-bold text-[11px]">집중 시간을 시계열로 확인해 리듬 변화를 파악합니다.</CardDescription>
+                      <CardTitle className={cn("text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation && "text-[var(--text-on-dark)]")}><Activity className={cn("h-5 w-5 text-primary", isAnalysisPresentation && "text-white")} /> 공부시간 추이</CardTitle>
+                      <CardDescription className={cn("font-bold text-[11px]", isAnalysisPresentation && "text-white/85")}>집중 시간을 시계열로 확인해 리듬 변화를 파악합니다.</CardDescription>
                     </div>
                     <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
                       {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
@@ -3296,13 +3298,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
                           <defs>
-                            <linearGradient id="studyMinutesGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.02} /></linearGradient>
+                            <linearGradient id="studyMinutesGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={analysisStudyTrendStrokeColor} stopOpacity={isAnalysisPresentation ? 0.28 : 0.35} /><stop offset="95%" stopColor={analysisStudyTrendStrokeColor} stopOpacity={isAnalysisPresentation ? 0.04 : 0.02} /></linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
-                          <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
-                          <YAxis tickLine={false} axisLine={false} fontSize={11} fontWeight={800} width={38} />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={analysisChartGridColor} />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} width={38} />
                           <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
-                          <Area type="monotone" dataKey="studyMinutes" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#studyMinutesGradient)" />
+                          <Area type="monotone" dataKey="studyMinutes" stroke={analysisStudyTrendStrokeColor} strokeWidth={3} fill="url(#studyMinutesGradient)" />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
