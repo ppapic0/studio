@@ -57,6 +57,8 @@ const heroMetrics = [
   },
 ];
 
+const analyticsFocusChips = ['공부시간', '목표 달성률', '성장률', '리듬', '시작·종료 시간', '중간 이탈시간'];
+
 const LARGE_CHART: ChartConfig = {
   width: 720,
   height: 292,
@@ -691,17 +693,34 @@ export function DataAnalyticsPreviewSection({ showNextView = true }: { showNextV
         />
       </div>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="relative mx-auto max-w-3xl text-center">
-          <span className="eyebrow-badge">DATA DRIVEN</span>
-          <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.58rem,8vw,3rem)] font-black leading-[1.08] text-[#14295F]">
-            실제 앱처럼 누적되는 그래프를
-            <br />
-            홈에서도 먼저 보여드립니다
-          </h2>
-          <p className="mt-4 break-keep text-[14px] font-bold leading-[1.74] text-[#2F4662] sm:text-[15.5px]">
-            공부시간, 목표 달성률, 성장률, 리듬, 시작·종료 시간, 중간 이탈시간까지 한 화면에서 읽을 수 있도록
-            실제 운영 구조를 홈페이지용으로 다시 정리했습니다.
-          </p>
+        <div className="relative mx-auto max-w-4xl">
+          <div className="overflow-hidden rounded-[2rem] border border-[#D8E5FF] bg-[linear-gradient(180deg,#FBFDFF_0%,#F3F7FF_100%)] px-5 py-8 text-center shadow-[0_20px_44px_rgba(20,41,95,0.06)] sm:px-8 sm:py-10">
+            <div className="pointer-events-none absolute inset-x-[18%] top-[16%] h-28 rounded-full bg-[radial-gradient(circle,rgba(122,167,255,0.10)_0%,transparent_72%)] blur-3xl" />
+            <div className="relative">
+              <span className="eyebrow-badge">DATA DRIVEN</span>
+              <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.5rem,6vw,2.7rem)] font-black leading-[1.08] text-[#14295F]">
+                학습 데이터를 체계적으로
+                <br />
+                분석하고 맞춤형 학습 방향을 제시합니다.
+              </h2>
+
+              <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+                {analyticsFocusChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="inline-flex rounded-full border border-[#D9E4F8] bg-white/88 px-3 py-1.5 text-[11px] font-black text-[#425A75] shadow-[0_8px_18px_rgba(20,41,95,0.06)]"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+
+              <p className="mx-auto mt-5 max-w-[24rem] break-keep text-[13px] font-bold leading-[1.72] text-[#526984] sm:text-[14px]">
+                학생, 학부모 상담자료로 사용하여 학습방향을 설정합니다.
+              </p>
+              <div className="mx-auto mt-6 h-[3px] w-full max-w-[15rem] rounded-full bg-[linear-gradient(90deg,rgba(20,41,95,0.14)_0%,rgba(20,41,95,0.55)_50%,rgba(20,41,95,0.14)_100%)]" />
+            </div>
+          </div>
         </div>
 
         <StaggerChildren stagger={90} className="mt-6 grid gap-3 sm:grid-cols-3">
