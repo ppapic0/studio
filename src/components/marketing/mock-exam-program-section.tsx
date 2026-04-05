@@ -1,3 +1,4 @@
+import type React from 'react';
 import Image from 'next/image';
 import type { LucideIcon } from 'lucide-react';
 import { BookOpenText, Crosshair, Gauge, Target } from 'lucide-react';
@@ -119,6 +120,7 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
                 'relative h-[13.5rem] overflow-hidden rounded-[1.45rem] border p-3 sm:h-[15rem] sm:rounded-[1.7rem] sm:p-4',
                 isDark ? 'border-white/12 bg-white/[0.04]' : 'border-[#D6E3FB] bg-white/75',
               )}
+              style={{ '--proof-cycle-duration': `${proofCycleDuration}s` } as React.CSSProperties}
             >
               <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-14 bg-gradient-to-r sm:w-20', isDark ? 'from-[#1A3471] via-[#1A3471]/50 to-transparent' : 'from-white via-white/60 to-transparent')} />
               <div className={cn('pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l sm:w-20', isDark ? 'from-[#1A3471] via-[#1A3471]/55 to-transparent' : 'from-white via-white/55 to-transparent')} />
@@ -184,36 +186,6 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
           })}
         </div>
       </div>
-      <style jsx>{`
-        .mock-exam-proof-card {
-          opacity: 0;
-          transform: translateX(32px) scale(0.94);
-          animation: mock-exam-proof-cycle ${proofCycleDuration}s ease-in-out infinite;
-        }
-
-        @keyframes mock-exam-proof-cycle {
-          0% {
-            opacity: 0;
-            transform: translateX(32px) scale(0.94);
-          }
-          8% {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
-          28% {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
-          36% {
-            opacity: 0;
-            transform: translateX(-22px) scale(0.98);
-          }
-          100% {
-            opacity: 0;
-            transform: translateX(-22px) scale(0.98);
-          }
-        }
-      `}</style>
     </section>
   );
 }
