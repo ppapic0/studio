@@ -2323,6 +2323,7 @@ export default function StudyPlanPage() {
     source?: StudentScheduleDoc['source'];
     recommendedStudyMinutes?: number | null;
     recommendedWeeklyDays?: number | null;
+    existingScheduleDoc?: Partial<StudentScheduleDoc> | null;
   }) => {
     if (!firestore || !user) return;
 
@@ -2348,12 +2349,53 @@ export default function StudyPlanPage() {
 
     await setDoc(scheduleRef, {
       ...scheduleDoc,
-      createdAt: (selectedScheduleDoc as any)?.createdAt || serverTimestamp(),
+      createdAt:
+        params.existingScheduleDoc?.createdAt ||
+        (params.dateKey === selectedDateKey ? (selectedScheduleDoc as any)?.createdAt : null) ||
+        serverTimestamp(),
       updatedAt: serverTimestamp(),
     }, { merge: true });
 
     await syncLegacyScheduleItems(params.dateKey, scheduleDoc as StudentScheduleDoc);
-  }, [activeMembership, firestore, selectedScheduleDoc, studentProfile?.name, syncLegacyScheduleItems, user]);
+  }, [activeMembership, firestore, selectedDateKey, selectedScheduleDoc, studentProfile?.name, syncLegacyScheduleItems, user]);
+
+  const syncWeekdayTemplateToVisibleSchedules = useCallback(async (params: {
+    templateId: string;
+    targetWeekdays: number[];
+    draft: AttendanceScheduleDraft;
+  }) => {
+    const targetWeekdaySet = new Set(params.targetWeekdays);
+    const todayStart = startOfDay(new Date());
+    const visibleTargetDays = weekDays.filter((day) => (
+      targetWeekdaySet.has(getDay(day)) &&
+      !isBefore(startOfDay(day), todayStart)
+    ));
+
+    for (const day of visibleTargetDays) {
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const existingSchedule = weekScheduleMap[dateKey];
+      const hasManualOverride = Boolean(
+        existingSchedule &&
+        existingSchedule.source !== 'regular-routine' &&
+        existingSchedule.recurrenceSourceId !== params.templateId
+      );
+
+      if (hasManualOverride) {
+        continue;
+      }
+
+      await persistStudentSchedule({
+        dateKey,
+        draft: params.draft,
+        awaySlots: params.draft.awaySlots || [],
+        recurrenceSourceId: params.templateId,
+        source: 'regular-routine',
+        recommendedStudyMinutes: scheduleRecommendationPrefill?.recommendedDailyStudyMinutes || null,
+        recommendedWeeklyDays: scheduleRecommendationPrefill?.recommendedWeeklyDays || null,
+        existingScheduleDoc: existingSchedule || null,
+      });
+    }
+  }, [persistStudentSchedule, scheduleRecommendationPrefill, weekDays, weekScheduleMap]);
 
   const handleSetAttendance = async (type: 'attend' | 'absent') => {
     if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
@@ -2605,24 +2647,30 @@ export default function StudyPlanPage() {
         { merge: true }
       );
       await batch.commit();
+      await syncWeekdayTemplateToVisibleSchedules({
+        templateId,
+        targetWeekdays,
+        draft: weekdayDraft,
+      });
       setScheduleSaveFeedback({
         title: '주간 기본 일정 저장 완료',
-        description: `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장했어요.`,
+        description: `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장하고 이번 주에도 바로 반영했어요.`,
       });
       setAttendanceSheetInitialTab('weekday');
       setIsAttendanceScheduleSheetOpen(false);
       return true;
-    } catch {
+    } catch (error: any) {
+      logHandledClientIssue('[plan-track] save weekday template failed', error);
       toast({
         variant: 'destructive',
         title: '정기 루틴 저장 실패',
-        description: '반복 루틴을 저장하지 못했어요.',
+        description: typeof error?.message === 'string' ? error.message : '반복 루틴을 저장하지 못했어요.',
       });
       return false;
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeScheduleTemplates, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, toast, user, weekdayDraft]);
+  }, [activeScheduleTemplates, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, toast, user, weekdayDraft]);
 
   const handleSaveSchedulePreset = useCallback(async () => {
     if (!firestore || !user) return;
