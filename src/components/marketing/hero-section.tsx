@@ -377,13 +377,6 @@ export function HeroSection({ brand }: HeroSectionProps) {
               상담 문의하기
             </a>
           </div>
-
-          <p
-            className="hero-meta-enter mx-auto max-w-[18rem] break-keep text-[11.5px] font-semibold leading-[1.68] text-white/[0.58] sm:max-w-[32rem] sm:text-[12.5px]"
-            style={{ ['--hero-meta-delay' as string]: '0.58s' }}
-          >
-            관리형 스터디센터 · 국어학원 · 학부모 앱 연동
-          </p>
         </div>
       </div>
     </section>

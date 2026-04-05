@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 import { cn } from '@/lib/utils';
 
 const appFlowCards = [
@@ -38,17 +40,25 @@ export function FeedbackManagementSection({ surface = 'card', titleBreakMode = '
             <div className={cn('pointer-events-none absolute inset-0', isDark ? 'bg-[radial-gradient(circle_at_75%_18%,rgba(255,255,255,0.10),transparent_28%)]' : 'bg-[radial-gradient(circle_at_75%_18%,rgba(255,122,22,0.12),transparent_28%)]')} />
             <div className="relative">
               <p className={cn('text-[10px] font-black tracking-[0.18em]', isDark ? 'text-white/[0.58]' : 'text-[#FF7A16]')}>APP LINKED MANAGEMENT</p>
-              <div className={cn('mt-4 flex min-h-[270px] items-center justify-center rounded-[1.6rem] border px-6 py-10 text-center sm:min-h-[320px]', isDark ? 'border-dashed border-white/[0.12] bg-white/[0.06]' : 'border-dashed border-[#14295F]/12 bg-white/82')}>
-                <div className="max-w-[220px]">
-                  <div className={cn('mx-auto h-16 w-16 rounded-[1.5rem] border shadow-[0_14px_30px_rgba(20,41,95,0.08)]', isDark ? 'border-white/[0.14] bg-white/10' : 'border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F6F9FF_100%)]')} />
-                  <p className={cn('mt-6 text-[11px] font-black tracking-[0.22em]', isDark ? 'text-white/[0.48]' : 'text-[#FF7A16]')}>REAL CAPTURE READY</p>
-                  <p className={cn('font-aggro-display mt-3 break-keep text-[1.15rem] font-black leading-[1.35] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>학습 현황 · 피드백 화면 예정</p>
+              <div className={cn('mt-4 rounded-[1.6rem] border px-4 py-5 text-center sm:px-5 sm:py-6', isDark ? 'border-white/[0.12] bg-white/[0.06]' : 'border-[#14295F]/12 bg-white/82')}>
+                <div className="mx-auto max-w-[290px]">
+                  <div className={cn('relative mx-auto aspect-[284/439] overflow-hidden rounded-[1.7rem] border shadow-[0_20px_44px_rgba(20,41,95,0.16)]', isDark ? 'border-white/[0.16] bg-[#0E2152]' : 'border-[#14295F]/10 bg-[#F7FAFF]')}>
+                    <Image
+                      src="/marketing/app-evidence/study-feedback-dashboard-preview.svg"
+                      alt="학습 현황과 피드백이 한 화면에서 보이는 앱 프리뷰"
+                      fill
+                      sizes="(min-width: 640px) 290px, 82vw"
+                      className="object-contain object-center"
+                    />
+                  </div>
+                  <p className={cn('mt-5 text-[11px] font-black tracking-[0.22em]', isDark ? 'text-white/[0.48]' : 'text-[#FF7A16]')}>REAL CAPTURE READY</p>
+                  <p className={cn('font-aggro-display mt-3 break-keep text-[1.15rem] font-black leading-[1.35] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>학습 현황 · 피드백 실제 화면</p>
                   <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.75]', isDark ? 'text-white/[0.74]' : 'text-[#506680]')}>
                     학생별 계획, 실행, 학습 현황과 피드백이
                     <br />
-                    바로 연결되는 앱 화면을 여기에
+                    한 화면 안에서 자연스럽게
                     <br />
-                    반영합니다.
+                    이어지는 구조를 보여줍니다.
                   </p>
                 </div>
               </div>

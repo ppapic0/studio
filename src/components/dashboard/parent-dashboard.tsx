@@ -3545,7 +3545,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       <Label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
                         확인 중인 자녀
                       </Label>
-                      <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={handleParentStudentChange}>
+                      <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={handleStudentChange}>
                         <SelectTrigger className="h-11 rounded-2xl border bg-white/90 px-4 text-left font-black shadow-sm">
                           <SelectValue placeholder={activeStudentLabel} />
                         </SelectTrigger>

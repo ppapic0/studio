@@ -1788,8 +1788,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           (priorityByStatus[left.boardStatus] ?? 99) - (priorityByStatus[right.boardStatus] ?? 99);
         if (statusDelta !== 0) return statusDelta;
         if (left.attendanceRiskLevel !== right.attendanceRiskLevel) {
-          const riskWeight = { risk: 0, warning: 1, stable: 2 } as const;
-          return riskWeight[left.attendanceRiskLevel] - riskWeight[right.attendanceRiskLevel];
+          const getRiskWeight = (level: string) => {
+            if (level === 'risk') return 0;
+            if (level === 'warning') return 1;
+            return 2;
+          };
+          return getRiskWeight(left.attendanceRiskLevel) - getRiskWeight(right.attendanceRiskLevel);
         }
         return left.studentName.localeCompare(right.studentName, 'ko');
       })

@@ -7,7 +7,7 @@ const SESSION_COOKIE = 'track_marketing_sid';
 
 type MarketingClientEvent = {
   eventType: 'page_view' | 'login_success';
-  pageType: 'landing' | 'experience' | 'login';
+  pageType: 'landing' | 'experience' | 'login' | 'center' | 'results';
   mode?: string | null;
   view?: string | null;
   placement?: string | null;

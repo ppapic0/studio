@@ -1,0 +1,103 @@
+<svg width="568" height="878" viewBox="0 0 568 878" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="24" y1="18" x2="544" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17316D"/>
+      <stop offset="1" stop-color="#0F2457"/>
+    </linearGradient>
+    <linearGradient id="card" x1="30" y1="0" x2="270" y2="350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A3C84"/>
+      <stop offset="1" stop-color="#112B66"/>
+    </linearGradient>
+    <linearGradient id="orangeCard" x1="0" y1="0" x2="210" y2="208" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF0D7"/>
+      <stop offset="1" stop-color="#FFD38B"/>
+    </linearGradient>
+    <linearGradient id="button" x1="0" y1="0" x2="0" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9A38"/>
+      <stop offset="1" stop-color="#FF7A16"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="568" height="878" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="14"/>
+      <feGaussianBlur stdDeviation="12"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0431373 0 0 0 0 0.0980392 0 0 0 0 0.254902 0 0 0 0.16 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="18" y="14" width="532" height="830" rx="28" fill="white"/>
+    <rect x="18" y="14" width="532" height="830" rx="28" fill="url(#bg)"/>
+
+    <text x="44" y="52" fill="white" font-size="15" font-weight="700" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">오늘도 성장한 하루</text>
+    <text x="417" y="52" fill="#D6E0FF" font-size="10" font-weight="700" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">TRACK STUDY CENTER</text>
+    <rect x="451" y="38" width="71" height="18" rx="9" fill="white" fill-opacity="0.12"/>
+
+    <text x="44" y="108" fill="white" font-size="36" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">6시간</text>
+    <text x="44" y="129" fill="#D4DEFF" font-size="12" font-weight="700" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">오늘의 학습 시간</text>
+
+    <rect x="42" y="148" width="318" height="88" rx="24" fill="url(#card)"/>
+    <text x="60" y="177" fill="#D9E3FF" font-size="11" font-weight="700" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">집중 루틴 현황</text>
+    <rect x="60" y="190" width="280" height="18" rx="9" fill="white" fill-opacity="0.14"/>
+    <rect x="60" y="190" width="214" height="18" rx="9" fill="#FFB34C"/>
+    <rect x="60" y="216" width="280" height="8" rx="4" fill="white" fill-opacity="0.12"/>
+    <rect x="60" y="216" width="126" height="8" rx="4" fill="white" fill-opacity="0.34"/>
+
+    <text x="385" y="108" fill="white" font-size="24" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">8회</text>
+    <text x="385" y="129" fill="#D4DEFF" font-size="12" font-weight="700" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">오늘의 체크 횟수</text>
+    <rect x="380" y="148" width="146" height="204" rx="24" fill="url(#orangeCard)"/>
+    <rect x="430" y="174" width="46" height="46" rx="14" fill="#FFB23D"/>
+    <rect x="430" y="174" width="46" height="46" rx="14" fill="white" fill-opacity="0.18"/>
+    <text x="416" y="248" fill="#5B3A08" font-size="11" font-weight="700" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">학습 흐름 집중</text>
+    <rect x="397" y="270" width="112" height="50" rx="16" fill="url(#button)"/>
+    <text x="423" y="301" fill="white" font-size="14" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">오늘 목표</text>
+
+    <rect x="42" y="260" width="318" height="260" rx="24" fill="url(#card)"/>
+    <text x="60" y="290" fill="white" font-size="16" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">오늘의 학습 흐름</text>
+    <rect x="60" y="314" width="282" height="64" rx="18" fill="white" fill-opacity="0.08"/>
+    <circle cx="84" cy="346" r="12" fill="white" fill-opacity="0.2"/>
+    <rect x="108" y="335" width="104" height="8" rx="4" fill="white" fill-opacity="0.65"/>
+    <rect x="108" y="350" width="188" height="8" rx="4" fill="white" fill-opacity="0.2"/>
+    <rect x="60" y="390" width="282" height="64" rx="18" fill="white" fill-opacity="0.08"/>
+    <circle cx="84" cy="422" r="12" fill="white" fill-opacity="0.2"/>
+    <rect x="108" y="411" width="138" height="8" rx="4" fill="white" fill-opacity="0.65"/>
+    <rect x="108" y="426" width="162" height="8" rx="4" fill="white" fill-opacity="0.2"/>
+    <rect x="60" y="466" width="282" height="36" rx="18" fill="#FFF1DA"/>
+    <text x="171" y="489" fill="#A75C00" font-size="12" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">집중 보상 확인</text>
+
+    <rect x="380" y="372" width="68" height="68" rx="20" fill="white"/>
+    <rect x="458" y="372" width="68" height="68" rx="20" fill="#FFF5E6"/>
+    <rect x="380" y="450" width="146" height="140" rx="24" fill="#FFF5E8"/>
+    <text x="396" y="480" fill="#A45A03" font-size="13" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">실시간 실행 분석</text>
+    <circle cx="412" cy="530" r="18" fill="#FF9B34"/>
+    <rect x="438" y="496" width="20" height="52" rx="10" fill="#FFD08A"/>
+    <rect x="466" y="482" width="20" height="66" rx="10" fill="#FFAB3F"/>
+    <rect x="494" y="512" width="20" height="36" rx="10" fill="#FFCB79"/>
+    <rect x="398" y="562" width="110" height="10" rx="5" fill="#D88E2A" fill-opacity="0.32"/>
+
+    <rect x="42" y="544" width="484" height="136" rx="24" fill="url(#card)"/>
+    <text x="60" y="574" fill="white" font-size="15" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">4주간 성장 그래프</text>
+    <rect x="58" y="598" width="56" height="54" rx="18" fill="white" fill-opacity="0.08"/>
+    <rect x="120" y="586" width="56" height="66" rx="18" fill="white" fill-opacity="0.1"/>
+    <rect x="182" y="574" width="56" height="78" rx="18" fill="#FF8A24"/>
+    <rect x="244" y="560" width="56" height="92" rx="18" fill="#FF9F40"/>
+    <rect x="306" y="548" width="56" height="104" rx="18" fill="#FFB04A"/>
+    <rect x="368" y="532" width="56" height="120" rx="18" fill="#FFBE63"/>
+    <rect x="430" y="518" width="56" height="134" rx="18" fill="#FFD07C"/>
+
+    <rect x="42" y="706" width="150" height="108" rx="22" fill="#F9FBFF"/>
+    <rect x="209" y="706" width="150" height="108" rx="22" fill="#FFF7EE"/>
+    <rect x="376" y="706" width="150" height="108" rx="22" fill="#FFF3F6"/>
+    <text x="60" y="738" fill="#14295F" font-size="12" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">오늘의 리포트</text>
+    <rect x="60" y="755" width="102" height="10" rx="5" fill="#14295F" fill-opacity="0.14"/>
+    <rect x="60" y="775" width="78" height="10" rx="5" fill="#14295F" fill-opacity="0.14"/>
+    <text x="227" y="738" fill="#C56A07" font-size="12" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">과목별 피드백</text>
+    <rect x="227" y="755" width="98" height="10" rx="5" fill="#C56A07" fill-opacity="0.14"/>
+    <rect x="227" y="775" width="82" height="10" rx="5" fill="#C56A07" fill-opacity="0.14"/>
+    <text x="394" y="738" fill="#D14A74" font-size="12" font-weight="800" font-family="Arial, Apple SD Gothic Neo, Noto Sans KR, sans-serif">다음날 실행 예약</text>
+    <rect x="394" y="755" width="102" height="10" rx="5" fill="#D14A74" fill-opacity="0.14"/>
+    <rect x="394" y="775" width="72" height="10" rx="5" fill="#D14A74" fill-opacity="0.14"/>
+  </g>
+</svg>

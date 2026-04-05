@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
 
 type MarketingPageTrackerProps = {
-  pageType: 'landing' | 'experience' | 'login';
+  pageType: 'landing' | 'experience' | 'login' | 'center' | 'results';
   placement?: string;
 };
 

@@ -778,6 +778,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return matched?.name || '학생';
   }, [studentsById, selectedSeat?.studentId]);
 
+  const selectedStudentProfile = useMemo(() => {
+    if (!selectedSeat?.studentId) return null;
+    return studentsById.get(selectedSeat.studentId) || null;
+  }, [studentsById, selectedSeat?.studentId]);
+
   const selectedSeatLabel = useMemo(
     () => formatSeatLabel(selectedSeat, roomConfigs),
     [selectedSeat, roomConfigs]
@@ -1247,8 +1252,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', studentId);
           batch.set(rankRef, {
             studentId,
-            displayNameSnapshot: selectedStudent?.name || '학생',
-            classNameSnapshot: selectedStudent?.className || null,
+            displayNameSnapshot: selectedStudentProfile?.name || selectedStudentName,
+            classNameSnapshot: selectedStudentProfile?.className || null,
             value: increment(sessionMinutes),
             updatedAt: serverTimestamp(),
           }, { merge: true });

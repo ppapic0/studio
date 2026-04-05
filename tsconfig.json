@@ -23,5 +23,11 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "functions"]
+  "exclude": [
+    "node_modules",
+    "functions",
+    "studio-review",
+    "studio-review_backup_20260312-003754",
+    "_deploy_tmp_studio_20260312-001941"
+  ]
 }
