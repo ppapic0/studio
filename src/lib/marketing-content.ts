@@ -277,7 +277,8 @@ const experienceShowcaseSections: ExperienceShowcaseSection[] = [
       {
         title: '공부시간 · 피드백 화면',
         caption: '공부시간 기록과 피드백이 다음 행동으로 이어지도록 정리한 화면입니다.',
-        alt: '학생 모드 공부시간과 피드백 스크린샷 예정 자리',
+        image: '/marketing/app-evidence/study-feedback-dashboard-preview.svg',
+        alt: '학생 모드 공부시간과 피드백 실제 화면',
       },
     ],
     insightTitle: '학생 화면은 다음 행동이 보여야 합니다',
