@@ -42,7 +42,7 @@ export default async function HomePage() {
           <CenterOverviewStack className="pt-8 sm:pt-10 lg:pt-12" />
           <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
             <ScrollReveal>
-              <FeedbackManagementSection />
+              <FeedbackManagementSection titleBreakMode="app" />
             </ScrollReveal>
           </div>
           <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">

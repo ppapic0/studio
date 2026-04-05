@@ -17,11 +17,13 @@ const appFlowCards = [
 
 type FeedbackManagementSectionProps = {
   surface?: 'card' | 'flat-light' | 'flat-dark';
+  titleBreakMode?: 'default' | 'app';
 };
 
-export function FeedbackManagementSection({ surface = 'card' }: FeedbackManagementSectionProps) {
+export function FeedbackManagementSection({ surface = 'card', titleBreakMode = 'default' }: FeedbackManagementSectionProps) {
   const isCard = surface === 'card';
   const isDark = surface === 'flat-dark';
+  const isAppTitle = titleBreakMode === 'app';
 
   return (
     <section
@@ -57,11 +59,22 @@ export function FeedbackManagementSection({ surface = 'card' }: FeedbackManageme
         <div className="order-1 px-6 py-7 sm:px-8 sm:py-8 lg:order-2">
           <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">SECTION 02</p>
           <h2 className={cn('font-aggro-display mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>
-            자체 개발한 트랙 러닝시스템으로
+            자체 개발한
             <br />
-            학습 현황을 실시간 체크 및
-            <br />
-            피드백
+            트랙 러닝시스템으로
+            {isAppTitle ? (
+              <>
+                <br />
+                실시간 체크 및 피드백
+              </>
+            ) : (
+              <>
+                <br />
+                학습 현황을 실시간 체크 및
+                <br />
+                피드백
+              </>
+            )}
           </h2>
 
           <div className="mt-6 space-y-3">
