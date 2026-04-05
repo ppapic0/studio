@@ -2290,7 +2290,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div className={cn(
                       "analysis-focus-kpi-summary surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 shadow-none",
-                      isMobile ? "flex items-center justify-between gap-3 px-3.5 py-2.5 text-left" : "px-3 py-2 text-right"
+                      isMobile ? "flex flex-col items-center justify-center gap-1.5 px-3.5 py-2.5 text-center" : "flex flex-col items-center justify-center px-3 py-2 text-center"
                     )}>
                       <p className={cn(
                         "analysis-focus-kpi-summary-label text-[10px] font-black uppercase tracking-[0.2em]",
