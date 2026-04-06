@@ -2299,7 +2299,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         className={cn(
                           "px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shadow-none",
                           isAnalysisPresentation
-                            ? "border-[#dbe7ff] bg-white/96 text-[#5F7299]"
+                            ? "border-white/20 bg-white/10 text-white"
                             : analysisSoftBadgeClass
                         )}
                       >
