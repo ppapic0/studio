@@ -394,7 +394,7 @@ function StatAnalysisCard({
                 'analysis-kpi-card-label inline-flex max-w-full items-center rounded-full border px-2.5 py-1 font-black break-keep',
                 tone.chip,
                 isCompactAnalysisKpi
-                  ? 'px-1.5 py-0.5 text-[8px] leading-[1.15] tracking-[-0.01em]'
+                  ? 'font-aggro-display px-1.5 py-0.5 text-[8px] leading-[1.1] tracking-[-0.03em]'
                   : isMobile
                     ? 'text-[10px] leading-4 tracking-[0.08em]'
                     : 'text-[10px] uppercase tracking-[0.18em]'
@@ -405,7 +405,7 @@ function StatAnalysisCard({
             <div className={cn('analysis-kpi-card-value dashboard-number font-aggro-display font-black tracking-tight break-keep text-[#17326B]', isCompactAnalysisKpi ? 'mt-2 whitespace-pre-line text-[0.95rem] leading-[0.95]' : isMobile ? 'mt-3 text-[1.9rem] leading-[0.92]' : 'mt-3 text-[1.85rem]')}>
               {displayedValue}
             </div>
-            <p className={cn('analysis-kpi-card-subvalue font-semibold break-keep text-[#3E5488]', isCompactAnalysisKpi ? 'mt-1 text-[8px] leading-[1.3]' : isMobile ? 'mt-1 text-[10px] leading-5' : 'mt-1 text-[11px] leading-5')}>
+            <p className={cn('analysis-kpi-card-subvalue break-keep text-[#3E5488]', isCompactAnalysisKpi ? 'mt-1 text-[8px] font-bold leading-[1.28] tracking-[-0.02em]' : isMobile ? 'mt-1 text-[10px] font-semibold leading-5' : 'mt-1 text-[11px] font-semibold leading-5')}>
               {displayedSubValue}
             </p>
           </div>
@@ -419,7 +419,7 @@ function StatAnalysisCard({
           </div>
           <div className={cn('analysis-kpi-card-meta-row flex items-center gap-2', isCompactAnalysisKpi ? 'mt-1 justify-end' : 'mt-2 justify-between')}>
             {!isCompactAnalysisKpi ? <span className="analysis-kpi-card-meta analysis-kpi-card-meta-label text-[10px] font-black uppercase tracking-[0.16em] text-[#4B6397]">Insight Rail</span> : null}
-            <span className={cn('analysis-kpi-card-progress font-black', isCompactAnalysisKpi ? 'text-[8px]' : 'text-[10px]', tone.text)}>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
+            <span className={cn('analysis-kpi-card-progress font-black', isCompactAnalysisKpi ? 'font-aggro-display text-[8px] tracking-[-0.03em]' : 'text-[10px]', tone.text)}>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
           </div>
         </CardContent>
       </Card>
