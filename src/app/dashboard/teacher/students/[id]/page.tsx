@@ -1895,6 +1895,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     'break-keep font-black tracking-tight',
     isAnalysisPresentation ? 'text-[var(--text-on-dark)]' : 'text-[#14295F]'
   );
+  const analysisRequestedTitleClass = isAnalysisPresentation ? 'text-white' : 'text-[#14295F]';
   const detailGrowthDescriptionClass = cn(
     'mt-1 font-semibold',
     isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : 'text-[#5c6e97]'
@@ -2918,7 +2919,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
             <Card className={cn("rounded-[1.65rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage analysis-full-conclusion-card")}>
               <CardHeader className={detailChartHeaderClass}>
-                <CardTitle className={cn("font-aggro-display text-[1.05rem] font-black tracking-tight", detailGrowthTitleClass)}>
+                <CardTitle className={cn("font-aggro-display text-[1.05rem] font-black tracking-tight", analysisRequestedTitleClass)}>
                   위험 신호 및 지원 우선순위
                 </CardTitle>
                 <CardDescription className={cn("text-[12px] font-semibold leading-5", detailGrowthDescriptionClass)}>
@@ -3279,7 +3280,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
                 <Card className={cn("rounded-[1.5rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage analysis-full-conclusion-card")}>
                   <CardHeader className="pb-2">
-                    <CardTitle className={cn("font-aggro-display text-base font-black tracking-tight flex items-center gap-2", detailGrowthTitleClass)}><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
+                    <CardTitle className={cn("font-aggro-display text-base font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className={cn(
@@ -3336,7 +3337,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
                 <Card className={cn("lg:col-span-4 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden", isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-amber-500" /> 계획 완수율</CardTitle>
+                    <CardTitle className={cn("text-xl font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><CheckCircle2 className="h-5 w-5 text-amber-500" /> 계획 완수율</CardTitle>
                     <CardDescription className="font-bold text-[11px]">일별 완료율로 실행력의 안정성을 점검합니다.</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-0">
@@ -3358,7 +3359,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
               <Card className={cn("rounded-[2rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage")}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-black tracking-tight flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
+                  <CardTitle className={cn("text-lg font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
