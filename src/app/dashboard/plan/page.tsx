@@ -281,6 +281,12 @@ function getPlanTimestampMs(task: Pick<StudyPlanItem, 'updatedAt' | 'createdAt'>
   return Math.max(updatedAtMs, createdAtMs);
 }
 
+function getScheduleTemplateTimestampMs(template: Pick<StudentScheduleTemplate, 'updatedAt' | 'createdAt'>) {
+  const updatedAtMs = template.updatedAt?.toDate?.().getTime?.() ?? 0;
+  const createdAtMs = template.createdAt?.toDate?.().getTime?.() ?? 0;
+  return Math.max(updatedAtMs, createdAtMs);
+}
+
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
@@ -846,7 +852,10 @@ export default function StudyPlanPage() {
     '처음 한 번 답한 설문 기준이에요. 이제는 이 기준을 바탕으로 학생이 직접 쓴 오늘 계획을 읽고 부족한 점과 보강 포인트를 보여줍니다.';
   const selectedWeekdayValue = selectedDate ? getDay(selectedDate) : 1;
   const activeScheduleTemplates = useMemo(
-    () => (scheduleTemplates || []).filter((template) => template.active !== false),
+    () =>
+      [...(scheduleTemplates || [])]
+        .filter((template) => template.active !== false)
+        .sort((left, right) => getScheduleTemplateTimestampMs(right) - getScheduleTemplateTimestampMs(left)),
     [scheduleTemplates]
   );
   const matchingWeekdayTemplate = useMemo(
@@ -2722,15 +2731,27 @@ export default function StudyPlanPage() {
         { merge: true }
       );
       await batch.commit();
-      const syncResult = await syncWeekdayTemplateToVisibleSchedules({
-        templateId,
-        targetWeekdays,
-        draft: weekdayDraft,
-      });
+      let syncResult: PersistStudentScheduleResult = { legacySyncWarning: false };
+      let visibleSyncWarning = false;
+
+      try {
+        syncResult = await syncWeekdayTemplateToVisibleSchedules({
+          templateId,
+          targetWeekdays,
+          draft: weekdayDraft,
+        });
+      } catch (error) {
+        visibleSyncWarning = true;
+        logHandledClientIssue('[plan-track] sync weekday template to visible schedules failed', error);
+      }
+
+      clearSchedulePrefillCache();
       setScheduleSaveFeedback({
-        variant: syncResult.legacySyncWarning ? 'warning' : 'success',
+        variant: syncResult.legacySyncWarning || visibleSyncWarning ? 'warning' : 'success',
         title: '주간 기본 일정 저장 완료',
-        description: syncResult.legacySyncWarning
+        description: visibleSyncWarning
+          ? `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장했어요. 이번 주 일정 반영은 잠시 늦을 수 있어요.`
+          : syncResult.legacySyncWarning
           ? `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.`
           : `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장하고 이번 주에도 바로 반영했어요.`,
       });
@@ -2747,7 +2768,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeScheduleTemplates, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
+  }, [activeScheduleTemplates, clearSchedulePrefillCache, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
 
   const handleSaveSchedulePreset = useCallback(async () => {
     if (!firestore || !user) return;
