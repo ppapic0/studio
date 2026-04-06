@@ -8,7 +8,6 @@ import { FocusFirewallSection } from '@/components/marketing/focus-firewall-sect
 import { HeroSection } from '@/components/marketing/hero-section';
 import { MarketingFooter } from '@/components/marketing/marketing-footer';
 import { MarketingHeader } from '@/components/marketing/marketing-header';
-import { MarketingLaunchNoticeModal } from '@/components/marketing/marketing-launch-notice-modal';
 import { MobileStudySystemSection } from '@/components/marketing/mobile-study-system-section';
 import { MarketingPageTracker } from '@/components/marketing/marketing-page-tracker';
 import { MockExamProgramSection } from '@/components/marketing/mock-exam-program-section';
@@ -34,7 +33,6 @@ export default async function HomePage() {
   return (
     <main className="min-h-screen overflow-x-clip bg-white pb-24 text-slate-900 sm:pb-0">
       <MarketingPageTracker pageType="landing" placement="landing_root" />
-      <MarketingLaunchNoticeModal notice={marketingContent.launchNotice} />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
       <HeroSection brand={marketingContent.brand} />
       {isMobile ? (
