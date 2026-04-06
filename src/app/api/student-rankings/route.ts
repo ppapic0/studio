@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
 
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import { getDailyRankWindowState, isTimestampInDailyRankWindow, toKstDate } from '@/lib/student-ranking-policy';
+import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
 
@@ -321,8 +321,9 @@ export async function GET(request: NextRequest) {
       const liveDateKey = toKstDateKeyFromTimestamp(selectedRecord.lastCheckInAt);
       if (!liveDateKey) return;
 
-      if (isTimestampInDailyRankWindow(liveStartedAtMs, dailyRankWindow)) {
-        addRankMinutes(dailyTotals, studentId, liveMinutes);
+      const dailyLiveMinutes = getDailyRankWindowOverlapMinutes(liveStartedAtMs, nowMs, dailyRankWindow);
+      if (dailyLiveMinutes > 0) {
+        addRankMinutes(dailyTotals, studentId, dailyLiveMinutes);
       }
 
       if (weekDateKeySet.has(liveDateKey)) {

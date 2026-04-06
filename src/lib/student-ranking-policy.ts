@@ -119,12 +119,55 @@ export function formatStudentRankRewardSummary(range: StudentRankingRange) {
     .join(" / ");
 }
 
+function getTimeRangeOverlapMs(
+  rangeStartMs: number,
+  rangeEndMs: number,
+  windowStartMs: number,
+  windowEndMs: number
+) {
+  if (!Number.isFinite(rangeStartMs) || !Number.isFinite(rangeEndMs)) return 0;
+  const overlapStart = Math.max(rangeStartMs, windowStartMs);
+  const overlapEnd = Math.min(rangeEndMs, windowEndMs);
+  if (overlapEnd <= overlapStart) return 0;
+  return overlapEnd - overlapStart;
+}
+
 export function isTimestampInDailyRankWindow(
   timestampMs: number,
   dailyRankWindow: Pick<DailyRankWindowState, "startsAt" | "endsAt">
 ) {
   if (!Number.isFinite(timestampMs) || timestampMs <= 0) return false;
   return timestampMs >= dailyRankWindow.startsAt.getTime() && timestampMs < dailyRankWindow.endsAt.getTime();
+}
+
+export function getDailyRankWindowOverlapMinutes(
+  startedAtMs: number,
+  referenceMs: number,
+  dailyRankWindow: Pick<DailyRankWindowState, "startsAt" | "endsAt">
+) {
+  const overlapMs = getTimeRangeOverlapMs(
+    startedAtMs,
+    referenceMs,
+    dailyRankWindow.startsAt.getTime(),
+    dailyRankWindow.endsAt.getTime()
+  );
+  if (overlapMs <= 0) return 0;
+  return Math.max(1, Math.ceil(overlapMs / 60000));
+}
+
+export function getDailyRankWindowOverlapSeconds(
+  startedAtMs: number,
+  referenceMs: number,
+  dailyRankWindow: Pick<DailyRankWindowState, "startsAt" | "endsAt">
+) {
+  const overlapMs = getTimeRangeOverlapMs(
+    startedAtMs,
+    referenceMs,
+    dailyRankWindow.startsAt.getTime(),
+    dailyRankWindow.endsAt.getTime()
+  );
+  if (overlapMs <= 0) return 0;
+  return Math.max(0, Math.floor(overlapMs / 1000));
 }
 
 export function getDailyRankWindowState(baseDate: Date = new Date()): DailyRankWindowState {

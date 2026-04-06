@@ -35,6 +35,7 @@ type CenterStudentContext = {
 const DAILY_RANK_START_HOUR = 17;
 const WEEKEND_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
+const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying", "away", "break"]);
 
 const STUDENT_RANK_REWARD_TIERS: Record<StudentRankingRange, StudentRankRewardTier[]> = {
   daily: [{ rank: 1, points: 500 }],
@@ -155,6 +156,82 @@ function getDateKeysCoveredByWindow(startsAt: Date, endsAt: Date) {
   }
 
   return keys;
+}
+
+function getAttendanceStatusRank(value: unknown) {
+  if (value === "studying") return 0;
+  if (value === "away" || value === "break") return 1;
+  if (value === "absent") return 3;
+  return 2;
+}
+
+function toTimestampMillis(value: unknown) {
+  if (value && typeof value === "object") {
+    if ("toMillis" in value && typeof value.toMillis === "function") {
+      return Number(value.toMillis());
+    }
+    if ("toDate" in value && typeof value.toDate === "function") {
+      return value.toDate().getTime();
+    }
+  }
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+
+function pickPreferredAttendanceRecord(records: Record<string, unknown>[]) {
+  if (!records.length) return null;
+
+  return [...records].sort((left, right) => {
+    const statusRankDiff = getAttendanceStatusRank(left.status) - getAttendanceStatusRank(right.status);
+    if (statusRankDiff !== 0) return statusRankDiff;
+
+    const checkInPresenceDiff = Number(Boolean(right.lastCheckInAt)) - Number(Boolean(left.lastCheckInAt));
+    if (checkInPresenceDiff !== 0) return checkInPresenceDiff;
+
+    return toTimestampMillis(right.updatedAt) - toTimestampMillis(left.updatedAt);
+  })[0] ?? null;
+}
+
+function getTimeRangeOverlapMs(
+  rangeStartMs: number,
+  rangeEndMs: number,
+  windowStartMs: number,
+  windowEndMs: number
+) {
+  if (!Number.isFinite(rangeStartMs) || !Number.isFinite(rangeEndMs)) return 0;
+  const overlapStart = Math.max(rangeStartMs, windowStartMs);
+  const overlapEnd = Math.min(rangeEndMs, windowEndMs);
+  if (overlapEnd <= overlapStart) return 0;
+  return overlapEnd - overlapStart;
+}
+
+function getDailyWindowOverlapMinutes(
+  startedAtMs: number,
+  referenceMs: number,
+  dailyWindow: Pick<ReturnType<typeof buildCompetitionWindow>, "startsAt" | "endsAt">
+) {
+  const overlapMs = getTimeRangeOverlapMs(
+    startedAtMs,
+    referenceMs,
+    dailyWindow.startsAt.getTime(),
+    dailyWindow.endsAt.getTime()
+  );
+  if (overlapMs <= 0) return 0;
+  return Math.max(1, Math.ceil(overlapMs / 60000));
+}
+
+function getLiveAttendanceOverlapMinutes(
+  attendance: Record<string, unknown>,
+  referenceMs: number,
+  dailyWindow: Pick<ReturnType<typeof buildCompetitionWindow>, "startsAt" | "endsAt">
+) {
+  const status = typeof attendance.status === "string" ? attendance.status : "";
+  if (!ACTIVE_LIVE_RANK_STATUSES.has(status)) return 0;
+
+  const startedAtMs = toTimestampMillis(attendance.lastCheckInAt);
+  if (startedAtMs <= 0) return 0;
+
+  return getDailyWindowOverlapMinutes(startedAtMs, referenceMs, dailyWindow);
 }
 
 function applyCompetitionRanks<T extends { value: number }>(entries: T[]): Array<T & { rank: number }> {
@@ -291,6 +368,32 @@ async function buildDailyAwardEntries(
       if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
       totals.set(studentId, (totals.get(studentId) || 0) + value);
     });
+  });
+
+  const attendanceBuckets = new Map<string, Record<string, unknown>[]>();
+  const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
+  attendanceSnap.forEach((docSnap) => {
+    const data = docSnap.data() as Record<string, unknown>;
+    const studentId = typeof data.studentId === "string" ? data.studentId : "";
+    if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId)) return;
+
+    const current = attendanceBuckets.get(studentId) || [];
+    current.push(data);
+    attendanceBuckets.set(studentId, current);
+  });
+
+  attendanceBuckets.forEach((records, studentId) => {
+    const selectedRecord = pickPreferredAttendanceRecord(records);
+    if (!selectedRecord) return;
+
+    const liveMinutes = getLiveAttendanceOverlapMinutes(
+      selectedRecord,
+      dailyWindow.endsAt.getTime(),
+      dailyWindow
+    );
+    if (liveMinutes <= 0) return;
+
+    totals.set(studentId, (totals.get(studentId) || 0) + liveMinutes);
   });
 
   const rankedEntries = applyCompetitionRanks(
