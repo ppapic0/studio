@@ -1146,6 +1146,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
   const [goalPathTypeDraft, setGoalPathTypeDraft] = useState<'school' | 'job'>('school');
   const [goalPathLabelDraft, setGoalPathLabelDraft] = useState('');
+  const [examSaveError, setExamSaveError] = useState<{ title: string; description: string } | null>(null);
   const [selectedRankRange, setSelectedRankRange] = useState<RankRange>(() =>
     getDailyRankWindowState(new Date()).isLive ? 'daily' : 'weekly'
   );
@@ -1212,14 +1213,31 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       userProfile?.targetDailyMinutesSource,
     ]
   );
+  const resolvedExamCountdownSettings = useMemo(
+    () => userProfile?.examCountdowns ?? studentProfile?.examCountdowns ?? DEFAULT_EXAM_COUNTDOWNS,
+    [userProfile?.examCountdowns, studentProfile?.examCountdowns]
+  );
+  const resolvedGoalPathType = useMemo(
+    () => ((userProfile?.goalPathType ?? studentProfile?.goalPathType) === 'job' ? 'job' : 'school'),
+    [userProfile?.goalPathType, studentProfile?.goalPathType]
+  );
+  const resolvedGoalPathLabel = useMemo(
+    () => userProfile?.goalPathLabel ?? studentProfile?.goalPathLabel ?? '',
+    [userProfile?.goalPathLabel, studentProfile?.goalPathLabel]
+  );
 
   useEffect(() => {
-    setExamDrafts(normalizeExamCountdowns(studentProfile?.examCountdowns));
-  }, [studentProfile?.examCountdowns]);
+    setExamDrafts(normalizeExamCountdowns(resolvedExamCountdownSettings));
+  }, [resolvedExamCountdownSettings]);
   useEffect(() => {
-    setGoalPathTypeDraft(studentProfile?.goalPathType === 'job' ? 'job' : 'school');
-    setGoalPathLabelDraft(studentProfile?.goalPathLabel || '');
-  }, [studentProfile?.goalPathLabel, studentProfile?.goalPathType]);
+    setGoalPathTypeDraft(resolvedGoalPathType);
+    setGoalPathLabelDraft(resolvedGoalPathLabel);
+  }, [resolvedGoalPathLabel, resolvedGoalPathType]);
+  useEffect(() => {
+    if (!isExamDialogOpen) {
+      setExamSaveError(null);
+    }
+  }, [isExamDialogOpen]);
 
   const studyLogRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !todayKey) return null;
@@ -1457,7 +1475,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     todayStart.setHours(0, 0, 0, 0);
     const todayMs = todayStart.getTime();
 
-    return normalizeExamCountdowns(studentProfile?.examCountdowns)
+    return normalizeExamCountdowns(resolvedExamCountdownSettings)
       .map((item) => {
         const parsed = item.date ? new Date(`${item.date}T00:00:00`) : null;
         const targetMs = parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : null;
@@ -1472,7 +1490,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const bSort = b.daysLeft === null ? 9999 : Math.abs(b.daysLeft);
         return aSort - bSort;
       });
-  }, [studentProfile?.examCountdowns]);
+  }, [resolvedExamCountdownSettings]);
   const configuredExamCountdowns = useMemo(
     () => examCountdowns.filter((item) => item.title.trim().length > 0 && item.date.trim().length > 0),
     [examCountdowns]
@@ -1482,8 +1500,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     [configuredExamCountdowns]
   );
   const homeFocusExamLabel = primaryExamCountdown?.dLabel || 'D-day 미설정';
-  const homeGoalTypeLabel = studentProfile?.goalPathType === 'job' ? '희망 직업' : '희망 학교';
-  const homeGoalLabel = studentProfile?.goalPathLabel?.trim() || homeGoalTypeLabel;
+  const homeGoalTypeLabel = resolvedGoalPathType === 'job' ? '희망 직업' : '희망 학교';
+  const homeGoalLabel = resolvedGoalPathLabel.trim() || homeGoalTypeLabel;
   const homeFocusSummaryLabel = `${homeGoalLabel} / ${homeFocusExamLabel}`;
 
   const subjectProgress = useMemo(() => {
@@ -2137,7 +2155,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleSaveExamCountdowns = async () => {
-    if (!studentProfileRef) return;
+    if (!userProfileRef) {
+      setExamSaveError({
+        title: '시험/목표 설정 저장 실패',
+        description: '사용자 정보를 찾지 못했어요. 잠시 후 다시 시도해주세요.',
+      });
+      return;
+    }
+
+    setExamSaveError(null);
     setIsExamSaving(true);
     try {
       const payload = examDrafts
@@ -2149,7 +2175,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         .filter((item) => item.title.length > 0 && item.date.length > 0);
 
       await setDoc(
-        studentProfileRef,
+        userProfileRef,
         {
           examCountdowns: payload,
           goalPathType: goalPathTypeDraft,
@@ -2159,15 +2185,29 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         { merge: true },
       );
 
-      toast({
-        title: '시험/목표 설정 완료',
-        description: '시험 디데이와 희망 학교·직업 정보가 저장되었습니다.',
-      });
+      if (studentProfileRef && studentProfile) {
+        const [mirrorResult] = await Promise.allSettled([
+          setDoc(
+            studentProfileRef,
+            {
+              examCountdowns: payload,
+              goalPathType: goalPathTypeDraft,
+              goalPathLabel: goalPathLabelDraft.trim(),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          ),
+        ]);
+
+        if (mirrorResult.status === 'rejected') {
+          logHandledClientIssue('[student-dashboard] mirror exam countdowns failed', mirrorResult.reason);
+        }
+      }
+
       setIsExamDialogOpen(false);
     } catch (error) {
       logHandledClientIssue('[student-dashboard] save exam countdowns failed', error);
-      toast({
-        variant: 'destructive',
+      setExamSaveError({
         title: '시험/목표 설정 저장 실패',
         description: '잠시 후 다시 시도해주세요.',
       });
@@ -2973,6 +3013,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <Plus className="mr-1.5 h-4 w-4" />
               시험 추가
             </Button>
+            {examSaveError ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                <p className="text-[11px] font-black text-rose-700">{examSaveError.title}</p>
+                <p className="mt-1 text-[12px] font-semibold leading-5 text-rose-600">{examSaveError.description}</p>
+              </div>
+            ) : null}
           </div>
           <DialogFooter className="border-t bg-white p-4 sm:p-5">
             <Button type="button" variant="ghost" className="h-10 rounded-xl font-bold" onClick={() => setIsExamDialogOpen(false)}>

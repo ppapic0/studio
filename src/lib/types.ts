@@ -12,6 +12,13 @@ export interface User {
   phoneNumber?: string;
   targetDailyMinutes?: number;
   targetDailyMinutesSource?: 'default' | 'routine' | 'manual';
+  examCountdowns?: Array<{
+    id: string;
+    title: string;
+    date: string;
+  }>;
+  goalPathType?: 'school' | 'job';
+  goalPathLabel?: string;
   studyRoutineOnboarding?: RoutineOnboardingState;
   studyRoutineProfile?: UserStudyProfile;
   studyPlannerDiagnostic?: StudyPlannerDiagnosticRecord;
