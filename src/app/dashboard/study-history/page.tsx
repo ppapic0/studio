@@ -1152,6 +1152,7 @@ export default function StudyHistoryPage() {
               const flowLabel = getStudyHistoryFlowLabel(minutes);
               const flowShortLabel = getStudyHistoryFlowShortLabel(minutes);
               const isLongTimeLabel = exactTimeLabel.length >= 7;
+              const isCompactMediumTimeLabel = compactTimeLabel.length >= 4;
               const isCompactLongTimeLabel = compactTimeLabel.length >= 5;
               const isCompactVeryLongTimeLabel = compactTimeLabel.length >= 6;
               const calendarAriaTimeLabel = isCurrentMonth
@@ -1249,10 +1250,12 @@ export default function StudyHistoryPage() {
                               "dashboard-number block max-w-full font-black leading-none tabular-nums text-center",
                               isMobile
                                 ? isCompactVeryLongTimeLabel
-                                  ? "text-[0.64rem] tracking-[-0.075em]"
+                                  ? "text-[0.56rem] tracking-[-0.1em]"
                                   : isCompactLongTimeLabel
-                                    ? "text-[0.74rem] tracking-[-0.065em]"
-                                    : "text-[0.86rem] tracking-[-0.055em]"
+                                    ? "text-[0.62rem] tracking-[-0.09em]"
+                                    : isCompactMediumTimeLabel
+                                      ? "text-[0.7rem] tracking-[-0.08em]"
+                                      : "text-[0.78rem] tracking-[-0.07em]"
                                 : isLongTimeLabel
                                   ? "text-[1rem] tracking-[-0.04em]"
                                   : "text-[1.16rem] tracking-[-0.05em]",
