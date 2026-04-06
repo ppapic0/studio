@@ -2432,7 +2432,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         </div>
                         <p className={cn(
                           "mt-3 text-[10px] font-black uppercase tracking-[0.18em]",
-                          analysisReadableSoftTextClass
+                          isAnalysisPresentation ? 'text-[#17326B]' : analysisReadableSoftTextClass
                         )}>
                           {label}
                         </p>
@@ -2456,7 +2456,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       <div key={key} className="surface-card surface-card--ghost on-dark rounded-[1.2rem] border border-white/10 px-3.5 py-3 shadow-none">
                         <p className={cn(
                           "text-[10px] font-black uppercase tracking-[0.18em]",
-                          analysisReadableSoftTextClass
+                          isAnalysisPresentation ? 'text-[#17326B]' : analysisReadableSoftTextClass
                         )}>
                           {label}
                         </p>
