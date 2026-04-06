@@ -312,7 +312,7 @@ export default function ExperiencePage() {
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,122,22,0.10),transparent_32%)]" />
               <div className="relative mx-auto max-w-3xl">
                 <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">READY FOR REAL CAPTURES</p>
-                <h2 className="mt-3 break-keep text-[clamp(1.55rem,3vw,2.2rem)] font-black leading-[1.2] text-[#14295F]">
+                <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.55rem,3vw,2.2rem)] font-black leading-[1.2] tracking-[-0.03em] text-[#14295F]">
                   {experienceShowcase.closingTitle}
                 </h2>
                 {experienceShowcase.closingDescription ? (
