@@ -1878,7 +1878,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     : 'rounded-[1rem] border border-[#dbe7ff] bg-white/82 px-3 py-2 shadow-[0_14px_30px_-28px_rgba(20,41,95,0.42)]';
   const detailBadgeClass = isAnalysisPresentation
     ? 'analysis-detail-badge'
-    : 'rounded-full border-[#dbe7ff] bg-white/84 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]';
+    : 'rounded-full border-[#dbe7ff] bg-white/84 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#111111]';
   const detailGrowthPeriodBadgeClass = cn(
     'rounded-full text-[10px] font-black',
     isAnalysisPresentation

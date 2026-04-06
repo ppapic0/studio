@@ -1935,7 +1935,7 @@ select {
 
   .analysis-full-shell .analysis-detail-badge,
   .analysis-full-shell .analysis-growth-period-badge {
-    color: var(--text-on-dark-muted) !important;
+    color: #111111 !important;
   }
 
   .analysis-full-shell .analysis-metric-chip {
