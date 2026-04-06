@@ -144,30 +144,21 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
   const style = toneStyleMap[tone];
   const hasPrimaryScreenImage = Boolean(section.primaryScreen.image);
   const showStudentScreenSet = section.mode === '학생 모드' && section.secondaryScreens.length >= 2;
-  const hideStudentScreenSet = section.mode === '학생 모드' && showStudentScreenSet;
-  const showStudentSummaryCard = hideStudentScreenSet;
-  const showScreenColumn = !hideStudentScreenSet && hasPrimaryScreenImage;
+  const showScreenColumn = hasPrimaryScreenImage;
 
   return (
-    <article className={`relative overflow-hidden rounded-[2.35rem] border p-5 shadow-[0_24px_58px_rgba(20,41,95,0.10)] sm:p-7 lg:p-8 ${style.sectionCard}`}>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.8),transparent_32%)]" />
-      <div className={`absolute ${reverse ? 'left-[-4%] top-[18%]' : 'right-[-4%] top-[14%]'} h-44 w-44 rounded-full blur-[120px] ${style.glow}`} />
+    <div className="relative">
+      <div className={`pointer-events-none absolute ${reverse ? 'left-[-4%] top-[18%]' : 'right-[-4%] top-[14%]'} h-44 w-44 rounded-full blur-[120px] ${style.glow}`} />
 
       <div
         className={`relative grid gap-6 lg:gap-8 ${
-          hideStudentScreenSet || !showScreenColumn
+          !showScreenColumn
             ? 'lg:grid-cols-1'
             : `lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] ${reverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`
         }`}
       >
-        <div className={`order-2 flex flex-col lg:order-1 ${hideStudentScreenSet || !showScreenColumn ? 'mx-auto w-full max-w-3xl' : ''}`}>
-          <div
-            className={
-              showStudentSummaryCard
-                ? 'rounded-[2rem] border border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EFF4FF_100%)] px-5 py-5 shadow-[0_20px_44px_rgba(20,41,95,0.06)] sm:px-6 sm:py-6'
-                : ''
-            }
-          >
+        <div className={`order-2 flex flex-col lg:order-1 ${!showScreenColumn ? 'mx-auto w-full max-w-3xl' : ''}`}>
+          <div>
             <div className="flex items-center gap-3">
               <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${style.iconWrap}`}>
                 <ModeIcon mode={section.mode} />
@@ -177,9 +168,9 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
 
             <h2
               className={`mt-5 break-keep text-[#14295F] ${
-                showStudentSummaryCard
+                tone === 'student'
                   ? 'font-aggro-display text-[clamp(1.85rem,4.2vw,2.7rem)] leading-[1.08] tracking-[-0.04em]'
-                  : 'text-[clamp(1.7rem,3.6vw,2.4rem)] font-black leading-[1.14]'
+                  : 'font-aggro-display text-[clamp(1.75rem,3.8vw,2.5rem)] leading-[1.1] tracking-[-0.03em]'
               }`}
             >
               {section.title.split('\n').map((line, index) => (
@@ -190,9 +181,9 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
             </h2>
             <p
               className={`mt-4 break-keep ${
-                showStudentSummaryCard
-                  ? 'max-w-[26rem] text-[15px] font-semibold leading-[1.72] text-[#506680]'
-                  : 'text-[15px] font-semibold leading-[1.9] text-[#40556F]'
+                tone === 'student'
+                  ? 'max-w-[28rem] text-[15px] font-semibold leading-[1.8] text-[#506680]'
+                  : 'max-w-[29rem] text-[15px] font-semibold leading-[1.85] text-[#40556F]'
               }`}
             >
               {section.summary}
@@ -205,14 +196,25 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
                 </span>
               ))}
             </div>
-          </div>
 
-          {showStudentSummaryCard ? (
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <ScreenshotCard screen={section.primaryScreen} tone={tone} />
-              <ScreenshotCard screen={section.secondaryScreens[0]!} tone={tone} />
+            <div className="mt-8 max-w-[34rem]">
+              <p className={`text-[10px] font-black tracking-[0.22em] ${style.label}`}>VIEW INSIGHT</p>
+              <h3 className="mt-3 break-keep text-[1.35rem] font-black leading-[1.3] text-[#14295F] sm:text-[1.55rem]">
+                {section.insightTitle}
+              </h3>
+              <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.82] text-[#51667D]">
+                {section.insightDescription}
+              </p>
+              <div className="mt-5">
+                <Link
+                  href={section.ctaHref}
+                  className={`inline-flex h-11 items-center justify-center rounded-full border px-5 text-[13px] font-black transition-colors ${style.textButton}`}
+                >
+                  {section.ctaLabel}
+                </Link>
+              </div>
             </div>
-          ) : null}
+          </div>
         </div>
 
         {showScreenColumn ? <div className="order-1 lg:order-2">
@@ -227,11 +229,11 @@ function ExperienceSectionBlock({ section, reverse = false }: { section: Experie
               </div>
             </div>
           ) : (
-            <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
-          )}
+              <ScreenshotCard screen={section.primaryScreen} tone={tone} featured />
+            )}
         </div> : null}
       </div>
-    </article>
+    </div>
   );
 }
 
@@ -239,78 +241,85 @@ export default function ExperiencePage() {
   const experienceShowcase = marketingContent.experienceShowcase;
 
   return (
-    <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#F8F5EF_0%,#FFFFFF_18%,#F7F9FD_100%)] text-[#14295F]">
+    <main className="min-h-screen overflow-x-clip bg-white text-[#14295F]">
       <MarketingPageTracker pageType="experience" placement="experience_page" />
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
+      <section className="relative overflow-hidden bg-white pt-8 sm:pt-10 lg:pt-12">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.10),transparent_46%),radial-gradient(circle_at_18%_16%,rgba(20,41,95,0.07),transparent_28%)]" />
+        <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-end">
+            <Link
+              href="/go/login?placement=experience_header"
+              className="inline-flex items-center gap-2 rounded-full bg-[#FF7A16] px-4 py-2 text-[13px] font-black text-white shadow-[0_14px_24px_rgba(255,122,22,0.26)] transition-transform hover:-translate-y-0.5"
+            >
+              실제 로그인
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
 
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-[26rem] bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.12),transparent_44%),radial-gradient(circle_at_22%_10%,rgba(20,41,95,0.08),transparent_28%)]" />
-
-      <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-        <div className="flex justify-end">
-          <Link
-            href="/go/login?placement=experience_header"
-            className="inline-flex items-center gap-2 rounded-full bg-[#FF7A16] px-4 py-2 text-[13px] font-black text-white shadow-[0_14px_24px_rgba(255,122,22,0.26)] transition-transform hover:-translate-y-0.5"
-          >
-            실제 로그인
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        <ScrollReveal className="mt-7">
-          <section className="relative overflow-hidden rounded-[2.6rem] border border-[#14295F]/10 bg-white px-6 py-7 shadow-[0_28px_64px_rgba(20,41,95,0.10)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(20,41,95,0.05),transparent_24%),radial-gradient(circle_at_92%_10%,rgba(255,122,22,0.10),transparent_24%)]" />
-            <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-8">
-              <div>
-                <SectionHeading
-                  eyebrow="ACTUAL LEARNING SYSTEM"
-                  title={experienceShowcase.heading}
-                  description={experienceShowcase.description}
-                />
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF] px-5 py-5">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[#14295F]/52">STUDENT VIEW</p>
-                  <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
-                    학습관리 시스템 운영으로 오늘의 계획이
-                    <br />
-                    실천으로 이어지고 기록이 누적됩니다.
-                  </p>
+          <ScrollReveal className="mt-7">
+            <div className="py-3 sm:py-5">
+              <div className="grid gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-10">
+                <div>
+                  <SectionHeading
+                    eyebrow="ACTUAL LEARNING SYSTEM"
+                    title={experienceShowcase.heading}
+                    description={experienceShowcase.description}
+                  />
                 </div>
-                <div className="rounded-[1.45rem] border border-[#FF7A16]/12 bg-[#FFF9F3] px-5 py-5">
-                  <p className="text-[11px] font-black tracking-[0.18em] text-[#B55200]/70">PARENT VIEW</p>
-                  <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
-                    학생의 학습데이터를 실시간으로 확인 가능한
-                    <br />
-                    학부모용 웹앱을 제공합니다.
-                  </p>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="rounded-[1.45rem] border border-[#D8E5FF] bg-[#F8FBFF] px-5 py-5">
+                    <p className="text-[11px] font-black tracking-[0.18em] text-[#14295F]/52">STUDENT VIEW</p>
+                    <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
+                      학습관리 시스템 운영으로 오늘의 계획이
+                      <br />
+                      실천으로 이어지고 기록이 누적됩니다.
+                    </p>
+                  </div>
+                  <div className="rounded-[1.45rem] border border-[#FFD9BF] bg-[#FFF7EF] px-5 py-5">
+                    <p className="text-[11px] font-black tracking-[0.18em] text-[#B55200]/70">PARENT VIEW</p>
+                    <p className="mt-3 break-keep text-[1rem] font-black leading-[1.42] text-[#14295F]">
+                      학생의 학습데이터를 실시간으로 확인 가능한
+                      <br />
+                      학부모용 웹앱을 제공합니다.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </section>
-        </ScrollReveal>
+          </ScrollReveal>
+        </div>
+      </section>
 
-        <div className="mt-8 space-y-6 sm:space-y-7">
-          {experienceShowcase.sections.map((section, index) => (
-            <ScrollReveal key={section.mode} delay={index * 80}>
+      {experienceShowcase.sections.map((section, index) => (
+        <section
+          key={section.mode}
+          className={index % 2 === 0 ? 'bg-[#FFF8F1] py-14 lg:py-18' : 'bg-white py-14 lg:py-18'}
+        >
+          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+            <ScrollReveal delay={index * 80}>
               <ExperienceSectionBlock section={section} reverse={index % 2 === 1} />
             </ScrollReveal>
-          ))}
-        </div>
+          </div>
+        </section>
+      ))}
 
-        <ScrollReveal className="mt-8">
+      <section className="bg-[#FFF8F1] py-14 lg:py-18">
+        <ScrollReveal>
           <DataAnalyticsPreviewSection showNextView={false} />
         </ScrollReveal>
+      </section>
 
-        <ScrollReveal className="mt-8">
-          <div className="space-y-5">
-            {experienceShowcase.footerNote ? (
-              <p className="text-center text-[12px] font-semibold text-[#667A95]">{experienceShowcase.footerNote}</p>
-            ) : null}
+      <section className="bg-white py-14 lg:py-18">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollReveal>
+            <div className="text-center">
+              {experienceShowcase.footerNote ? (
+                <p className="text-center text-[12px] font-semibold text-[#667A95]">{experienceShowcase.footerNote}</p>
+              ) : null}
 
-            <section className="relative overflow-hidden rounded-[2.1rem] border border-[#14295F]/10 bg-white px-6 py-7 text-center shadow-[0_20px_46px_rgba(20,41,95,0.08)] sm:px-8">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,122,22,0.10),transparent_32%)]" />
-              <div className="relative mx-auto max-w-3xl">
+              <div className="mx-auto mt-4 max-w-3xl">
                 <p className="text-[10px] font-black tracking-[0.22em] text-[#FF7A16]">READY FOR REAL CAPTURES</p>
                 <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.55rem,3vw,2.2rem)] font-black leading-[1.2] tracking-[-0.03em] text-[#14295F]">
                   {experienceShowcase.closingTitle}
@@ -326,10 +335,10 @@ export default function ExperiencePage() {
                   </Link>
                 </div>
               </div>
-            </section>
-          </div>
-        </ScrollReveal>
-      </div>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
       <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
     </main>
   );
