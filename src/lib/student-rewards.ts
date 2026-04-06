@@ -1,5 +1,3 @@
-import type { GrowthProgress } from '@/lib/types';
-
 export const NAVY_REWARD_THEME = {
   name: '네이비',
   min: 0,
@@ -9,23 +7,11 @@ export const NAVY_REWARD_THEME = {
   gradient: 'from-[#14295F] via-[#1B326D] to-[#233E86]',
 } as const;
 
-export const STUDY_BOX_REWARD_CURVE: Record<number, readonly [number, number]> = {
-  1: [5, 10],
-  2: [8, 13],
-  3: [10, 15],
-  4: [13, 18],
-  5: [15, 20],
-  6: [18, 23],
-  7: [20, 25],
-  8: [23, 28],
-};
-
 export type StudyBoxRarity = "common" | "rare" | "epic";
-
-const STUDY_BOX_RARITY_MULTIPLIER: Record<StudyBoxRarity, number> = {
-  common: 1,
-  rare: 1.25,
-  epic: 1.6,
+const STUDY_BOX_REWARD_RANGE_BY_RARITY: Record<StudyBoxRarity, readonly [number, number]> = {
+  common: [10, 20],
+  rare: [20, 30],
+  epic: [30, 40],
 };
 
 const EARLY_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: number }> = [
@@ -81,15 +67,6 @@ export function rollStudyBoxRarity(milestone: number): StudyBoxRarity {
   return weights.at(-1)?.rarity ?? "common";
 }
 
-export function getSkillRewardMultiplier(stats?: GrowthProgress['stats']) {
-  if (!stats) return 1;
-  const safeValues = [stats.focus, stats.consistency, stats.achievement, stats.resilience].map((value) =>
-    Math.max(0, Math.min(100, Number(value || 0)))
-  );
-  const average = safeValues.reduce((sum, value) => sum + value, 0) / safeValues.length;
-  return 1 + Math.min(0.2, average / 100 * 0.2);
-}
-
 export function getClaimedStudyBoxes(dayStatus?: Record<string, any>): number[] {
   const raw = dayStatus?.claimedStudyBoxes;
   if (!Array.isArray(raw)) return [];
@@ -105,12 +82,9 @@ export function getAvailableStudyBoxMilestones(totalMinutes: number, claimedStud
   return Array.from({ length: crossedMilestones }, (_, index) => index + 1).filter((milestone) => !claimed.has(milestone));
 }
 
-export function rollStudyBoxReward(milestone: number, stats?: GrowthProgress['stats']): StudyBoxReward {
-  const [baseMin, baseMax] = STUDY_BOX_REWARD_CURVE[milestone] || STUDY_BOX_REWARD_CURVE[1];
+export function rollStudyBoxReward(milestone: number): StudyBoxReward {
   const rarity = rollStudyBoxRarity(milestone);
-  const multiplier = getSkillRewardMultiplier(stats) * STUDY_BOX_RARITY_MULTIPLIER[rarity];
-  const minReward = Math.max(1, Math.round(baseMin * multiplier));
-  const maxReward = Math.max(minReward, Math.round(baseMax * multiplier));
+  const [minReward, maxReward] = STUDY_BOX_REWARD_RANGE_BY_RARITY[rarity];
   const awardedPoints = Math.floor(Math.random() * (maxReward - minReward + 1)) + minReward;
   return {
     milestone,
@@ -118,7 +92,7 @@ export function rollStudyBoxReward(milestone: number, stats?: GrowthProgress['st
     minReward,
     maxReward,
     awardedPoints,
-    multiplier,
+    multiplier: 1,
   };
 }
 

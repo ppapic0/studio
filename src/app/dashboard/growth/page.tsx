@@ -623,7 +623,7 @@ export default function GrowthPage() {
     if (liveClaimKeyRef.current === claimKey) return;
     liveClaimKeyRef.current = claimKey;
 
-    const nextRewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone, stats));
+    const nextRewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone));
     const awardedPoints = nextRewards.reduce((sum, reward) => sum + reward.awardedPoints, 0);
     const nextClaimedBoxes = Array.from(new Set([...claimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
     const nextRewardEntries = [...rewardEntries, ...nextRewards].sort((a, b) => a.milestone - b.milestone);
@@ -693,7 +693,6 @@ export default function GrowthPage() {
     progress?.pointsBalance,
     progressRef,
     rewardEntries,
-    stats,
     todayKey,
     todayStatus,
     toast,

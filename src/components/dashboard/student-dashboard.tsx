@@ -2567,7 +2567,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (homeLiveClaimKeyRef.current === claimKey) return;
     homeLiveClaimKeyRef.current = claimKey;
 
-    const rewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone, stats));
+    const rewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone));
     const awardedPoints = rewards.reduce((sum, reward) => sum + reward.awardedPoints, 0);
     const nextClaimedBoxes = Array.from(new Set([...syncedClaimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
     const nextRewardEntries = [...syncedRewardEntries, ...rewards].sort((a, b) => a.milestone - b.milestone);
@@ -2625,7 +2625,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     persistedRewardEntries,
     progress?.pointsBalance,
     progressRef,
-    stats,
     todayKey,
     todayPointStatus,
     toast,
