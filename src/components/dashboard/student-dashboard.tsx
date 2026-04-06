@@ -1360,6 +1360,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         .join('|'),
     [attendanceCurrentByStudent]
   );
+  const dailyRankWindow = useMemo(
+    () => getDailyRankWindowState(new Date(rankPreviewNowMs)),
+    [rankPreviewNowMs]
+  );
+  const rankSnapshotRefreshBucket = useMemo(
+    () =>
+      dailyRankWindow.isLive
+        ? `${dailyRankWindow.competitionDateKey}:${Math.floor(rankPreviewNowMs / 60000)}`
+        : dailyRankWindow.competitionDateKey,
+    [dailyRankWindow.competitionDateKey, dailyRankWindow.isLive, rankPreviewNowMs]
+  );
 
   useEffect(() => {
     if (!isActive || typeof window === 'undefined') return;
@@ -1417,7 +1428,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [activeMembership?.id, isActive, rankAttendanceRefreshKey, user]);
+  }, [activeMembership?.id, isActive, rankAttendanceRefreshKey, rankSnapshotRefreshBucket, user]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -2260,11 +2271,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const validDailyRankEntries = rankSnapshot.daily;
   const validWeeklyRankEntries = rankSnapshot.weekly;
-  const dailyRankWindow = useMemo(
-    () => getDailyRankWindowState(new Date(rankPreviewNowMs)),
-    [rankPreviewNowMs]
-  );
-
   const dailyStudyRank = useMemo(() => {
     if (!user || validDailyRankEntries.length === 0) return 0;
     const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === user.uid);
