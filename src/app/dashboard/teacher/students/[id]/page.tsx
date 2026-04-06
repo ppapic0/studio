@@ -1852,6 +1852,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     ? Math.round((studentReservations.filter((item) => item.status === 'done').length / studentReservations.length) * 100)
     : 0;
   const detailActionButtonClass = isAnalysisPresentation ? 'analysis-action-button' : '';
+  const detailWindowNavButtonClass = isAnalysisPresentation ? 'analysis-action-button analysis-window-nav-button' : '';
   const detailTabListClass = isAnalysisPresentation
     ? cn('analysis-tab-rail rounded-[1.5rem] grid p-1.5 gap-1.5', isMobile ? 'h-auto grid-cols-2' : 'h-14 grid-cols-3')
     : cn('rounded-2xl bg-muted/30 grid p-1 gap-1', isMobile ? 'h-auto grid-cols-2' : 'h-12 grid-cols-3');
@@ -2683,8 +2684,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className={cn('h-8 rounded-full px-3 text-[11px] font-black', isAnalysisPresentation && detailActionButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
-                      <Button variant="outline" size="sm" className={cn('h-8 rounded-full px-3 text-[11px] font-black', isAnalysisPresentation && detailActionButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                      <Button variant="outline" size="sm" className={cn('h-8 rounded-full px-3 text-[11px] font-black', isAnalysisPresentation && detailWindowNavButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                      <Button variant="outline" size="sm" className={cn('h-8 rounded-full px-3 text-[11px] font-black', isAnalysisPresentation && detailWindowNavButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
                     </div>
                   </div>
                 </div>
@@ -3045,8 +3046,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         {dailyGrowthWindowCount - boundedDailyGrowthWindowIndex}/{dailyGrowthWindowCount} 구간
                       </Badge>
                       <div className={cn(isMobile ? "grid grid-cols-2 gap-2" : "flex items-center gap-2")}>
-                        <Button variant="outline" size="sm" className={cn('h-8 rounded-full px-3 text-[11px] font-black', isMobile && 'w-full justify-center', isAnalysisPresentation && detailActionButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
-                        <Button variant="outline" size="sm" className={cn('h-8 rounded-full px-3 text-[11px] font-black', isMobile && 'w-full justify-center', isAnalysisPresentation && detailActionButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
+                        <Button variant="outline" size="sm" className={cn('h-8 rounded-full px-3 text-[11px] font-black', isMobile && 'w-full justify-center', isAnalysisPresentation && detailWindowNavButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))} disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}>이전 7일</Button>
+                        <Button variant="outline" size="sm" className={cn('h-8 rounded-full px-3 text-[11px] font-black', isMobile && 'w-full justify-center', isAnalysisPresentation && detailWindowNavButtonClass)} onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))} disabled={boundedDailyGrowthWindowIndex <= 0}>다음 7일</Button>
                       </div>
                     </div>
                     {hasDailyGrowthData ? (
