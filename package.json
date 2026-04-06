@@ -10,6 +10,7 @@
     "build:safe": "powershell -ExecutionPolicy Bypass -File ./scripts/build-safe.ps1",
     "start": "next start",
     "lint": "next lint",
+    "test:openclaw": "node scripts/validate-openclaw-snapshot.cjs",
     "test:risk": "node scripts/validate-student-risk-engine.cjs",
     "typecheck": "tsc --noEmit",
     "emulators": "firebase emulators:start",

@@ -4,6 +4,10 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 
 import { generateStructuredStudyPlan } from "./geminiClient";
+import {
+  executeOpenClawSnapshotExport,
+  OpenClawExportInProgressError,
+} from "./openclawSnapshot";
 import { generateStudyPlanInputSchema, validateStudyPlanOutput } from "./plannerSchema";
 
 if (admin.apps.length === 0) {
@@ -4212,6 +4216,120 @@ export const refreshClassroomSignals = functions
       classSummaryCount: payload.classSummaries.length,
       incidentCount: payload.incidents.length,
     };
+  });
+
+export const generateOpenClawSnapshot = functions
+  .region(region)
+  .runWith({
+    timeoutSeconds: 540,
+    memory: "1GB",
+  })
+  .https.onCall(async (data, context) => {
+    const db = admin.firestore();
+
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const centerId = typeof data?.centerId === "string" ? data.centerId.trim() : "";
+    if (!centerId) {
+      throw new functions.https.HttpsError("invalid-argument", "centerId is required.");
+    }
+
+    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!membership.role || !isAdminRole(membership.role)) {
+      throw new functions.https.HttpsError("permission-denied", "Only center admins can export OpenClaw snapshots.");
+    }
+    if (!isActiveMembershipStatus(membership.status)) {
+      throw new functions.https.HttpsError("permission-denied", "Inactive membership.");
+    }
+
+    try {
+      const result = await executeOpenClawSnapshotExport({
+        db,
+        centerId,
+        requestedBy: context.auth.uid,
+        enableOnRequest: true,
+      });
+      return {
+        ok: true,
+        centerId,
+        ...result,
+      };
+    } catch (error) {
+      if (error instanceof OpenClawExportInProgressError) {
+        throw new functions.https.HttpsError("failed-precondition", "OpenClaw snapshot export already running.", {
+          userMessage: "이미 OpenClaw 스냅샷을 생성 중입니다. 잠시 후 다시 시도해 주세요.",
+        });
+      }
+      console.error("[openclaw] manual export failed", {
+        centerId,
+        uid: context.auth.uid,
+        error,
+      });
+      throw new functions.https.HttpsError("internal", "OpenClaw snapshot export failed.", {
+        userMessage: "OpenClaw 스냅샷 생성 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+export const scheduledOpenClawSnapshotExport = functions
+  .region(region)
+  .runWith({
+    timeoutSeconds: 540,
+    memory: "1GB",
+  })
+  .pubsub.schedule("10 4 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const centersSnap = await db.collection("centers").get();
+    let exported = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const centerDoc of centersSnap.docs) {
+      const centerId = centerDoc.id;
+      const integrationSnap = await db.doc(`centers/${centerId}/integrations/openclaw`).get();
+      const integration = integrationSnap.exists ? (integrationSnap.data() as { enabled?: boolean }) : null;
+      if (!integration?.enabled) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        const result = await executeOpenClawSnapshotExport({
+          db,
+          centerId,
+          requestedBy: "scheduler",
+        });
+        exported += 1;
+        console.log("[openclaw] scheduled export complete", {
+          centerId,
+          objectPath: result.objectPath,
+          generatedAt: result.generatedAt,
+        });
+      } catch (error) {
+        if (error instanceof OpenClawExportInProgressError) {
+          skipped += 1;
+          console.warn("[openclaw] export skipped because another run is active", { centerId });
+          continue;
+        }
+        failed += 1;
+        console.error("[openclaw] scheduled export failed", {
+          centerId,
+          error,
+        });
+      }
+    }
+
+    console.log("[openclaw] scheduled export summary", {
+      centerCount: centersSnap.size,
+      exported,
+      skipped,
+      failed,
+    });
+    return null;
   });
 
 export const ensureCurrentUserMemberships = functions

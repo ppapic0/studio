@@ -1073,3 +1073,50 @@ export interface ClassroomSignalsDocument {
   seatSignals: ClassroomSeatSignal[];
   incidents: ClassroomSignalIncident[];
 }
+
+export type OpenClawIntegrationStatus = 'idle' | 'exporting' | 'success' | 'error';
+
+export interface OpenClawIntegrationDoc {
+  id?: string;
+  enabled?: boolean;
+  status?: OpenClawIntegrationStatus;
+  lastRequestedAt?: Timestamp | null;
+  lastRequestedBy?: string | null;
+  lastExportedAt?: Timestamp | null;
+  lastSnapshotPath?: string | null;
+  lastErrorAt?: Timestamp | null;
+  lastErrorMessage?: string | null;
+  schemaVersion?: string | null;
+}
+
+export interface OpenClawSnapshotRecordCounts {
+  students: {
+    memberships: number;
+    profiles: number;
+    growthProgress: number;
+  };
+  attendance: {
+    records: number;
+    schedules: number;
+    currentSeats: number;
+  };
+  consultations: {
+    logs: number;
+    reservations: number;
+  };
+  billing: {
+    invoices: number;
+    payments: number;
+    kpiDaily: number;
+  };
+  studyRoomUsage: {
+    dailyStudentStats: number;
+    studyLogDays: number;
+    sessions: number;
+  };
+  derived: {
+    riskCache: number;
+    classroomSignals: number;
+    kpiDaily: number;
+  };
+}

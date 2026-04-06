@@ -80,7 +80,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile } from '@/lib/types';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -195,6 +195,45 @@ const EMPTY_ADMIN_METRICS = {
   }>,
 };
 
+type GenerateOpenClawSnapshotResult = {
+  ok: boolean;
+  centerId: string;
+  generatedAt: string;
+  objectPath: string;
+  latestObjectPath: string;
+  recordCounts: OpenClawSnapshotRecordCounts;
+};
+
+const getCallableErrorMessage = (error: unknown, fallback: string): string => {
+  if (error && typeof error === 'object') {
+    const details = (error as { details?: unknown }).details;
+    if (details && typeof details === 'object') {
+      const userMessage = (details as { userMessage?: unknown }).userMessage;
+      if (typeof userMessage === 'string' && userMessage.trim()) {
+        return userMessage.trim();
+      }
+    }
+
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) {
+      return message.replace(/^FirebaseError:\s*/, '').trim();
+    }
+  }
+
+  return fallback;
+};
+
+const formatOpenClawCountSummary = (counts: OpenClawSnapshotRecordCounts): string => {
+  const studentTotal = counts.students.memberships + counts.students.profiles + counts.students.growthProgress;
+  const attendanceTotal = counts.attendance.records + counts.attendance.schedules + counts.attendance.currentSeats;
+  const consultationTotal = counts.consultations.logs + counts.consultations.reservations;
+  const billingTotal = counts.billing.invoices + counts.billing.payments + counts.billing.kpiDaily;
+  const studyRoomTotal =
+    counts.studyRoomUsage.dailyStudentStats + counts.studyRoomUsage.studyLogDays + counts.studyRoomUsage.sessions;
+
+  return `학생 ${studentTotal} · 출결 ${attendanceTotal} · 상담 ${consultationTotal} · 수납 ${billingTotal} · 독서실 ${studyRoomTotal}`;
+};
+
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const functions = useFunctions();
@@ -222,6 +261,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [noticeBody, setNoticeBody] = useState('');
   const [noticeAudience, setNoticeAudience] = useState<'parent' | 'student' | 'all'>('parent');
   const [isNoticeSubmitting, setIsNoticeSubmitting] = useState(false);
+  const [isOpenClawExporting, setIsOpenClawExporting] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -260,6 +300,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return doc(firestore, 'centers', centerId);
   }, [firestore, centerId]);
   const { data: centerData } = useDoc<any>(centerRef);
+
+  const openClawIntegrationRef = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return doc(firestore, 'centers', centerId, 'integrations', 'openclaw');
+  }, [firestore, centerId]);
+  const { data: openClawIntegration } = useDoc<OpenClawIntegrationDoc>(openClawIntegrationRef);
 
   const roomConfigs = useMemo(
     () => normalizeLayoutRooms(centerData?.layoutSettings),
@@ -660,6 +706,37 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       });
     } finally {
       setDeletingTeacherId(null);
+    }
+  };
+
+  const handleGenerateOpenClawSnapshot = async () => {
+    if (!functions || !centerId) return;
+
+    setIsOpenClawExporting(true);
+    try {
+      const generateSnapshot = httpsCallable<{ centerId: string }, GenerateOpenClawSnapshotResult>(
+        functions,
+        'generateOpenClawSnapshot',
+        { timeout: 600000 }
+      );
+      const result = await generateSnapshot({ centerId });
+      const generatedLabel = result.data.generatedAt
+        ? format(new Date(result.data.generatedAt), 'MM.dd HH:mm')
+        : '방금';
+
+      toast({
+        title: 'OpenClaw 스냅샷 생성 완료',
+        description: `${generatedLabel} · ${formatOpenClawCountSummary(result.data.recordCounts)}`,
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: 'OpenClaw 스냅샷 생성 실패',
+        description: getCallableErrorMessage(error, 'OpenClaw 스냅샷 생성 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setIsOpenClawExporting(false);
     }
   };
 
@@ -1668,6 +1745,54 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     []
   );
 
+  const isOpenClawBusy = isOpenClawExporting || openClawIntegration?.status === 'exporting';
+  const openClawStatus = isOpenClawBusy ? 'exporting' : openClawIntegration?.status || 'idle';
+  const openClawStatusMeta =
+    openClawStatus === 'exporting'
+      ? {
+          label: '생성 중',
+          badgeClass: 'bg-amber-100 text-amber-700 border-amber-200',
+          description: '스냅샷 파일과 상태 문서를 동기화하고 있습니다.',
+          icon: Loader2,
+          iconClassName: 'animate-spin text-amber-600',
+        }
+      : openClawStatus === 'success'
+        ? {
+            label: '정상',
+            badgeClass: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            description: '최근 스냅샷이 정상적으로 저장되었습니다.',
+            icon: CheckCircle2,
+            iconClassName: 'text-emerald-600',
+          }
+        : openClawStatus === 'error'
+          ? {
+              label: '오류',
+              badgeClass: 'bg-rose-100 text-rose-700 border-rose-200',
+              description: '마지막 생성 시도에서 오류가 발생했습니다.',
+              icon: AlertTriangle,
+              iconClassName: 'text-rose-600',
+            }
+          : {
+              label: openClawIntegration?.enabled ? '대기' : '미설정',
+              badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
+              description: openClawIntegration?.enabled
+                ? '자동 배치는 켜져 있지만 아직 성공 이력이 없습니다.'
+                : '수동 생성 시 자동 배치가 함께 활성화됩니다.',
+              icon: History,
+              iconClassName: 'text-slate-500',
+            };
+  const OpenClawStatusIcon = openClawStatusMeta.icon;
+  const openClawLastExportLabel = openClawIntegration?.lastExportedAt
+    ? format(openClawIntegration.lastExportedAt.toDate(), 'MM.dd HH:mm')
+    : '미생성';
+  const openClawLastRequestedLabel = openClawIntegration?.lastRequestedAt
+    ? format(openClawIntegration.lastRequestedAt.toDate(), 'MM.dd HH:mm')
+    : '기록 없음';
+  const openClawLatestPathLabel = openClawIntegration?.lastSnapshotPath
+    ? openClawIntegration.lastSnapshotPath.replace(`openclaw/centers/${centerId || ''}/`, '')
+    : 'history 경로 미생성';
+  const isOpenClawActionDisabled = !functions || !centerId || isOpenClawBusy;
+
   const centerHealthAxes = useMemo(() => {
     return adminHeatmapRows.slice(0, 5).map((row) => {
       const firstScore = row.trend[0]?.score ?? row.summaryScore;
@@ -1833,7 +1958,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           실시간 허브
         </Badge>
       </div>
-      <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3')}>
+      <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-4')}>
         <Card className="rounded-[2rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#2754D7_100%)] p-6 text-white shadow-[0_18px_40px_rgba(20,41,95,0.18)]">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
@@ -1964,6 +2089,59 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </Link>
             ))}
           </div>
+        </Card>
+
+        <Card className="rounded-[2rem] border-none bg-white p-6 shadow-lg ring-1 ring-black/[0.03]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">OpenClaw Snapshot</p>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">운영 데이터 배출구</h3>
+            </div>
+            <OpenClawStatusIcon className={cn('h-6 w-6', openClawStatusMeta.iconClassName)} />
+          </div>
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-[1.25rem] border border-slate-100 bg-slate-50/80 px-4 py-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">현재 상태</p>
+              <p className="mt-1 text-sm font-bold text-slate-600">{openClawStatusMeta.description}</p>
+            </div>
+            <Badge className={cn('rounded-full border font-black text-[10px] px-2.5 py-1', openClawStatusMeta.badgeClass)}>
+              {openClawStatusMeta.label}
+            </Badge>
+          </div>
+          <div className="mt-4 grid gap-2">
+            <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">마지막 성공</p>
+              <p className="mt-1 text-lg font-black text-[#14295F]">{openClawLastExportLabel}</p>
+              <p className="mt-1 text-[11px] font-bold text-slate-500">자동 배치 04:10 KST</p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">마지막 요청</p>
+              <p className="mt-1 text-sm font-black text-[#14295F]">{openClawLastRequestedLabel}</p>
+              <p className="mt-1 truncate text-[11px] font-bold text-slate-500" title={openClawLatestPathLabel}>
+                {openClawLatestPathLabel}
+              </p>
+            </div>
+            {openClawStatus === 'error' && openClawIntegration?.lastErrorMessage ? (
+              <div className="rounded-xl border border-rose-100 bg-rose-50/80 px-3 py-3 text-[11px] font-bold leading-5 text-rose-700">
+                {openClawIntegration.lastErrorMessage}
+              </div>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            className="mt-4 h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:bg-[#10224C]"
+            disabled={isOpenClawActionDisabled}
+            onClick={handleGenerateOpenClawSnapshot}
+          >
+            {isOpenClawBusy ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                OpenClaw 스냅샷 생성 중...
+              </>
+            ) : (
+              'OpenClaw 스냅샷 생성'
+            )}
+          </Button>
         </Card>
       </div>
       {centerHealthAxes.length > 0 ? (
