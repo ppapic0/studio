@@ -72,19 +72,15 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
   const controlTone = isDark
     ? {
         button: 'border-white/16 bg-white/10 text-white hover:bg-white/16',
-        count: 'bg-white/10 text-white/78',
         dotIdle: 'bg-white/24',
         dotActive: 'bg-white',
         card: 'border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.03)_100%)]',
-        label: 'bg-[#14295F]/86 text-white',
       }
     : {
         button: 'border-[#D6E3FB] bg-white/88 text-[#18356F] hover:bg-[#F4F8FF]',
-        count: 'bg-[#EDF3FF] text-[#5C7396]',
         dotIdle: 'bg-[#C8D7F2]',
         dotActive: 'bg-[#2F63E3]',
         card: 'border-[#D6E3FB] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(243,247,255,0.86)_100%)]',
-        label: 'bg-[#14295F]/86 text-white',
       };
 
   useEffect(() => {
@@ -129,19 +125,9 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
           <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-14 bg-gradient-to-r sm:w-20', isDark ? 'from-[#1A3471]/85 via-[#1A3471]/45 to-transparent' : 'from-white via-white/55 to-transparent')} />
           <div className={cn('pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l sm:w-20', isDark ? 'from-[#1A3471]/85 via-[#1A3471]/45 to-transparent' : 'from-white via-white/55 to-transparent')} />
 
-          <div className={cn('pointer-events-none absolute inset-x-5 top-3 flex items-center justify-between text-[10px] font-black tracking-[0.18em] sm:inset-x-6 sm:top-4', isDark ? 'text-white/72' : 'text-[#5C7396]')}>
-            <span>MOCK EXAM COVERS</span>
-            <span className={cn('rounded-full px-2 py-1 text-[9px]', controlTone.count)}>
-              {`${String(activeProofIndex + 1).padStart(2, '0')} / ${String(mockExamProofImages.length).padStart(2, '0')}`}
-            </span>
-          </div>
-
           <div className="relative flex min-h-[12.5rem] items-center justify-center sm:min-h-[14.5rem]">
             <div className={cn('pointer-events-none absolute left-1/2 top-1/2 h-[11rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[48px] sm:h-[13rem] sm:w-[13rem]', spotlightTone.aura)} />
             <div className="relative flex h-[10.8rem] w-full max-w-[16rem] items-center justify-center sm:h-[13rem] sm:max-w-[19rem]">
-              <div className={cn('absolute left-0 top-0 z-10 rounded-full px-3 py-1 text-[9px] font-black tracking-[0.14em] backdrop-blur-sm sm:text-[10px]', controlTone.label)}>
-                {activeProofImage.label}
-              </div>
               <Image
                 key={activeProofImage.src}
                 src={activeProofImage.src}
