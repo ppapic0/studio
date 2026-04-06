@@ -1953,7 +1953,10 @@ select {
     border-color: rgba(214, 225, 245, 0.92);
   }
 
-  .analysis-full-shell .analysis-detail-badge,
+  .analysis-full-shell .analysis-detail-badge {
+    color: #17326b !important;
+  }
+
   .analysis-full-shell .analysis-growth-period-badge {
     color: #ffffff !important;
   }
