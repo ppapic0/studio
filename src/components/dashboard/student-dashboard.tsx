@@ -2931,7 +2931,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <Input
                     value={goalPathLabelDraft}
                     onChange={(event) => setGoalPathLabelDraft(event.target.value)}
-                    placeholder={goalPathTypeDraft === 'job' ? '예: 교사, 검사, 개발자' : '예: 경희대학교 국어국문학과'}
+                    placeholder={goalPathTypeDraft === 'job' ? '예: 교사, 검사, 개발자' : '예: 건국대학교 교육공학과'}
                     className="h-10 rounded-xl border-primary/15 font-bold"
                   />
                 </div>
