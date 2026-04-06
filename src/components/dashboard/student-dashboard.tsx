@@ -1478,10 +1478,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => configuredExamCountdowns.find((item) => item.daysLeft !== null && item.daysLeft >= 0) ?? configuredExamCountdowns[0] ?? null,
     [configuredExamCountdowns]
   );
-  const homeFocusExamLabel = primaryExamCountdown?.dLabel || '시험 미설정';
-  const homeFocusExamTitle = primaryExamCountdown?.title || '준비 중인 시험을 추가해보세요';
+  const homeFocusExamLabel = primaryExamCountdown?.dLabel || 'D-day 미설정';
   const homeGoalTypeLabel = studentProfile?.goalPathType === 'job' ? '희망 직업' : '희망 학교';
-  const homeGoalLabel = studentProfile?.goalPathLabel?.trim() || `${homeGoalTypeLabel}를 입력해보세요`;
+  const homeGoalLabel = studentProfile?.goalPathLabel?.trim() || homeGoalTypeLabel;
+  const homeFocusSummaryLabel = `${homeGoalLabel} / ${homeFocusExamLabel}`;
 
   const subjectProgress = useMemo(() => {
     const bucket = new Map<string, { total: number; done: number }>();
@@ -2859,10 +2859,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         growthDeltaPercent={studyVsYesterday}
         pointBalance={homePointBalance}
         todayPointGain={todayPointAmount}
-        homeFocusExamLabel={homeFocusExamLabel}
-        homeFocusExamTitle={homeFocusExamTitle}
-        homeGoalLabel={homeGoalLabel}
-        homeGoalTypeLabel={homeGoalTypeLabel}
+        homeFocusSummaryLabel={homeFocusSummaryLabel}
         onOpenFocusEditor={() => setIsExamDialogOpen(true)}
         dailyPointStatus={progress?.dailyPointStatus}
         quests={homeQuestList}

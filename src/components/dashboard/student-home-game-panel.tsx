@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  CalendarDays,
   Check,
   ChevronRight,
   Crown,
@@ -10,7 +9,6 @@ import {
   Gift,
   Lock,
   Play,
-  Sparkles,
   Swords,
   Target,
   Timer,
@@ -519,10 +517,7 @@ export function StudentHomeGamePanel({
   growthDeltaPercent,
   pointBalance,
   todayPointGain,
-  homeFocusExamLabel,
-  homeFocusExamTitle,
-  homeGoalLabel,
-  homeGoalTypeLabel,
+  homeFocusSummaryLabel,
   onOpenFocusEditor,
   dailyPointStatus,
   quests,
@@ -571,10 +566,7 @@ export function StudentHomeGamePanel({
   growthDeltaPercent: number;
   pointBalance: number;
   todayPointGain: number;
-  homeFocusExamLabel: string;
-  homeFocusExamTitle: string;
-  homeGoalLabel: string;
-  homeGoalTypeLabel: string;
+  homeFocusSummaryLabel: string;
   onOpenFocusEditor: () => void;
   dailyPointStatus?: GrowthProgress["dailyPointStatus"];
   quests: StudentHomeQuest[];
@@ -653,28 +645,17 @@ export function StudentHomeGamePanel({
             <button
               type="button"
               onClick={onOpenFocusEditor}
-              title={`${todayPointLabel} · ${completionLabel} · ${streakLabel}`}
+              title={homeFocusSummaryLabel}
               className={cn(
-                "surface-chip surface-chip--dark min-w-[15rem] px-3 py-2.5 text-left shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/28",
-                isMobile ? "w-full self-stretch" : ""
+                "surface-chip surface-chip--dark inline-flex max-w-full items-center gap-2 px-3 py-2 text-left shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/28",
+                isMobile ? "max-w-[14.5rem] self-start" : "min-w-[12rem] max-w-[16rem]"
               )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/72">
-                    <CalendarDays className="h-3.5 w-3.5 text-white" />
-                    {homeFocusExamLabel}
-                  </div>
-                  <div className="mt-1 truncate text-[13px] font-black text-white">{homeFocusExamTitle}</div>
-                  <div className="mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/72">
-                    <Sparkles className="h-3.5 w-3.5 text-white" />
-                    {homeGoalTypeLabel}
-                  </div>
-                  <div className="mt-1 truncate text-[12px] font-black text-white/92">{homeGoalLabel}</div>
-                </div>
-                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-white/72" />
-              </div>
-              <span className="sr-only">{todayPointLabel} {completionLabel} {streakLabel}</span>
+              <span className={cn("truncate font-black text-white", isMobile ? "text-[11px]" : "text-[12px]")}>
+                {homeFocusSummaryLabel}
+              </span>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/72" />
+              <span className="sr-only">{homeFocusSummaryLabel}</span>
             </button>
           </div>
 
