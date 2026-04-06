@@ -4,34 +4,6 @@ import { ArrowRight } from 'lucide-react';
 
 import { StaggerChildren } from './stagger-children';
 
-type MetricTone = 'navy' | 'orange' | 'green';
-
-const heroMetrics = [
-  {
-    label: '주간 누적 학습',
-    value: '14시간 23분',
-    detail: '최근 7일 기준',
-    tone: 'navy' as const,
-  },
-  {
-    label: '평균 목표 달성률',
-    value: '93%',
-    detail: '후반부 안정화',
-    tone: 'orange' as const,
-  },
-  {
-    label: '리듬 안정도',
-    value: '91점',
-    detail: '상위권 유지',
-    tone: 'green' as const,
-  },
-] satisfies Array<{
-  label: string;
-  value: string;
-  detail: string;
-  tone: MetricTone;
-}>;
-
 const analyticsFocusChips = ['공부시간', '목표 달성률', '성장률', '리듬', '시작·종료 시간', '중간 이탈시간'];
 
 const analyticsScreenshots = [
@@ -50,37 +22,6 @@ const analyticsScreenshots = [
     frameClassName: 'mx-auto max-w-[33rem]',
   },
 ] as const;
-
-function MetricCard({
-  label,
-  value,
-  detail,
-  tone,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  tone: MetricTone;
-}) {
-  const toneClassMap: Record<MetricTone, string> = {
-    navy: 'border-[#14295F]/10 bg-[#F7FAFF]',
-    orange: 'border-[#FF7A16]/14 bg-[#FFF7F0]',
-    green: 'border-emerald-200 bg-[#F4FBF8]',
-  };
-
-  return (
-    <article
-      className={`brand-sheen-panel relative min-w-0 overflow-hidden rounded-[1rem] border px-2.5 py-3 shadow-[0_10px_20px_rgba(20,41,95,0.04)] sm:rounded-[1.2rem] sm:px-4 sm:py-4 ${toneClassMap[tone]}`}
-    >
-      <div className="brand-glow-drift absolute -right-8 top-0 h-20 w-20 rounded-full bg-[#FFB878]/14 blur-2xl" />
-      <div className="relative">
-        <p className="break-keep text-[9px] font-black leading-[1.28] text-[#4D627A] sm:text-[11px]">{label}</p>
-        <p className="brand-number-pop dashboard-number mt-1.5 break-keep text-[1.06rem] text-[#14295F] sm:mt-2 sm:text-[1.7rem]">{value}</p>
-        <p className="mt-1 hidden text-[8.5px] font-bold leading-[1.35] text-[#5A6E85] sm:mt-1.5 sm:block sm:text-[11px]">{detail}</p>
-      </div>
-    </article>
-  );
-}
 
 function AnalyticsScreenshotCard({
   screen,
@@ -154,18 +95,6 @@ export function DataAnalyticsPreviewSection({ showNextView = true }: { showNextV
             </div>
           </div>
         </div>
-
-        <StaggerChildren stagger={90} className="mt-6 grid gap-3 sm:grid-cols-3">
-          {heroMetrics.map((metric) => (
-            <MetricCard
-              key={metric.label}
-              label={metric.label}
-              value={metric.value}
-              detail={metric.detail}
-              tone={metric.tone}
-            />
-          ))}
-        </StaggerChildren>
 
         <StaggerChildren stagger={110} className="mt-8 space-y-4 sm:space-y-5">
           {analyticsScreenshots.map((screen) => (
