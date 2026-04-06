@@ -304,7 +304,9 @@ export default function ExperiencePage() {
 
         <ScrollReveal className="mt-8">
           <div className="space-y-5">
-            <p className="text-center text-[12px] font-semibold text-[#667A95]">{experienceShowcase.footerNote}</p>
+            {experienceShowcase.footerNote ? (
+              <p className="text-center text-[12px] font-semibold text-[#667A95]">{experienceShowcase.footerNote}</p>
+            ) : null}
 
             <section className="relative overflow-hidden rounded-[2.1rem] border border-[#14295F]/10 bg-white px-6 py-7 text-center shadow-[0_20px_46px_rgba(20,41,95,0.08)] sm:px-8">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,122,22,0.10),transparent_32%)]" />
@@ -313,9 +315,11 @@ export default function ExperiencePage() {
                 <h2 className="mt-3 break-keep text-[clamp(1.55rem,3vw,2.2rem)] font-black leading-[1.2] text-[#14295F]">
                   {experienceShowcase.closingTitle}
                 </h2>
-                <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.8] text-[#425A75]">
-                  {experienceShowcase.closingDescription}
-                </p>
+                {experienceShowcase.closingDescription ? (
+                  <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.8] text-[#425A75]">
+                    {experienceShowcase.closingDescription}
+                  </p>
+                ) : null}
                 <div className="mt-6">
                   <Link href={experienceShowcase.closingHref} className="premium-cta premium-cta-primary h-11 px-6 text-sm">
                     {experienceShowcase.closingLabel}

@@ -499,10 +499,9 @@ export const marketingContent: MarketingContent = {
     description:
       '학생은 더 분명하게 실행하고, 학부모는 더 빠르게 흐름을 확인할 수 있도록 트랙에서 직접 설계한 러닝시스템입니다.',
     sections: experienceShowcaseSections,
-    footerNote: '실제 스크린샷은 순차 반영 예정입니다.',
+    footerNote: '',
     closingTitle: '트랙은 실제 데이터로 엄밀하게 관리합니다.',
-    closingDescription:
-      '스크린샷이 반영되면 학생과 학부모가 어떤 구조로 관리되는지 더 선명하게 확인할 수 있습니다.',
+    closingDescription: '',
     closingHref: '/#consult',
     closingLabel: '상담 문의하기',
   },
