@@ -23,7 +23,6 @@ const toneStyleMap: Record<
     chip: string;
     sectionCard: string;
     frameCanvas: string;
-    device: string;
     insight: string;
     textButton: string;
     glow: string;
@@ -35,7 +34,6 @@ const toneStyleMap: Record<
     chip: 'border-[#14295F]/12 bg-[#EEF3FF] text-[#14295F]',
     sectionCard: 'border-[#14295F]/10 bg-white',
     frameCanvas: 'border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF3FF_100%)]',
-    device: 'border-[#14295F]/12 bg-white',
     insight: 'border-[#14295F]/10 bg-[#F8FBFF]',
     textButton: 'border-[#14295F]/12 bg-white text-[#14295F] hover:border-[#14295F]/22 hover:bg-[#F7FAFF]',
     glow: 'bg-[#8CB7FF]/18',
@@ -46,7 +44,6 @@ const toneStyleMap: Record<
     chip: 'border-[#FF7A16]/12 bg-[#FFF3E8] text-[#B55200]',
     sectionCard: 'border-[#FF7A16]/12 bg-white',
     frameCanvas: 'border-[#FFD9BF] bg-[linear-gradient(180deg,#FFF9F2_0%,#FFF3E8_100%)]',
-    device: 'border-[#FF7A16]/12 bg-white',
     insight: 'border-[#FF7A16]/12 bg-[#FFF9F2]',
     textButton: 'border-[#FF7A16]/12 bg-white text-[#B55200] hover:border-[#FF7A16]/24 hover:bg-[#FFF9F2]',
     glow: 'bg-[#FFB878]/20',
@@ -72,32 +69,52 @@ function ScreenshotCard({
   featured?: boolean;
 }) {
   const style = toneStyleMap[tone];
+  const isLandscape = Boolean(screen.width && screen.height && screen.width > screen.height);
+  const mediaWidthClass = featured
+    ? isLandscape
+      ? 'max-w-[30rem]'
+      : 'max-w-[24rem]'
+    : isLandscape
+      ? 'max-w-full'
+      : 'max-w-[20rem]';
 
   return (
     <article className={`overflow-hidden rounded-[2rem] border p-4 shadow-[0_20px_44px_rgba(20,41,95,0.08)] sm:p-5 ${style.sectionCard}`}>
-      <div className={`relative overflow-hidden rounded-[1.7rem] border p-4 sm:p-5 ${style.frameCanvas}`}>
+      <div className={`relative overflow-hidden rounded-[1.7rem] border p-3 sm:p-4 ${style.frameCanvas}`}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_58%)]" />
         <div className={`absolute -left-10 bottom-10 h-28 w-28 rounded-full blur-3xl ${style.glow}`} />
         <div className={`absolute -right-6 top-8 h-24 w-24 rounded-full blur-3xl ${style.glow}`} />
 
-        <div className={`relative flex items-center justify-center ${featured ? 'min-h-[29rem] sm:min-h-[31rem]' : 'min-h-[21rem] sm:min-h-[20rem]'}`}>
-          <div className={`absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px] ${style.glow}`} />
-          <div
-            className={`relative aspect-[10/20] w-full overflow-hidden rounded-[2.8rem] border shadow-[0_26px_54px_rgba(20,41,95,0.16)] ${style.device} ${
-              featured ? 'max-w-[21rem]' : 'max-w-[14.5rem]'
-            }`}
-          >
-            {screen.image ? (
-              <Image
-                src={screen.image}
-                alt={screen.alt}
-                fill
-                sizes={featured ? '(max-width: 1024px) 80vw, 28vw' : '(max-width: 768px) 48vw, 18vw'}
-                className="object-contain bg-white"
-              />
+        <div className={`relative flex items-center justify-center ${featured ? 'min-h-[17rem] sm:min-h-[19rem]' : 'min-h-[15rem] sm:min-h-[17rem]'}`}>
+          <div className={`absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full blur-[78px] ${style.glow}`} />
+          <div className={`relative mx-auto w-full ${mediaWidthClass}`}>
+            {screen.image && screen.width && screen.height ? (
+              <div className="overflow-hidden rounded-[1.45rem] border border-white/72 bg-white shadow-[0_22px_42px_rgba(20,41,95,0.14)]">
+                <Image
+                  src={screen.image}
+                  alt={screen.alt}
+                  width={screen.width}
+                  height={screen.height}
+                  sizes={featured ? '(max-width: 1024px) 92vw, 34vw' : '(max-width: 768px) 92vw, 26vw'}
+                  className="h-auto w-full"
+                />
+              </div>
+            ) : screen.image ? (
+              <div
+                className="relative overflow-hidden rounded-[1.45rem] border border-white/72 bg-white shadow-[0_22px_42px_rgba(20,41,95,0.14)]"
+                style={{ aspectRatio: featured ? '4 / 5' : '3 / 4' }}
+              >
+                <Image
+                  src={screen.image}
+                  alt={screen.alt}
+                  fill
+                  sizes={featured ? '(max-width: 1024px) 92vw, 34vw' : '(max-width: 768px) 92vw, 26vw'}
+                  className="object-contain bg-white"
+                />
+              </div>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                <span className="rounded-full border border-[#14295F]/10 bg-white/78 px-3 py-1 text-[10px] font-black tracking-[0.14em] text-[#14295F]/56 backdrop-blur">
+              <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-[1.45rem] border border-dashed border-[#14295F]/12 bg-white/82 px-6 py-8 text-center shadow-[0_22px_42px_rgba(20,41,95,0.08)]">
+                <span className="rounded-full border border-[#14295F]/10 bg-white/84 px-3 py-1 text-[10px] font-black tracking-[0.14em] text-[#14295F]/56 backdrop-blur">
                   실제 스크린샷 예정
                 </span>
                 <p className="mt-4 break-keep text-[1rem] font-black leading-[1.45] text-[#14295F]">

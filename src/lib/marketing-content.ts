@@ -57,6 +57,8 @@ export type ExperienceShowcaseFrame = {
   caption: string;
   image?: string;
   alt: string;
+  width?: number;
+  height?: number;
 };
 
 export type ExperienceShowcaseSection = {
@@ -268,6 +270,8 @@ const experienceShowcaseSections: ExperienceShowcaseSection[] = [
       caption: '이번 주 누적 공부 흐름과 성장 지표를 한 번에 읽는 학생 대표 화면입니다.',
       image: '/marketing/app-evidence/student-weekly-growth-summary-capture.png',
       alt: '학생 모드 이번 주 성장 요약 실제 화면',
+      width: 605,
+      height: 412,
     },
     secondaryScreens: [
       {
@@ -275,12 +279,16 @@ const experienceShowcaseSections: ExperienceShowcaseSection[] = [
         caption: '오늘의 할 일과 주간 계획을 함께 확인하며 바로 실행으로 이어지는 화면입니다.',
         image: '/marketing/app-evidence/student-daily-routine-planner-capture.png',
         alt: '학생 모드 오늘 할 일과 루틴 실제 화면',
+        width: 671,
+        height: 774,
       },
       {
         title: '공부시간 · 피드백 화면',
         caption: '공부시간 기록과 피드백이 다음 행동으로 이어지도록 정리한 화면입니다.',
         image: '/marketing/app-evidence/study-feedback-dashboard-capture.png',
         alt: '학생 모드 공부시간과 피드백 실제 화면',
+        width: 321,
+        height: 466,
       },
     ],
     insightTitle: '학생 화면은 다음 행동이 보여야 합니다',
