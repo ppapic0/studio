@@ -1,40 +1,10 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
-import { Activity, AlertTriangle, ArrowRight, BarChart3, Clock3, LineChart } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { StaggerChildren } from './stagger-children';
 
-type Point = {
-  x: number;
-  y: number;
-};
-
-type ChartConfig = {
-  width: number;
-  height: number;
-  padLeft: number;
-  padRight: number;
-  padTop: number;
-  padBottom: number;
-  min: number;
-  max: number;
-};
-
-type LegendTone = 'navy' | 'orange' | 'green' | 'violet' | 'rose';
-
-const chartLabels = ['3/2', '3/4', '3/6', '3/8', '3/10', '3/12', '3/14', '3/16'];
-
-const overviewStudyHours = [5.4, 5.9, 6.5, 7.4, 8.3, 9.6, 10.8, 11.1];
-const overviewGoalRates = [61, 64, 67, 74, 79, 86, 90, 93];
-
-const growthHours = [3.1, 4.0, 5.2, 4.8, 6.3, 7.1, 7.5, 7.8];
-const growthRates = [8, 14, 23, 18, 31, 40, 44, 46];
-
-const rhythmScores = [74, 77, 83, 81, 87, 90, 89, 92];
-const studyStartTimes = [9.1, 8.8, 8.7, 8.5, 8.4, 8.3, 8.2, 8.2];
-const studyEndTimes = [23.2, 23.1, 23.1, 23.0, 23.0, 22.9, 23.0, 22.9];
-const breakMinutes = [0.6, 0.3, 2.4, 0.2, 0.2, 0.1, 0.1, 0.1];
+type MetricTone = 'navy' | 'orange' | 'green';
 
 const heroMetrics = [
   {
@@ -55,128 +25,31 @@ const heroMetrics = [
     detail: '상위권 유지',
     tone: 'green' as const,
   },
-];
+] satisfies Array<{
+  label: string;
+  value: string;
+  detail: string;
+  tone: MetricTone;
+}>;
 
 const analyticsFocusChips = ['공부시간', '목표 달성률', '성장률', '리듬', '시작·종료 시간', '중간 이탈시간'];
 
-const LARGE_CHART: ChartConfig = {
-  width: 720,
-  height: 292,
-  padLeft: 28,
-  padRight: 28,
-  padTop: 24,
-  padBottom: 42,
-  min: 0,
-  max: 100,
-};
-
-const MOBILE_LARGE_CHART: ChartConfig = {
-  width: 360,
-  height: 220,
-  padLeft: 16,
-  padRight: 14,
-  padTop: 18,
-  padBottom: 30,
-  min: 0,
-  max: 100,
-};
-
-const MINI_CHART: ChartConfig = {
-  width: 520,
-  height: 220,
-  padLeft: 28,
-  padRight: 22,
-  padTop: 22,
-  padBottom: 34,
-  min: 0,
-  max: 100,
-};
-
-const MOBILE_MINI_CHART: ChartConfig = {
-  width: 320,
-  height: 184,
-  padLeft: 18,
-  padRight: 14,
-  padTop: 16,
-  padBottom: 28,
-  min: 0,
-  max: 100,
-};
-
-function getPlotBottom(config: ChartConfig) {
-  return config.height - config.padBottom;
-}
-
-function getPlotRight(config: ChartConfig) {
-  return config.width - config.padRight;
-}
-
-function getSeriesPoints(values: number[], config: ChartConfig): Point[] {
-  const plotWidth = getPlotRight(config) - config.padLeft;
-  const plotHeight = getPlotBottom(config) - config.padTop;
-  const lastIndex = Math.max(values.length - 1, 1);
-
-  return values.map((value, index) => ({
-    x: config.padLeft + (plotWidth / lastIndex) * index,
-    y:
-      config.padTop +
-      plotHeight -
-      ((value - config.min) / (config.max - config.min || 1)) * plotHeight,
-  }));
-}
-
-function toPolyline(points: Point[]) {
-  return points.map(({ x, y }) => `${x},${y}`).join(' ');
-}
-
-function toAreaPolygon(points: Point[], baseline: number) {
-  if (!points.length) return '';
-  const first = points[0]!;
-  const last = points[points.length - 1]!;
-  return `${toPolyline(points)} ${last.x},${baseline} ${first.x},${baseline}`;
-}
-
-function formatHourLabel(value: number) {
-  const wholeHour = Math.floor(value);
-  const minutes = Math.round((value - wholeHour) * 60);
-  return `${String(wholeHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-}
-
-function getVisibleLabelIndexes(isMobile: boolean) {
-  return isMobile ? [0, 2, 4, 6] : chartLabels.map((_, index) => index);
-}
-
-function ChartLegend({ label, tone }: { label: string; tone: LegendTone }) {
-  const toneClassMap: Record<LegendTone, string> = {
-    navy: 'bg-[#EEF3FF] text-[#14295F]',
-    orange: 'bg-[#FFF3E8] text-[#B55200]',
-    green: 'bg-[#EEF9F5] text-[#0C8F69]',
-    violet: 'bg-[#F4EEFF] text-[#6D44C5]',
-    rose: 'bg-[#FFF1F4] text-[#C43E68]',
-  };
-
-  return (
-    <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-black leading-none ${toneClassMap[tone]} sm:px-3 sm:text-[10px]`}>
-      {label}
-    </span>
-  );
-}
-
-function DataBadge({ label, tone = 'navy' }: { label: string; tone?: LegendTone }) {
-  const toneClassMap: Record<LegendTone, string> = {
-    navy: 'border-[#14295F]/10 bg-[#F3F7FF] text-[#425A75]',
-    orange: 'border-[#FF7A16]/16 bg-[#FFF5EC] text-[#B55200]',
-    green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    violet: 'border-violet-200 bg-violet-50 text-violet-700',
-    rose: 'border-rose-200 bg-rose-50 text-rose-700',
-  };
-
-  return (
-    <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-1 text-[9px] font-black leading-none ${toneClassMap[tone]} sm:px-3 sm:text-[10px]`}>
-      {label}
-    </span>
-  );
-}
+const analyticsScreenshots = [
+  {
+    src: '/marketing/app-evidence/experience-analytics-overview-capture.png',
+    alt: '트랙 학습 분석 요약 화면 스크린샷',
+    width: 836,
+    height: 660,
+    frameClassName: '',
+  },
+  {
+    src: '/marketing/app-evidence/experience-analytics-dashboard-capture.png',
+    alt: '트랙 학습 분석 상세 화면 스크린샷',
+    width: 522,
+    height: 800,
+    frameClassName: 'mx-auto max-w-[33rem]',
+  },
+] as const;
 
 function MetricCard({
   label,
@@ -187,14 +60,12 @@ function MetricCard({
   label: string;
   value: string;
   detail: string;
-  tone: LegendTone;
+  tone: MetricTone;
 }) {
-  const toneClassMap: Record<LegendTone, string> = {
+  const toneClassMap: Record<MetricTone, string> = {
     navy: 'border-[#14295F]/10 bg-[#F7FAFF]',
     orange: 'border-[#FF7A16]/14 bg-[#FFF7F0]',
     green: 'border-emerald-200 bg-[#F4FBF8]',
-    violet: 'border-violet-200 bg-violet-50',
-    rose: 'border-rose-200 bg-rose-50',
   };
 
   return (
@@ -211,470 +82,31 @@ function MetricCard({
   );
 }
 
-function ChartPanel({
-  icon: Icon,
-  title,
-  description,
-  badge,
-  legend,
-  footer,
-  children,
-  className = '',
+function AnalyticsScreenshotCard({
+  screen,
 }: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  badge: ReactNode;
-  legend?: ReactNode;
-  footer: string;
-  children: ReactNode;
-  className?: string;
+  screen: (typeof analyticsScreenshots)[number];
 }) {
   return (
-    <article
-      className={`brand-panel-scan relative min-w-0 overflow-hidden rounded-[1.1rem] border border-[#14295F]/10 bg-white p-3 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:rounded-[1.55rem] sm:p-6 ${className}`}
-    >
+    <article className="brand-panel-scan relative overflow-hidden rounded-[1.2rem] border border-[#14295F]/10 bg-white p-3 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:rounded-[1.55rem] sm:p-5">
       <div className="brand-glow-drift absolute -left-8 top-5 h-24 w-24 rounded-full bg-[#FF7A16]/8 blur-3xl" />
       <div
         className="brand-glow-drift absolute right-6 top-4 h-28 w-28 rounded-full bg-[#8AB2FF]/10 blur-3xl"
         style={{ animationDelay: '-2.4s' }}
       />
-      <div className="relative">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Icon className="h-3.5 w-3.5 shrink-0 text-[#14295F] sm:h-4 sm:w-4" />
-              <h3 className="break-keep text-[0.86rem] font-black leading-[1.28] text-[#14295F] sm:text-[1.15rem]">{title}</h3>
-            </div>
-            <p className="mt-1.5 break-keep text-[11px] font-semibold leading-[1.6] text-[#50657D] sm:mt-2 sm:text-[13.5px] sm:leading-[1.68]">{description}</p>
-          </div>
-          {badge}
-        </div>
-
-        {legend ? <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">{legend}</div> : null}
-
-        <div className="mt-3 sm:mt-4">{children}</div>
-
-        <div className="mt-3 rounded-[0.9rem] border border-[#14295F]/10 bg-[#F8FBFF] px-2.5 py-2.5 sm:mt-4 sm:rounded-[1rem] sm:px-4 sm:py-3">
-          <p className="break-keep text-[10px] font-semibold leading-[1.55] text-[#425A75] sm:text-[12.5px] sm:leading-[1.62]">{footer}</p>
+      <div className={`relative ${screen.frameClassName}`}>
+        <div className="overflow-hidden rounded-[1rem] border border-[#D8E5FF] bg-[linear-gradient(180deg,#FBFDFF_0%,#F3F7FF_100%)] p-2.5 shadow-[0_16px_32px_rgba(20,41,95,0.06)] sm:rounded-[1.2rem] sm:p-3.5">
+          <Image
+            src={screen.src}
+            alt={screen.alt}
+            width={screen.width}
+            height={screen.height}
+            sizes="(max-width: 640px) 92vw, (max-width: 1024px) 88vw, 1120px"
+            className="h-auto w-full rounded-[0.75rem] border border-[#EEF3FF] bg-white object-contain"
+          />
         </div>
       </div>
     </article>
-  );
-}
-
-function OverviewTrendChart({ mobile = false }: { mobile?: boolean }) {
-  const baseConfig = mobile ? MOBILE_LARGE_CHART : LARGE_CHART;
-  const studyConfig = { ...baseConfig, min: 4.5, max: 12 };
-  const rateConfig = { ...baseConfig, min: 55, max: 95 };
-  const studyPoints = getSeriesPoints(overviewStudyHours, studyConfig);
-  const goalPoints = getSeriesPoints(overviewGoalRates, rateConfig);
-  const baseline = getPlotBottom(baseConfig);
-  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
-
-  return (
-    <svg
-      viewBox={`0 0 ${baseConfig.width} ${baseConfig.height}`}
-      className={mobile ? 'h-[184px] w-full' : 'h-[245px] w-full sm:h-[270px]'}
-      aria-hidden="true"
-    >
-      {[0, 1, 2, 3].map((index) => {
-        const y =
-          baseConfig.padTop +
-          index * ((getPlotBottom(baseConfig) - baseConfig.padTop) / 3);
-        return (
-          <line
-            key={index}
-            x1={baseConfig.padLeft}
-            y1={y}
-            x2={getPlotRight(baseConfig)}
-            y2={y}
-            stroke="rgba(20,41,95,0.10)"
-            strokeDasharray="4 8"
-          />
-        );
-      })}
-
-      <polygon points={toAreaPolygon(studyPoints, baseline)} fill="rgba(20,41,95,0.05)" />
-
-      <polyline
-        className="brand-chart-draw"
-        fill="none"
-        stroke="#14295F"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={toPolyline(studyPoints)}
-        style={{ ['--brand-path-length' as string]: 1000 }}
-      />
-      <polyline
-        className="brand-chart-draw"
-        fill="none"
-        stroke="#FF7A16"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={toPolyline(goalPoints)}
-        style={{ ['--brand-path-length' as string]: 1000, animationDelay: '0.18s' }}
-      />
-
-      {studyPoints.map((point) => (
-        <circle
-          key={`study-${point.x}`}
-          className="brand-pulse-dot"
-          cx={point.x}
-          cy={point.y}
-          r="4.5"
-          fill="#14295F"
-          style={{ animationDelay: `${(point.x % 7) * 0.08}s` }}
-        />
-      ))}
-      {goalPoints.map((point) => (
-        <circle
-          key={`goal-${point.x}`}
-          className="brand-pulse-dot"
-          cx={point.x}
-          cy={point.y}
-          r="4.5"
-          fill="#FF7A16"
-          style={{ animationDelay: `${(point.x % 5) * 0.1}s` }}
-        />
-      ))}
-
-      {visibleLabelIndexes.map((index) => (
-        <text
-          key={chartLabels[index] ?? index}
-          x={studyPoints[index]?.x ?? LARGE_CHART.padLeft}
-          y={baseConfig.height - (mobile ? 10 : 12)}
-          textAnchor="middle"
-          fontSize={mobile ? '10' : '12'}
-          fontWeight="700"
-          fill="#51667D"
-        >
-          {chartLabels[index]}
-        </text>
-      ))}
-    </svg>
-  );
-}
-
-function WeeklyGrowthChart({ mobile = false }: { mobile?: boolean }) {
-  const baseConfig = mobile ? MOBILE_MINI_CHART : MINI_CHART;
-  const barConfig = { ...baseConfig, min: 0, max: 8.5 };
-  const lineConfig = { ...baseConfig, min: 0, max: 50 };
-  const barPoints = getSeriesPoints(growthHours, barConfig);
-  const linePoints = getSeriesPoints(growthRates, lineConfig);
-  const baseline = getPlotBottom(baseConfig);
-  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
-
-  return (
-    <svg
-      viewBox={`0 0 ${baseConfig.width} ${baseConfig.height}`}
-      className={mobile ? 'h-[172px] w-full' : 'h-[200px] w-full'}
-      aria-hidden="true"
-    >
-      {[0, 1, 2, 3].map((index) => {
-        const y = baseConfig.padTop + index * ((baseline - baseConfig.padTop) / 3);
-        return (
-          <line
-            key={index}
-            x1={baseConfig.padLeft}
-            y1={y}
-            x2={getPlotRight(baseConfig)}
-            y2={y}
-            stroke="rgba(20,41,95,0.09)"
-            strokeDasharray="4 8"
-          />
-        );
-      })}
-
-      {barPoints.map((point, index) => {
-        const barWidth = 28;
-        return (
-          <rect
-            key={`bar-${chartLabels[index]}`}
-            className="brand-bar-rise"
-            x={point.x - barWidth / 2}
-            y={point.y}
-            width={barWidth}
-            height={baseline - point.y}
-            rx="8"
-            fill="rgba(93, 148, 255, 0.32)"
-            style={{ animationDelay: `${index * 0.08}s` }}
-          />
-        );
-      })}
-
-      <polyline
-        className="brand-chart-draw"
-        fill="none"
-        stroke="#18B88A"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={toPolyline(linePoints)}
-        style={{ ['--brand-path-length' as string]: 1000, animationDelay: '0.22s' }}
-      />
-
-      {linePoints.map((point, index) => (
-        <circle
-          key={`growth-${point.x}`}
-          className="brand-pulse-dot"
-          cx={point.x}
-          cy={point.y}
-          r="4"
-          fill="#18B88A"
-          style={{ animationDelay: `${index * 0.09}s` }}
-        />
-      ))}
-
-      {visibleLabelIndexes.map((index) => (
-        <text
-          key={chartLabels[index] ?? index}
-          x={barPoints[index]?.x ?? MINI_CHART.padLeft}
-          y={baseConfig.height - 10}
-          textAnchor="middle"
-          fontSize={mobile ? '10' : '11'}
-          fontWeight="700"
-          fill="#5B7087"
-        >
-          {chartLabels[index]}
-        </text>
-      ))}
-    </svg>
-  );
-}
-
-function RhythmChart({ mobile = false }: { mobile?: boolean }) {
-  const baseConfig = mobile ? MOBILE_MINI_CHART : MINI_CHART;
-  const rhythmConfig = { ...baseConfig, min: 68, max: 96 };
-  const rhythmPoints = getSeriesPoints(rhythmScores, rhythmConfig);
-  const baseline = getPlotBottom(baseConfig);
-  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
-
-  return (
-    <svg
-      viewBox={`0 0 ${baseConfig.width} ${baseConfig.height}`}
-      className={mobile ? 'h-[172px] w-full' : 'h-[200px] w-full'}
-      aria-hidden="true"
-    >
-      {[0, 1, 2, 3].map((index) => {
-        const y = baseConfig.padTop + index * ((baseline - baseConfig.padTop) / 3);
-        return (
-          <line
-            key={index}
-            x1={baseConfig.padLeft}
-            y1={y}
-            x2={getPlotRight(baseConfig)}
-            y2={y}
-            stroke="rgba(20,41,95,0.08)"
-            strokeDasharray="4 8"
-          />
-        );
-      })}
-
-      <polygon points={toAreaPolygon(rhythmPoints, baseline)} fill="rgba(31, 179, 138, 0.10)" />
-      <polyline
-        className="brand-chart-draw"
-        fill="none"
-        stroke="#18B88A"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={toPolyline(rhythmPoints)}
-        style={{ ['--brand-path-length' as string]: 1000 }}
-      />
-
-      {rhythmPoints.map((point) => (
-        <circle
-          key={`rhythm-${point.x}`}
-          className="brand-pulse-dot"
-          cx={point.x}
-          cy={point.y}
-          r="4"
-          fill="#18B88A"
-          style={{ animationDelay: `${(point.x % 6) * 0.09}s` }}
-        />
-      ))}
-
-      {visibleLabelIndexes.map((index) => (
-        <text
-          key={chartLabels[index] ?? index}
-          x={rhythmPoints[index]?.x ?? MINI_CHART.padLeft}
-          y={baseConfig.height - 10}
-          textAnchor="middle"
-          fontSize={mobile ? '10' : '11'}
-          fontWeight="700"
-          fill="#5B7087"
-        >
-          {chartLabels[index]}
-        </text>
-      ))}
-    </svg>
-  );
-}
-
-function StudyWindowChart({ mobile = false }: { mobile?: boolean }) {
-  const baseConfig = mobile ? MOBILE_MINI_CHART : MINI_CHART;
-  const timeConfig = { ...baseConfig, padLeft: mobile ? 36 : 52, min: 8, max: 24 };
-  const startPoints = getSeriesPoints(studyStartTimes, timeConfig);
-  const endPoints = getSeriesPoints(studyEndTimes, timeConfig);
-  const baseline = getPlotBottom(timeConfig);
-  const yTicks = mobile ? [8, 12, 16, 20, 24] : [8, 12, 16, 20, 24];
-  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
-
-  return (
-    <svg
-      viewBox={`0 0 ${timeConfig.width} ${timeConfig.height}`}
-      className={mobile ? 'h-[176px] w-full' : 'h-[200px] w-full'}
-      aria-hidden="true"
-    >
-      {yTicks.map((tick) => {
-        const [{ y }] = getSeriesPoints([tick], { ...timeConfig, padRight: timeConfig.width - timeConfig.padLeft });
-        return (
-          <g key={tick}>
-            <line
-              x1={timeConfig.padLeft}
-              y1={y}
-              x2={getPlotRight(timeConfig)}
-              y2={y}
-              stroke="rgba(20,41,95,0.08)"
-              strokeDasharray="4 8"
-            />
-            <text x={mobile ? '4' : '8'} y={y + 4} fontSize={mobile ? '9.5' : '11'} fontWeight="700" fill="#5B7087">
-              {formatHourLabel(tick)}
-            </text>
-          </g>
-        );
-      })}
-
-      <polyline
-        className="brand-chart-draw"
-        fill="none"
-        stroke="#3292FF"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={toPolyline(startPoints)}
-        style={{ ['--brand-path-length' as string]: 1000 }}
-      />
-      <polyline
-        className="brand-chart-draw"
-        fill="none"
-        stroke="#8B5CF6"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={toPolyline(endPoints)}
-        style={{ ['--brand-path-length' as string]: 1000, animationDelay: '0.2s' }}
-      />
-
-      {startPoints.map((point) => (
-        <circle
-          key={`start-${point.x}`}
-          className="brand-pulse-dot"
-          cx={point.x}
-          cy={point.y}
-          r="4"
-          fill="#3292FF"
-          style={{ animationDelay: `${(point.x % 8) * 0.07}s` }}
-        />
-      ))}
-      {endPoints.map((point) => (
-        <circle
-          key={`end-${point.x}`}
-          className="brand-pulse-dot"
-          cx={point.x}
-          cy={point.y}
-          r="4"
-          fill="#8B5CF6"
-          style={{ animationDelay: `${(point.x % 9) * 0.06}s` }}
-        />
-      ))}
-
-      {visibleLabelIndexes.map((index) => (
-        <text
-          key={chartLabels[index] ?? index}
-          x={startPoints[index]?.x ?? timeConfig.padLeft}
-          y={timeConfig.height - 10}
-          textAnchor="middle"
-          fontSize={mobile ? '10' : '11'}
-          fontWeight="700"
-          fill="#5B7087"
-        >
-          {chartLabels[index]}
-        </text>
-      ))}
-    </svg>
-  );
-}
-
-function BreakTimeChart({ mobile = false }: { mobile?: boolean }) {
-  const baseConfig = mobile ? MOBILE_MINI_CHART : MINI_CHART;
-  const breakConfig = { ...baseConfig, min: 0, max: 3 };
-  const breakPoints = getSeriesPoints(breakMinutes, breakConfig);
-  const baseline = getPlotBottom(breakConfig);
-  const visibleLabelIndexes = getVisibleLabelIndexes(mobile);
-
-  return (
-    <svg
-      viewBox={`0 0 ${breakConfig.width} ${breakConfig.height}`}
-      className={mobile ? 'h-[172px] w-full' : 'h-[200px] w-full'}
-      aria-hidden="true"
-    >
-      {[0, 1, 2, 3].map((index) => {
-        const y = breakConfig.padTop + index * ((baseline - breakConfig.padTop) / 3);
-        return (
-          <line
-            key={index}
-            x1={breakConfig.padLeft}
-            y1={y}
-            x2={getPlotRight(breakConfig)}
-            y2={y}
-            stroke="rgba(20,41,95,0.08)"
-            strokeDasharray="4 8"
-          />
-        );
-      })}
-
-      <polygon points={toAreaPolygon(breakPoints, baseline)} fill="rgba(255, 98, 127, 0.14)" />
-      <polyline
-        className="brand-chart-draw"
-        fill="none"
-        stroke="#FF6B7A"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={toPolyline(breakPoints)}
-        style={{ ['--brand-path-length' as string]: 1000 }}
-      />
-
-      {breakPoints.map((point) => (
-        <circle
-          key={`break-${point.x}`}
-          className="brand-pulse-dot"
-          cx={point.x}
-          cy={point.y}
-          r="4"
-          fill="#FF6B7A"
-          style={{ animationDelay: `${(point.x % 4) * 0.1}s` }}
-        />
-      ))}
-
-      {visibleLabelIndexes.map((index) => (
-        <text
-          key={chartLabels[index] ?? index}
-          x={breakPoints[index]?.x ?? breakConfig.padLeft}
-          y={breakConfig.height - 10}
-          textAnchor="middle"
-          fontSize={mobile ? '10' : '11'}
-          fontWeight="700"
-          fill="#5B7087"
-        >
-          {chartLabels[index]}
-        </text>
-      ))}
-    </svg>
   );
 }
 
@@ -735,102 +167,11 @@ export function DataAnalyticsPreviewSection({ showNextView = true }: { showNextV
           ))}
         </StaggerChildren>
 
-        <div className="mt-8">
-          <ChartPanel
-            icon={LineChart}
-            title="공부시간 × 목표 달성률 추이"
-            description="공부시간이 늘수록 목표 달성률도 함께 올라가는 흐름을 한 눈에 읽게 구성했습니다."
-            badge={<DataBadge label="최근 2주 흐름" tone="navy" />}
-            legend={
-              <>
-                <ChartLegend label="공부시간" tone="navy" />
-                <ChartLegend label="목표 달성률" tone="orange" />
-              </>
-            }
-            footer="후반부로 갈수록 공부시간과 목표 달성률이 함께 안정화되는 모습이 보이도록 설계했습니다."
-          >
-            <div className="sm:hidden">
-              <OverviewTrendChart mobile />
-            </div>
-            <div className="hidden sm:block">
-              <OverviewTrendChart />
-            </div>
-          </ChartPanel>
-        </div>
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-2 lg:gap-5">
-          <ChartPanel
-            icon={BarChart3}
-            title="주간 학습시간 성장률"
-            description="주간 누적 학습시간과 전주 대비 성장률을 같이 봐서 실제 개선 속도를 읽습니다."
-            badge={<DataBadge label="상승세 유지" tone="green" />}
-            legend={
-              <>
-                <ChartLegend label="주간 학습시간" tone="navy" />
-                <ChartLegend label="전주 대비 성장률" tone="green" />
-              </>
-            }
-            footer="학습시간이 늘어나는 구간에서 성장률도 같이 받쳐주는 흐름으로 보이게 구성했습니다."
-          >
-            <div className="sm:hidden">
-              <WeeklyGrowthChart mobile />
-            </div>
-            <div className="hidden sm:block">
-              <WeeklyGrowthChart />
-            </div>
-          </ChartPanel>
-
-          <ChartPanel
-            icon={Activity}
-            title="학습 리듬 추이"
-            description="매일 비슷한 흐름으로 공부를 시작하고 유지하는 안정감을 점수로 확인합니다."
-            badge={<DataBadge label="최근 평균 89점" tone="green" />}
-            footer="중간에 작은 흔들림이 있어도 다시 회복되는 패턴이 보여 학습 태도가 안정적으로 보입니다."
-          >
-            <div className="sm:hidden">
-              <RhythmChart mobile />
-            </div>
-            <div className="hidden sm:block">
-              <RhythmChart />
-            </div>
-          </ChartPanel>
-
-          <ChartPanel
-            icon={Clock3}
-            title="공부 시작/종료 시간 추이"
-            description="시작 시간은 당겨지고 종료 시간은 일정하게 유지되는지 함께 확인합니다."
-            badge={<DataBadge label="시간 안정화" tone="violet" />}
-            legend={
-              <>
-                <ChartLegend label="공부 시작" tone="navy" />
-                <ChartLegend label="공부 종료" tone="violet" />
-              </>
-            }
-            footer="시작 시각 편차가 줄고 종료 시각도 크게 흔들리지 않아 루틴이 단단해진 인상을 줍니다."
-          >
-            <div className="sm:hidden">
-              <StudyWindowChart mobile />
-            </div>
-            <div className="hidden sm:block">
-              <StudyWindowChart />
-            </div>
-          </ChartPanel>
-
-          <ChartPanel
-            icon={AlertTriangle}
-            title="학습 중간 이탈시간 추이"
-            description="집중 흐름을 끊는 중간 이탈시간이 짧고 빠르게 회복되는지 확인합니다."
-            badge={<DataBadge label="낮음 유지" tone="rose" />}
-            footer="초반 1회 이탈 이후에는 짧고 안정적인 수준으로 유지돼 관리가 잘 되고 있는 흐름으로 보입니다."
-          >
-            <div className="sm:hidden">
-              <BreakTimeChart mobile />
-            </div>
-            <div className="hidden sm:block">
-              <BreakTimeChart />
-            </div>
-          </ChartPanel>
-        </div>
+        <StaggerChildren stagger={110} className="mt-8 space-y-4 sm:space-y-5">
+          {analyticsScreenshots.map((screen) => (
+            <AnalyticsScreenshotCard key={screen.src} screen={screen} />
+          ))}
+        </StaggerChildren>
 
         {showNextView ? (
           <article className="mt-6 rounded-[1.45rem] border border-[#14295F]/10 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(20,41,95,0.05)] sm:px-6 sm:py-5">
