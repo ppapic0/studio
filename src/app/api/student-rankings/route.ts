@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
 
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import { getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
+import { getDailyRankWindowState, isTimestampInDailyRankWindow, toKstDate } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
 
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
 
     const nowKst = toKstDate();
     const dailyRankWindow = getDailyRankWindowState(nowKst);
-    const todayKey = dailyRankWindow.competitionDateKey;
+    const dailyDateKeys = dailyRankWindow.coveredDateKeys;
     const monthKey = format(nowKst, 'yyyy-MM');
     const weekDateKeys = eachDayOfInterval({
       start: startOfWeek(nowKst, { weekStartsOn: 1 }),
@@ -183,9 +183,9 @@ export async function GET(request: NextRequest) {
     const studentsSnapPromise = adminDb
       .collection(`centers/${centerId}/students`)
       .get();
-    const dailySnapPromise = adminDb
-      .collection(`centers/${centerId}/dailyStudentStats/${todayKey}/students`)
-      .get();
+    const dailySnapPromises = dailyDateKeys.map((dateKey) =>
+      adminDb.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()
+    );
     const monthlySnapPromise = adminDb
       .collection(`centers/${centerId}/leaderboards/${monthKey}_study-time/entries`)
       .orderBy('value', 'desc')
@@ -198,14 +198,16 @@ export async function GET(request: NextRequest) {
       adminDb.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()
     );
 
-    const [membersSnap, studentsSnap, dailySnap, monthlySnap, attendanceSnap, ...weeklySnaps] = await Promise.all([
+    const [membersSnap, studentsSnap, monthlySnap, attendanceSnap, ...dailyAndWeeklySnaps] = await Promise.all([
       membersSnapPromise,
       studentsSnapPromise,
-      dailySnapPromise,
       monthlySnapPromise,
       attendanceSnapPromise,
+      ...dailySnapPromises,
       ...weeklySnapPromises,
     ]);
+    const dailySnaps = dailyAndWeeklySnaps.slice(0, dailySnapPromises.length);
+    const weeklySnaps = dailyAndWeeklySnaps.slice(dailySnapPromises.length);
 
     const studentProfiles = new Map<string, {
       displayNameSnapshot: string;
@@ -274,12 +276,14 @@ export async function GET(request: NextRequest) {
     const weeklyTotals = new Map<string, number>();
     const dailyTotals = new Map<string, number>();
 
-    dailySnap.forEach((docSnap) => {
-      const data = docSnap.data() as Record<string, unknown>;
-      const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
-      const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
-      if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
-      addRankMinutes(dailyTotals, studentId, value);
+    dailySnaps.forEach((snapshot) => {
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as Record<string, unknown>;
+        const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
+        const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
+        if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+        addRankMinutes(dailyTotals, studentId, value);
+      });
     });
 
     weeklySnaps.forEach((snapshot) => {
@@ -313,10 +317,11 @@ export async function GET(request: NextRequest) {
       const liveMinutes = getLiveAttendanceMinutes(selectedRecord, nowMs);
       if (liveMinutes <= 0) return;
 
+      const liveStartedAtMs = toTimestampMillis(selectedRecord.lastCheckInAt);
       const liveDateKey = toKstDateKeyFromTimestamp(selectedRecord.lastCheckInAt);
       if (!liveDateKey) return;
 
-      if (liveDateKey === todayKey) {
+      if (isTimestampInDailyRankWindow(liveStartedAtMs, dailyRankWindow)) {
         addRankMinutes(dailyTotals, studentId, liveMinutes);
       }
 

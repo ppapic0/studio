@@ -137,6 +137,16 @@ function buildCompetitionWindow(targetDate) {
         endsAt,
     };
 }
+function getDateKeysCoveredByWindow(startsAt, endsAt) {
+    const keys = [];
+    const cursor = startOfKstDay(startsAt);
+    const lastIncludedDate = startOfKstDay(new Date(endsAt.getTime() - 1));
+    while (cursor.getTime() <= lastIncludedDate.getTime()) {
+        keys.push(toDateKey(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return keys;
+}
 function applyCompetitionRanks(entries) {
     const sorted = [...entries].sort((left, right) => right.value - left.value);
     let lastValue = null;
@@ -221,23 +231,27 @@ function buildAwardEntries(range, rankedEntries) {
     })
         .filter((entry) => Boolean(entry));
 }
-async function buildDailyAwardEntries(db, centerId, competitionDateKey, context) {
-    const dailySnap = await db.collection(`centers/${centerId}/dailyStudentStats/${competitionDateKey}/students`).get();
-    const rankedEntries = applyCompetitionRanks(dailySnap.docs
-        .map((docSnap) => {
-        var _a;
-        const data = docSnap.data();
-        const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-        const value = Math.max(0, Number((_a = data.totalStudyMinutes) !== null && _a !== void 0 ? _a : 0));
-        if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0)
-            return null;
-        return {
-            studentId,
-            value,
-            profile: context.getProfile(studentId),
-        };
-    })
-        .filter((entry) => Boolean(entry)));
+async function buildDailyAwardEntries(db, centerId, competitionDate, context) {
+    const dailyWindow = buildCompetitionWindow(competitionDate);
+    const dailyDateKeys = getDateKeysCoveredByWindow(dailyWindow.startsAt, dailyWindow.endsAt);
+    const dailySnapshots = await Promise.all(dailyDateKeys.map((dateKey) => db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()));
+    const totals = new Map();
+    dailySnapshots.forEach((snapshot) => {
+        snapshot.forEach((docSnap) => {
+            var _a;
+            const data = docSnap.data();
+            const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
+            const value = Math.max(0, Number((_a = data.totalStudyMinutes) !== null && _a !== void 0 ? _a : 0));
+            if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0)
+                return;
+            totals.set(studentId, (totals.get(studentId) || 0) + value);
+        });
+    });
+    const rankedEntries = applyCompetitionRanks(Array.from(totals.entries()).map(([studentId, value]) => ({
+        studentId,
+        value,
+        profile: context.getProfile(studentId),
+    })));
     return buildAwardEntries("daily", rankedEntries);
 }
 async function buildWeeklyAwardEntries(db, centerId, startDate, endDate, context) {
@@ -436,7 +450,7 @@ exports.scheduledRankingRewardSettlement = functions
             if (!claimed)
                 continue;
             try {
-                const awards = await buildDailyAwardEntries(db, centerId, candidate.periodKey, await getContext());
+                const awards = await buildDailyAwardEntries(db, centerId, candidate.competitionDate, await getContext());
                 await applyAwardEntries(db, centerId, "daily", awardDateKey, awards);
                 await completeSettlement(settlementRef, {
                     awardDateKey,

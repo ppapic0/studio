@@ -5,6 +5,19 @@ export type StudentRankRewardTier = {
   points: number;
 };
 
+export type DailyRankWindowState = {
+  nowKst: Date;
+  isLive: boolean;
+  competitionDate: Date;
+  competitionDateKey: string;
+  startsAt: Date;
+  endsAt: Date;
+  coveredDateKeys: string[];
+  nextOpensAt: Date;
+  nextOpensAtLabel: string;
+  windowLabel: string;
+};
+
 const DAILY_RANK_START_HOUR = 17;
 const WEEKEND_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
@@ -68,6 +81,22 @@ function buildRelativeOpenLabel(nowKst: Date, opensAt: Date) {
   return `${dayLabel} ${padNumber(opensAt.getHours())}:${padNumber(opensAt.getMinutes())}`;
 }
 
+function getDateKeysCoveredByWindow(startsAt: Date, endsAt: Date) {
+  const keys: string[] = [];
+  const cursor = new Date(startsAt);
+  cursor.setHours(0, 0, 0, 0);
+
+  const lastIncludedDate = new Date(endsAt.getTime() - 1);
+  lastIncludedDate.setHours(0, 0, 0, 0);
+
+  while (cursor.getTime() <= lastIncludedDate.getTime()) {
+    keys.push(toKstDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return keys;
+}
+
 export function getDailyRankWindowLabel() {
   return "평일 17:00~01:00 · 주말 08:00~01:00";
 }
@@ -90,7 +119,15 @@ export function formatStudentRankRewardSummary(range: StudentRankingRange) {
     .join(" / ");
 }
 
-export function getDailyRankWindowState(baseDate: Date = new Date()) {
+export function isTimestampInDailyRankWindow(
+  timestampMs: number,
+  dailyRankWindow: Pick<DailyRankWindowState, "startsAt" | "endsAt">
+) {
+  if (!Number.isFinite(timestampMs) || timestampMs <= 0) return false;
+  return timestampMs >= dailyRankWindow.startsAt.getTime() && timestampMs < dailyRankWindow.endsAt.getTime();
+}
+
+export function getDailyRankWindowState(baseDate: Date = new Date()): DailyRankWindowState {
   const nowKst = toKstDate(baseDate);
   const todayWindow = buildCompetitionWindow(nowKst);
   const previousDate = new Date(nowKst);
@@ -109,6 +146,7 @@ export function getDailyRankWindowState(baseDate: Date = new Date()) {
     competitionDateKey: toKstDateKey(activeWindow.competitionDate),
     startsAt: activeWindow.startsAt,
     endsAt: activeWindow.endsAt,
+    coveredDateKeys: getDateKeysCoveredByWindow(activeWindow.startsAt, activeWindow.endsAt),
     nextOpensAt,
     nextOpensAtLabel: buildRelativeOpenLabel(nowKst, nextOpensAt),
     windowLabel: getDailyRankWindowLabel(),

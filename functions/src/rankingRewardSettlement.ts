@@ -144,6 +144,19 @@ function buildCompetitionWindow(targetDate: Date) {
   };
 }
 
+function getDateKeysCoveredByWindow(startsAt: Date, endsAt: Date) {
+  const keys: string[] = [];
+  const cursor = startOfKstDay(startsAt);
+  const lastIncludedDate = startOfKstDay(new Date(endsAt.getTime() - 1));
+
+  while (cursor.getTime() <= lastIncludedDate.getTime()) {
+    keys.push(toDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return keys;
+}
+
 function applyCompetitionRanks<T extends { value: number }>(entries: T[]): Array<T & { rank: number }> {
   const sorted = [...entries].sort((left, right) => right.value - left.value);
   let lastValue: number | null = null;
@@ -260,26 +273,32 @@ function buildAwardEntries(
 async function buildDailyAwardEntries(
   db: admin.firestore.Firestore,
   centerId: string,
-  competitionDateKey: string,
+  competitionDate: Date,
   context: CenterStudentContext
 ) {
-  const dailySnap = await db.collection(`centers/${centerId}/dailyStudentStats/${competitionDateKey}/students`).get();
+  const dailyWindow = buildCompetitionWindow(competitionDate);
+  const dailyDateKeys = getDateKeysCoveredByWindow(dailyWindow.startsAt, dailyWindow.endsAt);
+  const dailySnapshots = await Promise.all(
+    dailyDateKeys.map((dateKey) => db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get())
+  );
+
+  const totals = new Map<string, number>();
+  dailySnapshots.forEach((snapshot) => {
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
+      const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
+      if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
+      totals.set(studentId, (totals.get(studentId) || 0) + value);
+    });
+  });
 
   const rankedEntries = applyCompetitionRanks(
-    dailySnap.docs
-      .map((docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-        const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
-        if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return null;
-
-        return {
-          studentId,
-          value,
-          profile: context.getProfile(studentId),
-        };
-      })
-      .filter((entry): entry is { studentId: string; value: number; profile: StudentProfileSnapshot } => Boolean(entry))
+    Array.from(totals.entries()).map(([studentId, value]) => ({
+      studentId,
+      value,
+      profile: context.getProfile(studentId),
+    }))
   );
 
   return buildAwardEntries("daily", rankedEntries);
@@ -553,7 +572,7 @@ export const scheduledRankingRewardSettlement = functions
         if (!claimed) continue;
 
         try {
-          const awards = await buildDailyAwardEntries(db, centerId, candidate.periodKey, await getContext());
+          const awards = await buildDailyAwardEntries(db, centerId, candidate.competitionDate, await getContext());
           await applyAwardEntries(db, centerId, "daily", awardDateKey, awards);
           await completeSettlement(settlementRef, {
             awardDateKey,
