@@ -112,7 +112,7 @@ function AnalyticsScreenshotCard({
 
 export function DataAnalyticsPreviewSection({ showNextView = true }: { showNextView?: boolean }) {
   return (
-    <section id="data-approach" className="relative scroll-mt-28 overflow-hidden py-0">
+    <section id="data-approach" className="relative scroll-mt-28 overflow-hidden bg-[#F7F9FD] py-12 sm:py-20">
       <div className="pointer-events-none absolute inset-0">
         <div className="brand-glow-drift absolute left-[-8%] top-[14%] h-44 w-44 rounded-full bg-[#7AA7FF]/10 blur-[90px]" />
         <div
@@ -126,8 +126,8 @@ export function DataAnalyticsPreviewSection({ showNextView = true }: { showNextV
       </div>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="relative mx-auto max-w-4xl">
-          <div className="px-1 py-2 text-center sm:px-4 sm:py-4">
-            <div className="pointer-events-none absolute inset-x-[18%] top-[8%] h-28 rounded-full bg-[radial-gradient(circle,rgba(122,167,255,0.10)_0%,transparent_72%)] blur-3xl" />
+          <div className="overflow-hidden rounded-[2rem] border border-[#D8E5FF] bg-[linear-gradient(180deg,#FBFDFF_0%,#F3F7FF_100%)] px-5 py-8 text-center shadow-[0_20px_44px_rgba(20,41,95,0.06)] sm:px-8 sm:py-10">
+            <div className="pointer-events-none absolute inset-x-[18%] top-[16%] h-28 rounded-full bg-[radial-gradient(circle,rgba(122,167,255,0.10)_0%,transparent_72%)] blur-3xl" />
             <div className="relative">
               <span className="eyebrow-badge">DATA DRIVEN</span>
               <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.5rem,6vw,2.7rem)] font-black leading-[1.08] text-[#14295F]">
