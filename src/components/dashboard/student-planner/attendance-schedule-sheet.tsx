@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { BookmarkPlus, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock3, Copy, Loader2, RotateCcw, Save, Sparkles, Trash2, XCircle } from 'lucide-react';
+import { AlertCircle, BookmarkPlus, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock3, Copy, Loader2, RotateCcw, Save, Sparkles, Trash2, XCircle } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -89,6 +89,10 @@ type AttendanceScheduleSheetProps = {
   recommendationPrefillSummary?: {
     recommendedWeeklyDays: number;
     recommendedDailyStudyMinutes: number;
+  } | null;
+  saveError?: {
+    title: string;
+    description: string;
   } | null;
   personalTasks: Array<WithId<StudyPlanItem>>;
   personalTaskDraft: string;
@@ -316,6 +320,7 @@ export function AttendanceScheduleSheet({
   note,
   onNoteChange,
   recommendationPrefillSummary,
+  saveError,
 }: AttendanceScheduleSheetProps) {
   const [activeTab, setActiveTab] = useState<'today' | 'weekday'>(initialTab === 'today' ? 'today' : 'weekday');
   const [isPresetLibraryOpen, setIsPresetLibraryOpen] = useState(initialTab === 'saved');
@@ -835,7 +840,21 @@ export function AttendanceScheduleSheet({
           </Tabs>
         </div>
 
-        <div className={cn('border-t border-[#E4ECF9] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] p-4', isMobile ? 'space-y-2' : 'flex items-center justify-end gap-2')}>
+        <div className={cn('border-t border-[#E4ECF9] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] p-4', isMobile ? 'space-y-2' : 'space-y-3')}>
+          {saveError ? (
+            <div className="rounded-[1rem] border border-rose-200 bg-rose-50 px-4 py-3 text-left">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+                <div>
+                  <p className="text-[11px] font-black text-rose-600">{saveError.title}</p>
+                  <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-rose-500">
+                    {saveError.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <div className={cn(isMobile ? 'space-y-2' : 'flex items-center justify-end gap-2')}>
           <Button
             type="button"
             variant="outline"
@@ -884,6 +903,7 @@ export function AttendanceScheduleSheet({
               주간 기본 일정 저장
             </Button>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

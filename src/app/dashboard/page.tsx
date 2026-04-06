@@ -30,6 +30,7 @@ import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { type StudentProfile, type User as UserType, type UserStudyProfile } from '@/lib/types';
+import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
 
 const inviteFormSchema = z.object({
   inviteCode: z.string().trim().min(1, '초대 코드를 입력해 주세요.'),
@@ -186,6 +187,15 @@ export default function DashboardPage() {
     studentProfile?.studyRoutineOnboarding || userProfile?.studyRoutineOnboarding;
   const studentRoutineProfile =
     studentProfile?.studyRoutineProfile || userProfile?.studyRoutineProfile;
+  const resolvedTargetDailyMinutes = useMemo(
+    () => resolveStudentTargetDailyMinutesOrFallback(studentProfile, userProfile, 240),
+    [
+      studentProfile?.targetDailyMinutes,
+      studentProfile?.targetDailyMinutesSource,
+      userProfile?.targetDailyMinutes,
+      userProfile?.targetDailyMinutesSource,
+    ]
+  );
   const shouldForceStudentOnboarding =
     isStudentRole &&
     !isStudentProfileLoading &&
@@ -360,7 +370,7 @@ export default function DashboardPage() {
                 schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
                 grade: studentProfile?.grade || '학년 미정',
                 seatNo: studentProfile?.seatNo || 0,
-                targetDailyMinutes: studentProfile?.targetDailyMinutes || 240,
+                targetDailyMinutes: resolvedTargetDailyMinutes.minutes,
                 parentUids: studentProfile?.parentUids || [],
                 createdAt: studentProfile?.createdAt || serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -397,6 +407,7 @@ export default function DashboardPage() {
       user,
       userProfile?.schoolName,
       userProfileRef,
+      resolvedTargetDailyMinutes.minutes,
     ]
   );
 

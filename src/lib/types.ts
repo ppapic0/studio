@@ -10,6 +10,8 @@ export interface User {
   profileImageUrl?: string;
   schoolName?: string; 
   phoneNumber?: string;
+  targetDailyMinutes?: number;
+  targetDailyMinutesSource?: 'default' | 'routine' | 'manual';
   studyRoutineOnboarding?: RoutineOnboardingState;
   studyRoutineProfile?: UserStudyProfile;
   studyPlannerDiagnostic?: StudyPlannerDiagnosticRecord;

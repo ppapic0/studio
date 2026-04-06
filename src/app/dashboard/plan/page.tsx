@@ -140,6 +140,7 @@ import {
   validateScheduleDraft,
 } from '@/features/schedules/lib/scheduleModel';
 import { buildMainPlanRecommendations, type MainPlanRecommendation } from '@/features/planner/lib/buildMainPlanRecommendations';
+import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -174,6 +175,19 @@ const SCHEDULE_STATUS_BADGE_TONE: Record<string, string> = {
   '등원 예정': 'border-[#FFE2C5] bg-[#FFF4E8] text-[#D86A11]',
   휴식: 'border-[#DCE6F5] bg-[#EEF4FF] text-[#5A6F95]',
   미정: 'border-[#E5ECF7] bg-white text-[#5A6F95]',
+};
+
+type InlineMessage = {
+  title: string;
+  description: string;
+};
+
+type ScheduleSaveFeedback = InlineMessage & {
+  variant: 'success' | 'warning';
+};
+
+type PersistStudentScheduleResult = {
+  legacySyncWarning: boolean;
 };
 
 function createAwaySlot(overrides?: Partial<AttendanceAwaySlot>): AttendanceAwaySlot {
@@ -499,10 +513,7 @@ export default function StudyPlanPage() {
   const [extraAwayPlans, setExtraAwayPlans] = useState<AttendanceAwaySlot[]>([]);
   const [isScheduleAbsent, setIsScheduleAbsent] = useState(false);
   const [scheduleNote, setScheduleNote] = useState('');
-  const [scheduleSaveFeedback, setScheduleSaveFeedback] = useState<null | {
-    title: string;
-    description: string;
-  }>(null);
+  const [scheduleSaveFeedback, setScheduleSaveFeedback] = useState<ScheduleSaveFeedback | null>(null);
   const [isAttendanceScheduleSheetOpen, setIsAttendanceScheduleSheetOpen] = useState(false);
   const [attendanceSheetInitialTab, setAttendanceSheetInitialTab] = useState<'today' | 'weekday' | 'saved'>('today');
   const [expandedRecommendationIds, setExpandedRecommendationIds] = useState<string[]>([]);
@@ -528,6 +539,8 @@ export default function StudyPlanPage() {
   const [goalTargetHoursDraft, setGoalTargetHoursDraft] = useState('');
   const [goalTargetMinutesDraft, setGoalTargetMinutesDraft] = useState('');
   const [isGoalTargetSaving, setIsGoalTargetSaving] = useState(false);
+  const [goalTargetSaveError, setGoalTargetSaveError] = useState<InlineMessage | null>(null);
+  const [attendanceSaveError, setAttendanceSaveError] = useState<InlineMessage | null>(null);
 
   useEffect(() => {
     if (!scheduleSaveFeedback) return;
@@ -588,6 +601,7 @@ export default function StudyPlanPage() {
       setInTime(parsed.recommendedArrivalTime || '09:00');
       setOutTime(parsed.recommendedDepartureTime || '22:00');
       setAttendanceSheetInitialTab('weekday');
+      setAttendanceSaveError(null);
       setIsAttendanceScheduleSheetOpen(true);
     } catch {
       window.localStorage.removeItem(`planner-schedule-prefill:${user.uid}`);
@@ -997,6 +1011,15 @@ export default function StudyPlanPage() {
   );
   const hasAwayPlan = Boolean(awayStartTime && awayEndTime) || extraAwayPlans.some((slot) => Boolean(slot.startTime && slot.endTime));
   const isAbsentMode = useMemo(() => isScheduleAbsent || scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [isScheduleAbsent, scheduleItems]);
+  const resolvedTargetDailyMinutes = useMemo(
+    () => resolveStudentTargetDailyMinutesOrFallback(studentProfile, userProfile, 240),
+    [
+      studentProfile?.targetDailyMinutes,
+      studentProfile?.targetDailyMinutesSource,
+      userProfile?.targetDailyMinutes,
+      userProfile?.targetDailyMinutesSource,
+    ]
+  );
 
   const handleSaveRoutineProfile = useCallback(async (profile: UserStudyProfile) => {
     if (!firestore || !user || !activeMembership || !userProfileRef) return;
@@ -1027,18 +1050,18 @@ export default function StudyPlanPage() {
       studentProfileRef
         ? setDoc(
             studentProfileRef,
-            {
-              id: user.uid,
-              name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
-              schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
-              grade: studentProfile?.grade || '학년 미정',
-              seatNo: studentProfile?.seatNo || 0,
-              targetDailyMinutes: studentProfile?.targetDailyMinutes || 240,
-              parentUids: studentProfile?.parentUids || [],
-              createdAt: studentProfile?.createdAt || serverTimestamp(),
-              updatedAt: serverTimestamp(),
-              studyRoutineOnboarding: onboardingPayload,
-              studyRoutineProfile: studyProfilePayload,
+              {
+                id: user.uid,
+                name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
+                schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
+                grade: studentProfile?.grade || '학년 미정',
+                seatNo: studentProfile?.seatNo || 0,
+                targetDailyMinutes: resolvedTargetDailyMinutes.minutes,
+                parentUids: studentProfile?.parentUids || [],
+                createdAt: studentProfile?.createdAt || serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                studyRoutineOnboarding: onboardingPayload,
+                studyRoutineProfile: studyProfilePayload,
               studyRoutineWorkspace: null,
             },
             { merge: true }
@@ -1065,6 +1088,7 @@ export default function StudyPlanPage() {
     user,
     userProfile?.schoolName,
     userProfileRef,
+    resolvedTargetDailyMinutes.minutes,
   ]);
 
   const handleDismissRoutineOnboarding = useCallback(async () => {
@@ -1105,11 +1129,10 @@ export default function StudyPlanPage() {
   }, [routineOnboardingState?.presentedAt, studentProfileRef, toast, userProfileRef]);
 
   const handleSaveGoalTarget = useCallback(async () => {
-    if (!studentProfileRef) {
-      toast({
-        variant: 'destructive',
+    if (!userProfileRef) {
+      setGoalTargetSaveError({
         title: '목표시간을 저장할 수 없어요',
-        description: '학생 정보가 준비된 뒤에 다시 시도해 주세요.',
+        description: '회원 정보가 준비된 뒤에 다시 시도해 주세요.',
       });
       return;
     }
@@ -1120,8 +1143,7 @@ export default function StudyPlanPage() {
     const hasInvalidMinute = !Number.isInteger(parsedMinutes) || parsedMinutes < 0 || parsedMinutes > 59;
 
     if (hasInvalidHour || hasInvalidMinute) {
-      toast({
-        variant: 'destructive',
+      setGoalTargetSaveError({
         title: '시간 형식을 다시 확인해 주세요',
         description: '시간은 0~24, 분은 0~59 사이로 입력할 수 있어요.',
       });
@@ -1130,8 +1152,7 @@ export default function StudyPlanPage() {
 
     const nextTargetMinutes = parsedHours * 60 + parsedMinutes;
     if (nextTargetMinutes < 30 || nextTargetMinutes > 24 * 60) {
-      toast({
-        variant: 'destructive',
+      setGoalTargetSaveError({
         title: '목표시간 범위를 확인해 주세요',
         description: '하루 목표시간은 최소 30분부터 설정할 수 있어요.',
       });
@@ -1139,40 +1160,36 @@ export default function StudyPlanPage() {
     }
 
     setIsGoalTargetSaving(true);
+    setGoalTargetSaveError(null);
 
     try {
-      const studentProfileSnapshot = await getDoc(studentProfileRef);
+      await setDoc(userProfileRef, {
+        targetDailyMinutes: nextTargetMinutes,
+        targetDailyMinutesSource: 'manual',
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
 
-      if (studentProfileSnapshot.exists()) {
-        await updateDoc(studentProfileRef, {
-          targetDailyMinutes: nextTargetMinutes,
-          targetDailyMinutesSource: 'manual',
-          updatedAt: serverTimestamp(),
-        });
-      } else {
-        await setDoc(studentProfileRef, {
-          id: user?.uid || '',
-          name: studentProfile?.name || activeMembership?.displayName || user?.displayName || '학생',
-          schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
-          grade: studentProfile?.grade || '학년 미정',
-          seatNo: studentProfile?.seatNo || 0,
-          parentUids: studentProfile?.parentUids || [],
-          targetDailyMinutes: nextTargetMinutes,
-          targetDailyMinutesSource: 'manual',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
+      if (studentProfileRef) {
+        const mirrorWriteResult = await Promise.allSettled([
+          getDoc(studentProfileRef).then((studentProfileSnapshot) => {
+            if (!studentProfileSnapshot.exists()) return;
+            return updateDoc(studentProfileRef, {
+              targetDailyMinutes: nextTargetMinutes,
+              targetDailyMinutesSource: 'manual',
+              updatedAt: serverTimestamp(),
+            });
+          }),
+        ]);
+
+        if (mirrorWriteResult[0]?.status === 'rejected') {
+          logHandledClientIssue('[plan-track] mirror goal target failed', mirrorWriteResult[0].reason);
+        }
       }
 
-      toast({
-        title: '목표시간을 수정했어요',
-        description: `이제 하루 목표가 ${formatMinutesSummary(nextTargetMinutes)}으로 적용돼요.`,
-      });
       setIsGoalTargetDialogOpen(false);
     } catch (error: any) {
       logHandledClientIssue('[plan-track] save goal target failed', error);
-      toast({
-        variant: 'destructive',
+      setGoalTargetSaveError({
         title: '목표시간 저장 실패',
         description: typeof error?.message === 'string' ? error.message : '목표시간을 저장하지 못했습니다.',
       });
@@ -1180,19 +1197,10 @@ export default function StudyPlanPage() {
       setIsGoalTargetSaving(false);
     }
   }, [
-    activeMembership?.displayName,
     goalTargetHoursDraft,
     goalTargetMinutesDraft,
-    studentProfile?.grade,
-    studentProfile?.name,
-    studentProfile?.parentUids,
-    studentProfile?.schoolName,
-    studentProfile?.seatNo,
     studentProfileRef,
-    toast,
-    user?.displayName,
-    user?.uid,
-    userProfile?.schoolName,
+    userProfileRef,
   ]);
 
   useEffect(() => {
@@ -1422,14 +1430,15 @@ export default function StudyPlanPage() {
     ? DAILY_STUDY_MINUTES_MAP[effectiveRoutineProfile.answers.dailyStudyHours] || 0
     : 0;
   const hasManualTargetDailyMinutes =
-    studentProfile?.targetDailyMinutesSource === 'manual' && Number(studentProfile?.targetDailyMinutes || 0) > 0;
+    resolvedTargetDailyMinutes.source === 'manual' && resolvedTargetDailyMinutes.minutes > 0;
   const recommendedDailyMinutes = hasManualTargetDailyMinutes
-    ? studentProfile?.targetDailyMinutes || 240
-    : routineSuggestedDailyMinutes || studentProfile?.targetDailyMinutes || 240;
+    ? resolvedTargetDailyMinutes.minutes
+    : routineSuggestedDailyMinutes || resolvedTargetDailyMinutes.minutes;
   const openGoalTargetDialog = useCallback(() => {
     const currentTargetMinutes = Math.max(30, recommendedDailyMinutes || 240);
     setGoalTargetHoursDraft(String(Math.floor(currentTargetMinutes / 60)));
     setGoalTargetMinutesDraft(String(currentTargetMinutes % 60));
+    setGoalTargetSaveError(null);
     setIsGoalTargetDialogOpen(true);
   }, [recommendedDailyMinutes]);
   const planProgressPercent = recommendedDailyMinutes > 0
@@ -1543,6 +1552,7 @@ export default function StudyPlanPage() {
   const openAttendanceSheetForDate = useCallback((date: Date, tab: 'today' | 'weekday' | 'saved' = 'today') => {
     setSelectedDate(date);
     setAttendanceSheetInitialTab(tab);
+    setAttendanceSaveError(null);
     setIsAttendanceScheduleSheetOpen(true);
   }, []);
 
@@ -2357,8 +2367,8 @@ export default function StudyPlanPage() {
     recommendedStudyMinutes?: number | null;
     recommendedWeeklyDays?: number | null;
     existingScheduleDoc?: Partial<StudentScheduleDoc> | null;
-  }) => {
-    if (!firestore || !user) return;
+  }): Promise<PersistStudentScheduleResult> => {
+    if (!firestore || !user) return { legacySyncWarning: false };
 
     const validationMessage = validateScheduleDraft(params.draft, params.awaySlots || []);
     if (validationMessage) {
@@ -2389,20 +2399,27 @@ export default function StudyPlanPage() {
       updatedAt: serverTimestamp(),
     }, { merge: true });
 
-    await syncLegacyScheduleItems(params.dateKey, scheduleDoc as StudentScheduleDoc);
+    try {
+      await syncLegacyScheduleItems(params.dateKey, scheduleDoc as StudentScheduleDoc);
+      return { legacySyncWarning: false };
+    } catch (error) {
+      logHandledClientIssue(`[plan-track] sync schedule items failed (${params.dateKey})`, error);
+      return { legacySyncWarning: true };
+    }
   }, [activeMembership, firestore, selectedDateKey, selectedScheduleDoc, studentProfile?.name, syncLegacyScheduleItems, user]);
 
   const syncWeekdayTemplateToVisibleSchedules = useCallback(async (params: {
     templateId: string;
-    targetWeekdays: number[];
+    targetWeekdays: number[];    
     draft: AttendanceScheduleDraft;
-  }) => {
+  }): Promise<PersistStudentScheduleResult> => {
     const targetWeekdaySet = new Set(params.targetWeekdays);
     const todayStart = startOfDay(new Date());
     const visibleTargetDays = weekDays.filter((day) => (
       targetWeekdaySet.has(getDay(day)) &&
       !isBefore(startOfDay(day), todayStart)
     ));
+    let legacySyncWarning = false;
 
     for (const day of visibleTargetDays) {
       const dateKey = format(day, 'yyyy-MM-dd');
@@ -2417,7 +2434,7 @@ export default function StudyPlanPage() {
         continue;
       }
 
-      await persistStudentSchedule({
+      const persistResult = await persistStudentSchedule({
         dateKey,
         draft: params.draft,
         awaySlots: params.draft.awaySlots || [],
@@ -2427,7 +2444,9 @@ export default function StudyPlanPage() {
         recommendedWeeklyDays: scheduleRecommendationPrefill?.recommendedWeeklyDays || null,
         existingScheduleDoc: existingSchedule || null,
       });
+      legacySyncWarning = legacySyncWarning || persistResult.legacySyncWarning;
     }
+    return { legacySyncWarning };
   }, [persistStudentSchedule, scheduleRecommendationPrefill, weekDays, weekScheduleMap]);
 
   const handleSetAttendance = async (type: 'attend' | 'absent') => {
@@ -2504,6 +2523,7 @@ export default function StudyPlanPage() {
   }, []);
 
   const handleTodayScheduleChange = useCallback((patch: Partial<AttendanceScheduleDraft>) => {
+    setAttendanceSaveError(null);
     applyAttendanceDraftToState({
       ...buildCurrentAttendanceDraft(),
       ...patch,
@@ -2512,6 +2532,7 @@ export default function StudyPlanPage() {
   }, [applyAttendanceDraftToState, buildCurrentAttendanceDraft, extraAwayPlans]);
 
   const handleWeekdayDraftChange = useCallback((patch: Partial<AttendanceScheduleDraft>) => {
+    setAttendanceSaveError(null);
     setWeekdayDraft((previous) => ({
       ...previous,
       ...patch,
@@ -2519,11 +2540,17 @@ export default function StudyPlanPage() {
     }));
   }, []);
 
+  const handleScheduleNoteChange = useCallback((value: string) => {
+    setAttendanceSaveError(null);
+    setScheduleNote(value);
+  }, []);
+
   const handleSaveTodaySchedule = useCallback(async () => {
     if (!selectedDateKey) return false;
     setIsSubmitting(true);
+    setAttendanceSaveError(null);
     try {
-      await persistStudentSchedule({
+      const persistResult = await persistStudentSchedule({
         dateKey: selectedDateKey,
         draft: buildCurrentAttendanceDraft(),
         awaySlots: extraAwayPlans,
@@ -2533,15 +2560,17 @@ export default function StudyPlanPage() {
         recommendedWeeklyDays: scheduleRecommendationPrefill?.recommendedWeeklyDays || null,
       });
       setScheduleSaveFeedback({
+        variant: persistResult.legacySyncWarning ? 'warning' : 'success',
         title: '날짜별 일정 저장 완료',
-        description: '선택한 날짜의 등하원·외출 일정을 저장했어요.',
+        description: persistResult.legacySyncWarning
+          ? '선택한 날짜의 등하원·외출 일정을 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
+          : '선택한 날짜의 등하원·외출 일정을 저장했어요.',
       });
       clearSchedulePrefillCache();
       setIsAttendanceScheduleSheetOpen(false);
       return true;
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
+      setAttendanceSaveError({
         title: '일정 저장 실패',
         description: typeof error?.message === 'string' ? error.message : '일정을 저장하지 못했어요.',
       });
@@ -2549,13 +2578,14 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [buildCurrentAttendanceDraft, clearSchedulePrefillCache, extraAwayPlans, persistStudentSchedule, scheduleNote, scheduleRecommendationPrefill, selectedDateKey, toast]);
+  }, [buildCurrentAttendanceDraft, clearSchedulePrefillCache, extraAwayPlans, persistStudentSchedule, scheduleNote, scheduleRecommendationPrefill, selectedDateKey]);
 
   const handleSetTodayAbsent = useCallback(async () => {
     if (!selectedDateKey) return;
     setIsSubmitting(true);
+    setAttendanceSaveError(null);
     try {
-      await persistStudentSchedule({
+      const persistResult = await persistStudentSchedule({
         dateKey: selectedDateKey,
         draft: {
           ...buildCurrentAttendanceDraft(),
@@ -2564,48 +2594,60 @@ export default function StudyPlanPage() {
         note: scheduleNote,
       });
       setScheduleSaveFeedback({
+        variant: persistResult.legacySyncWarning ? 'warning' : 'success',
         title: '미등원 일정 저장 완료',
-        description: '선택한 날짜를 미등원 일정으로 저장했어요.',
+        description: persistResult.legacySyncWarning
+          ? '선택한 날짜를 미등원 일정으로 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
+          : '선택한 날짜를 미등원 일정으로 저장했어요.',
       });
       clearSchedulePrefillCache();
       setIsAttendanceScheduleSheetOpen(false);
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
+      setAttendanceSaveError({
         title: '일정 저장 실패',
         description: typeof error?.message === 'string' ? error.message : '일정을 저장하지 못했어요.',
       });
     } finally {
       setIsSubmitting(false);
     }
-  }, [buildCurrentAttendanceDraft, clearSchedulePrefillCache, persistStudentSchedule, scheduleNote, selectedDateKey, toast]);
+  }, [buildCurrentAttendanceDraft, clearSchedulePrefillCache, persistStudentSchedule, scheduleNote, selectedDateKey]);
 
   const handleResetTodaySchedule = useCallback(async () => {
     if (!firestore || !user || !selectedDateKey) return;
     setIsSubmitting(true);
+    setAttendanceSaveError(null);
     try {
       await deleteDoc(doc(firestore, 'users', user.uid, 'schedules', selectedDateKey));
-      await syncLegacyScheduleItems(selectedDateKey, null);
+      let legacySyncWarning = false;
+      try {
+        await syncLegacyScheduleItems(selectedDateKey, null);
+      } catch (error) {
+        legacySyncWarning = true;
+        logHandledClientIssue(`[plan-track] clear schedule items failed (${selectedDateKey})`, error);
+      }
       applyAttendanceDraftToState(EMPTY_ATTENDANCE_SCHEDULE_DRAFT);
       setScheduleNote('');
       clearSchedulePrefillCache();
       setScheduleSaveFeedback({
+        variant: legacySyncWarning ? 'warning' : 'success',
         title: '이 날짜 일정 초기화',
-        description: '저장된 날짜별 일정을 비웠어요.',
+        description: legacySyncWarning
+          ? '저장된 날짜별 일정을 비웠어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
+          : '저장된 날짜별 일정을 비웠어요.',
       });
       setIsAttendanceScheduleSheetOpen(false);
-    } catch {
-      toast({
-        variant: 'destructive',
+    } catch (error: any) {
+      setAttendanceSaveError({
         title: '초기화 실패',
-        description: '일정을 초기화하지 못했어요.',
+        description: typeof error?.message === 'string' ? error.message : '일정을 초기화하지 못했어요.',
       });
     } finally {
       setIsSubmitting(false);
     }
-  }, [applyAttendanceDraftToState, clearSchedulePrefillCache, firestore, selectedDateKey, syncLegacyScheduleItems, toast, user]);
+  }, [applyAttendanceDraftToState, clearSchedulePrefillCache, firestore, selectedDateKey, syncLegacyScheduleItems, user]);
 
   const handleToggleRecurringWeekday = useCallback((weekday: number) => {
+    setAttendanceSaveError(null);
     setSelectedRecurringWeekdays((previous) =>
       previous.includes(weekday)
         ? previous.filter((value) => value !== weekday)
@@ -2614,14 +2656,14 @@ export default function StudyPlanPage() {
   }, []);
 
   const handleCopyTodayToWeekday = useCallback(() => {
+    setAttendanceSaveError(null);
     setWeekdayDraft(buildCurrentAttendanceDraft());
   }, [buildCurrentAttendanceDraft]);
 
   const handleSaveWeekdayTemplate = useCallback(async () => {
     if (!firestore || !user) return false;
     if (selectedRecurringWeekdays.length === 0) {
-      toast({
-        variant: 'destructive',
+      setAttendanceSaveError({
         title: '반복 요일을 선택해 주세요',
         description: '최소 1개 이상의 요일을 선택해야 저장할 수 있어요.',
       });
@@ -2630,8 +2672,7 @@ export default function StudyPlanPage() {
 
     const validationMessage = validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []);
     if (validationMessage) {
-      toast({
-        variant: 'destructive',
+      setAttendanceSaveError({
         title: '반복 루틴 저장 실패',
         description: validationMessage,
       });
@@ -2639,6 +2680,7 @@ export default function StudyPlanPage() {
     }
 
     setIsSubmitting(true);
+    setAttendanceSaveError(null);
     try {
       const targetWeekdays = [...selectedRecurringWeekdays].sort((left, right) => left - right);
       const templateId = matchingRecurringTemplate?.id || `template-${selectedRecurringWeekdays.join('-')}`;
@@ -2680,22 +2722,24 @@ export default function StudyPlanPage() {
         { merge: true }
       );
       await batch.commit();
-      await syncWeekdayTemplateToVisibleSchedules({
+      const syncResult = await syncWeekdayTemplateToVisibleSchedules({
         templateId,
         targetWeekdays,
         draft: weekdayDraft,
       });
       setScheduleSaveFeedback({
+        variant: syncResult.legacySyncWarning ? 'warning' : 'success',
         title: '주간 기본 일정 저장 완료',
-        description: `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장하고 이번 주에도 바로 반영했어요.`,
+        description: syncResult.legacySyncWarning
+          ? `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.`
+          : `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장하고 이번 주에도 바로 반영했어요.`,
       });
       setAttendanceSheetInitialTab('weekday');
       setIsAttendanceScheduleSheetOpen(false);
       return true;
     } catch (error: any) {
       logHandledClientIssue('[plan-track] save weekday template failed', error);
-      toast({
-        variant: 'destructive',
+      setAttendanceSaveError({
         title: '정기 루틴 저장 실패',
         description: typeof error?.message === 'string' ? error.message : '반복 루틴을 저장하지 못했어요.',
       });
@@ -2703,7 +2747,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeScheduleTemplates, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, toast, user, weekdayDraft]);
+  }, [activeScheduleTemplates, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
 
   const handleSaveSchedulePreset = useCallback(async () => {
     if (!firestore || !user) return;
@@ -3462,6 +3506,7 @@ export default function StudyPlanPage() {
                 className={cn("student-aggro-body rounded-xl border border-[#D8E3F2] bg-white font-black text-[#17326B] hover:bg-[#FFF7EF]", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
                 onClick={() => {
                   setAttendanceSheetInitialTab('weekday');
+                  setAttendanceSaveError(null);
                   setIsAttendanceScheduleSheetOpen(true);
                 }}
               >
@@ -3489,12 +3534,31 @@ export default function StudyPlanPage() {
           ) : null}
 
           {scheduleSaveFeedback ? (
-            <div className="rounded-[1.15rem] border border-[#D5E3FA] bg-[linear-gradient(180deg,#F6F9FF_0%,#FFFFFF_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_16px_28px_-24px_rgba(20,41,95,0.12)]">
-              <p className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.18em] text-[#2F5AC7]">저장 완료</p>
+            <div
+              className={cn(
+                'rounded-[1.15rem] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_16px_28px_-24px_rgba(20,41,95,0.12)]',
+                scheduleSaveFeedback.variant === 'warning'
+                  ? 'border border-[#FFD7B5] bg-[linear-gradient(180deg,#FFF8EE_0%,#FFFFFF_100%)]'
+                  : 'border border-[#D5E3FA] bg-[linear-gradient(180deg,#F6F9FF_0%,#FFFFFF_100%)]'
+              )}
+            >
+              <p
+                className={cn(
+                  'student-aggro-kicker text-[10px] font-black uppercase tracking-[0.18em]',
+                  scheduleSaveFeedback.variant === 'warning' ? 'text-[#D86A11]' : 'text-[#2F5AC7]'
+                )}
+              >
+                {scheduleSaveFeedback.variant === 'warning' ? '저장 경고' : '저장 완료'}
+              </p>
               <p className="font-aggro-display mt-2 break-keep text-[1rem] font-black text-[#17326B]">
                 {scheduleSaveFeedback.title}
               </p>
-              <p className="student-aggro-body mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+              <p
+                className={cn(
+                  'student-aggro-body mt-1 break-keep text-[12px] font-semibold leading-5',
+                  scheduleSaveFeedback.variant === 'warning' ? 'text-[#8E5A2B]' : 'text-[#5A6F95]'
+                )}
+              >
                 {scheduleSaveFeedback.description}
               </p>
             </div>
@@ -3567,6 +3631,7 @@ export default function StudyPlanPage() {
         open={isGoalTargetDialogOpen}
         onOpenChange={(open) => {
           if (isGoalTargetSaving) return;
+          if (!open) setGoalTargetSaveError(null);
           setIsGoalTargetDialogOpen(open);
         }}
       >
@@ -3609,7 +3674,10 @@ export default function StudyPlanPage() {
                     max={24}
                     inputMode="numeric"
                     value={goalTargetHoursDraft}
-                    onChange={(event) => setGoalTargetHoursDraft(event.target.value)}
+                    onChange={(event) => {
+                      setGoalTargetSaveError(null);
+                      setGoalTargetHoursDraft(event.target.value);
+                    }}
                     className="mt-2 h-12 rounded-[1rem] border-[#DCE6F5] bg-[#FCFDFF] text-base font-black text-[#17326B]"
                   />
                 </div>
@@ -3624,7 +3692,10 @@ export default function StudyPlanPage() {
                     max={59}
                     inputMode="numeric"
                     value={goalTargetMinutesDraft}
-                    onChange={(event) => setGoalTargetMinutesDraft(event.target.value)}
+                    onChange={(event) => {
+                      setGoalTargetSaveError(null);
+                      setGoalTargetMinutesDraft(event.target.value);
+                    }}
                     className="mt-2 h-12 rounded-[1rem] border-[#DCE6F5] bg-[#FCFDFF] text-base font-black text-[#17326B]"
                   />
                 </div>
@@ -3632,6 +3703,14 @@ export default function StudyPlanPage() {
             </div>
 
             <DialogFooter className="flex-col gap-2 border-t border-[#EEF3FB] bg-[#FCFDFF] px-6 py-4 sm:flex-col">
+              {goalTargetSaveError ? (
+                <div className="w-full rounded-[1rem] border border-rose-200 bg-rose-50 px-4 py-3 text-left">
+                  <p className="text-[11px] font-black text-rose-600">{goalTargetSaveError.title}</p>
+                  <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-rose-500">
+                    {goalTargetSaveError.description}
+                  </p>
+                </div>
+              ) : null}
               <Button
                 type="submit"
                 disabled={isGoalTargetSaving}
@@ -3650,7 +3729,10 @@ export default function StudyPlanPage() {
                 type="button"
                 variant="outline"
                 disabled={isGoalTargetSaving}
-                onClick={() => setIsGoalTargetDialogOpen(false)}
+                onClick={() => {
+                  setGoalTargetSaveError(null);
+                  setIsGoalTargetDialogOpen(false);
+                }}
                 className="h-11 w-full rounded-[1rem] border-[#D6E1F3] font-black text-[#17326B]"
               >
                 취소
@@ -3883,8 +3965,9 @@ export default function StudyPlanPage() {
         onDeletePreset={(presetId) => void handleDeleteScheduleTemplate(presetId)}
         onTogglePresetActive={(presetId, active) => void handleToggleScheduleTemplateActive(presetId, active)}
         note={scheduleNote}
-        onNoteChange={setScheduleNote}
+        onNoteChange={handleScheduleNoteChange}
         recommendationPrefillSummary={scheduleRecommendationPrefill}
+        saveError={attendanceSaveError}
         personalTasks={personalTasks as Array<WithId<StudyPlanItem>>}
         personalTaskDraft={newPersonalTask}
         onPersonalTaskDraftChange={setNewPersonalTask}

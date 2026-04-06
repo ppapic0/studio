@@ -73,10 +73,11 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog } from '@/lib/types';
+import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, type User as UserType } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { QRCodeSVG } from 'qrcode.react';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
+import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
 import {
   StudentHomeGamePanel,
   type StudentHomeQuest,
@@ -1188,11 +1189,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isActive });
 
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user?.uid]);
+  const { data: userProfile } = useDoc<UserType>(userProfileRef, { enabled: isActive });
+
   const studentProfileRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
     return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isActive });
+  const resolvedTargetDailyMinutes = useMemo(
+    () => resolveStudentTargetDailyMinutesOrFallback(studentProfile, userProfile, 240),
+    [
+      studentProfile?.targetDailyMinutes,
+      studentProfile?.targetDailyMinutesSource,
+      userProfile?.targetDailyMinutes,
+      userProfile?.targetDailyMinutesSource,
+    ]
+  );
 
   useEffect(() => {
     setExamDrafts(normalizeExamCountdowns(studentProfile?.examCountdowns));
@@ -2473,7 +2489,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const readyBoxes = homeRewardBoxes.filter((box) => box.state === 'ready');
   const selectedHomeBox = selectedBoxHour ? homeRewardBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
 
-  const growthGoalMinutes = Math.max(30, Number(studentProfile?.targetDailyMinutes || 600));
+  const growthGoalMinutes = Math.max(30, resolvedTargetDailyMinutes.minutes);
   const growthPercent = Math.min(100, (liveTodayMinutes / growthGoalMinutes) * 100);
   const weeklyBestDay = useMemo(() => {
     const best = studyTimeTrend.reduce<{ date: string; minutes: number } | null>((current, item) => {
