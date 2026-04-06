@@ -1146,10 +1146,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
   const [goalPathTypeDraft, setGoalPathTypeDraft] = useState<'school' | 'job'>('school');
   const [goalPathLabelDraft, setGoalPathLabelDraft] = useState('');
-  const [selectedRankRange, setSelectedRankRange] = useState<RankRange>('daily');
+  const [selectedRankRange, setSelectedRankRange] = useState<RankRange>(() =>
+    getDailyRankWindowState(new Date()).isLive ? 'daily' : 'weekly'
+  );
   const [rankSnapshot, setRankSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [rankSnapshotLoading, setRankSnapshotLoading] = useState(false);
   const hasHydratedRankSnapshotRef = useRef(false);
+  const hasManualHomeRankRangeRef = useRef(false);
   const studyBoxClaimKeyRef = useRef<string | null>(null);
   const homeBoxTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const homeLiveClaimKeyRef = useRef<string | null>(null);
@@ -1396,7 +1399,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [activeMembership?.id, isActive, rankAttendanceRefreshKey, selectedRankRange, user]);
+  }, [activeMembership?.id, isActive, rankAttendanceRefreshKey, user]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -2398,11 +2401,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     weeklyStudyRankMinutes,
     dailyRankWindow,
   ]);
+  const preferredHomeRankRange = useMemo<RankRange>(() => {
+    if (dailyRankWindow.isLive) return 'daily';
+    if (validWeeklyRankEntries.length > 0) return 'weekly';
+    if (validRankEntries.length > 0) return 'monthly';
+    return 'weekly';
+  }, [dailyRankWindow.isLive, validRankEntries.length, validWeeklyRankEntries.length]);
   const selectedHomeRank = homeRankMap[selectedRankRange];
+  const handleSelectHomeRankRange = useCallback((nextRange: RankRange) => {
+    hasManualHomeRankRangeRef.current = true;
+    setSelectedRankRange(nextRange);
+  }, []);
   const hasExternalLiveRankPreview = useMemo(
     () => selectedHomeRank.preview.some((entry) => entry.isLive && entry.studentId && entry.studentId !== user?.uid),
     [selectedHomeRank.preview, user?.uid]
   );
+
+  useEffect(() => {
+    if (hasManualHomeRankRangeRef.current) return;
+    setSelectedRankRange((current) => (current === preferredHomeRankRange ? current : preferredHomeRankRange));
+  }, [preferredHomeRankRange]);
 
   useEffect(() => {
     setRankPreviewNowMs(Date.now());
@@ -2870,7 +2888,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         weeklyTrend={studyTimeTrend}
         bestDayLabel={weeklyBestDay}
         selectedRankRange={selectedRankRange}
-        onSelectRankRange={setSelectedRankRange}
+        onSelectRankRange={handleSelectHomeRankRange}
         selectedHomeRank={selectedHomeRank as StudentHomeRankState}
         onOpenLeaderboard={() => router.push(`/dashboard/leaderboards?range=${selectedRankRange}`)}
         isVaultOpen={isVaultOpen}
