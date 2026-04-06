@@ -326,22 +326,36 @@ export function AttendanceScheduleSheet({
   const [isPresetLibraryOpen, setIsPresetLibraryOpen] = useState(initialTab === 'saved');
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [openedSnapshot, setOpenedSnapshot] = useState('');
+  const [hasLocalEdits, setHasLocalEdits] = useState(false);
+  const normalizedSelectedWeekdays = useMemo(
+    () => [...selectedWeekdays].sort(),
+    [selectedWeekdays]
+  );
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        todayDraft,
+        weekdayDraft,
+        note,
+        selectedWeekdays: normalizedSelectedWeekdays,
+        presetName,
+      }),
+    [normalizedSelectedWeekdays, note, presetName, todayDraft, weekdayDraft]
+  );
 
   useEffect(() => {
     if (!open) return;
     setActiveTab(initialTab === 'today' ? 'today' : 'weekday');
     setIsPresetLibraryOpen(initialTab === 'saved');
     setIsCloseConfirmOpen(false);
-    setOpenedSnapshot(
-      JSON.stringify({
-        todayDraft,
-        weekdayDraft,
-        note,
-        selectedWeekdays: [...selectedWeekdays].sort(),
-        presetName,
-      })
-    );
+    setHasLocalEdits(false);
+    setOpenedSnapshot('');
   }, [initialTab, open]);
+
+  useEffect(() => {
+    if (!open || hasLocalEdits) return;
+    setOpenedSnapshot(currentSnapshot);
+  }, [currentSnapshot, hasLocalEdits, open]);
 
   const formatWeekdaySummary = (weekdays?: number[]) => {
     if (!weekdays?.length) return '';
@@ -355,14 +369,7 @@ export function AttendanceScheduleSheet({
   const hasUnsavedChanges =
     open &&
     openedSnapshot !== '' &&
-    openedSnapshot !==
-      JSON.stringify({
-        todayDraft,
-        weekdayDraft,
-        note,
-        selectedWeekdays: [...selectedWeekdays].sort(),
-        presetName,
-      });
+    openedSnapshot !== currentSnapshot;
 
   const activeDraftValidationMessage =
     activeTab === 'today'
@@ -378,13 +385,37 @@ export function AttendanceScheduleSheet({
     onOpenChange(false);
   };
 
+  const markAsLocallyEdited = () => {
+    setHasLocalEdits(true);
+  };
+
+  const markCurrentStateAsSaved = () => {
+    setHasLocalEdits(false);
+    setOpenedSnapshot(currentSnapshot);
+  };
+
+  const handleSaveTodayAction = async () => {
+    if (isSubmitting || activeDraftValidationMessage) return false;
+    const saved = await onSaveToday();
+    if (saved) {
+      markCurrentStateAsSaved();
+    }
+    return saved;
+  };
+
+  const handleSaveWeekdayAction = async () => {
+    if (isSubmitting || selectedWeekdays.length === 0 || activeDraftValidationMessage) return false;
+    const saved = await onSaveWeekday();
+    if (saved) {
+      markCurrentStateAsSaved();
+    }
+    return saved;
+  };
+
   const handleSaveAndClose = async () => {
     if (isSubmitting) return;
     if (activeTab === 'weekday') {
-      if (selectedWeekdays.length === 0 || activeDraftValidationMessage) {
-        return;
-      }
-      const saved = await onSaveWeekday();
+      const saved = await handleSaveWeekdayAction();
       if (saved) {
         setIsCloseConfirmOpen(false);
         onOpenChange(false);
@@ -392,11 +423,7 @@ export function AttendanceScheduleSheet({
       return;
     }
 
-    if (activeDraftValidationMessage) {
-      return;
-    }
-
-    const saved = await onSaveToday();
+    const saved = await handleSaveTodayAction();
     if (saved) {
       setIsCloseConfirmOpen(false);
       onOpenChange(false);
@@ -414,6 +441,7 @@ export function AttendanceScheduleSheet({
   }, [weekdayOptions]);
 
   const setSelectedWeekdaysTo = (targetValues: number[]) => {
+    markAsLocallyEdited();
     const nextValues = weekdayOptions.filter((option) => targetValues.includes(option.value)).map((option) => option.value);
     weekdayOptions.forEach((option) => {
       const shouldSelect = nextValues.includes(option.value);
@@ -606,7 +634,10 @@ export function AttendanceScheduleSheet({
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={onApplySelectedWeekdayTemplateToToday}
+                      onClick={() => {
+                        markAsLocallyEdited();
+                        onApplySelectedWeekdayTemplateToToday();
+                      }}
                       className="h-9 rounded-full border-emerald-200 bg-white px-4 text-[11px] font-black text-emerald-700 hover:bg-emerald-50"
                     >
                       <Copy className="mr-1.5 h-3.5 w-3.5" />
@@ -616,13 +647,24 @@ export function AttendanceScheduleSheet({
                 </div>
               ) : null}
 
-              <AttendanceDraftFields draft={todayDraft} onChange={onTodayChange} isMobile={isMobile} disabled={isSubmitting} />
+              <AttendanceDraftFields
+                draft={todayDraft}
+                onChange={(patch) => {
+                  markAsLocallyEdited();
+                  onTodayChange(patch);
+                }}
+                isMobile={isMobile}
+                disabled={isSubmitting}
+              />
 
               <div className="rounded-[1.35rem] border border-[#E4ECF9] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] p-4">
                 <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">메모</Label>
                 <Input
                   value={note}
-                  onChange={(event) => onNoteChange(event.target.value)}
+                  onChange={(event) => {
+                    markAsLocallyEdited();
+                    onNoteChange(event.target.value);
+                  }}
                   disabled={isSubmitting}
                   placeholder="이 날짜에만 필요한 메모가 있으면 적어둘 수 있어요."
                   className={cn('mt-2 rounded-xl border-[#D6E1F6] bg-white font-black text-[#17326B] shadow-none placeholder:text-[#8C9BBC]', isMobile ? 'h-11 text-sm' : 'h-12 text-sm')}
@@ -655,7 +697,10 @@ export function AttendanceScheduleSheet({
                       key={option.value}
                       type="button"
                       variant="outline"
-                      onClick={() => onToggleWeekday(option.value)}
+                      onClick={() => {
+                        markAsLocallyEdited();
+                        onToggleWeekday(option.value);
+                      }}
                       className={cn(
                         'h-9 rounded-full px-4 text-[11px] font-black',
                         selectedWeekdays.includes(option.value)
@@ -706,13 +751,24 @@ export function AttendanceScheduleSheet({
                 </div>
               </div>
 
-              <AttendanceDraftFields draft={weekdayDraft} onChange={onWeekdayChange} isMobile={isMobile} disabled={isSubmitting} />
+              <AttendanceDraftFields
+                draft={weekdayDraft}
+                onChange={(patch) => {
+                  markAsLocallyEdited();
+                  onWeekdayChange(patch);
+                }}
+                isMobile={isMobile}
+                disabled={isSubmitting}
+              />
 
               <div className={cn('grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={onCopyTodayToWeekday}
+                  onClick={() => {
+                    markAsLocallyEdited();
+                    onCopyTodayToWeekday();
+                  }}
                   disabled={isSubmitting}
                   className="h-11 rounded-xl border-[#DCE6F7] bg-white font-black text-[#17326B] hover:bg-[#F8FBFF]"
                 >
@@ -721,7 +777,7 @@ export function AttendanceScheduleSheet({
                 </Button>
                 <Button
                   type="button"
-                  onClick={onSaveWeekday}
+                  onClick={() => void handleSaveWeekdayAction()}
                   disabled={isSubmitting || selectedWeekdays.length === 0 || Boolean(validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []))}
                   className="h-11 rounded-xl bg-[linear-gradient(135deg,#FF9A2B_0%,#FF7A16_100%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.36)]"
                 >
@@ -744,7 +800,10 @@ export function AttendanceScheduleSheet({
                   <div className={cn('grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]')}>
                     <Input
                       value={presetName}
-                      onChange={(event) => onPresetNameChange(event.target.value)}
+                      onChange={(event) => {
+                        markAsLocallyEdited();
+                        onPresetNameChange(event.target.value);
+                      }}
                       placeholder="예: 평일 기본 루틴"
                       className="h-11 rounded-xl border-[#D6E1F6] bg-white font-black text-[#17326B] shadow-none placeholder:text-[#8C9BBC]"
                     />
@@ -813,7 +872,10 @@ export function AttendanceScheduleSheet({
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => onApplyPresetToWeekday(preset)}
+                              onClick={() => {
+                                markAsLocallyEdited();
+                                onApplyPresetToWeekday(preset);
+                              }}
                               disabled={preset.active === false}
                               className="h-10 rounded-xl border-[#DCE6F7] bg-white font-black text-[#17326B] hover:bg-[#FFF8EF]"
                             >
@@ -822,7 +884,10 @@ export function AttendanceScheduleSheet({
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => onApplyPresetToToday(preset)}
+                              onClick={() => {
+                                markAsLocallyEdited();
+                                onApplyPresetToToday(preset);
+                              }}
                               disabled={preset.active === false}
                               className="h-10 rounded-xl border-[#DCE6F7] bg-white font-black text-[#17326B] hover:bg-[#F8FBFF]"
                             >
@@ -878,7 +943,7 @@ export function AttendanceScheduleSheet({
               </Button>
               <Button
                 type="button"
-                onClick={onSaveToday}
+                onClick={() => void handleSaveTodayAction()}
                 disabled={isSubmitting || Boolean(validateScheduleDraft(todayDraft, todayDraft.awaySlots || []))}
                 className={cn(
                   'h-11 rounded-xl bg-[linear-gradient(135deg,#FF9A2B_0%,#FF7A16_100%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.36)]',
@@ -892,7 +957,7 @@ export function AttendanceScheduleSheet({
           ) : (
             <Button
               type="button"
-              onClick={onSaveWeekday}
+              onClick={() => void handleSaveWeekdayAction()}
               disabled={isSubmitting || selectedWeekdays.length === 0 || Boolean(validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []))}
               className={cn(
                 'h-11 rounded-xl bg-[linear-gradient(135deg,#FF9A2B_0%,#FF7A16_100%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.36)]',
