@@ -490,10 +490,10 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
                 />
                 <div className="grid gap-1">
                   <span className="text-sm font-black text-[#14295F]">
-                    [선택] 문자/전화로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.
+                    [선택] 전화·문자(필요 시 이메일)로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.
                   </span>
                   <span className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
-                    운영 연락과 분리된 홍보 안내에만 사용되며, 동의하지 않아도 상담 접수는 가능합니다.
+                    운영 연락과 별도로, 혜택·이벤트·신규 프로그램 안내를 전화번호 중심으로 드리며 필요 시 이메일로도 안내드립니다.
                   </span>
                 </div>
               </label>

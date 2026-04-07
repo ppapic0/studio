@@ -789,10 +789,10 @@ export function SignupForm() {
                       </FormControl>
                       <div className="grid gap-1">
                         <FormLabel className="cursor-pointer text-sm font-black text-[#14295F]">
-                          [선택] 이메일로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.
+                          [선택] 전화·문자(필요 시 이메일)로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.
                         </FormLabel>
                         <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
-                          운영 문자와 별도로, 홍보·이벤트·신규 프로그램 안내에만 사용됩니다.
+                          운영 연락과 별도로, 혜택·이벤트·신규 프로그램 안내를 전화번호 중심으로 드리며 필요 시 이메일로도 안내드립니다.
                         </p>
                         <FormMessage />
                       </div>
