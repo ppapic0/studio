@@ -1,9 +1,14 @@
 'use client';
 
-const VISITOR_STORAGE_KEY = 'track_marketing_visitor_id';
-const SESSION_STORAGE_KEY = 'track_marketing_session_id';
-const VISITOR_COOKIE = 'track_marketing_vid';
-const SESSION_COOKIE = 'track_marketing_sid';
+import {
+  MARKETING_OPT_OUT_COOKIE,
+  MARKETING_OPT_OUT_STORAGE_KEY,
+  MARKETING_OPT_OUT_VALUE,
+  MARKETING_SESSION_COOKIE,
+  MARKETING_SESSION_STORAGE_KEY,
+  MARKETING_VISITOR_COOKIE,
+  MARKETING_VISITOR_STORAGE_KEY,
+} from '@/lib/marketing-tracking-shared';
 
 type MarketingClientEvent = {
   eventType: 'page_view' | 'login_success';
@@ -14,6 +19,15 @@ type MarketingClientEvent = {
   target?: string | null;
   extra?: Record<string, unknown>;
 };
+
+function deleteCookie(name: string) {
+  if (typeof document === 'undefined') return;
+  const parts = [`${name}=`, 'path=/', 'SameSite=Lax', 'max-age=0'];
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    parts.push('Secure');
+  }
+  document.cookie = parts.join('; ');
+}
 
 function readCookie(name: string) {
   if (typeof document === 'undefined') return '';
@@ -37,6 +51,14 @@ function writeCookie(name: string, value: string, maxAgeSeconds?: number) {
   document.cookie = parts.join('; ');
 }
 
+function clearMarketingIdentity() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(MARKETING_VISITOR_STORAGE_KEY);
+  window.sessionStorage.removeItem(MARKETING_SESSION_STORAGE_KEY);
+  deleteCookie(MARKETING_VISITOR_COOKIE);
+  deleteCookie(MARKETING_SESSION_COOKIE);
+}
+
 function buildId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -49,27 +71,56 @@ export function ensureMarketingIdentity() {
     return { visitorId: '', sessionId: '' };
   }
 
+  if (isMarketingTrackingOptedOut()) {
+    clearMarketingIdentity();
+    return { visitorId: '', sessionId: '' };
+  }
+
   const storedVisitor =
-    window.localStorage.getItem(VISITOR_STORAGE_KEY) || readCookie(VISITOR_COOKIE);
+    window.localStorage.getItem(MARKETING_VISITOR_STORAGE_KEY) || readCookie(MARKETING_VISITOR_COOKIE);
   const visitorId = storedVisitor || buildId();
 
   const storedSession =
-    window.sessionStorage.getItem(SESSION_STORAGE_KEY) || readCookie(SESSION_COOKIE);
+    window.sessionStorage.getItem(MARKETING_SESSION_STORAGE_KEY) || readCookie(MARKETING_SESSION_COOKIE);
   const sessionId = storedSession || buildId();
 
-  window.localStorage.setItem(VISITOR_STORAGE_KEY, visitorId);
-  window.sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+  window.localStorage.setItem(MARKETING_VISITOR_STORAGE_KEY, visitorId);
+  window.sessionStorage.setItem(MARKETING_SESSION_STORAGE_KEY, sessionId);
 
-  writeCookie(VISITOR_COOKIE, visitorId, 60 * 60 * 24 * 180);
-  writeCookie(SESSION_COOKIE, sessionId);
+  writeCookie(MARKETING_VISITOR_COOKIE, visitorId, 60 * 60 * 24 * 180);
+  writeCookie(MARKETING_SESSION_COOKIE, sessionId);
 
   return { visitorId, sessionId };
 }
 
+export function isMarketingTrackingOptedOut() {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.localStorage.getItem(MARKETING_OPT_OUT_STORAGE_KEY) === MARKETING_OPT_OUT_VALUE ||
+    readCookie(MARKETING_OPT_OUT_COOKIE) === MARKETING_OPT_OUT_VALUE
+  );
+}
+
+export function setMarketingTrackingOptOut(optedOut: boolean) {
+  if (typeof window === 'undefined') return;
+
+  if (optedOut) {
+    window.localStorage.setItem(MARKETING_OPT_OUT_STORAGE_KEY, MARKETING_OPT_OUT_VALUE);
+    writeCookie(MARKETING_OPT_OUT_COOKIE, MARKETING_OPT_OUT_VALUE, 60 * 60 * 24 * 365);
+    clearMarketingIdentity();
+    return;
+  }
+
+  window.localStorage.removeItem(MARKETING_OPT_OUT_STORAGE_KEY);
+  deleteCookie(MARKETING_OPT_OUT_COOKIE);
+}
+
 export async function trackMarketingClientEvent(payload: MarketingClientEvent) {
   if (typeof window === 'undefined') return false;
+  if (isMarketingTrackingOptedOut()) return false;
 
   const identity = ensureMarketingIdentity();
+  if (!identity.visitorId || !identity.sessionId) return false;
   const body = JSON.stringify({
     ...payload,
     ...identity,

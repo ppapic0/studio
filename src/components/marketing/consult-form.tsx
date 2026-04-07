@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
+
+import { PRIVACY_ROUTE } from "@/lib/legal-documents";
 
 type ServiceType = "korean_academy" | "study_center";
 type StudyCenterRequestType = "consult" | "waitlist";
@@ -14,6 +17,8 @@ type FormState = {
   consultPhone: string;
   serviceType: ServiceType;
   studyCenterRequestType: StudyCenterRequestType;
+  privacyConsentRequired: boolean;
+  marketingConsentOptional: boolean;
 };
 
 type ReceiptInfo = {
@@ -36,6 +41,8 @@ const INITIAL_FORM: FormState = {
   consultPhone: "",
   serviceType: "korean_academy",
   studyCenterRequestType: "consult",
+  privacyConsentRequired: false,
+  marketingConsentOptional: false,
 };
 
 const GRADE_OPTIONS = ["중3", "고1", "고2", "고3", "N수생"];
@@ -132,7 +139,8 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
       form.school.trim().length === 0 ||
       form.grade.length === 0 ||
       form.gender.length === 0 ||
-      normalizePhone(form.consultPhone).length < 8
+      normalizePhone(form.consultPhone).length < 8 ||
+      !form.privacyConsentRequired
     );
   }, [form, submitting]);
 
@@ -365,6 +373,57 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
             className="h-11 w-full rounded-lg border border-[#14295F]/15 px-3 text-sm font-bold text-[#14295F] outline-none transition focus:border-[#FF7A16]"
           />
         </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 rounded-[1.6rem] border border-[#14295F]/10 bg-[#f8fbff] p-4">
+        <div className="grid gap-1">
+          <p className="text-sm font-black text-[#14295F]">개인정보 동의</p>
+          <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+            상담 연락과 입학대기 안내를 위해 필요한 항목만 수집합니다.
+          </p>
+        </div>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
+          <input
+            type="checkbox"
+            checked={form.privacyConsentRequired}
+            onChange={(event) => setField("privacyConsentRequired", event.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-[#14295F]/30 text-[#14295F] focus:ring-[#FF7A16]"
+          />
+          <div className="grid gap-1">
+            <span className="text-sm font-black text-[#14295F]">
+              [필수] 상담 신청 및 입학대기 안내를 위한 개인정보 수집·이용에 동의합니다.
+            </span>
+            <span className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+              학생 이름, 학교, 학년, 성별, 연락처, 서비스 유형을 상담 안내와 접수 확인에 사용합니다.
+            </span>
+            <Link
+              href={PRIVACY_ROUTE}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[11px] font-black text-[#FF7A16] underline underline-offset-4"
+            >
+              개인정보처리방침 전문 보기
+            </Link>
+          </div>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-[1.25rem] border border-[#FF7A16]/15 bg-white px-4 py-3">
+          <input
+            type="checkbox"
+            checked={form.marketingConsentOptional}
+            onChange={(event) => setField("marketingConsentOptional", event.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-[#FF7A16]/30 text-[#FF7A16] focus:ring-[#FF7A16]"
+          />
+          <div className="grid gap-1">
+            <span className="text-sm font-black text-[#14295F]">
+              [선택] 문자/전화로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.
+            </span>
+            <span className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+              운영 연락과 분리된 홍보 안내에만 사용되며, 동의하지 않아도 상담 접수는 가능합니다.
+            </span>
+          </div>
+        </label>
       </div>
 
       {error ? (

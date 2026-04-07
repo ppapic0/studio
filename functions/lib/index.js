@@ -2302,8 +2302,51 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
     const studentLinkCode = String(studentLinkCodeInput).trim();
     const displayNameInput = String((data === null || data === void 0 ? void 0 : data.displayName) || "").trim();
     const parentPhoneNumber = normalizePhoneNumber((data === null || data === void 0 ? void 0 : data.parentPhoneNumber) || (data === null || data === void 0 ? void 0 : data.phoneNumber) || "");
+    const legalConsentsInput = (data === null || data === void 0 ? void 0 : data.legalConsents) && typeof data.legalConsents === "object"
+        ? data.legalConsents
+        : {};
+    const normalizeConsentInput = (value, fallbackSource) => {
+        const raw = value && typeof value === "object" ? value : {};
+        const version = typeof raw.version === "string" ? raw.version.trim() : "";
+        const source = typeof raw.source === "string" && raw.source.trim().length > 0
+            ? raw.source.trim()
+            : fallbackSource;
+        const channel = typeof raw.channel === "string" && raw.channel.trim().length > 0
+            ? raw.channel.trim()
+            : null;
+        return {
+            agreed: raw.agreed === true,
+            version,
+            source,
+            channel,
+        };
+    };
+    const termsConsentInput = normalizeConsentInput(legalConsentsInput.terms, "signup");
+    const privacyConsentInput = normalizeConsentInput(legalConsentsInput.privacy, "signup");
+    const age14ConsentInput = normalizeConsentInput(legalConsentsInput.age14, "signup");
+    const marketingEmailConsentInput = normalizeConsentInput(legalConsentsInput.marketingEmail, "signup");
     if (!allowedRoles.includes(role)) {
         throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.");
+    }
+    if (!termsConsentInput.agreed || !termsConsentInput.version) {
+        throw new functions.https.HttpsError("invalid-argument", "Terms consent is required.", {
+            userMessage: "이용약관 동의가 필요합니다.",
+        });
+    }
+    if (!privacyConsentInput.agreed || !privacyConsentInput.version) {
+        throw new functions.https.HttpsError("invalid-argument", "Privacy consent is required.", {
+            userMessage: "개인정보 수집 및 이용 동의가 필요합니다.",
+        });
+    }
+    if (!age14ConsentInput.agreed || !age14ConsentInput.version) {
+        throw new functions.https.HttpsError("invalid-argument", "Age confirmation is required.", {
+            userMessage: "만 14세 이상 확인이 필요합니다.",
+        });
+    }
+    if (!marketingEmailConsentInput.version) {
+        throw new functions.https.HttpsError("invalid-argument", "Marketing consent version is required.", {
+            userMessage: "선택 동의 정보를 다시 확인해 주세요.",
+        });
     }
     if (role !== "parent" && !code) {
         throw new functions.https.HttpsError("invalid-argument", "초대 코드가 누락되었습니다.", {
@@ -2515,6 +2558,33 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 return value.filter((id) => typeof id === "string" && id.trim().length > 0);
             };
             const ts = admin.firestore.Timestamp.now();
+            const legalConsents = {
+                terms: {
+                    agreed: termsConsentInput.agreed,
+                    version: termsConsentInput.version,
+                    agreedAt: termsConsentInput.agreed ? ts : null,
+                    source: termsConsentInput.source,
+                },
+                privacy: {
+                    agreed: privacyConsentInput.agreed,
+                    version: privacyConsentInput.version,
+                    agreedAt: privacyConsentInput.agreed ? ts : null,
+                    source: privacyConsentInput.source,
+                },
+                age14: {
+                    agreed: age14ConsentInput.agreed,
+                    version: age14ConsentInput.version,
+                    agreedAt: age14ConsentInput.agreed ? ts : null,
+                    source: age14ConsentInput.source,
+                },
+                marketingEmail: {
+                    agreed: marketingEmailConsentInput.agreed,
+                    version: marketingEmailConsentInput.version,
+                    agreedAt: marketingEmailConsentInput.agreed ? ts : null,
+                    source: marketingEmailConsentInput.source,
+                    channel: marketingEmailConsentInput.channel || "email",
+                },
+            };
             let resolvedDisplayName = displayNameInput || tokenDisplayName || "사용자";
             const existingLinkedStudentIds = Array.from(new Set([
                 ...extractLinkedIds(existingMembershipData === null || existingMembershipData === void 0 ? void 0 : existingMembershipData.linkedStudentIds),
@@ -2563,6 +2633,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 email: emailFromToken,
                 displayName: resolvedDisplayName,
                 schoolName: schoolName || "",
+                legalConsents,
                 updatedAt: ts,
                 createdAt: ts,
             };

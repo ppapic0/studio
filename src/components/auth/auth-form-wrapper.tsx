@@ -1,4 +1,8 @@
-﻿type AuthFormWrapperProps = {
+import Link from 'next/link';
+
+import { PRIVACY_ROUTE, TERMS_ROUTE } from '@/lib/legal-documents';
+
+type AuthFormWrapperProps = {
   children: React.ReactNode;
   title: React.ReactNode;
   subtitle: string;
@@ -27,6 +31,14 @@ export function AuthFormWrapper({
             ) : null}
           </div>
           <div className="auth-rise-in parent-entry-delay-2">{children}</div>
+          <div className="auth-rise-in parent-entry-delay-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-[#14295F]/8 pt-4 text-xs font-black text-[#14295F]/56">
+            <Link href={TERMS_ROUTE} className="transition hover:text-[#FF7A16]">
+              이용약관
+            </Link>
+            <Link href={PRIVACY_ROUTE} className="transition hover:text-[#FF7A16]">
+              개인정보처리방침
+            </Link>
+          </div>
         </div>
       </div>
 

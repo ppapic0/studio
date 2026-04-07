@@ -11,6 +11,7 @@ import {
 } from '@/lib/api-security';
 import { adminDb } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
+import { MARKETING_OPT_OUT_COOKIE, MARKETING_OPT_OUT_VALUE, MARKETING_SESSION_COOKIE, MARKETING_VISITOR_COOKIE } from '@/lib/marketing-tracking-shared';
 
 type MarketingEventPayload = {
   eventType?: 'page_view' | 'login_success';
@@ -51,6 +52,10 @@ function normalizeTrackedPathname(value: string | null | undefined, fallback: st
 }
 
 export async function POST(request: NextRequest) {
+  if (request.cookies.get(MARKETING_OPT_OUT_COOKIE)?.value === MARKETING_OPT_OUT_VALUE) {
+    return noStoreJson({ ok: true, optedOut: true });
+  }
+
   const rateLimit = applyIpRateLimit(request, 'marketing-events:create', {
     max: 240,
     windowMs: 5 * 60 * 1000,
@@ -68,11 +73,11 @@ export async function POST(request: NextRequest) {
     const centerId = await resolveMarketingCenterId();
     const visitorId =
       payload.visitorId ||
-      request.cookies.get('track_marketing_vid')?.value ||
+      request.cookies.get(MARKETING_VISITOR_COOKIE)?.value ||
       null;
     const sessionId =
       payload.sessionId ||
-      request.cookies.get('track_marketing_sid')?.value ||
+      request.cookies.get(MARKETING_SESSION_COOKIE)?.value ||
       null;
 
     const eventData = {

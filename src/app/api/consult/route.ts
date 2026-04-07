@@ -10,6 +10,11 @@ import {
   tooManyRequestsJson,
 } from "@/lib/api-security";
 import { adminDb } from "@/lib/firebase-admin";
+import {
+  buildClientConsentSnapshot,
+  MARKETING_CONSENT_VERSION,
+  PRIVACY_VERSION,
+} from "@/lib/legal-documents";
 import { resolveMarketingCenterId } from "@/lib/marketing-center";
 
 const WEBSITE_CONSULT_SOURCE = "website";
@@ -33,6 +38,8 @@ const consultSchema = z.object({
     .refine((value) => value.length >= 8 && value.length <= 15, "연락처는 15자 이내로 입력해주세요."),
   serviceType: z.enum(["korean_academy", "study_center"]),
   studyCenterRequestType: z.enum(["consult", "waitlist"]).optional(),
+  privacyConsentRequired: z.boolean().refine((value) => value, "개인정보 수집 및 이용 동의가 필요합니다."),
+  marketingConsentOptional: z.boolean().optional().default(false),
 });
 
 function getKoreaDateKey() {
@@ -100,7 +107,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { serviceType, studyCenterRequestType, ...fields } = parsed.data;
+    const {
+      serviceType,
+      studyCenterRequestType,
+      privacyConsentRequired,
+      marketingConsentOptional,
+      ...fields
+    } = parsed.data;
     const { requestType, requestTypeLabel } = resolveRequestType(serviceType, studyCenterRequestType);
 
     const centerId = await resolveMarketingCenterId();
@@ -116,6 +129,21 @@ export async function POST(request: NextRequest) {
       shouldAutoCreateWaitlist && centerId
         ? await getNextWaitlistQueueNumber(centerId)
         : null;
+    const consents = {
+      privacy: buildClientConsentSnapshot({
+        agreed: privacyConsentRequired,
+        version: PRIVACY_VERSION,
+        source: "consult",
+        agreedAt: createdAt,
+      }),
+      marketingPhoneSms: buildClientConsentSnapshot({
+        agreed: marketingConsentOptional,
+        version: MARKETING_CONSENT_VERSION,
+        source: "consult",
+        channel: "sms_phone",
+        agreedAt: createdAt,
+      }),
+    };
 
     const payload = {
       ...fields,
@@ -128,6 +156,7 @@ export async function POST(request: NextRequest) {
       sourceLabel: WEBSITE_CONSULT_LABEL,
       status: "new",
       linkedLeadId: null,
+      consents,
       createdAt,
       updatedAt: createdAt,
     };

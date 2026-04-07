@@ -13,6 +13,7 @@ import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
 import { useAuth, useFunctions } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Form,
   FormControl,
@@ -30,6 +31,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  buildClientConsentSnapshot,
+  MARKETING_CONSENT_VERSION,
+  PRIVACY_ROUTE,
+  PRIVACY_VERSION,
+  TERMS_ROUTE,
+  TERMS_VERSION,
+} from '@/lib/legal-documents';
 
 const roleEnum = z.enum(['student', 'teacher', 'parent', 'centerAdmin']);
 
@@ -45,6 +54,10 @@ const formSchema = z
     parentLinkCode: z.string().trim().optional(),
     studentLinkCode: z.string().trim().optional(),
     phoneNumber: z.string().trim().optional(),
+    termsConsent: z.boolean().refine((value) => value, '이용약관에 동의해 주세요.'),
+    privacyConsent: z.boolean().refine((value) => value, '개인정보 수집 및 이용에 동의해 주세요.'),
+    age14Consent: z.boolean().refine((value) => value, '만 14세 이상 여부를 확인해 주세요.'),
+    marketingEmailConsent: z.boolean(),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.confirmPassword) {
@@ -88,6 +101,10 @@ export function SignupForm() {
       parentLinkCode: '',
       studentLinkCode: '',
       phoneNumber: '',
+      termsConsent: false,
+      privacyConsent: false,
+      age14Consent: false,
+      marketingEmailConsent: false,
     },
   });
 
@@ -236,6 +253,7 @@ export function SignupForm() {
 
       setLoadingStatus('센터 가입 처리 중...');
       const completeSignupFn = httpsCallable(functions, 'completeSignupWithInvite');
+      const consentRecordedAt = new Date().toISOString();
       await completeSignupFn({
         code: inviteCode,
         role: values.role,
@@ -245,6 +263,33 @@ export function SignupForm() {
         parentLinkCode: values.parentLinkCode || null,
         studentLinkCode: values.studentLinkCode || null,
         phoneNumber: values.phoneNumber || null,
+        legalConsents: {
+          terms: buildClientConsentSnapshot({
+            agreed: values.termsConsent,
+            version: TERMS_VERSION,
+            source: 'signup',
+            agreedAt: consentRecordedAt,
+          }),
+          privacy: buildClientConsentSnapshot({
+            agreed: values.privacyConsent,
+            version: PRIVACY_VERSION,
+            source: 'signup',
+            agreedAt: consentRecordedAt,
+          }),
+          age14: buildClientConsentSnapshot({
+            agreed: values.age14Consent,
+            version: PRIVACY_VERSION,
+            source: 'signup',
+            agreedAt: consentRecordedAt,
+          }),
+          marketingEmail: buildClientConsentSnapshot({
+            agreed: values.marketingEmailConsent,
+            version: MARKETING_CONSENT_VERSION,
+            source: 'signup',
+            channel: 'email',
+            agreedAt: consentRecordedAt,
+          }),
+        },
       });
 
       setLoadingStatus('회원가입 완료');
@@ -527,6 +572,152 @@ export function SignupForm() {
             학부모는 센터 초대코드 없이 학생 코드로 가입할 수 있습니다.
           </div>
         )}
+
+        <div className="grid gap-3 rounded-[1.6rem] border border-[#14295F]/10 bg-[#f8fbff] p-4">
+          <div className="grid gap-1">
+            <p className="text-sm font-black text-[#14295F]">필수 동의</p>
+            <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+              회원가입과 계정 연동을 위해 아래 항목 확인이 필요합니다.
+            </p>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="termsConsent"
+            render={({ field }) => (
+              <FormItem className="rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                      disabled={isLoading}
+                      className="mt-1 h-5 w-5 rounded-md border-[#14295F]/20 data-[state=checked]:border-[#14295F] data-[state=checked]:bg-[#14295F] data-[state=checked]:text-white"
+                    />
+                  </FormControl>
+                  <div className="grid gap-1">
+                    <FormLabel className="cursor-pointer text-sm font-black text-[#14295F]">
+                      [필수] 이용약관에 동의합니다.
+                    </FormLabel>
+                    <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                      서비스 이용 조건, 회원가입 및 운영 알림 기준을 확인합니다.
+                    </p>
+                    <Link
+                      href={TERMS_ROUTE}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] font-black text-[#FF7A16] underline underline-offset-4"
+                    >
+                      이용약관 전문 보기
+                    </Link>
+                    <FormMessage />
+                  </div>
+                </div>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="privacyConsent"
+            render={({ field }) => (
+              <FormItem className="rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                      disabled={isLoading}
+                      className="mt-1 h-5 w-5 rounded-md border-[#14295F]/20 data-[state=checked]:border-[#14295F] data-[state=checked]:bg-[#14295F] data-[state=checked]:text-white"
+                    />
+                  </FormControl>
+                  <div className="grid gap-1">
+                    <FormLabel className="cursor-pointer text-sm font-black text-[#14295F]">
+                      [필수] 개인정보 수집 및 이용에 동의합니다.
+                    </FormLabel>
+                    <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                      계정 생성, 센터 가입 처리, 학생·학부모 연동을 위해 필요한 정보만 수집합니다.
+                    </p>
+                    <Link
+                      href={PRIVACY_ROUTE}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] font-black text-[#FF7A16] underline underline-offset-4"
+                    >
+                      개인정보처리방침 전문 보기
+                    </Link>
+                    <FormMessage />
+                  </div>
+                </div>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="age14Consent"
+            render={({ field }) => (
+              <FormItem className="rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                      disabled={isLoading}
+                      className="mt-1 h-5 w-5 rounded-md border-[#14295F]/20 data-[state=checked]:border-[#14295F] data-[state=checked]:bg-[#14295F] data-[state=checked]:text-white"
+                    />
+                  </FormControl>
+                  <div className="grid gap-1">
+                    <FormLabel className="cursor-pointer text-sm font-black text-[#14295F]">
+                      [필수] 만 14세 이상입니다.
+                    </FormLabel>
+                    <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                      현재는 별도 법정대리인 동의 절차 없이 만 14세 이상만 회원가입할 수 있습니다.
+                    </p>
+                    <FormMessage />
+                  </div>
+                </div>
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid gap-3 rounded-[1.6rem] border border-[#FF7A16]/12 bg-[#fff7ef] p-4">
+          <div className="grid gap-1">
+            <p className="text-sm font-black text-[#14295F]">선택 동의</p>
+            <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+              아래 항목은 선택이며, 동의하지 않아도 회원가입은 가능합니다.
+            </p>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="marketingEmailConsent"
+            render={({ field }) => (
+              <FormItem className="rounded-[1.25rem] border border-[#FF7A16]/15 bg-white px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                      disabled={isLoading}
+                      className="mt-1 h-5 w-5 rounded-md border-[#FF7A16]/28 data-[state=checked]:border-[#FF7A16] data-[state=checked]:bg-[#FF7A16] data-[state=checked]:text-white"
+                    />
+                  </FormControl>
+                  <div className="grid gap-1">
+                    <FormLabel className="cursor-pointer text-sm font-black text-[#14295F]">
+                      [선택] 이메일로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.
+                    </FormLabel>
+                    <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                      운영 문자와 별도로, 홍보·이벤트·신규 프로그램 안내에만 사용됩니다.
+                    </p>
+                    <FormMessage />
+                  </div>
+                </div>
+              </FormItem>
+            )}
+          />
+        </div>
 
         <Button type="submit" className="mt-2 h-14 w-full rounded-2xl text-lg font-black shadow-xl" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}

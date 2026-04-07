@@ -1,5 +1,8 @@
 import Image from 'next/image';
+import Link from 'next/link';
 
+import { MarketingTrackingOptOutButton } from '@/components/marketing/marketing-tracking-opt-out-button';
+import { PRIVACY_ROUTE, TERMS_ROUTE } from '@/lib/legal-documents';
 import type { MarketingContent } from '@/lib/marketing-content';
 
 type MarketingFooterProps = {
@@ -41,6 +44,14 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
                 상담 문의
               </a>
             </div>
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-xs font-black text-white/62">
+              <Link href={TERMS_ROUTE} className="transition hover:text-[#FFB273]">
+                이용약관
+              </Link>
+              <Link href={PRIVACY_ROUTE} className="transition hover:text-[#FFB273]">
+                개인정보처리방침
+              </Link>
+            </div>
           </div>
 
           <div
@@ -62,8 +73,12 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
           </div>
         </div>
 
-        <div className="mt-8 pt-6 text-[12px] font-semibold text-white" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-          © {new Date().getFullYear()} {brand.name}. All rights reserved.
+        <div
+          className="mt-8 flex flex-col gap-4 pt-6 text-[12px] font-semibold text-white sm:flex-row sm:items-end sm:justify-between"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          <div>© {new Date().getFullYear()} {brand.name}. All rights reserved.</div>
+          <MarketingTrackingOptOutButton theme="dark" compact className="sm:max-w-fit" />
         </div>
       </div>
     </footer>

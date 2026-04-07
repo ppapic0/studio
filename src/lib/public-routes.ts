@@ -5,6 +5,8 @@ const MARKETING_PUBLIC_ROUTES = new Set([
   '/lp',
   '/center',
   '/results',
+  '/terms',
+  '/privacy',
 ]);
 
 const AUTH_PUBLIC_ROUTES = new Set(['/login', '/signup']);

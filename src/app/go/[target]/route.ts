@@ -4,6 +4,12 @@ import * as admin from 'firebase-admin';
 import { applyIpRateLimit } from '@/lib/api-security';
 import { adminDb } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
+import {
+  MARKETING_OPT_OUT_COOKIE,
+  MARKETING_OPT_OUT_VALUE,
+  MARKETING_SESSION_COOKIE,
+  MARKETING_VISITOR_COOKIE,
+} from '@/lib/marketing-tracking-shared';
 
 const TARGET_PATHS: Record<string, string> = {
   login: '/login',
@@ -11,13 +17,17 @@ const TARGET_PATHS: Record<string, string> = {
 };
 
 async function logMarketingEntry(request: NextRequest, target: string, targetPath: string) {
+  if (request.cookies.get(MARKETING_OPT_OUT_COOKIE)?.value === MARKETING_OPT_OUT_VALUE) {
+    return;
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const placement = searchParams.get('placement') || 'unknown';
   const mode = searchParams.get('mode');
   const view = searchParams.get('view');
   const source = searchParams.get('source') || 'marketing';
-  const visitorId = request.cookies.get('track_marketing_vid')?.value || null;
-  const sessionId = request.cookies.get('track_marketing_sid')?.value || null;
+  const visitorId = request.cookies.get(MARKETING_VISITOR_COOKIE)?.value || null;
+  const sessionId = request.cookies.get(MARKETING_SESSION_COOKIE)?.value || null;
 
   try {
     const centerId = await resolveMarketingCenterId();
