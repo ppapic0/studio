@@ -45,7 +45,7 @@ function buildLoginScope(request: NextRequest, email: string) {
 }
 
 function resolveIdentityToolkitUrl() {
-  const apiKey = firebaseConfig.apiKey || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const apiKey = firebaseConfig.apiKey;
   if (!apiKey) {
     throw new Error('Firebase API key is not configured.');
   }

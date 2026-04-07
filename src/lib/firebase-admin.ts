@@ -1,4 +1,4 @@
-
+import 'server-only';
 import * as admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -7,7 +7,6 @@ if (!admin.apps.length) {
       process.env.FIREBASE_PROJECT_ID ||
       process.env.GCLOUD_PROJECT ||
       process.env.GOOGLE_CLOUD_PROJECT ||
-      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
       'studio-2815552762-86e0f',
   });
 }

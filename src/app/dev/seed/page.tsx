@@ -9,6 +9,8 @@ import { seedInitialData } from '@/lib/membership-actions';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Database } from 'lucide-react';
 
+const LOCALHOST_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0']);
+
 export default function SeedPage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -18,8 +20,10 @@ export default function SeedPage() {
   const isAdmin =
     activeMembership?.role === 'centerAdmin' ||
     activeMembership?.role === 'owner';
+  const isLocalDevHost =
+    typeof window !== 'undefined' && LOCALHOST_HOSTS.has(window.location.hostname.trim().toLowerCase());
 
-  if (process.env.NODE_ENV === 'production') {
+  if (!isLocalDevHost) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md border-dashed border-2">

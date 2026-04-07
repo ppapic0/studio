@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { shouldUseStrictFirestorePermissionErrors } from '@/lib/client-debug-flags';
 
 /** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
@@ -60,7 +61,7 @@ export function useCollection<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   const enabled = options.enabled !== false;
-  const strictPermissionErrors = process.env.NEXT_PUBLIC_STRICT_FIRESTORE_ERRORS === 'true';
+  const strictPermissionErrors = shouldUseStrictFirestorePermissionErrors();
 
   useEffect(() => {
     if (!memoizedTargetRefOrQuery || !enabled) {

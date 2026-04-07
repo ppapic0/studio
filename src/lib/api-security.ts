@@ -87,8 +87,7 @@ function getTrustedOrigins(request: RequestLike) {
 
   const configuredOrigins = [
     process.env.APP_ORIGIN,
-    process.env.NEXT_PUBLIC_APP_ORIGIN,
-    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.SITE_URL,
   ];
 
   configuredOrigins.forEach((origin) => {
