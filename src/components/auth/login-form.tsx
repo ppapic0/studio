@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore, useFunctions } from '@/firebase';
-import { sendPasswordResetEmail, signInWithCustomToken, signOut } from 'firebase/auth';
+import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
@@ -167,10 +167,10 @@ export function LoginForm() {
       });
 
       const loginPayload = (await loginResponse.json().catch(() => null)) as
-        | { ok?: boolean; customToken?: string; message?: string }
+        | { ok?: boolean; message?: string }
         | null;
 
-      if (!loginResponse.ok || !loginPayload?.customToken) {
+      if (!loginResponse.ok || !loginPayload?.ok) {
         throw Object.assign(new Error(loginPayload?.message || '로그인 처리 중 오류가 발생했습니다.'), {
           code:
             loginResponse.status === 429
@@ -182,7 +182,7 @@ export function LoginForm() {
       }
 
       hasServerSession = true;
-      const userCredential = await signInWithCustomToken(auth, loginPayload.customToken);
+      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
       if (functions) {
         try {
           const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');

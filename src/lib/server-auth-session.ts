@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { AUTH_SESSION_COOKIE_NAME } from '@/lib/auth-session-shared';
 import { adminAuth } from '@/lib/firebase-admin';
 
-type VerifiedSessionClaims = Awaited<ReturnType<typeof adminAuth.verifySessionCookie>>;
+type VerifiedSessionClaims = Awaited<ReturnType<typeof adminAuth.verifyIdToken>>;
 
 export async function getVerifiedServerSession(): Promise<VerifiedSessionClaims | null> {
   const cookieStore = await cookies();
@@ -16,6 +16,10 @@ export async function getVerifiedServerSession(): Promise<VerifiedSessionClaims 
   try {
     return await adminAuth.verifySessionCookie(sessionCookie);
   } catch {
-    return null;
+    try {
+      return await adminAuth.verifyIdToken(sessionCookie);
+    } catch {
+      return null;
+    }
   }
 }

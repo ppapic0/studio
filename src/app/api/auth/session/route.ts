@@ -9,7 +9,6 @@ import {
 } from '@/lib/api-security';
 import {
   AUTH_SESSION_COOKIE_NAME,
-  AUTH_SESSION_MAX_AGE_MS,
   AUTH_SESSION_MAX_AGE_SECONDS,
 } from '@/lib/auth-session-shared';
 import { adminAuth } from '@/lib/firebase-admin';
@@ -22,6 +21,15 @@ const SESSION_COOKIE_OPTIONS = {
 };
 
 export const dynamic = 'force-dynamic';
+
+function resolveIdTokenCookieMaxAge(decodedToken: { exp?: number }) {
+  if (typeof decodedToken.exp !== 'number') {
+    return Math.min(AUTH_SESSION_MAX_AGE_SECONDS, 60 * 60);
+  }
+
+  const remainingSeconds = decodedToken.exp - Math.floor(Date.now() / 1000);
+  return Math.max(60, Math.min(AUTH_SESSION_MAX_AGE_SECONDS, remainingSeconds));
+}
 
 export async function POST(request: NextRequest) {
   if (!hasTrustedBrowserContext(request, { allowMissingHeaders: true })) {
@@ -51,15 +59,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await adminAuth.verifyIdToken(idToken);
-    const sessionCookie = await adminAuth.createSessionCookie(idToken, {
-      expiresIn: AUTH_SESSION_MAX_AGE_MS,
-    });
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
 
     const response = noStoreJson({ ok: true });
-    response.cookies.set(AUTH_SESSION_COOKIE_NAME, sessionCookie, {
+    response.cookies.set(AUTH_SESSION_COOKIE_NAME, idToken, {
       ...SESSION_COOKIE_OPTIONS,
-      maxAge: AUTH_SESSION_MAX_AGE_SECONDS,
+      maxAge: resolveIdTokenCookieMaxAge(decodedToken),
     });
     return response;
   } catch {

@@ -106,6 +106,34 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     };
   }, [auth, hasTriedSessionSync, isAuthRoute, mounted, pathname, redirectPath, router, user, userLoading]);
 
+  useEffect(() => {
+    if (userLoading || !mounted || !user || isAuthRoute || isPublicRoute(pathname)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncServerSession = async () => {
+      try {
+        await createServerAuthSession(user);
+      } catch (error) {
+        if (!cancelled) {
+          logHandledClientIssue('[auth-guard] protected route session refresh failed', error);
+        }
+      }
+    };
+
+    void syncServerSession();
+    const refreshInterval = window.setInterval(() => {
+      void syncServerSession();
+    }, 30 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshInterval);
+    };
+  }, [isAuthRoute, mounted, pathname, user, userLoading]);
+
   // 하이드레이션 오류 방지
   if (!mounted) {
     return (

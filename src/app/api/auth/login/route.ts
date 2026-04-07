@@ -12,10 +12,8 @@ import {
 } from '@/lib/api-security';
 import {
   AUTH_SESSION_COOKIE_NAME,
-  AUTH_SESSION_MAX_AGE_MS,
   AUTH_SESSION_MAX_AGE_SECONDS,
 } from '@/lib/auth-session-shared';
-import { adminAuth } from '@/lib/firebase-admin';
 import { firebaseConfig } from '@/firebase/config';
 
 const SESSION_COOKIE_OPTIONS = {
@@ -30,6 +28,7 @@ const LOGIN_ACCOUNT_LIMIT = { max: 6, windowMs: 10 * 60 * 1000 };
 
 type FirebasePasswordLoginResponse = {
   idToken?: string;
+  expiresIn?: string;
 };
 
 function normalizeLoginEmail(value: unknown) {
@@ -42,6 +41,15 @@ function normalizePassword(value: unknown) {
 
 function buildLoginScope(request: NextRequest, email: string) {
   return `${getClientIp(request)}:${email}`;
+}
+
+function resolveAuthCookieMaxAge(expiresIn: unknown) {
+  const parsed = Number(expiresIn);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return Math.min(AUTH_SESSION_MAX_AGE_SECONDS, 60 * 60);
+  }
+
+  return Math.max(60, Math.min(AUTH_SESSION_MAX_AGE_SECONDS, Math.floor(parsed)));
 }
 
 function resolveIdentityToolkitUrl() {
@@ -148,21 +156,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const decoded = await adminAuth.verifyIdToken(idToken);
-    const sessionCookie = await adminAuth.createSessionCookie(idToken, {
-      expiresIn: AUTH_SESSION_MAX_AGE_MS,
-    });
-    const customToken = await adminAuth.createCustomToken(decoded.uid);
-
     clearRateLimitIdentifier('auth-login-account', loginScope);
 
     const response = noStoreJson({
       ok: true,
-      customToken,
     });
-    response.cookies.set(AUTH_SESSION_COOKIE_NAME, sessionCookie, {
+    response.cookies.set(AUTH_SESSION_COOKIE_NAME, idToken, {
       ...SESSION_COOKIE_OPTIONS,
-      maxAge: AUTH_SESSION_MAX_AGE_SECONDS,
+      maxAge: resolveAuthCookieMaxAge(
+        payload && 'expiresIn' in payload ? payload.expiresIn : undefined
+      ),
     });
     return response;
   } catch {
