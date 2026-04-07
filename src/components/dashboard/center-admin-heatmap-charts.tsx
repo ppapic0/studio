@@ -1,26 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ResponsiveContainer,
-  BarChart,
-  Bar,
   AreaChart,
   Area,
   CartesianGrid,
-  Cell,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import {
-  Activity,
   ArrowUpRight,
   BarChart3,
   Loader2,
   Sparkles,
-  TrendingUp,
   UserRound,
 } from 'lucide-react';
 
@@ -56,54 +51,46 @@ function getTonePalette(score: number) {
   const tone = getHeatmapTone(score);
   if (tone === 'stable') {
     return {
-      fill: '#10b981',
-      stroke: '#059669',
-      light: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-      glow: 'shadow-[0_14px_32px_rgba(16,185,129,0.18)]',
+      fill: '#14295F',
+      stroke: '#17326B',
+      badgeClass: 'bg-[#14295F] text-white',
+      chipClass: 'border-[#dbe7ff] bg-[#eef4ff] text-[#14295F]',
+      surfaceClass: 'bg-[#f6f8ff]',
+      textClass: 'text-[#14295F]',
+      glowClass: 'shadow-[0_24px_48px_-38px_rgba(20,41,95,0.34)]',
     };
   }
   if (tone === 'good') {
     return {
-      fill: '#06b6d4',
-      stroke: '#0891b2',
-      light: 'bg-cyan-50 text-cyan-800 border-cyan-200',
-      glow: 'shadow-[0_14px_32px_rgba(6,182,212,0.18)]',
+      fill: '#2554D7',
+      stroke: '#2554D7',
+      badgeClass: 'bg-[#eef4ff] text-[#2554D7]',
+      chipClass: 'border-[#dbe7ff] bg-[#f7f9ff] text-[#2554D7]',
+      surfaceClass: 'bg-[#f7f9ff]',
+      textClass: 'text-[#2554D7]',
+      glowClass: 'shadow-[0_24px_48px_-38px_rgba(37,84,215,0.22)]',
     };
   }
   if (tone === 'watch') {
     return {
-      fill: '#f59e0b',
-      stroke: '#d97706',
-      light: 'bg-amber-50 text-amber-800 border-amber-200',
-      glow: 'shadow-[0_14px_32px_rgba(245,158,11,0.16)]',
+      fill: '#FF7A16',
+      stroke: '#FF7A16',
+      badgeClass: 'bg-[#FFF2E8] text-[#C95A08]',
+      chipClass: 'border-[#FFD7BA] bg-[#FFF7F1] text-[#C95A08]',
+      surfaceClass: 'bg-[#FFF8F2]',
+      textClass: 'text-[#C95A08]',
+      glowClass: 'shadow-[0_24px_48px_-38px_rgba(255,122,22,0.26)]',
     };
   }
   return {
-    fill: '#f43f5e',
-    stroke: '#e11d48',
-    light: 'bg-rose-50 text-rose-800 border-rose-200',
-    glow: 'shadow-[0_14px_32px_rgba(244,63,94,0.18)]',
+    fill: '#E24C4B',
+    stroke: '#D13E3D',
+    badgeClass: 'bg-rose-100 text-rose-700',
+    chipClass: 'border-rose-200 bg-rose-50 text-rose-700',
+    surfaceClass: 'bg-rose-50/70',
+    textClass: 'text-rose-700',
+    glowClass: 'shadow-[0_24px_48px_-38px_rgba(226,76,75,0.24)]',
   };
-}
-
-function SummaryTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: { label: string; score: number; summaryLabel: string } }>;
-}) {
-  if (!active || !payload?.length) return null;
-  const point = payload[0]?.payload;
-  if (!point) return null;
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur">
-      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">{point.label}</p>
-      <p className="mt-1 text-lg font-black tracking-tight text-slate-900">{point.score}점</p>
-      <p className="mt-1 text-xs font-bold text-slate-500">{point.summaryLabel}</p>
-    </div>
-  );
 }
 
 function TrendTooltip({
@@ -118,9 +105,11 @@ function TrendTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur">
+    <div className="rounded-2xl border border-[#dbe7ff] bg-white/95 p-4 shadow-xl backdrop-blur">
       <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-black tracking-tight text-slate-900">{Math.round(Number(payload[0]?.value || 0))}점</p>
+      <p className="mt-1 text-sm font-black tracking-tight text-[#14295F]">
+        {Math.round(Number(payload[0]?.value || 0))}점
+      </p>
     </div>
   );
 }
@@ -136,15 +125,45 @@ export function CenterAdminHeatmapCharts({
   actionLabel,
   className,
 }: CenterAdminHeatmapChartsProps) {
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-  const summaryChartData = rows.map((row) => ({
-    id: row.id,
-    label: row.label,
-    score: row.summaryScore,
-    summaryLabel: row.summaryLabel,
-  }));
+
+  const lowestRowId = useMemo(() => {
+    if (rows.length === 0) return null;
+
+    return rows.reduce((lowest, current) => {
+      if (current.summaryScore < lowest.summaryScore) return current;
+      if (current.summaryScore === lowest.summaryScore && current.label.localeCompare(lowest.label, 'ko') < 0) {
+        return current;
+      }
+      return lowest;
+    }).id;
+  }, [rows]);
+
+  useEffect(() => {
+    setActiveRowId(lowestRowId);
+  }, [scopeLabel, lowestRowId]);
+
+  useEffect(() => {
+    if (!activeRowId) return;
+    if (rows.some((row) => row.id === activeRowId)) return;
+    setActiveRowId(lowestRowId);
+  }, [rows, activeRowId, lowestRowId]);
+
+  const activeRow = rows.find((row) => row.id === activeRowId) || rows.find((row) => row.id === lowestRowId) || null;
+  const activePalette = getTonePalette(activeRow?.summaryScore ?? 75);
+  const activeMetricPreview = activeRow?.metrics.slice(0, 3) || [];
+  const activeTrendData = activeRow?.trend.map((point) => ({
+    label: point.label,
+    score: point.score,
+  })) || [];
+  const activeLastTrendScore = activeTrendData.length > 0
+    ? activeTrendData[activeTrendData.length - 1]?.score ?? 0
+    : null;
+
   const selectedRow = rows.find((row) => row.id === selectedRowId) || null;
   const selectedDomainKey = (selectedRow?.id || null) as CenterAdminSeatDomainKey | null;
+
   const topStudents = useMemo(() => {
     if (!selectedDomainKey) return [];
 
@@ -165,10 +184,10 @@ export function CenterAdminHeatmapCharts({
 
   if (isLoading) {
     return (
-      <Card className={cn('overflow-hidden rounded-[2.5rem] border-none bg-white shadow-xl', className)}>
+      <Card className={cn('overflow-hidden rounded-[2.5rem] border border-[#14295F]/10 bg-white shadow-xl', className)}>
         <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8">
-          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-25" />
-          <p className="text-sm font-black uppercase tracking-[0.24em] text-muted-foreground">운영 그래프 동기화 중</p>
+          <Loader2 className="h-10 w-10 animate-spin text-[#14295F] opacity-25" />
+          <p className="text-sm font-black uppercase tracking-[0.24em] text-slate-500">운영 그래프 동기화 중</p>
         </CardContent>
       </Card>
     );
@@ -176,224 +195,252 @@ export function CenterAdminHeatmapCharts({
 
   return (
     <>
-      <Card className={cn('overflow-hidden rounded-[2.5rem] border-none bg-white shadow-xl', className)}>
-        <CardHeader className="border-b bg-muted/5 px-5 py-5 sm:px-8 sm:py-6">
+      <Card
+        className={cn(
+          'overflow-hidden rounded-[2.5rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#f6f8ff_0%,#ffffff_58%,#fff7ef_100%)] shadow-[0_28px_60px_-46px_rgba(20,41,95,0.48)]',
+          className
+        )}
+      >
+        <CardHeader className="border-b border-white/12 bg-[linear-gradient(135deg,#14295F_0%,#17326B_68%,#FF7A16_138%)] px-5 py-5 text-white sm:px-7 sm:py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid gap-1.5">
-              <div className="flex items-center gap-2 text-primary/70">
+              <div className="flex items-center gap-2 text-white/72">
                 <Sparkles className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-[0.28em]">Center Graph View</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.28em]">Insight Studio</span>
               </div>
-              <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight sm:text-2xl">
-                <BarChart3 className="h-5 w-5 text-primary/60" />
+              <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-white sm:text-2xl">
+                <BarChart3 className="h-5 w-5 text-white/80" />
                 {title}
               </CardTitle>
-              <CardDescription className="text-xs font-bold text-muted-foreground">{description}</CardDescription>
+              <CardDescription className="text-xs font-bold text-white/74">{description}</CardDescription>
             </div>
-            {actionHref && actionLabel && (
-              <Button asChild variant="outline" className="h-10 rounded-xl border-2 font-black">
-                <Link href={actionHref}>
-                  {actionLabel}
-                  <ArrowUpRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <Badge className="h-7 rounded-full border-none bg-white/14 px-3 text-[10px] font-black text-white">
+                기본 선택: 최저 점수 축
+              </Badge>
+              <Badge className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-black text-[#14295F]">
+                {scopeLabel}
+              </Badge>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-5 p-5 sm:p-8">
+        <CardContent className="space-y-5 p-5 sm:p-7">
           {rows.length === 0 ? (
-            <div className="rounded-[2rem] border-2 border-dashed border-muted-foreground/15 px-6 py-12 text-center">
-              <p className="text-sm font-black text-muted-foreground/50">표시할 운영 그래프 데이터가 없습니다.</p>
+            <div className="rounded-[2rem] border-2 border-dashed border-[#14295F]/10 bg-white px-6 py-12 text-center">
+              <p className="text-sm font-black text-slate-500">표시할 운영 그래프 데이터가 없습니다.</p>
             </div>
           ) : (
             <>
-              <div className="grid gap-4 xl:grid-cols-[1.12fr_0.88fr]">
-                <Card className="rounded-[2rem] border border-primary/10 bg-[#fafcff] shadow-sm">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-primary">
-                      <TrendingUp className="h-5 w-5 text-emerald-500" />
-                      영역별 운영 건강도
-                    </CardTitle>
-                    <CardDescription className="text-xs font-bold text-muted-foreground">
-                      센터관리자가 바로 우선순위를 정할 수 있게 5개 축을 같은 100점 체계로 비교합니다.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <ResponsiveContainer width="100%" height={320}>
-                      <BarChart
-                        data={summaryChartData}
-                        layout="vertical"
-                        margin={{ top: 8, right: 16, left: 12, bottom: 8 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#eef2ff" horizontal={false} />
-                        <XAxis
-                          type="number"
-                          domain={[0, 100]}
-                          tick={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="label"
-                          width={92}
-                          tick={{ fontSize: 11, fontWeight: 900, fill: '#1e3a8a' }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <Tooltip cursor={{ fill: 'rgba(15,23,42,0.04)' }} content={<SummaryTooltip />} />
-                        <Bar dataKey="score" radius={[0, 14, 14, 0]} barSize={26}>
-                          {summaryChartData.map((entry) => (
-                            <Cell key={entry.id} fill={getTonePalette(entry.score).fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-
-                <div className="grid gap-3">
+              <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                <div className="inline-flex min-w-max gap-2 rounded-full bg-[#14295F]/5 p-1">
                   {rows.map((row) => {
-                    const palette = getTonePalette(row.summaryScore);
-                    const leadMetric = row.metrics[0];
+                    const rowPalette = getTonePalette(row.summaryScore);
+                    const isActive = activeRow?.id === row.id;
 
                     return (
                       <button
                         key={row.id}
                         type="button"
-                        onClick={() => setSelectedRowId(row.id)}
+                        onClick={() => setActiveRowId(row.id)}
                         className={cn(
-                          'rounded-[1.8rem] border bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-xl',
-                          palette.light,
-                          palette.glow
+                          'group flex min-w-[148px] items-center justify-between gap-3 rounded-full border px-4 py-3 text-left transition-[transform,box-shadow,border-color,background-color,color] duration-200 hover:-translate-y-0.5',
+                          isActive
+                            ? 'border-[#FF7A16]/25 bg-white text-[#14295F] shadow-[0_20px_38px_-28px_rgba(20,41,95,0.42)] ring-1 ring-[#FF7A16]/25'
+                            : 'border-transparent bg-transparent text-slate-500 hover:border-[#14295F]/10 hover:bg-white/84 hover:text-[#14295F]'
                         )}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="grid gap-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-black tracking-tight">{row.label}</p>
-                              <Badge className={cn('h-6 border-none px-2.5 text-[10px] font-black', palette.light)}>
-                                {row.summaryScore}
-                              </Badge>
-                            </div>
-                            <p className="text-xs font-bold opacity-80">{row.description}</p>
-                          </div>
-                          <Activity className="h-4 w-4 shrink-0 opacity-55" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black tracking-tight">{row.label}</p>
+                          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.18em] opacity-70">
+                            {row.summaryLabel}
+                          </p>
                         </div>
-                        <div className="mt-3 rounded-2xl bg-white/80 px-3 py-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[10px] font-black uppercase tracking-[0.24em] opacity-55">대표 지표</p>
-                              <p className="mt-1 text-base font-black tracking-tight">{leadMetric?.label || '지표 준비중'}</p>
-                            </div>
-                            <Badge className="border-none bg-white/90 text-slate-700">
-                              개입 5명
-                            </Badge>
-                          </div>
-                          <p className="text-xs font-bold opacity-80">{leadMetric?.value || '-'} · {leadMetric?.hint || '데이터를 확인해주세요.'}</p>
-                        </div>
+                        <span
+                          className={cn(
+                            'inline-flex h-9 min-w-9 items-center justify-center rounded-full px-2.5 text-xs font-black',
+                            isActive ? rowPalette.badgeClass : 'bg-slate-100 text-slate-500'
+                          )}
+                        >
+                          {row.summaryScore}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-2">
-                {rows.map((row) => {
-                  const palette = getTonePalette(row.summaryScore);
-                  const trendData = row.trend.map((point) => ({
-                    label: point.label,
-                    score: point.score,
-                  }));
-
-                  return (
-                    <Card key={row.id} className="rounded-[2rem] border border-primary/10 bg-white shadow-sm">
-                      <CardHeader className="space-y-3 pb-2">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="grid gap-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <CardTitle className="text-lg font-black tracking-tight text-primary">{row.label}</CardTitle>
-                              <Badge className={cn('h-6 border-none px-2.5 text-[10px] font-black', palette.light)}>
-                                {row.summaryLabel} {row.summaryScore}
-                              </Badge>
-                            </div>
-                            <CardDescription className="text-xs font-bold text-muted-foreground">
-                              {row.description}
-                            </CardDescription>
-                          </div>
-                          {row.href && (
-                            <Button asChild variant="ghost" className="h-9 rounded-xl px-3 text-[11px] font-black text-primary">
-                              <Link href={row.href}>
-                                관련 화면
-                                <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                          )}
+              {activeRow ? (
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+                  <div className="rounded-[2rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_18px_44px_-36px_rgba(20,41,95,0.28)]">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-2">
+                        <div className={cn('flex items-center gap-2', activePalette.textClass)}>
+                          <BarChart3 className="h-4 w-4" />
+                          <span className="text-[10px] font-black uppercase tracking-[0.24em]">Selected Axis</span>
                         </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {row.metrics.map((metric) => (
-                            <span
-                              key={metric.id}
-                              className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black', getTonePalette(metric.score).light)}
-                            >
-                              {metric.label} {metric.value}
-                            </span>
-                          ))}
+                        <div>
+                          <h3 className="text-2xl font-black tracking-tight text-[#14295F]">{activeRow.label}</h3>
+                          <p className="mt-1 text-sm font-bold leading-6 text-slate-500">{activeRow.description}</p>
                         </div>
-                      </CardHeader>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className={cn('h-7 rounded-full border-none px-3 text-xs font-black', activePalette.badgeClass)}>
+                          {activeRow.summaryLabel} {activeRow.summaryScore}점
+                        </Badge>
+                        <Badge className="h-7 rounded-full border border-[#FF7A16]/18 bg-[#FFF2E8] px-3 text-[10px] font-black text-[#C95A08]">
+                          우선 분석 축
+                        </Badge>
+                      </div>
+                    </div>
 
-                      <CardContent className="pt-0">
-                        <ResponsiveContainer width="100%" height={188}>
-                          <AreaChart data={trendData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id={`heatmap_${row.id}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor={palette.fill} stopOpacity={0.32} />
-                                <stop offset="100%" stopColor={palette.fill} stopOpacity={0.02} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#eef2ff" vertical={false} />
-                            <XAxis
-                              dataKey="label"
-                              tick={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis
-                              domain={[0, 100]}
-                              tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }}
-                              tickLine={false}
-                              axisLine={false}
-                              width={28}
-                            />
-                            <Tooltip content={<TrendTooltip />} />
-                            <Area
-                              type="monotone"
-                              dataKey="score"
-                              stroke={palette.stroke}
-                              strokeWidth={2.5}
-                              fill={`url(#heatmap_${row.id})`}
-                              dot={{ r: 3, fill: palette.stroke, strokeWidth: 0 }}
-                              activeDot={{ r: 5, fill: palette.stroke, strokeWidth: 0 }}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                        <p className="mt-2 text-[11px] font-bold leading-relaxed text-slate-500">
-                          최근 7일 추이를 기준으로 안정도 흐름을 바로 읽고, 아래 관련 화면으로 세부 조치를 이어갈 수 있습니다.
+                    <div className="mt-5 grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
+                      <div className={cn('rounded-[1.6rem] border p-4', activePalette.chipClass, activePalette.glowClass)}>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">현재 점수</p>
+                        <p className="dashboard-number mt-2 text-4xl tracking-tight">{activeRow.summaryScore}</p>
+                        <p className="mt-1 text-[11px] font-bold opacity-85">
+                          {activeRow.summaryLabel} 상태를 먼저 확인합니다.
                         </p>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                      </div>
+
+                      <div className="rounded-[1.6rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">최근 추이</p>
+                            <p className="mt-1 text-sm font-black text-[#14295F]">최근 7일 운영 변화</p>
+                          </div>
+                          {activeLastTrendScore !== null ? (
+                            <span className={cn('text-xs font-black', activePalette.textClass)}>
+                              최근 {Math.round(activeLastTrendScore)}점
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className={cn('mt-3 rounded-[1.4rem] border border-[#14295F]/8 p-2', activePalette.surfaceClass)}>
+                          <ResponsiveContainer width="100%" height={200}>
+                            <AreaChart data={activeTrendData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id={`heatmap_active_${activeRow.id}`} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor={activePalette.fill} stopOpacity={0.32} />
+                                  <stop offset="100%" stopColor={activePalette.fill} stopOpacity={0.03} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e6edf9" vertical={false} />
+                              <XAxis
+                                dataKey="label"
+                                tick={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}
+                                tickLine={false}
+                                axisLine={false}
+                              />
+                              <YAxis
+                                domain={[0, 100]}
+                                tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }}
+                                tickLine={false}
+                                axisLine={false}
+                                width={28}
+                              />
+                              <Tooltip content={<TrendTooltip />} />
+                              <Area
+                                type="monotone"
+                                dataKey="score"
+                                stroke={activePalette.stroke}
+                                strokeWidth={2.5}
+                                fill={`url(#heatmap_active_${activeRow.id})`}
+                                dot={{ r: 3, fill: activePalette.stroke, strokeWidth: 0 }}
+                                activeDot={{ r: 5, fill: activePalette.stroke, strokeWidth: 0 }}
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <p className="mt-3 text-[11px] font-bold leading-5 text-slate-500">
+                          홈에서는 한 번에 1개 축만 크게 보고, 세부 개입 학생은 아래 버튼으로 이어집니다.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="rounded-[2rem] border border-[#14295F]/10 bg-white p-4 shadow-[0_16px_34px_-30px_rgba(20,41,95,0.24)]">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-black text-[#14295F]">대표 지표</p>
+                        <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
+                          {activeMetricPreview.length}개
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid gap-2">
+                        {activeMetricPreview.map((metric) => {
+                          const metricPalette = getTonePalette(metric.score);
+                          return (
+                            <div
+                              key={metric.id}
+                              className={cn(
+                                'rounded-[1.2rem] border p-3 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5',
+                                metricPalette.chipClass
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[11px] font-black">{metric.label}</p>
+                                <span className="text-sm font-black">{metric.value}</span>
+                              </div>
+                              <p className="mt-1 text-[11px] font-bold leading-5 opacity-80">{metric.hint}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[2rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#14295F_0%,#17326B_100%)] p-4 text-white shadow-[0_22px_48px_-36px_rgba(20,41,95,0.55)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Next Action</p>
+                      <p className="mt-2 text-lg font-black tracking-tight">바로 이어서 조치하기</p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-white/74">
+                        관련 화면 이동과 개입 우선 학생 확인을 여기서 이어갑니다.
+                      </p>
+                      <div className="mt-4 grid gap-2">
+                        {activeRow.href ? (
+                          <Button
+                            asChild
+                            type="button"
+                            className="h-10 rounded-xl bg-[#FF7A16] text-sm font-black text-white transition-colors hover:bg-[#E56D10]"
+                          >
+                            <Link href={activeRow.href}>
+                              관련 화면 이동
+                              <ArrowUpRight className="ml-2 h-4 w-4" />
+                            </Link>
+                          </Button>
+                        ) : actionHref && actionLabel ? (
+                          <Button
+                            asChild
+                            type="button"
+                            className="h-10 rounded-xl bg-[#FF7A16] text-sm font-black text-white transition-colors hover:bg-[#E56D10]"
+                          >
+                            <Link href={actionHref}>
+                              {actionLabel}
+                              <ArrowUpRight className="ml-2 h-4 w-4" />
+                            </Link>
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-xl border-white/18 bg-white/10 text-sm font-black text-white transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-white/16"
+                          onClick={() => setSelectedRowId(activeRow.id)}
+                        >
+                          개입 우선 학생 보기
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={!!selectedRow} onOpenChange={(open) => !open && setSelectedRowId(null)}>
-      <DialogContent motionPreset="dashboard-premium" className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl">
+        <DialogContent
+          motionPreset="dashboard-premium"
+          className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl"
+        >
           {selectedRow && (
             <>
               <div className="shrink-0 bg-gradient-to-r from-[#14295F] to-[#1d3f89] p-6 text-white sm:p-8">
@@ -406,7 +453,9 @@ export function CenterAdminHeatmapCharts({
                   </DialogDescription>
                 </DialogHeader>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Badge className="border-none bg-white/15 text-white">{selectedRow.summaryLabel} {selectedRow.summaryScore}</Badge>
+                  <Badge className="border-none bg-white/15 text-white">
+                    {selectedRow.summaryLabel} {selectedRow.summaryScore}
+                  </Badge>
                   <Badge className="border-none bg-white/15 text-white">
                     대표 지표 {selectedRow.metrics[0]?.label || '-'}
                   </Badge>
