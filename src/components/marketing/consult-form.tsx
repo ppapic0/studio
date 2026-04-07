@@ -4,6 +4,15 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PRIVACY_ROUTE } from "@/lib/legal-documents";
 
 type ServiceType = "korean_academy" | "study_center";
@@ -131,16 +140,16 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptInfo | null>(null);
+  const [consentDialogOpen, setConsentDialogOpen] = useState(false);
 
-  const isDisabled = useMemo(() => {
+  const isPrimaryActionDisabled = useMemo(() => {
     return (
       submitting ||
       form.studentName.trim().length === 0 ||
       form.school.trim().length === 0 ||
       form.grade.length === 0 ||
       form.gender.length === 0 ||
-      normalizePhone(form.consultPhone).length < 8 ||
-      !form.privacyConsentRequired
+      normalizePhone(form.consultPhone).length < 8
     );
   }, [form, submitting]);
 
@@ -149,8 +158,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
     setError(null);
   }
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitConsultRequest() {
     setSubmitting(true);
     setError(null);
     const normalizedPhone = normalizePhone(form.consultPhone);
@@ -186,6 +194,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
         requestTypeLabel: data.requestTypeLabel ?? "상담 신청",
         waitlistRegistered: Boolean(data.waitlistRegistered),
       });
+      setConsentDialogOpen(false);
       setForm(INITIAL_FORM);
     } catch (err) {
       console.error("[consult-form] submit error", err);
@@ -193,6 +202,22 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isPrimaryActionDisabled) return;
+    setError(null);
+    setConsentDialogOpen(true);
+  }
+
+  async function handleConfirmConsent() {
+    if (!form.privacyConsentRequired) {
+      setError("개인정보 수집 및 이용 동의가 필요합니다.");
+      return;
+    }
+
+    await submitConsultRequest();
   }
 
   if (receipt) {
@@ -375,64 +400,13 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 rounded-[1.6rem] border border-[#14295F]/10 bg-[#f8fbff] p-4">
-        <div className="grid gap-1">
-          <p className="text-sm font-black text-[#14295F]">개인정보 동의</p>
-          <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
-            상담 연락과 입학대기 안내를 위해 필요한 항목만 수집합니다.
-          </p>
-        </div>
-
-        <label className="flex cursor-pointer items-start gap-3 rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
-          <input
-            type="checkbox"
-            checked={form.privacyConsentRequired}
-            onChange={(event) => setField("privacyConsentRequired", event.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-[#14295F]/30 text-[#14295F] focus:ring-[#FF7A16]"
-          />
-          <div className="grid gap-1">
-            <span className="text-sm font-black text-[#14295F]">
-              [필수] 상담 신청 및 입학대기 안내를 위한 개인정보 수집·이용에 동의합니다.
-            </span>
-            <span className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
-              학생 이름, 학교, 학년, 성별, 연락처, 서비스 유형을 상담 안내와 접수 확인에 사용합니다.
-            </span>
-            <Link
-              href={PRIVACY_ROUTE}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] font-black text-[#FF7A16] underline underline-offset-4"
-            >
-              개인정보처리방침 전문 보기
-            </Link>
-          </div>
-        </label>
-
-        <label className="flex cursor-pointer items-start gap-3 rounded-[1.25rem] border border-[#FF7A16]/15 bg-white px-4 py-3">
-          <input
-            type="checkbox"
-            checked={form.marketingConsentOptional}
-            onChange={(event) => setField("marketingConsentOptional", event.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-[#FF7A16]/30 text-[#FF7A16] focus:ring-[#FF7A16]"
-          />
-          <div className="grid gap-1">
-            <span className="text-sm font-black text-[#14295F]">
-              [선택] 문자/전화로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.
-            </span>
-            <span className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
-              운영 연락과 분리된 홍보 안내에만 사용되며, 동의하지 않아도 상담 접수는 가능합니다.
-            </span>
-          </div>
-        </label>
-      </div>
-
       {error ? (
         <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{error}</p>
       ) : null}
 
       <button
         type="submit"
-        disabled={isDisabled}
+        disabled={isPrimaryActionDisabled}
         className="premium-cta premium-cta-primary mt-5 h-12 w-full gap-2 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? (
@@ -446,6 +420,111 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
           "상담 요청 접수"
         )}
       </button>
+
+      <Dialog open={consentDialogOpen} onOpenChange={(open) => !submitting && setConsentDialogOpen(open)}>
+        <DialogContent className="rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-xl">
+          <div className="rounded-t-[2rem] bg-[#14295F] px-6 py-6 text-white sm:px-7">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-[1.8rem] font-black tracking-[-0.04em]">
+                {form.serviceType === "study_center" && form.studyCenterRequestType === "waitlist"
+                  ? "입학대기 신청 전 개인정보 동의"
+                  : "상담문의 전 개인정보 동의"}
+              </DialogTitle>
+              <DialogDescription className="pt-2 text-sm font-bold leading-6 text-white/78">
+                상담 연락과 입학대기 안내를 위해 필요한 항목만 수집합니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="grid gap-4 px-6 py-6 sm:px-7">
+            <div className="grid gap-3 rounded-[1.6rem] border border-[#14295F]/10 bg-[#f8fbff] p-4">
+              <div className="grid gap-1">
+                <p className="text-sm font-black text-[#14295F]">필수 동의</p>
+                <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                  아래 항목에 동의해야 상담문의 또는 입학대기 신청을 접수할 수 있습니다.
+                </p>
+              </div>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={form.privacyConsentRequired}
+                  onChange={(event) => setField("privacyConsentRequired", event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-[#14295F]/30 text-[#14295F] focus:ring-[#FF7A16]"
+                />
+                <div className="grid gap-1">
+                  <span className="text-sm font-black text-[#14295F]">
+                    [필수] 상담 신청 및 입학대기 안내를 위한 개인정보 수집·이용에 동의합니다.
+                  </span>
+                  <span className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                    학생 이름, 학교, 학년, 성별, 연락처, 서비스 유형을 상담 안내와 접수 확인에 사용합니다.
+                  </span>
+                  <Link
+                    href={PRIVACY_ROUTE}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] font-black text-[#FF7A16] underline underline-offset-4"
+                  >
+                    개인정보처리방침 전문 보기
+                  </Link>
+                </div>
+              </label>
+            </div>
+
+            <div className="grid gap-3 rounded-[1.6rem] border border-[#FF7A16]/12 bg-[#fff7ef] p-4">
+              <div className="grid gap-1">
+                <p className="text-sm font-black text-[#14295F]">선택 동의</p>
+                <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                  아래 항목은 선택이며, 동의하지 않아도 상담 접수는 가능합니다.
+                </p>
+              </div>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-[1.25rem] border border-[#FF7A16]/15 bg-white px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={form.marketingConsentOptional}
+                  onChange={(event) => setField("marketingConsentOptional", event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-[#FF7A16]/30 text-[#FF7A16] focus:ring-[#FF7A16]"
+                />
+                <div className="grid gap-1">
+                  <span className="text-sm font-black text-[#14295F]">
+                    [선택] 문자/전화로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.
+                  </span>
+                  <span className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                    운영 연락과 분리된 홍보 안내에만 사용되며, 동의하지 않아도 상담 접수는 가능합니다.
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-[#14295F]/8 bg-[#f8fbff] px-6 py-5 sm:px-7">
+            <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 rounded-2xl border-[#14295F]/12 font-black text-[#14295F]"
+                onClick={() => setConsentDialogOpen(false)}
+                disabled={submitting}
+              >
+                다시 확인할게요
+              </Button>
+              <Button
+                type="button"
+                className="h-12 rounded-2xl bg-[#FF7A16] font-black text-white hover:bg-[#e86d11]"
+                onClick={() => void handleConfirmConsent()}
+                disabled={submitting || !form.privacyConsentRequired}
+              >
+                {submitting
+                  ? "접수 중..."
+                  : form.serviceType === "study_center" && form.studyCenterRequestType === "waitlist"
+                    ? "동의하고 입학대기 신청하기"
+                    : "동의하고 상담 접수하기"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
