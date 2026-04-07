@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { History, Loader2, RotateCcw, Target } from 'lucide-react';
+import { History, Loader2, Target } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -184,34 +184,10 @@ export function StudyComposerCard({
       </CardHeader>
 
       <CardContent className={cn(compact ? 'space-y-3 p-4 pt-0' : isMobile ? 'space-y-3 p-5 pt-0' : 'space-y-4 p-6 pt-0')}>
-        {activeRecentTitle ? (
-          <div className="flex items-center justify-between gap-3 rounded-[1.15rem] border border-[#FFB36B]/28 bg-[#FF7A16]/12 px-3 py-2.5">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFB36B]">불러온 계획 사용 중</p>
-              <p className="mt-1 line-clamp-1 text-sm font-black text-white">{activeRecentTitle}</p>
-            </div>
-            {onResetRecentPrefill ? (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={disabled || isSubmitting}
-                onClick={onResetRecentPrefill}
-                className="h-8 shrink-0 rounded-full border border-white/12 bg-white/[0.1] px-3 text-[10px] font-black text-white hover:bg-white/[0.16]"
-              >
-                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                초기화
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-
         <div className="rounded-[1.55rem] border border-white/12 bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F7FF_100%)] p-4 text-[#14295F] shadow-[0_18px_42px_-34px_rgba(20,41,95,0.45)]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FF7A16]">
-                {isVolumeMode ? '분량형 기본' : '시간형 작성'}
-              </p>
-              <p className="mt-1 break-keep text-sm font-black leading-6">
+              <p className="break-keep text-sm font-black leading-6">
                 과목을 고르고 끝낼 양만 적으면 바로 오늘 계획에 추가돼요.
               </p>
             </div>

@@ -287,7 +287,7 @@ export function StudyPlanSheet({
                           disabled={isPast}
                           isMobile={isMobile}
                           tone="emerald"
-                          badgeLabel={`${task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'} · ${isVolumeTask ? '분량형' : '시간형'}`}
+                          badgeLabel={task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'}
                           metaLabel={buildStudyTaskMeta(task)}
                           volumeMeta={
                             isVolumeTask

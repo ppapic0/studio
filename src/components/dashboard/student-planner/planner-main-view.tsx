@@ -131,7 +131,7 @@ function getChecklistBadge(task: any, subjectOptions: any[]) {
 
   const subject = subjectOptions.find((item) => item.id === (task.subject || 'etc'));
   return {
-    label: `${subject?.label || '기타'} · ${resolveStudyPlanMode(task) === 'volume' ? '분량형' : '시간형'}`,
+    label: subject?.label || '기타',
     className: 'border border-[#FFB347]/22 bg-[#FF9626]/14 text-[var(--accent-orange-soft)]',
   };
 }
