@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, type ComponentType, type ReactNode } from 'react';
 import {
   Card,
   CardContent,
@@ -98,6 +98,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { motion, useReducedMotion } from 'framer-motion';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
@@ -163,6 +164,11 @@ function formatAttendanceStatus(status?: string): string {
   return ATTENDANCE_STATUS_LABEL[status] || status;
 }
 
+function formatDurationMinutes(totalMinutes: number): string {
+  const safeMinutes = Math.max(0, Number(totalMinutes || 0));
+  return `${Math.floor(safeMinutes / 60)}시간 ${safeMinutes % 60}분`;
+}
+
 function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
   const explicitDelta = Number((req as any).penaltyPointsDelta);
   if (Number.isFinite(explicitDelta) && explicitDelta > 0) {
@@ -187,12 +193,86 @@ const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: st
   { value: 'status', label: '상태' },
 ];
 
+type TeacherSectionHeaderProps = {
+  badge: string;
+  title: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+  right?: ReactNode;
+  tone?: 'navy' | 'emerald' | 'amber';
+  onDark?: boolean;
+};
+
+function TeacherSectionHeader({
+  badge,
+  title,
+  description,
+  icon: Icon,
+  right,
+  tone = 'navy',
+  onDark = false,
+}: TeacherSectionHeaderProps) {
+  const toneStyles = {
+    badge:
+      tone === 'emerald'
+        ? onDark
+          ? 'bg-emerald-400/12 text-emerald-100'
+          : 'bg-emerald-100 text-emerald-700'
+        : tone === 'amber'
+          ? onDark
+            ? 'bg-[#FFB56A]/14 text-[#FFE6C9]'
+            : 'bg-[#FFF2E8] text-[#C95A08]'
+          : onDark
+            ? 'bg-white/10 text-white'
+            : 'bg-[#EEF4FF] text-[#2554D7]',
+    icon:
+      tone === 'emerald'
+        ? onDark
+          ? 'bg-white/10 text-emerald-100'
+          : 'bg-emerald-100 text-emerald-600'
+        : tone === 'amber'
+          ? onDark
+            ? 'bg-white/10 text-[#FFE6C9]'
+            : 'bg-[#FFF2E8] text-[#C95A08]'
+          : onDark
+            ? 'bg-white/10 text-white'
+            : 'bg-[#EEF4FF] text-[#2554D7]',
+    title: onDark ? 'text-white' : 'text-[#14295F]',
+    description: onDark ? 'text-white/72' : 'text-slate-500',
+  };
+
+  return (
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
+        <div className="flex items-start gap-3">
+          <span className={cn('inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.25rem] shadow-sm', toneStyles.icon)}>
+            <Icon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <Badge className={cn('h-6 rounded-full border-none px-2.5 text-[10px] font-black tracking-[0.16em] uppercase', toneStyles.badge)}>
+              {badge}
+            </Badge>
+            <h2 className={cn('mt-3 text-xl font-black tracking-tight sm:text-[1.45rem]', toneStyles.title)}>
+              {title}
+            </h2>
+          </div>
+        </div>
+        <p className={cn('mt-3 max-w-[42rem] text-xs font-bold leading-5 sm:text-sm', toneStyles.description)}>
+          {description}
+        </p>
+      </div>
+      {right ? <div className="flex shrink-0 flex-wrap gap-2">{right}</div> : null}
+    </div>
+  );
+}
+
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
+  const prefersReducedMotion = useReducedMotion();
   
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<number>(Date.now());
@@ -835,6 +915,94 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const topTeacherPriority = teacherActionQueue[0] || null;
   const secondaryTeacherPriorities = teacherActionQueue.slice(1);
   const TopTeacherPriorityIcon = topTeacherPriority?.icon;
+
+  const getDeckMotionProps = (delay = 0, offset = 18) =>
+    prefersReducedMotion
+      ? { initial: false as const }
+      : {
+          initial: { opacity: 0, y: offset },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.48, delay, ease: 'easeOut' as const },
+        };
+
+  const heroSummaryCards = [
+    {
+      key: 'total',
+      label: `${selectedClass === 'all' ? '센터 전체' : selectedClass} 오늘 누적`,
+      value: formatDurationMinutes(stats.totalCenterMinutes),
+      footnote: '실제 공부시간 기준',
+      icon: Activity,
+      iconClass: 'bg-emerald-400/12 text-emerald-100',
+      valueClass: 'text-emerald-100',
+    },
+    {
+      key: 'avg',
+      label: '평균 학습',
+      value: formatDurationMinutes(stats.avgMinutes),
+      footnote: '현재 필터 기준 평균',
+      icon: Users,
+      iconClass: 'bg-sky-400/12 text-sky-100',
+      valueClass: 'text-sky-100',
+    },
+    {
+      key: 'top20',
+      label: '상위 20% 평균',
+      value: formatDurationMinutes(stats.top20Avg),
+      footnote: '상위권 기준점',
+      icon: Trophy,
+      iconClass: 'bg-amber-400/14 text-[#FFE6C9]',
+      valueClass: 'text-[#FFE6C9]',
+    },
+  ];
+
+  const operationalKpis = [
+    {
+      key: 'studying',
+      label: '학습 중',
+      value: roomScopedKpi?.studying ?? stats.studying,
+      caption: '현재 공부 상태',
+      icon: Activity,
+      shellClass: 'border-[#D8E6FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)]',
+      iconClass: 'bg-[#EAF2FF] text-[#2554D7]',
+      valueClass: 'text-[#2554D7]',
+    },
+    {
+      key: 'absent',
+      label: '미입실',
+      value: roomScopedKpi?.absent ?? stats.absent,
+      caption: '출결 확인 우선',
+      icon: AlertCircle,
+      shellClass: 'border-rose-100 bg-[linear-gradient(180deg,#FFF8F9_0%,#FFF1F4_100%)]',
+      iconClass: 'bg-rose-100 text-rose-600',
+      valueClass: 'text-rose-600',
+    },
+    {
+      key: 'away',
+      label: '외출/휴식',
+      value: roomScopedKpi?.away ?? stats.away,
+      caption: '자리 이탈 상태',
+      icon: Clock,
+      shellClass: 'border-amber-100 bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF4E6_100%)]',
+      iconClass: 'bg-amber-100 text-amber-600',
+      valueClass: 'text-amber-600',
+    },
+    {
+      key: 'total',
+      label:
+        selectedRoomView === 'all'
+          ? selectedClass === 'all'
+            ? '전체 좌석'
+            : `${selectedClass} 정원`
+          : `${getRoomLabel(selectedRoomView, roomConfigs)} 좌석`,
+      value: roomScopedKpi?.total ?? stats.total,
+      caption: selectedRoomView === 'all' ? '운영 가능 좌석' : '선택 호실 기준',
+      icon: Armchair,
+      shellClass: 'border-[#D8E6FF] bg-[linear-gradient(180deg,#F8FAFF_0%,#EEF4FF_100%)]',
+      iconClass: 'bg-[#EAF2FF] text-[#14295F]',
+      valueClass: 'text-[#14295F]',
+      hasEdit: true,
+    },
+  ];
 
   const unassignedStudents = useMemo(() => {
     if (!students || !studentMembers) return [];
@@ -1773,161 +1941,296 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-24 min-h-screen">
-      <header className={cn("flex justify-between px-4 pt-6 gap-4", isMobile ? "flex-col" : "flex-row items-center")}>
-        <div className="flex items-center gap-3">
-          <Monitor className={cn("text-primary", isMobile ? "h-6 w-6" : "h-8 w-8")} />
-          <div className="grid">
-            <h1 className={cn("font-black tracking-tight", isMobile ? "text-2xl" : "text-3xl")}>실시간 관제 홈</h1>
-            <p className={cn("font-bold text-muted-foreground uppercase tracking-[0.3em] mt-0.5 ml-1", isMobile ? "text-[8px]" : "text-[10px]")}>통합 관제 센터</p>
-          </div>
-          <Badge className="bg-blue-600 text-white border-none font-black text-[10px] rounded-full px-2.5 h-5 tracking-tighter">실시간</Badge>
-        </div>
+      <motion.section className="px-4 pt-6" {...getDeckMotionProps(0.02, 22)}>
+        <Card className="marketing-card-dark relative overflow-hidden rounded-[2.8rem] border-none">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(129,173,255,0.3),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,160,67,0.14),transparent_30%)]" />
+          <div className="pointer-events-none absolute -right-12 top-0 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+          <CardContent className={cn("relative", isMobile ? "p-4" : "p-6 sm:p-7")}>
+            <div className={cn("grid gap-5", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.2fr)_420px] xl:items-stretch")}>
+              <div className="flex flex-col justify-between gap-6">
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="h-6 rounded-full border border-white/10 bg-white/10 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-none">
+                      Teacher Control Deck
+                    </Badge>
+                    <Badge className="h-6 rounded-full border-none bg-[#FF8A1F] px-3 text-[10px] font-black text-white shadow-[0_10px_24px_-16px_rgba(255,138,31,0.85)]">
+                      실시간
+                    </Badge>
+                    <Badge className="h-6 rounded-full border border-white/10 bg-white/[0.06] px-3 text-[10px] font-black text-white/90 shadow-none">
+                      {selectedClass === 'all' ? '센터 전체 운영' : `${selectedClass} 운영`}
+                    </Badge>
+                  </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border shadow-sm px-4">
-            <Filter className="h-3.5 w-3.5 text-primary opacity-40" />
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="border-none shadow-none focus:ring-0 font-black text-xs h-8 w-[140px] bg-transparent">
-                <SelectValue placeholder="반 선택" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-none shadow-2xl">
-                <SelectItem value="all" className="font-black">센터 전체 보기</SelectItem>
-                {availableClasses.map(c => (
-                  <SelectItem key={c} value={c} className="font-black">{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className={cn("flex items-center gap-2 bg-white/80 backdrop-blur-md p-1.5 rounded-[1.25rem] border shadow-sm", isMobile ? "hidden" : "p-2 rounded-[1.5rem]")}>
-            <div className="flex items-center gap-2 px-4 border-r">
-              <Activity className="h-4 w-4 text-emerald-500" />
-              <div className="grid leading-none">
-                <span className="text-[8px] font-black text-muted-foreground uppercase">{selectedClass === 'all' ? '센터 전체' : selectedClass} 오늘 누적</span>
-                <span className="text-sm font-black text-emerald-600">{Math.floor(stats.totalCenterMinutes / 60)}시간 {stats.totalCenterMinutes % 60}분</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-4 border-r">
-              <Users className="h-4 w-4 text-blue-500" />
-              <div className="grid leading-none">
-                <span className="text-[8px] font-black text-muted-foreground uppercase">평균 학습</span>
-                <span className="text-sm font-black text-blue-600">{Math.floor(stats.avgMinutes / 60)}시간 {stats.avgMinutes % 60}분</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-4">
-              <Trophy className="h-4 w-4 text-amber-500" />
-              <div className="grid leading-none">
-                <span className="text-[8px] font-black text-muted-foreground uppercase">상위 20% 평균</span>
-                <span className="text-sm font-black text-amber-600">{Math.floor(stats.top20Avg / 60)}시간 {stats.top20Avg % 60}분</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+                  <div className="flex items-start gap-4">
+                    <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.5rem] border border-white/10 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                      <Monitor className="h-7 w-7 text-white" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.34em] text-white/55">통합 관제 센터</p>
+                      <h1 className={cn("mt-2 font-aggro-display text-white", isMobile ? "text-[2.15rem]" : "text-[3.2rem] leading-[0.98]")}>
+                        실시간 관제 홈
+                      </h1>
+                      <p className={cn("mt-3 max-w-[40rem] font-bold text-white/78", isMobile ? "text-sm leading-6" : "text-[15px] leading-7")}>
+                        상담, 출결, 좌석 리스크, 리포트 후속까지 오늘 먼저 개입해야 할 흐름을 한 덱으로 정리했습니다.
+                        선생님이 들어오자마자 지금 처리할 일부터 바로 보이도록 상단 위계를 다시 세웠습니다.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-      <section className="px-4">
-        <Card className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-[linear-gradient(135deg,#f6f8ff_0%,#ffffff_62%,#fff7ef_100%)] shadow-[0_24px_56px_-42px_rgba(20,41,95,0.38)]">
-          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
+                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
+                  <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">오늘 우선순위</p>
+                    <p className="mt-2 text-lg font-black tracking-tight text-white">
+                      {teacherActionQueue.length > 0 ? `${teacherActionQueue.length}건 바로 확인` : '즉시 처리 항목 없음'}
+                    </p>
+                  </div>
+                  <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">실시간 교실</p>
+                    <p className="mt-2 text-lg font-black tracking-tight text-white">
+                      {selectedRoomView === 'all' ? '전체 호실 보기' : getRoomLabel(selectedRoomView, roomConfigs)}
+                    </p>
+                  </div>
+                  <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">학생 리스크</p>
+                    <p className="mt-2 text-lg font-black tracking-tight text-white">
+                      위험 {seatOverlaySummary.riskCount}명 · 미열람 {seatOverlaySummary.unreadCount}건
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-white/60">
+                    <Filter className="h-3.5 w-3.5" />
+                    반 선택
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 rounded-[1.3rem] border border-white/10 bg-white/92 p-1.5 pl-4 text-[#14295F] shadow-[0_18px_34px_-24px_rgba(0,0,0,0.45)]">
+                    <Filter className="h-3.5 w-3.5 shrink-0 text-[#14295F]/45" />
+                    <Select value={selectedClass} onValueChange={setSelectedClass}>
+                      <SelectTrigger className="h-9 w-full border-none bg-transparent px-0 text-left text-xs font-black shadow-none focus:ring-0">
+                        <SelectValue placeholder="반 선택" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-none shadow-2xl">
+                        <SelectItem value="all" className="font-black">센터 전체 보기</SelectItem>
+                        {availableClasses.map((c) => (
+                          <SelectItem key={c} value={c} className="font-black">{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                  {heroSummaryCards.map((item) => (
+                    <div
+                      key={item.key}
+                      className={cn(
+                        "rounded-[1.7rem] border border-white/10 bg-white/[0.08] p-4 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]",
+                        item.key === 'top20' && isMobile ? 'col-span-2' : ''
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">{item.label}</p>
+                          <p className={cn("dashboard-number mt-2 whitespace-nowrap text-[1.4rem] leading-none sm:text-[1.75rem]", item.valueClass)}>
+                            {item.value}
+                          </p>
+                          <p className="mt-2 text-[11px] font-bold text-white/58">{item.footnote}</p>
+                        </div>
+                        <span className={cn("inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem]", item.iconClass)}>
+                          <item.icon className="h-[18px] w-[18px]" />
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.section>
+
+      <motion.section className="px-4" {...getDeckMotionProps(0.1, 18)}>
+        <Card className="marketing-card relative overflow-hidden rounded-[2.75rem] border-none">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(244,248,255,0.85)_0%,rgba(255,255,255,0)_100%)]" />
+          <CardContent className={cn("relative space-y-5", isMobile ? "p-4" : "p-5 sm:p-6")}>
             <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
               <div>
                 <div className="flex items-center gap-2">
-                  <Badge className="h-6 border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
+                  <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black tracking-[0.16em] uppercase text-white">
                     오늘의 우선순위
                   </Badge>
-                  <Badge className="h-6 border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">
+                  <Badge className="h-6 rounded-full border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">
                     TOP 3
                   </Badge>
                 </div>
-                <p className="mt-2 text-xl font-black tracking-tight text-[#14295F]">선생님이 오늘 먼저 처리해야 할 일</p>
-                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-                  상담, 출결, 학생 리스크, 리포트 후속 중에서 오늘성 높은 작업만 먼저 고정했습니다.
+                <p className={cn("mt-4 text-[#14295F]", isMobile ? "font-aggro-display text-[1.7rem]" : "font-aggro-display text-[2.2rem]")}>
+                  오늘 먼저 처리할 일
+                </p>
+                <p className="mt-2 max-w-[42rem] text-xs font-bold leading-6 text-slate-500 sm:text-sm">
+                  상담, 출결, 학생 리스크, 리포트 후속 가운데 오늘성 높은 작업만 위로 고정했습니다.
+                  클릭하면 해당 섹션으로 바로 이동합니다.
                 </p>
               </div>
-              <Badge className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-black text-[#14295F] shadow-sm">
+              <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_16px_28px_-24px_rgba(20,41,95,0.32)]">
                 {selectedClass === 'all' ? '센터 전체' : selectedClass}
               </Badge>
             </div>
 
             {!topTeacherPriority ? (
-              <div className="rounded-[1.6rem] border border-dashed border-slate-200 bg-white px-5 py-8 text-center text-sm font-black text-slate-500">
+              <div className="rounded-[1.9rem] border border-dashed border-slate-200 bg-white px-5 py-10 text-center text-sm font-black text-slate-500">
                 현재 바로 처리해야 할 우선순위 항목이 없습니다.
               </div>
             ) : (
-              <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.2fr)_360px]")}>
-                <div className="rounded-[1.8rem] border border-[#FFD7BA] bg-[linear-gradient(135deg,#FFF8F2_0%,#ffffff_100%)] px-5 py-5 shadow-[0_18px_38px_-30px_rgba(255,122,22,0.34)]">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">
-                          1순위
-                        </Badge>
-                        <span className={cn("inline-flex h-9 w-9 items-center justify-center rounded-full", topTeacherPriority.toneClass)}>
-                          {TopTeacherPriorityIcon ? <TopTeacherPriorityIcon className="h-4 w-4" /> : null}
-                        </span>
+              <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.28fr)_360px]")}>
+                <motion.div {...getDeckMotionProps(0.14, 14)}>
+                  <div className="app-depth-card-warm rounded-[2rem] border px-5 py-5 sm:px-6 sm:py-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className="h-7 rounded-full border-none bg-[#FF7A16] px-3 text-[10px] font-black text-white">
+                            1순위
+                          </Badge>
+                          <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-full shadow-sm", topTeacherPriority.toneClass)}>
+                            {TopTeacherPriorityIcon ? <TopTeacherPriorityIcon className="h-[18px] w-[18px]" /> : null}
+                          </span>
+                          <span className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C95A08]/70">
+                            immediate action
+                          </span>
+                        </div>
+                        <p className={cn("mt-4 text-[#14295F]", isMobile ? "text-[1.45rem] leading-[1.1]" : "text-[1.85rem] leading-[1.08]", "font-aggro-display")}>
+                          {topTeacherPriority.title}
+                        </p>
+                        <p className="mt-3 max-w-[38rem] text-sm font-bold leading-7 text-slate-600">
+                          {topTeacherPriority.detail}
+                        </p>
                       </div>
-                      <p className="mt-3 text-lg font-black tracking-tight text-[#14295F]">{topTeacherPriority.title}</p>
-                      <p className="mt-2 text-sm font-bold leading-6 text-slate-500">{topTeacherPriority.detail}</p>
+                      <Button
+                        type="button"
+                        className="h-11 shrink-0 rounded-[1.1rem] bg-[#14295F] px-4 text-xs font-black text-white shadow-[0_18px_34px_-24px_rgba(20,41,95,0.45)] hover:bg-[#10224C]"
+                        onClick={topTeacherPriority.onClick}
+                      >
+                        {topTeacherPriority.actionLabel}
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      className="h-10 rounded-xl bg-[#14295F] px-4 text-xs font-black text-white hover:bg-[#10224C]"
-                      onClick={topTeacherPriority.onClick}
-                    >
-                      {topTeacherPriority.actionLabel}
-                    </Button>
                   </div>
-                </div>
+                </motion.div>
 
                 <div className="grid gap-3">
                   {secondaryTeacherPriorities.map((item, index) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={item.onClick}
-                      className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/22 hover:shadow-[0_16px_30px_-24px_rgba(20,41,95,0.28)]"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
-                              {index + 2}순위
-                            </Badge>
-                            <span className={cn("inline-flex h-7 w-7 items-center justify-center rounded-full", item.toneClass)}>
-                              <item.icon className="h-4 w-4" />
-                            </span>
+                    <motion.div key={item.key} {...getDeckMotionProps(0.18 + index * 0.05, 12)}>
+                      <button
+                        type="button"
+                        onClick={item.onClick}
+                        className={cn(
+                          "group w-full rounded-[1.75rem] px-4 py-4 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5",
+                          index === 0 ? "app-depth-card" : "marketing-card-soft"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Badge className={cn(
+                                "h-5 rounded-full border-none px-2 text-[10px] font-black",
+                                index === 0 ? "bg-[#EEF4FF] text-[#2554D7]" : "bg-[#FFF2E8] text-[#C95A08]"
+                              )}>
+                                {index + 2}순위
+                              </Badge>
+                              <span className={cn("inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm", item.toneClass)}>
+                                <item.icon className="h-4 w-4" />
+                              </span>
+                            </div>
+                            <p className="mt-3 text-base font-black text-[#14295F]">{item.title}</p>
+                            <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
                           </div>
-                          <p className="mt-2 text-sm font-black text-[#14295F]">{item.title}</p>
-                          <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
+                          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-300 transition-transform duration-200 group-hover:translate-x-0.5" />
                         </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
-                      </div>
-                    </button>
+                      </button>
+                    </motion.div>
                   ))}
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
-      </section>
+      </motion.section>
 
-      <section ref={liveBoardSectionRef} className="px-4">
-        <Card className="rounded-[2rem] border-none bg-white/90 shadow-sm ring-1 ring-black/5">
-          <CardContent className={cn("flex flex-col gap-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
-            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="h-6 border-none bg-primary/10 px-2.5 text-[10px] font-black text-primary">
-                  실시간 교실 보기
-                </Badge>
-                <p className="text-xs font-bold text-muted-foreground">
-                  전체는 통합 현황, 호실 선택 시 상세 도면과 배치 수정을 확인합니다.
-                </p>
-              </div>
-              {selectedRoomView !== 'all' && (
-                <p className="text-[11px] font-black text-primary/70">
-                  현재 선택: {getRoomLabel(selectedRoomView, roomConfigs)}
-                </p>
-              )}
-            </div>
+      <motion.section className="px-4" {...getDeckMotionProps(0.16, 16)}>
+        <div className={cn("mb-3 flex gap-3 px-1", isMobile ? "flex-col" : "items-end justify-between")}>
+          <div>
+            <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#2554D7]">
+              운영 스냅샷
+            </Badge>
+            <p className="mt-3 text-xl font-black tracking-tight text-[#14295F] sm:text-[1.45rem]">지금 바로 읽히는 핵심 지표</p>
+            <p className="mt-1 text-xs font-bold text-slate-500 sm:text-sm">학습, 미입실, 외출, 좌석을 같은 시야 안에서 빠르게 판단할 수 있게 다시 정렬했습니다.</p>
+          </div>
+          <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+            {selectedRoomView === 'all' ? '홈 상단 스냅샷' : `${getRoomLabel(selectedRoomView, roomConfigs)} 스냅샷`}
+          </Badge>
+        </div>
+
+        <div className={cn("grid gap-4", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
+          {operationalKpis.map((item, index) => (
+            <motion.div key={item.key} {...getDeckMotionProps(0.2 + index * 0.05, 12)}>
+              <Card className={cn("rounded-[2rem] border p-5 sm:p-6", item.shellClass)}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={cn("font-black uppercase tracking-[0.18em] text-slate-500", isMobile ? "text-[9px]" : "text-[10px]")}>
+                      {item.label}
+                    </p>
+                    <p className={cn("dashboard-number mt-3 whitespace-nowrap leading-none", isMobile ? "text-[2.1rem]" : "text-[3.2rem]", item.valueClass)}>
+                      {item.value}
+                    </p>
+                    <p className="mt-2 text-[11px] font-bold text-slate-500">{item.caption}</p>
+                  </div>
+                  <span className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem]", item.iconClass)}>
+                    <item.icon className="h-5 w-5" />
+                  </span>
+                </div>
+                {item.hasEdit ? (
+                  <div className="mt-4">
+                    <Button
+                      variant={isEditMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={handleToggleEditMode}
+                      className={cn(
+                        "h-9 rounded-xl px-3 font-black text-[10px] gap-1.5 shadow-sm",
+                        isEditMode ? "bg-primary text-white" : "border-2 hover:bg-primary/5"
+                      )}
+                    >
+                      <Settings2 className="h-3.5 w-3.5" /> {isMobile ? '배치' : isEditMode ? '수정 완료' : '배치 수정'}
+                    </Button>
+                  </div>
+                ) : null}
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </motion.section>
+
+      <motion.section ref={liveBoardSectionRef} className="px-4" {...getDeckMotionProps(0.28, 14)}>
+        <Card className="app-depth-card overflow-hidden rounded-[2.45rem] border-none">
+          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
+            <TeacherSectionHeader
+              badge="실시간 교실"
+              title="한 화면에서 전체 교실 흐름 보기"
+              description="전체는 통합 현황, 호실 선택 시 상세 도면과 배치 수정으로 바로 이어집니다."
+              icon={LayoutGrid}
+              tone="navy"
+              right={
+                selectedRoomView !== 'all' ? (
+                  <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+                    현재 선택: {getRoomLabel(selectedRoomView, roomConfigs)}
+                  </Badge>
+                ) : (
+                  <Badge className="h-8 rounded-full border-none bg-[#EEF4FF] px-3.5 text-[10px] font-black text-[#2554D7]">
+                    전체 보기
+                  </Badge>
+                )
+              }
+            />
 
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1969,96 +2272,62 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             </div>
           </CardContent>
         </Card>
-      </section>
+      </motion.section>
 
-      <section ref={seatInsightSectionRef} className="px-4">
-        <Card className="rounded-[2.5rem] border-none shadow-sm bg-white p-6 sm:p-8 overflow-hidden relative group">
-          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform duration-1000"><TrendingUp className="h-32 w-32" /></div>
-          <CardHeader className="p-0 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="grid gap-1">
-                <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-emerald-500" /> 최근 30일 센터 학습 추이
-                </CardTitle>
-                <CardDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">누적 공부시간 추이 (실제 공부시간 기준)</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">{trendLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/50" />}<Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px] px-2.5">{trendLoading ? "업데이트 중" : "최근 30일"}</Badge></div>
+      <motion.section className="px-4" {...getDeckMotionProps(0.34, 14)}>
+        <Card className="marketing-card-dark overflow-hidden rounded-[2.55rem] border-none">
+          <CardContent className={cn("space-y-6", isMobile ? "p-4" : "p-6 sm:p-7")}>
+            <TeacherSectionHeader
+              badge="최근 30일 추이"
+              title="센터 전체 학습 온도 보기"
+              description="실제 공부시간만 기준으로 최근 30일 학습 흐름을 읽고, 상단 우선순위 뒤의 큰 방향을 빠르게 판단합니다."
+              icon={TrendingUp}
+              tone="emerald"
+              onDark
+              right={
+                <div className="flex items-center gap-2">
+                  {trendLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" />}
+                  <Badge className="h-8 rounded-full border border-white/10 bg-white/[0.08] px-3.5 text-[10px] font-black text-white">
+                    {trendLoading ? "업데이트 중" : "최근 30일"}
+                  </Badge>
+                </div>
+              }
+            />
+
+            <div className="h-[220px] w-full rounded-[2rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.02)_100%)] px-1 pb-2 pt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={centerTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorTrend" x1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6EE7B7" stopOpacity={0.32}/>
+                      <stop offset="95%" stopColor="#6EE7B7" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.12)" />
+                  <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.62)' }} />
+                  <YAxis fontSize={9} fontWeight="900" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.62)' }} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="rounded-xl border border-white/10 bg-[#08142F]/96 p-3 shadow-2xl">
+                            <p className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/55">{label}</p>
+                            <p className="dashboard-number text-base text-emerald-200">
+                              {payload[0].value}시간 ({Number(payload[0].payload.totalMinutes).toLocaleString()}분)
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area type="monotone" dataKey="hours" stroke="#6EE7B7" strokeWidth={3} fillOpacity={1} fill="url(#colorTrend)" animationDuration={prefersReducedMotion ? 0 : 1600} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
-          </CardHeader>
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={centerTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorTrend" x1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} tick={{fill: '#999'}} />
-                <YAxis fontSize={9} fontWeight="900" axisLine={false} tickLine={false} tick={{fill: '#999'}} />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-white p-3 rounded-xl shadow-2xl border-none ring-1 ring-black/5">
-                          <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">{label}</p>
-                          <p className="dashboard-number text-base text-emerald-600">{payload[0].value}시간 ({Number(payload[0].payload.totalMinutes).toLocaleString()}분)</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area type="monotone" dataKey="hours" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorTrend)" animationDuration={2000} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          </CardContent>
         </Card>
-      </section>
-
-      <section className={cn("grid gap-4 px-4", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
-        {[
-          { label: '학습 중', val: roomScopedKpi?.studying ?? stats.studying, color: 'text-blue-600', icon: Activity },
-          { label: '미입실', val: roomScopedKpi?.absent ?? stats.absent, color: 'text-rose-500', icon: AlertCircle },
-          { label: '외출/휴식', val: roomScopedKpi?.away ?? stats.away, color: 'text-amber-500', icon: Clock },
-          {
-            label:
-              selectedRoomView === 'all'
-                ? selectedClass === 'all'
-                  ? '전체 좌석'
-                  : `${selectedClass} 정원`
-                : `${getRoomLabel(selectedRoomView, roomConfigs)} 좌석`,
-            val: roomScopedKpi?.total ?? stats.total,
-            color: 'text-primary',
-            icon: Armchair,
-            hasEdit: true,
-          }
-        ].map((item, i) => (
-          <Card key={i} className="rounded-[2rem] sm:rounded-[2.5rem] border-none shadow-sm bg-white p-5 sm:p-8 transition-all hover:shadow-md relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-2">
-              <span className={cn("font-black text-muted-foreground uppercase tracking-widest", isMobile ? "text-[9px]" : "text-[11px]")}>{item.label}</span>
-              <item.icon className={cn(isMobile ? "h-4 w-4" : "h-5 w-5", item.color)} />
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className={cn("dashboard-number", isMobile ? "text-3xl" : "text-5xl", item.color)}>{item.val}</div>
-              {item.hasEdit && (
-                <Button 
-                  variant={isEditMode ? "default" : "outline"} 
-                  size="sm" 
-                  onClick={handleToggleEditMode}
-                  className={cn(
-                    "rounded-xl h-8 px-2.5 sm:h-9 sm:px-3 font-black text-[9px] sm:text-[10px] gap-1.5 transition-all shadow-sm",
-                    isEditMode ? "bg-primary text-white" : "border-2 hover:bg-primary/5"
-                  )}
-                >
-                  <Settings2 className="h-3.5 w-3.5" /> {!isMobile && (isEditMode ? '수정 완료' : '배치 수정')}
-                </Button>
-              )}
-            </div>
-          </Card>
-        ))}
-      </section>
+      </motion.section>
 
       <CenterAdminAttendanceBoard
         roomConfigs={roomConfigs}
@@ -2074,43 +2343,40 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         onSeatClick={handleSeatClick}
       />
 
-      <section className="px-4">
-        <Card className="overflow-hidden rounded-[2.5rem] border-none bg-white shadow-sm ring-1 ring-black/5">
+      <motion.section ref={seatInsightSectionRef} className="px-4" {...getDeckMotionProps(0.4, 12)}>
+        <Card className="app-depth-card overflow-hidden rounded-[2.5rem] border-none">
           <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
-            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
-              <div className="grid gap-1">
-                <div className="flex items-center gap-2">
-                  <Badge className="h-6 border-none bg-primary/10 px-2.5 text-[10px] font-black text-primary">
-                    도면 학생 히트맵
-                  </Badge>
+            <TeacherSectionHeader
+              badge="도면 학생 히트맵"
+              title="좌석에서 바로 학생 운영 건강도 읽기"
+              description="좌석마다 학생 운영 신호를 바로 보고, 클릭하면 5개 도메인 상세와 개입 이유를 확인합니다."
+              icon={ShieldAlert}
+              tone="navy"
+              right={
+                <>
                   {isEditMode && (
-                    <Badge className="h-6 border-none bg-amber-100 px-2.5 text-[10px] font-black text-amber-700">
+                    <Badge className="h-8 rounded-full border-none bg-amber-100 px-3.5 text-[10px] font-black text-amber-700">
                       편집 중에는 상태 보기만 표시
                     </Badge>
                   )}
-                </div>
-                <p className="text-xs font-bold text-muted-foreground">
-                  좌석마다 학생 운영 건강도를 바로 보고, 클릭하면 5개 도메인 상세와 개입 이유를 확인합니다.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: '안정', value: seatOverlaySummary.healthyCount, tone: 'bg-emerald-100 text-emerald-700' },
-                  { label: '주의', value: seatOverlaySummary.warningCount, tone: 'bg-amber-100 text-amber-700' },
-                  { label: '위험', value: seatOverlaySummary.riskCount, tone: 'bg-rose-100 text-rose-700' },
-                  { label: '미열람', value: seatOverlaySummary.unreadCount, tone: 'bg-sky-100 text-sky-700' },
-                  { label: '상담', value: seatOverlaySummary.counselingCount, tone: 'bg-violet-100 text-violet-700' },
-                  { label: '장기외출', value: seatOverlaySummary.awayCount, tone: 'bg-amber-100 text-amber-700' },
-                ].map((item) => (
-                  <span
-                    key={item.label}
-                    className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", item.tone)}
-                  >
-                    {item.label} {item.value}
-                  </span>
-                ))}
-              </div>
-            </div>
+                  {[
+                    { label: '안정', value: seatOverlaySummary.healthyCount, tone: 'bg-emerald-100 text-emerald-700' },
+                    { label: '주의', value: seatOverlaySummary.warningCount, tone: 'bg-amber-100 text-amber-700' },
+                    { label: '위험', value: seatOverlaySummary.riskCount, tone: 'bg-rose-100 text-rose-700' },
+                    { label: '미열람', value: seatOverlaySummary.unreadCount, tone: 'bg-sky-100 text-sky-700' },
+                    { label: '상담', value: seatOverlaySummary.counselingCount, tone: 'bg-violet-100 text-violet-700' },
+                    { label: '장기외출', value: seatOverlaySummary.awayCount, tone: 'bg-amber-100 text-amber-700' },
+                  ].map((item) => (
+                    <span
+                      key={item.label}
+                      className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", item.tone)}
+                    >
+                      {item.label} {item.value}
+                    </span>
+                  ))}
+                </>
+              }
+            />
 
             <div className="flex flex-wrap gap-2">
               {SEAT_OVERLAY_OPTIONS.map((option) => (
@@ -2143,7 +2409,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             </div>
           </CardContent>
         </Card>
-      </section>
+      </motion.section>
 
       {selectedRoomView === 'all' ? (
         <Card className="mx-4 overflow-hidden rounded-[3rem] border-none bg-white shadow-xl">
