@@ -1057,6 +1057,32 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => formatSeatLabel(selectedSeat, roomConfigs),
     [selectedSeat, roomConfigs]
   );
+  const selectedSeatModeLabel = useMemo(
+    () => (selectedSeat?.type === 'aisle' ? '통로 모드' : '좌석 모드'),
+    [selectedSeat?.type]
+  );
+  const selectedSeatZoneLabel = useMemo(
+    () => (selectedSeat?.type === 'aisle' ? '통로' : selectedSeat?.seatZone || '미정'),
+    [selectedSeat?.seatZone, selectedSeat?.type]
+  );
+  const selectedSeatAssignmentLabel = useMemo(() => {
+    if (selectedSeat?.type === 'aisle') return '학생 배정 비활성';
+    if (selectedSeat?.studentId) return '현재 배정된 좌석';
+    return '즉시 배정 가능';
+  }, [selectedSeat?.studentId, selectedSeat?.type]);
+  const selectedSeatAvailabilityCopy = useMemo(() => {
+    if (selectedSeat?.type === 'aisle') {
+      return '현재는 이동 동선 확보용 통로로 설정되어 있습니다.';
+    }
+    if (selectedSeat?.studentId) {
+      return '배정 정보가 연결된 좌석입니다.';
+    }
+    return '학생을 바로 연결할 수 있는 빈 좌석입니다.';
+  }, [selectedSeat?.studentId, selectedSeat?.type]);
+  const unassignedStudentCountLabel = useMemo(
+    () => `${unassignedStudents.length}명 대기`,
+    [unassignedStudents]
+  );
 
   const activeSeatOverlayMode: CenterAdminSeatOverlayMode = isEditMode ? 'status' : seatOverlayMode;
   const activeSeatOverlayOption =
@@ -3718,53 +3744,256 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isAssigning} onOpenChange={setIsAssigning}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-none rounded-none" : "sm:max-w-md")}>
-          <div className="bg-primary p-8 text-white relative shrink-0">
-            <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-24 w-24" /></div>
-            <DialogHeader className="relative z-10"><DialogTitle className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-3">{selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}배정 설정</DialogTitle><p className="text-white/60 font-bold mt-1 text-xs">{selectedSeatLabel}</p></DialogHeader>
-          </div>
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-white space-y-6">
-            {isEditMode && (
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-muted/30 border-2 border-dashed border-primary/20"><Button onClick={handleToggleCellType} className={cn("w-full h-12 rounded-xl font-black gap-2 transition-all", selectedSeat?.type === 'aisle' ? "bg-primary text-white" : "bg-white text-primary border-2")}><ArrowRightLeft className="h-4 w-4" />{selectedSeat?.type === 'aisle' ? '좌석으로 사용' : '통로로 전환'}</Button></div>
-                
-                {selectedSeat?.type !== 'aisle' && (
-                  <div className="space-y-3 p-6 rounded-[2rem] bg-white border-2 border-primary/5 shadow-sm">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-2"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
-                    <Select value={selectedSeat?.seatZone || '미정'} onValueChange={handleUpdateZone}>
-                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
-                        <SelectValue placeholder="구역 선택" />
-                      </SelectTrigger>
-                                  <SelectContent className="rounded-xl border-none shadow-2xl">
-                                    <SelectItem value="미정" className="font-bold">미정</SelectItem>
-                                    <SelectItem value="A존 (집중)" className="font-bold">A존 (집중)</SelectItem>
-                                    <SelectItem value="B존 (표준)" className="font-bold">B존 (표준)</SelectItem>
-                                    <SelectItem value="고정석" className="font-bold">고정석</SelectItem>
-                                    <SelectItem value="자유석" className="font-bold">자유석</SelectItem>
-                                  </SelectContent>
-                    </Select>
-                  </div>
-                )}
+        <DialogContent
+          className={cn(
+            "flex flex-col overflow-hidden border-none p-0 shadow-2xl",
+            isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "sm:max-w-4xl rounded-[3rem]",
+          )}
+        >
+          <motion.div className="flex h-full flex-col overflow-hidden bg-[#F7F9FC]" {...getDeckMotionProps(0.02, 14)}>
+            <div className="relative shrink-0 overflow-hidden bg-[linear-gradient(135deg,#14295F_0%,#2046AB_58%,#3769D8_100%)] px-6 py-7 text-white sm:px-8 sm:py-8">
+              <div className="absolute right-0 top-0 p-8 opacity-10 sm:p-10">
+                {selectedSeat?.type === 'aisle' ? <MapIcon className="h-24 w-24 rotate-6" /> : <UserPlus className="h-24 w-24 rotate-6" />}
               </div>
-            )}
-            
-            {selectedSeat?.type !== 'aisle' && (
-              <div className="space-y-4">
-                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" /><Input placeholder="이름 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="rounded-xl border-2 pl-10 h-11 text-sm font-bold" /></div>
-                <ScrollArea className="h-[300px] pr-4">
-                  <div className="space-y-2">
-                    {unassignedStudents.length === 0 ? <p className="text-center py-10 text-[10px] font-bold text-muted-foreground/40 italic">미배정 학생이 없습니다.</p> : unassignedStudents.map((student) => (
-                      <div key={student.id} onClick={() => assignStudentToSeat(student)} className="p-4 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center justify-between transition-all">
-                        <div className="flex items-center gap-3 min-w-0"><div className="h-9 w-9 rounded-xl bg-primary/5 flex items-center justify-center font-black text-primary border border-primary/10 shrink-0">{student.name.charAt(0)}</div><div className="grid gap-0.5 min-w-0"><span className="font-black text-sm truncate">{student.name}</span><span className="text-[10px] font-bold text-muted-foreground truncate">{student.schoolName}</span></div></div>
-                        <ChevronRight className="h-4 w-4 opacity-40 shrink-0" />
+              <DialogHeader className="relative z-10 space-y-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border-white/15 bg-white/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.26em] text-white">
+                    Seat Brief
+                  </Badge>
+                  <Badge className="border-white/15 bg-white/12 px-3 py-1 text-[10px] font-bold text-white">
+                    {selectedSeatLabel}
+                  </Badge>
+                  <Badge className="border-white/15 bg-white/12 px-3 py-1 text-[10px] font-bold text-white">
+                    {selectedSeatModeLabel}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <DialogTitle className="flex items-center gap-3 font-aggro-display text-2xl tracking-tight text-white sm:text-[2rem]">
+                    {selectedSeat?.type === 'aisle' ? <MapIcon className="h-7 w-7" /> : <UserPlus className="h-7 w-7" />}
+                    배정 설정
+                  </DialogTitle>
+                  <DialogDescription className="max-w-2xl text-sm font-semibold leading-6 text-white/82">
+                    좌석 상태를 먼저 확인하고, 필요하면 통로 전환과 구역 설정을 마친 뒤 학생 배정까지 바로 이어서 처리할 수 있습니다.
+                  </DialogDescription>
+                </div>
+                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "sm:grid-cols-3")}>
+                  <div className="rounded-[1.45rem] border border-white/14 bg-white/10 px-4 py-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">현재 구역</p>
+                    <p className="mt-2 text-base font-black text-white">{selectedSeatZoneLabel}</p>
+                    <p className="mt-1 text-xs font-semibold text-white/72">좌석 컨텍스트를 먼저 고정합니다.</p>
+                  </div>
+                  <div className="rounded-[1.45rem] border border-white/14 bg-white/10 px-4 py-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">좌석 상태</p>
+                    <p className="mt-2 text-base font-black text-white">{selectedSeatModeLabel}</p>
+                    <p className="mt-1 text-xs font-semibold text-white/72">{selectedSeatAvailabilityCopy}</p>
+                  </div>
+                  <div className="rounded-[1.45rem] border border-white/14 bg-white/10 px-4 py-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">배정 상태</p>
+                    <p className="mt-2 text-base font-black text-white">{selectedSeatAssignmentLabel}</p>
+                    <p className="mt-1 text-xs font-semibold text-white/72">
+                      {selectedSeat?.type === 'aisle' ? '학생 검색은 숨김 처리됩니다.' : '빈 좌석일 때만 학생 배정을 이어갑니다.'}
+                    </p>
+                  </div>
+                </div>
+              </DialogHeader>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#F7F9FC] p-5 sm:p-6">
+              <div className={cn("grid gap-5", isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]")}>
+                <motion.div
+                  {...getDeckMotionProps(0.08, 10)}
+                  className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-[0_20px_44px_rgba(15,23,42,0.07)] sm:p-6"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5C6E97]">Seat Control</p>
+                      <p className="mt-2 text-xl font-black tracking-tight text-[#14295F]">좌석 관리</p>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-[#5C6E97]">
+                        좌석과 통로 상태를 먼저 정리하고, 좌석인 경우에만 구역을 고정합니다.
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
+                      {selectedSeatLabel}
+                    </div>
+                  </div>
+
+                  {isEditMode && (
+                    <div className="mt-6 space-y-4">
+                      <div className="rounded-[1.7rem] bg-[#14295F] p-5 text-white shadow-[0_20px_38px_rgba(20,41,95,0.22)]">
+                        <div className="flex items-center gap-2">
+                          <ArrowRightLeft className="h-4 w-4 text-white" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">Primary Action</p>
+                        </div>
+                        <p className="mt-3 text-lg font-black text-white">
+                          {selectedSeat?.type === 'aisle' ? '좌석으로 다시 활성화' : '통로 모드로 전환'}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-white/78">
+                          {selectedSeat?.type === 'aisle'
+                            ? '학생을 다시 배정할 수 있는 좌석으로 되돌립니다.'
+                            : '이 칸을 학생 배정 없이 이동 동선용 통로로 사용합니다.'}
+                        </p>
+                        <Button
+                          onClick={handleToggleCellType}
+                          disabled={isSaving}
+                          className={cn(
+                            "mt-5 h-12 w-full rounded-[1.05rem] font-black transition-all",
+                            selectedSeat?.type === 'aisle'
+                              ? "bg-white text-[#14295F] hover:bg-white/92"
+                              : "bg-[#FF7A16] text-white hover:bg-[#E9680C]",
+                          )}
+                        >
+                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                          {selectedSeat?.type === 'aisle' ? '좌석으로 사용' : '통로로 전환'}
+                        </Button>
                       </div>
-                    ))}
+
+                      {selectedSeat?.type !== 'aisle' ? (
+                        <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-[#F7FAFF] p-5">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-[#14295F]" />
+                            <Label className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5C6E97]">
+                              좌석 구역 설정
+                            </Label>
+                          </div>
+                          <p className="mt-3 text-base font-black text-[#14295F]">현재 구역: {selectedSeatZoneLabel}</p>
+                          <p className="mt-2 text-sm font-semibold leading-6 text-[#5C6E97]">
+                            배정 전에 구역을 고정하면 학생 운영과 좌석 분류가 더 안정적으로 이어집니다.
+                          </p>
+                          <Select value={selectedSeat?.seatZone || '미정'} onValueChange={handleUpdateZone}>
+                            <SelectTrigger className="mt-5 h-12 rounded-[1.05rem] border border-[#D7E4FF] bg-white px-4 font-black text-[#14295F] shadow-none">
+                              <SelectValue placeholder="구역 선택" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-none shadow-2xl">
+                              <SelectItem value="미정" className="font-bold text-[#14295F]">미정</SelectItem>
+                              <SelectItem value="A존 (집중)" className="font-bold text-[#14295F]">A존 (집중)</SelectItem>
+                              <SelectItem value="B존 (표준)" className="font-bold text-[#14295F]">B존 (표준)</SelectItem>
+                              <SelectItem value="고정석" className="font-bold text-[#14295F]">고정석</SelectItem>
+                              <SelectItem value="자유석" className="font-bold text-[#14295F]">자유석</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div className="rounded-[1.7rem] bg-[#14295F] p-5 text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">Aisle Mode</p>
+                          <p className="mt-3 text-lg font-black text-white">현재는 통로 모드입니다.</p>
+                          <p className="mt-2 text-sm font-semibold leading-6 text-white/78">
+                            통로 상태에서는 학생 배정과 구역 선택이 비활성화됩니다. 좌석으로 다시 전환하면 바로 배정 흐름이 열립니다.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+
+                <motion.div
+                  {...getDeckMotionProps(0.12, 12)}
+                  className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-[0_20px_44px_rgba(15,23,42,0.07)] sm:p-6"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5C6E97]">Student Assign</p>
+                      <p className="mt-2 text-xl font-black tracking-tight text-[#14295F]">학생 배정</p>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-[#5C6E97]">
+                        이름으로 빠르게 찾고, 미배정 학생을 바로 좌석에 연결합니다.
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
+                      {selectedSeat?.type === 'aisle' ? '배정 잠금' : unassignedStudentCountLabel}
+                    </div>
                   </div>
-                </ScrollArea>
+
+                  {selectedSeat?.type !== 'aisle' ? (
+                    <div className="mt-6 space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5C6E97]" />
+                        <Input
+                          placeholder="학생 이름으로 검색"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="h-12 rounded-[1.05rem] border border-[#D7E4FF] bg-[#F7FAFF] pl-11 font-black text-[#14295F] placeholder:text-[#7F91B3]"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
+                          {unassignedStudentCountLabel}
+                        </div>
+                        <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
+                          {searchTerm.trim() ? `검색어 ${searchTerm.trim()}` : '전체 미배정 보기'}
+                        </div>
+                      </div>
+
+                      <ScrollArea className="h-[340px] pr-4">
+                        <div className="space-y-3">
+                          {unassignedStudents.length === 0 ? (
+                            <div className="rounded-[1.8rem] bg-[#14295F] p-6 text-center text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">
+                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">
+                                {searchTerm.trim() ? 'Search Empty' : 'No Candidate'}
+                              </p>
+                              <p className="mt-3 text-lg font-black text-white">
+                                {searchTerm.trim() ? '검색 결과가 없습니다.' : '미배정 학생이 없습니다.'}
+                              </p>
+                              <p className="mt-2 text-sm font-semibold leading-6 text-white/78">
+                                {searchTerm.trim()
+                                  ? '다른 이름으로 다시 찾거나 검색어를 지우고 전체 학생을 확인해 주세요.'
+                                  : '현재는 바로 연결할 수 있는 학생이 없어서 배정 카드가 비어 있습니다.'}
+                              </p>
+                            </div>
+                          ) : (
+                            unassignedStudents.map((student) => (
+                              <button
+                                key={student.id}
+                                type="button"
+                                onClick={() => assignStudentToSeat(student)}
+                                className="flex w-full items-center justify-between rounded-[1.6rem] border border-[#D7E4FF] bg-[#F7FAFF] px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:border-[#9CB6F6] hover:shadow-[0_18px_34px_rgba(20,41,95,0.1)]"
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] bg-white text-base font-black text-[#14295F] shadow-[0_12px_24px_rgba(20,41,95,0.08)]">
+                                    {student.name.charAt(0)}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-black text-[#14295F]">{student.name}</p>
+                                    <p className="mt-1 truncate text-xs font-semibold text-[#5C6E97]">
+                                      {student.schoolName || '학교 미등록'}
+                                      {student.grade ? ` · ${student.grade}` : ''}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
+                                    배정
+                                  </span>
+                                  <ChevronRight className="h-4 w-4 text-[#14295F]" />
+                                </div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  ) : (
+                    <div className="mt-6 rounded-[1.8rem] bg-[#14295F] p-6 text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">Assign Locked</p>
+                      <p className="mt-3 text-lg font-black text-white">학생 배정이 잠겨 있습니다.</p>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-white/78">
+                        통로 모드에서는 학생 검색과 배정 리스트가 숨겨집니다. 좌석으로 다시 전환하면 여기서 바로 학생을 연결할 수 있습니다.
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
               </div>
-            )}
-          </div>
-          <DialogFooter className={cn("bg-muted/20 border-t shrink-0 flex justify-center", isMobile ? "p-4" : "p-6")}><Button variant="ghost" onClick={() => setIsAssigning(false)} className="w-full font-bold text-muted-foreground">취소</Button></DialogFooter>
+            </div>
+
+            <DialogFooter className={cn("shrink-0 border-t border-[#D7E4FF] bg-white flex justify-center", isMobile ? "p-4" : "p-6")}>
+              <Button
+                variant="ghost"
+                onClick={() => setIsAssigning(false)}
+                className="h-12 w-full rounded-[1.1rem] font-black text-[#14295F] hover:bg-[#F1F6FF]"
+              >
+                취소
+              </Button>
+            </DialogFooter>
+          </motion.div>
         </DialogContent>
       </Dialog>
     </div>
