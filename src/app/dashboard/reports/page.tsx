@@ -50,7 +50,7 @@ import { generateDailyReport } from '@/ai/flows/generate-daily-report';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { parseDateInputValue } from '@/lib/dashboard-access';
 import { buildAttendanceRoutineInfo, deriveAttendanceDisplayState, toDateSafe } from '@/lib/attendance-auto';
-import { deriveDailyReportSignals } from '@/lib/daily-report-ai';
+import { deriveDailyReportSignals, normalizeDailyReportContentFingerprint } from '@/lib/daily-report-ai';
 
 type StudyLogDayDoc = StudyLogDay & {
   updatedAt?: unknown;
@@ -69,6 +69,53 @@ type AttendanceRecordDoc = {
   updatedAt?: unknown;
   routineMissingAtCheckIn?: boolean;
 };
+
+const MAX_RECENT_REPORT_HISTORY = 7;
+const REPORT_SECTION_HEADINGS = new Set(['오늘 관찰', '교육학적 해석', '내일 코칭', '가정 연계 팁']);
+
+function uniqueStrings(items: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      items
+        .map((item) => item?.trim())
+        .filter((item): item is string => Boolean(item))
+    )
+  );
+}
+
+function getReportVariationSignature(report?: DailyReport | null) {
+  return report?.aiMeta?.variationSignature || report?.aiMeta?.variationKey || null;
+}
+
+function getReportContentHighlights(content?: string | null) {
+  return (content || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !REPORT_SECTION_HEADINGS.has(line))
+    .slice(0, 3);
+}
+
+function buildRecentReportAvoidExpressions(params: {
+  recentReports: DailyReport[];
+  currentAiMeta?: DailyReport['aiMeta'] | null;
+  currentContent?: string;
+}) {
+  const { recentReports, currentAiMeta, currentContent } = params;
+
+  return uniqueStrings([
+    currentAiMeta?.teacherOneLiner,
+    ...(currentAiMeta?.strengths || []),
+    ...(currentAiMeta?.improvements || []),
+    ...getReportContentHighlights(currentContent),
+    ...recentReports.flatMap((report) => [
+      report.aiMeta?.teacherOneLiner,
+      ...(report.aiMeta?.strengths || []),
+      ...(report.aiMeta?.improvements || []),
+      ...getReportContentHighlights(report.content),
+    ]),
+  ]).slice(0, 12);
+}
 
 export default function DailyReportsPage() {
   const { user } = useUser();
@@ -227,10 +274,25 @@ export default function DailyReportsPage() {
         .map((snapshot) => snapshot.data() as DailyReport)
         .filter((report) => report.dateKey && report.dateKey !== dateKey)
         .sort((a, b) => (b.dateKey || '').localeCompare(a.dateKey || ''));
-      const recentVariationKeys = sortedRecentReports
-        .map((report) => report.aiMeta?.variationKey)
-        .filter((key): key is string => Boolean(key))
-        .slice(0, 5);
+      const recentReportsForVariation = sortedRecentReports.slice(0, MAX_RECENT_REPORT_HISTORY);
+      const currentAiMeta = aiReportMeta || existingReport?.aiMeta || null;
+      const draftVariationSignature =
+        currentAiMeta?.variationSignature ||
+        currentAiMeta?.variationKey ||
+        getReportVariationSignature(existingReport);
+      const draftFingerprint = normalizeDailyReportContentFingerprint(
+        reportContent || existingReport?.content || ''
+      );
+      const excludedVariationSignatures = uniqueStrings([
+        draftVariationSignature,
+        ...recentReportsForVariation.map((report) => getReportVariationSignature(report)),
+      ]);
+      const excludedContentFingerprints = uniqueStrings([
+        draftFingerprint,
+        ...recentReportsForVariation.map((report) => normalizeDailyReportContentFingerprint(report.content || '')),
+      ]);
+      const generationAttempt =
+        Math.max(aiReportMeta?.generationAttempt || 0, existingReport?.aiMeta?.generationAttempt || 0) + 1;
 
       const signals = deriveDailyReportSignals({
         studentId: selectedStudent.id,
@@ -246,9 +308,14 @@ export default function DailyReportsPage() {
         currentSeatStatus: liveSeat?.status,
         isTodayTarget,
         hasAttendanceEvidence,
-        recentVariationKeys,
-        preferredVariationKey:
-          aiReportMeta?.variationKey || existingReport?.aiMeta?.variationKey || null,
+        generationAttempt,
+        excludedVariationSignatures,
+        excludedContentFingerprints,
+      });
+      const avoidExpressions = buildRecentReportAvoidExpressions({
+        recentReports: recentReportsForVariation,
+        currentAiMeta,
+        currentContent: reportContent || existingReport?.content || '',
       });
 
       const aiInput = {
@@ -274,11 +341,19 @@ export default function DailyReportsPage() {
         pedagogyLens: signals.pedagogyLens,
         secondaryLens: signals.secondaryLens,
         stateBucket: signals.stateBucket,
-        variationKey: signals.variationKey,
+        internalStage: signals.internalStage,
+        stageFocus: signals.stageFocus,
+        stageCoachingPoint: signals.stageCoachingPoint,
+        stageHomePoint: signals.stageHomePoint,
+        generationAttempt,
+        variationSignature: signals.variationSignature,
         variationStyle: signals.variationStyle,
         variationGuide: signals.variationGuide,
         coachingFocus: signals.coachingFocus,
         homeTip: signals.homeTip,
+        avoidExpressions,
+        excludedVariationSignatures,
+        excludedContentFingerprints,
         metrics: signals.metrics,
       };
 
@@ -288,8 +363,8 @@ export default function DailyReportsPage() {
         teacherOneLiner: result.teacherOneLiner,
         strengths: result.strengths,
         improvements: result.improvements,
-        level: result.level,
-        levelName: result.levelName,
+        internalStage: result.internalStage,
+        generationAttempt: result.generationAttempt,
         attendanceLabel: signals.attendanceLabel,
         totalStudyMinutes: studyMinutes,
         completionRate,
@@ -297,7 +372,7 @@ export default function DailyReportsPage() {
         pedagogyLens: result.pedagogyLens,
         secondaryLens: result.secondaryLens,
         stateBucket: result.stateBucket,
-        variationKey: result.variationKey,
+        variationSignature: result.variationSignature,
         variationStyle: result.variationStyle,
         coachingFocus: result.coachingFocus,
         homeTip: result.homeTip,
@@ -310,8 +385,8 @@ export default function DailyReportsPage() {
         metrics: result.metrics,
       });
       toast({
-        title: `인공지능 리포트 생성 완료 (Lv.${result.level})`,
-        description: `${result.pedagogyLens} 렌즈 기준으로 코칭 포인트를 정리했습니다.`,
+        title: '인공지능 리포트 생성 완료',
+        description: `${result.pedagogyLens} 렌즈 기준으로 ${result.coachingFocus} 포인트를 정리했습니다.`,
       });
     } catch (e: any) {
       toast({ 

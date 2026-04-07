@@ -341,11 +341,6 @@ function KpiGraphGrid({
       <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">상태 요약</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {aiMeta.levelName && (
-            <Badge className="border-none bg-indigo-50 text-indigo-700 font-black">
-              {`Lv.${aiMeta.level || '-'} ${aiMeta.levelName}`}
-            </Badge>
-          )}
           {aiMeta.pedagogyLens && (
             <Badge className="border-none bg-sky-50 text-sky-700 font-black">
               {aiMeta.pedagogyLens}

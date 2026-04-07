@@ -26,6 +26,26 @@ export interface DailyReportAiMetrics {
   trendSummary: string;
 }
 
+export interface DailyReportStageProfile {
+  focus: string;
+  coachingPoint: string;
+  homePoint: string;
+}
+
+export interface DailyReportVariationPhraseIndexes {
+  observation: number;
+  interpretation: number;
+  coaching: number;
+  homeConnection: number;
+}
+
+export interface DailyReportVariationSelection {
+  variationSignature: string;
+  variationStyle: DailyReportVariationStyle;
+  variationGuide: string;
+  phraseIndexes: DailyReportVariationPhraseIndexes;
+}
+
 export interface DailyReportAiSignals {
   attendanceLabel: string;
   studyBand: StudyBand;
@@ -37,9 +57,14 @@ export interface DailyReportAiSignals {
   pedagogyLens: PedagogyLens;
   secondaryLens: PedagogyLens;
   stateBucket: string;
-  variationKey: string;
+  internalStage: number;
+  stageFocus: string;
+  stageCoachingPoint: string;
+  stageHomePoint: string;
+  variationSignature: string;
   variationStyle: DailyReportVariationStyle;
   variationGuide: string;
+  phraseIndexes: DailyReportVariationPhraseIndexes;
   coachingFocus: string;
   homeTip: string;
   metrics: DailyReportAiMetrics;
@@ -56,8 +81,20 @@ type DeriveDailyReportSignalsInput = {
   currentSeatStatus?: AttendanceCurrent['status'];
   isTodayTarget?: boolean;
   hasAttendanceEvidence?: boolean;
-  recentVariationKeys?: string[];
-  preferredVariationKey?: string | null;
+  generationAttempt?: number;
+  excludedVariationSignatures?: string[];
+  excludedContentFingerprints?: string[];
+};
+
+type SelectDailyReportVariationInput = {
+  studentId: string;
+  dateKey: string;
+  stateBucket: string;
+  pedagogyLens: PedagogyLens;
+  internalStage: number;
+  generationAttempt?: number;
+  excludedVariationSignatures?: string[];
+  excludedContentFingerprints?: string[];
 };
 
 const VARIATION_STYLE_BY_INDEX: DailyReportVariationStyle[] = [
@@ -68,6 +105,122 @@ const VARIATION_STYLE_BY_INDEX: DailyReportVariationStyle[] = [
   '가정 대화형',
   '회복 지원형',
 ];
+
+const SECTION_VARIANT_COUNT = 4;
+const TOTAL_VARIATION_SIGNATURES =
+  VARIATION_STYLE_BY_INDEX.length *
+  SECTION_VARIANT_COUNT *
+  SECTION_VARIANT_COUNT *
+  SECTION_VARIANT_COUNT *
+  SECTION_VARIANT_COUNT;
+
+const INTERNAL_STAGE_PROFILES: Record<number, DailyReportStageProfile> = {
+  1: {
+    focus: '학습 시작 문턱을 낮추는 단계',
+    coachingPoint: '첫 10분 안에 가장 쉬운 과제로 착수하도록 돕는 것',
+    homePoint: '결과보다 시작 시도 자체를 먼저 인정해 주는 대화',
+  },
+  2: {
+    focus: '짧은 집중 블록을 끊기지 않게 붙이는 단계',
+    coachingPoint: '한 번 시작한 블록을 최소 20분까지 유지하게 만드는 것',
+    homePoint: '오늘 시작한 시간과 끝낸 블록을 함께 확인하는 대화',
+  },
+  3: {
+    focus: '하루 기본 학습량의 바닥을 만드는 단계',
+    coachingPoint: '매일 같은 순서로 첫 과목을 여는 루틴을 고정하는 것',
+    homePoint: '학습량 평가보다 정해진 순서를 지킨 점을 짚어 주는 대화',
+  },
+  4: {
+    focus: '등원 후 리듬을 빠르게 올리는 단계',
+    coachingPoint: '등원 직후 지체 없이 첫 과제에 진입하게 관리하는 것',
+    homePoint: '언제 시작했는지와 방해 요소가 무엇이었는지 가볍게 묻는 대화',
+  },
+  5: {
+    focus: '기본 계획과 실제 실행을 맞추는 단계',
+    coachingPoint: '작은 계획이라도 당일 안에 완료 체크까지 닫도록 만드는 것',
+    homePoint: '계획한 것과 실제 한 것의 차이를 비난 없이 함께 보는 대화',
+  },
+  6: {
+    focus: '과제 수를 현실적으로 조절하는 단계',
+    coachingPoint: '욕심내기보다 끝낼 수 있는 양으로 재배치하는 것',
+    homePoint: '많이 했는지보다 끝낸 경험이 있었는지 물어보는 대화',
+  },
+  7: {
+    focus: '자기조절 루프를 하루 안에 완성하는 단계',
+    coachingPoint: '중간 점검과 마감 점검을 같은 날에 닫아 주는 것',
+    homePoint: '오늘 잘 먹힌 전략 하나를 함께 찾아보는 대화',
+  },
+  8: {
+    focus: '과목 전환 손실을 줄이는 단계',
+    coachingPoint: '전환 전에 짧은 복기와 다음 목표 확인을 넣는 것',
+    homePoint: '무슨 과목을 했는지보다 어떻게 전환했는지 묻는 대화',
+  },
+  9: {
+    focus: '완료율을 안정적으로 유지하는 단계',
+    coachingPoint: '마감 직전 무너지는 과제를 줄이고 우선순위를 선명히 하는 것',
+    homePoint: '끝까지 마친 일 하나를 구체적으로 칭찬하는 대화',
+  },
+  10: {
+    focus: '집중 지속 시간을 한 단계 늘리는 단계',
+    coachingPoint: '핵심 과목의 첫 집중 블록 길이를 조금 더 늘리는 것',
+    homePoint: '힘들었던 구간을 버틴 방식을 함께 언어화하는 대화',
+  },
+  11: {
+    focus: '학습량과 정확도를 함께 관리하는 단계',
+    coachingPoint: '많이 하는 흐름 속에서도 오답 복기를 놓치지 않게 하는 것',
+    homePoint: '많이 한 것과 남긴 실수를 같이 균형 있게 보는 대화',
+  },
+  12: {
+    focus: '좋은 날의 패턴을 복제하는 단계',
+    coachingPoint: '집중이 잘 된 시간대와 과제 구성을 다시 재현하는 것',
+    homePoint: '오늘 잘된 이유를 함께 찾아 다음에도 반복하게 돕는 대화',
+  },
+  13: {
+    focus: '학습 흐름의 편차를 줄이는 단계',
+    coachingPoint: '좋은 날과 흔들리는 날의 차이를 줄이는 루틴을 고정하는 것',
+    homePoint: '기복이 생긴 원인을 감정이 아닌 상황으로 돌아보는 대화',
+  },
+  14: {
+    focus: '고난도 과제 진입을 안정화하는 단계',
+    coachingPoint: '가장 어려운 과제를 집중력이 높은 초반에 배치하는 것',
+    homePoint: '어려운 과제를 피하지 않은 점을 인정해 주는 대화',
+  },
+  15: {
+    focus: '상위권 루틴의 밀도를 높이는 단계',
+    coachingPoint: '핵심 과목에서 밀도 높은 블록을 반복적으로 확보하는 것',
+    homePoint: '성과만이 아니라 유지한 루틴의 질을 칭찬하는 대화',
+  },
+  16: {
+    focus: '성과를 재현 가능한 습관으로 고정하는 단계',
+    coachingPoint: '잘된 하루를 우연으로 넘기지 않고 반복 규칙으로 만드는 것',
+    homePoint: '잘된 이유를 운이 아닌 습관으로 연결해 주는 대화',
+  },
+  17: {
+    focus: '고효율 루틴을 장기 지속 가능한 형태로 다듬는 단계',
+    coachingPoint: '무리한 몰입보다 유지 가능한 고효율 패턴으로 정리하는 것',
+    homePoint: '많이 했다는 평가보다 지속 가능성을 함께 점검하는 대화',
+  },
+  18: {
+    focus: '고난도 수행 후 복기 품질을 끌어올리는 단계',
+    coachingPoint: '문제풀이 뒤 즉시 오답과 복기를 연결하는 것',
+    homePoint: '잘한 점 뒤에 다음 보완 한 가지를 차분히 나누는 대화',
+  },
+  19: {
+    focus: '최상위권 페이스를 흔들림 없이 유지하는 단계',
+    coachingPoint: '좋은 흐름 속에서도 루틴 이탈 신호를 빠르게 잡아내는 것',
+    homePoint: '결과 압박보다 현재의 좋은 패턴을 유지하도록 응원하는 대화',
+  },
+  20: {
+    focus: '완성된 루틴을 미세 조정하는 단계',
+    coachingPoint: '높은 학습량 속에서도 피로 관리와 정교한 보완을 병행하는 것',
+    homePoint: '높은 기준을 요구하기보다 지금의 완성도를 안정적으로 지키게 돕는 대화',
+  },
+};
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
 
 function clampMinutes(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -92,52 +245,151 @@ function hashSeed(seed: string) {
   return hash;
 }
 
-export function resolveDailyReportLevel(totalStudyMinutes: number, completionRate: number) {
-  const minutes = clampMinutes(totalStudyMinutes);
-  const safeCompletionRate = Math.max(0, Math.min(100, Math.round(completionRate)));
+function decodeVariationIndex(variationIndex: number) {
+  const safeIndex = Math.abs(variationIndex) % TOTAL_VARIATION_SIGNATURES;
+  const styleIndex = safeIndex % VARIATION_STYLE_BY_INDEX.length;
+  const observationIndex =
+    Math.floor(safeIndex / VARIATION_STYLE_BY_INDEX.length) % SECTION_VARIANT_COUNT;
+  const interpretationIndex =
+    Math.floor(safeIndex / (VARIATION_STYLE_BY_INDEX.length * SECTION_VARIANT_COUNT)) % SECTION_VARIANT_COUNT;
+  const coachingIndex =
+    Math.floor(
+      safeIndex /
+        (VARIATION_STYLE_BY_INDEX.length * SECTION_VARIANT_COUNT * SECTION_VARIANT_COUNT)
+    ) % SECTION_VARIANT_COUNT;
+  const homeConnectionIndex =
+    Math.floor(
+      safeIndex /
+        (VARIATION_STYLE_BY_INDEX.length *
+          SECTION_VARIANT_COUNT *
+          SECTION_VARIANT_COUNT *
+          SECTION_VARIANT_COUNT)
+    ) % SECTION_VARIANT_COUNT;
 
-  const minuteLevel =
-    minutes < 60 ? 1
-      : minutes < 120 ? 2
-      : minutes < 180 ? 3
-      : minutes < 240 ? 4
-      : minutes < 300 ? 5
-      : minutes < 360 ? 6
-      : minutes < 420 ? 7
-      : minutes < 480 ? 8
-      : minutes < 540 ? 9
-      : 10;
+  return {
+    variationStyle: VARIATION_STYLE_BY_INDEX[styleIndex],
+    phraseIndexes: {
+      observation: observationIndex,
+      interpretation: interpretationIndex,
+      coaching: coachingIndex,
+      homeConnection: homeConnectionIndex,
+    } satisfies DailyReportVariationPhraseIndexes,
+  };
+}
 
-  const completionLevel =
-    safeCompletionRate < 40 ? 1
-      : safeCompletionRate < 50 ? 2
-      : safeCompletionRate < 60 ? 3
-      : safeCompletionRate < 70 ? 4
-      : safeCompletionRate < 75 ? 5
-      : safeCompletionRate < 80 ? 6
-      : safeCompletionRate < 85 ? 7
-      : safeCompletionRate < 90 ? 8
-      : safeCompletionRate < 95 ? 9
-      : 10;
+function buildVariationSignature(params: {
+  internalStage: number;
+  pedagogyLens: PedagogyLens;
+  variationStyle: DailyReportVariationStyle;
+  phraseIndexes: DailyReportVariationPhraseIndexes;
+}) {
+  const { internalStage, pedagogyLens, variationStyle, phraseIndexes } = params;
+  return [
+    `${internalStage}`,
+    pedagogyLens,
+    variationStyle,
+    `o${phraseIndexes.observation + 1}`,
+    `i${phraseIndexes.interpretation + 1}`,
+    `c${phraseIndexes.coaching + 1}`,
+    `h${phraseIndexes.homeConnection + 1}`,
+  ].join(':');
+}
 
-  const level = Math.max(1, Math.min(minuteLevel, completionLevel));
-  const names: Record<number, string> = {
-    1: '학습 습관 형성 단계',
-    2: '적응 단계',
-    3: '기본 루틴 형성 단계',
-    4: '안정적 진입 단계',
-    5: '자기주도 시작 단계',
-    6: '집중도 향상 단계',
-    7: '상위권 루틴 단계',
-    8: '고효율 학습 단계',
-    9: '최상위 집중 단계',
-    10: '수능 상위권 완성 단계',
+export function parseDailyReportVariationSignature(
+  signature: string | null | undefined
+): DailyReportVariationSelection | null {
+  if (!signature) return null;
+  const [stageText, pedagogyLens, variationStyle, observation, interpretation, coaching, homeConnection] =
+    signature.split(':');
+
+  const internalStage = Number(stageText);
+  if (!Number.isFinite(internalStage)) return null;
+  if (!pedagogyLens || !variationStyle) return null;
+  if (!VARIATION_STYLE_BY_INDEX.includes(variationStyle as DailyReportVariationStyle)) return null;
+
+  const phraseIndexes = {
+    observation: clampNumber(Number(observation?.replace(/^o/u, '')) - 1, 0, SECTION_VARIANT_COUNT - 1),
+    interpretation: clampNumber(Number(interpretation?.replace(/^i/u, '')) - 1, 0, SECTION_VARIANT_COUNT - 1),
+    coaching: clampNumber(Number(coaching?.replace(/^c/u, '')) - 1, 0, SECTION_VARIANT_COUNT - 1),
+    homeConnection: clampNumber(Number(homeConnection?.replace(/^h/u, '')) - 1, 0, SECTION_VARIANT_COUNT - 1),
   };
 
   return {
-    level,
-    levelName: names[level] ?? '학습 성장 단계',
+    variationSignature: buildVariationSignature({
+      internalStage,
+      pedagogyLens: pedagogyLens as PedagogyLens,
+      variationStyle: variationStyle as DailyReportVariationStyle,
+      phraseIndexes,
+    }),
+    variationStyle: variationStyle as DailyReportVariationStyle,
+    variationGuide: buildVariationGuide(variationStyle as DailyReportVariationStyle, phraseIndexes),
+    phraseIndexes,
   };
+}
+
+function buildVariationGuide(
+  variationStyle: DailyReportVariationStyle,
+  phraseIndexes: DailyReportVariationPhraseIndexes
+) {
+  const styleGuide =
+    variationStyle === '차분한 관찰형'
+      ? '차분하고 객관적인 관찰형 문장으로 쓰고, 과장된 감탄 표현은 피합니다.'
+      : variationStyle === '격려형'
+        ? '학생의 자존감을 지키는 따뜻한 격려형 문체를 사용하되, 수치 근거는 분명히 남깁니다.'
+        : variationStyle === '전략 코칭형'
+          ? '행동 제안을 구체적으로 쓰고, 내일 바로 실행할 수 있는 전략형 문장으로 씁니다.'
+          : variationStyle === '균형 피드백형'
+            ? '성과와 과제를 균형 있게 다루고, 칭찬과 보완을 5:5 정도로 배치합니다.'
+            : variationStyle === '가정 대화형'
+              ? '가정에서 어떻게 말을 건네면 좋을지 자연스럽게 연결되는 관계형 문체로 씁니다.'
+              : '부담을 낮추는 회복 지원형 문체로 쓰고, 실패 평가보다 회복 경로를 강조합니다.';
+
+  const observationGuide = [
+    '관찰 문장은 수치와 리듬을 먼저 보여 주세요.',
+    '관찰 문장은 오늘의 변화를 비교형으로 풀어 주세요.',
+    '관찰 문장은 행동 단서와 수치를 함께 엮어 주세요.',
+    '관찰 문장은 출결 흐름까지 붙여 장면감 있게 써 주세요.',
+  ][phraseIndexes.observation];
+  const interpretationGuide = [
+    '해석 문장은 습관과 자기조절 관점에서 풀어 주세요.',
+    '해석 문장은 최근 연속 흐름을 강조해 주세요.',
+    '해석 문장은 성과와 과제를 균형 있게 다뤄 주세요.',
+    '해석 문장은 다음 코칭으로 자연스럽게 이어지게 해 주세요.',
+  ][phraseIndexes.interpretation];
+  const coachingGuide = [
+    '코칭 문장은 내일 바로 실행할 한 가지 행동을 선명하게 적어 주세요.',
+    '코칭 문장은 시작 루틴 또는 마감 루틴을 구체화해 주세요.',
+    '코칭 문장은 과목 배치나 집중 블록 운영을 짚어 주세요.',
+    '코칭 문장은 부담을 낮춘 실행형 문장으로 정리해 주세요.',
+  ][phraseIndexes.coaching];
+  const homeGuide = [
+    '가정 팁은 인정형 질문으로 마무리해 주세요.',
+    '가정 팁은 비교나 압박 없이 관계형 대화로 써 주세요.',
+    '가정 팁은 시작 시간 또는 회복 포인트를 물어보게 해 주세요.',
+    '가정 팁은 다음 행동을 짧게 함께 정리하도록 이끌어 주세요.',
+  ][phraseIndexes.homeConnection];
+
+  return `${styleGuide} ${observationGuide} ${interpretationGuide} ${coachingGuide} ${homeGuide}`;
+}
+
+export function resolveDailyReportLevel(totalStudyMinutes: number, completionRate: number) {
+  const minutes = clampMinutes(totalStudyMinutes);
+  const safeCompletionRate = clampNumber(Math.round(completionRate), 0, 100);
+  const studyStage = clampNumber(Math.ceil(minutes / 30), 1, 20);
+  const completionStage = clampNumber(Math.ceil(safeCompletionRate / 5), 1, 20);
+  const internalStage = Math.min(studyStage, completionStage);
+
+  return {
+    studyStage,
+    completionStage,
+    internalStage,
+    stageProfile: INTERNAL_STAGE_PROFILES[internalStage] ?? INTERNAL_STAGE_PROFILES[1],
+  };
+}
+
+export function getDailyReportStageProfile(internalStage: number) {
+  const safeStage = clampNumber(Math.round(internalStage), 1, 20);
+  return INTERNAL_STAGE_PROFILES[safeStage] ?? INTERNAL_STAGE_PROFILES[1];
 }
 
 export function formatDailyReportStudyTime(totalMinutes: number) {
@@ -147,6 +399,20 @@ export function formatDailyReportStudyTime(totalMinutes: number) {
   if (hours === 0) return `${mins}분`;
   if (mins === 0) return `${hours}시간`;
   return `${hours}시간 ${mins}분`;
+}
+
+export function normalizeDailyReportContentFingerprint(content: string) {
+  return (content || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\d+/g, '')
+    .replace(/[^\p{L}]+/gu, '');
+}
+
+export function isDailyReportFingerprintBlocked(candidateContent: string, blockedFingerprints: string[]) {
+  const fingerprint = normalizeDailyReportContentFingerprint(candidateContent);
+  if (!fingerprint) return false;
+  return blockedFingerprints.includes(fingerprint);
 }
 
 function resolveStudyBand(totalStudyMinutes: number): StudyBand {
@@ -202,11 +468,7 @@ function resolveRoutineBand(params: {
     return '루틴누락';
   }
   if (attendanceDisplayStatus === 'confirmed_absent') return '미입실';
-  if (
-    isTodayTarget &&
-    currentSeatStatus === 'absent' &&
-    hasAttendanceEvidence
-  ) {
+  if (isTodayTarget && currentSeatStatus === 'absent' && hasAttendanceEvidence) {
     return '퇴실불안정';
   }
   return '정상';
@@ -225,11 +487,7 @@ function resolveAttendanceLabel(params: {
   if (attendanceDisplayStatus === 'missing_routine') return '루틴 기록 누락';
   if (attendanceDisplayStatus === 'confirmed_present_missing_routine') return '입실은 했지만 루틴 기록 누락';
   if (attendanceDisplayStatus === 'confirmed_absent') return '미입실';
-  if (
-    isTodayTarget &&
-    currentSeatStatus === 'absent' &&
-    hasAttendanceEvidence
-  ) {
+  if (isTodayTarget && currentSeatStatus === 'absent' && hasAttendanceEvidence) {
     return '퇴실 후 흐름 점검 필요';
   }
   if (currentSeatStatus === 'studying' || attendanceDisplayStatus === 'confirmed_present') return '정상 입실';
@@ -287,62 +545,65 @@ function resolvePedagogyLens(params: {
   } else if (pedagogyLens === '성장 가속') {
     secondaryLens = volatilityBand === '안정' ? '자기조절' : '집중 회복';
   } else {
-    secondaryLens = routineBand !== '정상' ? '습관 형성' : continuityBand === '연속호조' ? '성장 가속' : '집중 회복';
+    secondaryLens =
+      routineBand !== '정상'
+        ? '습관 형성'
+        : continuityBand === '연속호조'
+          ? '성장 가속'
+          : '집중 회복';
   }
 
   return { pedagogyLens, secondaryLens };
 }
 
-function buildVariationGuide(variationStyle: DailyReportVariationStyle) {
-  switch (variationStyle) {
-    case '차분한 관찰형':
-      return '차분하고 객관적인 관찰형 문장으로 쓰고, 과장된 감탄 표현은 피합니다.';
-    case '격려형':
-      return '학생의 자존감을 지키는 따뜻한 격려형 문체를 사용하되, 수치 근거는 분명히 남깁니다.';
-    case '전략 코칭형':
-      return '행동 제안을 구체적으로 쓰고, 내일 바로 실행할 수 있는 전략형 문장으로 씁니다.';
-    case '균형 피드백형':
-      return '성과와 과제를 균형 있게 다루고, 칭찬과 보완을 5:5 정도로 배치합니다.';
-    case '가정 대화형':
-      return '가정에서 어떻게 말을 건네면 좋을지 자연스럽게 연결되는 관계형 문체로 씁니다.';
-    default:
-      return '부담을 낮추는 회복 지원형 문체로 쓰고, 실패 평가보다 회복 경로를 강조합니다.';
-  }
-}
-
-function selectCoachingFocus(mainLens: PedagogyLens, routineBand: RoutineBand, volatilityBand: VolatilityBand, continuityBand: ContinuityBand) {
+function selectCoachingFocus(
+  mainLens: PedagogyLens,
+  routineBand: RoutineBand,
+  volatilityBand: VolatilityBand,
+  continuityBand: ContinuityBand,
+  stageProfile: DailyReportStageProfile
+) {
   if (mainLens === '습관 형성') {
-    if (routineBand !== '정상') return '등원 직후 30분 착수 루틴을 고정하고 첫 과목 시작 시간을 매일 같게 맞추기';
-    return '첫 과제 시작 시간을 고정하고 완료 체크를 당일에 마감하기';
+    if (routineBand !== '정상') {
+      return `${stageProfile.coachingPoint}, 등원 직후 30분 안에 첫 과목을 시작하게 돕기`;
+    }
+    return `${stageProfile.coachingPoint}, 첫 과제 시작 시간과 완료 체크를 같은 날에 닫기`;
   }
   if (mainLens === '집중 회복') {
-    if (continuityBand === '연속저하') return '첫 60분 단일 과목 집중 블록으로 리듬을 회복하기';
-    return '오늘보다 한 단계 쉬운 목표로 성공 경험을 먼저 확보하기';
+    if (continuityBand === '연속저하') {
+      return `${stageProfile.coachingPoint}, 첫 60분 단일 과목 집중 블록으로 흐름을 회복하기`;
+    }
+    return `${stageProfile.coachingPoint}, 오늘보다 한 단계 쉬운 목표로 성공 경험을 먼저 만들기`;
   }
   if (mainLens === '성장 가속') {
-    return '고난도 과제를 초반 집중 시간에 배치하고 오답 복기를 짧게 바로 연결하기';
+    return `${stageProfile.coachingPoint}, 고난도 과제를 초반 집중 시간에 배치하고 짧은 복기를 바로 연결하기`;
   }
   if (volatilityBand !== '안정') {
-    return '과목 전환 전에 완료 체크와 10분 복기를 넣어 흐름 손실을 줄이기';
+    return `${stageProfile.coachingPoint}, 과목 전환 전에 완료 체크와 10분 복기를 넣기`;
   }
-  return '계획-실행-점검의 자기조절 루프를 하루 안에 닫도록 마감 루틴을 유지하기';
+  return `${stageProfile.coachingPoint}, 계획-실행-점검 루프를 하루 안에 닫기`;
 }
 
-function selectHomeTip(mainLens: PedagogyLens, routineBand: RoutineBand, continuityBand: ContinuityBand) {
+function selectHomeTip(
+  mainLens: PedagogyLens,
+  routineBand: RoutineBand,
+  continuityBand: ContinuityBand,
+  stageProfile: DailyReportStageProfile
+) {
   if (mainLens === '습관 형성') {
     return routineBand !== '정상'
-      ? '결과를 묻기보다 오늘 몇 시에 시작했는지부터 짧게 확인해 주세요.'
-      : '학습량 평가보다 시작 시간을 지킨 점을 먼저 인정해 주세요.';
+      ? `${stageProfile.homePoint}를 중심으로, 오늘 몇 시에 다시 흐름을 잡았는지 짧게 물어봐 주세요.`
+      : `${stageProfile.homePoint}를 중심으로, 학습량 평가보다 시작 시간을 지킨 점을 먼저 인정해 주세요.`;
   }
   if (mainLens === '집중 회복') {
     return continuityBand === '연속저하'
-      ? '비교나 질책보다 오늘 회복된 한 지점을 먼저 짚어 주는 질문이 좋습니다.'
-      : '왜 못했는지보다 오늘 다시 붙잡은 구간이 어디였는지 묻는 대화가 도움이 됩니다.';
+      ? `${stageProfile.homePoint}를 중심으로, 비교나 질책보다 오늘 회복된 한 지점을 먼저 짚어 주세요.`
+      : `${stageProfile.homePoint}를 중심으로, 왜 못했는지보다 다시 붙잡은 구간을 물어봐 주세요.`;
   }
   if (mainLens === '성장 가속') {
-    return '칭찬 뒤에 다음 도전 목표를 한 문장으로 함께 정리해 주면 성장 속도가 유지됩니다.';
+    return `${stageProfile.homePoint}를 중심으로, 칭찬 뒤에 다음 도전 목표를 한 문장으로 함께 정리해 주세요.`;
   }
-  return '공부량 자체보다 어떤 전략이 잘 먹혔는지 질문해 주면 자기조절력이 더 빨리 자랍니다.';
+  return `${stageProfile.homePoint}를 중심으로, 공부량보다 어떤 전략이 잘 먹혔는지 질문해 주세요.`;
 }
 
 function buildTrendSummary(growthBand: GrowthBand, volatilityBand: VolatilityBand, avg7StudyMinutes: number, todayMinutes: number) {
@@ -367,6 +628,63 @@ function buildTrendSummary(growthBand: GrowthBand, volatilityBand: VolatilityBan
   return `최근 7일 평균 ${formatDailyReportStudyTime(avg7StudyMinutes)} 대비 오늘 ${formatDailyReportStudyTime(todayMinutes)}으로 큰 흔들림 없이 유지되고 있습니다.`;
 }
 
+export function selectDailyReportVariation({
+  studentId,
+  dateKey,
+  stateBucket,
+  pedagogyLens,
+  internalStage,
+  generationAttempt = 1,
+  excludedVariationSignatures = [],
+  excludedContentFingerprints = [],
+}: SelectDailyReportVariationInput): DailyReportVariationSelection {
+  const safeInternalStage = clampNumber(Math.round(internalStage), 1, 20);
+  const safeAttempt = Math.max(1, Math.round(generationAttempt));
+  const excludedSet = new Set(excludedVariationSignatures.filter(Boolean));
+  const contentSalt =
+    excludedContentFingerprints.length > 0
+      ? hashSeed(excludedContentFingerprints.join('|')) % TOTAL_VARIATION_SIGNATURES
+      : 0;
+  const baseIndex =
+    (
+      hashSeed(`${studentId}:${dateKey}:${stateBucket}:${pedagogyLens}:${safeInternalStage}`) +
+      contentSalt +
+      (safeAttempt - 1) * 131
+    ) %
+    TOTAL_VARIATION_SIGNATURES;
+
+  for (let offset = 0; offset < TOTAL_VARIATION_SIGNATURES; offset += 1) {
+    const decoded = decodeVariationIndex((baseIndex + offset) % TOTAL_VARIATION_SIGNATURES);
+    const variationSignature = buildVariationSignature({
+      internalStage: safeInternalStage,
+      pedagogyLens,
+      variationStyle: decoded.variationStyle,
+      phraseIndexes: decoded.phraseIndexes,
+    });
+    if (!excludedSet.has(variationSignature)) {
+      return {
+        variationSignature,
+        variationStyle: decoded.variationStyle,
+        variationGuide: buildVariationGuide(decoded.variationStyle, decoded.phraseIndexes),
+        phraseIndexes: decoded.phraseIndexes,
+      };
+    }
+  }
+
+  const fallback = decodeVariationIndex(baseIndex);
+  return {
+    variationSignature: buildVariationSignature({
+      internalStage: safeInternalStage,
+      pedagogyLens,
+      variationStyle: fallback.variationStyle,
+      phraseIndexes: fallback.phraseIndexes,
+    }),
+    variationStyle: fallback.variationStyle,
+    variationGuide: buildVariationGuide(fallback.variationStyle, fallback.phraseIndexes),
+    phraseIndexes: fallback.phraseIndexes,
+  };
+}
+
 export function deriveDailyReportSignals({
   studentId,
   dateKey,
@@ -378,8 +696,9 @@ export function deriveDailyReportSignals({
   currentSeatStatus,
   isTodayTarget = false,
   hasAttendanceEvidence = false,
-  recentVariationKeys = [],
-  preferredVariationKey,
+  generationAttempt = 1,
+  excludedVariationSignatures = [],
+  excludedContentFingerprints = [],
 }: DeriveDailyReportSignalsInput): DailyReportAiSignals {
   const safeMinutes = clampMinutes(totalStudyMinutes);
   const safeCompletionRate = Math.max(0, Math.min(100, Math.round(completionRate)));
@@ -422,6 +741,7 @@ export function deriveDailyReportSignals({
     routineBand,
     continuityBand,
   });
+  const { internalStage, stageProfile } = resolveDailyReportLevel(safeMinutes, safeCompletionRate);
 
   const stateBucket = [
     studyBand,
@@ -431,35 +751,16 @@ export function deriveDailyReportSignals({
     routineBand,
     continuityBand,
   ].join('|');
-  const baseIndex = hashSeed(`${studentId}:${dateKey}:${stateBucket}`) % VARIATION_STYLE_BY_INDEX.length;
-  const candidateKeys = VARIATION_STYLE_BY_INDEX.map(
-    (_, index) => `${pedagogyLens}:${stateBucket}:v${index + 1}`
-  );
-  const recentSet = new Set(recentVariationKeys);
-  const preferredIndex =
-    preferredVariationKey && candidateKeys.includes(preferredVariationKey)
-      ? candidateKeys.indexOf(preferredVariationKey)
-      : -1;
-  const variationIndex =
-    preferredIndex >= 0
-      ? preferredIndex
-      : candidateKeys.findIndex((_, index) => {
-            const targetIndex = (baseIndex + index) % candidateKeys.length;
-            return !recentSet.has(candidateKeys[targetIndex]);
-          }) >= 0
-        ? (() => {
-            for (let offset = 0; offset < candidateKeys.length; offset += 1) {
-              const nextIndex = (baseIndex + offset) % candidateKeys.length;
-              if (!recentSet.has(candidateKeys[nextIndex])) {
-                return nextIndex;
-              }
-            }
-            return baseIndex;
-          })()
-        : baseIndex;
-  const variationKey = candidateKeys[variationIndex];
-  const variationStyle = VARIATION_STYLE_BY_INDEX[variationIndex];
-  const variationGuide = buildVariationGuide(variationStyle);
+  const variation = selectDailyReportVariation({
+    studentId,
+    dateKey,
+    stateBucket,
+    pedagogyLens,
+    internalStage,
+    generationAttempt,
+    excludedVariationSignatures,
+    excludedContentFingerprints,
+  });
 
   return {
     attendanceLabel: resolveAttendanceLabel({
@@ -477,11 +778,22 @@ export function deriveDailyReportSignals({
     pedagogyLens,
     secondaryLens,
     stateBucket,
-    variationKey,
-    variationStyle,
-    variationGuide,
-    coachingFocus: selectCoachingFocus(pedagogyLens, routineBand, volatilityBand, continuityBand),
-    homeTip: selectHomeTip(pedagogyLens, routineBand, continuityBand),
+    internalStage,
+    stageFocus: stageProfile.focus,
+    stageCoachingPoint: stageProfile.coachingPoint,
+    stageHomePoint: stageProfile.homePoint,
+    variationSignature: variation.variationSignature,
+    variationStyle: variation.variationStyle,
+    variationGuide: variation.variationGuide,
+    phraseIndexes: variation.phraseIndexes,
+    coachingFocus: selectCoachingFocus(
+      pedagogyLens,
+      routineBand,
+      volatilityBand,
+      continuityBand,
+      stageProfile
+    ),
+    homeTip: selectHomeTip(pedagogyLens, routineBand, continuityBand, stageProfile),
     metrics: {
       growthRate,
       deltaMinutesFromAvg,

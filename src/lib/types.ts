@@ -808,6 +808,8 @@ export interface DailyReport {
     improvements: string[];
     level?: number;
     levelName?: string;
+    internalStage?: number;
+    generationAttempt?: number;
     attendanceLabel?: string;
     totalStudyMinutes?: number;
     completionRate?: number;
@@ -819,6 +821,7 @@ export interface DailyReport {
     secondaryLens?: '습관 형성' | '자기조절' | '집중 회복' | '성장 가속';
     stateBucket?: string;
     variationKey?: string;
+    variationSignature?: string;
     variationStyle?: '차분한 관찰형' | '격려형' | '전략 코칭형' | '균형 피드백형' | '가정 대화형' | '회복 지원형';
     coachingFocus?: string;
     homeTip?: string;

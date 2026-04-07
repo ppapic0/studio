@@ -8,7 +8,10 @@ import { z } from 'genkit';
 
 import {
   formatDailyReportStudyTime,
-  resolveDailyReportLevel,
+  isDailyReportFingerprintBlocked,
+  normalizeDailyReportContentFingerprint,
+  parseDailyReportVariationSignature,
+  selectDailyReportVariation,
 } from '@/lib/daily-report-ai';
 
 const StudyBandSchema = z.enum(['저학습', '기준학습', '고학습', '고집중']);
@@ -66,11 +69,19 @@ const DailyReportInputSchema = z.object({
   pedagogyLens: PedagogyLensSchema.describe('주 교육 렌즈'),
   secondaryLens: PedagogyLensSchema.describe('보조 교육 렌즈'),
   stateBucket: z.string().describe('6축 상태 버킷 요약 키'),
-  variationKey: z.string().describe('이번 생성 variant 식별자'),
+  internalStage: z.number().min(1).max(20).describe('내부 20단계 성장 스테이지'),
+  stageFocus: z.string().describe('현재 단계의 핵심 초점'),
+  stageCoachingPoint: z.string().describe('현재 단계의 교실 코칭 포인트'),
+  stageHomePoint: z.string().describe('현재 단계의 가정 대화 포인트'),
+  generationAttempt: z.number().min(1).describe('같은 데이터에 대한 생성 시도 횟수'),
+  variationSignature: z.string().describe('이번 생성 variation 시그니처'),
   variationStyle: VariationStyleSchema.describe('문체 변주 스타일'),
   variationGuide: z.string().describe('문체 변주 지침'),
   coachingFocus: z.string().describe('내일 코칭 핵심 포인트'),
   homeTip: z.string().describe('가정 연계 팁'),
+  avoidExpressions: z.array(z.string()).default([]).describe('이번 생성에서 피해야 할 최근 표현'),
+  excludedVariationSignatures: z.array(z.string()).default([]).describe('이미 사용된 variation 시그니처'),
+  excludedContentFingerprints: z.array(z.string()).default([]).describe('중복 회피 대상 본문 fingerprint'),
   metrics: DailyReportMetricsSchema,
 });
 
@@ -87,8 +98,8 @@ const DailyReportDraftSchema = z.object({
 });
 
 const DailyReportOutputSchema = z.object({
-  level: z.number().min(1).max(10).describe('10단계 시스템 기준 단계'),
-  levelName: z.string().describe('단계명'),
+  internalStage: z.number().min(1).max(20).describe('내부 20단계 성장 스테이지'),
+  generationAttempt: z.number().min(1).describe('이번 생성 시도 횟수'),
   content: z.string().describe('발송용 리포트 본문'),
   teacherOneLiner: z.string().describe('선생님 한 줄 코칭'),
   strengths: z.array(z.string()).describe('오늘 잘한 점'),
@@ -96,7 +107,7 @@ const DailyReportOutputSchema = z.object({
   pedagogyLens: PedagogyLensSchema.describe('주 교육 렌즈'),
   secondaryLens: PedagogyLensSchema.describe('보조 교육 렌즈'),
   stateBucket: z.string().describe('6축 분기 요약 키'),
-  variationKey: z.string().describe('이번 생성 variant 식별자'),
+  variationSignature: z.string().describe('이번 생성 variation 시그니처'),
   variationStyle: VariationStyleSchema.describe('문체 변주 스타일'),
   coachingFocus: z.string().describe('내일 코칭의 핵심 포인트'),
   homeTip: z.string().describe('가정 연계 팁'),
@@ -110,6 +121,8 @@ const DailyReportOutputSchema = z.object({
 });
 
 export type DailyReportOutput = z.infer<typeof DailyReportOutputSchema>;
+
+type DailyReportDraft = z.infer<typeof DailyReportDraftSchema>;
 
 function formatSignedMinutes(value: number) {
   const rounded = Math.round(value);
@@ -134,6 +147,25 @@ function ensureSentence(text: string, fallback: string) {
   return normalized && normalized.length > 0 ? normalized : fallback;
 }
 
+function uniqueStrings(items: Array<string | undefined | null>) {
+  return Array.from(
+    new Set(
+      items
+        .map((item) => item?.trim())
+        .filter((item): item is string => Boolean(item))
+    )
+  );
+}
+
+function resolvePhraseIndexes(input: DailyReportInput) {
+  return parseDailyReportVariationSignature(input.variationSignature)?.phraseIndexes ?? {
+    observation: 0,
+    interpretation: 0,
+    coaching: 0,
+    homeConnection: 0,
+  };
+}
+
 function buildStrengthFallback(input: DailyReportInput) {
   const strengths: string[] = [];
 
@@ -151,6 +183,9 @@ function buildStrengthFallback(input: DailyReportInput) {
   }
   if (input.continuityBand === '연속호조') {
     strengths.push('최근 며칠간 학습 페이스가 연속적으로 좋아지고 있습니다.');
+  }
+  if (input.internalStage >= 15) {
+    strengths.push('좋은 흐름을 유지할 수 있는 자기관리 단서가 비교적 선명했습니다.');
   }
 
   return strengths.slice(0, 3);
@@ -177,9 +212,56 @@ function buildImprovementFallback(input: DailyReportInput) {
   if (input.growthBand === '하락' || input.growthBand === '급하락') {
     improvements.push('최근 학습량이 내려오는 흐름이라 회복 가능한 작은 성공 구간을 다시 만들어야 합니다.');
   }
+  if (input.internalStage <= 4) {
+    improvements.push('현재는 결과를 늘리기보다 시작 문턱을 낮추는 루틴부터 안정화할 필요가 있습니다.');
+  }
 
   return improvements.slice(0, 3);
 }
+
+const OBSERVATION_VARIANTS = [
+  (input: DailyReportInput) =>
+    `오늘은 ${input.attendanceLabel} 흐름 속에서도 ${input.stageFocus}이 핵심 과제로 드러났습니다.`,
+  (input: DailyReportInput) =>
+    `학습시간 ${formatDailyReportStudyTime(input.totalStudyMinutes)}와 완료율 ${Math.round(input.completionRate)}%를 함께 보면, ${input.stageFocus}에 초점을 맞춰야 하는 날이었습니다.`,
+  (input: DailyReportInput) =>
+    `최근 7일 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 변화가 있었고, 실제 운영 포인트는 ${input.stageFocus} 쪽에 더 가까웠습니다.`,
+  (input: DailyReportInput) =>
+    `수치만 보면 단순한 하루처럼 보여도, 오늘 기록 안에는 ${input.stageFocus}을 확인할 만한 단서가 분명히 남아 있었습니다.`,
+];
+
+const INTERPRETATION_VARIANTS = [
+  (input: DailyReportInput) =>
+    `${input.stageFocus} 관점에서 보면 오늘은 ${input.pedagogyLens} 코칭을 더 또렷하게 걸어야 하는 구간입니다.`,
+  (input: DailyReportInput) =>
+    `주 렌즈인 ${input.pedagogyLens}에 비추어 보면, 오늘 데이터는 ${input.stageFocus}이 성과를 좌우하는 하루로 해석됩니다.`,
+  (input: DailyReportInput) =>
+    `현재 내부 단계는 ${input.stageFocus}을 다지는 구간이라, 결과보다 운영 밀도와 자기조절 루프를 함께 봐야 합니다.`,
+  (input: DailyReportInput) =>
+    `${input.secondaryLens}까지 함께 고려하면, 오늘은 단순 증감보다 ${input.stageFocus}이 다음 흐름을 결정할 가능성이 큽니다.`,
+];
+
+const COACHING_VARIANTS = [
+  (input: DailyReportInput) =>
+    `교실에서는 ${input.stageCoachingPoint}에 집중해 ${input.coachingFocus}로 바로 연결하겠습니다.`,
+  (input: DailyReportInput) =>
+    `내일 코칭은 ${input.stageCoachingPoint}을 축으로 두고, ${input.coachingFocus}이 실제 행동으로 남도록 운영하겠습니다.`,
+  (input: DailyReportInput) =>
+    `실행 포인트는 ${input.stageCoachingPoint}이며, 이를 위해 ${input.coachingFocus}을 가장 먼저 확인하겠습니다.`,
+  (input: DailyReportInput) =>
+    `내일은 ${input.stageCoachingPoint}을 먼저 고정한 뒤 ${input.coachingFocus}까지 이어지게 짧고 선명하게 관리하겠습니다.`,
+];
+
+const HOME_CONNECTION_VARIANTS = [
+  (input: DailyReportInput) =>
+    `가정에서는 ${input.stageHomePoint}를 바탕으로, ${input.homeTip}`,
+  (input: DailyReportInput) =>
+    `오늘은 가정에서도 ${input.stageHomePoint} 흐름을 살리는 질문이 도움이 됩니다. ${input.homeTip}`,
+  (input: DailyReportInput) =>
+    `집에서는 ${input.stageHomePoint}을 중심으로 이야기해 주시면 좋겠습니다. ${input.homeTip}`,
+  (input: DailyReportInput) =>
+    `가정 대화는 ${input.stageHomePoint}에 맞춰 짧고 편안하게 이어가 주세요. ${input.homeTip}`,
+];
 
 function buildFallbackObservation(input: DailyReportInput) {
   const toneLead: Record<DailyReportInput['variationStyle'], string> = {
@@ -190,22 +272,15 @@ function buildFallbackObservation(input: DailyReportInput) {
     '가정 대화형': `${input.studentName} 학생의 오늘 데이터는 가정과 교실이 같은 방향으로 도와줄 힌트를 담고 있습니다.`,
     '회복 지원형': `${input.studentName} 학생은 오늘의 기록 안에서도 다시 회복할 수 있는 단서를 남겼습니다.`,
   };
+  const phraseIndexes = resolvePhraseIndexes(input);
 
   return [
     toneLead[input.variationStyle],
-    `총 학습시간은 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 계획 완료율은 ${Math.round(input.completionRate)}%였고 최근 7일 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)}(${formatSignedPercent(input.metrics.growthRate)}) 변화했습니다.`,
-    `출결 흐름은 ${input.attendanceLabel}로 정리되며, 현재 학습 구간은 ${input.studyBand}/${input.completionBand} 범주에 가깝습니다.`,
+    OBSERVATION_VARIANTS[phraseIndexes.observation](input),
   ].join(' ');
 }
 
 function buildFallbackInterpretation(input: DailyReportInput) {
-  const lensInterpretation: Record<DailyReportInput['pedagogyLens'], string> = {
-    '습관 형성': '오늘 결과는 절대량 자체보다 시작 시점과 루틴 고정이 성과를 좌우하는 전형적인 습관 형성 구간으로 해석됩니다.',
-    '자기조절': '오늘 결과는 계획-실행-점검의 자기조절 루프가 어느 정도 작동하지만 마감 밀도를 더 높일 여지가 있는 상태로 보입니다.',
-    '집중 회복': '오늘 결과는 학습 의지보다 집중 리듬 회복과 과제 난이도 조절이 먼저 필요한 구간으로 읽힙니다.',
-    '성장 가속': '오늘 결과는 기본 루틴이 받쳐진 상태에서 더 높은 난이도와 정교한 피드백이 성장을 가속할 수 있는 구간으로 보입니다.',
-  };
-
   const continuityText =
     input.continuityBand === '연속호조'
       ? '최근 며칠의 상승 흐름이 이어지고 있어 좋은 패턴을 고정하는 것이 중요합니다.'
@@ -214,8 +289,9 @@ function buildFallbackInterpretation(input: DailyReportInput) {
         : input.continuityBand === '회복중'
           ? '이전의 저하 흐름에서 회복 신호가 보여 작은 성공 경험을 이어가는 것이 중요합니다.'
           : '최근 흐름은 크게 무너지지 않았지만 한 단계 더 끌어올릴 운영 포인트가 남아 있습니다.';
+  const phraseIndexes = resolvePhraseIndexes(input);
 
-  return `${lensInterpretation[input.pedagogyLens]} 보조 렌즈는 ${input.secondaryLens}이며, ${continuityText}`;
+  return `${INTERPRETATION_VARIANTS[phraseIndexes.interpretation](input)} ${continuityText}`;
 }
 
 function buildFallbackCoaching(input: DailyReportInput) {
@@ -227,19 +303,28 @@ function buildFallbackCoaching(input: DailyReportInput) {
     '가정 대화형': '내일은 교실 코칭과 가정 대화가 같은 메시지를 쓰는 것이 도움이 됩니다.',
     '회복 지원형': '내일은 평가보다 회복 경험을 쌓는 행동 하나를 먼저 성공시키는 것이 중요합니다.',
   };
+  const phraseIndexes = resolvePhraseIndexes(input);
 
-  return `${actionTone[input.variationStyle]} 핵심 코칭 포인트는 ${input.coachingFocus}입니다.`;
+  return `${actionTone[input.variationStyle]} ${COACHING_VARIANTS[phraseIndexes.coaching](input)}`;
 }
 
 function buildFallbackHomeConnection(input: DailyReportInput) {
-  return `가정에서는 ${input.homeTip}`;
+  const phraseIndexes = resolvePhraseIndexes(input);
+  return HOME_CONNECTION_VARIANTS[phraseIndexes.homeConnection](input).trim();
 }
 
 function buildFallbackTeacherOneLiner(input: DailyReportInput) {
-  return `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)} 학습했고, 계획 완료율 ${Math.round(input.completionRate)}%, 최근 7일 평균 대비 ${formatSignedPercent(input.metrics.growthRate)} 흐름으로 ${input.pedagogyLens} 관점의 코칭이 필요한 상태입니다.`;
+  const variants = [
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)} 학습했고 완료율 ${Math.round(input.completionRate)}%, 최근 7일 평균 대비 ${formatSignedPercent(input.metrics.growthRate)} 흐름으로 ${input.pedagogyLens} 코칭이 필요한 상태입니다.`,
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}를 확보했고 최근 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 변화를 보였으며, 완료율은 ${Math.round(input.completionRate)}%였습니다.`,
+    `${input.studentName} 학생은 오늘 학습시간 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 완료율 ${Math.round(input.completionRate)}%, 최근 7일 대비 ${formatSignedPercent(input.metrics.growthRate)} 흐름으로 ${input.stageFocus}을 점검할 필요가 있습니다.`,
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)} 학습과 완료율 ${Math.round(input.completionRate)}%를 기록했고, 최근 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 차이 속에서 ${input.stageFocus}이 핵심 포인트였습니다.`,
+  ];
+  const phraseIndexes = resolvePhraseIndexes(input);
+  return variants[phraseIndexes.observation];
 }
 
-function composeReportContent(input: DailyReportInput, draft: z.infer<typeof DailyReportDraftSchema>) {
+function composeReportContent(input: DailyReportInput, draft: DailyReportDraft) {
   const numericObservation = [
     `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)} 학습했고 계획 완료율은 ${Math.round(input.completionRate)}%였습니다.`,
     `최근 7일 평균은 ${formatDailyReportStudyTime(input.metrics.avg7StudyMinutes)}이며 오늘은 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)}(${formatSignedPercent(input.metrics.growthRate)}) 변화했습니다.`,
@@ -262,7 +347,6 @@ function composeReportContent(input: DailyReportInput, draft: z.infer<typeof Dai
 }
 
 function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutput {
-  const { level, levelName } = resolveDailyReportLevel(input.totalStudyMinutes, input.completionRate);
   const observation = buildFallbackObservation(input);
   const interpretation = buildFallbackInterpretation(input);
   const coaching = buildFallbackCoaching(input);
@@ -278,8 +362,8 @@ function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutp
   const teacherOneLiner = buildFallbackTeacherOneLiner(input);
 
   return {
-    level,
-    levelName,
+    internalStage: input.internalStage,
+    generationAttempt: input.generationAttempt,
     content: composeReportContent(input, {
       observation,
       interpretation,
@@ -295,7 +379,7 @@ function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutp
     pedagogyLens: input.pedagogyLens,
     secondaryLens: input.secondaryLens,
     stateBucket: input.stateBucket,
-    variationKey: input.variationKey,
+    variationSignature: input.variationSignature,
     variationStyle: input.variationStyle,
     coachingFocus: input.coachingFocus,
     homeTip: input.homeTip,
@@ -334,10 +418,19 @@ const dailyReportPrompt = ai.definePrompt({
 - 연속성 구간: {{{continuityBand}}}
 - 주 교육 렌즈: {{{pedagogyLens}}}
 - 보조 교육 렌즈: {{{secondaryLens}}}
+- 내부 스테이지: {{{internalStage}}}
+- 현재 단계 초점: {{{stageFocus}}}
+- 단계별 교실 코칭 포인트: {{{stageCoachingPoint}}}
+- 단계별 가정 대화 포인트: {{{stageHomePoint}}}
 - 코칭 포인트: {{{coachingFocus}}}
 - 가정 연계 팁 핵심: {{{homeTip}}}
 - 문체 변주 스타일: {{{variationStyle}}}
+- variation 시그니처: {{{variationSignature}}}
 - 문체 지침: {{{variationGuide}}}
+
+### 이번 생성에서 피해야 할 표현
+{{#each avoidExpressions}}- {{{this}}}
+{{/each}}
 
 ### 참고 데이터
 - 오늘 계획 목록:
@@ -359,11 +452,13 @@ const dailyReportPrompt = ai.definePrompt({
 5. strengths와 improvements는 각각 2~3개 짧은 항목으로 작성하세요.
 6. 문체는 부드럽지만 실무적으로, 과장 칭찬 없이 관찰 -> 해석 -> 행동 흐름을 유지하세요.
 7. 오늘 상태가 좋더라도 매일 같은 표현을 반복하지 말고, 제공된 문체 변주 스타일과 지침을 반영하세요.
-8. 루틴누락/지각/미입실/퇴실불안정이면 반드시 생활리듬이나 시작 루틴 관점을 한 번 이상 포함하세요.
-9. homeConnection은 압박형 지시 대신 질문형, 인정형, 관계형 피드백으로 작성하세요.
-10. JSON만 반환하세요.`,
+8. avoidExpressions에 담긴 표현과 문장 뼈대는 그대로 재사용하지 마세요.
+9. 루틴누락/지각/미입실/퇴실불안정이면 반드시 생활리듬이나 시작 루틴 관점을 한 번 이상 포함하세요.
+10. homeConnection은 압박형 지시 대신 질문형, 인정형, 관계형 피드백으로 작성하세요.
+11. 내부 스테이지는 절대 학생/학부모에게 직접 드러내지 말고, 코칭 깊이를 조절하는 참고 정보로만 사용하세요.
+12. JSON만 반환하세요.`,
   config: {
-    temperature: 0.6,
+    temperature: 0.8,
     safetySettings: [
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -373,6 +468,76 @@ const dailyReportPrompt = ai.definePrompt({
   },
 });
 
+function buildOutputFromDraft(input: DailyReportInput, output: DailyReportDraft | null) {
+  const deterministic = buildDeterministicDailyReport(input);
+  if (!output) {
+    return deterministic;
+  }
+
+  const observation = ensureSentence(output.observation, buildFallbackObservation(input));
+  const interpretation = ensureSentence(output.interpretation, buildFallbackInterpretation(input));
+  const coaching = ensureSentence(output.coaching, buildFallbackCoaching(input));
+  const homeConnection = ensureSentence(output.homeConnection, buildFallbackHomeConnection(input));
+  const teacherOneLiner = ensureSentence(output.teacherOneLiner, deterministic.teacherOneLiner);
+  const strengths = sanitizeShortList(output.strengths, deterministic.strengths);
+  const improvements = sanitizeShortList(output.improvements, deterministic.improvements);
+
+  return {
+    ...deterministic,
+    content: composeReportContent(input, {
+      observation,
+      interpretation,
+      coaching,
+      homeConnection,
+      teacherOneLiner,
+      strengths,
+      improvements,
+    }),
+    teacherOneLiner,
+    strengths,
+    improvements,
+    homeTip:
+      homeConnection
+        .replace(/^가정에서는\s*/u, '')
+        .replace(/^집에서는\s*/u, '')
+        .replace(/^오늘은 가정에서도\s*/u, '')
+        .trim() || input.homeTip,
+  };
+}
+
+async function runPromptWithInput(input: DailyReportInput) {
+  const { output } = await dailyReportPrompt(input);
+  return buildOutputFromDraft(input, output ?? null);
+}
+
+function buildRetryInput(
+  input: DailyReportInput,
+  blockedVariationSignatures: string[],
+  blockedFingerprints: string[]
+) {
+  const nextGenerationAttempt = Math.max(1, input.generationAttempt) + 1;
+  const nextVariation = selectDailyReportVariation({
+    studentId: input.studentId,
+    dateKey: input.date,
+    stateBucket: input.stateBucket,
+    pedagogyLens: input.pedagogyLens,
+    internalStage: input.internalStage,
+    generationAttempt: nextGenerationAttempt,
+    excludedVariationSignatures: blockedVariationSignatures,
+    excludedContentFingerprints: blockedFingerprints,
+  });
+
+  return {
+    ...input,
+    generationAttempt: nextGenerationAttempt,
+    variationSignature: nextVariation.variationSignature,
+    variationStyle: nextVariation.variationStyle,
+    variationGuide: nextVariation.variationGuide,
+    excludedVariationSignatures: blockedVariationSignatures,
+    excludedContentFingerprints: blockedFingerprints,
+  } satisfies DailyReportInput;
+}
+
 const dailyReportFlow = ai.defineFlow(
   {
     name: 'dailyReportFlow',
@@ -380,36 +545,46 @@ const dailyReportFlow = ai.defineFlow(
     outputSchema: DailyReportOutputSchema,
   },
   async (input) => {
-    const deterministic = buildDeterministicDailyReport(input);
-    const { output } = await dailyReportPrompt(input);
-    if (!output) {
-      return deterministic;
+    const initialBlockedFingerprints = uniqueStrings(input.excludedContentFingerprints);
+    const initialBlockedSignatures = uniqueStrings(input.excludedVariationSignatures);
+
+    const firstResult = await runPromptWithInput(input);
+    const firstFingerprint = normalizeDailyReportContentFingerprint(firstResult.content);
+    if (!isDailyReportFingerprintBlocked(firstResult.content, initialBlockedFingerprints)) {
+      return firstResult;
     }
 
-    const observation = ensureSentence(output.observation, buildFallbackObservation(input));
-    const interpretation = ensureSentence(output.interpretation, buildFallbackInterpretation(input));
-    const coaching = ensureSentence(output.coaching, buildFallbackCoaching(input));
-    const homeConnection = ensureSentence(output.homeConnection, buildFallbackHomeConnection(input));
-    const teacherOneLiner = ensureSentence(output.teacherOneLiner, deterministic.teacherOneLiner);
-    const strengths = sanitizeShortList(output.strengths, deterministic.strengths);
-    const improvements = sanitizeShortList(output.improvements, deterministic.improvements);
+    const retryBlockedFingerprints = uniqueStrings([
+      ...initialBlockedFingerprints,
+      firstFingerprint,
+    ]);
+    const retryBlockedSignatures = uniqueStrings([
+      ...initialBlockedSignatures,
+      input.variationSignature,
+    ]);
+    const retryInput = buildRetryInput(input, retryBlockedSignatures, retryBlockedFingerprints);
+    retryInput.avoidExpressions = uniqueStrings([
+      ...input.avoidExpressions,
+      firstResult.teacherOneLiner,
+      ...firstResult.strengths,
+      ...firstResult.improvements,
+    ]).slice(0, 12);
 
-    return {
-      ...deterministic,
-      content: composeReportContent(input, {
-        observation,
-        interpretation,
-        coaching,
-        homeConnection,
-        teacherOneLiner,
-        strengths,
-        improvements,
-      }),
-      teacherOneLiner,
-      strengths,
-      improvements,
-      homeTip: homeConnection.replace(/^가정에서는\s*/u, '').trim() || input.homeTip,
-    };
+    const retryResult = await runPromptWithInput(retryInput);
+    if (!isDailyReportFingerprintBlocked(retryResult.content, retryBlockedFingerprints)) {
+      return retryResult;
+    }
+
+    const fallbackBlockedFingerprints = uniqueStrings([
+      ...retryBlockedFingerprints,
+      normalizeDailyReportContentFingerprint(retryResult.content),
+    ]);
+    const fallbackBlockedSignatures = uniqueStrings([
+      ...retryBlockedSignatures,
+      retryInput.variationSignature,
+    ]);
+    const fallbackInput = buildRetryInput(retryInput, fallbackBlockedSignatures, fallbackBlockedFingerprints);
+    return buildDeterministicDailyReport(fallbackInput);
   }
 );
 
