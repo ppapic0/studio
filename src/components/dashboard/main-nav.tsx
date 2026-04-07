@@ -11,6 +11,7 @@ import {
   History,
   LayoutDashboard,
   Loader2,
+  Medal,
   Megaphone,
   MessageCircle,
   Monitor,
@@ -41,6 +42,7 @@ const adminNavItems = [
   { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
   { href: '/dashboard/leads', label: '홍보/상담 리드DB', icon: Megaphone },
   { href: '/dashboard/revenue', label: '비즈니스 분석', icon: DollarSign },
+  { href: '/dashboard/results', label: '합격 실적', icon: Medal },
   { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   { href: '/dashboard/settings/notifications', label: '문자 알림', icon: Bell },
   { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
@@ -69,6 +71,7 @@ const adminNavGroups: NavGroup[] = [
     title: '분석/수익',
     items: [
       { href: '/dashboard/revenue', label: '비즈니스 분석', icon: DollarSign },
+      { href: '/dashboard/results', label: '합격 실적', icon: Medal },
       { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
       { href: '/dashboard/settings/notifications', label: '문자 알림', icon: Bell },
       { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
@@ -84,6 +87,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/study-history', label: '기록트랙', icon: CalendarDays },
     { href: '/dashboard/plan', label: '계획트랙', icon: ClipboardCheck },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
+    { href: '/dashboard/results', label: '합격 실적', icon: Medal },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
   teacher: [
@@ -94,6 +98,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/leads', label: '홍보/상담 리드DB', icon: Megaphone },
     { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
+    { href: '/dashboard/results', label: '합격 실적', icon: Medal },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
   parent: [
@@ -102,6 +107,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard?parentTab=data', label: '데이터', icon: FileText },
     { href: '/dashboard?parentTab=communication', label: '소통', icon: MessageCircle },
     { href: '/dashboard?parentTab=billing', label: '수납', icon: DollarSign },
+    { href: '/dashboard/results', label: '합격 실적', icon: Medal },
   ],
   centerAdmin: [...adminNavItems],
   owner: [...adminNavItems],
