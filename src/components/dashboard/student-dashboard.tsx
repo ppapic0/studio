@@ -1629,16 +1629,37 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const statsUpdate: Record<string, any> = {};
         let earnedPointsThisSession = 0;
         let wroteSomething = false;
+        let nextFirstSessionAt: Timestamp | null = null;
+        let nextLastSessionAt: Timestamp | null = null;
+        let currentSessionEndAt: Timestamp | null = null;
+        let normalizedAwayGapMinutes = 0;
 
         if (sessionSeconds > 0) {
           const currentCumulativeMinutes = sessionDateKey === todayKey
             ? Number(todayStudyLog?.totalMinutes || 0)
             : 0;
           let existingSessionDayMinutes = currentCumulativeMinutes;
+          let existingSessionDayData: StudyLogDay | null = sessionDateKey === todayKey
+            ? (todayStudyLog || null)
+            : null;
           if (sessionDateKey !== todayKey) {
             const sessionDaySnap = await getDoc(sessionStudyLogRef);
-            existingSessionDayMinutes = Number(sessionDaySnap.data()?.totalMinutes || 0);
+            existingSessionDayData = sessionDaySnap.exists() ? (sessionDaySnap.data() as StudyLogDay) : null;
+            existingSessionDayMinutes = Number(existingSessionDayData?.totalMinutes || 0);
           }
+          const previousFirstSessionAt = toDateSafeAttendance(existingSessionDayData?.firstSessionStartAt) || null;
+          const previousLastSessionAt = toDateSafeAttendance(existingSessionDayData?.lastSessionEndAt) || null;
+          nextFirstSessionAt = previousFirstSessionAt && previousFirstSessionAt.getTime() <= sessionStartAt.getTime()
+            ? Timestamp.fromDate(previousFirstSessionAt)
+            : safeSeatStart;
+          currentSessionEndAt = Timestamp.fromMillis(nowTs);
+          nextLastSessionAt = previousLastSessionAt && previousLastSessionAt.getTime() >= nowTs
+            ? Timestamp.fromDate(previousLastSessionAt)
+            : currentSessionEndAt;
+          const awayGapMinutes = previousLastSessionAt
+            ? Math.round((sessionStartAt.getTime() - previousLastSessionAt.getTime()) / 60000)
+            : 0;
+          normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
 
           statsUpdate.focus = increment((sessionMinutes / 60) * 0.1);
 
@@ -1677,6 +1698,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             studentId: user.uid,
             centerId: activeMembership.id,
             dateKey: sessionDateKey,
+            firstSessionStartAt: nextFirstSessionAt,
+            lastSessionEndAt: nextLastSessionAt,
+            ...(normalizedAwayGapMinutes > 0 ? { awayMinutes: increment(normalizedAwayGapMinutes) } : {}),
             updatedAt: serverTimestamp(),
           }, { merge: true });
           wroteSomething = true;
@@ -1708,8 +1732,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
           const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey, 'sessions', sessionId);
           batch.set(sessionRef, {
+            centerId,
+            studentId: user.uid,
+            dateKey: sessionDateKey,
             startTime: safeSeatStart,
-            endTime: Timestamp.fromMillis(nowTs),
+            endTime: currentSessionEndAt || Timestamp.fromMillis(nowTs),
             durationMinutes: sessionMinutes,
             sessionId,
             createdAt: serverTimestamp(),
@@ -1785,9 +1812,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               dateKey: sessionDateKey,
               updatedAt: serverTimestamp(),
             };
+            if (nextFirstSessionAt) {
+              fallbackStudyLogData.firstSessionStartAt = nextFirstSessionAt;
+            }
+            if (nextLastSessionAt) {
+              fallbackStudyLogData.lastSessionEndAt = nextLastSessionAt;
+            }
 
             if (sessionSeconds > 0) {
               fallbackStudyLogData.totalMinutes = increment(sessionMinutes);
+              if (normalizedAwayGapMinutes > 0) {
+                fallbackStudyLogData.awayMinutes = increment(normalizedAwayGapMinutes);
+              }
             }
 
             await setDoc(sessionStudyLogRef, fallbackStudyLogData, { merge: true });
@@ -1805,8 +1841,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
             if (sessionSeconds > 0) {
               await setDoc(fallbackSessionRef, {
+                centerId,
+                studentId: user.uid,
+                dateKey: sessionDateKey,
                 startTime: safeSeatStart,
-                endTime: Timestamp.fromMillis(nowTs),
+                endTime: currentSessionEndAt || Timestamp.fromMillis(nowTs),
                 durationMinutes: sessionMinutes,
                 sessionId,
                 createdAt: serverTimestamp(),

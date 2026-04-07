@@ -52,7 +52,6 @@ const OPENCLAW_BILLING_DAYS = 180;
 const OPENCLAW_KPI_DAYS = 35;
 const OPENCLAW_STUDY_LOG_DAYS = 35;
 const OPENCLAW_SESSION_DAYS = 14;
-const DOC_CHUNK_SIZE = 350;
 class OpenClawExportInProgressError extends Error {
     constructor(message = "An OpenClaw export is already running.") {
         super(message);
@@ -241,14 +240,21 @@ const STUDY_LOG_DAY_FIELDS = [
     "studentId",
     "dateKey",
     "totalMinutes",
+    "awayMinutes",
+    "firstSessionStartAt",
+    "lastSessionEndAt",
     "createdAt",
     "updatedAt",
     "autoClosedAt",
 ];
 const SESSION_FIELDS = [
+    "centerId",
+    "studentId",
+    "dateKey",
     "startTime",
     "endTime",
     "durationMinutes",
+    "sessionId",
     "closedReason",
     "autoClosedAt",
     "validationFlag",
@@ -397,11 +403,18 @@ function extractParentDisplayNames(parentMembers, studentId, studentParentUids) 
         .map((member) => (typeof member.displayName === "string" ? member.displayName.trim() : ""))
         .filter((name) => name.length > 0);
 }
-async function fetchDocsByRefs(db, refs) {
+async function fetchStudyLogDaySnapshots(params) {
+    const { db, centerId, studentIds, fromDateKey, toDateKey } = params;
     const snapshots = [];
-    for (const chunk of chunkArray(refs, DOC_CHUNK_SIZE)) {
-        const chunkSnapshots = await db.getAll(...chunk);
-        snapshots.push(...chunkSnapshots);
+    for (const studentIdChunk of chunkArray(studentIds, 24)) {
+        const chunkResults = await Promise.all(studentIdChunk.map((studentId) => db
+            .collection(`centers/${centerId}/studyLogs/${studentId}/days`)
+            .where("dateKey", ">=", fromDateKey)
+            .where("dateKey", "<=", toDateKey)
+            .get()));
+        chunkResults.forEach((snap) => {
+            snapshots.push(...snap.docs);
+        });
     }
     return snapshots;
 }
@@ -654,18 +667,17 @@ async function buildOpenClawSnapshot(params) {
         studentId: docSnap.data().studentId || docSnap.id,
         dateKey: studyLogDateKeys[index] || "",
     })));
-    const studyLogDayRefs = [];
-    for (const studentId of studentIds) {
-        for (const dateKey of studyLogDateKeys) {
-            studyLogDayRefs.push(db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`));
-        }
-    }
-    const studyLogDaySnaps = await fetchDocsByRefs(db, studyLogDayRefs);
-    const existingStudyLogDaySnaps = studyLogDaySnaps.filter((docSnap) => {
-        if (!docSnap.exists)
-            return false;
-        return studyLogDateKeySet.has(docSnap.id);
-    });
+    const existingStudyLogDaySnaps = await fetchStudyLogDaySnapshots({
+        db,
+        centerId,
+        studentIds,
+        fromDateKey: studyLogDateKeys[0],
+        toDateKey: studyLogDateKeys[studyLogDateKeys.length - 1],
+    }).then((snaps) => snaps.filter((docSnap) => {
+        const raw = docSnap.data();
+        const dateKey = typeof raw.dateKey === "string" ? raw.dateKey : docSnap.id;
+        return studyLogDateKeySet.has(dateKey);
+    }));
     snapshot.studyRoomUsage.studyLogDays = existingStudyLogDaySnaps.map((docSnap) => {
         var _a;
         const raw = docSnap.data();

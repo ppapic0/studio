@@ -1438,6 +1438,54 @@ async function getDocsInChunks(
   return snapshots;
 }
 
+async function loadStudentProfileMap(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  studentIds: string[]
+): Promise<Map<string, Record<string, any>>> {
+  const profileRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/students/${studentId}`));
+  const profileSnaps = await getDocsInChunks(db, profileRefs);
+  const profileMap = new Map<string, Record<string, any>>();
+
+  profileSnaps.forEach((snap) => {
+    if (!snap.exists) return;
+    profileMap.set(snap.id, snap.data() as Record<string, any>);
+  });
+
+  return profileMap;
+}
+
+async function loadStudyMinutesByStudentForDateKeys(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  dateKeys: string[]
+): Promise<Map<string, number>> {
+  const uniqueDateKeys = Array.from(
+    new Set(dateKeys.filter((dateKey) => typeof dateKey === "string" && dateKey.length > 0))
+  );
+  if (uniqueDateKeys.length === 0) {
+    return new Map<string, number>();
+  }
+
+  const totalsByStudentId = new Map<string, number>();
+  const statSnaps = await Promise.all(
+    uniqueDateKeys.map((dateKey) => db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get())
+  );
+
+  statSnaps.forEach((snap) => {
+    snap.forEach((docSnap) => {
+      const raw = docSnap.data() as Record<string, unknown>;
+      const studentId = asTrimmedString(raw.studentId, docSnap.id);
+      if (!studentId) return;
+
+      const totalStudyMinutes = Math.max(0, Math.round(Number(raw.totalStudyMinutes ?? 0)));
+      totalsByStudentId.set(studentId, (totalsByStudentId.get(studentId) || 0) + totalStudyMinutes);
+    });
+  });
+
+  return totalsByStudentId;
+}
+
 function derivePenaltyPointsFromLogs(logs: Array<{ pointsDelta?: unknown; source?: unknown; createdAt?: unknown }>): number {
   const sortedLogs = [...logs].sort((a, b) => toMillisSafe(a.createdAt) - toMillisSafe(b.createdAt));
   let total = 0;
@@ -3722,17 +3770,37 @@ export const scheduledAttendanceCheck = functions
           .collection("centers").doc(centerId)
           .collection("studyLogs").doc(studentId)
           .collection("days").doc(sessionDateKey);
+        const existingLogSnap = await logRef.get();
+        const existingLog = existingLogSnap.exists ? (existingLogSnap.data() as Record<string, any>) : null;
+        const previousFirstSessionAt = toTimestampOrNow(existingLog?.firstSessionStartAt);
+        const previousLastSessionAt = toTimestampOrNow(existingLog?.lastSessionEndAt);
+        const nextFirstSessionAt = previousFirstSessionAt && previousFirstSessionAt.toMillis() <= lastCheckInAt.toMillis()
+          ? previousFirstSessionAt
+          : lastCheckInAt;
+        const nextLastSessionAt = previousLastSessionAt && previousLastSessionAt.toMillis() >= autoEndTime.toMillis()
+          ? previousLastSessionAt
+          : autoEndTime;
+        const awayGapMinutes = previousLastSessionAt
+          ? Math.round((lastCheckInAt.toMillis() - previousLastSessionAt.toMillis()) / 60000)
+          : 0;
+        const normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
 
         batch.set(logRef, {
           totalMinutes: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
           studentId,
           centerId,
           dateKey: sessionDateKey,
+          firstSessionStartAt: nextFirstSessionAt,
+          lastSessionEndAt: nextLastSessionAt,
+          ...(normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {}),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
 
         const sessionRef = logRef.collection("sessions").doc();
         batch.set(sessionRef, {
+          centerId,
+          studentId,
+          dateKey: sessionDateKey,
           startTime: lastCheckInAt,
           endTime: autoEndTime,
           durationMinutes: MAX_SESSION_MINUTES,
@@ -3867,23 +3935,17 @@ export const scheduledWeeklyReport = functions
         .where("status", "==", "active")
         .get();
 
-      for (const memberDoc of membersSnap.docs) {
-        const studentId = memberDoc.id;
+      const activeStudentIds = membersSnap.docs.map((memberDoc) => memberDoc.id);
+      if (activeStudentIds.length === 0) continue;
 
-        // 7일 총 집중 시간 합산
-        let weeklyMinutes = 0;
-        await Promise.all(
-          dateKeys.map(async (dateKey) => {
-            const statSnap = await db
-              .doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`)
-              .get();
-            if (statSnap.exists) {
-              weeklyMinutes += Number(statSnap.data()?.totalStudyMinutes ?? 0);
-            }
-          })
-        );
+      const [studentProfileMap, weeklyMinutesByStudent] = await Promise.all([
+        loadStudentProfileMap(db, centerId, activeStudentIds),
+        loadStudyMinutesByStudentForDateKeys(db, centerId, dateKeys),
+      ]);
 
-        const studentData = (await db.doc(`centers/${centerId}/students/${studentId}`).get()).data() as any;
+      for (const studentId of activeStudentIds) {
+        const weeklyMinutes = weeklyMinutesByStudent.get(studentId) || 0;
+        const studentData = studentProfileMap.get(studentId) || null;
         const studentName = typeof studentData?.name === "string" ? studentData.name : "학생";
         const targetWeekly = (Number(studentData?.targetDailyMinutes ?? 0) * 5);
 
@@ -4056,29 +4118,32 @@ export const scheduledDailyRiskAlert = functions
         .where("status", "==", "active")
         .get();
 
+      const activeStudentIds = membersSnap.docs.map((memberDoc) => memberDoc.id);
+      if (activeStudentIds.length === 0) {
+        await db.doc(`centers/${centerId}/riskCache/${todayKey}`).set({
+          atRiskStudentIds: [],
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          dateKey: todayKey,
+        }, { merge: true });
+        continue;
+      }
+
+      const [studentProfileMap, actualMinutesByStudent] = await Promise.all([
+        loadStudentProfileMap(db, centerId, activeStudentIds),
+        loadStudyMinutesByStudentForDateKeys(db, centerId, dateKeys),
+      ]);
+
       const atRiskStudentIds: string[] = [];
       const atRiskNames: string[] = [];
 
-      for (const memberDoc of membersSnap.docs) {
-        const studentId = memberDoc.id;
-        const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
-        if (!studentSnap.exists) continue;
-        const studentData = studentSnap.data() as any;
+      for (const studentId of activeStudentIds) {
+        const studentData = studentProfileMap.get(studentId) || null;
+        if (!studentData) continue;
         const targetDailyMinutes = Number(studentData?.targetDailyMinutes ?? 0);
         if (targetDailyMinutes <= 0) continue;
 
         const target14Days = targetDailyMinutes * 14;
-        let actual14Minutes = 0;
-        await Promise.all(
-          dateKeys.map(async (dateKey) => {
-            const statSnap = await db
-              .doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`)
-              .get();
-            if (statSnap.exists) {
-              actual14Minutes += Number(statSnap.data()?.totalStudyMinutes ?? 0);
-            }
-          })
-        );
+        const actual14Minutes = actualMinutesByStudent.get(studentId) || 0;
 
         const achieveRate = actual14Minutes / target14Days;
         if (achieveRate < 0.3) {

@@ -71,9 +71,9 @@ import {
 import { useFirestore, useCollection, useFunctions, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { addDoc, collection, query, where, Timestamp, doc, limit, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -112,6 +112,21 @@ const toSafeStudentName = (displayName?: string | null, memberId?: string): stri
 
 const normalizePhoneNumber = (value?: string | null): string => {
   return String(value || '').replace(/\D/g, '').trim();
+};
+
+const toTimestampDateSafe = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (value instanceof Timestamp) {
+    return value.toDate();
+  }
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate?: () => Date }).toDate === 'function') {
+    const date = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
 };
 
 const calculateRhythmScoreFromMinutes = (minutes: number[]): number => {
@@ -465,11 +480,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     nowMs: now,
   });
 
+  const [focusStudyLogDaysRaw, setFocusStudyLogDaysRaw] = useState<StudyLogDay[]>([]);
   const [focusStudentTrendRaw, setFocusStudentTrendRaw] = useState<DailyStudentStat[]>([]);
   const [trendLoading, setTrendLoading] = useState(false);
 
   useEffect(() => {
-    if (!firestore || !centerId || !selectedFocusStudentId || !today || !isActive) {
+    if (!firestore || !centerId || !selectedFocusStudentId || !today || !todayKey || !isActive) {
+      setFocusStudyLogDaysRaw([]);
       setFocusStudentTrendRaw([]);
       setTrendLoading(false);
       return;
@@ -479,25 +496,43 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const loadTrendData = async () => {
       setTrendLoading(true);
       try {
-        const dateKeys = Array.from({ length: 90 }, (_, i) => format(subDays(today, i), 'yyyy-MM-dd'));
-        const rows = await Promise.all(
-          dateKeys.map(async (dateKey) => {
-            try {
-              const studentsRef = collection(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students');
-              const snap = await getDocs(query(studentsRef, where('studentId', '==', selectedFocusStudentId), limit(1)));
-              if (snap.empty) return null;
-              return snap.docs[0].data() as DailyStudentStat;
-            } catch {
-              return null;
-            }
-          })
-        );
+        const studyLogStartKey = format(subDays(today, 89), 'yyyy-MM-dd');
+        const studyLogDaysRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedFocusStudentId, 'days');
+        const last7DateKeys = Array.from({ length: 7 }, (_, index) => format(subDays(today, index), 'yyyy-MM-dd'));
+        const [studyLogSnap, trendStatSnaps] = await Promise.all([
+          getDocs(
+            query(
+              studyLogDaysRef,
+              where('dateKey', '>=', studyLogStartKey),
+              where('dateKey', '<=', todayKey),
+              orderBy('dateKey', 'asc')
+            )
+          ),
+          Promise.all(
+            last7DateKeys.map((dateKey) =>
+              getDoc(doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', selectedFocusStudentId))
+            )
+          ),
+        ]);
 
         if (!disposed) {
-          setFocusStudentTrendRaw(rows.filter((row): row is DailyStudentStat => !!row));
+          setFocusStudyLogDaysRaw(
+            studyLogSnap.docs
+              .map((docSnap) => docSnap.data() as StudyLogDay)
+              .filter((row) => typeof row.dateKey === 'string' && row.dateKey.length > 0)
+          );
+          setFocusStudentTrendRaw(
+            trendStatSnaps
+              .filter((snap) => snap.exists())
+              .map((snap) => snap.data() as DailyStudentStat)
+              .filter((row) => typeof row.dateKey === 'string' && row.dateKey.length > 0)
+          );
         }
       } catch {
-        if (!disposed) setFocusStudentTrendRaw([]);
+        if (!disposed) {
+          setFocusStudyLogDaysRaw([]);
+          setFocusStudentTrendRaw([]);
+        }
       } finally {
         if (!disposed) setTrendLoading(false);
       }
@@ -507,7 +542,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       disposed = true;
     };
-  }, [firestore, centerId, selectedFocusStudentId, today, isActive]);
+  }, [firestore, centerId, selectedFocusStudentId, today, todayKey, isActive]);
 
   // 5. 데일리 리포트 데이터
   const reportsQuery = useMemoFirebase(() => {
@@ -1356,36 +1391,39 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [selectedFocusStudent, selectedFocusStat, selectedFocusProgress]);
 
   const focusStudentTrend = useMemo(() => {
-    const sorted = [...(focusStudentTrendRaw || [])]
-      .filter((row) => typeof row.dateKey === 'string' && row.dateKey.length > 0)
-      .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
-      .slice(-45);
-
     const progress = progressList?.find((p) => p.id === selectedFocusStudentId);
-    const scoreByDateKey = new Map(
-      sorted.map((row) => [
-        row.dateKey,
-        {
-          score: calculateStudentFocusScore(row, progress),
-          completion: Math.round(row.todayPlanCompletionRate || 0),
-          minutes: Math.round(row.totalStudyMinutes || 0),
-        },
-      ])
+    const minutesByDateKey = new Map(
+      (focusStudyLogDaysRaw || []).map((row) => [row.dateKey, Math.round(row.totalMinutes || 0)])
+    );
+    const statByDateKey = new Map(
+      (focusStudentTrendRaw || [])
+        .filter((row) => typeof row.dateKey === 'string' && row.dateKey.length > 0)
+        .map((row) => [row.dateKey, row])
     );
 
     const baseDate = today || new Date();
     return Array.from({ length: 7 }, (_, index) => {
       const day = subDays(baseDate, 6 - index);
       const dateKey = format(day, 'yyyy-MM-dd');
-      const found = scoreByDateKey.get(dateKey);
+      const stat = statByDateKey.get(dateKey);
+      const minutes = minutesByDateKey.get(dateKey) ?? Math.round(stat?.totalStudyMinutes || 0);
+      const score = stat
+        ? calculateStudentFocusScore(
+            {
+              ...stat,
+              totalStudyMinutes: minutes,
+            },
+            progress
+          )
+        : 0;
       return {
         date: format(day, 'MM/dd'),
-        score: found?.score ?? 0,
-        completion: found?.completion ?? 0,
-        minutes: found?.minutes ?? 0,
+        score,
+        completion: stat ? Math.round(stat.todayPlanCompletionRate || 0) : 0,
+        minutes,
       };
     });
-  }, [focusStudentTrendRaw, progressList, selectedFocusStudentId, today]);
+  }, [focusStudentTrendRaw, focusStudyLogDaysRaw, progressList, selectedFocusStudentId, today]);
 
   // ── 선택 학생 세션 데이터 로드 (시작시간 분포·외출시간 산출용) ──
   useEffect(() => {
@@ -1398,8 +1436,36 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setDayDataLoading(true);
       try {
         const last14Days = Array.from({ length: 14 }, (_, i) => format(subDays(today, i), 'yyyy-MM-dd'));
+        const daySummaryByDateKey = new Map(
+          (focusStudyLogDaysRaw || []).map((row) => [row.dateKey, row])
+        );
         const result: Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }> = {};
-        await Promise.all(last14Days.map(async (dateKey) => {
+        const fallbackDateKeys: string[] = [];
+
+        last14Days.forEach((dateKey) => {
+          const daySummary = daySummaryByDateKey.get(dateKey);
+          if (!daySummary) {
+            result[dateKey] = { awayMinutes: 0, startHour: null, endHour: null };
+            return;
+          }
+
+          const firstSessionStartAt = toTimestampDateSafe(daySummary.firstSessionStartAt);
+          const lastSessionEndAt = toTimestampDateSafe(daySummary.lastSessionEndAt);
+          const awayMinutes = Number(daySummary.awayMinutes || 0);
+
+          if (firstSessionStartAt && lastSessionEndAt) {
+            result[dateKey] = {
+              awayMinutes: Math.max(0, Math.round(awayMinutes)),
+              startHour: firstSessionStartAt.getHours() + (firstSessionStartAt.getMinutes() / 60),
+              endHour: lastSessionEndAt.getHours() + (lastSessionEndAt.getMinutes() / 60),
+            };
+            return;
+          }
+
+          fallbackDateKeys.push(dateKey);
+        });
+
+        await Promise.all(fallbackDateKeys.map(async (dateKey) => {
           try {
             const sessionsRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedFocusStudentId, 'days', dateKey, 'sessions');
             const snap = await getDocs(query(sessionsRef, orderBy('startTime')));
@@ -1429,18 +1495,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     };
     loadDayData();
     return () => { disposed = true; };
-  }, [firestore, centerId, selectedFocusStudentId, today]);
+  }, [firestore, centerId, selectedFocusStudentId, today, focusStudyLogDaysRaw]);
 
   // ── 4 KPI 그래프 데이터 계산 ──
 
   // 1) 주간 학습시간 성장률 (최근 6주)
   const weeklyGrowthData = useMemo(() => {
-    if (!focusStudentTrendRaw || !today) return [];
+    if (!focusStudyLogDaysRaw || !today) return [];
+    const minutesByDateKey = new Map(
+      (focusStudyLogDaysRaw || []).map((row) => [row.dateKey, Math.round(row.totalMinutes || 0)])
+    );
     const weeks = Array.from({ length: 6 }, (_, weekIdx) => {
       const weekEnd = subDays(today, weekIdx * 7);
       const weekDays = Array.from({ length: 7 }, (_, d) => format(subDays(weekEnd, d), 'yyyy-MM-dd'));
-      const weekData = focusStudentTrendRaw.filter((r) => weekDays.includes(r.dateKey));
-      const totalMinutes = weekData.reduce((sum, r) => sum + (r.totalStudyMinutes || 0), 0);
+      const totalMinutes = weekDays.reduce((sum, dateKey) => sum + (minutesByDateKey.get(dateKey) ?? 0), 0);
       return { label: `${format(subDays(today, (weekIdx + 1) * 7), 'M/d')}~`, totalMinutes };
     }).reverse();
     return weeks.map((week, i, arr) => {
@@ -1448,13 +1516,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         ? Math.round((week.totalMinutes - arr[i - 1].totalMinutes) / arr[i - 1].totalMinutes * 100) : 0;
       return { ...week, growth };
     });
-  }, [focusStudentTrendRaw, today]);
+  }, [focusStudyLogDaysRaw, today]);
 
   // 2) 일자별 학습시간 성장률 (최근 6주, 7일 단위로 조회)
   const dailyGrowthData = useMemo(() => {
     if (!today) return [];
     const minutesByDateKey = new Map(
-      (focusStudentTrendRaw || []).map((row) => [row.dateKey, Math.round(row.totalStudyMinutes || 0)])
+      (focusStudyLogDaysRaw || []).map((row) => [row.dateKey, Math.round(row.totalMinutes || 0)])
     );
 
     const series = Array.from({ length: 42 }, (_, idx) => {
@@ -1475,7 +1543,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const growth = prev > 0 ? Math.round(((item.minutes - prev) / prev) * 100) : 0;
       return { ...item, growth };
     });
-  }, [focusStudentTrendRaw, today]);
+  }, [focusStudyLogDaysRaw, today]);
 
   // 3) 학습 시간 분포 리듬 (요일별 평균 시작/종료시각)
   const rhythmData = useMemo(() => {

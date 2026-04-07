@@ -788,6 +788,9 @@ export interface StudyLogDay {
   centerId: string;
   dateKey: string;
   totalMinutes: number;
+  awayMinutes?: number;
+  firstSessionStartAt?: Timestamp | null;
+  lastSessionEndAt?: Timestamp | null;
 }
 
 export interface DailyReport {

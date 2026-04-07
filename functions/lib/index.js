@@ -1098,6 +1098,37 @@ async function getDocsInChunks(db, refs) {
     }
     return snapshots;
 }
+async function loadStudentProfileMap(db, centerId, studentIds) {
+    const profileRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/students/${studentId}`));
+    const profileSnaps = await getDocsInChunks(db, profileRefs);
+    const profileMap = new Map();
+    profileSnaps.forEach((snap) => {
+        if (!snap.exists)
+            return;
+        profileMap.set(snap.id, snap.data());
+    });
+    return profileMap;
+}
+async function loadStudyMinutesByStudentForDateKeys(db, centerId, dateKeys) {
+    const uniqueDateKeys = Array.from(new Set(dateKeys.filter((dateKey) => typeof dateKey === "string" && dateKey.length > 0)));
+    if (uniqueDateKeys.length === 0) {
+        return new Map();
+    }
+    const totalsByStudentId = new Map();
+    const statSnaps = await Promise.all(uniqueDateKeys.map((dateKey) => db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()));
+    statSnaps.forEach((snap) => {
+        snap.forEach((docSnap) => {
+            var _a;
+            const raw = docSnap.data();
+            const studentId = asTrimmedString(raw.studentId, docSnap.id);
+            if (!studentId)
+                return;
+            const totalStudyMinutes = Math.max(0, Math.round(Number((_a = raw.totalStudyMinutes) !== null && _a !== void 0 ? _a : 0)));
+            totalsByStudentId.set(studentId, (totalsByStudentId.get(studentId) || 0) + totalStudyMinutes);
+        });
+    });
+    return totalsByStudentId;
+}
 function derivePenaltyPointsFromLogs(logs) {
     const sortedLogs = [...logs].sort((a, b) => toMillisSafe(a.createdAt) - toMillisSafe(b.createdAt));
     let total = 0;
@@ -3019,15 +3050,27 @@ exports.scheduledAttendanceCheck = functions
                 .collection("centers").doc(centerId)
                 .collection("studyLogs").doc(studentId)
                 .collection("days").doc(sessionDateKey);
-            batch.set(logRef, {
-                totalMinutes: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
-                studentId,
-                centerId,
-                dateKey: sessionDateKey,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
+            const existingLogSnap = await logRef.get();
+            const existingLog = existingLogSnap.exists ? existingLogSnap.data() : null;
+            const previousFirstSessionAt = toTimestampOrNow(existingLog === null || existingLog === void 0 ? void 0 : existingLog.firstSessionStartAt);
+            const previousLastSessionAt = toTimestampOrNow(existingLog === null || existingLog === void 0 ? void 0 : existingLog.lastSessionEndAt);
+            const nextFirstSessionAt = previousFirstSessionAt && previousFirstSessionAt.toMillis() <= lastCheckInAt.toMillis()
+                ? previousFirstSessionAt
+                : lastCheckInAt;
+            const nextLastSessionAt = previousLastSessionAt && previousLastSessionAt.toMillis() >= autoEndTime.toMillis()
+                ? previousLastSessionAt
+                : autoEndTime;
+            const awayGapMinutes = previousLastSessionAt
+                ? Math.round((lastCheckInAt.toMillis() - previousLastSessionAt.toMillis()) / 60000)
+                : 0;
+            const normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
+            batch.set(logRef, Object.assign(Object.assign({ totalMinutes: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES), studentId,
+                centerId, dateKey: sessionDateKey, firstSessionStartAt: nextFirstSessionAt, lastSessionEndAt: nextLastSessionAt }, (normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {})), { updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
             const sessionRef = logRef.collection("sessions").doc();
             batch.set(sessionRef, {
+                centerId,
+                studentId,
+                dateKey: sessionDateKey,
                 startTime: lastCheckInAt,
                 endTime: autoEndTime,
                 durationMinutes: MAX_SESSION_MINUTES,
@@ -3144,20 +3187,16 @@ exports.scheduledWeeklyReport = functions
             .where("role", "==", "student")
             .where("status", "==", "active")
             .get();
-        for (const memberDoc of membersSnap.docs) {
-            const studentId = memberDoc.id;
-            // 7일 총 집중 시간 합산
-            let weeklyMinutes = 0;
-            await Promise.all(dateKeys.map(async (dateKey) => {
-                var _a, _b;
-                const statSnap = await db
-                    .doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`)
-                    .get();
-                if (statSnap.exists) {
-                    weeklyMinutes += Number((_b = (_a = statSnap.data()) === null || _a === void 0 ? void 0 : _a.totalStudyMinutes) !== null && _b !== void 0 ? _b : 0);
-                }
-            }));
-            const studentData = (await db.doc(`centers/${centerId}/students/${studentId}`).get()).data();
+        const activeStudentIds = membersSnap.docs.map((memberDoc) => memberDoc.id);
+        if (activeStudentIds.length === 0)
+            continue;
+        const [studentProfileMap, weeklyMinutesByStudent] = await Promise.all([
+            loadStudentProfileMap(db, centerId, activeStudentIds),
+            loadStudyMinutesByStudentForDateKeys(db, centerId, dateKeys),
+        ]);
+        for (const studentId of activeStudentIds) {
+            const weeklyMinutes = weeklyMinutesByStudent.get(studentId) || 0;
+            const studentData = studentProfileMap.get(studentId) || null;
             const studentName = typeof (studentData === null || studentData === void 0 ? void 0 : studentData.name) === "string" ? studentData.name : "학생";
             const targetWeekly = (Number((_a = studentData === null || studentData === void 0 ? void 0 : studentData.targetDailyMinutes) !== null && _a !== void 0 ? _a : 0) * 5);
             const weeklyHours = Math.floor(weeklyMinutes / 60);
@@ -3302,28 +3341,30 @@ exports.scheduledDailyRiskAlert = functions
             .where("role", "==", "student")
             .where("status", "==", "active")
             .get();
+        const activeStudentIds = membersSnap.docs.map((memberDoc) => memberDoc.id);
+        if (activeStudentIds.length === 0) {
+            await db.doc(`centers/${centerId}/riskCache/${todayKey}`).set({
+                atRiskStudentIds: [],
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                dateKey: todayKey,
+            }, { merge: true });
+            continue;
+        }
+        const [studentProfileMap, actualMinutesByStudent] = await Promise.all([
+            loadStudentProfileMap(db, centerId, activeStudentIds),
+            loadStudyMinutesByStudentForDateKeys(db, centerId, dateKeys),
+        ]);
         const atRiskStudentIds = [];
         const atRiskNames = [];
-        for (const memberDoc of membersSnap.docs) {
-            const studentId = memberDoc.id;
-            const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
-            if (!studentSnap.exists)
+        for (const studentId of activeStudentIds) {
+            const studentData = studentProfileMap.get(studentId) || null;
+            if (!studentData)
                 continue;
-            const studentData = studentSnap.data();
             const targetDailyMinutes = Number((_a = studentData === null || studentData === void 0 ? void 0 : studentData.targetDailyMinutes) !== null && _a !== void 0 ? _a : 0);
             if (targetDailyMinutes <= 0)
                 continue;
             const target14Days = targetDailyMinutes * 14;
-            let actual14Minutes = 0;
-            await Promise.all(dateKeys.map(async (dateKey) => {
-                var _a, _b;
-                const statSnap = await db
-                    .doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`)
-                    .get();
-                if (statSnap.exists) {
-                    actual14Minutes += Number((_b = (_a = statSnap.data()) === null || _a === void 0 ? void 0 : _a.totalStudyMinutes) !== null && _b !== void 0 ? _b : 0);
-                }
-            }));
+            const actual14Minutes = actualMinutesByStudent.get(studentId) || 0;
             const achieveRate = actual14Minutes / target14Days;
             if (achieveRate < 0.3) {
                 atRiskStudentIds.push(studentId);
