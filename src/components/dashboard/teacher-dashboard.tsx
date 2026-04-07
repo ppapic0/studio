@@ -1135,6 +1135,37 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [selectedStudentPenaltyPoints, selectedStudentPenaltyLogs]);
 
+  const selectedStudentHistoryMetrics = useMemo(() => {
+    if (!selectedStudentHistory.length) {
+      return {
+        averageMinutes: 0,
+        peakMinutes: 0,
+        latestMinutes: 0,
+        latestDateKey: '',
+      };
+    }
+
+    const minutes = selectedStudentHistory.map((item) => Math.max(0, Number(item.totalMinutes || 0)));
+    const totalMinutes = minutes.reduce((sum, value) => sum + value, 0);
+
+    return {
+      averageMinutes: Math.round(totalMinutes / minutes.length),
+      peakMinutes: Math.max(...minutes),
+      latestMinutes: minutes[0] || 0,
+      latestDateKey: selectedStudentHistory[0]?.dateKey || '',
+    };
+  }, [selectedStudentHistory]);
+
+  const latestSelectedPenaltyLog = useMemo(
+    () => selectedStudentPenaltyLogs[0] || null,
+    [selectedStudentPenaltyLogs]
+  );
+
+  const latestSelectedReport = useMemo(
+    () => selectedStudentReports[0] || null,
+    [selectedStudentReports]
+  );
+
   const handleToggleEditMode = () => {
     if (!isEditMode && selectedRoomView === 'all' && roomConfigs[0]) {
       setSelectedRoomView(roomConfigs[0].id);
@@ -2815,222 +2846,366 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                 return (
                   <>
-                    <div className={cn("relative shrink-0 p-6 text-white sm:p-7 lg:p-8", selectedSeat.status === 'studying' ? "bg-blue-600" : "bg-primary")}>
-                      <div className="absolute top-0 right-0 p-6 opacity-10 rotate-12 sm:p-8"><Sparkles className="h-20 w-20 sm:h-24 sm:w-24 lg:h-28 lg:w-28" /></div>
-                      <DialogHeader className="relative z-10">
-                        <DialogTitle className="text-2xl font-black tracking-tighter sm:text-3xl lg:text-[2rem]">{studentsById.get(selectedSeat.studentId || '')?.name || '학생'}</DialogTitle>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px]">{selectedSeatLabel}</Badge>
-                          <Badge className="bg-white/20 text-white border-none font-black px-2.5 py-0.5 text-[10px] whitespace-nowrap">{formatAttendanceStatus(selectedSeat.status)}</Badge>
-                          {selectedSeat.seatZone && <Badge className="bg-white text-primary border-none font-black px-2.5 py-0.5 text-[10px] uppercase">{selectedSeat.seatZone}</Badge>}
-                        </div>
-                        {selectedSeat.studentId && (
-                          <div className="mt-4 grid gap-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60">실시간 세션</p>
-                                <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.session}</p>
+                    <div
+                      className={cn(
+                        "relative shrink-0 overflow-hidden text-white",
+                        selectedSeat.status === 'studying'
+                          ? "bg-[linear-gradient(135deg,#1D4ED8_0%,#14295F_100%)]"
+                          : selectedSeat.status === 'away' || selectedSeat.status === 'break'
+                            ? "bg-[linear-gradient(135deg,#FF8A1F_0%,#14295F_100%)]"
+                            : "bg-[linear-gradient(135deg,#14295F_0%,#1E3A8A_100%)]"
+                      )}
+                    >
+                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,166,77,0.18),transparent_26%)]" />
+                      <div className="pointer-events-none absolute -right-10 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+                      <div className={cn("relative space-y-5", isMobile ? "p-5" : "p-6 sm:p-7 lg:p-8")}>
+                        <DialogHeader className="space-y-5">
+                          <div className={cn("flex gap-5", isMobile ? "flex-col" : "items-start justify-between")}>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className="h-6 rounded-full border border-white/10 bg-white/10 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-white">
+                                  학생 운영 브리프
+                                </Badge>
+                                <Badge className="h-6 rounded-full border-none bg-white/16 px-3 text-[10px] font-black text-white">
+                                  {selectedSeatLabel}
+                                </Badge>
+                                <Badge className="h-6 rounded-full border-none bg-white/16 px-3 text-[10px] font-black text-white">
+                                  {formatAttendanceStatus(selectedSeat.status)}
+                                </Badge>
+                                {selectedSeat.seatZone && (
+                                  <Badge className="h-6 rounded-full border-none bg-white px-3 text-[10px] font-black uppercase text-primary">
+                                    {selectedSeat.seatZone}
+                                  </Badge>
+                                )}
                               </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 누적</p>
-                                <p className="mt-1 text-xl font-black tabular-nums text-white">{timeInfo?.total}</p>
+                              <DialogTitle className="mt-4 text-2xl font-black tracking-tighter sm:text-3xl lg:text-[2.15rem]">
+                                {studentsById.get(selectedSeat.studentId || '')?.name || '학생'}
+                              </DialogTitle>
+                              <DialogDescription className="mt-3 max-w-[42rem] text-sm font-bold leading-6 text-white/82">
+                                {selectedSeatSignal?.topReason || selectedAttendanceSignal?.note || '오늘 가장 먼저 확인할 상태와 대응 포인트를 한 화면에서 정리했습니다.'}
+                              </DialogDescription>
+                            </div>
+
+                            <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "min-w-[270px] grid-cols-2")}>
+                              <div className="rounded-[1.6rem] border border-white/10 bg-white/10 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">실시간 세션</p>
+                                <p className="mt-2 text-xl font-black tabular-nums text-white">{timeInfo?.session || '-'}</p>
+                              </div>
+                              <div className="rounded-[1.6rem] border border-white/10 bg-white/10 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">오늘 누적</p>
+                                <p className="mt-2 text-xl font-black tabular-nums text-white">{timeInfo?.total || '-'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </DialogHeader>
+                        {selectedSeat.studentId && (
+                          <div className="grid gap-3">
+                            <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "lg:grid-cols-4")}>
+                              <div className="rounded-[1.55rem] border border-white/10 bg-white/10 px-4 py-3">
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">오늘 판정</p>
+                                <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal?.boardLabel || '확인중'}</p>
+                              </div>
+                              <div className="rounded-[1.55rem] border border-white/10 bg-white/10 px-4 py-3">
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">최근 7일</p>
+                                <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal?.attendanceRiskLabel || '데이터 없음'}</p>
+                              </div>
+                              <div className="rounded-[1.55rem] border border-white/10 bg-white/10 px-4 py-3">
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">최근 리포트</p>
+                                <p className="mt-2 text-sm font-black text-white">{latestSelectedReport?.dateKey || '발송 없음'}</p>
+                              </div>
+                              <div className="rounded-[1.55rem] border border-white/10 bg-white/10 px-4 py-3">
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">현재 벌점</p>
+                                <p className="mt-2 text-sm font-black text-white">{selectedPenaltyRecovery.effectivePoints}점</p>
                               </div>
                             </div>
 
-                            {selectedAttendanceSignal && (
-                              <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4">
-                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 판정</p>
-                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.boardLabel}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">루틴 예정</p>
-                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.routineExpectedArrivalTime || '미설정'}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">오늘 공부</p>
-                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.todayStudyLabel}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">최근 7일</p>
-                                    <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal.attendanceRiskLabel}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">복귀/퇴실</p>
-                                    <p className="mt-2 text-sm font-black text-white">
-                                      {selectedAttendanceSignal.isReturned
-                                        ? '복귀'
-                                        : selectedAttendanceSignal.isCheckedOut
-                                          ? '퇴실'
-                                          : selectedAttendanceSignal.seatStatus === 'away' || selectedAttendanceSignal.seatStatus === 'break'
-                                            ? '외출 중'
-                                            : '-'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <p className="mt-3 text-xs font-bold leading-relaxed text-white/90">
-                                  {selectedAttendanceSignal.note}
-                                </p>
-                              </div>
-                            )}
-
-                            {selectedSeatSignal && (
-                              <>
-                                <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <Badge className={cn("border-none font-black", selectedSeatPresentation.chipClass)}>
-                                      {selectedSeatSignal.primaryChip}
-                                    </Badge>
-                                    {selectedSeatSignal.secondaryFlags.map((flag) => (
-                                      <Badge key={`${selectedSeat.id}_${flag}`} className={cn("border-none font-black", selectedSeatPresentation.flagClass)}>
-                                        {flag}
+                            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]")}>
+                              <motion.div {...getDeckMotionProps(0.03, 10)} className="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {selectedSeatSignal ? (
+                                    <>
+                                      <Badge className={cn("border-none font-black", selectedSeatPresentation.chipClass)}>
+                                        {selectedSeatSignal.primaryChip}
                                       </Badge>
-                                    ))}
-                                  </div>
-                                  <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
-                                    {selectedSeatSignal.topReason}
-                                  </p>
-                                </div>
-
-                                <div className="space-y-3">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-[11px] font-bold text-white/70">
-                                      점수를 누르면 왜 이 점수가 나왔는지와 바로 할 대응을 AI 기준으로 짧게 보여줍니다.
-                                    </p>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-white/50">
-                                      점수 선택
-                                    </p>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                                    {selectedSeatDomainSummary.map((domain) => {
-                                      const isActive = domain.key === selectedSeatInsightKey;
-                                      return (
-                                        <button
-                                          key={domain.key}
-                                          type="button"
-                                          onClick={() => setSelectedSeatInsightKey(domain.key)}
-                                          className={cn(
-                                            "rounded-2xl border px-3 py-3 text-center transition-all",
-                                            isActive
-                                              ? "border-white bg-white/20 shadow-lg shadow-black/10"
-                                              : "border-white/10 bg-white/10 hover:bg-white/15"
-                                          )}
-                                        >
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-white/60">{domain.label}</p>
-                                          <Badge className={cn("mt-2 border-none font-black", domain.badgeClass)}>
-                                            {domain.score}
-                                          </Badge>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {selectedSeatDomainInsight && (
-                                    <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/20 p-4">
-                                      <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-white/60">AI 분석</p>
-                                          <p className="mt-1 text-sm font-black text-white">
-                                            {selectedSeatDomainInsight.label} {selectedSeatDomainInsight.score}점
-                                          </p>
-                                        </div>
-                                        <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
-                                          {selectedSeatDomainInsight.score}
+                                      {selectedSeatSignal.secondaryFlags.map((flag) => (
+                                        <Badge key={`${selectedSeat.id}_${flag}`} className={cn("border-none font-black", selectedSeatPresentation.flagClass)}>
+                                          {flag}
                                         </Badge>
-                                      </div>
-                                      <p className="mt-3 text-sm font-bold leading-relaxed text-white/90">
-                                        {selectedSeatDomainInsight.analysis}
-                                      </p>
-                                      <p className="mt-2 text-xs font-bold leading-relaxed text-white/75">
-                                        대응: {selectedSeatDomainInsight.action}
-                                      </p>
-                                    </div>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <Badge className="border-none bg-white/16 font-black text-white">운영 신호 확인중</Badge>
                                   )}
                                 </div>
-                              </>
+                                <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-white/55">오늘 개입 요약</p>
+                                <p className="mt-2 text-lg font-black leading-snug text-white">
+                                  {selectedSeatSignal?.topReason || selectedAttendanceSignal?.note || '지금 바로 개입이 필요한 포인트가 없습니다.'}
+                                </p>
+                                <p className="mt-3 text-xs font-bold leading-6 text-white/78">
+                                  {selectedAttendanceSignal?.note || '출결 신호와 운영 히트맵을 함께 읽어 오늘 필요한 대응을 먼저 보여줍니다.'}
+                                </p>
+                              </motion.div>
+
+                              <motion.div {...getDeckMotionProps(0.06, 10)} className="rounded-[2rem] border border-white/10 bg-slate-950/20 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+                                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">선택된 AI 해석</p>
+                                {selectedSeatDomainInsight ? (
+                                  <>
+                                    <div className="mt-3 flex items-center justify-between gap-3">
+                                      <p className="text-base font-black text-white">
+                                        {selectedSeatDomainInsight.label} {selectedSeatDomainInsight.score}점
+                                      </p>
+                                      <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
+                                        {selectedSeatDomainInsight.score}
+                                      </Badge>
+                                    </div>
+                                    <p className="mt-3 text-sm font-bold leading-relaxed text-white/88">
+                                      {selectedSeatDomainInsight.analysis}
+                                    </p>
+                                    <p className="mt-3 text-xs font-bold leading-relaxed text-white/72">
+                                      대응: {selectedSeatDomainInsight.action}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="mt-3 text-sm font-bold leading-relaxed text-white/78">
+                                    도메인 점수를 선택하면 왜 이 점수가 나왔는지와 바로 할 대응을 짧게 보여줍니다.
+                                  </p>
+                                )}
+                              </motion.div>
+                            </div>
+
+                            {selectedSeatSignal && (
+                              <div className="rounded-[2rem] border border-white/10 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="text-[11px] font-bold text-white/74">
+                                    점수를 누르면 개입 이유와 다음 대응이 바로 바뀝니다.
+                                  </p>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">
+                                    도메인 선택
+                                  </p>
+                                </div>
+                                <div className={cn("mt-3 grid gap-2", isMobile ? "grid-cols-2" : "sm:grid-cols-5")}>
+                                  {selectedSeatDomainSummary.map((domain) => {
+                                    const isActive = domain.key === selectedSeatInsightKey;
+                                    return (
+                                      <button
+                                        key={domain.key}
+                                        type="button"
+                                        onClick={() => setSelectedSeatInsightKey(domain.key)}
+                                        className={cn(
+                                          "rounded-[1.35rem] border px-3 py-3 text-center transition-all",
+                                          isActive
+                                            ? "border-white bg-white/22 shadow-lg shadow-black/10"
+                                            : "border-white/10 bg-white/8 hover:bg-white/14"
+                                        )}
+                                      >
+                                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{domain.label}</p>
+                                        <Badge className={cn("mt-2 border-none font-black", domain.badgeClass)}>
+                                          {domain.score}
+                                        </Badge>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             )}
                           </div>
                         )}
-                      </DialogHeader>
+                      </div>
                     </div>
-                    
-                    <div className="flex min-h-0 flex-1 flex-col bg-[#fafafa]">
-                      <Tabs defaultValue="status" className="flex h-full min-h-0 w-full flex-col">
-                        <TabsList className="h-14 w-full shrink-0 rounded-none border-b bg-muted/20 p-0">
-                          <TabsTrigger value="status" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-primary transition-all">실시간 상태</TabsTrigger>
-                          <TabsTrigger value="history" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-emerald-500 transition-all">학습 히스토리</TabsTrigger>
-                          <TabsTrigger value="penalty" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-rose-500 transition-all">벌점 관리</TabsTrigger>
-                          <TabsTrigger value="reports" className="flex-1 h-full rounded-none data-[state=active]:bg-white data-[state=active]:shadow-none font-black text-xs uppercase tracking-widest border-b-2 border-transparent data-[state=active]:border-amber-500 transition-all">리포트 내역</TabsTrigger>
-                        </TabsList>
 
-                        <div className="min-h-0 flex-1 overflow-hidden">
-                          <TabsContent value="status" className="mt-0 h-full overflow-y-auto custom-scrollbar p-6 pb-28 sm:p-8 sm:pb-32 space-y-8">
-                            {isEditMode ? (
-                              <div className="grid gap-4">
-                                <div className="space-y-3 p-6 rounded-[2rem] bg-white border-2 border-primary/5 shadow-sm">
-                                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-2"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
-                                  <Select value={selectedSeat.seatZone || '미정'} onValueChange={handleUpdateZone}>
-                                    <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
-                                      <SelectValue placeholder="구역 선택" />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-xl border-none shadow-2xl">
-                                      <SelectItem value="미정" className="font-bold">미정</SelectItem>
-                                      <SelectItem value="A존 (집중)" className="font-bold">A존 (집중)</SelectItem>
-                                      <SelectItem value="B존 (표준)" className="font-bold">B존 (표준)</SelectItem>
-                                      <SelectItem value="고정석" className="font-bold">고정석</SelectItem>
-                                      <SelectItem value="자유석" className="font-bold">자유석</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                    <div className="flex min-h-0 flex-1 flex-col bg-[#F7F9FC]">
+                      <div className={cn("grid min-h-0 flex-1", isMobile ? "grid-cols-1" : "lg:grid-cols-[340px_minmax(0,1fr)]")}>
+                        <div className="border-b border-[#DDE7FF] bg-white/82 backdrop-blur-sm lg:border-b-0 lg:border-r">
+                          <div className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
+                            <motion.div {...getDeckMotionProps(0.08, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-5 shadow-sm">
+                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/48">First Check</p>
+                              <h4 className="mt-3 text-lg font-black tracking-tight text-[#14295F]">오늘 먼저 볼 개입 포인트</h4>
+                              <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
+                                {selectedSeatSignal?.topReason || selectedAttendanceSignal?.note || '지금 바로 개입이 필요한 포인트가 없습니다.'}
+                              </p>
+                              {selectedSeatDomainInsight && (
+                                <div className="mt-4 rounded-[1.5rem] border border-[#D7E4FF] bg-[#F8FBFF] p-4">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="text-sm font-black text-[#14295F]">{selectedSeatDomainInsight.label}</p>
+                                    <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
+                                      {selectedSeatDomainInsight.score}
+                                    </Badge>
+                                  </div>
+                                  <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                                    대응: {selectedSeatDomainInsight.action}
+                                  </p>
                                 </div>
-                                <div className="grid gap-3">
-                                  <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-rose-200">좌석 배정 해제</Button>
-                                  <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="w-full h-12 rounded-xl font-black gap-2 border-2"><ArrowRightLeft className="h-4 w-4" /> 통로로 전환하기</Button>
+                              )}
+                            </motion.div>
+
+                            <motion.div {...getDeckMotionProps(0.12, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                              <div className="flex items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/48">Quick Action</p>
+                                  <h4 className="mt-2 text-lg font-black tracking-tight text-[#14295F]">
+                                    {isEditMode ? '좌석 관리 액션' : '지금 바로 실행'}
+                                  </h4>
+                                </div>
+                                {isEditMode ? (
+                                  <Badge className="h-7 rounded-full border-none bg-[#FFF2E8] px-3 text-[10px] font-black text-[#C95A08]">편집 모드</Badge>
+                                ) : (
+                                  <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#2554D7]">실시간 조치</Badge>
+                                )}
+                              </div>
+
+                              {isEditMode ? (
+                                <div className="mt-4 space-y-3">
+                                  <div className="space-y-2">
+                                    <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
+                                    <Select value={selectedSeat.seatZone || '미정'} onValueChange={handleUpdateZone}>
+                                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
+                                        <SelectValue placeholder="구역 선택" />
+                                      </SelectTrigger>
+                                      <SelectContent className="rounded-xl border-none shadow-2xl">
+                                        <SelectItem value="미정" className="font-bold">미정</SelectItem>
+                                        <SelectItem value="A존 (집중)" className="font-bold">A존 (집중)</SelectItem>
+                                        <SelectItem value="B존 (표준)" className="font-bold">B존 (표준)</SelectItem>
+                                        <SelectItem value="고정석" className="font-bold">고정석</SelectItem>
+                                        <SelectItem value="자유석" className="font-bold">자유석</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="h-12 w-full rounded-xl font-black shadow-lg shadow-rose-100">
+                                    좌석 배정 해제
+                                  </Button>
+                                  <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="h-11 w-full rounded-xl border-2 font-black gap-2">
+                                    <ArrowRightLeft className="h-4 w-4" />
+                                    통로로 전환하기
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="mt-4 grid grid-cols-2 gap-3">
+                                  <Button onClick={() => handleStatusUpdate('studying')} disabled={isSaving} className="h-20 rounded-[1.6rem] bg-blue-600 font-black text-white shadow-lg shadow-blue-200 hover:bg-blue-700">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <Zap className="h-5 w-5 fill-current" />
+                                      <span className="text-sm leading-none">입실 확인</span>
+                                    </div>
+                                  </Button>
+                                  <Button variant="outline" onClick={() => handleStatusUpdate('absent')} disabled={isSaving} className="h-20 rounded-[1.6rem] border-2 border-rose-100 font-black text-rose-600 hover:bg-rose-50">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <AlertCircle className="h-5 w-5" />
+                                      <span className="text-sm leading-none">퇴실 처리</span>
+                                    </div>
+                                  </Button>
+                                </div>
+                              )}
+                            </motion.div>
+
+                            <motion.div {...getDeckMotionProps(0.16, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/48">Operator Memo</p>
+                              <div className="mt-4 space-y-3">
+                                <div className="rounded-[1.35rem] bg-[#F7FAFF] px-4 py-3">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">최근 학습 기록</p>
+                                  <p className="mt-1 text-sm font-black text-[#14295F]">
+                                    {selectedStudentHistoryMetrics.latestDateKey ? `${selectedStudentHistoryMetrics.latestDateKey} · ${formatDurationMinutes(selectedStudentHistoryMetrics.latestMinutes)}` : '기록 없음'}
+                                  </p>
+                                </div>
+                                <div className="rounded-[1.35rem] bg-[#FFF7F7] px-4 py-3">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-rose-500">최근 벌점</p>
+                                  <p className="mt-1 text-sm font-black text-slate-700">
+                                    {latestSelectedPenaltyLog?.reason || '최근 벌점 기록 없음'}
+                                  </p>
+                                </div>
+                                <div className="rounded-[1.35rem] bg-[#FFF9F0] px-4 py-3">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-600">최근 리포트</p>
+                                  <p className="mt-1 text-sm font-black text-slate-700">
+                                    {latestSelectedReport?.dateKey || '발송 이력 없음'}
+                                  </p>
                                 </div>
                               </div>
-                            ) : (
-                              <div className="grid grid-cols-2 gap-4">
-                                <Button onClick={() => handleStatusUpdate('studying')} disabled={isSaving} className="h-20 sm:h-24 rounded-[2rem] font-black bg-blue-600 hover:bg-blue-700 text-white gap-2 flex flex-col items-center justify-center shadow-xl active:scale-95 transition-all"><Zap className="h-5 w-5 fill-current" /><span className="text-base sm:text-lg leading-none">입실 확인</span></Button>
-                                <Button variant="outline" onClick={() => handleStatusUpdate('absent')} disabled={isSaving} className="h-20 sm:h-24 rounded-[2rem] font-black border-2 border-rose-100 text-rose-600 hover:bg-rose-50 gap-2 flex flex-col items-center justify-center active:scale-95 transition-all"><AlertCircle className="h-5 w-5" /><span className="text-base sm:text-lg leading-none">퇴실 처리</span></Button>
+                            </motion.div>
+                          </div>
+                        </div>
+
+                        <div className="min-h-0 flex flex-col">
+                          <Tabs defaultValue="status" className="flex h-full min-h-0 w-full flex-col">
+                            <div className={cn("px-4 pt-4", isMobile ? "" : "sm:px-6 sm:pt-6")}>
+                              <TabsList className="grid h-auto w-full grid-cols-4 rounded-[1.35rem] bg-[#EEF4FF] p-1">
+                                <TabsTrigger value="status" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-[#14295F] data-[state=active]:shadow-sm">실시간 상태</TabsTrigger>
+                                <TabsTrigger value="history" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">학습 히스토리</TabsTrigger>
+                                <TabsTrigger value="penalty" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-sm">벌점 관리</TabsTrigger>
+                                <TabsTrigger value="reports" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm">리포트 내역</TabsTrigger>
+                              </TabsList>
+                            </div>
+
+                            <div className="min-h-0 flex-1 overflow-hidden">
+                          <TabsContent value="status" className="mt-0 h-full overflow-y-auto custom-scrollbar p-6 pb-28 sm:p-8 sm:pb-32 space-y-6">
+                            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-4")}>
+                              <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">오늘 판정</p>
+                                <p className="mt-3 text-lg font-black text-[#14295F]">{selectedAttendanceSignal?.boardLabel || '확인중'}</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">{selectedAttendanceSignal?.note || '현재 상태를 기준으로 운영 신호를 표시합니다.'}</p>
                               </div>
-                            )}
+                              <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">루틴 예정</p>
+                                <p className="mt-3 text-lg font-black text-[#14295F]">{selectedAttendanceSignal?.routineExpectedArrivalTime || '미설정'}</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">도착 루틴과 실제 출결 흐름을 함께 확인합니다.</p>
+                              </div>
+                              <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">오늘 공부</p>
+                                <p className="mt-3 text-lg font-black text-[#14295F]">{selectedAttendanceSignal?.todayStudyLabel || timeInfo?.total || '-'}</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">실시간 세션과 누적 시간을 같이 읽습니다.</p>
+                              </div>
+                              <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">복귀/퇴실</p>
+                                <p className="mt-3 text-lg font-black text-[#14295F]">
+                                  {selectedAttendanceSignal?.isReturned
+                                    ? '복귀'
+                                    : selectedAttendanceSignal?.isCheckedOut
+                                      ? '퇴실'
+                                      : selectedAttendanceSignal?.seatStatus === 'away' || selectedAttendanceSignal?.seatStatus === 'break'
+                                        ? '외출 중'
+                                        : '진행 중'}
+                                </p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">{isEditMode ? '좌측 관리 패널에서 수정할 수 있습니다.' : '빠른 조치는 좌측 즉시 액션에서 처리합니다.'}</p>
+                              </div>
+                            </div>
 
                             <div className="space-y-4">
                               <div className="flex items-center justify-between px-1">
-                                <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest flex items-center gap-2"><History className="h-3 w-3" /> 오늘의 몰입 세션</h4>
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase">{todayKey}</span>
+                                <h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary/60"><History className="h-3 w-3" /> 오늘의 몰입 세션</h4>
+                                <span className="text-[9px] font-bold uppercase text-muted-foreground">{todayKey}</span>
                               </div>
-                              <div className="grid gap-2">
+                              <div className="grid gap-3">
                                 {sessionsLoading ? (
                                   <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-6 w-6 text-primary opacity-20" /></div>
                                 ) : (
                                   <>
                                     {selectedSeat.status === 'studying' && selectedSeat.lastCheckInAt && (
-                                      <div className="p-4 rounded-2xl bg-blue-600 text-white border border-blue-700 shadow-lg flex items-center justify-between animate-pulse">
+                                      <div className="flex items-center justify-between rounded-[1.8rem] border border-blue-700 bg-blue-600 p-4 text-white shadow-lg">
                                         <div className="flex items-center gap-3">
-                                          <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center"><Zap className="h-4 w-4 fill-current text-white" /></div>
+                                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20"><Zap className="h-4 w-4 fill-current text-white" /></div>
                                           <div className="grid leading-tight">
-                                            <span className="font-black text-xs">{format(selectedSeat.lastCheckInAt.toDate(), 'HH:mm:ss')} ~ 진행 중</span>
-                                            <span className="text-[8px] font-bold text-white/60 uppercase">활성 세션</span>
+                                            <span className="text-xs font-black">{format(selectedSeat.lastCheckInAt.toDate(), 'HH:mm:ss')} ~ 진행 중</span>
+                                            <span className="text-[8px] font-bold uppercase text-white/60">활성 세션</span>
                                           </div>
                                         </div>
-                                        <Badge className="bg-white/20 text-white border-none font-black text-[10px] px-2.5 h-6">
+                                        <Badge className="h-6 border-none bg-white/20 px-2.5 text-[10px] font-black text-white">
                                           {timeInfo?.session}
                                         </Badge>
                                       </div>
                                     )}
-                                    
+
                                     {selectedStudentSessions.length === 0 && selectedSeat.status !== 'studying' ? (
-                                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px] text-muted-foreground">기록된 세션이 없습니다.</div>
+                                      <div className="rounded-[1.8rem] border-2 border-dashed border-[#D7E4FF] py-10 text-center text-[10px] font-bold italic text-muted-foreground">
+                                        기록된 세션이 없습니다.
+                                      </div>
                                     ) : (
                                       selectedStudentSessions.map((session) => (
-                                        <div key={session.id} className="p-4 rounded-2xl bg-white border border-border/50 shadow-sm flex items-center justify-between">
+                                        <div key={session.id} className="flex items-center justify-between rounded-[1.65rem] border border-[#D7E4FF] bg-white p-4 shadow-sm">
                                           <div className="flex items-center gap-3">
-                                            <div className="h-9 w-9 rounded-xl bg-primary/5 flex items-center justify-center"><Timer className="h-4 w-4 text-primary/40" /></div>
-                                            <div className="grid leading-tight"><span className="font-black text-xs">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span><span className="text-[8px] font-bold text-muted-foreground uppercase">기록됨</span></div>
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/5"><Timer className="h-4 w-4 text-primary/40" /></div>
+                                            <div className="grid leading-tight">
+                                              <span className="text-xs font-black">{format(session.startTime.toDate(), 'HH:mm')} ~ {format(session.endTime.toDate(), 'HH:mm')}</span>
+                                              <span className="text-[8px] font-bold uppercase text-muted-foreground">기록됨</span>
+                                            </div>
                                           </div>
-                                          <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[10px] px-2.5 h-6">{session.durationMinutes}분</Badge>
+                                          <Badge className="h-6 border-none bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-600">{session.durationMinutes}분</Badge>
                                         </div>
                                       ))
                                     )}
@@ -3043,25 +3218,42 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           <TabsContent value="history" className="mt-0 h-full overflow-y-auto custom-scrollbar p-6 pb-28 sm:p-8 sm:pb-32 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <TrendingUp className="h-4 w-4 text-emerald-600" />
-                              <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">최근 학습 시간 변화</h4>
+                              <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600">최근 학습 시간 변화</h4>
                             </div>
-                            <div className="grid gap-2">
+
+                            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+                              <div className="rounded-[1.9rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">최근 평균</p>
+                                <p className="dashboard-number mt-3 text-2xl text-emerald-600">{formatDurationMinutes(selectedStudentHistoryMetrics.averageMinutes)}</p>
+                              </div>
+                              <div className="rounded-[1.9rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">최고 기록</p>
+                                <p className="dashboard-number mt-3 text-2xl text-[#14295F]">{formatDurationMinutes(selectedStudentHistoryMetrics.peakMinutes)}</p>
+                              </div>
+                              <div className="rounded-[1.9rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">가장 최근</p>
+                                <p className="dashboard-number mt-3 text-2xl text-[#14295F]">{formatDurationMinutes(selectedStudentHistoryMetrics.latestMinutes)}</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">{selectedStudentHistoryMetrics.latestDateKey || '기록 없음'}</p>
+                              </div>
+                            </div>
+
+                            <div className="grid gap-3">
                               {sessionsLoading ? (
                                 <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
                               ) : selectedStudentHistory.length === 0 ? (
-                                <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">학습 기록이 없습니다.</div>
+                                <div className="rounded-[2rem] border-2 border-dashed border-emerald-100 py-20 text-center text-sm font-black italic text-slate-400">학습 기록이 없습니다.</div>
                               ) : (
                                 selectedStudentHistory.map((hLog) => (
-                                  <div key={hLog.dateKey} className="p-4 rounded-2xl bg-white border shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all">
+                                  <div key={hLog.dateKey} className="flex items-center justify-between rounded-[1.8rem] border border-emerald-100 bg-white p-4 shadow-sm transition-all hover:border-emerald-200">
                                     <div className="flex flex-col gap-0.5">
                                       <span className="text-xs font-black text-primary">{format(new Date(hLog.dateKey.replace(/-/g, '/')), 'MM/dd (EEE)', {locale: ko})}</span>
-                                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">일일 기록</span>
+                                      <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">일일 기록</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                      <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden shadow-inner">
-                                        <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (hLog.totalMinutes / 480) * 100)}%` }} />
+                                      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted shadow-inner">
+                                        <div className="h-full rounded-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (hLog.totalMinutes / 480) * 100)}%` }} />
                                       </div>
-                                      <div className="text-right min-w-[60px]">
+                                      <div className="min-w-[70px] text-right">
                                         <span className="dashboard-number text-sm text-slate-900">{Math.floor(hLog.totalMinutes / 60)}시간 {hLog.totalMinutes % 60}분</span>
                                       </div>
                                     </div>
@@ -3075,44 +3267,47 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             <div className="flex items-center justify-between gap-2 px-1">
                               <div className="flex items-center gap-2">
                                 <ShieldAlert className="h-4 w-4 text-rose-600" />
-                                <h4 className="text-[10px] font-black uppercase text-rose-600 tracking-widest">벌점 현황</h4>
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-600">벌점 현황</h4>
                               </div>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 rounded-lg px-2 text-[10px] font-black text-rose-600 hover:bg-rose-50"
+                                className="h-8 rounded-xl px-3 text-[10px] font-black text-rose-600 hover:bg-rose-50"
                                 onClick={() => setIsPenaltyGuideOpen(true)}
                               >
                                 규칙 보기
                               </Button>
                             </div>
 
-                            <div className="rounded-3xl border border-rose-100 bg-white p-5 shadow-sm space-y-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">현재 누적 벌점</p>
-                                  <p className="dashboard-number text-3xl text-rose-600">{selectedPenaltyRecovery.effectivePoints}점</p>
-                                  {selectedPenaltyRecovery.recoveredPoints > 0 && (
-                                    <p className="text-[10px] font-bold text-rose-500/80">
-                                      원점수 {selectedPenaltyRecovery.basePoints}점 · 회복 {selectedPenaltyRecovery.recoveredPoints}점
-                                    </p>
-                                  )}
-                                </div>
-                                <Badge className="border-none bg-rose-50 text-rose-700 font-black">
-                                  학생: {selectedStudentName}
-                                </Badge>
+                            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+                              <div className="rounded-[1.9rem] border border-rose-100 bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-500">현재 누적</p>
+                                <p className="dashboard-number mt-3 text-3xl text-rose-600">{selectedPenaltyRecovery.effectivePoints}점</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">학생: {selectedStudentName}</p>
                               </div>
+                              <div className="rounded-[1.9rem] border border-rose-100 bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-500">자동 회복</p>
+                                <p className="dashboard-number mt-3 text-3xl text-emerald-600">{selectedPenaltyRecovery.recoveredPoints}점</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">원점수 {selectedPenaltyRecovery.basePoints}점</p>
+                              </div>
+                              <div className="rounded-[1.9rem] border border-rose-100 bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-500">최근 반영일</p>
+                                <p className="mt-3 text-base font-black text-[#14295F]">{selectedPenaltyRecovery.latestPositiveLabel}</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">신규 벌점 없이 7일이 지나면 1점씩 회복됩니다.</p>
+                              </div>
+                            </div>
 
-                              {canAdjustPenalty && (
-                                <div className="grid gap-3 rounded-2xl border border-rose-100 bg-rose-50/40 p-4">
+                            {canAdjustPenalty && (
+                              <div className="rounded-[2rem] border border-rose-100 bg-white p-5 shadow-sm">
+                                <div className="grid gap-3 rounded-[1.5rem] border border-rose-100 bg-rose-50/50 p-4">
                                   <div className="grid gap-1">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-rose-600">벌점 부여 사유</Label>
+                                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-600">벌점 부여 사유</Label>
                                     <Textarea
                                       value={manualPenaltyReason}
                                       onChange={(event) => setManualPenaltyReason(event.target.value)}
                                       placeholder="벌점 부여 사유를 입력해 주세요."
-                                      className="min-h-[88px] rounded-xl border-2 font-bold resize-none"
+                                      className="min-h-[88px] resize-none rounded-xl border-2 font-bold"
                                     />
                                   </div>
                                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[120px_1fr]">
@@ -3122,12 +3317,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                       step={1}
                                       value={manualPenaltyPoints}
                                       onChange={(event) => setManualPenaltyPoints(event.target.value)}
-                                      className="h-11 rounded-xl border-2 font-black text-center"
+                                      className="h-11 rounded-xl border-2 text-center font-black"
                                     />
                                     <Button
                                       onClick={handleAddPenalty}
                                       disabled={isPenaltySaving}
-                                      className="h-11 rounded-xl font-black bg-rose-600 hover:bg-rose-700"
+                                      className="h-11 rounded-xl bg-rose-600 font-black hover:bg-rose-700"
                                     >
                                       {isPenaltySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : '벌점 부여'}
                                     </Button>
@@ -3137,15 +3332,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                       variant="outline"
                                       onClick={handleResetPenalty}
                                       disabled={isPenaltySaving}
-                                      className="h-11 rounded-xl font-black border-2 border-rose-200 text-rose-700 hover:bg-rose-50 gap-2"
+                                      className="h-11 rounded-xl border-2 border-rose-200 font-black text-rose-700 hover:bg-rose-50 gap-2"
                                     >
                                       <RotateCcw className="h-4 w-4" />
                                       벌점 초기화
                                     </Button>
                                   )}
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
 
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 px-1">
@@ -3155,9 +3350,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               {sessionsLoading ? (
                                 <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
                               ) : selectedStudentPenaltyLogs.length === 0 ? (
-                                <div className="py-20 text-center opacity-30 italic font-black text-sm border-2 border-dashed rounded-3xl">벌점 기록이 없습니다.</div>
+                                <div className="rounded-[2rem] border-2 border-dashed border-rose-100 py-20 text-center text-sm font-black italic text-slate-400">벌점 기록이 없습니다.</div>
                               ) : (
-                                <div className="grid gap-2">
+                                <div className="grid gap-3">
                                   {selectedStudentPenaltyLogs.map((log) => {
                                     const rawPoints = Number(log.pointsDelta || 0);
                                     const createdAtDate = (log.createdAt as any)?.toDate?.();
@@ -3171,18 +3366,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                             ? '루틴 미작성'
                                           : '지각/결석 신청';
                                     return (
-                                      <div key={log.id} className="p-4 rounded-2xl bg-white border border-rose-100 shadow-sm flex items-start justify-between gap-3">
-                                        <div className="grid gap-1 min-w-0">
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <Badge className="border-none bg-rose-50 text-rose-700 font-black text-[10px] h-5 px-2">{sourceLabel}</Badge>
+                                      <div key={log.id} className="flex items-start justify-between gap-3 rounded-[1.8rem] border border-rose-100 bg-white p-4 shadow-sm">
+                                        <div className="grid min-w-0 gap-1">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <Badge className="h-5 border-none bg-rose-50 px-2 text-[10px] font-black text-rose-700">{sourceLabel}</Badge>
                                             <span className="text-[10px] font-bold text-muted-foreground">{createdAtLabel}</span>
                                           </div>
-                                          <p className="text-sm font-bold text-foreground/80 break-keep">{log.reason || '사유 없음'}</p>
+                                          <p className="break-keep text-sm font-bold text-foreground/80">{log.reason || '사유 없음'}</p>
                                         </div>
-                                        <Badge className={cn(
-                                          "border-none font-black text-xs h-6 px-2.5",
-                                          rawPoints >= 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
-                                        )}>
+                                        <Badge className={cn("h-6 border-none px-2.5 text-xs font-black", rawPoints >= 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700")}>
                                           {rawPoints >= 0 ? `+${rawPoints}` : rawPoints}점
                                         </Badge>
                                       </div>
@@ -3196,34 +3388,62 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           <TabsContent value="reports" className="mt-0 h-full min-h-0 overflow-y-auto custom-scrollbar p-6 pb-36 sm:p-8 sm:pb-40 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <FileText className="h-4 w-4 text-amber-600" />
-                              <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest">최근 발송된 리포트 (5건)</h4>
+                              <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-600">최근 발송된 리포트 (5건)</h4>
                             </div>
+
+                            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
+                              <div className="rounded-[1.9rem] border border-amber-100 bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">최근 발송</p>
+                                <p className="mt-3 text-base font-black text-[#14295F]">{latestSelectedReport?.dateKey || '발송 없음'}</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">{latestSelectedReport ? '가장 최근 리포트 날짜입니다.' : '아직 발송된 리포트가 없습니다.'}</p>
+                              </div>
+                              <div className="rounded-[1.9rem] border border-amber-100 bg-white p-5 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">열람 상태</p>
+                                <p className="mt-3 text-base font-black text-[#14295F]">
+                                  {selectedStudentReports.filter((report) => Boolean(report.viewedAt)).length} / {selectedStudentReports.length}
+                                </p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">발송된 리포트 중 열람 완료 수입니다.</p>
+                              </div>
+                            </div>
+
                             <div className="grid gap-3">
                               {sessionsLoading ? (
                                 <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div>
                               ) : selectedStudentReports.length === 0 ? (
-                                <div className="py-20 text-center opacity-20 italic font-black text-sm border-2 border-dashed rounded-3xl">발송된 리포트가 없습니다.</div>
+                                <div className="rounded-[2rem] border-2 border-dashed border-amber-100 py-20 text-center text-sm font-black italic text-slate-400">발송된 리포트가 없습니다.</div>
                               ) : (
                                 selectedStudentReports.map((report) => (
                                   <button
                                     key={report.id}
                                     type="button"
                                     onClick={() => setSelectedReportPreview(report)}
-                                    className="w-full text-left p-5 rounded-2xl bg-white border border-amber-100 shadow-sm space-y-2 relative group hover:shadow-md transition-all"
+                                    className="w-full text-left"
                                   >
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-[10px] font-black text-amber-600 uppercase tracking-tighter">{report.dateKey}</span>
-                                      {report.viewedAt && <Badge className="bg-emerald-50 text-emerald-700 border-none font-black text-[10px] px-1.5 h-5">열람함</Badge>}
+                                    <div className="rounded-[1.85rem] border border-amber-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-600">{report.dateKey}</span>
+                                            {report.viewedAt ? (
+                                              <Badge className="h-5 border-none bg-emerald-50 px-2 text-[10px] font-black text-emerald-700">열람함</Badge>
+                                            ) : (
+                                              <Badge className="h-5 border-none bg-amber-50 px-2 text-[10px] font-black text-amber-700">미열람</Badge>
+                                            )}
+                                          </div>
+                                          <p className="mt-3 line-clamp-2 text-sm font-bold leading-6 text-slate-700">{report.content.substring(0, 100)}...</p>
+                                        </div>
+                                        <ChevronRight className="mt-1 h-4 w-4 shrink-0 opacity-25" />
+                                      </div>
                                     </div>
-                                    <p className="text-xs font-bold text-foreground/70 line-clamp-2 leading-relaxed">{report.content.substring(0, 100)}...</p>
                                   </button>
                                 ))
                               )}
                             </div>
-                            <div className="border-t border-dashed pt-2">
+
+                            <div className="border-t border-dashed pt-3">
                               <Button
                                 variant="secondary"
-                                className="h-14 w-full rounded-2xl border border-primary/5 bg-primary/5 font-black text-primary transition-all hover:bg-primary/10 sm:h-16"
+                                className="h-16 w-full rounded-[1.7rem] border border-primary/5 bg-primary/5 font-black text-primary transition-all hover:bg-primary/10"
                                 asChild
                               >
                                 <Link href={`/dashboard/teacher/students/${selectedSeat.studentId}`}>
@@ -3236,72 +3456,252 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           </TabsContent>
                         </div>
                       </Tabs>
+                    </div>
+                  </div>
 
                       <Dialog open={isPenaltyGuideOpen} onOpenChange={setIsPenaltyGuideOpen}>
-                        <DialogContent className={cn("rounded-[2rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-[420px]" : "sm:max-w-lg")}>
-                          <div className="bg-gradient-to-r from-rose-600 to-rose-500 p-6 text-white">
-                            <DialogHeader>
-                              <DialogTitle className="text-xl font-black tracking-tight">벌점 규정 안내</DialogTitle>
-                              <DialogDescription className="text-white/80 font-bold">
-                                부여 기준, 누적 단계, 자동 회복 규칙
-                              </DialogDescription>
-                            </DialogHeader>
-                          </div>
-                          <div className="space-y-3 bg-white p-5">
-                            <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
-                              <p>지각 출석: +1점</p>
-                              <p>결석: +2점</p>
-                              <p>루틴 미작성: +{ROUTINE_MISSING_PENALTY_POINTS}점</p>
-                              <p>센터 수동 부여: 입력 점수만큼 반영</p>
+                        <DialogContent
+                          className={cn(
+                            "overflow-hidden border-none p-0 shadow-2xl",
+                            isMobile
+                              ? "fixed left-1/2 top-1/2 w-[95vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]"
+                              : "sm:max-w-xl rounded-[2.2rem]",
+                          )}
+                        >
+                          <motion.div
+                            {...getDeckMotionProps(0.02, 14)}
+                            className="overflow-hidden rounded-[inherit] bg-[#F7F9FC]"
+                          >
+                            <div className="border-b border-white/15 bg-[linear-gradient(135deg,#7F1D1D_0%,#BE123C_55%,#FB7185_100%)] p-6 text-white sm:p-7">
+                              <DialogHeader className="space-y-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge className="border-white/15 bg-white/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-white">
+                                    Penalty Guide
+                                  </Badge>
+                                  <Badge className="border-white/15 bg-white/12 px-3 py-1 text-[10px] font-bold text-white/90">
+                                    누적 {selectedPenaltyRecovery.effectivePoints}점 적용 중
+                                  </Badge>
+                                </div>
+                                <div className="space-y-1">
+                                  <DialogTitle className="font-aggro-display text-2xl tracking-tight sm:text-[1.9rem]">
+                                    벌점 운영 규칙
+                                  </DialogTitle>
+                                  <DialogDescription className="text-sm font-semibold leading-relaxed text-white/80">
+                                    현재 학생에게 적용되는 벌점 기준과 자동 회복 흐름을 한 번에 확인할 수 있도록 정리했습니다.
+                                  </DialogDescription>
+                                </div>
+                              </DialogHeader>
                             </div>
-                            <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
-                              <p>7점 이상: 선생님과 상담</p>
-                              <p>12점 이상: 학부모 상담</p>
-                              <p>20점 이상: 퇴원</p>
+
+                            <div className="space-y-4 p-5 sm:p-6">
+                              <div className="grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-[1.6rem] border border-rose-100 bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-500">원점수</p>
+                                  <p className="mt-2 dashboard-number text-3xl font-black text-slate-900">
+                                    {selectedPenaltyRecovery.basePoints}
+                                    <span className="ml-1 text-lg">점</span>
+                                  </p>
+                                  <p className="mt-1 text-xs font-semibold text-slate-500">수동 부여와 규칙 반영 전 기준 점수</p>
+                                </div>
+                                <div className="rounded-[1.6rem] border border-emerald-100 bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-600">자동 회복</p>
+                                  <p className="mt-2 dashboard-number text-3xl font-black text-slate-900">
+                                    {selectedPenaltyRecovery.recoveredPoints}
+                                    <span className="ml-1 text-lg">점</span>
+                                  </p>
+                                  <p className="mt-1 text-xs font-semibold text-slate-500">신규 벌점 없이 유지된 기간만큼 차감</p>
+                                </div>
+                                <div className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">최근 반영</p>
+                                  <p className="mt-2 text-lg font-black text-slate-900">{selectedPenaltyRecovery.latestPositiveLabel}</p>
+                                  <p className="mt-1 text-xs font-semibold text-slate-500">가장 최근에 벌점이 올라간 날짜</p>
+                                </div>
+                              </div>
+
+                              <div className="grid gap-3 sm:grid-cols-[1.05fr_0.95fr]">
+                                <div className="rounded-[1.8rem] border border-rose-100 bg-white p-5 shadow-[0_22px_48px_rgba(15,23,42,0.06)]">
+                                  <div className="mb-4 flex items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-500">부여 기준</p>
+                                      <p className="mt-1 text-base font-black text-slate-900">상황별 반영 점수</p>
+                                    </div>
+                                    <Badge className="border-rose-200 bg-rose-50 px-3 py-1 text-[10px] font-bold text-rose-700">
+                                      운영 기준
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {[
+                                      { label: '지각 출석', value: '+1점' },
+                                      { label: '결석', value: '+2점' },
+                                      { label: '루틴 미작성', value: `+${ROUTINE_MISSING_PENALTY_POINTS}점` },
+                                      { label: '센터 수동 부여', value: '입력 점수 반영' },
+                                    ].map((rule) => (
+                                      <div
+                                        key={rule.label}
+                                        className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3"
+                                      >
+                                        <span className="text-sm font-semibold text-slate-700">{rule.label}</span>
+                                        <span className="text-sm font-black text-slate-950">{rule.value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                  <div className="rounded-[1.8rem] border border-amber-100 bg-white p-5 shadow-[0_22px_48px_rgba(15,23,42,0.06)]">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-600">상담 단계</p>
+                                    <div className="mt-4 space-y-2">
+                                      {[
+                                        { label: '7점 이상', value: '선생님 상담' },
+                                        { label: '12점 이상', value: '학부모 상담' },
+                                        { label: '20점 이상', value: '퇴원 검토' },
+                                      ].map((step) => (
+                                        <div
+                                          key={step.label}
+                                          className="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3"
+                                        >
+                                          <p className="text-xs font-black text-amber-700">{step.label}</p>
+                                          <p className="mt-1 text-sm font-semibold text-slate-700">{step.value}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="rounded-[1.8rem] border border-emerald-100 bg-[#F3FBF8] p-5 shadow-[0_22px_48px_rgba(15,23,42,0.06)]">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-600">회복 규칙</p>
+                                    <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-700">
+                                      신규 벌점 없이 7일이 지나면 1점이 자동 회복됩니다.
+                                    </p>
+                                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-white/90 px-4 py-3 text-sm font-semibold text-slate-700">
+                                      적용 점수는 <span className="font-black text-slate-950">{selectedPenaltyRecovery.effectivePoints}점</span>이며,
+                                      원점수 {selectedPenaltyRecovery.basePoints}점에서 회복 {selectedPenaltyRecovery.recoveredPoints}점을 제외한 값입니다.
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 text-sm font-bold text-slate-700 space-y-1">
-                              <p>신규 벌점 없이 7일 경과 시 1점 자동 회복</p>
-                              <p>원점수 {selectedPenaltyRecovery.basePoints}점 · 회복 {selectedPenaltyRecovery.recoveredPoints}점 · 적용 {selectedPenaltyRecovery.effectivePoints}점</p>
-                              <p>최근 벌점 반영일: {selectedPenaltyRecovery.latestPositiveLabel}</p>
-                            </div>
-                          </div>
-                          <DialogFooter className="border-t bg-white p-4">
-                            <Button className="w-full h-11 rounded-xl font-black" onClick={() => setIsPenaltyGuideOpen(false)}>
-                              확인
-                            </Button>
-                          </DialogFooter>
+
+                            <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
+                              <Button
+                                className="h-12 w-full rounded-[1.1rem] bg-[#14295F] font-black text-white shadow-[0_14px_32px_rgba(20,41,95,0.24)] hover:bg-[#10224f]"
+                                onClick={() => setIsPenaltyGuideOpen(false)}
+                              >
+                                확인
+                              </Button>
+                            </DialogFooter>
+                          </motion.div>
                         </DialogContent>
                       </Dialog>
 
                       <Dialog open={!!selectedReportPreview} onOpenChange={(open) => !open && setSelectedReportPreview(null)}>
-                        <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
+                        <DialogContent className={cn("overflow-hidden border-none p-0 shadow-2xl", isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "max-h-[90vh] rounded-[2.5rem] sm:max-w-2xl")}>
                           {selectedReportPreview && (
-                            <>
-                              <div className="bg-amber-500 text-white p-8 relative shrink-0">
-                                <DialogHeader className="relative z-10">
-                                  <DialogTitle className="text-2xl font-black tracking-tighter">발송 리포트 상세</DialogTitle>
-                                  <DialogDescription className="text-white/80 font-bold">
-                                    {selectedReportPreview.dateKey} · {selectedStudentName} 학생
-                                  </DialogDescription>
+                            <motion.div
+                              {...getDeckMotionProps(0.04, 16)}
+                              className="flex h-full flex-col overflow-hidden bg-[#F7F9FC]"
+                            >
+                              <div className="shrink-0 border-b border-white/10 bg-[linear-gradient(135deg,#14295F_0%,#2246A0_58%,#FF8B2B_100%)] px-6 py-7 text-white sm:px-8 sm:py-8">
+                                <DialogHeader className="space-y-5">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge className="border-white/15 bg-white/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-white">
+                                      Report Review
+                                    </Badge>
+                                    <Badge className="border-white/15 bg-white/12 px-3 py-1 text-[10px] font-bold text-white/90">
+                                      {selectedReportPreview.dateKey}
+                                    </Badge>
+                                    <Badge className="border-white/15 bg-white/12 px-3 py-1 text-[10px] font-bold text-white/90">
+                                      {selectedStudentName}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <DialogTitle className="font-aggro-display text-2xl tracking-tight sm:text-[2rem]">
+                                      발송 리포트 상세
+                                    </DialogTitle>
+                                    <DialogDescription className="max-w-2xl text-sm font-semibold leading-relaxed text-white/82">
+                                      학부모에게 전달된 문장을 그대로 검토하고, 열람 여부와 발송 기준일을 빠르게 확인할 수 있는 상세 화면입니다.
+                                    </DialogDescription>
+                                  </div>
                                 </DialogHeader>
                               </div>
-                              <div className="flex-1 overflow-y-auto p-6 pb-10 sm:p-8 sm:pb-12 bg-white space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <Badge className="border-none bg-amber-50 text-amber-700 font-black">{selectedReportPreview.dateKey}</Badge>
-                                  {selectedReportPreview.viewedAt && <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">열람 완료</Badge>}
-                                </div>
-                                <div className="rounded-2xl border border-amber-100 bg-amber-50/30 p-5">
-                                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">
-                                    {selectedReportPreview.content?.trim() || '리포트 내용이 없습니다.'}
-                                  </p>
+
+                              <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
+                                <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+                                  <div className="space-y-4">
+                                    <div className="rounded-[1.9rem] border border-slate-200 bg-white p-5 shadow-[0_22px_48px_rgba(15,23,42,0.08)]">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.26em] text-[#FF7A16]">Delivery Brief</p>
+                                      <div className="mt-4 space-y-3">
+                                        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                                          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">기준일</p>
+                                          <p className="mt-1 text-sm font-bold text-slate-900">{selectedReportPreview.dateKey}</p>
+                                        </div>
+                                        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                                          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">열람 상태</p>
+                                          <p className="mt-1 text-sm font-bold text-slate-900">
+                                            {selectedReportPreview.viewedAt ? '열람 완료' : '미열람'}
+                                          </p>
+                                          <p className="mt-1 text-xs font-medium text-slate-500">
+                                            {selectedReportPreview.viewedAt
+                                              ? (() => {
+                                                  const viewedAtDate = toDateSafeAttendance(selectedReportPreview.viewedAt as any);
+                                                  return viewedAtDate
+                                                    ? format(viewedAtDate, 'MM/dd HH:mm')
+                                                    : '열람 기록 확인 필요';
+                                                })()
+                                              : '아직 확인 기록이 없습니다.'}
+                                          </p>
+                                        </div>
+                                        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                                          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">학생</p>
+                                          <p className="mt-1 text-sm font-bold text-slate-900">{selectedStudentName}</p>
+                                          <p className="mt-1 text-xs font-medium text-slate-500">최근 상담이나 발송 흐름과 함께 검토해 보세요.</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_22px_48px_rgba(15,23,42,0.08)] sm:p-6">
+                                      <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#14295F]">Report Body</p>
+                                          <p className="mt-1 text-base font-black text-slate-900">학부모 발송 본문</p>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <Badge className="border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-700">
+                                            {selectedReportPreview.dateKey}
+                                          </Badge>
+                                          <Badge
+                                            className={cn(
+                                              "px-3 py-1 text-[10px] font-bold",
+                                              selectedReportPreview.viewedAt
+                                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                : "border-slate-200 bg-slate-100 text-slate-600",
+                                            )}
+                                          >
+                                            {selectedReportPreview.viewedAt ? '열람 완료' : '미열람'}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                      <div className="mt-5 rounded-[1.6rem] border border-amber-100 bg-[#FFF8F0] p-5 sm:p-6">
+                                        <p className="whitespace-pre-wrap text-sm font-semibold leading-7 text-slate-800">
+                                          {selectedReportPreview.content?.trim() || '리포트 내용이 없습니다.'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                              <DialogFooter className="p-6 bg-white border-t">
-                                <Button variant="ghost" onClick={() => setSelectedReportPreview(null)} className="w-full font-black">
+
+                              <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
+                                <Button
+                                  variant="ghost"
+                                  onClick={() => setSelectedReportPreview(null)}
+                                  className="h-12 w-full rounded-[1.1rem] font-black text-slate-600 hover:bg-slate-100"
+                                >
                                   닫기
                                 </Button>
                               </DialogFooter>
-                            </>
+                            </motion.div>
                           )}
                         </DialogContent>
                       </Dialog>
