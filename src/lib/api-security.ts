@@ -33,6 +33,11 @@ function getRateLimitStore() {
   return globalRateLimitState.__trackRateLimitStore;
 }
 
+function normalizeRateLimitIdentifier(identifier: string | null | undefined) {
+  if (!identifier) return 'unknown';
+  return identifier.trim().toLowerCase().slice(0, 160) || 'unknown';
+}
+
 export function getRequestOrigin(request: RequestLike) {
   try {
     return new URL(request.url).origin;
@@ -153,9 +158,17 @@ export function applyIpRateLimit(
   key: string,
   options: RateLimitOptions,
 ) {
+  return applyIdentifierRateLimit(key, getClientIp(request), options);
+}
+
+export function applyIdentifierRateLimit(
+  key: string,
+  identifier: string,
+  options: RateLimitOptions,
+) {
   const store = getRateLimitStore();
   const now = Date.now();
-  const bucketKey = `${key}:${getClientIp(request)}`;
+  const bucketKey = `${key}:${normalizeRateLimitIdentifier(identifier)}`;
   const existing = store.get(bucketKey);
 
   if (!existing || existing.resetAt <= now) {
@@ -176,6 +189,11 @@ export function applyIpRateLimit(
     ok: existing.count <= options.max,
     retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
   };
+}
+
+export function clearRateLimitIdentifier(key: string, identifier: string) {
+  const store = getRateLimitStore();
+  store.delete(`${key}:${normalizeRateLimitIdentifier(identifier)}`);
 }
 
 export function hasTrustedBrowserContext(

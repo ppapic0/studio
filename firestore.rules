@@ -55,7 +55,7 @@ service cloud.firestore {
     }
 
     function isCenterAdmin(centerId) {
-      return isRoleCenterAdmin(getMemberRole(centerId));
+      return isActiveMember(centerId) && isRoleCenterAdmin(getMemberRole(centerId));
     }
 
     function isRoleTeacherOrAdmin(role) {
@@ -63,7 +63,7 @@ service cloud.firestore {
     }
 
     function isTeacherOrAdmin(centerId) {
-      return isRoleTeacherOrAdmin(getMemberRole(centerId));
+      return isActiveMember(centerId) && isRoleTeacherOrAdmin(getMemberRole(centerId));
     }
 
     function isStudent(centerId) {

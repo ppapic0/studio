@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore, useFunctions } from '@/firebase';
-import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { sendPasswordResetEmail, signInWithCustomToken, signOut } from 'firebase/auth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { trackMarketingClientEvent } from '@/lib/marketing-tracking-client';
@@ -41,7 +41,7 @@ import {
   AUTH_SESSION_SYNC_SKIP_STORAGE_KEY,
   sanitizeDashboardReturnPath,
 } from '@/lib/auth-session-shared';
-import { createServerAuthSession } from '@/lib/client-auth-session';
+import { clearServerAuthSession } from '@/lib/client-auth-session';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const formSchema = z.object({
@@ -150,9 +150,38 @@ export function LoginForm() {
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY, '1');
     }
+    let hasServerSession = false;
     try {
       const trimmedEmail = values.email.trim();
-      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
+      const loginResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password: values.password,
+        }),
+      });
+
+      const loginPayload = (await loginResponse.json().catch(() => null)) as
+        | { ok?: boolean; customToken?: string; message?: string }
+        | null;
+
+      if (!loginResponse.ok || !loginPayload?.customToken) {
+        throw Object.assign(new Error(loginPayload?.message || '로그인 처리 중 오류가 발생했습니다.'), {
+          code:
+            loginResponse.status === 429
+              ? 'auth/too-many-requests'
+              : loginResponse.status === 401
+                ? 'auth/invalid-credential'
+                : 'auth/internal-error',
+        });
+      }
+
+      hasServerSession = true;
+      const userCredential = await signInWithCustomToken(auth, loginPayload.customToken);
       if (functions) {
         try {
           const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
@@ -180,18 +209,24 @@ export function LoginForm() {
           emailDomain: trimmedEmail.includes('@') ? trimmedEmail.split('@')[1] : null,
         },
       });
-      await createServerAuthSession(userCredential.user);
       if (typeof window !== 'undefined') {
         setDashboardEntryMotionKeys(resolveDashboardEntryMotionKeys(memberships));
       }
       router.replace(postLoginPath);
     } catch (error: any) {
+      if (hasServerSession) {
+        await clearServerAuthSession().catch(() => undefined);
+      }
       await signOut(auth).catch(() => undefined);
       logHandledClientIssue('[login-form] login failed', error);
       let errorMessage = '오류가 발생했습니다. 다시 시도해 주세요.';
 
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.';
+      } else if (error instanceof Error && error.message.trim()) {
+        errorMessage = error.message.trim();
       }
 
       toast({
