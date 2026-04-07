@@ -34,6 +34,7 @@ type AdminWorkbenchCommandBarProps = {
   eyebrow?: string;
   title: string;
   description: string;
+  variant?: 'default' | 'teacherWorkbench';
   searchValue?: string;
   searchPlaceholder?: string;
   onSearchChange?: (value: string) => void;
@@ -54,6 +55,7 @@ export function AdminWorkbenchCommandBar({
   eyebrow,
   title,
   description,
+  variant = 'default',
   searchValue,
   searchPlaceholder = '학생명, 반, 키워드 검색',
   onSearchChange,
@@ -73,10 +75,15 @@ export function AdminWorkbenchCommandBar({
   children,
   className,
 }: AdminWorkbenchCommandBarProps) {
+  const isTeacherWorkbench = variant === 'teacherWorkbench';
+
   return (
     <section
       className={cn(
-        'sticky top-3 z-20 rounded-[2rem] border border-slate-200/80 bg-white/88 p-4 shadow-[0_18px_48px_-38px_rgba(20,41,95,0.36)] backdrop-blur-xl',
+        'sticky top-3 z-20 backdrop-blur-xl',
+        isTeacherWorkbench
+          ? 'rounded-[2.15rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.98)_100%)] p-5 shadow-[0_24px_56px_-42px_rgba(20,41,95,0.34)]'
+          : 'rounded-[2rem] border border-slate-200/80 bg-white/88 p-4 shadow-[0_18px_48px_-38px_rgba(20,41,95,0.36)]',
         className
       )}
     >
@@ -84,12 +91,20 @@ export function AdminWorkbenchCommandBar({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
             {eyebrow ? (
-              <Badge className="rounded-full border border-[#dbe7ff] bg-[#eef4ff] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">
+              <Badge className={cn(
+                'rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]',
+                isTeacherWorkbench
+                  ? 'border border-[#14295F] bg-[#14295F] text-white'
+                  : 'border border-[#dbe7ff] bg-[#eef4ff] text-[#2554d4]'
+              )}>
                 {eyebrow}
               </Badge>
             ) : null}
-            <h2 className="text-xl font-black tracking-tight text-[#14295F]">{title}</h2>
-            <p className="text-xs font-semibold leading-5 text-[#5c6e97]">{description}</p>
+            <h2 className={cn(
+              'tracking-tight text-[#14295F]',
+              isTeacherWorkbench ? 'font-aggro-display text-[1.35rem] font-black' : 'text-xl font-black'
+            )}>{title}</h2>
+            <p className={cn('font-semibold leading-5 text-[#5c6e97]', isTeacherWorkbench ? 'max-w-3xl text-[12px]' : 'text-xs')}>{description}</p>
           </div>
 
           {quickActions.length > 0 ? (
@@ -100,7 +115,12 @@ export function AdminWorkbenchCommandBar({
                     key={action.label}
                     type="button"
                     variant="outline"
-                    className="h-10 rounded-xl border-slate-200 bg-white px-4 text-xs font-black text-[#17306f]"
+                    className={cn(
+                      'h-10 rounded-xl px-4 text-xs font-black',
+                      isTeacherWorkbench
+                        ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
+                        : 'border-slate-200 bg-white text-[#17306f]'
+                    )}
                     onClick={action.onClick}
                     disabled={action.disabled}
                   >
@@ -116,7 +136,12 @@ export function AdminWorkbenchCommandBar({
                       asChild
                       type="button"
                       variant="outline"
-                      className="h-10 rounded-xl border-slate-200 bg-white px-4 text-xs font-black text-[#17306f]"
+                      className={cn(
+                        'h-10 rounded-xl px-4 text-xs font-black',
+                        isTeacherWorkbench
+                          ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
+                          : 'border-slate-200 bg-white text-[#17306f]'
+                      )}
                     >
                       <Link href={action.href}>
                         {action.icon ? <span className="mr-1.5 inline-flex items-center">{action.icon}</span> : null}
@@ -136,7 +161,10 @@ export function AdminWorkbenchCommandBar({
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center">
               {onPeriodChange ? (
-                <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                <div className={cn(
+                  'inline-flex rounded-xl p-1',
+                  isTeacherWorkbench ? 'border border-[#dbe7ff] bg-[#f8fbff]' : 'border border-slate-200 bg-slate-50'
+                )}>
                   {periodOptions.map((option) => (
                     <button
                       key={option.value}
@@ -146,7 +174,9 @@ export function AdminWorkbenchCommandBar({
                         'rounded-lg px-3 py-2 text-[11px] font-black transition-colors',
                         periodValue === option.value
                           ? 'bg-white text-[#17306f] shadow-sm'
-                          : 'text-slate-500 hover:text-slate-700'
+                          : isTeacherWorkbench
+                            ? 'text-[#5c6e97] hover:text-[#14295F]'
+                            : 'text-slate-500 hover:text-slate-700'
                       )}
                     >
                       {option.label}
@@ -157,11 +187,17 @@ export function AdminWorkbenchCommandBar({
 
               {onSelectChange && selectOptions?.length ? (
                 <div className="grid gap-1">
-                  <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  <Label className={cn(
+                    'text-[10px] font-black uppercase tracking-[0.16em]',
+                    isTeacherWorkbench ? 'text-[#5c6e97]' : 'text-slate-500'
+                  )}>
                     {selectLabel}
                   </Label>
                   <Select value={selectValue} onValueChange={onSelectChange}>
-                    <SelectTrigger className="h-11 min-w-[180px] rounded-xl border-2 font-black">
+                    <SelectTrigger className={cn(
+                      'h-11 min-w-[180px] rounded-xl border-2 font-black',
+                      isTeacherWorkbench && 'border-[#dbe7ff] bg-white text-[#14295F]'
+                    )}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -177,12 +213,18 @@ export function AdminWorkbenchCommandBar({
 
               {onSearchChange ? (
                 <div className={cn('relative min-w-0 flex-1 xl:max-w-md', searchWidthClassName)}>
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Search className={cn(
+                    'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2',
+                    isTeacherWorkbench ? 'text-[#7b8db3]' : 'text-slate-400'
+                  )} />
                   <Input
                     value={searchValue}
                     onChange={(event) => onSearchChange(event.target.value)}
                     placeholder={searchPlaceholder}
-                    className="h-11 rounded-xl border-2 pl-10 font-bold"
+                    className={cn(
+                      'h-11 rounded-xl border-2 pl-10 font-bold',
+                      isTeacherWorkbench && 'border-[#dbe7ff] bg-white text-[#14295F] placeholder:text-[#9aa9c7]'
+                    )}
                   />
                 </div>
               ) : null}

@@ -123,7 +123,7 @@ const RiskIntelligencePanel = dynamic(
     loading: () => (
       <div className="py-16 flex flex-col items-center justify-center gap-3">
         <Loader2 className="h-7 w-7 animate-spin text-rose-500/40" />
-        <p className="text-xs font-bold text-muted-foreground/60">리스크 분석을 준비하는 중입니다...</p>
+        <p className="text-xs font-bold text-[#9aa9c7]">리스크 분석을 준비하는 중입니다...</p>
       </div>
     ),
   }
@@ -282,7 +282,7 @@ export default function StudentListPage() {
         ? 'bg-emerald-100 text-emerald-700'
         : attendance?.status === 'away' || attendance?.status === 'break'
           ? 'bg-amber-100 text-amber-700'
-          : 'bg-slate-100 text-slate-700';
+          : 'bg-[#eef4ff] text-[#14295F]';
 
     return {
       member,
@@ -713,8 +713,8 @@ export default function StudentListPage() {
     switch (status) {
       case 'studying': return <Badge className="bg-emerald-500 font-black text-[9px] h-5">공부중</Badge>;
       case 'away': return <Badge variant="outline" className="text-amber-500 border-amber-500 font-black text-[9px] h-5">외출중</Badge>;
-      case 'break': return <Badge variant="secondary" className="font-black text-[9px] h-5">휴식중</Badge>;
-      default: return <Badge variant="outline" className="font-black text-[9px] h-5 opacity-40">미입실</Badge>;
+      case 'break': return <Badge variant="secondary" className="font-black text-[9px] h-5 bg-[#fff4e8] text-[#d86a11]">휴식중</Badge>;
+      default: return <Badge variant="outline" className="font-black text-[9px] h-5 border-[#dbe7ff] text-[#14295F]">미입실</Badge>;
     }
   };
 
@@ -732,56 +732,164 @@ export default function StudentListPage() {
 
   return (
     <div className={cn("flex flex-col", isMobile ? "gap-4 pb-20" : "gap-8")}>
-      <header className={cn("flex justify-between gap-4", isMobile ? "flex-col" : "flex-row items-center")}>
-        <div className="flex flex-col gap-1">
-          <h1 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-2xl" : "text-4xl")}>
-            <GraduationCap className={cn("text-primary", isMobile ? "h-6 w-6" : "h-10 w-10")} />
-            학생 운영 인덱스
-          </h1>
-          <p className={cn("font-bold text-muted-foreground ml-1 uppercase tracking-widest whitespace-nowrap", isMobile ? "text-[9px]" : "text-xs")}>
-            학생 360 진입 전, 상태와 반별 운영 신호를 먼저 좁혀봅니다.
-          </p>
-        </div>
-        
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-            <DialogTrigger asChild>
-              <Button className={cn("rounded-2xl font-black gap-2 shadow-lg interactive-button", isMobile ? "h-12 flex-1" : "h-14 px-8 text-base")}>
-                <UserPlus className="h-5 w-5" /> 신규 가입
+      <header className="grid gap-4">
+        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+          <div className={cn(
+            "overflow-hidden rounded-[2.4rem] border-none shadow-[0_36px_80px_-56px_rgba(20,41,95,0.7)]",
+            isMobile ? "p-0" : "p-0"
+          )}>
+            <div className={cn(
+              "relative overflow-hidden bg-[linear-gradient(135deg,#14295F_0%,#173D8B_52%,#2554D4_100%)] text-white",
+              isMobile ? "px-5 py-5" : "px-7 py-7"
+            )}>
+              <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+              <div className="pointer-events-none absolute bottom-0 left-0 h-28 w-28 rounded-full bg-[#FF7A16]/18 blur-2xl" />
+              <div className={cn("relative z-10 grid gap-5", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] items-start")}>
+                <div className="space-y-4">
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">
+                    Teacher Workbench
+                  </Badge>
+                  <div className="space-y-2">
+                    <h1 className={cn("font-aggro-display font-black tracking-[-0.05em] text-white", isMobile ? "text-[1.9rem] leading-[1.02]" : "text-[clamp(2.45rem,4vw,3.65rem)] leading-[0.98]")}>
+                      학생 운영 워크벤치
+                    </h1>
+                    <p className={cn("max-w-2xl font-semibold text-white/80", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
+                      빠르게 스캔하고, 바로 처리하고, 필요할 때 학생 360으로 자연스럽게 이어지는 선생님용 학생 운영 허브입니다.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                      재원생 {counts.active}명
+                    </Badge>
+                    <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                      좌석 연동 {operationalSummary.assignedSeatCount}명
+                    </Badge>
+                    <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                      공부중 {operationalSummary.studyingCount}명
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-1")}>
+                  <div className="rounded-[1.7rem] border border-white/12 bg-white/10 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">오늘 운영 포인트</p>
+                    <p className="mt-2 text-base font-black leading-6 text-white">
+                      실시간 상태 필터와 빠른 실행 시트를 묶어서, 학생별 출결·상담·문자 흐름을 한 번에 정리합니다.
+                    </p>
+                    <p className="mt-2 text-xs font-semibold text-white/70">
+                      검색과 반 필터를 함께 쓰면 학생 360 진입 전 운영 범위를 더 빠르게 좁힐 수 있습니다.
+                    </p>
+                  </div>
+                  {canManageStudentAccounts ? (
+                    <DialogTrigger asChild>
+                      <Button className={cn("rounded-[1.2rem] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]", isMobile ? "h-12 w-full" : "h-12 w-full")}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        학생 계정 바로 생성
+                      </Button>
+                    </DialogTrigger>
+                  ) : (
+                    <div className="rounded-[1.2rem] border border-white/12 bg-white/8 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">권한 안내</p>
+                      <p className="mt-1 text-sm font-black text-white">학생 생성 권한은 센터관리자 전용입니다.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogContent motionPreset="dashboard-premium" className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 h-[84vh] w-[92vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]" : "sm:max-w-2xl")}>
+            <div className="bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] px-7 py-6 text-white">
+              <DialogHeader>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                    학생 등록
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    운영 워크벤치
+                  </Badge>
+                </div>
+                <DialogTitle className="text-3xl font-black tracking-tight">센터 학생 계정 생성</DialogTitle>
+                <DialogDescription className="font-semibold text-white/80">
+                  기본 계정 정보와 학교/학년 정보만 입력하면 학생 운영 워크벤치에 바로 연결됩니다.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+            <div className="max-h-[56vh] space-y-4 overflow-y-auto bg-white px-6 py-5 custom-scrollbar">
+              <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
+                <div className="rounded-[1.5rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                  <div className="mb-4">
+                    <p className="text-sm font-black tracking-tight text-[#14295F]">기본 계정 정보</p>
+                    <p className="text-[11px] font-semibold text-[#5c6e97]">학생이 로그인할 계정 정보를 먼저 입력합니다.</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] font-black uppercase text-[#5c6e97]">이름</Label>
+                      <Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]" />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] font-black uppercase text-[#5c6e97]">이메일 (아이디)</Label>
+                      <Input type="email" placeholder="이메일을 입력하세요" value={newStudent.email} onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]" />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] font-black uppercase text-[#5c6e97]">비밀번호 (8자 이상)</Label>
+                      <Input type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({ ...newStudent, password: e.target.value })} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.5rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                  <div className="mb-4">
+                    <p className="text-sm font-black tracking-tight text-[#14295F]">학교 / 학년</p>
+                    <p className="text-[11px] font-semibold text-[#5c6e97]">운영 카드와 학생 360에서 함께 쓰일 기본 학적 정보입니다.</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] font-black uppercase text-[#5c6e97]">소속 학교</Label>
+                      <Input placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({ ...newStudent, schoolName: e.target.value })} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]" />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] font-black uppercase text-[#5c6e97]">학년</Label>
+                      <Select value={newStudent.grade} onValueChange={(val) => setNewStudent({ ...newStudent, grade: val })}>
+                        <SelectTrigger className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1학년">1학년</SelectItem>
+                          <SelectItem value="2학년">2학년</SelectItem>
+                          <SelectItem value="3학년">3학년</SelectItem>
+                          <SelectItem value="N수생">N수생</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="border-t border-[#dbe7ff] bg-[#f8fbff] p-6">
+              <Button onClick={handleAddStudent} disabled={isSubmitting} className="h-12 w-full rounded-xl bg-[#14295F] font-black text-white shadow-xl hover:bg-[#173D8B]">
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                학생 계정 생성 완료
               </Button>
-            </DialogTrigger>
-            <DialogContent motionPreset="dashboard-premium" className={cn("rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] h-[80vh] max-w-[400px] rounded-[2rem]" : "sm:max-w-md")}>
-              <div className="bg-primary p-10 text-white relative overflow-hidden">
-                 <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><UserPlus className="h-32 w-32" /></div>
-                 <DialogHeader className="relative z-10">
-                   <DialogTitle className="text-3xl font-black">학생 등록</DialogTitle>
-                   <DialogDescription className="text-white/70 font-bold">센터에 학생 계정을 직접 생성합니다.</DialogDescription>
-                 </DialogHeader>
-              </div>
-              <div className="p-8 space-y-5 bg-white overflow-y-auto custom-scrollbar max-h-[50vh]">
-                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">이름</Label><Input placeholder="홍길동" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} className="rounded-xl h-12 border-2" /></div>
-                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">이메일 (아이디)</Label><Input type="email" placeholder="이메일을 입력하세요" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="rounded-xl h-12 border-2" /></div>
-                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">비밀번호 (8자 이상)</Label><Input type="password" placeholder="••••••••" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="rounded-xl h-12 border-2" /></div>
-                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">소속 학교</Label><Input placeholder="예: 동백고등학교" value={newStudent.schoolName} onChange={(e) => setNewStudent({...newStudent, schoolName: e.target.value})} className="rounded-xl h-12 border-2" /></div>
-                <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-primary/70">학년</Label><Select value={newStudent.grade} onValueChange={(val) => setNewStudent({...newStudent, grade: val})}><SelectTrigger className="rounded-xl h-12 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
-              </div>
-              <DialogFooter className="bg-muted/30 p-8 border-t"><Button onClick={handleAddStudent} disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">{isSubmitting ? <Loader2 className="animate-spin" /> : '학생 계정 생성 완료'}</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </header>
 
       {canViewRiskPanel && (
-        <Card className="rounded-[2rem] border-none bg-white p-5 shadow-lg ring-1 ring-border/50">
+        <Card className="rounded-[2rem] border border-[#dbe7ff] bg-white p-5 shadow-[0_24px_56px_-42px_rgba(20,41,95,0.28)]">
           <div className={cn('flex items-center justify-between gap-3', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
             <div className="space-y-1">
-              <p className="text-xs font-black tracking-widest text-muted-foreground">리스크 인텔리전스</p>
-              <p className="text-sm font-bold text-muted-foreground">센터관리자 전용 리스크 분석을 학생관리 센터에서 확인합니다.</p>
+              <Badge className="rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
+                관리자 전용
+              </Badge>
+              <p className="pt-2 text-sm font-black tracking-tight text-[#14295F]">리스크 인텔리전스</p>
+              <p className="text-sm font-semibold text-[#5c6e97]">학생관리 센터에서 바로 리스크 분석 패널을 열고 운영 리스크를 함께 확인합니다.</p>
             </div>
             <Button
               type="button"
               variant={showRiskPanel ? 'default' : 'outline'}
-              className="h-10 rounded-xl font-black"
+              className={cn("h-10 rounded-xl font-black", showRiskPanel ? "bg-[#14295F] text-white hover:bg-[#173D8B]" : "border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]")}
               onClick={() => setShowRiskPanel((prev) => !prev)}
             >
               {showRiskPanel ? '리스크 분석 닫기' : '리스크 분석 열기'}
@@ -797,16 +905,16 @@ export default function StudentListPage() {
 
       <section className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'md:grid-cols-3 xl:grid-cols-6')}>
         {[
-          { label: '재원생', value: `${operationalSummary.activeStudents}명`, sub: '현재 관리 대상', tone: 'text-[#14295F] bg-[#eef4ff]' },
+          { label: '관리 규모', value: `${operationalSummary.activeStudents}명`, sub: '현재 관리 대상', tone: 'text-[#14295F] bg-[#eef4ff]' },
           { label: '공부중', value: `${operationalSummary.studyingCount}명`, sub: '실시간 좌석 기준', tone: 'text-emerald-700 bg-emerald-50' },
           { label: '외출', value: `${operationalSummary.awayCount}명`, sub: '복귀 확인 필요', tone: 'text-amber-700 bg-amber-50' },
           { label: '미입실', value: `${operationalSummary.absentCount}명`, sub: '도착 전 / 퇴실 포함', tone: 'text-rose-700 bg-rose-50' },
-          { label: '좌석배정', value: `${operationalSummary.assignedSeatCount}명`, sub: '도면 연동 가능', tone: 'text-sky-700 bg-sky-50' },
-          { label: '리스크', value: canViewRiskPanel ? (showRiskPanel ? '열림' : '대기') : '-', sub: '센터관리자 분석 패널', tone: 'text-violet-700 bg-violet-50' },
+          { label: '좌석 연동', value: `${operationalSummary.assignedSeatCount}명`, sub: '도면 연동 가능', tone: 'text-sky-700 bg-sky-50' },
+          { label: '리스크 패널', value: canViewRiskPanel ? (showRiskPanel ? '열림' : '대기') : '-', sub: '센터관리자 분석 패널', tone: 'text-violet-700 bg-violet-50' },
         ].map((item) => (
-          <Card key={item.label} className="rounded-[1.75rem] border-none bg-white shadow-md ring-1 ring-black/[0.03]">
+          <Card key={item.label} className="rounded-[1.75rem] border border-[#dbe7ff] bg-white shadow-[0_22px_52px_-46px_rgba(20,41,95,0.32)]">
             <CardContent className="p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">{item.label}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">{item.label}</p>
               <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{item.value}</p>
               <div className={cn('mt-3 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black', item.tone)}>
                 {item.sub}
@@ -817,9 +925,10 @@ export default function StudentListPage() {
       </section>
 
       <AdminWorkbenchCommandBar
+        variant="teacherWorkbench"
         eyebrow="학생/상담 워크벤치"
         title="학생 운영 워크벤치"
-        description="같은 필터와 같은 빠른 실행으로 학생 관리, 상담, 문자, 출결 흐름을 빠르게 묶습니다."
+        description="같은 필터와 같은 빠른 실행으로 학생 관리, 상담, 문자, 출결 흐름을 빠르게 묶고 바로 학생 360으로 이어집니다."
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="이름, 학교 또는 좌석 번호 검색"
@@ -841,9 +950,9 @@ export default function StudentListPage() {
         ]}
       >
         <div className="grid gap-1">
-          <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">실시간 상태</Label>
+          <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">실시간 상태</Label>
           <Select value={liveStatusFilter} onValueChange={setLiveStatusFilter}>
-            <SelectTrigger className="h-11 min-w-[180px] rounded-xl border-2 font-black">
+            <SelectTrigger className="h-11 min-w-[180px] rounded-xl border-2 border-[#dbe7ff] bg-white font-black text-[#14295F]">
               <SelectValue placeholder="실시간 상태 전체" />
             </SelectTrigger>
             <SelectContent className="rounded-2xl">
@@ -857,14 +966,14 @@ export default function StudentListPage() {
       </AdminWorkbenchCommandBar>
 
       <Tabs defaultValue="active" className="w-full" onValueChange={setStatusTab}>
-        <TabsList className={cn("grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border border-border/50 shadow-inner", isMobile ? "h-14 mb-4" : "h-16 mb-8 max-w-2xl")}>
-          <TabsTrigger value="active" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all"><UserCheck className="h-4 w-4" /><span className="hidden sm:inline">재원생</span><Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-emerald-50 text-emerald-600">{counts.active}</Badge></TabsTrigger>
-          <TabsTrigger value="onHold" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all"><PauseCircle className="h-4 w-4" /><span className="hidden sm:inline">휴학생</span><Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-amber-50 text-amber-600">{counts.onHold}</Badge></TabsTrigger>
-          <TabsTrigger value="withdrawn" className="rounded-xl font-black data-[state=active]:bg-white data-[state=active]:shadow-md gap-2 transition-all"><UserMinus className="h-4 w-4" /><span className="hidden sm:inline">퇴원생</span><Badge variant="secondary" className="ml-1 h-5 px-1.5 rounded-md font-black text-[10px] bg-slate-100 text-slate-600">{counts.withdrawn}</Badge></TabsTrigger>
+        <TabsList className={cn("grid grid-cols-3 rounded-[1.7rem] border border-[#dbe7ff] bg-[#f8fbff] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]", isMobile ? "h-14 mb-4" : "h-16 mb-8 max-w-2xl")}>
+          <TabsTrigger value="active" className="rounded-[1.1rem] font-black text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_18px_40px_-30px_rgba(20,41,95,0.6)] gap-2 transition-all"><UserCheck className="h-4 w-4" /><span className="hidden sm:inline">재원생</span><Badge variant="secondary" className="ml-1 h-5 rounded-md bg-emerald-50 px-1.5 text-[10px] font-black text-emerald-600">{counts.active}</Badge></TabsTrigger>
+          <TabsTrigger value="onHold" className="rounded-[1.1rem] font-black text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_18px_40px_-30px_rgba(20,41,95,0.6)] gap-2 transition-all"><PauseCircle className="h-4 w-4" /><span className="hidden sm:inline">휴학생</span><Badge variant="secondary" className="ml-1 h-5 rounded-md bg-amber-50 px-1.5 text-[10px] font-black text-amber-600">{counts.onHold}</Badge></TabsTrigger>
+          <TabsTrigger value="withdrawn" className="rounded-[1.1rem] font-black text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_18px_40px_-30px_rgba(20,41,95,0.6)] gap-2 transition-all"><UserMinus className="h-4 w-4" /><span className="hidden sm:inline">퇴원생</span><Badge variant="secondary" className="ml-1 h-5 rounded-md bg-[#eef4ff] px-1.5 text-[10px] font-black text-[#14295F]">{counts.withdrawn}</Badge></TabsTrigger>
         </TabsList>
 
-        {membersLoading ? (<div className="flex flex-col items-center justify-center py-40"><Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" /></div>) : filteredStudents.length === 0 ? (
-          <div className="text-center py-32 bg-white/50 rounded-[3rem] border-2 border-dashed"><Users className="h-16 w-16 mx-auto text-muted-foreground/10 mb-4" /><p className="font-black text-muted-foreground/40 uppercase">데이터가 없습니다.</p></div>
+        {membersLoading ? (<div className="flex flex-col items-center justify-center rounded-[2.4rem] border border-[#dbe7ff] bg-white py-28 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]"><Loader2 className="h-12 w-12 animate-spin text-[#2554d4]/40" /><p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-[#9aa9c7]">학생 운영 데이터를 불러오는 중입니다.</p></div>) : filteredStudents.length === 0 ? (
+          <div className="rounded-[2.6rem] border-2 border-dashed border-[#dbe7ff] bg-white px-6 py-24 text-center shadow-[0_24px_56px_-44px_rgba(20,41,95,0.16)]"><Users className="mx-auto mb-4 h-16 w-16 text-[#d4dff7]" /><p className="font-black uppercase tracking-[0.18em] text-[#9aa9c7]">조건에 맞는 학생이 없습니다.</p><p className="mt-2 text-sm font-semibold text-[#5c6e97]">검색어, 반, 실시간 상태를 다시 조합해 보세요.</p></div>
         ) : (
           <div className={cn("grid gap-4", isMobile ? "grid-cols-1 px-1" : "xl:grid-cols-2")}>
             {filteredStudents.map((member) => {
@@ -875,12 +984,18 @@ export default function StudentListPage() {
                 ? '공부중'
                 : attendance?.status === 'away' || attendance?.status === 'break'
                   ? '외출'
-                  : attendance?.status === 'absent'
-                    ? '미입실'
-                    : '확인중';
+                : attendance?.status === 'absent'
+                  ? '미입실'
+                  : '확인중';
+              const attendanceBarClass =
+                attendance?.status === 'studying'
+                  ? 'bg-emerald-500'
+                  : attendance?.status === 'away' || attendance?.status === 'break'
+                    ? 'bg-amber-500'
+                    : 'bg-[#9aa9c7]';
               return (
-                <Card key={member.id} className={cn("rounded-[2rem] border-none shadow-lg hover:shadow-2xl transition-all group overflow-hidden bg-white ring-1 ring-border/50", member.status === 'withdrawn' && "bg-muted/5")}>
-                  <div className={cn("h-1.5 w-full", attendance?.status === 'studying' ? "bg-emerald-500" : "bg-muted")} />
+                <Card key={member.id} className={cn("group overflow-hidden rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_24px_56px_-44px_rgba(20,41,95,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_30px_70px_-44px_rgba(20,41,95,0.36)]", member.status === 'withdrawn' && "bg-[#fbfcff]")}>
+                  <div className={cn("h-1.5 w-full", attendanceBarClass)} />
                   <CardContent className={isMobile ? "p-5" : "p-6"}>
                     <button
                       type="button"
@@ -888,13 +1003,13 @@ export default function StudentListPage() {
                       className="block w-full text-left rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-4 min-w-0">
-                          <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-border/50"><AvatarFallback className="bg-primary/5 text-primary font-black text-xl">{member.displayName?.charAt(0) || 'S'}</AvatarFallback></Avatar>
+                        <div className="flex min-w-0 items-start gap-4">
+                          <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-[#dbe7ff]"><AvatarFallback className="bg-[#eef4ff] text-[#14295F] font-black text-xl">{member.displayName?.charAt(0) || 'S'}</AvatarFallback></Avatar>
                           <div className="flex flex-col min-w-0 gap-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-lg font-black truncate tracking-tighter">{member.displayName}</h3>
+                              <h3 className="truncate text-lg font-black tracking-tighter text-[#14295F]">{member.displayName}</h3>
                               {member.className ? (
-                                <Badge className="h-5 rounded-full border-none bg-slate-100 px-2 text-[10px] font-black text-slate-700">{member.className}</Badge>
+                                <Badge className="h-5 rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2 text-[10px] font-black text-[#14295F]">{member.className}</Badge>
                               ) : null}
                               {member.status === 'active' && getStatusBadge(attendance?.status)}
                             </div>
@@ -902,40 +1017,40 @@ export default function StudentListPage() {
                               <Badge className="h-6 rounded-full border-none bg-[#eef4ff] px-2.5 text-[10px] font-black text-[#244b90]">
                                 {profile?.schoolName || '학교 정보 없음'}
                               </Badge>
-                              <Badge className="h-6 rounded-full border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
+                              <Badge className="h-6 rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2.5 text-[10px] font-black text-[#14295F]">
                                 {profile?.grade || '학년 정보 없음'}
                               </Badge>
-                              <Badge className="h-6 rounded-full border-none bg-white ring-1 ring-slate-200 px-2.5 text-[10px] font-black text-slate-600">
+                              <Badge className="h-6 rounded-full border border-[#dbe7ff] bg-white px-2.5 text-[10px] font-black text-[#5c6e97]">
                                 {seatLabel}
                               </Badge>
                             </div>
-                            <div className="grid gap-2 text-[11px] font-bold text-slate-500 sm:grid-cols-3">
-                              <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">현재 상태</p>
+                            <div className="grid gap-2 text-[11px] font-bold text-[#5c6e97] sm:grid-cols-3">
+                              <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9aa9c7]">현재 상태</p>
                                 <p className="mt-1 text-sm font-black text-[#14295F]">{attendanceLabel}</p>
                               </div>
-                              <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">계정 상태</p>
+                              <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9aa9c7]">계정 상태</p>
                                 <p className="mt-1 text-sm font-black text-[#14295F]">
                                   {member.status === 'active' ? '재원중' : member.status === 'onHold' ? '휴원' : '퇴원'}
                                 </p>
                               </div>
-                              <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">운영 이동</p>
+                              <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9aa9c7]">운영 이동</p>
                                 <p className="mt-1 text-sm font-black text-[#14295F]">운영 그래프 확인하기</p>
                               </div>
                             </div>
                           </div>
                         </div>
-                        <ChevronRight className="h-5 w-5 opacity-20 group-hover:opacity-100 transition-all" />
+                        <ChevronRight className="h-5 w-5 text-[#9aa9c7] opacity-40 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
                       </div>
                     </button>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" className="h-10 rounded-xl px-4 text-xs font-black" onClick={() => setSelectedStudentId(member.id)}>
-                        요약 보기
+                      <Button type="button" variant="outline" className="h-10 rounded-xl border-[#dbe7ff] bg-white px-4 text-xs font-black text-[#14295F] hover:bg-[#f4f7ff]" onClick={() => setSelectedStudentId(member.id)}>
+                        즉시 처리
                       </Button>
-                      <Button type="button" className="h-10 rounded-xl px-4 text-xs font-black" onClick={() => handleOpenStudent360(member.id)}>
-                        운영 그래프 확인하기
+                      <Button type="button" className="h-10 rounded-xl bg-[#14295F] px-4 text-xs font-black text-white hover:bg-[#173D8B]" onClick={() => handleOpenStudent360(member.id)}>
+                        학생 360 열기
                       </Button>
                     </div>
 
@@ -979,97 +1094,77 @@ export default function StudentListPage() {
         >
           {selectedStudentPreview ? (
             <>
-              <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white">
+              <div className="bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] px-6 py-6 text-white">
                 <SheetHeader className="space-y-2 text-left">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className="border border-white/14 bg-white/8 text-white font-black">
+                      학생 브리프
+                    </Badge>
+                    {selectedStudentPreview.member.className ? (
+                      <Badge className="border border-white/14 bg-white/8 text-white/80 font-black">
+                        {selectedStudentPreview.member.className}
+                      </Badge>
+                    ) : null}
+                    <Badge className="border border-white/14 bg-white/8 text-white/80 font-black">
+                      {selectedStudentPreview.seatLabel}
+                    </Badge>
+                  </div>
                   <SheetTitle className="text-2xl font-black tracking-tight text-white">
                     {selectedStudentPreview.member.displayName}
                   </SheetTitle>
                   <SheetDescription className="text-sm font-bold text-white/80">
-                    학생 360으로 들어가기 전에 현재 상태와 운영 액션을 먼저 확인합니다.
+                    학생 360으로 들어가기 전에 현재 상태와 바로 처리할 운영 액션을 한 번에 확인합니다.
                   </SheetDescription>
                 </SheetHeader>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {selectedStudentPreview.member.className ? (
-                    <Badge className="border-none bg-white/20 text-white font-black">
-                      {selectedStudentPreview.member.className}
-                    </Badge>
-                  ) : null}
-                  <Badge className={cn('border-none font-black', selectedStudentPreview.attendanceTone)}>
-                    {selectedStudentPreview.attendanceLabel}
-                  </Badge>
-                  <Badge className="border-none bg-white/20 text-white font-black">
-                    {selectedStudentPreview.seatLabel}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-5 p-6">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">학교 / 학년</p>
-                    <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">
-                      {selectedStudentPreview.profile?.schoolName || '학교 미등록'}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      {selectedStudentPreview.profile?.grade || '학년 미등록'}
-                    </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-[1.2rem] border border-white/14 bg-white/8 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">현재 상태</p>
+                    <p className="mt-2 text-base font-black text-white">{selectedStudentPreview.attendanceLabel}</p>
                   </div>
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">계정 상태</p>
-                    <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">
+                  <div className="rounded-[1.2rem] border border-white/14 bg-white/8 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">학교 / 학년</p>
+                    <p className="mt-2 text-base font-black text-white">{selectedStudentPreview.profile?.schoolName || '학교 미등록'}</p>
+                    <p className="mt-1 text-xs font-semibold text-white/80">{selectedStudentPreview.profile?.grade || '학년 미등록'}</p>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-white/14 bg-white/8 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">계정 상태</p>
+                    <p className="mt-2 text-base font-black text-white">
                       {selectedStudentPreview.member.status === 'active'
                         ? '재원중'
                         : selectedStudentPreview.member.status === 'onHold'
                           ? '휴원'
                           : '퇴원'}
                     </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">학생 운영 인덱스 기준 상태</p>
                   </div>
                 </div>
+              </div>
 
-                <div className="analysis-card rounded-[1.9rem] border-none p-5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">바로 할 일</p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <Button asChild className="h-11 rounded-xl font-black">
+              <div className="space-y-5 p-6">
+                <div className="rounded-[1.9rem] border border-[#dbe7ff] bg-white p-5 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                  <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]')}>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">바로 할 일</p>
+                      <p className="mt-2 text-sm font-black text-[#14295F]">즉시 처리할 액션을 고른 뒤 바로 저장할 수 있습니다.</p>
+                    </div>
+                    <Button asChild className="h-11 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">
                       <Link href={`/dashboard/teacher/students/${selectedStudentPreview.member.id}`}>학생 360 열기</Link>
                     </Button>
-                    <Button
-                      type="button"
-                      variant={activeQuickAction === 'attendance' ? 'default' : 'outline'}
-                      className={cn(
-                        'h-11 rounded-xl font-black transition-all',
-                        activeQuickAction !== 'attendance' && 'analysis-action-button border-none'
-                      )}
-                      onClick={() => setActiveQuickAction('attendance')}
-                    >
+                  </div>
+                  <div className={cn('mt-4 grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+                    <Button type="button" variant={activeQuickAction === 'attendance' ? 'default' : 'outline'} className={cn('h-11 rounded-xl font-black', activeQuickAction === 'attendance' ? 'bg-[#14295F] text-white hover:bg-[#173D8B]' : 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]')} onClick={() => setActiveQuickAction('attendance')}>
                       출결 처리
                     </Button>
-                    <Button
-                      type="button"
-                      variant={activeQuickAction === 'counseling' ? 'default' : 'outline'}
-                      className={cn(
-                        'h-11 rounded-xl font-black transition-all',
-                        activeQuickAction !== 'counseling' && 'analysis-action-button border-none'
-                      )}
-                      onClick={() => setActiveQuickAction('counseling')}
-                    >
+                    <Button type="button" variant={activeQuickAction === 'counseling' ? 'default' : 'outline'} className={cn('h-11 rounded-xl font-black', activeQuickAction === 'counseling' ? 'bg-[#14295F] text-white hover:bg-[#173D8B]' : 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]')} onClick={() => setActiveQuickAction('counseling')}>
                       상담 기록
                     </Button>
-                    <Button
-                      type="button"
-                      variant={activeQuickAction === 'sms' ? 'default' : 'outline'}
-                      className={cn(
-                        'h-11 rounded-xl font-black transition-all',
-                        activeQuickAction !== 'sms' && 'analysis-action-button border-none'
-                      )}
-                      onClick={() => setActiveQuickAction('sms')}
-                    >
+                    <Button type="button" variant={activeQuickAction === 'sms' ? 'default' : 'outline'} className={cn('h-11 rounded-xl font-black', activeQuickAction === 'sms' ? 'bg-[#14295F] text-white hover:bg-[#173D8B]' : 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]')} onClick={() => setActiveQuickAction('sms')}>
                       문자 보내기
                     </Button>
                   </div>
+                </div>
 
-                  <div className={cn('mt-5 grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)]')}>
-                    <div className="analysis-card rounded-[1.55rem] border-none p-4">
+                <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)]')}>
+                    <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_22px_48px_-38px_rgba(20,41,95,0.2)]">
                       {activeQuickAction === 'attendance' ? (
                         <div className="space-y-4">
                           <div>
@@ -1100,7 +1195,7 @@ export default function StudentListPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-11 rounded-xl border-slate-200 bg-white font-black text-slate-700 hover:bg-slate-50"
+                              className="h-11 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]"
                               disabled={attendanceActionSaving}
                               onClick={() => handleInlineAttendanceAction('absent')}
                             >
@@ -1144,7 +1239,7 @@ export default function StudentListPage() {
                                 value={counselingContent}
                                 onChange={(event) => setCounselingContent(event.target.value)}
                                 placeholder="오늘 확인한 핵심 이슈나 학생 반응을 적어 주세요."
-                                className="min-h-[108px]"
+                                className="min-h-[108px] border-[#dbe7ff] bg-white font-bold text-[#14295F] placeholder:text-[#9aa9c7]"
                               />
                             </div>
                             <div className="space-y-2">
@@ -1153,12 +1248,12 @@ export default function StudentListPage() {
                                 value={counselingImprovement}
                                 onChange={(event) => setCounselingImprovement(event.target.value)}
                                 placeholder="다음 상담이나 수업에서 바로 이어갈 조치가 있으면 적어 주세요."
-                                className="min-h-[96px]"
+                                className="min-h-[96px] border-[#dbe7ff] bg-white font-bold text-[#14295F] placeholder:text-[#9aa9c7]"
                               />
                             </div>
                             <Button
                               type="button"
-                              className="h-11 rounded-xl font-black"
+                              className="h-11 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]"
                               disabled={counselingActionSaving}
                               onClick={handleInlineCounselingSave}
                             >
@@ -1183,7 +1278,7 @@ export default function StudentListPage() {
                               value={manualSmsMessage}
                               onChange={(event) => setManualSmsMessage(event.target.value)}
                               placeholder={`${selectedStudentPreview.member.displayName} 학생 관련 안내 문구를 입력해 주세요.`}
-                              className="min-h-[136px]"
+                              className="min-h-[136px] border-[#dbe7ff] bg-white font-bold text-[#14295F] placeholder:text-[#9aa9c7]"
                             />
                             <p className="text-[11px] font-bold text-[#7b8db3]">
                               학생 상세 문자 콘솔로 이동하지 않고 여기서 바로 문자 발송을 접수합니다.
@@ -1191,7 +1286,7 @@ export default function StudentListPage() {
                           </div>
                           <Button
                             type="button"
-                            className="h-11 rounded-xl font-black"
+                            className="h-11 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]"
                             disabled={manualSmsSending}
                             onClick={handleInlineManualSms}
                           >
@@ -1202,7 +1297,7 @@ export default function StudentListPage() {
                       ) : null}
                     </div>
 
-                    <div className="analysis-summary-rail rounded-[1.55rem] border border-[#dbe6ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.98)_100%)] p-4 shadow-[0_22px_36px_-30px_rgba(20,41,95,0.32)]">
+                    <div className="rounded-[1.55rem] border border-[#dbe6ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.98)_100%)] p-4 shadow-[0_22px_36px_-30px_rgba(20,41,95,0.32)]">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">운영 요약</p>
                       <div className="mt-3 space-y-3">
                         <div className="rounded-[1rem] bg-white/90 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]">
@@ -1246,7 +1341,6 @@ export default function StudentListPage() {
                         </div>
                         </div>
                       </div>
-                    </div>
                 </div>
               </div>
             </>
