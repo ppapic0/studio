@@ -159,6 +159,10 @@ interface WaitlistEntry {
   updatedAt?: any;
 }
 
+interface WaitlistEntryWithOrder extends WaitlistEntry {
+  displayQueueNumber: number | null;
+}
+
 interface WaitlistModal {
   open: boolean;
   sourceLeadId: string;
@@ -262,6 +266,10 @@ function getNextWaitlistQueueNumber(entries: WaitlistEntry[]) {
   return Math.max(entries.length, maxAssigned) + 1;
 }
 
+function getStoredWaitlistQueueNumber(entry: Pick<WaitlistEntry, 'queueNumber'>) {
+  return typeof entry.queueNumber === 'number' && Number.isFinite(entry.queueNumber) ? entry.queueNumber : null;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function MarketingConsultingCRM({
@@ -360,21 +368,36 @@ export function MarketingConsultingCRM({
     [websiteRequests]
   );
 
-  const waitlist = useMemo(
-    () =>
-      [...(waitlistRaw || [])].sort((a, b) => {
-        const statusOrder = { waiting: 0, admitted: 1, cancelled: 2 } as const;
-        const statusGap = statusOrder[a.status || 'waiting'] - statusOrder[b.status || 'waiting'];
-        if (statusGap !== 0) return statusGap;
+  const waitlist = useMemo<WaitlistEntryWithOrder[]>(() => {
+    const sortedEntries = [...(waitlistRaw || [])].sort((a, b) => {
+      const statusOrder = { waiting: 0, admitted: 1, cancelled: 2 } as const;
+      const statusGap = statusOrder[a.status || 'waiting'] - statusOrder[b.status || 'waiting'];
+      if (statusGap !== 0) return statusGap;
 
-        const aQueue = typeof a.queueNumber === 'number' ? a.queueNumber : Number.MAX_SAFE_INTEGER;
-        const bQueue = typeof b.queueNumber === 'number' ? b.queueNumber : Number.MAX_SAFE_INTEGER;
-        if (aQueue !== bQueue) return aQueue - bQueue;
+      const aQueue = getStoredWaitlistQueueNumber(a) ?? Number.MAX_SAFE_INTEGER;
+      const bQueue = getStoredWaitlistQueueNumber(b) ?? Number.MAX_SAFE_INTEGER;
+      if (aQueue !== bQueue) return aQueue - bQueue;
 
-        return toDateMs(a.createdAt) - toDateMs(b.createdAt);
-      }),
-    [waitlistRaw]
-  );
+      return toDateMs(a.createdAt) - toDateMs(b.createdAt);
+    });
+
+    const waitingOrderById = new Map<string, number>();
+    let waitingOrder = 1;
+
+    sortedEntries.forEach((entry) => {
+      if ((entry.status || 'waiting') !== 'waiting') return;
+      waitingOrderById.set(entry.id, waitingOrder);
+      waitingOrder += 1;
+    });
+
+    return sortedEntries.map((entry) => ({
+      ...entry,
+      displayQueueNumber:
+        (entry.status || 'waiting') === 'waiting'
+          ? waitingOrderById.get(entry.id) || null
+          : getStoredWaitlistQueueNumber(entry),
+    }));
+  }, [waitlistRaw]);
 
   const waitlistBySourceLeadId = useMemo(() => {
     const grouped = new Map<string, WaitlistEntry[]>();
@@ -883,8 +906,9 @@ export function MarketingConsultingCRM({
   };
 
   const exportWaitlistToCsv = () => {
-    const headers = ['대기등록일', '상태', '서비스', '학생명', '학교', '학년', '학생전화번호', '학부모전화번호', '추천경로', '추천인', '메모'];
+    const headers = ['대기순서', '대기등록일', '상태', '서비스', '학생명', '학교', '학년', '학생전화번호', '학부모전화번호', '추천경로', '추천인', '메모'];
     const rows = filteredWaitlist.map((entry) => [
+      entry.displayQueueNumber || '',
       entry.waitlistDate || '',
       WAITLIST_STATUS_META[entry.status || 'waiting']?.label || '',
       SERVICE_TYPE_META[entry.serviceType]?.label || '',
@@ -1739,9 +1763,9 @@ export function MarketingConsultingCRM({
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-base font-black text-slate-800">{entry.studentName}</p>
-                            {typeof entry.queueNumber === 'number' && (
+                            {typeof entry.displayQueueNumber === 'number' && (
                               <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
-                                대기번호 {entry.queueNumber}
+                                대기순서 {entry.displayQueueNumber}번
                               </Badge>
                             )}
                             <Badge className={cn('border text-[10px] font-black', WAITLIST_STATUS_META[entry.status || 'waiting'].className)}>
@@ -1999,8 +2023,8 @@ export function MarketingConsultingCRM({
                       <Badge className={cn('border font-black', SERVICE_TYPE_META[selectedWaitlistEntry.serviceType].color)}>
                         {SERVICE_TYPE_META[selectedWaitlistEntry.serviceType].label}
                       </Badge>
-                      {typeof selectedWaitlistEntry.queueNumber === 'number' ? (
-                        <Badge variant="outline" className="font-black">대기번호 {selectedWaitlistEntry.queueNumber}</Badge>
+                      {typeof selectedWaitlistEntry.displayQueueNumber === 'number' ? (
+                        <Badge variant="outline" className="font-black">대기순서 {selectedWaitlistEntry.displayQueueNumber}번</Badge>
                       ) : null}
                     </div>
                     <p className="mt-3 text-sm font-bold text-slate-500">{selectedWaitlistEntry.memo || '저장된 메모가 없습니다.'}</p>
