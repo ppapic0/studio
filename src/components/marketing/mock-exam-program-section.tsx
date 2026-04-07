@@ -57,6 +57,7 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
   const isDark = surface === 'flat-dark';
   const [activeProofIndex, setActiveProofIndex] = useState(0);
   const activeProofImage = mockExamProofImages[activeProofIndex] ?? mockExamProofImages[0];
+  const spotlightMessage = mockExamProgram.spotlight.replace(/\n+/g, ' ').trim();
   const spotlightTone = isDark
     ? {
         panel: 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)]',
@@ -112,6 +113,19 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
         <h2 className={cn('font-aggro-display mt-4 break-keep text-[clamp(1.55rem,3.1vw,2.25rem)] font-black leading-[1.12] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>
           {mockExamProgram.title}
         </h2>
+        <div className="mt-5 flex flex-wrap items-center gap-2.5">
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.12em]',
+              isDark ? 'border-[#FFB878]/30 bg-[#FF7A16]/18 text-[#FFE0C2]' : 'border-[#FFB878]/55 bg-[#FFF3E8] text-[#C35C00]',
+            )}
+          >
+            유료 이용 가능
+          </span>
+          <p className={cn('break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/72' : 'text-[#53687F]')}>
+            {spotlightMessage}
+          </p>
+        </div>
 
         <div
           className={cn(
