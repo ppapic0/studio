@@ -68,10 +68,10 @@ import {
   LayoutGrid,
   ClipboardCheck,
 } from 'lucide-react';
-import { useFirestore, useCollection, useFunctions, useDoc } from '@/firebase';
+import { useFirestore, useCollection, useFunctions, useDoc, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
 import { format, subDays } from 'date-fns';
@@ -244,9 +244,59 @@ const formatOpenClawCountSummary = (counts: OpenClawSnapshotRecordCounts): strin
   return `학생 ${studentTotal} · 출결 ${attendanceTotal} · 상담 ${consultationTotal} · 수납 ${billingTotal} · 독서실 ${studyRoomTotal}`;
 };
 
+const STAFF_MEMBER_ROLES: CenterMembership['role'][] = ['teacher', 'centerAdmin', 'owner'];
+
+const getStaffRoleLabel = (role?: CenterMembership['role'] | null): string => {
+  if (role === 'centerAdmin') return '센터관리자';
+  if (role === 'owner') return '원장';
+  return '선생님';
+};
+
+const resolveDateKey = (docId: string, rawDateKey: unknown): string => {
+  if (typeof rawDateKey === 'string' && rawDateKey.trim()) {
+    return rawDateKey.trim();
+  }
+  return docId;
+};
+
+const normalizeParentCommunicationRecord = (item: any) => {
+  const senderRole = typeof item?.senderRole === 'string' ? item.senderRole : '';
+  const hasParentIdentity =
+    senderRole === 'parent'
+    || (typeof item?.parentUid === 'string' && item.parentUid.trim().length > 0)
+    || (typeof item?.parentName === 'string' && item.parentName.trim().length > 0)
+    || (typeof item?.parentPhone === 'string' && item.parentPhone.trim().length > 0);
+
+  const parentUid = hasParentIdentity
+    ? (
+      (typeof item?.parentUid === 'string' && item.parentUid.trim())
+      || (typeof item?.senderUid === 'string' && item.senderUid.trim())
+      || ''
+    )
+    : '';
+  const parentName = hasParentIdentity
+    ? (
+      (typeof item?.parentName === 'string' && item.parentName.trim())
+      || (typeof item?.senderName === 'string' && item.senderName.trim())
+      || ''
+    )
+    : '';
+  const parentPhone = typeof item?.parentPhone === 'string' ? item.parentPhone.trim() : '';
+
+  return {
+    ...item,
+    senderRole,
+    studentId: typeof item?.studentId === 'string' ? item.studentId : '',
+    parentUid,
+    parentName,
+    parentPhone,
+  };
+};
+
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const functions = useFunctions();
+  const { user } = useUser();
   const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
@@ -357,7 +407,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   const teacherMembersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'teacher'));
+    return query(collection(firestore, 'centers', centerId, 'members'), where('role', 'in', STAFF_MEMBER_ROLES));
   }, [firestore, centerId]);
   const { data: teacherMembers } = useCollection<CenterMembership>(teacherMembersQuery, { enabled: isActive });
 
@@ -504,9 +554,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           getDocs(
             query(
               studyLogDaysRef,
-              where('dateKey', '>=', studyLogStartKey),
-              where('dateKey', '<=', todayKey),
-              orderBy('dateKey', 'asc')
+              where(documentId(), '>=', studyLogStartKey),
+              where(documentId(), '<=', todayKey),
+              orderBy(documentId(), 'asc')
             )
           ),
           Promise.all(
@@ -519,13 +569,25 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         if (!disposed) {
           setFocusStudyLogDaysRaw(
             studyLogSnap.docs
-              .map((docSnap) => docSnap.data() as StudyLogDay)
+              .map((docSnap) => {
+                const raw = docSnap.data() as StudyLogDay;
+                return {
+                  ...raw,
+                  dateKey: resolveDateKey(docSnap.id, raw?.dateKey),
+                } as StudyLogDay;
+              })
               .filter((row) => typeof row.dateKey === 'string' && row.dateKey.length > 0)
           );
           setFocusStudentTrendRaw(
             trendStatSnaps
               .filter((snap) => snap.exists())
-              .map((snap) => snap.data() as DailyStudentStat)
+              .map((snap) => {
+                const raw = snap.data() as DailyStudentStat;
+                return {
+                  ...raw,
+                  dateKey: resolveDateKey(snap.id, raw?.dateKey),
+                } as DailyStudentStat;
+              })
               .filter((row) => typeof row.dateKey === 'string' && row.dateKey.length > 0)
           );
         }
@@ -574,6 +636,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'parentCommunications');
   }, [firestore, centerId]);
   const { data: parentCommunications } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
+  const normalizedParentCommunications = useMemo(
+    () => (parentCommunications || []).map((item) => normalizeParentCommunicationRecord(item)),
+    [parentCommunications]
+  );
 
   const consultingLeadsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -649,22 +715,48 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       counselingByTeacher.set(teacherId, bucket);
     });
 
-    return (teacherMembers || [])
-      .filter((teacher): teacher is CenterMembership => Boolean(teacher))
-      .map((teacher) => {
-        const reports = [...(reportByTeacher.get(teacher.id) || [])].sort(
+    const staffMemberById = new Map((teacherMembers || []).map((member) => [member.id, member]));
+    const fallbackNameByStaffId = new Map<string, string>();
+    (counselingLogs || []).forEach((log) => {
+      const teacherId = typeof log.teacherId === 'string' ? log.teacherId.trim() : '';
+      if (!teacherId || fallbackNameByStaffId.has(teacherId)) return;
+      if (typeof log.teacherName === 'string' && log.teacherName.trim()) {
+        fallbackNameByStaffId.set(teacherId, log.teacherName.trim());
+      }
+    });
+
+    const staffIds = new Set<string>([
+      ...staffMemberById.keys(),
+      ...reportByTeacher.keys(),
+      ...counselingByTeacher.keys(),
+    ]);
+
+    return Array.from(staffIds)
+      .filter((staffId) => staffId.trim().length > 0)
+      .map((staffId) => {
+        const member = staffMemberById.get(staffId);
+        const reports = [...(reportByTeacher.get(staffId) || [])].sort(
           (a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0)
         );
-        const logs = [...(counselingByTeacher.get(teacher.id) || [])].sort(
+        const logs = [...(counselingByTeacher.get(staffId) || [])].sort(
           (a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0)
         );
+        const role = member?.role || 'teacher';
 
         return {
-          ...teacher,
-          teacherName: teacher.displayName || `선생님-${teacher.id.slice(0, 6)}`,
+          id: staffId,
+          role,
+          roleLabel: getStaffRoleLabel(role),
+          status: member?.status || 'active',
+          phoneNumber: member?.phoneNumber || '',
+          teacherName:
+            member?.displayName
+            || fallbackNameByStaffId.get(staffId)
+            || `${getStaffRoleLabel(role)}-${staffId.slice(0, 6)}`,
           reports,
           sentReports: reports.filter((report) => report?.status === 'sent'),
           logs,
+          canDelete: member?.role === 'teacher',
         };
       })
       .sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ko'));
@@ -904,7 +996,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       }
     });
 
-    (parentCommunications || []).forEach((item: any) => {
+    normalizedParentCommunications.forEach((item: any) => {
       const createdAtMs = item?.createdAt?.toMillis?.() ?? item?.updatedAt?.toMillis?.() ?? 0;
       if (createdAtMs < thirtyDaysAgoMs) return;
       if (!targetMemberIds.has(item.studentId)) return;
@@ -1012,7 +1104,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       if (a.trustScore !== b.trustScore) return a.trustScore - b.trustScore;
       return a.parentName.localeCompare(b.parentName, 'ko');
     });
-  }, [isMounted, now, parentMembers, parentActivityEvents, parentCommunications, studentNameById, targetMemberIds]);
+  }, [isMounted, now, parentMembers, parentActivityEvents, normalizedParentCommunications, studentNameById, targetMemberIds]);
 
   const filteredParentTrustRows = useMemo(() => {
     const keyword = parentTrustSearch.trim().toLowerCase();
@@ -1058,7 +1150,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [attendanceSeatSignalsBySeatId, roomNameById, roomOrderById]);
 
   const handleCreateAnnouncement = async () => {
-    if (!firestore || !centerId || !activeMembership) return;
+    if (!firestore || !centerId || !activeMembership || !user) return;
     const title = noticeTitle.trim();
     const body = noticeBody.trim();
     if (!title || !body) {
@@ -1079,7 +1171,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         status: 'published',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        createdByUid: activeMembership.id,
+        createdByUid: user.uid,
+        createdByName: user.displayName || activeMembership.displayName || '센터관리자',
         createdByRole: activeMembership.role,
       });
       setNoticeTitle('');
@@ -1238,9 +1331,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const createdAtMs = (event.createdAt as any)?.toMillis?.() ?? 0;
       return createdAtMs >= thirtyDaysAgoMs;
     });
-    const recentParentCommunications = (parentCommunications || []).filter((item: any) => {
+    const recentParentCommunications = normalizedParentCommunications.filter((item: any) => {
       if (!targetMemberIds.has(item.studentId)) return false;
-      const createdAtMs = item?.createdAt?.toMillis?.() ?? 0;
+      const createdAtMs = item?.createdAt?.toMillis?.() ?? item?.updatedAt?.toMillis?.() ?? 0;
       return createdAtMs >= thirtyDaysAgoMs;
     });
 
@@ -1336,7 +1429,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       focusTop10,
       focusBottom10,
     };
-  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, parentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs]);
+  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, normalizedParentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs]);
 
   const recentAnnouncementsPreview = (centerAnnouncements || []).slice(0, 3);
   const topFocusPreview = metrics.focusTop10.slice(0, 4);
@@ -3138,12 +3231,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">계정 관리</Badge>
                 <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-primary">
-                  선생님 {teacherRows.length}명
+                  운영 계정 {teacherRows.length}명
                 </Badge>
               </div>
-              <DialogTitle className="text-2xl font-black tracking-tight">선생님 계정 관리</DialogTitle>
+              <DialogTitle className="text-2xl font-black tracking-tight">운영 계정 관리</DialogTitle>
               <DialogDescription className="text-sm font-medium text-white/75">
-                검색, 상세 확인, 계정 삭제는 여기서 처리하고 홈에는 활동 요약만 남겨둡니다.
+                선생님, 센터관리자, 원장 계정의 활동을 함께 보고 선생님 계정만 삭제할 수 있습니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -3187,6 +3280,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="truncate text-base font-black tracking-tight text-slate-900">{teacher.teacherName}</p>
+                          <Badge className="h-6 rounded-full border-none bg-[#14295F]/10 px-2.5 text-[10px] font-black text-[#14295F]">
+                            {teacher.roleLabel}
+                          </Badge>
                           <Badge className="h-6 rounded-full border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
                             {teacher.status}
                           </Badge>
@@ -3219,26 +3315,28 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         >
                           상세 보기
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-9 rounded-xl border-rose-200 px-3 text-xs font-black text-rose-700 hover:bg-rose-50"
-                          disabled={deletingTeacherId === teacher.id}
-                          onClick={() => void handleDeleteTeacher({ id: teacher.id, teacherName: teacher.teacherName })}
-                        >
-                          {deletingTeacherId === teacher.id ? (
-                            <>
-                              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                              삭제 중...
-                            </>
-                          ) : (
-                            <>
-                              <UserX className="mr-2 h-3.5 w-3.5" />
-                              계정 삭제
-                            </>
-                          )}
-                        </Button>
+                        {teacher.canDelete && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-xl border-rose-200 px-3 text-xs font-black text-rose-700 hover:bg-rose-50"
+                            disabled={deletingTeacherId === teacher.id}
+                            onClick={() => void handleDeleteTeacher({ id: teacher.id, teacherName: teacher.teacherName })}
+                          >
+                            {deletingTeacherId === teacher.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                삭제 중...
+                              </>
+                            ) : (
+                              <>
+                                <UserX className="mr-2 h-3.5 w-3.5" />
+                                계정 삭제
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3755,7 +3853,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black tracking-tight">{selectedTeacher.teacherName}</DialogTitle>
                   <DialogDescription className="text-primary-foreground/80 font-bold">
-                    상담일지 {selectedTeacher.logs.length}건 · 발송 리포트 {selectedTeacher.sentReports.length}건
+                    {selectedTeacher.roleLabel} · 상담일지 {selectedTeacher.logs.length}건 · 발송 리포트 {selectedTeacher.sentReports.length}건
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -3764,6 +3862,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
                   <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">계정 정보</p>
                   <div className="mt-2 grid gap-1 text-sm font-bold text-slate-700">
+                    <p>계정 구분: {selectedTeacher.roleLabel}</p>
                     <p>사용자번호: {selectedTeacher.id}</p>
                     <p>전화번호: {selectedTeacher.phoneNumber || '미등록'}</p>
                     <p>상태: {selectedTeacher.status}</p>
