@@ -19,7 +19,7 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
   const universities = outcomes.filter((o) => o.label !== '성장 사례');
 
   return (
-    <section id="results" className="hidden scroll-mt-20 py-10 sm:block sm:py-16" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%)' }}>
+    <section id="results" className="scroll-mt-20 py-10 sm:py-16" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%)' }}>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-lg text-center">
           <span className="eyebrow-badge">2026 RESULT</span>
@@ -30,7 +30,37 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
           </h2>
         </div>
 
-        <div className="mt-9">
+        <div className="mt-8 sm:hidden">
+          <p className="mb-4 text-center text-[10px] font-black uppercase tracking-[0.26em] text-[#14295F]/46">
+            주요 합격 실적
+          </p>
+          <div className="space-y-2.5">
+            {universities.map((u, index) => (
+              <article
+                key={u.label}
+                className="brand-sheen-panel relative overflow-hidden rounded-[1.45rem] border border-[#14295F]/10 bg-white px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.08)]"
+              >
+                <div className="brand-glow-drift absolute -right-8 top-0 h-20 w-20 rounded-full bg-[#FFB878]/12 blur-2xl" />
+                <div className="relative flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black tracking-[0.16em] text-[#7A8FB2]">
+                      RESULT {String(index + 1).padStart(2, '0')}
+                    </p>
+                    <h3 className="mt-2 break-keep text-[1.05rem] font-black leading-[1.2] text-[#14295F]">
+                      {u.label}
+                    </h3>
+                    <p className="mt-1.5 text-[12px] font-semibold text-[#567089]">{u.detail}</p>
+                  </div>
+                  <p className="brand-number-pop shrink-0 text-[1.6rem] font-black leading-none text-[#14295F]">
+                    {u.value}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-9 hidden sm:block">
           <p className="mb-5 text-center text-[10px] font-black uppercase tracking-[0.26em] text-[#14295F]/46">
             주요 합격 실적
           </p>
@@ -65,7 +95,7 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:min-w-[33rem] lg:flex-1">
+            <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3 lg:min-w-[33rem] lg:flex-1">
               {successStory.timeline.map((item) => (
                 <article
                   key={item.label}

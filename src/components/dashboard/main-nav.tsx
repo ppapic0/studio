@@ -87,7 +87,6 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/study-history', label: '기록트랙', icon: CalendarDays },
     { href: '/dashboard/plan', label: '계획트랙', icon: ClipboardCheck },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
-    { href: '/dashboard/results', label: '합격 실적', icon: Medal },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
   teacher: [

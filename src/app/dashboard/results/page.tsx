@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, ChevronLeft, Medal, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { useAppContext } from '@/contexts/app-context';
 import { marketingContent } from '@/lib/marketing-content';
@@ -56,11 +58,22 @@ const highlightRows = [
 
 export default function DashboardResultsPage() {
   const { activeMembership, viewMode } = useAppContext();
+  const router = useRouter();
   const role = activeMembership?.role;
   const isMobile = role === 'parent' || viewMode === 'mobile';
   const homeHref = role === 'parent' ? '/dashboard?parentTab=home' : '/dashboard';
   const supportHref = role === 'parent' ? '/dashboard?parentTab=communication' : '/dashboard/appointments';
   const supportLabel = role === 'parent' ? '소통 탭으로 이동' : '상담트랙으로 이동';
+
+  useEffect(() => {
+    if (role === 'student') {
+      router.replace('/dashboard');
+    }
+  }, [role, router]);
+
+  if (role === 'student') {
+    return null;
+  }
 
   return (
     <div className={cn('space-y-5', !isMobile && 'space-y-6')}>
