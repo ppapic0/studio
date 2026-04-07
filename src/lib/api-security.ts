@@ -41,6 +41,97 @@ export function getRequestOrigin(request: RequestLike) {
   }
 }
 
+function normalizeOrigin(value: string | null | undefined) {
+  if (!value) return '';
+  try {
+    return new URL(value).origin;
+  } catch {
+    return '';
+  }
+}
+
+function buildOrigin(protocol: string | null | undefined, host: string | null | undefined) {
+  const normalizedProtocol = protocol?.split(',')[0]?.trim().replace(/:$/, '');
+  const normalizedHost = host?.split(',')[0]?.trim();
+  if (!normalizedProtocol || !normalizedHost) return '';
+  return normalizeOrigin(`${normalizedProtocol}://${normalizedHost}`);
+}
+
+function getTrustedOrigins(request: RequestLike) {
+  const trustedOrigins = new Set<string>();
+  const requestOrigin = getRequestOrigin(request);
+
+  if (requestOrigin) {
+    trustedOrigins.add(requestOrigin);
+  }
+
+  const requestProtocol = requestOrigin ? new URL(requestOrigin).protocol.replace(/:$/, '') : null;
+  const hostHeader = request.headers.get('host');
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+
+  const hostOrigin = buildOrigin(forwardedProto || requestProtocol, hostHeader);
+  if (hostOrigin) {
+    trustedOrigins.add(hostOrigin);
+  }
+
+  const forwardedOrigin = buildOrigin(forwardedProto || requestProtocol, forwardedHost);
+  if (forwardedOrigin) {
+    trustedOrigins.add(forwardedOrigin);
+  }
+
+  const configuredOrigins = [
+    process.env.APP_ORIGIN,
+    process.env.NEXT_PUBLIC_APP_ORIGIN,
+    process.env.NEXT_PUBLIC_SITE_URL,
+  ];
+
+  configuredOrigins.forEach((origin) => {
+    const normalized = normalizeOrigin(origin);
+    if (normalized) {
+      trustedOrigins.add(normalized);
+    }
+  });
+
+  return trustedOrigins;
+}
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
+
+function isTrustedOrigin(candidateOrigin: string, trustedOrigins: Set<string>) {
+  const normalizedCandidate = normalizeOrigin(candidateOrigin);
+  if (!normalizedCandidate) return false;
+  if (trustedOrigins.has(normalizedCandidate)) return true;
+
+  let candidateUrl: URL;
+  try {
+    candidateUrl = new URL(normalizedCandidate);
+  } catch {
+    return false;
+  }
+
+  for (const trustedOrigin of trustedOrigins) {
+    try {
+      const trustedUrl = new URL(trustedOrigin);
+      const isLoopbackPair =
+        LOOPBACK_HOSTS.has(candidateUrl.hostname.toLowerCase()) &&
+        LOOPBACK_HOSTS.has(trustedUrl.hostname.toLowerCase());
+
+      if (
+        isLoopbackPair &&
+        candidateUrl.protocol === trustedUrl.protocol &&
+        candidateUrl.port === trustedUrl.port
+      ) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return false;
+}
+
 export function getClientIp(request: RequestLike) {
   const forwardedFor = request.headers.get('x-forwarded-for');
   if (forwardedFor) {
@@ -92,7 +183,7 @@ export function hasTrustedBrowserContext(
   options?: { allowMissingHeaders?: boolean },
 ) {
   const allowMissingHeaders = options?.allowMissingHeaders !== false;
-  const requestOrigin = getRequestOrigin(request);
+  const trustedOrigins = getTrustedOrigins(request);
   const secFetchSite = request.headers.get('sec-fetch-site');
 
   if (secFetchSite && !['same-origin', 'same-site', 'none'].includes(secFetchSite)) {
@@ -100,19 +191,13 @@ export function hasTrustedBrowserContext(
   }
 
   const origin = request.headers.get('origin');
-  if (origin && requestOrigin && origin !== requestOrigin) {
+  if (origin && !isTrustedOrigin(origin, trustedOrigins)) {
     return false;
   }
 
   const referer = request.headers.get('referer');
-  if (referer && requestOrigin) {
-    try {
-      if (new URL(referer).origin !== requestOrigin) {
-        return false;
-      }
-    } catch {
-      return false;
-    }
+  if (referer && !isTrustedOrigin(referer, trustedOrigins)) {
+    return false;
   }
 
   if (!origin && !referer && !allowMissingHeaders) {
