@@ -67,6 +67,7 @@ type ReferralRoute = '추천' | '네이버' | '카페' | '광고' | '기타';
 
 interface ConsultingLead {
   id: string;
+  receiptId?: string;
   studentName: string;
   parentName: string;
   parentPhone: string;
@@ -108,6 +109,7 @@ interface LeadFormState {
 
 interface WebsiteConsultRequest {
   id: string;
+  receiptId?: string;
   studentName: string;
   school: string;
   grade?: string;
@@ -394,6 +396,7 @@ export function MarketingConsultingCRM({
       if (statusFilter !== 'all' && lead.status !== statusFilter) return false;
       if (!keyword) return true;
       return [
+        lead.receiptId,
         lead.studentName,
         lead.parentName,
         lead.parentPhone,
@@ -423,7 +426,7 @@ export function MarketingConsultingCRM({
     return websiteRequests.filter((req) => {
       if (statusFilter !== 'all' && req.status !== statusFilter) return false;
       if (!keyword) return true;
-      return [req.studentName, req.school, req.grade, req.consultPhone, req.sourceLabel, req.requestTypeLabel]
+      return [req.receiptId, req.studentName, req.school, req.grade, req.consultPhone, req.sourceLabel, req.requestTypeLabel]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -639,6 +642,7 @@ export function MarketingConsultingCRM({
         `웹 접수: ${formatDateTimeLabel(request.createdAt)}`,
       ];
       const leadRef = await addDoc(collection(firestore, 'centers', centerId, 'consultingLeads'), {
+        receiptId: request.receiptId || null,
         studentName: request.studentName?.trim() || '',
         parentName: '웹사이트 문의',
         parentPhone: request.consultPhone?.trim() || '',
@@ -838,8 +842,9 @@ export function MarketingConsultingCRM({
   };
 
   const exportToCsv = () => {
-    const headers = ['상담일', '상태', '유입경로', '추천인', '학생명', '학교', '학년', '학생전화번호', '학부모명', '학부모전화번호', '메모'];
+    const headers = ['접수확인번호', '상담일', '상태', '유입경로', '추천인', '학생명', '학교', '학년', '학생전화번호', '학부모명', '학부모전화번호', '메모'];
     const rows = filteredLeads.map((lead) => [
+      lead.receiptId || '',
       lead.consultationDate || '',
       STATUS_META[lead.status || 'new']?.label || '',
       lead.referralRoute || lead.marketingChannel || '',
@@ -1036,6 +1041,11 @@ export function MarketingConsultingCRM({
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-black text-slate-900">{request.studentName || '(학생명 미입력)'}</p>
+                            {request.receiptId ? (
+                              <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
+                                접수번호 {request.receiptId}
+                              </Badge>
+                            ) : null}
                             <Badge className={cn('border text-[10px] font-black', STATUS_META[request.status || 'new'].className)}>
                               {STATUS_META[request.status || 'new'].label}
                             </Badge>
@@ -1372,15 +1382,20 @@ export function MarketingConsultingCRM({
                     : lead.requestTypeLabel;
 
                   return (
-                  <Card key={lead.id} className="rounded-xl border-none shadow-sm ring-1 ring-border/60">
-                    <CardContent className={cn('space-y-3', isMobile ? 'p-4' : 'p-5')}>
-                      <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-start justify-between')}>
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-base font-black text-slate-800">{lead.studentName || '(학생명 미입력)'}</p>
-                            <Badge className={cn('border text-[10px] font-black', STATUS_META[lead.status || 'new'].className)}>
-                              {STATUS_META[lead.status || 'new'].label}
-                            </Badge>
+                    <Card key={lead.id} className="rounded-xl border-none shadow-sm ring-1 ring-border/60">
+                      <CardContent className={cn('space-y-3', isMobile ? 'p-4' : 'p-5')}>
+                        <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-base font-black text-slate-800">{lead.studentName || '(학생명 미입력)'}</p>
+                              {lead.receiptId ? (
+                                <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
+                                  접수번호 {lead.receiptId}
+                                </Badge>
+                              ) : null}
+                              <Badge className={cn('border text-[10px] font-black', STATUS_META[lead.status || 'new'].className)}>
+                                {STATUS_META[lead.status || 'new'].label}
+                              </Badge>
                             {lead.school && (
                               <Badge variant="outline" className="max-w-[180px] truncate text-[10px] font-black text-slate-700">
                                 {lead.school}
@@ -1806,6 +1821,7 @@ export function MarketingConsultingCRM({
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">기본 정보</p>
                     <div className="mt-3 space-y-2 text-sm font-bold text-slate-700">
+                      <p>접수번호: {selectedLead.receiptId || '-'}</p>
                       <p>학부모: {selectedLead.parentName || '미입력'}</p>
                       <p>학부모 연락처: {selectedLead.parentPhone || '-'}</p>
                       <p>학생 연락처: {selectedLead.studentPhone || '-'}</p>
@@ -1870,6 +1886,7 @@ export function MarketingConsultingCRM({
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">웹 접수 정보</p>
                     <div className="mt-3 space-y-2 text-sm font-bold text-slate-700">
+                      <p>접수번호: {selectedWebsiteRequest.receiptId || '-'}</p>
                       <p>연락처: {selectedWebsiteRequest.consultPhone || '-'}</p>
                       <p>학교/학년: {[selectedWebsiteRequest.school, selectedWebsiteRequest.grade].filter(Boolean).join(' · ') || '-'}</p>
                       <p>접수일: {selectedWebsiteRequest.consultationDate || '-'}</p>

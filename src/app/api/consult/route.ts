@@ -22,15 +22,15 @@ function normalizePhone(value: string) {
 }
 
 const consultSchema = z.object({
-  studentName: z.string().trim().min(1, "학생 이름을 입력해주세요.").max(40, "학생 이름이 너무 깁니다."),
-  school: z.string().trim().min(1, "학교명을 입력해주세요.").max(80, "학교명이 너무 깁니다."),
+  studentName: z.string().trim().min(1, "학생 이름을 입력해주세요.").max(15, "학생 이름은 15자 이내로 입력해주세요."),
+  school: z.string().trim().min(1, "학교명을 입력해주세요.").max(15, "학교명은 15자 이내로 입력해주세요."),
   grade: z.string().trim().min(1, "학년을 선택해주세요.").max(10, "학년 형식이 올바르지 않습니다."),
   gender: z.enum(["남", "여"], { errorMap: () => ({ message: "성별을 선택해주세요." }) }),
   consultPhone: z
     .string()
     .trim()
     .transform(normalizePhone)
-    .refine((value) => value.length >= 8 && value.length <= 30, "연락처 형식이 올바르지 않습니다."),
+    .refine((value) => value.length >= 8 && value.length <= 15, "연락처는 15자 이내로 입력해주세요."),
   serviceType: z.enum(["korean_academy", "study_center"]),
   studyCenterRequestType: z.enum(["consult", "waitlist"]).optional(),
 });
@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
           memo: memoLines.join("\n"),
           source: WEBSITE_CONSULT_SOURCE,
           sourceRequestId: requestId,
+          receiptId,
           addedToWaitlistId: autoWaitlistId,
           addedToWaitlistIds: autoWaitlistId ? [autoWaitlistId] : [],
           createdAt: admin.firestore.FieldValue.serverTimestamp(),

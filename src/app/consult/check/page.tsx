@@ -97,6 +97,7 @@ export default function ConsultCheckPage() {
                   setError(null);
                   setResults(null);
                 }}
+                maxLength={15}
                 placeholder="예: 010-1234-5678"
                 className="h-11 w-full rounded-lg border border-[#14295F]/15 px-3 text-sm font-bold text-[#14295F] outline-none transition focus:border-[#FF7A16]"
               />
@@ -114,6 +115,7 @@ export default function ConsultCheckPage() {
                   setError(null);
                   setResults(null);
                 }}
+                maxLength={15}
                 placeholder="예: 김트랙"
                 className="h-11 w-full rounded-lg border border-[#14295F]/15 px-3 text-sm font-bold text-[#14295F] outline-none transition focus:border-[#FF7A16]"
               />

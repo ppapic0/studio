@@ -13,6 +13,22 @@ function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function toDateMs(value: unknown) {
+  if (!value) return 0;
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? 0 : value.getTime();
+  }
+  if (typeof (value as { toDate?: () => Date }).toDate === "function") {
+    const parsed = (value as { toDate: () => Date }).toDate();
+    return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+  }
+  return 0;
+}
+
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
@@ -38,31 +54,20 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const runQuery = async (phoneValue: string) => {
-      let query = adminDb
-        .collection("marketingConsultRequests")
-        .where("consultPhone", "==", phoneValue)
-        .orderBy("createdAt", "desc")
-        .limit(5);
+    const snapshot = await adminDb
+      .collection("marketingConsultRequests")
+      .where("consultPhone", "==", normalizedPhone)
+      .limit(20)
+      .get();
 
-      if (name) {
-        query = adminDb
-          .collection("marketingConsultRequests")
-          .where("consultPhone", "==", phoneValue)
-          .where("studentName", "==", name)
-          .orderBy("createdAt", "desc")
-          .limit(5);
-      }
-
-      return query.get();
-    };
-
-    const snapshots = await Promise.all(
-      Array.from(new Set([phone, normalizedPhone].filter((value): value is string => !!value))).map(runQuery),
-    );
-
-    const docs = snapshots.flatMap((snapshot) => snapshot.docs);
-    const uniqueDocs = Array.from(new Map(docs.map((doc) => [doc.id, doc])).values()).slice(0, 5);
+    const normalizedName = name?.trim();
+    const uniqueDocs = Array.from(new Map(snapshot.docs.map((doc) => [doc.id, doc])).values())
+      .filter((doc) => {
+        if (!normalizedName) return true;
+        return String(doc.data().studentName || "").trim() === normalizedName;
+      })
+      .sort((a, b) => toDateMs(b.data().createdAt) - toDateMs(a.data().createdAt))
+      .slice(0, 5);
 
     if (uniqueDocs.length === 0) {
       return noStoreJson({ ok: true, results: [] });

@@ -278,6 +278,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
             id="studentName"
             value={form.studentName}
             onChange={(e) => setField("studentName", e.target.value)}
+            maxLength={15}
             placeholder="예: 김트랙"
             className="h-11 w-full rounded-lg border border-[#14295F]/15 px-3 text-sm font-bold text-[#14295F] outline-none transition focus:border-[#FF7A16]"
           />
@@ -292,6 +293,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
               id="school"
               value={form.school}
               onChange={(e) => setField("school", e.target.value)}
+              maxLength={15}
               placeholder="예: 동백고등학교"
               className="h-11 w-full rounded-lg border border-[#14295F]/15 px-3 text-sm font-bold text-[#14295F] outline-none transition focus:border-[#FF7A16]"
             />
@@ -353,6 +355,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
             id="consultPhone"
             value={form.consultPhone}
             onChange={(e) => setField("consultPhone", e.target.value)}
+            maxLength={15}
             placeholder="예: 010-1234-5678"
             className="h-11 w-full rounded-lg border border-[#14295F]/15 px-3 text-sm font-bold text-[#14295F] outline-none transition focus:border-[#FF7A16]"
           />
