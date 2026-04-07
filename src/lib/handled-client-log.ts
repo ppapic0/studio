@@ -1,18 +1,8 @@
+import { getSafeErrorMessage, isSensitiveExposedMessage } from '@/lib/exposed-error';
+
 export function getHandledClientIssueMessage(error: unknown): string | null {
-  if (typeof error === 'string') {
-    const trimmed = error.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  }
-
-  if (error && typeof error === 'object' && 'message' in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === 'string') {
-      const trimmed = message.trim();
-      return trimmed.length > 0 ? trimmed : null;
-    }
-  }
-
-  return null;
+  const sanitized = getSafeErrorMessage(error, '');
+  return sanitized || null;
 }
 
 export function logHandledClientIssue(label: string, error: unknown) {
@@ -24,5 +14,13 @@ export function logHandledClientIssue(label: string, error: unknown) {
     return;
   }
 
-  console.warn(label, error);
+  if (error && typeof error === 'object' && 'message' in error) {
+    const rawMessage = String((error as { message?: unknown }).message || '').trim();
+    if (rawMessage && isSensitiveExposedMessage(rawMessage)) {
+      console.warn(label, '[redacted]');
+      return;
+    }
+  }
+
+  console.warn(label, '[redacted]');
 }

@@ -13,6 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { getSafeErrorMessage } from "@/lib/exposed-error";
+import { logHandledClientIssue } from "@/lib/handled-client-log";
 import { PRIVACY_ROUTE } from "@/lib/legal-documents";
 
 type ServiceType = "korean_academy" | "study_center";
@@ -179,7 +181,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
       };
 
       if (!response.ok || !data.ok) {
-        setError(data.message ?? "접수 중 오류가 발생했습니다.");
+        setError(getSafeErrorMessage(data.message, "접수 중 오류가 발생했습니다."));
         return;
       }
 
@@ -197,7 +199,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
       setConsentDialogOpen(false);
       setForm(INITIAL_FORM);
     } catch (err) {
-      console.error("[consult-form] submit error", err);
+      logHandledClientIssue("[consult-form] submit error", err);
       setError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
       setSubmitting(false);

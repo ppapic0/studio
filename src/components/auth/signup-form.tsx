@@ -49,6 +49,7 @@ import {
 } from '@/lib/legal-documents';
 import { AUTH_SESSION_SYNC_SKIP_STORAGE_KEY } from '@/lib/auth-session-shared';
 import { createServerAuthSession } from '@/lib/client-auth-session';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const roleEnum = z.enum(['student', 'teacher', 'parent', 'centerAdmin']);
@@ -143,20 +144,11 @@ export function SignupForm() {
             : typeof error?.details?.error === 'string'
               ? error.details.error
               : '';
-    const detailMessage = String(detailMessageRaw || '')
-      .replace(/^\d+\s+FAILED_PRECONDITION:?\s*/i, '')
-      .replace(/^\d+\s+ALREADY_EXISTS:?\s*/i, '')
-      .replace(/^\d+\s+INVALID_ARGUMENT:?\s*/i, '')
-      .replace(/^\d+\s+INTERNAL:?\s*/i, '')
-      .trim();
+    const detailMessage = getSafeErrorMessage(detailMessageRaw, '');
 
     const rawMessage = String(error?.message || '').trim();
     const strippedRaw = rawMessage.replace(/^FirebaseError:\s*/i, '').trim();
-    const cleanedRaw = strippedRaw
-      .replace(/^\d+\s+FAILED_PRECONDITION:?\s*/i, '')
-      .replace(/^\d+\s+ALREADY_EXISTS:?\s*/i, '')
-      .replace(/^\d+\s+INVALID_ARGUMENT:?\s*/i, '')
-      .trim();
+    const cleanedRaw = getSafeErrorMessage(strippedRaw, '');
 
     const normalizedRaw =
       /^(functions\/)?internal$/i.test(cleanedRaw) || /\(functions\/internal\)/i.test(cleanedRaw)

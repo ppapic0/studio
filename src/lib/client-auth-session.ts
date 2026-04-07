@@ -1,6 +1,7 @@
 import type { User } from 'firebase/auth';
 
 import { AUTH_SESSION_API_ROUTE } from '@/lib/auth-session-shared';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
 
 type SessionRouteResponse = {
   ok?: boolean;
@@ -8,11 +9,7 @@ type SessionRouteResponse = {
 };
 
 function resolveSessionRouteMessage(payload: SessionRouteResponse | null, fallback: string) {
-  const message = payload?.message;
-  if (typeof message === 'string' && message.trim().length > 0) {
-    return message.trim();
-  }
-  return fallback;
+  return getSafeErrorMessage(payload?.message, fallback);
 }
 
 export async function createServerAuthSession(user: User) {

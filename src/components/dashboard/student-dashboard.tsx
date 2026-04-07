@@ -111,6 +111,7 @@ import {
   formatStudentRankRewardSummary,
   getDailyRankWindowState,
 } from '@/lib/student-ranking-policy';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
@@ -2929,7 +2930,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       toast({
         variant: 'destructive',
         title: '퀘스트 저장 실패',
-        description: typeof error?.message === 'string' ? error.message : '잠시 후 다시 시도해주세요.',
+        description: getSafeErrorMessage(error, '잠시 후 다시 시도해주세요.'),
       });
     } finally {
       pendingQuestIdsRef.current.delete(taskId);

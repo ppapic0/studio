@@ -1780,7 +1780,7 @@ exports.deleteStudentAccount = functions.region(region).runWith({
         return { ok: true, message: "정리가 완료되었습니다." };
     }
     catch (error) {
-        throw new functions.https.HttpsError("internal", error.message);
+        throw new functions.https.HttpsError("internal", "학생 계정 삭제 중 오류가 발생했습니다.");
     }
 });
 exports.deleteTeacherAccount = functions.region(region).runWith({
@@ -1838,7 +1838,7 @@ exports.deleteTeacherAccount = functions.region(region).runWith({
         };
     }
     catch (error) {
-        throw new functions.https.HttpsError("internal", (error === null || error === void 0 ? void 0 : error.message) || "선생님 계정 삭제 중 오류가 발생했습니다.");
+        throw new functions.https.HttpsError("internal", "선생님 계정 삭제 중 오류가 발생했습니다.");
     }
 });
 exports.updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {

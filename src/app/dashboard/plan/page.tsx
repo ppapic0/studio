@@ -86,6 +86,7 @@ import {
   type WithId,
 } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -1200,7 +1201,7 @@ export default function StudyPlanPage() {
       logHandledClientIssue('[plan-track] save goal target failed', error);
       setGoalTargetSaveError({
         title: '목표시간 저장 실패',
-        description: typeof error?.message === 'string' ? error.message : '목표시간을 저장하지 못했습니다.',
+        description: getSafeErrorMessage(error, '목표시간을 저장하지 못했습니다.'),
       });
     } finally {
       setIsGoalTargetSaving(false);
@@ -1766,7 +1767,7 @@ export default function StudyPlanPage() {
       toast({
         variant: 'destructive',
         title: '오늘 계획을 만들지 못했어요',
-        description: typeof error?.message === 'string' ? error.message : '다시 한 번 시도해주세요.',
+        description: getSafeErrorMessage(error, '다시 한 번 시도해주세요.'),
       });
       return false;
     } finally {
@@ -1826,7 +1827,7 @@ export default function StudyPlanPage() {
       toast({
         variant: 'destructive',
         title: '어제 계획을 불러오지 못했어요',
-        description: typeof error?.message === 'string' ? error.message : '다시 시도해주세요.',
+        description: getSafeErrorMessage(error, '다시 시도해주세요.'),
       });
     } finally {
       setIsSubmitting(false);
@@ -1912,7 +1913,7 @@ export default function StudyPlanPage() {
       toast({
         variant: 'destructive',
         title: '내일로 미루지 못했어요',
-        description: typeof error?.message === 'string' ? error.message : '다시 시도해주세요.',
+        description: getSafeErrorMessage(error, '다시 시도해주세요.'),
       });
     } finally {
       setIsSubmitting(false);
@@ -1968,7 +1969,7 @@ export default function StudyPlanPage() {
       toast({
         variant: 'destructive',
         title: '미완료 항목을 삭제하지 못했어요',
-        description: typeof error?.message === 'string' ? error.message : '다시 시도해주세요.',
+        description: getSafeErrorMessage(error, '다시 시도해주세요.'),
       });
     } finally {
       setIsSubmitting(false);
@@ -2260,7 +2261,7 @@ export default function StudyPlanPage() {
       toast({
         variant: 'destructive',
         title: '할 일 추가 실패',
-        description: typeof error?.message === 'string' ? error.message : '할 일을 저장하지 못했습니다.',
+        description: getSafeErrorMessage(error, '할 일을 저장하지 못했습니다.'),
       });
       return false;
     } finally {
@@ -2581,7 +2582,7 @@ export default function StudyPlanPage() {
     } catch (error: any) {
       setAttendanceSaveError({
         title: '일정 저장 실패',
-        description: typeof error?.message === 'string' ? error.message : '일정을 저장하지 못했어요.',
+        description: getSafeErrorMessage(error, '일정을 저장하지 못했어요.'),
       });
       return false;
     } finally {
@@ -2614,7 +2615,7 @@ export default function StudyPlanPage() {
     } catch (error: any) {
       setAttendanceSaveError({
         title: '일정 저장 실패',
-        description: typeof error?.message === 'string' ? error.message : '일정을 저장하지 못했어요.',
+        description: getSafeErrorMessage(error, '일정을 저장하지 못했어요.'),
       });
     } finally {
       setIsSubmitting(false);
@@ -2648,7 +2649,7 @@ export default function StudyPlanPage() {
     } catch (error: any) {
       setAttendanceSaveError({
         title: '초기화 실패',
-        description: typeof error?.message === 'string' ? error.message : '일정을 초기화하지 못했어요.',
+        description: getSafeErrorMessage(error, '일정을 초기화하지 못했어요.'),
       });
     } finally {
       setIsSubmitting(false);
@@ -2762,7 +2763,7 @@ export default function StudyPlanPage() {
       logHandledClientIssue('[plan-track] save weekday template failed', error);
       setAttendanceSaveError({
         title: '정기 루틴 저장 실패',
-        description: typeof error?.message === 'string' ? error.message : '반복 루틴을 저장하지 못했어요.',
+        description: getSafeErrorMessage(error, '반복 루틴을 저장하지 못했어요.'),
       });
       return false;
     } finally {
@@ -3086,7 +3087,7 @@ export default function StudyPlanPage() {
       toast({
         variant: 'destructive',
         title: '계획 복사 실패',
-        description: typeof error?.message === 'string' ? error.message : '학습 계획을 복사하지 못했습니다.',
+        description: getSafeErrorMessage(error, '학습 계획을 복사하지 못했습니다.'),
       });
     } finally { setIsSubmitting(false); }
   };
@@ -3124,7 +3125,7 @@ export default function StudyPlanPage() {
       toast({
         variant: 'destructive',
         title: '루틴 복사 실패',
-        description: typeof error?.message === 'string' ? error.message : '생활 루틴을 복사하지 못했습니다.',
+        description: getSafeErrorMessage(error, '생활 루틴을 복사하지 못했습니다.'),
       });
     } finally { setIsSubmitting(false); }
   };

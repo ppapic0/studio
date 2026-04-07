@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore } from '@/firebase';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import type { Invoice } from '@/lib/types';
 
 type CheckoutPageClientProps = {
@@ -60,7 +61,7 @@ export function CheckoutPageClient({ invoiceId, tossClientKey }: CheckoutPageCli
         failUrl,
       });
     } catch (error) {
-      console.error('Payment request failed:', error);
+      logHandledClientIssue('[payment-checkout] request failed', error);
       setIsRequesting(false);
     }
   };

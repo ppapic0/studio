@@ -9,6 +9,8 @@ import { useAppContext } from '@/contexts/app-context';
 import { useFunctions } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { useToast } from '@/hooks/use-toast';
 
 type ConfirmInvoicePaymentResult = {
@@ -83,16 +85,8 @@ function SuccessContent() {
         });
       } catch (error: any) {
         const fallback = '결제 후 처리 중 오류가 발생했습니다. 잠시 후 다시 확인해 주세요.';
-        const detail =
-          typeof error?.details === 'string'
-            ? error.details
-            : typeof error?.details?.userMessage === 'string'
-              ? error.details.userMessage
-              : typeof error?.message === 'string'
-                ? error.message.replace(/^FirebaseError:\s*/i, '').trim()
-                : fallback;
-
-        setErrorMessage(detail || fallback);
+        logHandledClientIssue('[payment-success] confirm failed', error);
+        setErrorMessage(getSafeErrorMessage(error, fallback));
         setIsProcessing(false);
       }
     };

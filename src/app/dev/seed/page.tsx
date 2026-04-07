@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useUser, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { seedInitialData } from '@/lib/membership-actions';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Database } from 'lucide-react';
 
@@ -54,7 +55,7 @@ export default function SeedPage() {
         toast({ title: '시딩 성공', description: '초기 데이터가 주입되었습니다.' });
       }
     } catch (error: any) {
-      toast({ variant: 'destructive', title: '시딩 실패', description: error.message });
+      toast({ variant: 'destructive', title: '시딩 실패', description: getSafeErrorMessage(error) });
     } finally {
       setIsSeeding(false);
     }
