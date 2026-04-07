@@ -1938,7 +1938,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         {
           key: 'lead',
           title: `상담·리드 ${metrics?.leadPipelineCount30d ?? 0}건`,
-          detail: '웹 상담폼, 입학 대기, 수동 리드를 같은 흐름에서 확인할 수 있습니다.',
+          detail: '웹 유입 확인 후 상담 리드 워크벤치와 입학 대기 흐름으로 이어서 관리할 수 있습니다.',
           actionLabel: '리드 워크벤치',
           href: '/dashboard/leads',
           icon: Megaphone,

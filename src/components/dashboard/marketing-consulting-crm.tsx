@@ -349,6 +349,11 @@ export function MarketingConsultingCRM({
     [websiteRequestsRaw]
   );
 
+  const pendingWebsiteRequests = useMemo(
+    () => websiteRequests.filter((request) => !request.linkedLeadId),
+    [websiteRequests]
+  );
+
   const waitlist = useMemo(
     () =>
       [...(waitlistRaw || [])].sort((a, b) => {
@@ -423,7 +428,7 @@ export function MarketingConsultingCRM({
 
   const filteredWebsiteRequests = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
-    return websiteRequests.filter((req) => {
+    return pendingWebsiteRequests.filter((req) => {
       if (statusFilter !== 'all' && req.status !== statusFilter) return false;
       if (!keyword) return true;
       return [req.receiptId, req.studentName, req.school, req.grade, req.consultPhone, req.sourceLabel, req.requestTypeLabel]
@@ -432,7 +437,7 @@ export function MarketingConsultingCRM({
         .toLowerCase()
         .includes(keyword);
     });
-  }, [searchTerm, statusFilter, websiteRequests]);
+  }, [pendingWebsiteRequests, searchTerm, statusFilter]);
 
   const filteredWaitlist = useMemo(() => {
     const keyword = waitlistSearch.trim().toLowerCase();
@@ -481,11 +486,11 @@ export function MarketingConsultingCRM({
   }, [leads]);
 
   const websiteSummary = useMemo(() => {
-    const total = websiteRequests.length;
-    const newCount = websiteRequests.filter((r) => r.status === 'new').length;
-    const contactedCount = websiteRequests.filter((r) => r.status === 'contacted').length;
+    const total = pendingWebsiteRequests.length;
+    const newCount = pendingWebsiteRequests.filter((r) => r.status === 'new').length;
+    const contactedCount = pendingWebsiteRequests.filter((r) => r.status === 'contacted').length;
     return { total, newCount, contactedCount };
-  }, [websiteRequests]);
+  }, [pendingWebsiteRequests]);
 
   const visitSummary = useMemo(() => {
     const events = entryEventsRaw || [];
@@ -685,7 +690,8 @@ export function MarketingConsultingCRM({
         linkedLeadId: leadRef.id,
         updatedAt: serverTimestamp(),
       });
-      toast({ title: '웹 상담폼 내역을 리드 DB로 옮겼습니다.', description: '센터 홍보 DB에서 후속 상담 상태를 이어서 관리할 수 있습니다.' });
+      setSelectedDrawer({ type: 'lead', id: leadRef.id });
+      toast({ title: '웹 상담폼 내역을 리드 DB로 옮겼습니다.', description: '이제 상담 리드 워크벤치에서 후속 상담 상태를 이어서 관리할 수 있습니다.' });
     } catch (error) {
       console.error(error);
       toast({ variant: 'destructive', title: '리드 이동 실패', description: '웹사이트 상담폼 내역을 일반 리드 DB로 옮기는 중 오류가 발생했습니다.' });
@@ -964,7 +970,7 @@ export function MarketingConsultingCRM({
                   홍보/상담 리드 DB
                 </CardTitle>
                 <CardDescription className="font-semibold">
-                  상담 온 학생/학부모 연락처를 입력하고 상태를 추적하는 CRM입니다.
+                  웹사이트에서 새로 들어온 문의를 먼저 확인하고, 필요한 건만 상담 리드 워크벤치로 넘겨 관리합니다.
                 </CardDescription>
               </div>
               <Button
@@ -990,11 +996,11 @@ export function MarketingConsultingCRM({
                     <p className="text-sm font-black text-slate-900">웹사이트 상담폼 접수</p>
                   </div>
                   <p className="text-xs font-semibold text-slate-600">
-                    랜딩페이지 상담 문의는 리드 DB에 자동 반영되며, 여기서는 원본 접수 이력과 리드 연결 상태를 함께 확인할 수 있습니다.
+                    웹사이트에 새로 들어온 문의만 먼저 보여줍니다. 워크벤치로 넘긴 항목은 여기서 숨겨지고 상담 리드 워크벤치에서 이어서 관리합니다.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge className="border-none bg-transparent text-[#C25A00] shadow-none">전체 {websiteSummary.total}건</Badge>
+                  <Badge className="border-none bg-transparent text-[#C25A00] shadow-none">확인 대기 {websiteSummary.total}건</Badge>
                   <Badge className="border-none bg-transparent text-blue-700 shadow-none">신규 {websiteSummary.newCount}건</Badge>
                   <Badge className="border-none bg-transparent text-amber-700 shadow-none">연락중 {websiteSummary.contactedCount}건</Badge>
                 </div>
@@ -1032,7 +1038,7 @@ export function MarketingConsultingCRM({
                   </div>
                 ) : filteredWebsiteRequests.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-orange-200 bg-white/80 px-4 py-6 text-center text-sm font-semibold text-slate-500">
-                    아직 웹사이트 상담폼으로 접수된 내역이 없습니다.
+                    지금 확인할 새 웹사이트 상담 접수는 없습니다.
                   </div>
                 ) : (
                   filteredWebsiteRequests.slice(0, 8).map((request) => (
@@ -1331,7 +1337,7 @@ export function MarketingConsultingCRM({
             <AdminWorkbenchCommandBar
               eyebrow="홍보/상담 워크벤치"
               title="상담 리드 워크벤치"
-              description="같은 검색과 같은 상태 필터로 웹 유입과 수동 상담 리드를 이어서 관리합니다."
+              description="웹에서 넘긴 상담과 수동 입력 리드를 한 곳에서 이어서 관리합니다."
               searchValue={searchTerm}
               onSearchChange={setSearchTerm}
               searchPlaceholder="이름, 학교, 전화번호, 유입경로 검색"
