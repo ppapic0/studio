@@ -1858,6 +1858,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () =>
       [
         {
+          key: 'intervention',
+          title: `즉시 개입 학생 ${urgentInterventionStudents.length}명`,
+          detail:
+            urgentInterventionStudents[0]
+              ? `${urgentInterventionStudents[0].studentName} · ${urgentInterventionStudents[0].topReason}`
+              : '좌석 히트맵과 학생 360에서 우선 개입 학생을 먼저 확인하세요.',
+          actionLabel: '학생 360',
+          href: '/dashboard/teacher/students?showRisk=1#risk-analysis',
+          icon: ShieldAlert,
+          toneClass: 'bg-rose-100 text-rose-700',
+        },
+        {
           key: 'attendance',
           title: `미입실·지각 ${attendanceBoardSummary.lateOrAbsentCount}명`,
           detail: '오늘 출결 KPI에서 미입실, 지각 반복 학생을 먼저 확인하세요.',
@@ -1903,11 +1915,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           toneClass: 'bg-emerald-100 text-emerald-700',
         },
       ].filter((item) => {
+        if (item.key === 'intervention') return urgentInterventionStudents.length > 0;
+        if (item.key === 'attendance') return attendanceBoardSummary.lateOrAbsentCount > 0;
         if (item.key === 'away') return attendanceBoardSummary.longAwayCount > 0;
         if (item.key === 'guardian') return parentContactRecommendations.length > 0;
+        if (item.key === 'lead') return (metrics?.leadPipelineCount30d ?? 0) > 0;
         return true;
       }),
-    [attendanceBoardSummary, metrics, parentContactRecommendations]
+    [attendanceBoardSummary, metrics, parentContactRecommendations, urgentInterventionStudents]
   );
 
   const todayAttendanceContactTargets = useMemo(() => {
@@ -2208,6 +2223,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const parentContactCompactPreview = parentContactRecommendations.slice(0, 2);
   const leadAnnouncement = recentAnnouncementsPreview[0] || null;
   const leadTeacherActivity = teacherActivityPreviewRows[0] || null;
+  const adminPriorityActions = todayActionQueue.slice(0, 3);
+  const topAdminPriority = adminPriorityActions[0] || null;
+  const secondaryAdminPriorityActions = adminPriorityActions.slice(1);
+  const TopAdminPriorityIcon = topAdminPriority?.icon;
 
   return (
     <div className={cn('mx-auto flex w-full max-w-[1400px] flex-col gap-6', isMobile ? 'px-1 pb-6' : 'px-4 py-6')}>
@@ -2285,51 +2304,87 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">우선 처리 리스트</p>
-                      <CardTitle className="mt-2 text-xl font-black tracking-tight text-[#14295F]">지금 바로 처리할 일</CardTitle>
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">오늘의 우선순위</p>
+                      <CardTitle className="mt-2 text-xl font-black tracking-tight text-[#14295F]">운영실에 들어오면 먼저 할 일 TOP 3</CardTitle>
                       <CardDescription className="mt-1 text-xs font-bold text-slate-500">
-                        홈에서 바로 확인하고 필요한 워크벤치로 이동합니다.
+                        가장 먼저 처리해야 할 항목만 순서대로 고정해 두었습니다.
                       </CardDescription>
                     </div>
                     <AlertTriangle className="h-5 w-5 text-rose-500" />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {todayActionQueue.length === 0 ? (
+                  {!topAdminPriority ? (
                     <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8 text-center text-xs font-bold text-slate-500">
                       현재 우선 처리 큐가 비어 있습니다.
                     </div>
                   ) : (
-                    todayActionQueue.map((item) => (
-                      <div key={item.key} className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+                    <>
+                      <div className="rounded-[1.5rem] border border-[#FFD7BA] bg-[linear-gradient(135deg,#FFF8F2_0%,#ffffff_100%)] px-4 py-4 shadow-[0_18px_36px_-30px_rgba(255,122,22,0.34)]">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className={cn('inline-flex h-7 w-7 items-center justify-center rounded-full', item.toneClass)}>
-                                <item.icon className="h-4 w-4" />
+                              <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">
+                                1순위
+                              </Badge>
+                              <span className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full', topAdminPriority.toneClass)}>
+                                {TopAdminPriorityIcon ? <TopAdminPriorityIcon className="h-4 w-4" /> : null}
                               </span>
-                              <p className="text-sm font-black text-[#14295F]">{item.title}</p>
                             </div>
-                            <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
+                            <p className="mt-3 text-base font-black tracking-tight text-[#14295F]">{topAdminPriority.title}</p>
+                            <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">{topAdminPriority.detail}</p>
                           </div>
-                          {item.actionType === 'dialog' ? (
+                          {topAdminPriority.actionType === 'dialog' ? (
                             <Button
                               type="button"
                               size="sm"
-                              variant="outline"
-                              className="h-8 rounded-lg px-3 text-[11px] font-black"
+                              className="h-9 rounded-xl bg-[#14295F] px-3 text-[11px] font-black text-white hover:bg-[#10224C]"
                               onClick={() => setIsParentTrustDialogOpen(true)}
                             >
-                              {item.actionLabel}
+                              {topAdminPriority.actionLabel}
                             </Button>
                           ) : (
-                            <Button asChild type="button" size="sm" variant="outline" className="h-8 rounded-lg px-3 text-[11px] font-black">
-                              <Link href={item.href!}>{item.actionLabel}</Link>
+                            <Button asChild type="button" size="sm" className="h-9 rounded-xl bg-[#14295F] px-3 text-[11px] font-black text-white hover:bg-[#10224C]">
+                              <Link href={topAdminPriority.href!}>{topAdminPriority.actionLabel}</Link>
                             </Button>
                           )}
                         </div>
                       </div>
-                    ))
+
+                      {secondaryAdminPriorityActions.map((item, index) => (
+                        <div key={item.key} className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
+                                  {index + 2}순위
+                                </Badge>
+                                <span className={cn('inline-flex h-7 w-7 items-center justify-center rounded-full', item.toneClass)}>
+                                  <item.icon className="h-4 w-4" />
+                                </span>
+                                <p className="text-sm font-black text-[#14295F]">{item.title}</p>
+                              </div>
+                              <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
+                            </div>
+                            {item.actionType === 'dialog' ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 rounded-lg px-3 text-[11px] font-black"
+                                onClick={() => setIsParentTrustDialogOpen(true)}
+                              >
+                                {item.actionLabel}
+                              </Button>
+                            ) : (
+                              <Button asChild type="button" size="sm" variant="outline" className="h-8 rounded-lg px-3 text-[11px] font-black">
+                                <Link href={item.href!}>{item.actionLabel}</Link>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </CardContent>
               </Card>

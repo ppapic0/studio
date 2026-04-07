@@ -221,6 +221,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
   const [trendLoading, setTrendLoading] = useState(false);
   const staleSeatCleanupInFlightRef = useRef(false);
+  const liveBoardSectionRef = useRef<HTMLDivElement | null>(null);
+  const seatInsightSectionRef = useRef<HTMLDivElement | null>(null);
+  const appointmentsSectionRef = useRef<HTMLDivElement | null>(null);
+  const reportsSectionRef = useRef<HTMLDivElement | null>(null);
   
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
@@ -744,6 +748,113 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { data: rawAppointments, isLoading: aptLoading } = useCollection<CounselingReservation>(appointmentsQuery, { enabled: isActive });
 
   const appointments = useMemo(() => rawAppointments ? [...rawAppointments].sort((a,b)=>(b.scheduledAt?.toMillis()||0)-(a.createdAt?.toMillis()||0)) : [], [rawAppointments]);
+  const unreadReportCount = useMemo(
+    () => (rawRecentReports || []).filter((report) => !report.viewedAt).length,
+    [rawRecentReports]
+  );
+
+  const scrollToSection = (sectionRef: { current: HTMLDivElement | null }) => {
+    sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const teacherActionQueue = useMemo(() => {
+    const pendingAppointments = appointments.filter((apt) => apt.status === 'requested');
+    const nextPendingAppointment = [...pendingAppointments].sort(
+      (left, right) => (left.scheduledAt?.toMillis() || 0) - (right.scheduledAt?.toMillis() || 0)
+    )[0];
+    const upcomingConfirmedAppointments = appointments.filter((apt) => {
+      if (apt.status !== 'confirmed' || !apt.scheduledAt) return false;
+      return apt.scheduledAt.toMillis() >= now;
+    });
+    const nextConfirmedAppointment = [...upcomingConfirmedAppointments].sort(
+      (left, right) => (left.scheduledAt?.toMillis() || 0) - (right.scheduledAt?.toMillis() || 0)
+    )[0];
+
+    const items = [
+      pendingAppointments.length > 0
+        ? {
+            key: 'pending-counseling',
+            title: `상담 승인 대기 ${pendingAppointments.length}건`,
+            detail: nextPendingAppointment
+              ? `${nextPendingAppointment.studentName} 학생 상담 요청부터 확인하세요.`
+              : '오늘 요청된 상담을 먼저 승인하거나 조정하세요.',
+            actionLabel: '상담 현황',
+            icon: MessageSquare,
+            toneClass: 'bg-[#FFF2E8] text-[#C95A08]',
+            onClick: () => scrollToSection(appointmentsSectionRef),
+          }
+        : upcomingConfirmedAppointments.length > 0
+          ? {
+              key: 'confirmed-counseling',
+              title: `곧 시작 상담 ${upcomingConfirmedAppointments.length}건`,
+              detail: nextConfirmedAppointment?.scheduledAt
+                ? `${format(nextConfirmedAppointment.scheduledAt.toDate(), 'HH:mm')} · ${nextConfirmedAppointment.studentName} 학생 상담이 예정되어 있습니다.`
+                : '확정된 상담 일정을 먼저 준비하세요.',
+              actionLabel: '상담 준비',
+              icon: Clock,
+              toneClass: 'bg-[#EEF4FF] text-[#2554D7]',
+              onClick: () => scrollToSection(appointmentsSectionRef),
+            }
+          : null,
+      attendanceBoardSummary.lateOrAbsentCount > 0
+        ? {
+            key: 'attendance',
+            title: `미입실·지각 ${attendanceBoardSummary.lateOrAbsentCount}명`,
+            detail: '실시간 교실에서 출결 신호 학생을 먼저 확인하고 바로 연락 여부를 판단하세요.',
+            actionLabel: '실시간 교실',
+            icon: AlertCircle,
+            toneClass: 'bg-rose-100 text-rose-700',
+            onClick: () => scrollToSection(liveBoardSectionRef),
+          }
+        : null,
+      attendanceBoardSummary.longAwayCount > 0
+        ? {
+            key: 'long-away',
+            title: `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
+            detail: '오래 자리를 비운 학생의 복귀 여부를 실시간 교실에서 먼저 점검하세요.',
+            actionLabel: '좌석 확인',
+            icon: LogOut,
+            toneClass: 'bg-amber-100 text-amber-700',
+            onClick: () => scrollToSection(liveBoardSectionRef),
+          }
+        : null,
+      seatOverlaySummary.riskCount > 0
+        ? {
+            key: 'risk',
+            title: `리스크 학생 ${seatOverlaySummary.riskCount}명`,
+            detail: '학생 히트맵에서 위험 학생을 먼저 눌러 오늘 개입이 필요한 이유를 확인하세요.',
+            actionLabel: '학생 히트맵',
+            icon: ShieldAlert,
+            toneClass: 'bg-[#EEF4FF] text-[#2554D7]',
+            onClick: () => scrollToSection(seatInsightSectionRef),
+          }
+        : null,
+      unreadReportCount > 0
+        ? {
+            key: 'unread-report',
+            title: `미열람 리포트 ${unreadReportCount}건`,
+            detail: '학부모가 아직 읽지 않은 리포트를 보고 후속 안내가 필요한지 먼저 확인하세요.',
+            actionLabel: '리포트 보기',
+            icon: Eye,
+            toneClass: 'bg-[#FFF2E8] text-[#C95A08]',
+            onClick: () => scrollToSection(reportsSectionRef),
+          }
+        : null,
+    ].filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+    return items.slice(0, 3);
+  }, [
+    appointments,
+    attendanceBoardSummary.lateOrAbsentCount,
+    attendanceBoardSummary.longAwayCount,
+    now,
+    seatOverlaySummary.riskCount,
+    unreadReportCount,
+  ]);
+
+  const topTeacherPriority = teacherActionQueue[0] || null;
+  const secondaryTeacherPriorities = teacherActionQueue.slice(1);
+  const TopTeacherPriorityIcon = topTeacherPriority?.icon;
 
   const unassignedStudents = useMemo(() => {
     if (!students || !studentMembers) return [];
@@ -1740,6 +1851,91 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </header>
 
       <section className="px-4">
+        <Card className="overflow-hidden rounded-[2.3rem] border border-[#14295F]/10 bg-[linear-gradient(135deg,#f6f8ff_0%,#ffffff_62%,#fff7ef_100%)] shadow-[0_24px_56px_-42px_rgba(20,41,95,0.38)]">
+          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
+            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
+              <div>
+                <div className="flex items-center gap-2">
+                  <Badge className="h-6 border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
+                    오늘의 우선순위
+                  </Badge>
+                  <Badge className="h-6 border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">
+                    TOP 3
+                  </Badge>
+                </div>
+                <p className="mt-2 text-xl font-black tracking-tight text-[#14295F]">선생님이 오늘 먼저 처리해야 할 일</p>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                  상담, 출결, 학생 리스크, 리포트 후속 중에서 오늘성 높은 작업만 먼저 고정했습니다.
+                </p>
+              </div>
+              <Badge className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-black text-[#14295F] shadow-sm">
+                {selectedClass === 'all' ? '센터 전체' : selectedClass}
+              </Badge>
+            </div>
+
+            {!topTeacherPriority ? (
+              <div className="rounded-[1.6rem] border border-dashed border-slate-200 bg-white px-5 py-8 text-center text-sm font-black text-slate-500">
+                현재 바로 처리해야 할 우선순위 항목이 없습니다.
+              </div>
+            ) : (
+              <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.2fr)_360px]")}>
+                <div className="rounded-[1.8rem] border border-[#FFD7BA] bg-[linear-gradient(135deg,#FFF8F2_0%,#ffffff_100%)] px-5 py-5 shadow-[0_18px_38px_-30px_rgba(255,122,22,0.34)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">
+                          1순위
+                        </Badge>
+                        <span className={cn("inline-flex h-9 w-9 items-center justify-center rounded-full", topTeacherPriority.toneClass)}>
+                          {TopTeacherPriorityIcon ? <TopTeacherPriorityIcon className="h-4 w-4" /> : null}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-lg font-black tracking-tight text-[#14295F]">{topTeacherPriority.title}</p>
+                      <p className="mt-2 text-sm font-bold leading-6 text-slate-500">{topTeacherPriority.detail}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      className="h-10 rounded-xl bg-[#14295F] px-4 text-xs font-black text-white hover:bg-[#10224C]"
+                      onClick={topTeacherPriority.onClick}
+                    >
+                      {topTeacherPriority.actionLabel}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  {secondaryTeacherPriorities.map((item, index) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={item.onClick}
+                      className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/22 hover:shadow-[0_16px_30px_-24px_rgba(20,41,95,0.28)]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
+                              {index + 2}순위
+                            </Badge>
+                            <span className={cn("inline-flex h-7 w-7 items-center justify-center rounded-full", item.toneClass)}>
+                              <item.icon className="h-4 w-4" />
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm font-black text-[#14295F]">{item.title}</p>
+                          <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section ref={liveBoardSectionRef} className="px-4">
         <Card className="rounded-[2rem] border-none bg-white/90 shadow-sm ring-1 ring-black/5">
           <CardContent className={cn("flex flex-col gap-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
             <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
@@ -1800,7 +1996,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </Card>
       </section>
 
-      <section className="px-4">
+      <section ref={seatInsightSectionRef} className="px-4">
         <Card className="rounded-[2.5rem] border-none shadow-sm bg-white p-6 sm:p-8 overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform duration-1000"><TrendingUp className="h-32 w-32" /></div>
           <CardHeader className="p-0 mb-6">
@@ -2147,7 +2343,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       ) : null}
 
       <div className={cn("grid gap-6 px-4", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
-        <div className="lg:col-span-7 space-y-4">
+        <div ref={appointmentsSectionRef} className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
               <MessageSquare className="h-6 w-6 text-primary" />
@@ -2179,7 +2375,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </div>
         </div>
 
-        <div className="lg:col-span-5 space-y-4">
+        <div ref={reportsSectionRef} className="lg:col-span-5 space-y-4">
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
               <FileSearch className="h-6 w-6 text-emerald-600" />
