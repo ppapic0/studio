@@ -3164,7 +3164,7 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
             userMessage: "센터 또는 학생 정보가 누락되었습니다.",
         });
     }
-    if (!["study_start", "away_start", "study_end", "late_alert", "check_in", "check_out"].includes(eventType)) {
+    if (!["study_start", "away_start", "away_end", "study_end", "late_alert", "check_in", "check_out"].includes(eventType)) {
         throw new functions.https.HttpsError("invalid-argument", "Invalid event type.", {
             userMessage: "알림 타입이 올바르지 않습니다.",
         });

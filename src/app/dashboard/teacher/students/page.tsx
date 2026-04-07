@@ -402,13 +402,15 @@ export default function StudentListPage() {
   };
 
   const handleInlineAttendanceAction = async (nextStatus: AttendanceCurrent['status']) => {
-    if (!firestore || !functions || !centerId || !selectedStudentPreview) return;
+    if (!firestore || !centerId || !selectedStudentPreview) return;
 
     const studentId = selectedStudentPreview.member.id;
     const studentName = selectedStudentPreview.member.displayName || '학생';
     const prevStatus = selectedStudentPreview.attendance?.status || 'absent';
     const seatDocId = selectedStudentPreview.seatDocId;
     const seatIdentity = selectedStudentPreview.seatIdentity;
+    const nextStatusLabel =
+      nextStatus === 'studying' ? '공부중' : nextStatus === 'away' ? '외출' : '미입실';
 
     if (!seatDocId || (!seatIdentity.roomSeatNo && !seatIdentity.seatNo)) {
       toast({
@@ -595,14 +597,26 @@ export default function StudentListPage() {
         console.warn('[student-index] auto attendance sync skipped', syncError?.message || syncError);
       });
 
-      if (smsEventType) {
-        const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
-        await notifyAttendanceSms({ centerId, studentId, eventType: smsEventType });
+      let successTitle = '출결 처리를 저장했습니다.';
+      let successDescription = `${studentName} 학생 상태를 ${nextStatusLabel}으로 반영했습니다.`;
+
+      if (smsEventType && functions) {
+        try {
+          const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
+          await notifyAttendanceSms({ centerId, studentId, eventType: smsEventType });
+        } catch (notifyError: any) {
+          console.warn('[student-index] attendance sms notify skipped', notifyError?.message || notifyError);
+          successTitle = '출결은 저장되었습니다.';
+          successDescription = `${studentName} 학생 상태는 ${nextStatusLabel}으로 반영했고, 보호자 문자 접수는 확인이 필요합니다.`;
+        }
+      } else if (smsEventType && !functions) {
+        successTitle = '출결은 저장되었습니다.';
+        successDescription = `${studentName} 학생 상태는 ${nextStatusLabel}으로 반영했고, 문자 기능은 아직 준비되지 않았습니다.`;
       }
 
       toast({
-        title: '출결 처리를 저장했습니다.',
-        description: `${studentName} 학생 상태를 ${nextStatus === 'studying' ? '공부중' : nextStatus === 'away' ? '외출' : '미입실'}으로 반영했습니다.`,
+        title: successTitle,
+        description: successDescription,
       });
     } catch (error) {
       console.error('[student-index] inline attendance update failed', error);

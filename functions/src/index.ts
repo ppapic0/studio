@@ -3922,7 +3922,7 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
     });
   }
 
-  if (!(["study_start", "away_start", "study_end", "late_alert", "check_in", "check_out"] as AttendanceSmsEventType[]).includes(eventType)) {
+  if (!(["study_start", "away_start", "away_end", "study_end", "late_alert", "check_in", "check_out"] as AttendanceSmsEventType[]).includes(eventType)) {
     throw new functions.https.HttpsError("invalid-argument", "Invalid event type.", {
       userMessage: "알림 타입이 올바르지 않습니다.",
     });
