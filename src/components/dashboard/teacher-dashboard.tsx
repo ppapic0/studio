@@ -249,7 +249,7 @@ function TeacherSectionHeader({
             ? 'bg-white/10 text-white'
             : 'bg-[#EEF4FF] text-[#2554D7]',
     title: onDark ? 'text-white' : 'text-[#14295F]',
-    description: onDark ? 'text-white/72' : 'text-slate-500',
+    description: onDark ? 'text-white/72' : 'text-[#5c6e97]',
   };
 
   return (
@@ -2437,12 +2437,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       <h3 className="mt-3 text-[1.8rem] font-black tracking-tight text-[#14295F]">
                         두 호실 흐름을 한 화면에서 비교
                       </h3>
-                      <p className="mt-2 max-w-[40rem] text-xs font-bold leading-5 text-slate-500 sm:text-sm">
+                      <p className="mt-2 max-w-[40rem] text-xs font-bold leading-5 text-[#5c6e97] sm:text-sm">
                         호실별 학생 밀도와 좌석 사용 상황을 빠르게 비교하고, 필요한 호실만 바로 상세 보기로 전환할 수 있게 정리했습니다.
                       </p>
                     </div>
                     <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black uppercase text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
-                      2-room live
+                      2실 운영 보기
                     </Badge>
                   </div>
 
@@ -2455,9 +2455,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         <CardContent className="space-y-5 p-4 sm:p-5">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="grid gap-1">
-                              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/45">Live Room</p>
+                              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">실시간 호실</p>
                               <h3 className="text-[1.7rem] font-black tracking-tight text-[#14295F]">{room.name}</h3>
-                              <p className="text-xs font-bold text-slate-500">
+                              <p className="text-xs font-bold text-[#5c6e97]">
                                 좌석 클릭으로 학생 상세를 열고, 필요하면 바로 호실 상세 보기로 넘어갈 수 있습니다.
                               </p>
                             </div>
@@ -2483,16 +2483,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                           <div className="grid grid-cols-3 gap-3">
                             <div className="rounded-[1.4rem] border border-[#D7E4FF] bg-[#F8FBFF] p-3">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 중</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#5c6e97]">학습 중</p>
                               <p className="dashboard-number mt-1 text-2xl text-[#2554D7]">{room.studying}</p>
                             </div>
                             <div className="rounded-[1.4rem] border border-emerald-100 bg-emerald-50/70 p-3">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">배정 좌석</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#5c6e97]">배정 좌석</p>
                               <p className="dashboard-number mt-1 text-2xl text-emerald-600">{room.assigned}</p>
                             </div>
-                            <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-3">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">가용 좌석</p>
-                              <p className="dashboard-number mt-1 text-2xl text-slate-700">{room.availableSeats}</p>
+                            <div className="rounded-[1.4rem] border border-[#D7E4FF] bg-[#F8FBFF] p-3">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#5c6e97]">가용 좌석</p>
+                              <p className="dashboard-number mt-1 text-2xl text-[#14295F]">{room.availableSeats}</p>
                             </div>
                           </div>
 
@@ -2596,7 +2596,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black text-emerald-700">
                             배정 좌석 {selectedRoomSummary?.assigned ?? 0}
                           </span>
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-700">
+                          <span className="inline-flex items-center rounded-full bg-[#F1F6FF] px-3 py-1 text-[10px] font-black text-[#14295F]">
                             가용 좌석 {selectedRoomSummary?.availableSeats ?? 0}
                           </span>
                         </div>
@@ -2659,9 +2659,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 />
 
                 <div className="rounded-[2rem] border border-[#D7E4FF] bg-white/85 p-4 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/45">현재 오버레이</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">현재 오버레이</p>
                   <p className="mt-2 text-sm font-black text-[#14295F]">{activeSeatOverlayOption.label}</p>
-                  <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                  <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
                     {SEAT_OVERLAY_DESCRIPTIONS[activeSeatOverlayMode]}
                   </p>
                 </div>
@@ -2697,7 +2697,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 </div>
 
                 <div className="rounded-[2rem] border border-[#D7E4FF] bg-[#F7FAFF] p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/45">범례</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">범례</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {activeSeatOverlayLegends.map((legend) => (
                       <span
@@ -2738,23 +2738,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   }
                 />
                 <div className="grid gap-3">
-                  {aptLoading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : appointments.length === 0 ? (
-                    <div className="rounded-[2.3rem] border-2 border-dashed border-[#D7E4FF] bg-white/55 py-16 text-center"><p className="text-sm font-black italic text-slate-400">예정된 상담이 없습니다.</p></div>
+                  {aptLoading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-[#2554D4]/30" /></div> : appointments.length === 0 ? (
+                    <div className="rounded-[2.3rem] border-2 border-dashed border-[#D7E4FF] bg-white/70 py-16 text-center"><p className="text-sm font-black text-[#5c6e97]">예정된 상담이 없습니다.</p></div>
                   ) : appointments.map((apt) => (
                     <Card key={apt.id} className="rounded-[2rem] border border-[#D7E4FF] bg-white/92 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0">
-                          <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl border border-primary/10 bg-primary/5">
-                            <span className="text-[10px] font-black leading-none text-primary/60">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'HH:mm') : ''}</span>
+                          <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl border border-[#D7E4FF] bg-[#F1F6FF]">
+                            <span className="text-[10px] font-black leading-none text-[#14295F]">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'HH:mm') : ''}</span>
                           </div>
                           <div className="grid min-w-0 leading-tight">
-                            <span className="truncate text-sm font-black">{apt.studentName} 학생</span>
-                            <span className="max-w-[220px] truncate text-[10px] font-bold text-muted-foreground">{apt.studentNote || '상담 주제 미입력'}</span>
+                            <span className="truncate text-sm font-black text-[#14295F]">{apt.studentName} 학생</span>
+                            <span className="max-w-[220px] truncate text-[10px] font-bold text-[#5c6e97]">{apt.studentNote || '상담 주제 미입력'}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge className={cn("border-none text-[9px] font-black", apt.status === 'requested' ? "bg-amber-50 text-amber-600" : "bg-emerald-500 text-white")}>{apt.status === 'requested' ? '승인대기' : '예약확정'}</Badge>
-                          <ChevronRight className="h-4 w-4 opacity-20" />
+                          <Badge className={cn("border-none text-[9px] font-black", apt.status === 'requested' ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700")}>{apt.status === 'requested' ? '승인대기' : '예약확정'}</Badge>
+                          <ChevronRight className="h-4 w-4 text-[#9AA9C7]" />
                         </div>
                       </div>
                     </Card>
@@ -2781,7 +2781,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 />
                 <div className="grid gap-3">
                   {!recentReportsFeed || recentReportsFeed.length === 0 ? (
-                    <div className="rounded-[2.3rem] border-2 border-dashed border-emerald-100 bg-white/55 py-16 text-center"><p className="text-sm font-black italic text-slate-400">최근 발송된 리포트가 없습니다.</p></div>
+                    <div className="rounded-[2.3rem] border-2 border-dashed border-emerald-100 bg-white/70 py-16 text-center"><p className="text-sm font-black text-[#5c6e97]">최근 발송된 리포트가 없습니다.</p></div>
                   ) : recentReportsFeed.map((report) => (
                     <button
                       key={report.id}
@@ -2798,7 +2798,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                             <div className="grid min-w-0 leading-tight">
                               <span className="truncate text-sm font-black">{report.studentName} 학생</span>
-                              <p className="max-w-[180px] truncate text-[10px] font-bold text-muted-foreground">{report.content.substring(0, 40)}...</p>
+                              <p className="max-w-[180px] truncate text-[10px] font-bold text-[#5c6e97]">{report.content.substring(0, 40)}...</p>
                             </div>
                           </div>
                           <div className={cn("flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-300 shadow-sm transition-all group-hover:bg-emerald-500 group-hover:text-white", report.viewedAt ? "text-emerald-600" : "text-emerald-300")}>
@@ -2819,9 +2819,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
           {selectedRecentReport && (
             <>
-              <div className="bg-emerald-600 text-white p-8 relative shrink-0">
+              <div className="bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_58%,#FF8B2B_100%)] p-8 text-white relative shrink-0">
                 <DialogHeader className="relative z-10">
-                  <DialogTitle className="text-2xl font-black tracking-tighter">최근 발송 리포트 상세</DialogTitle>
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                      최근 발송 리포트
+                    </Badge>
+                    <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                      학부모 발송 문장 검토
+                    </Badge>
+                  </div>
+                  <DialogTitle className="text-2xl font-black tracking-tighter">발송 리포트 상세</DialogTitle>
                   <DialogDescription className="text-white/80 font-bold">
                     {selectedRecentReport.dateKey} · {selectedRecentReport.studentName || '학생'}
                   </DialogDescription>
@@ -2829,19 +2837,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white space-y-3">
                 <div className="flex items-center justify-between">
-                  <Badge className="border-none bg-emerald-50 text-emerald-700 font-black">{selectedRecentReport.dateKey}</Badge>
-                  <Badge className={cn("border-none font-black", selectedRecentReport.viewedAt ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                  <Badge className="border-none bg-[#EEF4FF] text-[#14295F] font-black">{selectedRecentReport.dateKey}</Badge>
+                  <Badge className={cn("border-none font-black", selectedRecentReport.viewedAt ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>
                     {selectedRecentReport.viewedAt ? '열람 완료' : '미열람'}
                   </Badge>
                 </div>
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/20 p-5">
-                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">
+                <div className="rounded-2xl border border-[#D7E4FF] bg-[#F8FBFF] p-5">
+                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-[#14295F]">
                     {selectedRecentReport.content?.trim() || '리포트 내용이 없습니다.'}
                   </p>
                 </div>
               </div>
-              <DialogFooter className="p-6 bg-white border-t">
-                <Button variant="ghost" onClick={() => setSelectedRecentReport(null)} className="w-full font-black">
+              <DialogFooter className="p-6 bg-white border-t border-[#D7E4FF]">
+                <Button variant="ghost" onClick={() => setSelectedRecentReport(null)} className="w-full font-black text-[#14295F] hover:bg-[#F1F6FF]">
                   닫기
                 </Button>
               </DialogFooter>
@@ -2899,7 +2907,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   {formatAttendanceStatus(selectedSeat.status)}
                                 </Badge>
                                 {selectedSeat.seatZone && (
-                                  <Badge className="h-6 rounded-full border-none bg-white px-3 text-[10px] font-black uppercase text-primary">
+                                  <Badge className="h-6 rounded-full border-none bg-white px-3 text-[10px] font-black uppercase text-[#14295F]">
                                     {selectedSeat.seatZone}
                                   </Badge>
                                 )}
@@ -2972,7 +2980,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                 </p>
                               </motion.div>
 
-                              <motion.div {...getDeckMotionProps(0.06, 10)} className="rounded-[2rem] border border-white/10 bg-slate-950/20 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+                              <motion.div {...getDeckMotionProps(0.06, 10)} className="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">선택된 AI 해석</p>
                                 {selectedSeatDomainInsight ? (
                                   <>
@@ -3044,9 +3052,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         <div className="border-b border-[#DDE7FF] bg-white/82 backdrop-blur-sm lg:border-b-0 lg:border-r">
                           <div className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
                             <motion.div {...getDeckMotionProps(0.08, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-5 shadow-sm">
-                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/48">First Check</p>
+                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]">First Check</p>
                               <h4 className="mt-3 text-lg font-black tracking-tight text-[#14295F]">오늘 먼저 볼 개입 포인트</h4>
-                              <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
+                              <p className="mt-2 text-sm font-bold leading-6 text-[#5c6e97]">
                                 {selectedSeatSignal?.topReason || selectedAttendanceSignal?.note || '지금 바로 개입이 필요한 포인트가 없습니다.'}
                               </p>
                               {selectedSeatDomainInsight && (
@@ -3736,7 +3744,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 );
               })()}
               <DialogFooter className={cn("bg-white border-t shrink-0 flex justify-center", isMobile ? "p-4" : "p-6")}>
-                <Button variant="ghost" onClick={() => setIsManaging(false)} className="w-full font-bold text-muted-foreground">닫기</Button>
+                <Button variant="ghost" onClick={() => setIsManaging(false)} className="w-full font-bold text-[#14295F] hover:bg-[#F1F6FF]">닫기</Button>
               </DialogFooter>
             </>
           )}

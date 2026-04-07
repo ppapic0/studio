@@ -281,8 +281,8 @@ const CustomTooltip = ({ active, payload, label, unit = '분', presentationMode 
           ? 'analysis-card rounded-[1.15rem] border-none px-4 py-3 shadow-[0_22px_36px_-28px_rgba(20,41,95,0.46)]'
           : 'bg-white/95 backdrop-blur-xl border-2 border-primary/10 p-4 rounded-2xl shadow-xl ring-1 ring-black/5'
       )}>
-        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-1">{label}</p>
-        <div className="flex items-baseline gap-1.5"><span className="text-2xl font-black text-primary">{payload[0].value}</span><span className="text-xs font-black text-primary/60">{unit}</span></div>
+        <p className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">{label}</p>
+        <div className="flex items-baseline gap-1.5"><span className="text-2xl font-black text-[#14295F]">{payload[0].value}</span><span className="text-xs font-black text-[#7b8db3]">{unit}</span></div>
       </div>
     );
   }
@@ -1836,15 +1836,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   };
 
   if (studentLoading) {
-    return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
+    return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-[#2554D4]" /></div>;
   }
 
   if (isStudentSelfView && currentUser && studentId !== currentUser.uid) {
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center gap-3 px-4 py-24 text-center">
         <AlertTriangle className="h-10 w-10 text-amber-500" />
-        <h2 className="text-2xl font-black tracking-tight text-slate-900">본인 분석만 확인할 수 있어요</h2>
-        <p className="text-sm font-semibold text-muted-foreground">다른 학생 계정 분석 화면에는 접근할 수 없습니다.</p>
+        <h2 className="text-2xl font-black tracking-tight text-[#14295F]">본인 분석만 확인할 수 있어요</h2>
+        <p className="text-sm font-semibold text-[#5c6e97]">다른 학생 계정 분석 화면에는 접근할 수 없습니다.</p>
         <Button asChild className="rounded-xl px-5 font-black">
           <Link href="/dashboard/analysis">분석트랙으로 돌아가기</Link>
         </Button>
@@ -3863,7 +3863,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <div key={reservation.id} className={cn("rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-3", isAnalysisPresentation && "analysis-record-card")}>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                           <p className="text-sm font-black text-[#14295F]">{scheduledAt ? format(scheduledAt, 'M월 d일 (EEE) HH:mm', { locale: ko }) : '일정 미기입'}</p>
-                          <Badge className={cn('font-black text-[10px] rounded-full px-2.5 text-white', reservation.status === 'done' && 'bg-emerald-500', reservation.status === 'confirmed' && 'bg-blue-500', reservation.status === 'requested' && 'bg-amber-500', reservation.status === 'canceled' && 'bg-slate-500')}>{STATUS_LABEL[reservation.status]}</Badge>
+                          <Badge className={cn('rounded-full px-2.5 text-[10px] font-black', reservation.status === 'done' && 'bg-emerald-50 text-emerald-700', reservation.status === 'confirmed' && 'bg-[#EEF4FF] text-[#2554D4]', reservation.status === 'requested' && 'bg-amber-50 text-amber-700', reservation.status === 'canceled' && 'bg-[#F1F6FF] text-[#14295F]')}>{STATUS_LABEL[reservation.status]}</Badge>
                         </div>
                         <p className="text-xs font-bold text-[#5c6e97]">담당: {reservation.teacherName || '담당 선생님'}{isPast ? ' · 지난 일정' : ' · 예정 일정'}</p>
                         {reservation.teacherNote && <p className="mt-1 text-xs font-semibold text-[#5c6e97]">메모: {reservation.teacherNote}</p>}
@@ -4482,9 +4482,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </Badge>
                 </div>
               ) : null}
-              <DialogTitle className="text-3xl font-black tracking-tighter">프로필 수정</DialogTitle>
+              <DialogTitle className="text-3xl font-black tracking-tighter">정보 수정</DialogTitle>
               <DialogDescription className={cn("font-semibold", isAnalysisPresentation ? "text-[#5F7299]" : "text-white/80")}>
-                기본 정보, 학교/학년, 연동 정보를 한 번에 정리합니다.
+                기본 정보, 학교/학년, 연락/연동 정보를 한 번에 정리합니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -4576,10 +4576,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <ShieldCheck className="h-4 w-4 text-[#2554d4]" />
                 </div>
                 <div>
-                  <p className="text-sm font-black tracking-tight text-[#14295F]">연결 정보</p>
-                  <p className="text-[11px] font-semibold text-[#5c6e97]">학부모 연동코드와 계정 정보는 여기서 함께 관리합니다.</p>
+                    <p className="text-sm font-black tracking-tight text-[#14295F]">연락 / 연동</p>
+                    <p className="text-[11px] font-semibold text-[#5c6e97]">학부모 연동코드와 계정 접근 정보는 여기서 함께 관리합니다.</p>
+                  </div>
                 </div>
-              </div>
               <div className={cn("grid gap-3", canManageStudentAccounts ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")}>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase text-[#5c6e97]">부모 연동코드 (6자리)</Label>
@@ -4620,6 +4620,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
                   {formatSeatLabel(student)}
                 </Badge>
+                <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                  상담 예약
+                </Badge>
               </div>
               <DialogTitle className="text-2xl font-black tracking-tight">상담 예약 생성</DialogTitle>
               <DialogDescription className="font-semibold text-white/80">
@@ -4628,6 +4631,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </DialogHeader>
           </div>
           <div className="space-y-4 bg-white px-6 py-5">
+            <div className="rounded-[1.35rem] border border-[#D7E4FF] bg-[#F8FBFF] px-4 py-3 text-sm font-semibold leading-6 text-[#14295F]">
+              오늘 운영 메모와 최근 상담 흐름을 같이 보면서, 다음 상담 시간을 먼저 고정하는 용도의 빠른 예약 카드입니다.
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">날짜</Label><Input type="date" value={aptDate} onChange={(event) => setAptDate(event.target.value)} className="h-11 rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">시간</Label><Input type="time" value={aptTime} onChange={(event) => setAptTime(event.target.value)} className="h-11 rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
@@ -4635,7 +4641,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">메모 (선택)</Label><Textarea value={aptNote} onChange={(event) => setAptNote(event.target.value)} placeholder="상담 전 확인할 이슈나 목표" className="min-h-[92px] rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
           </div>
           <DialogFooter className="border-t border-[#dbe7ff] bg-[#f8fbff] p-6">
-            <Button onClick={handleCreateReservation} disabled={isSubmitting} className="h-12 w-full rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '상담 예약 저장'}</Button>
+            <div className="flex w-full gap-3">
+              <DialogClose asChild>
+                <Button variant="outline" className="h-12 flex-1 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]">취소</Button>
+              </DialogClose>
+              <Button onClick={handleCreateReservation} disabled={isSubmitting} className="h-12 flex-1 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '상담 예약 저장'}</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -4651,6 +4662,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
                     상담 기록
                   </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    상담 일지
+                  </Badge>
                 </div>
                 <DialogTitle className="text-2xl font-black tracking-tight">상담 일지 작성</DialogTitle>
                 <DialogDescription className="font-semibold text-white/80">
@@ -4659,12 +4673,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </DialogHeader>
             </div>
             <div className="space-y-4 bg-white px-6 py-5">
+              <div className="rounded-[1.35rem] border border-[#D7E4FF] bg-[#F8FBFF] px-4 py-3 text-sm font-semibold leading-6 text-[#14295F]">
+                학생 질문, 오늘 반응, 다음 실행 포인트를 한 흐름으로 남기면 학생 360 상담 기록과 같은 맥락으로 이어집니다.
+              </div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">상담 유형</Label><Select value={logType} onValueChange={(value) => setLogType(value as typeof logType)}><SelectTrigger className="h-11 rounded-xl border-[#dbe7ff] text-[#14295F]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학습 상담</SelectItem><SelectItem value="life">생활 상담</SelectItem><SelectItem value="career">진로 상담</SelectItem></SelectContent></Select></div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">상담 내용</Label><Textarea value={logContent} onChange={(event) => setLogContent(event.target.value)} placeholder="핵심 상담 내용을 입력하세요." className="min-h-[120px] rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
               <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">개선 포인트</Label><Textarea value={logImprovement} onChange={(event) => setLogImprovement(event.target.value)} placeholder="향후 실행 포인트를 기록하세요." className="min-h-[90px] rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
             </div>
             <DialogFooter className="border-t border-[#dbe7ff] bg-[#f8fbff] p-6">
-              <Button onClick={handleCreateCounselingLog} disabled={isSubmitting} className="h-12 w-full rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '상담 일지 저장'}</Button>
+              <div className="flex w-full gap-3">
+                <DialogClose asChild>
+                  <Button variant="outline" className="h-12 flex-1 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]">취소</Button>
+                </DialogClose>
+                <Button onClick={handleCreateCounselingLog} disabled={isSubmitting} className="h-12 flex-1 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '상담 일지 저장'}</Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -4679,6 +4701,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </Badge>
                   <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
                     즉시 피드백
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    학생 팝업 전달
                   </Badge>
                 </div>
                 <DialogTitle className="text-2xl font-black tracking-tight">한 줄 피드백 전송</DialogTitle>
@@ -4706,9 +4731,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
             <DialogFooter className="border-t border-[#dbe7ff] bg-[#f8fbff] p-6">
-              <Button onClick={handleCreateQuickFeedback} disabled={isQuickFeedbackSubmitting} className="h-12 w-full rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">
-                {isQuickFeedbackSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '한 줄 피드백 보내기'}
-              </Button>
+              <div className="flex w-full gap-3">
+                <DialogClose asChild>
+                  <Button variant="outline" className="h-12 flex-1 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]">취소</Button>
+                </DialogClose>
+                <Button onClick={handleCreateQuickFeedback} disabled={isQuickFeedbackSubmitting} className="h-12 flex-1 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">
+                  {isQuickFeedbackSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '한 줄 피드백 보내기'}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

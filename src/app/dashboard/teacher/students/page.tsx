@@ -721,13 +721,13 @@ export default function StudentListPage() {
   if (membershipsLoading && !activeMembership) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-30" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#2554D4]/30" />
       </div>
     );
   }
 
   if (!isTeacherOrAdmin) {
-    return <div className="flex items-center justify-center h-[60vh]"><p>권한이 없습니다.</p></div>;
+    return <div className="flex items-center justify-center h-[60vh]"><p className="font-black text-[#14295F]">권한이 없습니다.</p></div>;
   }
 
   return (
@@ -1062,17 +1062,45 @@ export default function StudentListPage() {
                               {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} 강제 삭제 실행
                             </Button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-[400px]">
-                            <AlertDialogHeader>
-                              <div className="mx-auto bg-rose-50 p-4 rounded-[1.5rem] mb-4"><AlertTriangle className="h-10 w-10 text-rose-600" /></div>
-                              <AlertDialogTitle className="text-2xl font-black text-center tracking-tighter leading-tight">데이터 강제 삭제</AlertDialogTitle>
-                              <AlertDialogDescription className="text-center font-bold pt-2 leading-relaxed text-sm">
-                                <span className="text-rose-600 font-black">[{member.displayName}]</span> 학생의 계정과 <span className="font-black text-primary">학습 로그, 계획 등 모든 하위 데이터</span>를 강제로 삭제합니다. 복구가 불가능합니다.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter className="mt-8 flex flex-col gap-2">
-                              <AlertDialogAction onClick={() => handleDeleteAccount(member.id, member.displayName || '학생')} className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all">{isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : '강제 삭제 승인'}</AlertDialogAction>
-                              <AlertDialogCancel className="h-14 rounded-2xl font-black border-2">취소</AlertDialogCancel>
+                          <AlertDialogContent className="max-w-[400px] rounded-[2.5rem] border-none bg-white p-0 shadow-2xl overflow-hidden">
+                            <div className="bg-[linear-gradient(135deg,#14295F_0%,#1F4CB1_58%,#FF8B2B_100%)] px-8 py-7 text-white">
+                              <AlertDialogHeader>
+                                <div className="mb-4 flex flex-wrap items-center gap-2">
+                                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                                    위험 작업
+                                  </Badge>
+                                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                                    퇴원생 데이터 삭제
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="rounded-[1.3rem] bg-white/12 p-3"><AlertTriangle className="h-8 w-8 text-white" /></div>
+                                  <div className="space-y-1">
+                                    <AlertDialogTitle className="text-2xl font-black tracking-tighter leading-tight text-white">데이터 강제 삭제</AlertDialogTitle>
+                                    <AlertDialogDescription className="font-bold leading-relaxed text-sm text-white/80">
+                                      삭제 뒤에는 복구가 불가능하니, 퇴원 처리와 계정 상태를 먼저 다시 확인해 주세요.
+                                    </AlertDialogDescription>
+                                  </div>
+                                </div>
+                              </AlertDialogHeader>
+                            </div>
+                            <div className="space-y-4 bg-white px-8 py-6">
+                              <div className="rounded-[1.6rem] border border-[#D7E4FF] bg-[#F8FBFF] px-5 py-4">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">삭제 대상</p>
+                                <p className="mt-2 text-lg font-black text-[#14295F]">{member.displayName || '학생'}</p>
+                                <p className="mt-2 text-sm font-semibold leading-6 text-[#5c6e97]">
+                                  계정과 함께 <span className="font-black text-[#14295F]">학습 로그, 계획, 출결, 리포트, 상담 기록</span> 등 연결된 하위 데이터가 모두 삭제됩니다.
+                                </p>
+                              </div>
+                              <div className="rounded-[1.4rem] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold leading-6 text-[#14295F]">
+                                <span className="font-black text-rose-600">주의:</span> 이 작업은 되돌릴 수 없고, 같은 학생 코드로도 이전 데이터를 복원하지 않습니다.
+                              </div>
+                            </div>
+                            <AlertDialogFooter className="border-t border-[#D7E4FF] bg-[#F8FBFF] px-8 py-6">
+                              <div className="flex w-full flex-col gap-2">
+                                <AlertDialogAction onClick={() => handleDeleteAccount(member.id, member.displayName || '학생')} className="h-14 rounded-2xl font-black bg-rose-600 text-white hover:bg-rose-700 shadow-xl active:scale-95 transition-all">{isDeleting === member.id ? <Loader2 className="animate-spin h-5 w-5" /> : '강제 삭제 승인'}</AlertDialogAction>
+                                <AlertDialogCancel className="h-14 rounded-2xl border-2 border-[#D7E4FF] bg-white font-black text-[#14295F] hover:bg-[#F1F6FF]">취소</AlertDialogCancel>
+                              </div>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
