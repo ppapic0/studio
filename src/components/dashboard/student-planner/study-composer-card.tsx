@@ -254,6 +254,14 @@ export function StudyComposerCard({
 
           {isVolumeMode ? (
             <>
+              <Input
+                value={taskValue}
+                onChange={(event) => onTaskChange(event.target.value)}
+                placeholder="예: 수학 3점 문항 30문제"
+                disabled={disabled || isSubmitting}
+                className="mt-3 h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
+              />
+
               <div className={cn('mt-3 grid gap-2', isMobile ? 'grid-cols-[minmax(0,1fr)_7.4rem]' : 'grid-cols-[minmax(0,1fr)_8rem]')}>
                 <Input
                   type="number"
@@ -337,14 +345,16 @@ export function StudyComposerCard({
             />
           )}
 
-          <div className={cn('mt-3 gap-2', isMobile ? 'space-y-2' : 'grid grid-cols-[minmax(0,1fr)_8.5rem]')}>
-            <Input
-              value={taskValue}
-              onChange={(event) => onTaskChange(event.target.value)}
-              placeholder={isVolumeMode ? '예: 수학 3점 문항 30문제' : '예: 영어 단어 복습'}
-              disabled={disabled || isSubmitting}
-              className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-            />
+          <div className={cn('mt-3 gap-2', isMobile || isVolumeMode ? 'space-y-2' : 'grid grid-cols-[minmax(0,1fr)_8.5rem]')}>
+            {!isVolumeMode ? (
+              <Input
+                value={taskValue}
+                onChange={(event) => onTaskChange(event.target.value)}
+                placeholder="예: 영어 단어 복습"
+                disabled={disabled || isSubmitting}
+                className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
+              />
+            ) : null}
             <Button
               type="button"
               onClick={onSubmit}
