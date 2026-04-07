@@ -10,23 +10,6 @@ const TARGET_PATHS: Record<string, string> = {
   experience: '/experience',
 };
 
-function resolvePublicOrigin(request: NextRequest) {
-  const configuredOrigin =
-    process.env.APP_ORIGIN ||
-    process.env.NEXT_PUBLIC_APP_ORIGIN ||
-    process.env.NEXT_PUBLIC_SITE_URL;
-
-  if (configuredOrigin) {
-    try {
-      return new URL(configuredOrigin).origin;
-    } catch {
-      // Ignore invalid configured origin and fall back to request origin.
-    }
-  }
-
-  return request.nextUrl.origin;
-}
-
 async function logMarketingEntry(request: NextRequest, target: string, targetPath: string) {
   const searchParams = request.nextUrl.searchParams;
   const placement = searchParams.get('placement') || 'unknown';
@@ -75,17 +58,16 @@ export async function GET(
 ) {
   const { target } = await context.params;
   const targetPath = TARGET_PATHS[target];
-  const publicOrigin = resolvePublicOrigin(request);
 
   if (!targetPath) {
-    const response = NextResponse.redirect(new URL('/', publicOrigin));
+    const response = new NextResponse(null, { status: 307 });
+    response.headers.set('Location', '/');
     response.headers.set('Cache-Control', 'no-store, max-age=0');
     return response;
   }
 
   const searchParams = request.nextUrl.searchParams;
-
-  const destination = new URL(targetPath, publicOrigin);
+  const destination = new URL(targetPath, 'https://track.internal');
   for (const [key, value] of searchParams.entries()) {
     if (key === 'placement' || key === 'source') continue;
     destination.searchParams.set(key, value);
@@ -99,7 +81,9 @@ export async function GET(
     void logMarketingEntry(request, target, targetPath);
   }
 
-  const response = NextResponse.redirect(destination);
+  const relativeLocation = `${destination.pathname}${destination.search}`;
+  const response = new NextResponse(null, { status: 307 });
+  response.headers.set('Location', relativeLocation);
   response.headers.set('Cache-Control', 'no-store, max-age=0');
   return response;
 }
