@@ -1864,14 +1864,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const detailTabTriggerClass = isAnalysisPresentation
     ? 'analysis-tab-trigger min-w-0 rounded-[1rem] font-aggro-display font-black text-xs gap-1.5 px-3 py-2.5'
     : 'min-w-0 rounded-[1.1rem] font-black text-xs gap-1.5 px-3 text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_20px_48px_-36px_rgba(20,41,95,0.58)]';
-  const detailChartCardClass = cn('overflow-hidden rounded-[1.65rem] border border-slate-200 bg-white', isAnalysisPresentation && 'analysis-chart-stage analysis-chart-stage--warm analysis-full-chart-card border-none');
+  const detailChartCardClass = cn(
+    'overflow-hidden rounded-[1.8rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]',
+    isAnalysisPresentation && 'analysis-chart-stage analysis-chart-stage--warm analysis-full-chart-card border-none'
+  );
   const detailGrowthChartCardClass = cn(detailChartCardClass, isAnalysisPresentation && 'analysis-growth-card analysis-full-chart-card--feature');
   const detailChartHeaderClass = cn('relative z-10', isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4');
   const detailChartContentClass = cn('relative z-10 pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5');
   const detailChartPanelClass = cn(
-    'relative rounded-[1.3rem] border bg-white/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]',
+    'relative rounded-[1.3rem] border bg-[#f8fbff] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]',
     isMobile ? 'p-3' : 'p-4',
-    isAnalysisPresentation ? 'analysis-detail-panel border-none' : 'border-slate-100'
+    isAnalysisPresentation ? 'analysis-detail-panel border-none' : 'border-[#dbe7ff]'
   );
   const detailMetricHeaderClass = isMobile
     ? 'flex flex-col items-stretch gap-2.5'
@@ -1881,7 +1884,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         'analysis-metric-chip flex flex-col items-center justify-center gap-1 text-center',
         isMobile ? 'min-h-[4.25rem] min-w-0 w-full max-w-[7.5rem] self-start px-3 py-2.5' : 'min-h-[4.9rem] min-w-[5.8rem] px-3 py-3'
       )
-    : 'rounded-[1rem] border border-[#dbe7ff] bg-white px-3 py-2 shadow-[0_14px_30px_-28px_rgba(20,41,95,0.42)]';
+    : 'rounded-[1rem] border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2 shadow-[0_14px_30px_-28px_rgba(20,41,95,0.42)]';
   const detailBadgeClass = isAnalysisPresentation
     ? 'analysis-detail-badge'
     : 'rounded-full border-[#dbe7ff] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]';
@@ -1907,7 +1910,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : 'text-[#5c6e97]'
   );
   const analysisReadableMutedTextClass = isAnalysisPresentation ? 'text-[#f4f8ff]' : 'text-[#6a7da6]';
-  const analysisReadableSoftTextClass = isAnalysisPresentation ? 'text-white/90' : 'text-[var(--text-on-dark-muted)]';
+  const analysisReadableSoftTextClass = isAnalysisPresentation ? 'text-white/90' : 'text-[#5c6e97]';
   const analysisChartTickColor = isAnalysisPresentation ? '#f4f8ff' : '#6a7da6';
   const analysisChartTickSoftColor = isAnalysisPresentation ? '#f4f8ff' : '#7b8dab';
   const analysisChartGridColor = isAnalysisPresentation ? 'rgba(244, 248, 255, 0.34)' : '#f2f2f2';
@@ -1918,7 +1921,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const analysisChipSubLabelClass = cn('text-[11px] font-semibold leading-[1.2]', analysisChipSecondaryTextClass);
   const detailInsightBandClass = cn(
     'mt-3 rounded-[1.15rem] px-3.5 py-3',
-    isAnalysisPresentation ? 'analysis-signal-band' : 'border border-slate-200 bg-slate-50/85'
+    isAnalysisPresentation ? 'analysis-signal-band' : 'border border-[#dbe7ff] bg-[#f8fbff]'
   );
   const detailPrimaryTextClass = isAnalysisPresentation ? 'text-[#17326B]' : 'text-[#14295F]';
   const detailSecondaryTextClass = isAnalysisPresentation ? 'text-[#5F7299]' : 'text-[#5c6e97]';
@@ -2225,7 +2228,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <Badge variant={isAnalysisPresentation ? 'outline' : 'outline'} className={cn("font-black text-[10px] rounded-full", isAnalysisPresentation && analysisSoftBadgeClass)}><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
                 )}
               </div>
-              <div className={cn("flex flex-wrap items-center gap-2 text-xs font-bold", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-muted-foreground")}>
+              <div className={cn("flex flex-wrap items-center gap-2 text-xs font-bold", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
                 <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-[#D86A11]" : "text-primary")}><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
                 <span className="opacity-30">|</span><span>{student?.grade}</span><span className="opacity-30">|</span>
                 <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-[#2E9B73]" : "text-emerald-600")}><LayoutGrid className="h-3 w-3" /> {student?.className || '반 미지정'}</span>
@@ -2492,7 +2495,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
           {!isStudentSelfView ? (
             <section className={cn('grid gap-4', isAnalysisPresentation ? (isMobile ? 'grid-cols-1' : 'grid-cols-2') : (isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1.15fr_0.95fr]'))}>
-              <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-premium-card analysis-full-section-card surface-card surface-card--secondary on-dark rounded-[2rem] shadow-none')}>
+              <Card className={cn('rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]', isAnalysisPresentation && 'analysis-premium-card analysis-full-section-card surface-card surface-card--secondary on-dark rounded-[2rem] shadow-none border-none')}>
                 <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
                   <div className={cn(isMobile ? "flex flex-col items-stretch gap-2.5" : "flex items-start justify-between gap-3")}>
                     <div>
@@ -2524,7 +2527,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           "rounded-[1.25rem] border px-4 py-4",
                           isAnalysisPresentation
                             ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none"
-                            : "border-slate-100 bg-slate-50/70"
+                            : "border-[#dbe7ff] bg-[#f8fbff]"
                         )}
                       >
                         <div className={cn(isMobile ? "flex flex-col items-stretch gap-2.5" : "flex items-start justify-between gap-3")}>
@@ -2535,7 +2538,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                               </Badge>
                               <p className={cn("text-sm font-black", detailPrimaryTextClass)}>{item.title}</p>
                             </div>
-                            <p className={cn("mt-2 text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-slate-600")}>{item.detail}</p>
+                            <p className={cn("mt-2 text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : detailSecondaryTextClass)}>{item.detail}</p>
                           </div>
                           <Button asChild size="sm" variant={isAnalysisPresentation ? 'outline' : 'outline'} className={cn("h-8 rounded-lg px-3 text-[11px] font-black", isMobile && "h-9 w-full justify-center", isAnalysisPresentation && detailActionButtonClass)}>
                             <Link href={item.href}>바로 이동</Link>
@@ -2548,7 +2551,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </Card>
 
               {canViewFinance ? (
-                <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-premium-card analysis-full-section-card surface-card surface-card--secondary on-dark rounded-[2rem] shadow-none')}>
+                <Card className={cn('rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]', isAnalysisPresentation && 'analysis-premium-card analysis-full-section-card surface-card surface-card--secondary on-dark rounded-[2rem] shadow-none border-none')}>
                   <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
                     <div className={cn(isMobile ? "flex flex-col items-stretch gap-2.5" : "flex items-start justify-between gap-3")}>
                       <div>
@@ -2588,7 +2591,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                                     : 'text-emerald-300')
                           )}>{signal.value}</p>
                         </div>
-                        <p className={cn("mt-1 text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-slate-600")}>{signal.helper}</p>
+                        <p className={cn("mt-1 text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : detailSecondaryTextClass)}>{signal.helper}</p>
                       </div>
                     ))}
                   </CardContent>
@@ -3333,7 +3336,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </Card>
             </div>
 
-            <Card className={cn("rounded-[1.65rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage analysis-full-conclusion-card")}>
+            <Card className={cn(detailChartCardClass, isAnalysisPresentation && "analysis-full-conclusion-card")}>
               <CardHeader className={detailChartHeaderClass}>
                 <CardTitle className={cn("font-aggro-display text-[1.05rem] font-black tracking-tight", analysisRequestedTitleClass)}>
                   위험 신호 및 지원 우선순위
@@ -3345,7 +3348,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <CardContent className={cn(detailChartContentClass, 'space-y-3')}>
                 <div className={cn(
                   "rounded-xl border px-4 py-3",
-                  isAnalysisPresentation ? "analysis-full-conclusion-panel" : "border-slate-200 bg-slate-50"
+                  isAnalysisPresentation ? "analysis-full-conclusion-panel" : "border-[#dbe7ff] bg-[#f8fbff]"
                 )}>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">전체분석 요약</p>
                   <p className="mt-1 text-sm font-black leading-6 text-[#14295F]">{chartInsightHeadline}</p>
@@ -3694,14 +3697,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className={cn("rounded-[1.5rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage analysis-full-conclusion-card")}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className={cn("font-aggro-display text-base font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
+                <Card className={cn(detailChartCardClass, isAnalysisPresentation && "analysis-full-conclusion-card")}>
+                  <CardHeader className={cn(detailChartHeaderClass, "pb-2")}>
+                    <div className="space-y-2">
+                      <Badge className={cn("w-fit rounded-full px-2.5 py-1 text-[10px] font-black", isAnalysisPresentation ? "bg-[#FFF1DE] text-[#17326B]" : "border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]")}>
+                        우선순위 결론
+                      </Badge>
+                      <CardTitle className={cn("font-aggro-display text-base font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
+                      <CardDescription className={cn("text-[12px] font-semibold leading-5", detailGrowthDescriptionClass)}>
+                        지원이 필요한 포인트를 한 문장과 대응 신호로 정리했습니다.
+                      </CardDescription>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className={cn(
                       "rounded-xl border px-4 py-3",
-                      isAnalysisPresentation ? "analysis-full-conclusion-panel" : "border-slate-200 bg-slate-50"
+                      isAnalysisPresentation ? "analysis-full-conclusion-panel" : "border-[#dbe7ff] bg-[#f8fbff]"
                     )}>
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">전체분석 요약</p>
                       <p className="mt-1 text-sm font-black leading-6 text-[#14295F]">{chartInsightHeadline}</p>
@@ -3721,13 +3732,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           ) : (
             <>
               <div className="grid gap-6 lg:grid-cols-12">
-                <Card className={cn("lg:col-span-8 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden", isAnalysisPresentation && "analysis-chart-stage")}>
+                <Card className={cn("lg:col-span-8", detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <CardTitle className={cn("text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation && "text-[var(--text-on-dark)]")}><Activity className={cn("h-5 w-5 text-primary", isAnalysisPresentation && "text-white")} /> 공부시간 추이</CardTitle>
-                      <CardDescription className={cn("font-bold text-[11px]", isAnalysisPresentation && "text-white/85")}>집중 시간을 시계열로 확인해 리듬 변화를 파악합니다.</CardDescription>
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <Badge className={detailBadgeClass}>운영 그래프</Badge>
+                        <Badge variant="outline" className={detailGrowthPeriodBadgeClass}>{RANGE_MAP[focusedChartView]}일 관찰</Badge>
+                      </div>
+                      <CardTitle className={cn("text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><Activity className={cn("h-5 w-5 text-primary", isAnalysisPresentation && "text-white")} /> 공부시간 추이</CardTitle>
+                      <CardDescription className={cn("font-bold text-[11px]", isAnalysisPresentation ? "text-white/85" : "text-[#5c6e97]")}>집중 시간이 흔들리는 구간을 먼저 읽고 리듬 변화 해석까지 연결합니다.</CardDescription>
                     </div>
-                    <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
+                    <div className={cn("flex gap-1 rounded-xl p-1 w-fit", isAnalysisPresentation ? "bg-white/8" : "border border-[#dbe7ff] bg-[#f8fbff]")}>
                       {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
                         <Button key={key} variant={focusedChartView === key ? 'default' : 'ghost'} className={cn("h-8 px-3 rounded-lg text-[10px] font-black", isAnalysisPresentation && focusedChartView !== key && detailActionButtonClass)} onClick={() => setFocusedChartView(key)}>{RANGE_MAP[key]}일</Button>
                       ))}
@@ -3751,10 +3766,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
 
-                <Card className={cn("lg:col-span-4 rounded-[2rem] border-none shadow-lg bg-white overflow-hidden", isAnalysisPresentation && "analysis-chart-stage")}>
+                <Card className={cn("lg:col-span-4", detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-3">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge className={detailBadgeClass}>실행력 점검</Badge>
+                    </div>
                     <CardTitle className={cn("text-xl font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><CheckCircle2 className="h-5 w-5 text-amber-500" /> 계획 완수율</CardTitle>
-                    <CardDescription className="font-bold text-[11px]">일별 완료율로 실행력의 안정성을 점검합니다.</CardDescription>
+                    <CardDescription className={cn("font-bold text-[11px]", isAnalysisPresentation ? "text-white/85" : "text-[#5c6e97]")}>일별 완료율로 실행력의 안정성과 흔들리는 날짜를 점검합니다.</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="h-[280px] w-full">
@@ -3773,12 +3791,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </Card>
               </div>
 
-              <Card className={cn("rounded-[2rem] overflow-hidden border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-chart-stage")}>
-                <CardHeader className="pb-2">
-                  <CardTitle className={cn("text-lg font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Card className={cn(detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
+                  <CardHeader className={cn(detailChartHeaderClass, "pb-2")}>
+                    <div className="space-y-2">
+                      <Badge className={cn("w-fit rounded-full px-2.5 py-1 text-[10px] font-black", isAnalysisPresentation ? "bg-[#FFF1DE] text-[#17326B]" : "border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]")}>
+                        위험 리포트
+                      </Badge>
+                      <CardTitle className={cn("text-lg font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><AlertTriangle className="h-4 w-4 text-rose-500" /> 위험 신호 및 지원 우선순위</CardTitle>
+                      <CardDescription className={cn("text-[12px] font-semibold leading-5", detailGrowthDescriptionClass)}>
+                        최근 흐름에서 지금 개입해야 할 포인트만 짧게 압축했습니다.
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                  <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">전체분석 요약</p>
                     <p className="mt-1 text-sm font-black leading-6 text-[#14295F]">{chartInsightHeadline}</p>
                     <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
@@ -3813,10 +3839,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           ) : null}
           <div className={cn('grid gap-6', isAnalysisPresentation ? (isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]') : 'lg:grid-cols-12')}>
             <Card className={cn("rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]", !isAnalysisPresentation && "lg:col-span-5", isAnalysisPresentation && "analysis-full-section-card border-none shadow-lg")}>
-              <CardHeader><CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation && "text-[var(--text-on-dark)]")}><CalendarCheck2 className="h-5 w-5 text-indigo-500" /> 상담 예약 일정</CardTitle></CardHeader>
+              <CardHeader className="space-y-2">
+                {!isAnalysisPresentation ? (
+                  <Badge className="w-fit rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                    상담 예약 상태
+                  </Badge>
+                ) : null}
+                <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><CalendarCheck2 className="h-5 w-5 text-indigo-500" /> 상담 예약 일정</CardTitle>
+                <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
+                  예정, 완료, 지난 일정을 구분해 다음 상담 운영 흐름을 바로 읽습니다.
+                </CardDescription>
+              </CardHeader>
               <CardContent className="space-y-3">
                 {reservationLoading ? (
-                  <div className="flex items-center justify-center h-36 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                  <div className="flex items-center justify-center h-36 text-[#5c6e97]"><Loader2 className="h-5 w-5 animate-spin" /></div>
                 ) : studentReservations.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-[#dbe7ff] py-8 text-center text-sm font-bold text-[#5c6e97]">등록된 상담 예약이 없습니다.</div>
                 ) : (
@@ -3824,13 +3860,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     const scheduledAt = reservation.scheduledAt?.toDate();
                     const isPast = scheduledAt ? isBefore(scheduledAt, startOfDay(today)) : false;
                     return (
-                    <div key={reservation.id} className={cn("rounded-xl border border-border/60 bg-muted/10 px-3 py-3", isAnalysisPresentation && "analysis-record-card")}>
+                    <div key={reservation.id} className={cn("rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-3", isAnalysisPresentation && "analysis-record-card")}>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <p className="text-sm font-black text-slate-800">{scheduledAt ? format(scheduledAt, 'M월 d일 (EEE) HH:mm', { locale: ko }) : '일정 미기입'}</p>
-                          <Badge className={cn('font-black text-[10px] rounded-full px-2.5', reservation.status === 'done' && 'bg-emerald-500', reservation.status === 'confirmed' && 'bg-blue-500', reservation.status === 'requested' && 'bg-amber-500', reservation.status === 'canceled' && 'bg-slate-500')}>{STATUS_LABEL[reservation.status]}</Badge>
+                          <p className="text-sm font-black text-[#14295F]">{scheduledAt ? format(scheduledAt, 'M월 d일 (EEE) HH:mm', { locale: ko }) : '일정 미기입'}</p>
+                          <Badge className={cn('font-black text-[10px] rounded-full px-2.5 text-white', reservation.status === 'done' && 'bg-emerald-500', reservation.status === 'confirmed' && 'bg-blue-500', reservation.status === 'requested' && 'bg-amber-500', reservation.status === 'canceled' && 'bg-slate-500')}>{STATUS_LABEL[reservation.status]}</Badge>
                         </div>
                         <p className="text-xs font-bold text-[#5c6e97]">담당: {reservation.teacherName || '담당 선생님'}{isPast ? ' · 지난 일정' : ' · 예정 일정'}</p>
-                        {reservation.teacherNote && <p className="mt-1 text-xs font-semibold text-slate-600">메모: {reservation.teacherNote}</p>}
+                        {reservation.teacherNote && <p className="mt-1 text-xs font-semibold text-[#5c6e97]">메모: {reservation.teacherNote}</p>}
                       </div>
                     );
                   })
@@ -3839,7 +3875,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </Card>
 
               <Card className={cn("rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]", !isAnalysisPresentation && "lg:col-span-7", isAnalysisPresentation && "analysis-full-section-card border-none shadow-lg")}>
-                <CardHeader><CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation && "text-[var(--text-on-dark)]")}><MessageSquare className="h-5 w-5 text-rose-500" /> 개인 상담 일지</CardTitle></CardHeader>
+                <CardHeader className="space-y-2">
+                  {!isAnalysisPresentation ? (
+                    <Badge className="w-fit rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                      상담 기록 캔버스
+                    </Badge>
+                  ) : null}
+                  <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><MessageSquare className="h-5 w-5 text-rose-500" /> 개인 상담 일지</CardTitle>
+                  <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
+                    최근 피드백과 상담 일지를 연결해 다음 대화 포인트를 바로 확인합니다.
+                  </CardDescription>
+                </CardHeader>
                 <CardContent className="space-y-3">
                   <div className={cn("rounded-2xl border border-[#ffd9b7] bg-[#fff8f2] p-3.5 shadow-sm", isAnalysisPresentation && "analysis-full-highlight-panel")}>
                     <div className="mb-2 flex items-center justify-between gap-3">
@@ -3880,7 +3926,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                                 {feedback.createdAt ? format(feedback.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}
                               </span>
                             </div>
-                            <p className="text-sm font-bold leading-relaxed text-slate-800">{feedback.message}</p>
+                            <p className="text-sm font-bold leading-relaxed text-[#14295F]">{feedback.message}</p>
                           </div>
                         ))}
                       </div>
@@ -3898,13 +3944,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
                       '';
                     return (
-                    <div key={log.id} className={cn("rounded-xl border border-border/60 bg-white px-3 py-3 shadow-sm", isAnalysisPresentation && "analysis-record-card")}>
+                    <div key={log.id} className={cn("rounded-xl border border-[#dbe7ff] bg-white px-3 py-3 shadow-sm", isAnalysisPresentation && "analysis-record-card")}>
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <Badge className={cn(
                           "font-black text-[10px] rounded-full",
                           isAnalysisPresentation
                             ? "border border-[#F1DDC7] bg-[#FFF4E5] text-[#17326B] shadow-none"
-                            : "bg-primary text-white"
+                            : "border border-[#dbe7ff] bg-[#eef4ff] text-[#14295F]"
                         )}>{log.type === 'academic' ? '학습 상담' : log.type === 'life' ? '생활 상담' : '진로 상담'}</Badge>
                         <Badge
                           variant="outline"
@@ -3926,7 +3972,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <p className="text-sm font-bold leading-relaxed text-sky-900 whitespace-pre-wrap">{studentQuestion}</p>
                         </div>
                       )}
-                      <p className="text-sm font-bold leading-relaxed text-slate-800">{log.content}</p>
+                      <p className="text-sm font-bold leading-relaxed text-[#14295F]">{log.content}</p>
                       {log.improvement && <div className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700">개선 포인트: {log.improvement}</div>}
                     </div>
                     );
@@ -3959,8 +4005,81 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </motion.section>
           )}
 
+          {!isAnalysisPresentation ? (
+            <motion.section
+              {...defaultSectionMotion(0.2)}
+              className="grid"
+            >
+              <Card className="rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]">
+                <CardHeader className={cn(isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
+                  <div className={cn(isMobile ? "flex flex-col gap-3" : "flex items-start justify-between gap-4")}>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                          오늘 계획 브리프
+                        </Badge>
+                        <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white px-2.5 py-1 text-[10px] font-black text-[#2554d4]">
+                          오늘 기준
+                        </Badge>
+                      </div>
+                      <CardTitle className="mt-3 font-aggro-display text-[1.15rem] font-black tracking-tight text-[#14295F]">
+                        오늘 계획과 루틴을 먼저 점검하세요
+                      </CardTitle>
+                      <CardDescription className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                        학습 할 일, 루틴, 개인 체크를 한 번에 읽고 오늘 보완이 필요한 지점을 먼저 확인합니다.
+                      </CardDescription>
+                    </div>
+                    <div className="rounded-[1rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">오늘 완료율</p>
+                      <p className="mt-2 font-aggro-display text-[1.9rem] font-black tracking-[-0.05em] text-[#14295F]">
+                        {todayPlanSummary.studyTotal > 0 ? Math.round((todayPlanSummary.studyDone / todayPlanSummary.studyTotal) * 100) : 0}%
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className={cn('grid gap-3', isMobile ? 'px-4 pb-4' : 'px-5 pb-5 md:grid-cols-4')}>
+                  <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">학습 할 일</p>
+                    <p className="mt-2 text-xl font-black text-[#14295F]">{todayPlanSummary.studyDone}/{todayPlanSummary.studyTotal}</p>
+                    <p className="mt-1 text-xs font-semibold text-[#5c6e97]">완료 / 전체 학습 계획</p>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">루틴 수</p>
+                    <p className="mt-2 text-xl font-black text-[#14295F]">{todayPlanSummary.routineCount}개</p>
+                    <p className="mt-1 text-xs font-semibold text-[#5c6e97]">등원, 식사, 학원 등 시간 루틴</p>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">개인 체크</p>
+                    <p className="mt-2 text-xl font-black text-[#14295F]">{todayPlanSummary.personalCount}개</p>
+                    <p className="mt-1 text-xs font-semibold text-[#5c6e97]">생활/기타 개인 항목</p>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-[#ffe1c5] bg-[#fff8f2] px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d86a11]">운영 해석</p>
+                    <p className="mt-2 text-sm font-black leading-6 text-[#14295F]">
+                      {todayPlanSummary.studyTotal === 0
+                        ? '오늘 등록된 학습 계획이 없어 계획 입력부터 확인이 필요합니다.'
+                        : todayPlanSummary.studyDone >= todayPlanSummary.studyTotal
+                          ? '오늘 계획은 모두 완료되어 유지 피드백 중심으로 운영하면 좋습니다.'
+                          : '아직 남은 학습 계획이 있어 오늘 마감 전 보완 액션이 필요합니다.'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.section>
+          ) : null}
+
           <Card className={cn("rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]", isAnalysisPresentation && "analysis-full-section-card border-none shadow-lg")}>
-            <CardHeader><CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><BookOpen className="h-5 w-5 text-emerald-500" /> 과거 7일 계획/루틴</CardTitle></CardHeader>
+            <CardHeader className="space-y-2">
+              {!isAnalysisPresentation ? (
+                <Badge className="w-fit rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                  최근 실행 흐름
+                </Badge>
+              ) : null}
+              <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><BookOpen className="h-5 w-5 text-emerald-500" /> 과거 7일 계획/루틴</CardTitle>
+              <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
+                오늘 계획 이후에는 최근 7일의 실행 흔적을 보고 루틴 안정성을 비교합니다.
+              </CardDescription>
+            </CardHeader>
             <CardContent className="space-y-4">
               {isDataLoading ? (
                 <div className="flex items-center justify-center h-36 text-[#5c6e97]"><Loader2 className="h-5 w-5 animate-spin" /></div>
@@ -4090,90 +4209,117 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isRhythmGuideModalOpen} onOpenChange={setIsRhythmGuideModalOpen}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
+        <DialogContent className="rounded-[2.25rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl">
           <div className={cn(
             "px-6 py-5",
             isAnalysisPresentation
               ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE5C4_100%)] text-[#17326B]"
-              : "bg-gradient-to-r from-[#0f2359] to-[#1d3f8c] text-white"
+              : "bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] text-white"
           )}>
             <DialogHeader>
+              {!isAnalysisPresentation ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                    {student?.name || '학생'}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    {formatSeatLabel(student)}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    리듬 안내
+                  </Badge>
+                </div>
+              ) : null}
               <DialogTitle className="text-2xl font-black tracking-tight">평균 공부 리듬 그래프</DialogTitle>
               <DialogDescription className={cn("font-semibold", isAnalysisPresentation ? "text-[#5F7299]" : "text-white/80")}>
-                최근 {RANGE_MAP[focusedChartView]}일 공부시간 흐름과 리듬 점수 계산식을 함께 보여줍니다.
+                최근 {RANGE_MAP[focusedChartView]}일 공부시간 흐름을 보고, 리듬 점수가 어떤 기준으로 계산되는지 함께 확인합니다.
               </DialogDescription>
             </DialogHeader>
           </div>
 
-          <div className="px-6 py-5 space-y-4 bg-white">
-            <div className="rounded-2xl border bg-white p-4">
-              <div className="mb-3 flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
-                {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
-                  <Button
-                    key={key}
-                    variant={focusedChartView === key ? 'default' : 'ghost'}
-                    className="h-8 px-3 rounded-lg text-[10px] font-black"
-                    onClick={() => setFocusedChartView(key)}
-                  >
-                    {RANGE_MAP[key]}일
-                  </Button>
-                ))}
+          <div className="space-y-4 bg-white px-6 py-5">
+            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]")}>
+              <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                <div className={cn("mb-3 flex gap-1 rounded-xl p-1 w-fit", isAnalysisPresentation ? "bg-[#17326B]/8" : "border border-[#dbe7ff] bg-[#f8fbff]")}>
+                  {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
+                    <Button
+                      key={key}
+                      variant={focusedChartView === key ? 'default' : 'ghost'}
+                      className={cn(
+                        "h-8 px-3 rounded-lg text-[10px] font-black",
+                        !isAnalysisPresentation && focusedChartView !== key && "text-[#14295F] hover:bg-white hover:text-[#14295F]"
+                      )}
+                      onClick={() => setFocusedChartView(key)}
+                    >
+                      {RANGE_MAP[key]}일
+                    </Button>
+                  ))}
+                </div>
+                <div className="h-[240px] w-full rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] p-3">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="rhythmStudyMinutesGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dbe7ff" />
+                      <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
+                      <YAxis tickLine={false} axisLine={false} fontSize={11} fontWeight={800} width={36} />
+                      <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
+                      <Area type="monotone" dataKey="studyMinutes" stroke="#10b981" strokeWidth={3} fill="url(#rhythmStudyMinutesGradient)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              <div className="h-[240px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="rhythmStudyMinutesGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
-                    <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} fontSize={11} fontWeight={800} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={11} fontWeight={800} width={36} />
-                          <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
-                    <Area type="monotone" dataKey="studyMinutes" stroke="#10b981" strokeWidth={3} fill="url(#rhythmStudyMinutesGradient)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+
+              <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">리듬 해석 브리프</p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#14295F]">
+                    평균 공부시간, 흔들림 폭, 전일 변동률을 함께 봐서 공부 리듬의 안정성을 점수화합니다.
+                  </p>
+                </div>
+                <div className="mt-4">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-[#5c6e97]">계산식</p>
+                  <div className="mt-2 rounded-[1.2rem] bg-[#14295F] px-4 py-3 text-white">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-white/60">
+                      {rhythmGuideMeta.mode === 'dayCompare' ? '전일 비교 보정식' : '표준편차 기반 수식'}
+                    </p>
+                    <p className="mt-1 font-mono text-sm font-semibold text-white">{rhythmGuideMeta.formulaExpression}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                  <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2.5">
+                    <p className="font-black text-[#5c6e97]">평균 공부시간</p>
+                    <p className="text-base font-black text-[#14295F]">{rhythmGuideMeta.averageMinutes}분</p>
+                  </div>
+                  <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2.5">
+                    <p className="font-black text-[#5c6e97]">표준편차</p>
+                    <p className="text-base font-black text-[#14295F]">{rhythmGuideMeta.stdDevMinutes}분</p>
+                  </div>
+                  <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2.5">
+                    <p className="font-black text-[#5c6e97]">변동계수</p>
+                    <p className="text-base font-black text-[#14295F]">{rhythmGuideMeta.variationPercent}%</p>
+                  </div>
+                  <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2.5">
+                    <p className="font-black text-[#5c6e97]">전일 변동률</p>
+                    <p className="text-base font-black text-[#14295F]">{rhythmGuideMeta.dayDiffPercent}%</p>
+                  </div>
+                  <div className="sm:col-span-2 rounded-xl border border-[#d5f2e7] bg-[#f2fff8] px-3 py-3">
+                    <p className="font-black text-[#0f8f65]">최종 리듬 점수</p>
+                    <p className="mt-1 text-lg font-black text-[#14295F]">{rhythmScore}점</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">지금 창에서 선택한 기간을 기준으로 계산됩니다.</p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-white p-4">
-              <p className="font-black text-[11px] uppercase tracking-widest text-slate-500">계산식</p>
-              <div className="mt-2 rounded-xl bg-slate-900 text-slate-50 px-3.5 py-3">
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-300">
-                  {rhythmGuideMeta.mode === 'dayCompare' ? '전일 비교 보정식' : '표준편차 기반 수식'}
-                </p>
-                <p className="mt-1 font-mono text-sm font-semibold">{rhythmGuideMeta.formulaExpression}</p>
-              </div>
-
-              <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-                  <p className="font-black text-slate-500">평균 공부시간</p>
-                  <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.averageMinutes}분</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-                  <p className="font-black text-slate-500">표준편차</p>
-                  <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.stdDevMinutes}분</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-                  <p className="font-black text-slate-500">변동계수</p>
-                  <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.variationPercent}%</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-                  <p className="font-black text-slate-500">전일 변동률</p>
-                  <p className="font-black text-slate-900 text-base">{rhythmGuideMeta.dayDiffPercent}%</p>
-                </div>
-                <div className="col-span-2 rounded-xl bg-emerald-50 px-3 py-2.5 border border-emerald-100">
-                  <p className="font-black text-emerald-700">최종 리듬 점수</p>
-                  <p className="font-black text-emerald-700 text-base">{rhythmScore}점</p>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
+            <DialogFooter className="pt-1">
               <DialogClose asChild>
-                <Button className="rounded-xl font-black">확인</Button>
+                <Button className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">확인</Button>
               </DialogClose>
             </DialogFooter>
           </div>
@@ -4280,7 +4426,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             )}
 
             <section className="space-y-6">
-              <h4 className="text-xs font-black uppercase text-primary/60 flex items-center gap-2 whitespace-nowrap"><Activity className="h-4 w-4" /> 핵심 역량 분석</h4>
+              <h4 className="text-xs font-black uppercase text-[#5c6e97] flex items-center gap-2 whitespace-nowrap"><Activity className="h-4 w-4 text-[#2554d4]" /> 핵심 역량 분석</h4>
               <div className="grid gap-8">
                 {Object.entries(STAT_CONFIG).map(([key, config]) => {
                   const statKey = key as keyof typeof editStats;
@@ -4289,11 +4435,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   return (
                     <div key={key} className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3"><div className={cn('p-2 rounded-xl', config.accent)}><Icon className={cn('h-5 w-5', config.color)} /></div><div><p className="text-sm font-black tracking-tight">{config.label}</p><p className="text-[10px] font-bold text-muted-foreground uppercase">{config.sub}</p></div></div>
-                        <div className="text-right flex items-baseline gap-1"><span className="text-2xl font-black tabular-nums">{value.toFixed(1)}</span><span className="text-[10px] font-bold text-muted-foreground/40">/ 100</span></div>
+                        <div className="flex items-center gap-3"><div className={cn('p-2 rounded-xl', config.accent)}><Icon className={cn('h-5 w-5', config.color)} /></div><div><p className="text-sm font-black tracking-tight text-[#14295F]">{config.label}</p><p className="text-[10px] font-bold text-[#5c6e97] uppercase">{config.sub}</p></div></div>
+                        <div className="text-right flex items-baseline gap-1"><span className="text-2xl font-black tabular-nums text-[#14295F]">{value.toFixed(1)}</span><span className="text-[10px] font-bold text-[#9aa9c7]">/ 100</span></div>
                       </div>
-                      {isEditStats && canEditGrowthData ? <Slider value={[value]} max={100} step={0.5} onValueChange={([next]) => setEditStats({ ...editStats, [statKey]: next })} /> : <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner"><div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${value}%` }} /></div>}
-                      <p className="text-[11px] font-semibold text-muted-foreground">{config.guide}</p>
+                      {isEditStats && canEditGrowthData ? <Slider value={[value]} max={100} step={0.5} onValueChange={([next]) => setEditStats({ ...editStats, [statKey]: next })} /> : <div className="h-2.5 w-full rounded-full overflow-hidden bg-[#e7eefb] shadow-inner"><div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${value}%` }} /></div>}
+                      <p className="text-[11px] font-semibold text-[#5c6e97]">{config.guide}</p>
                     </div>
                   );
                 })}
@@ -4315,23 +4461,151 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="rounded-[2.5rem] sm:max-w-md p-0 overflow-hidden border-none shadow-2xl">
+        <DialogContent className="rounded-[2.5rem] sm:max-w-2xl p-0 overflow-hidden border-none shadow-2xl">
           <div className={cn(
-            "p-10",
+            "px-6 py-5",
             isAnalysisPresentation
               ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE7CB_100%)] text-[#17326B]"
-              : "bg-primary text-white"
-          )}><DialogTitle className="text-3xl font-black tracking-tighter">프로필 수정</DialogTitle></div>
-          <div className="p-8 space-y-4 bg-white">
-            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">이름</Label><Input value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="rounded-xl h-12 border-2 font-bold" /></div>
-            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">소속 반</Label><Select value={editForm.className || 'none'} onValueChange={(value) => setEditForm({ ...editForm, className: value === 'none' ? '' : value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="none" className="font-bold">미배정</SelectItem>{availableClasses.map((className) => <SelectItem key={className} value={className} className="font-bold">{className}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학교</Label><Input value={editForm.schoolName} onChange={(event) => setEditForm({ ...editForm, schoolName: event.target.value })} className="rounded-xl h-12 border-2 font-bold" /></div>
-            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학년</Label><Select value={editForm.grade} onValueChange={(value) => setEditForm({ ...editForm, grade: value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
-                  {canManageStudentAccounts && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학생 상태</Label><Select value={editForm.memberStatus} onValueChange={(value: 'active' | 'onHold' | 'withdrawn') => setEditForm({ ...editForm, memberStatus: value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">재원생</SelectItem><SelectItem value="onHold">휴원생</SelectItem><SelectItem value="withdrawn">퇴원생</SelectItem></SelectContent></Select></div>}
-            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">부모 연동코드 (6자리)</Label><Input value={editForm.parentLinkCode} onChange={(event) => setEditForm({ ...editForm, parentLinkCode: event.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" maxLength={6} className="rounded-xl h-12 border-2 font-bold tracking-[0.2em]" placeholder="123456" /></div>
-                  {canManageStudentAccounts && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">비밀번호 (변경 시에만)</Label><Input type="password" value={editForm.password} onChange={(event) => setEditForm({ ...editForm, password: event.target.value })} className="rounded-xl h-12 border-2 font-bold" placeholder="6자 이상 입력 시 변경" /></div>}
+              : "bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] text-white"
+          )}>
+            <DialogHeader>
+              {!isAnalysisPresentation ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                    {student?.name || '학생'}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    {formatSeatLabel(student)}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    정보 수정
+                  </Badge>
+                </div>
+              ) : null}
+              <DialogTitle className="text-3xl font-black tracking-tighter">프로필 수정</DialogTitle>
+              <DialogDescription className={cn("font-semibold", isAnalysisPresentation ? "text-[#5F7299]" : "text-white/80")}>
+                기본 정보, 학교/학년, 연동 정보를 한 번에 정리합니다.
+              </DialogDescription>
+            </DialogHeader>
           </div>
-          <DialogFooter className="p-8 bg-muted/20 border-t"><Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">{isUpdating ? <Loader2 className="h-5 w-5 animate-spin" /> : '정보 저장'}</Button></DialogFooter>
+          <div className="space-y-4 bg-white px-6 py-5">
+            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
+              <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="rounded-xl bg-[#eef4ff] p-2">
+                    <UserRound className="h-4 w-4 text-[#2554d4]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black tracking-tight text-[#14295F]">기본 정보</p>
+                    <p className="text-[11px] font-semibold text-[#5c6e97]">학생 식별과 소속 정보를 먼저 정리합니다.</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-[#5c6e97]">이름</Label>
+                    <Input value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-[#5c6e97]">소속 반</Label>
+                    <Select value={editForm.className || 'none'} onValueChange={(value) => setEditForm({ ...editForm, className: value === 'none' ? '' : value })}>
+                      <SelectTrigger className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="none" className="font-bold">미배정</SelectItem>
+                        {availableClasses.map((className) => <SelectItem key={className} value={className} className="font-bold">{className}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="rounded-xl bg-[#eef4ff] p-2">
+                    <Building2 className="h-4 w-4 text-[#2554d4]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black tracking-tight text-[#14295F]">학교 / 학년</p>
+                    <p className="text-[11px] font-semibold text-[#5c6e97]">학습 맥락과 재원 상태를 함께 확인합니다.</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-[#5c6e97]">학교</Label>
+                    <Input value={editForm.schoolName} onChange={(event) => setEditForm({ ...editForm, schoolName: event.target.value })} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]" />
+                  </div>
+                  <div className={cn("grid gap-3", canManageStudentAccounts ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-[#5c6e97]">학년</Label>
+                      <Select value={editForm.grade} onValueChange={(value) => setEditForm({ ...editForm, grade: value })}>
+                        <SelectTrigger className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1학년">1학년</SelectItem>
+                          <SelectItem value="2학년">2학년</SelectItem>
+                          <SelectItem value="3학년">3학년</SelectItem>
+                          <SelectItem value="N수생">N수생</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {canManageStudentAccounts ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-[#5c6e97]">학생 상태</Label>
+                        <Select value={editForm.memberStatus} onValueChange={(value: 'active' | 'onHold' | 'withdrawn') => setEditForm({ ...editForm, memberStatus: value })}>
+                          <SelectTrigger className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">재원생</SelectItem>
+                            <SelectItem value="onHold">휴원생</SelectItem>
+                            <SelectItem value="withdrawn">퇴원생</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="rounded-xl bg-[#eef4ff] p-2">
+                  <ShieldCheck className="h-4 w-4 text-[#2554d4]" />
+                </div>
+                <div>
+                  <p className="text-sm font-black tracking-tight text-[#14295F]">연결 정보</p>
+                  <p className="text-[11px] font-semibold text-[#5c6e97]">학부모 연동코드와 계정 정보는 여기서 함께 관리합니다.</p>
+                </div>
+              </div>
+              <div className={cn("grid gap-3", canManageStudentAccounts ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")}>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-[#5c6e97]">부모 연동코드 (6자리)</Label>
+                  <Input value={editForm.parentLinkCode} onChange={(event) => setEditForm({ ...editForm, parentLinkCode: event.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" maxLength={6} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold tracking-[0.2em] text-[#14295F]" placeholder="123456" />
+                </div>
+                {canManageStudentAccounts ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-[#5c6e97]">비밀번호 (변경 시에만)</Label>
+                    <Input type="password" value={editForm.password} onChange={(event) => setEditForm({ ...editForm, password: event.target.value })} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]" placeholder="6자 이상 입력 시 변경" />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="border-t border-[#dbe7ff] bg-[#f8fbff] p-6">
+            <div className="flex w-full gap-3">
+              <DialogClose asChild>
+                <Button variant="outline" className="flex-1 h-12 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]">
+                  취소
+                </Button>
+              </DialogClose>
+              <Button onClick={handleUpdateInfo} disabled={isUpdating} className="flex-1 h-12 rounded-xl bg-[#14295F] font-black text-white shadow-xl hover:bg-[#173D8B]">
+                {isUpdating ? <Loader2 className="h-5 w-5 animate-spin" /> : '정보 저장'}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
