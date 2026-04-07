@@ -6,6 +6,7 @@ import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 
 import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import {
   buildAttendanceRoutineInfo,
   deriveAttendanceDisplayState,
@@ -152,7 +153,7 @@ export function useCenterAdminAttendanceBoard({
           setHistoryRecordsByDate(Object.fromEntries(entries));
         }
       } catch (error) {
-        console.error('[center-admin-attendance-board] history load failed', error);
+        logHandledClientIssue('[center-admin-attendance-board] history load failed', error);
         if (!cancelled) {
           setHistoryRecordsByDate({});
         }
@@ -198,7 +199,7 @@ export function useCenterAdminAttendanceBoard({
           setRoutineInfoByStudentId(Object.fromEntries(entries));
         }
       } catch (error) {
-        console.error('[center-admin-attendance-board] routine load failed', error);
+        logHandledClientIssue('[center-admin-attendance-board] routine load failed', error);
         if (!cancelled) {
           setRoutineInfoByStudentId({});
         }

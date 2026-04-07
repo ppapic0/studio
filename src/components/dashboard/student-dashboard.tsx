@@ -1129,14 +1129,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
-  const [rankPreviewNowMs, setRankPreviewNowMs] = useState(() => Date.now());
+  const [rankPreviewNowMs, setRankPreviewNowMs] = useState(0);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const actionLockAtRef = useRef<number | null>(null);
   const isMobile = viewMode === 'mobile';
   
   // 지각/결석 신청서 상태
   const [requestType, setRequestType] = useState<'late' | 'absence'>('late');
-  const [requestDate, setRequestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [requestDate, setRequestDate] = useState('');
   const [requestReason, setRequestReason] = useState('');
   const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
   const [selectedTeacherReport, setSelectedTeacherReport] = useState<DailyReport | null>(null);
@@ -1147,9 +1147,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [goalPathTypeDraft, setGoalPathTypeDraft] = useState<'school' | 'job'>('school');
   const [goalPathLabelDraft, setGoalPathLabelDraft] = useState('');
   const [examSaveError, setExamSaveError] = useState<{ title: string; description: string } | null>(null);
-  const [selectedRankRange, setSelectedRankRange] = useState<RankRange>(() =>
-    getDailyRankWindowState(new Date()).isLive ? 'daily' : 'weekly'
-  );
+  const [selectedRankRange, setSelectedRankRange] = useState<RankRange>('weekly');
   const [rankSnapshot, setRankSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [rankSnapshotLoading, setRankSnapshotLoading] = useState(false);
   const hasHydratedRankSnapshotRef = useRef(false);
@@ -1157,6 +1155,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studyBoxClaimKeyRef = useRef<string | null>(null);
   const homeBoxTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const homeLiveClaimKeyRef = useRef<string | null>(null);
+  const autoRequestDateRef = useRef('');
   const [homeClaimedBoxes, setHomeClaimedBoxes] = useState<number[]>([]);
   const [homeRewardEntries, setHomeRewardEntries] = useState<ReturnType<typeof coerceStudyBoxRewards>>([]);
   const [homeOpenedBoxes, setHomeOpenedBoxes] = useState<number[]>([]);
@@ -1172,7 +1171,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [pendingQuestIds, setPendingQuestIds] = useState<string[]>([]);
   const pendingQuestIdsRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => { setToday(new Date()); }, []);
+  useEffect(() => {
+    const syncToday = () => {
+      const next = new Date();
+      setToday((previous) => {
+        if (previous && format(previous, 'yyyy-MM-dd') === format(next, 'yyyy-MM-dd')) {
+          return previous;
+        }
+        return next;
+      });
+    };
+
+    syncToday();
+    const intervalId = window.setInterval(syncToday, 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
@@ -1185,6 +1198,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       : []),
     [today]
   );
+
+  useEffect(() => {
+    if (!todayKey) return;
+    setRequestDate((current) => {
+      if (!current || current === autoRequestDateRef.current) {
+        autoRequestDateRef.current = todayKey;
+        return todayKey;
+      }
+      return current;
+    });
+  }, [todayKey]);
 
   // 1. 성장 및 통계 데이터 조회
   const progressRef = useMemoFirebase(() => {
@@ -1482,15 +1506,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [today, logMinutesByDateKey]);
 
   const examCountdowns = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayMs = todayStart.getTime();
+    const todayStart = today ? new Date(today) : null;
+    if (todayStart) {
+      todayStart.setHours(0, 0, 0, 0);
+    }
+    const todayMs = todayStart?.getTime() ?? null;
 
     return normalizeExamCountdowns(resolvedExamCountdownSettings)
       .map((item) => {
         const parsed = item.date ? new Date(`${item.date}T00:00:00`) : null;
         const targetMs = parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : null;
         if (!targetMs) return { ...item, dLabel: '날짜 미설정', daysLeft: null as number | null };
+        if (todayMs === null) return { ...item, dLabel: '--', daysLeft: null as number | null };
 
         const diffDays = Math.ceil((targetMs - todayMs) / (1000 * 60 * 60 * 24));
         const dLabel = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? 'D-Day' : `D+${Math.abs(diffDays)}`;
@@ -1501,7 +1528,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const bSort = b.daysLeft === null ? 9999 : Math.abs(b.daysLeft);
         return aSort - bSort;
       });
-  }, [resolvedExamCountdownSettings]);
+  }, [resolvedExamCountdownSettings, today]);
   const configuredExamCountdowns = useMemo(
     () => examCountdowns.filter((item) => item.title.trim().length > 0 && item.date.trim().length > 0),
     [examCountdowns]
@@ -1553,7 +1580,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (isProcessingAction) {
       const lockAgeMs = actionLockAtRef.current ? Date.now() - actionLockAtRef.current : 0;
       if (lockAgeMs < 15000) return;
-      console.warn('[student-track] action lock timed out; force unlock');
+        logHandledClientIssue('[student-track] action lock timed out; force unlock', 'action lock timed out');
       setIsProcessingAction(false);
       actionLockAtRef.current = null;
       toast({
@@ -1597,7 +1624,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         }
       } catch (seatError: any) {
-        console.warn('[student-track] seat lookup skipped', seatError?.message || seatError);
+          logHandledClientIssue('[student-track] seat lookup skipped', seatError);
       }
 
       if (isTimerActive) {
@@ -1787,7 +1814,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             if (stopSeatRef && stopSeatPayload) {
               await setDoc(stopSeatRef, stopSeatPayload, { merge: true });
             }
-            console.warn('[student-track] duplicated stop request ignored', { centerId, userId: user.uid, sessionId });
+            logHandledClientIssue('[student-track] duplicated stop request ignored', { centerId, userId: user.uid, sessionId });
           } else {
             stopCommitError = commitError;
           }
@@ -1804,7 +1831,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               stopRequestDeduped = true;
               usedStopFallback = true;
               stopCommitError = null;
-              console.warn('[student-track] stop fallback skipped because session already existed');
+                logHandledClientIssue('[student-track] stop fallback skipped because session already existed', 'session already existed');
             } else {
             const fallbackStudyLogData: any = {
               studentId: user.uid,
@@ -1854,7 +1881,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
             usedStopFallback = true;
             stopCommitError = null;
-            console.warn('[student-track] stop fallback saved core study logs while optional writes were skipped');
+                logHandledClientIssue('[student-track] stop fallback saved core study logs while optional writes were skipped', 'optional writes skipped');
             }
           } catch (fallbackError: any) {
             logHandledClientIssue('[student-track] stop fallback failed', fallbackError);
@@ -1876,7 +1903,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             checkInAt: checkInAtForAttendance,
             confirmedByUserId: user.uid,
           }).catch((syncError: any) => {
-            console.warn('[student-track] auto attendance sync skipped', syncError?.message || syncError);
+            logHandledClientIssue('[student-track] auto attendance sync skipped', syncError);
           });
         }
 
@@ -1886,7 +1913,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             studentName: user.displayName || '\uD559\uC0DD',
             type: 'exit',
           }).catch((notifyError: any) => {
-            console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
+          logHandledClientIssue('[student-track] exit notification skipped', notifyError);
           });
         }
 
@@ -1970,7 +1997,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             }
             usedStartFallback = true;
             startCommitError = null;
-            console.warn('[student-track] start fallback kept study-day doc in sync');
+          logHandledClientIssue('[student-track] start fallback kept study-day doc in sync', 'attendance sync skipped');
           } catch (fallbackError: any) {
             logHandledClientIssue('[student-track] start fallback failed', fallbackError);
           }
@@ -1990,7 +2017,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             checkInAt: new Date(nowTs),
             confirmedByUserId: user.uid,
           }).catch((syncError: any) => {
-            console.warn('[student-track] auto attendance sync skipped', syncError?.message || syncError);
+            logHandledClientIssue('[student-track] auto attendance sync skipped', syncError);
           });
         }
 
@@ -1999,7 +2026,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           studentName: user.displayName || '\uD559\uC0DD',
           type: 'entry',
         }).catch((notifyError: any) => {
-          console.warn('[student-track] entry notification skipped', notifyError?.message || notifyError);
+          logHandledClientIssue('[student-track] entry notification skipped', notifyError);
         });
 
         setStartTime(nowTs);
@@ -2737,7 +2764,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       }
     }).catch((error: any) => {
       homeLiveClaimKeyRef.current = null;
-      console.warn('[student-track] live study box claim failed', error?.message || error);
+      logHandledClientIssue('[student-track] live study box claim failed', error);
       setHomeClaimedBoxes(persistedClaimedBoxes);
       setHomeRewardEntries(persistedRewardEntries);
       setHomePointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
@@ -3348,7 +3375,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <Textarea placeholder="사유를 상세히 입력해 주세요." value={requestReason} onChange={e => setRequestReason(e.target.value)} className="rounded-2xl border-2 min-h-[100px] font-bold text-sm resize-none" />
                   </div>
-                  {requestDate === format(new Date(), 'yyyy-MM-dd') && (
+                  {todayKey && requestDate === todayKey && (
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3"><AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" /><p className="text-[11px] font-bold text-rose-900">당일 신청도 먼저 접수되며, 담당 선생님 승인 후 센터 규정에 따라 반영됩니다.</p></div>
                   )}
                   <Button onClick={handleRequestSubmitInternal} disabled={isRequestSubmitting || requestReason.length < 10} className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white">

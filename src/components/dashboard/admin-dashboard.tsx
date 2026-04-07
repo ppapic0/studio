@@ -76,6 +76,7 @@ import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
@@ -251,7 +252,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState<Date | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>('all');
-  const [now, setNow] = useState<number>(Date.now());
+  const [now, setNow] = useState<number>(0);
   const [teacherSearch, setTeacherSearch] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
   const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
@@ -265,7 +266,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
-  const [liveTickMs, setLiveTickMs] = useState<number>(Date.now());
+  const [liveTickMs, setLiveTickMs] = useState<number>(0);
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeBody, setNoticeBody] = useState('');
   const [noticeAudience, setNoticeAudience] = useState<'parent' | 'student' | 'all'>('parent');
@@ -437,7 +438,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     weeklyStudyMinutesByStudent,
   } = useCenterAdminHeatmap({
     centerId,
-    isActive,
+    isActive: isActive && !!today,
     selectedClass,
     referenceDate: today,
     preloadedActiveMembers: activeMembers,
@@ -470,7 +471,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     isLoading: attendanceBoardLoading,
   } = useCenterAdminAttendanceBoard({
     centerId,
-    isActive,
+    isActive: isActive && !!today,
     selectedClass,
     referenceDate: today,
     students,
@@ -718,7 +719,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         setSelectedTeacherId(null);
       }
     } catch (error: any) {
-      console.error(error);
+      logHandledClientIssue('[center-admin] delete teacher failed', error);
       const message = String(error?.message || '').replace(/^FirebaseError:\s*/, '') || '선생님 계정 삭제 중 오류가 발생했습니다.';
       toast({
         variant: 'destructive',
@@ -750,7 +751,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         description: `${generatedLabel} · ${formatOpenClawCountSummary(result.data.recordCounts)}`,
       });
     } catch (error) {
-      console.error(error);
+      logHandledClientIssue('[center-admin] openclaw snapshot failed', error);
       toast({
         variant: 'destructive',
         title: 'OpenClaw 스냅샷 생성 실패',
@@ -1086,7 +1087,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setIsAnnouncementDialogOpen(false);
       toast({ title: '공지사항 등록 완료', description: '학부모 소통창에 즉시 반영됩니다.' });
     } catch (error) {
-      console.error(error);
+      logHandledClientIssue('[center-admin] create announcement failed', error);
       toast({
         variant: 'destructive',
         title: '공지사항 등록 실패',
@@ -1401,7 +1402,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         .map((row) => [row.dateKey, row])
     );
 
-    const baseDate = today || new Date();
+    if (!today) return [];
+    const baseDate = today;
     return Array.from({ length: 7 }, (_, index) => {
       const day = subDays(baseDate, 6 - index);
       const dateKey = format(day, 'yyyy-MM-dd');

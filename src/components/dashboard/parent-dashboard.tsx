@@ -72,6 +72,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import {
   type ParentPortalTab,
   type ParentQuickRequestKey,
@@ -1300,7 +1301,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const [today, setToday] = useState<Date | null>(null);
   const [tab, setTab] = useState<ParentPortalTab>('home');
-  const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());
+  const [currentCalendarDate, setCurrentCalendarDate] = useState<Date | null>(null);
 
   const [channel, setChannel] = useState<'visit' | 'phone' | 'online'>('visit');
   const [quickType, setQuickType] = useState<ParentQuickRequestKey>('math_support');
@@ -1336,7 +1337,22 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  useEffect(() => setToday(new Date()), []);
+  useEffect(() => {
+    const syncToday = () => {
+      const next = new Date();
+      setToday((previous) => {
+        if (previous && format(previous, 'yyyy-MM-dd') === format(next, 'yyyy-MM-dd')) {
+          return previous;
+        }
+        return next;
+      });
+      setCurrentCalendarDate((previous) => previous ?? next);
+    };
+
+    syncToday();
+    const intervalId = window.setInterval(syncToday, 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const active센터Membership = useMemo(() => {
     if (activeMembership) {
@@ -1346,6 +1362,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [activeMembership, memberships]);
 
   const centerId = active센터Membership?.id;
+  const calendarBaseDate = currentCalendarDate ?? today;
   const linkedStudentIds = useMemo(
     () =>
       (active센터Membership?.linkedStudentIds || []).filter(
@@ -1433,7 +1450,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           setLinkedStudents(records);
         }
       } catch (error) {
-        console.warn('[parent-dashboard] failed to load linked students', error);
+        logHandledClientIssue('[parent-dashboard] failed to load linked students', error);
         if (!cancelled) {
           setLinkedStudents(
             linkedStudentIds.map((id, index) => ({
@@ -1467,7 +1484,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         metadata: metadata || {},
       });
     } catch (error) {
-      console.warn('[parent-activity] failed to log event', eventType, error);
+      logHandledClientIssue(`[parent-activity] failed to log event (${eventType})`, error);
     }
   };
 
@@ -1555,8 +1572,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const analyticsLookbackDays = tab === 'data' ? 42 : 35;
   const recentAnalyticsStartKey = today ? format(subDays(today, analyticsLookbackDays - 1), 'yyyy-MM-dd') : '';
-  const calendarRangeStartKey = format(startOfWeek(startOfMonth(currentCalendarDate), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-  const calendarRangeEndKey = format(endOfWeek(endOfMonth(currentCalendarDate), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  const calendarRangeStartKey = calendarBaseDate
+    ? format(startOfWeek(startOfMonth(calendarBaseDate), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    : '';
+  const calendarRangeEndKey = calendarBaseDate
+    ? format(endOfWeek(endOfMonth(calendarBaseDate), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    : '';
 
   // 홈/학습/데이터용 최근 로그 또는 캘린더 범위만 조회
   const allLogsQuery = useMemoFirebase(() => {
@@ -1677,7 +1698,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           setCheckOutByDateKey(nextCheckOut);
         }
       } catch (error) {
-        console.warn('[parent-dashboard] failed to load check-in trend', error);
+        logHandledClientIssue('[parent-dashboard] failed to load check-in trend', error);
         if (!cancelled) {
           setCheckInByDateKey({});
           setCheckOutByDateKey({});
@@ -1779,7 +1800,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           );
         }
       } catch (error) {
-        console.warn('[parent-dashboard] failed to load study rhythm trend', error);
+        logHandledClientIssue('[parent-dashboard] failed to load study rhythm trend', error);
         if (!cancelled) {
           setStudyStartByDateKey({});
           setStudyEndByDateKey({});
@@ -1820,7 +1841,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         viewedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }).catch((error) => {
-        console.warn('[parent-report] viewedAt update failed', error);
+        logHandledClientIssue('[parent-report] viewedAt update failed', error);
       });
     }
 
@@ -2463,12 +2484,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   // 캘린더 데이터 생성
   const calendarData = useMemo(() => {
-    const start = startOfMonth(currentCalendarDate);
-    const end = endOfMonth(currentCalendarDate);
+    if (!calendarBaseDate) return [];
+    const start = startOfMonth(calendarBaseDate);
+    const end = endOfMonth(calendarBaseDate);
     const calendarStart = startOfWeek(start, { weekStartsOn: 1 });
     const calendarEnd = endOfWeek(end, { weekStartsOn: 1 });
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-  }, [currentCalendarDate]);
+  }, [calendarBaseDate]);
 
   const getHeatmapColor = (minutes: number) => {
     const level = getParentCalendarFlowLevel(minutes);
@@ -2931,7 +2953,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       viewedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }).catch((error) => {
-      console.warn('[parent-dashboard] report viewed update failed', error);
+      logHandledClientIssue('[parent-dashboard] report viewed update failed', error);
     });
   };
 
@@ -3562,11 +3584,35 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
                 <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-[#F0D9BB] bg-[linear-gradient(180deg,#fffdf8_0%,#fff3e4_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(180,96,22,0.18)] ring-1 ring-white/70">
                   <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/78 text-[#7D4B16] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#FFF0DD] hover:text-[#8D4A11]" onClick={() => setCurrentCalendarDate(subMonths(currentCalendarDate, 1))}><ChevronLeft className="h-5 w-5" /></Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={!calendarBaseDate}
+                    className="h-9 w-9 rounded-[1rem] bg-white/78 text-[#7D4B16] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#FFF0DD] hover:text-[#8D4A11]"
+                    onClick={() => {
+                      if (!calendarBaseDate) return;
+                      setCurrentCalendarDate(subMonths(calendarBaseDate, 1));
+                    }}
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
                   <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-[#F3DFC4] bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_14px_30px_-24px_rgba(180,96,22,0.16)]">
-                    <span className="font-black text-sm tracking-tight text-[#7D4B16]">{format(currentCalendarDate, 'yyyy년 M월')}</span>
+                    <span className="font-black text-sm tracking-tight text-[#7D4B16]">
+                      {calendarBaseDate ? format(calendarBaseDate, 'yyyy년 M월') : '--'}
+                    </span>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-[1rem] bg-white/78 text-[#7D4B16] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#FFF0DD] hover:text-[#8D4A11]" onClick={() => setCurrentCalendarDate(addMonths(currentCalendarDate, 1))}><ChevronRight className="h-5 w-5" /></Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={!calendarBaseDate}
+                    className="h-9 w-9 rounded-[1rem] bg-white/78 text-[#7D4B16] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#FFF0DD] hover:text-[#8D4A11]"
+                    onClick={() => {
+                      if (!calendarBaseDate) return;
+                      setCurrentCalendarDate(addMonths(calendarBaseDate, 1));
+                    }}
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
                 </div>
               </header>
 
@@ -3606,8 +3652,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const dateKey = format(day, 'yyyy-MM-dd');
                       const minutes = allLogs?.find((log) => log.dateKey === dateKey)?.totalMinutes || 0;
                       const hasPlans = weeklyPlans?.some((plan) => plan.dateKey === dateKey);
-                      const isCurrentMonth = isSameMonth(day, currentCalendarDate);
-                      const isTodayCalendar = isSameDay(day, new Date());
+                      const isCurrentMonth = calendarBaseDate ? isSameMonth(day, calendarBaseDate) : false;
+                      const isTodayCalendar = today ? isSameDay(day, today) : false;
                       const flowLevel = getParentCalendarFlowLevel(minutes);
                       const hasDeepFocus = isCurrentMonth && flowLevel === 'deep';
                       const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
