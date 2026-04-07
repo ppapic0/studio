@@ -25,6 +25,7 @@ type ReceiptInfo = {
   gender: string;
   consultPhone: string;
   requestTypeLabel: string;
+  waitlistRegistered: boolean;
 };
 
 const INITIAL_FORM: FormState = {
@@ -92,7 +93,9 @@ function ReceiptCard({ receipt, onReset }: { receipt: ReceiptInfo; onReset: () =
       </div>
 
       <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 text-xs font-bold leading-relaxed text-amber-700">
-        📞 담당 선생님이 확인 후 등록하신 연락처로 연락드릴 예정입니다.
+        {receipt.waitlistRegistered
+          ? "📞 신청 내역은 먼저 대기 인원에 반영되며, 담당 선생님이 확인 후 등록하신 연락처로 연락드릴 예정입니다."
+          : "📞 담당 선생님이 확인 후 등록하신 연락처로 연락드릴 예정입니다."}
         <br />
         접수 확인 번호로{" "}
         <a href="/consult/check" className="underline underline-offset-2">
@@ -156,6 +159,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
         receiptId?: string;
         createdAt?: string;
         requestTypeLabel?: string;
+        waitlistRegistered?: boolean;
       };
 
       if (!response.ok || !data.ok) {
@@ -172,6 +176,7 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
         gender: form.gender,
         consultPhone: normalizedPhone,
         requestTypeLabel: data.requestTypeLabel ?? "상담 신청",
+        waitlistRegistered: Boolean(data.waitlistRegistered),
       });
       setForm(INITIAL_FORM);
     } catch (err) {

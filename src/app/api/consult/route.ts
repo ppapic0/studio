@@ -125,15 +125,15 @@ export async function POST(request: NextRequest) {
     const requestId = adminDb.collection("marketingConsultRequests").doc().id;
     const receiptId = requestId.slice(0, 8).toUpperCase();
     const shouldAutoCreateLead = Boolean(centerId);
+    const shouldAutoCreateWaitlist = shouldAutoCreateLead && serviceType === "study_center";
     const autoLeadId = shouldAutoCreateLead
       ? adminDb.collection("centers").doc(centerId!).collection("consultingLeads").doc().id
       : null;
-    const autoWaitlistId = shouldAutoCreateLead
-      && requestType === "study_center_waitlist"
+    const autoWaitlistId = shouldAutoCreateWaitlist
       ? adminDb.collection("centers").doc(centerId!).collection("admissionWaitlist").doc().id
       : null;
     const autoWaitlistQueueNumber =
-      shouldAutoCreateLead && centerId && requestType === "study_center_waitlist"
+      shouldAutoCreateWaitlist && centerId
         ? await getNextWaitlistQueueNumber(centerId)
         : null;
 
@@ -214,10 +214,13 @@ export async function POST(request: NextRequest) {
             serviceType,
             status: "waiting",
             queueNumber: autoWaitlistQueueNumber,
-            memo: WEBSITE_CONSULT_LABEL,
+            memo: `${WEBSITE_CONSULT_LABEL} · ${requestTypeLabel}`,
             waitlistDate: consultationDate,
             sourceLeadId: autoLeadId,
             sourceWebsiteRequestId: requestId,
+            receiptId,
+            requestType,
+            requestTypeLabel,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
@@ -229,10 +232,19 @@ export async function POST(request: NextRequest) {
 
     const successMessage =
       requestType === "study_center_waitlist"
-        ? "입학 대기 신청이 접수되었습니다."
-        : "상담 신청이 접수되었습니다.";
+        ? "입학 대기 신청이 접수되었습니다. 대기 인원에 반영되었습니다."
+        : requestType === "study_center_consult"
+          ? "상담 신청이 접수되었습니다. 대기 인원에 먼저 반영되었습니다."
+          : "상담 신청이 접수되었습니다.";
 
-    return noStoreJson({ ok: true, message: successMessage, receiptId, createdAt, requestTypeLabel });
+    return noStoreJson({
+      ok: true,
+      message: successMessage,
+      receiptId,
+      createdAt,
+      requestTypeLabel,
+      waitlistRegistered: shouldAutoCreateWaitlist,
+    });
   } catch (error) {
     console.error("[consult][POST] failed", error);
     return noStoreJson(
