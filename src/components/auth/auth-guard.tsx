@@ -42,6 +42,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [hasTriedSessionSync, setHasTriedSessionSync] = useState(false);
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const redirectPath = sanitizeDashboardReturnPath(searchParams.get('next'));
+  const [authRouteSyncError, setAuthRouteSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -51,6 +52,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!mounted) return;
     setHasTriedSessionSync(false);
     setIsSessionSyncing(false);
+    setAuthRouteSyncError(null);
   }, [mounted, pathname, user?.uid]);
 
   useEffect(() => {
@@ -79,6 +81,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     const syncServerSession = async () => {
       setHasTriedSessionSync(true);
       setIsSessionSyncing(true);
+      setAuthRouteSyncError(null);
 
       try {
         await createServerAuthSession(user);
@@ -87,6 +90,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         logHandledClientIssue('[auth-guard] session sync failed', error);
+        const timeoutMessage =
+          error instanceof Error && error.message
+            ? error.message
+            : '인증 세션을 준비하지 못했습니다. 다시 로그인해 주세요.';
         try {
           await signOut(auth);
         } catch (signOutError) {
@@ -94,6 +101,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         } finally {
           if (!cancelled) {
             setIsSessionSyncing(false);
+            setAuthRouteSyncError(timeoutMessage);
           }
         }
       }
@@ -154,7 +162,18 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (isPublicRoute(pathname)) {
-    return <>{children}</>;
+    return (
+      <>
+        {authRouteSyncError && isAuthRoute ? (
+          <div className="fixed inset-x-0 top-4 z-[120] flex justify-center px-4">
+            <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 shadow-lg">
+              {authRouteSyncError}
+            </div>
+          </div>
+        ) : null}
+        {children}
+      </>
+    );
   }
 
   // 로딩 중일 때
