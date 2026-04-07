@@ -421,7 +421,6 @@ export function MarketingConsultingCRM({
   const filteredWebsiteRequests = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
     return websiteRequests.filter((req) => {
-      if (req.linkedLeadId) return false; // 리드 DB로 이동된 건은 숨김
       if (statusFilter !== 'all' && req.status !== statusFilter) return false;
       if (!keyword) return true;
       return [req.studentName, req.school, req.grade, req.consultPhone, req.sourceLabel, req.requestTypeLabel]
@@ -986,7 +985,7 @@ export function MarketingConsultingCRM({
                     <p className="text-sm font-black text-slate-900">웹사이트 상담폼 접수</p>
                   </div>
                   <p className="text-xs font-semibold text-slate-600">
-                    랜딩페이지 상담 문의는 여기서 확인 후 리드 DB로 옮길 수 있고, 웹 입학 대기 신청은 리드 DB와 대기 DB에 동시에 바로 반영됩니다.
+                    랜딩페이지 상담 문의는 리드 DB에 자동 반영되며, 여기서는 원본 접수 이력과 리드 연결 상태를 함께 확인할 수 있습니다.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

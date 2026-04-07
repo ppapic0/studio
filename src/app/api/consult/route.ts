@@ -73,6 +73,22 @@ function resolveRequestType(
   return { requestType: "study_center_consult", requestTypeLabel: "관리형 스터디센터 상담" };
 }
 
+function buildLeadMemoLines(
+  requestType: string,
+  fields: {
+    school: string;
+    grade: string;
+  },
+  createdAt: string,
+) {
+  return [
+    requestType === "study_center_waitlist" ? "웹 입학 대기 신청" : "웹 상담 신청",
+    `학교: ${fields.school}`,
+    `학년: ${fields.grade}`,
+    `웹 접수: ${createdAt}`,
+  ];
+}
+
 export async function POST(request: NextRequest) {
   const rateLimit = applyIpRateLimit(request, "consult:create", {
     max: 5,
@@ -108,15 +124,18 @@ export async function POST(request: NextRequest) {
     const consultationDate = getKoreaDateKey();
     const requestId = adminDb.collection("marketingConsultRequests").doc().id;
     const receiptId = requestId.slice(0, 8).toUpperCase();
-    const shouldAutoCreateLead = Boolean(centerId && requestType === "study_center_waitlist");
+    const shouldAutoCreateLead = Boolean(centerId);
     const autoLeadId = shouldAutoCreateLead
       ? adminDb.collection("centers").doc(centerId!).collection("consultingLeads").doc().id
       : null;
     const autoWaitlistId = shouldAutoCreateLead
+      && requestType === "study_center_waitlist"
       ? adminDb.collection("centers").doc(centerId!).collection("admissionWaitlist").doc().id
       : null;
     const autoWaitlistQueueNumber =
-      shouldAutoCreateLead && centerId ? await getNextWaitlistQueueNumber(centerId) : null;
+      shouldAutoCreateLead && centerId && requestType === "study_center_waitlist"
+        ? await getNextWaitlistQueueNumber(centerId)
+        : null;
 
     const payload = {
       ...fields,
@@ -145,24 +164,13 @@ export async function POST(request: NextRequest) {
         .doc(requestId);
       batch.set(centerRequestRef, { ...payload, receiptId });
 
-      if (shouldAutoCreateLead && autoLeadId && autoWaitlistId) {
+      if (shouldAutoCreateLead && autoLeadId) {
         const leadRef = adminDb
           .collection("centers")
           .doc(centerId)
           .collection("consultingLeads")
           .doc(autoLeadId);
-        const waitlistRef = adminDb
-          .collection("centers")
-          .doc(centerId)
-          .collection("admissionWaitlist")
-          .doc(autoWaitlistId);
-
-        const memoLines = [
-          "웹 입학 대기 신청",
-          `학교: ${fields.school}`,
-          `학년: ${fields.grade}`,
-          `웹 접수: ${createdAt}`,
-        ];
+        const memoLines = buildLeadMemoLines(requestType, fields, createdAt);
 
         batch.set(leadRef, {
           studentName: fields.studentName,
@@ -183,28 +191,36 @@ export async function POST(request: NextRequest) {
           source: WEBSITE_CONSULT_SOURCE,
           sourceRequestId: requestId,
           addedToWaitlistId: autoWaitlistId,
-          addedToWaitlistIds: [autoWaitlistId],
+          addedToWaitlistIds: autoWaitlistId ? [autoWaitlistId] : [],
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           createdByUid: null,
         });
 
-        batch.set(waitlistRef, {
-          studentName: fields.studentName,
-          parentPhone: fields.consultPhone,
-          studentPhone: "",
-          school: fields.school,
-          grade: fields.grade,
-          serviceType,
-          status: "waiting",
-          queueNumber: autoWaitlistQueueNumber,
-          memo: WEBSITE_CONSULT_LABEL,
-          waitlistDate: consultationDate,
-          sourceLeadId: autoLeadId,
-          sourceWebsiteRequestId: requestId,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        if (autoWaitlistId) {
+          const waitlistRef = adminDb
+            .collection("centers")
+            .doc(centerId)
+            .collection("admissionWaitlist")
+            .doc(autoWaitlistId);
+
+          batch.set(waitlistRef, {
+            studentName: fields.studentName,
+            parentPhone: fields.consultPhone,
+            studentPhone: "",
+            school: fields.school,
+            grade: fields.grade,
+            serviceType,
+            status: "waiting",
+            queueNumber: autoWaitlistQueueNumber,
+            memo: WEBSITE_CONSULT_LABEL,
+            waitlistDate: consultationDate,
+            sourceLeadId: autoLeadId,
+            sourceWebsiteRequestId: requestId,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
       }
     }
 
