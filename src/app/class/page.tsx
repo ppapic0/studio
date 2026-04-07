@@ -243,7 +243,7 @@ export default async function ClassPage() {
         <section className="py-16 sm:py-20 bg-white">
           <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
             <div className="border-l-[5px] border-[#14295F] pl-6 py-1">
-              <p className="break-keep text-[clamp(1.55rem,3.2vw,2.15rem)] font-black leading-[1.45] text-[#14295F]">
+              <p className="font-aggro-display break-keep text-[clamp(1.55rem,3.2vw,2.15rem)] font-black leading-[1.3] tracking-[-0.03em] text-[#14295F]">
                 공부는 방향이 중요합니다.
                 <br />
                 성장의 길, <span className="text-[#FF7A16]">트랙</span>에서 시작됩니다
@@ -260,7 +260,7 @@ export default async function ClassPage() {
         <section className="py-20 sm:py-28" style={{ background: '#f4f7ff' }}>
           <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
             <span className="eyebrow-badge">수업 소개</span>
-            <h2 className="mt-5 break-keep text-[clamp(1.75rem,3.6vw,2.4rem)] font-black leading-[1.12] text-[#14295F]">
+            <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.75rem,3.6vw,2.4rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
               국어 수업은 이렇게 진행됩니다
             </h2>
             <p className="mx-auto mt-6 max-w-[560px] break-keep text-[15.5px] font-semibold leading-[1.88] text-[#334e6a]">
@@ -297,7 +297,7 @@ export default async function ClassPage() {
               {/* Left */}
               <div>
                 <span className="eyebrow-badge">원장 직강</span>
-                <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
+                <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
                   원장이 직접 수업합니다
                 </h2>
                 <p className="mt-5 break-keep text-[15.5px] font-semibold leading-[1.9] text-[#334e6a]">
@@ -350,7 +350,7 @@ export default async function ClassPage() {
             <p className="text-[10.5px] font-black tracking-[0.26em] text-[#FFB273] uppercase">
               수업 철학
             </p>
-            <h2 className="mt-6 break-keep text-[clamp(1.6rem,3.4vw,2.3rem)] font-black leading-[1.22] text-white">
+            <h2 className="font-aggro-display mt-6 break-keep text-[clamp(1.6rem,3.4vw,2.3rem)] font-black leading-[1.16] tracking-[-0.03em] text-white">
               국어는 결국,<br />
               설명 가능한 실력이 되어야 합니다
             </h2>
@@ -372,7 +372,7 @@ export default async function ClassPage() {
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-xl text-center">
               <span className="eyebrow-badge">수업 방식</span>
-              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
+              <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
                 시험장에서 바로 쓰는
                 <br />
                 핵심 기준 4가지
@@ -416,7 +416,7 @@ export default async function ClassPage() {
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-xl text-center">
               <span className="eyebrow-badge-light">수업 자료</span>
-              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-white">
+              <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.08] tracking-[-0.03em] text-white">
                 자료의 밀도는
                 <br />
                 수업의 밀도와 연결됩니다
@@ -499,7 +499,7 @@ export default async function ClassPage() {
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-xl text-center">
               <span className="eyebrow-badge">수업 대상</span>
-              <h2 className="mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.1] text-[#14295F]">
+              <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
                 이런 학생에게 맞습니다
               </h2>
             </div>
@@ -545,7 +545,7 @@ export default async function ClassPage() {
             {/* heading */}
             <div className="max-w-xl">
               <span className="eyebrow-badge-light">수업 상담</span>
-              <h2 className="mt-5 break-keep text-[clamp(1.75rem,3.6vw,2.4rem)] font-black leading-[1.1] text-white">
+              <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.75rem,3.6vw,2.4rem)] font-black leading-[1.08] tracking-[-0.03em] text-white">
                 수업이 필요한 지점부터
                 <br />
                 함께 확인해보세요
