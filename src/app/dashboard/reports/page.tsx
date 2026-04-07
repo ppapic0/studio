@@ -344,13 +344,17 @@ export default function DailyReportsPage() {
         createdAt: serverTimestamp(),
       }, { merge: true });
 
-      // 리포트 발송 시 카카오톡 알림
-      if (status === 'sent') {
-        sendKakaoNotification(firestore, centerId, {
+        // 리포트 발송 시 카카오톡 알림
+        if (status === 'sent') {
+        void sendKakaoNotification(firestore, centerId, {
+          studentId: selectedStudent.id,
           studentName: selectedStudent.name,
-          type: 'report'
+          type: 'report',
+          customData: { dateKey },
+        }).catch((notifyError: any) => {
+          console.warn('[daily-report] report notification skipped', notifyError?.message || notifyError);
         });
-      }
+        }
 
       toast({ title: status === 'sent' ? "발송 완료" : "저장 완료" });
       setIsWriteModalOpen(false);

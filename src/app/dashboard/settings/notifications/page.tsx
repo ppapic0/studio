@@ -57,7 +57,9 @@ type ParentSmsEventType =
   | 'away_end'
   | 'study_end'
   | 'late_alert'
-  | 'weekly_report';
+  | 'weekly_report'
+  | 'daily_report'
+  | 'payment_reminder';
 
 type SmsConsoleEventType = ParentSmsEventType | 'risk_alert' | 'manual_note';
 
@@ -289,6 +291,8 @@ const SMS_EVENTS: Array<{ value: SmsConsoleEventType; label: string }> = [
   { value: 'study_end', label: '공부종료' },
   { value: 'late_alert', label: '지각' },
   { value: 'weekly_report', label: '주간리포트' },
+  { value: 'daily_report', label: '일일리포트' },
+  { value: 'payment_reminder', label: '결제알림' },
   { value: 'manual_note', label: '수동 문자' },
   { value: 'risk_alert', label: '리스크 알림' },
 ];
@@ -300,6 +304,8 @@ const RECIPIENT_EVENT_OPTIONS: Array<{ value: ParentSmsEventType; label: string 
   { value: 'study_end', label: '공부종료' },
   { value: 'late_alert', label: '지각' },
   { value: 'weekly_report', label: '주간리포트' },
+  { value: 'daily_report', label: '일일리포트' },
+  { value: 'payment_reminder', label: '결제알림' },
 ];
 
 const TEMPLATE_META: Array<{
@@ -436,6 +442,8 @@ function getDefaultEventToggles(): Record<ParentSmsEventType, boolean> {
     study_end: true,
     late_alert: true,
     weekly_report: true,
+    daily_report: true,
+    payment_reminder: true,
   };
 }
 

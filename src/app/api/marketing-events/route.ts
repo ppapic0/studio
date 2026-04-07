@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
+import { z } from 'zod';
 
+import {
+  applyIpRateLimit,
+  forbiddenJson,
+  hasTrustedBrowserContext,
+  noStoreJson,
+  tooManyRequestsJson,
+} from '@/lib/api-security';
 import { adminDb } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
 
@@ -18,10 +26,45 @@ type MarketingEventPayload = {
   extra?: Record<string, unknown>;
 };
 
+const marketingEventSchema = z.object({
+  eventType: z.enum(['page_view', 'login_success']).optional(),
+  pageType: z.enum(['landing', 'experience', 'login', 'center', 'results']).optional(),
+  mode: z.string().trim().max(40).nullable().optional(),
+  view: z.string().trim().max(40).nullable().optional(),
+  placement: z.string().trim().max(80).nullable().optional(),
+  target: z.string().trim().max(40).nullable().optional(),
+  visitorId: z.string().trim().max(120).nullable().optional(),
+  sessionId: z.string().trim().max(120).nullable().optional(),
+  pathname: z.string().trim().max(240).nullable().optional(),
+  search: z.string().trim().max(400).nullable().optional(),
+  extra: z.record(
+    z.string(),
+    z.union([z.string().max(160), z.number(), z.boolean(), z.null()]),
+  ).optional(),
+});
+
+export const dynamic = 'force-dynamic';
+
+function normalizeTrackedPathname(value: string | null | undefined, fallback: string) {
+  if (!value || !value.startsWith('/')) return fallback;
+  return value.slice(0, 240);
+}
 
 export async function POST(request: NextRequest) {
+  const rateLimit = applyIpRateLimit(request, 'marketing-events:create', {
+    max: 240,
+    windowMs: 5 * 60 * 1000,
+  });
+  if (!rateLimit.ok) {
+    return tooManyRequestsJson(rateLimit.retryAfterSeconds, '이벤트 수집 요청이 너무 많습니다.');
+  }
+
+  if (!hasTrustedBrowserContext(request)) {
+    return forbiddenJson('허용되지 않은 이벤트 수집 경로입니다.');
+  }
+
   try {
-    const payload = (await request.json()) as MarketingEventPayload;
+    const payload = marketingEventSchema.parse((await request.json()) as MarketingEventPayload);
     const centerId = await resolveMarketingCenterId();
     const visitorId =
       payload.visitorId ||
@@ -42,8 +85,8 @@ export async function POST(request: NextRequest) {
       view: payload.view || null,
       visitorId,
       sessionId,
-      pathname: payload.pathname || request.nextUrl.pathname,
-      search: payload.search || '',
+      pathname: normalizeTrackedPathname(payload.pathname, request.nextUrl.pathname),
+      search: (payload.search || '').slice(0, 400),
       extra: payload.extra || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       userAgent: request.headers.get('user-agent') || null,
@@ -60,9 +103,9 @@ export async function POST(request: NextRequest) {
         .add(eventData);
     }
 
-    return NextResponse.json({ ok: true });
+    return noStoreJson({ ok: true });
   } catch (error) {
     console.error('[marketing-events][POST] failed', error);
-    return NextResponse.json({ ok: false }, { status: 500 });
+    return noStoreJson({ ok: false }, { status: 500 });
   }
 }

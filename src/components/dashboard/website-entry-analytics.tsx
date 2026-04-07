@@ -88,7 +88,9 @@ export function WebsiteEntryAnalytics({ centerId }: { centerId?: string }) {
         if (!currentUser) return;
         const token = await currentUser.getIdToken();
 
-        const res = await fetch('/api/website-analytics', {
+        const params = new URLSearchParams({ centerId });
+        const res = await fetch(`/api/website-analytics?${params.toString()}`, {
+          cache: 'no-store',
           headers: { Authorization: `Bearer ${token}` },
         });
 

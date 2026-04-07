@@ -5,7 +5,8 @@ import {
   writeBatch, 
   serverTimestamp, 
   Firestore,
-  Timestamp
+  Timestamp,
+  getDoc,
 } from 'firebase/firestore';
 import { format, subDays, startOfDay } from 'date-fns';
 
@@ -15,6 +16,21 @@ import { format, subDays, startOfDay } from 'date-fns';
  * 또한 최근 30일간의 센터 KPI 데이터를 생성하여 그래프를 정상적으로 표시합니다.
  */
 export async function seedInitialData(db: Firestore, uid: string, centerId: string) {
+  const [memberSnap, userCenterSnap] = await Promise.all([
+    getDoc(doc(db, 'centers', centerId, 'members', uid)),
+    getDoc(doc(db, 'userCenters', uid, 'centers', centerId)),
+  ]);
+  const callerRole = String(memberSnap.data()?.role || userCenterSnap.data()?.role || '').trim();
+  const isAdmin =
+    callerRole === 'centerAdmin' ||
+    callerRole === 'owner' ||
+    callerRole === 'admin' ||
+    callerRole === 'centerManager';
+
+  if (!isAdmin) {
+    throw new Error('센터 관리자만 초기 데이터 시딩을 실행할 수 있습니다.');
+  }
+
   const batch = writeBatch(db);
   const today = new Date();
   const timestamp = serverTimestamp();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
 
+import { applyIpRateLimit } from '@/lib/api-security';
 import { adminDb } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
 
@@ -10,12 +11,17 @@ const TARGET_PATHS: Record<string, string> = {
 };
 
 function resolvePublicOrigin(request: NextRequest) {
-  const forwardedProto = request.headers.get('x-forwarded-proto');
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  const host = forwardedHost || request.headers.get('host');
+  const configuredOrigin =
+    process.env.APP_ORIGIN ||
+    process.env.NEXT_PUBLIC_APP_ORIGIN ||
+    process.env.NEXT_PUBLIC_SITE_URL;
 
-  if (host) {
-    return `${forwardedProto || 'https'}://${host}`;
+  if (configuredOrigin) {
+    try {
+      return new URL(configuredOrigin).origin;
+    } catch {
+      // Ignore invalid configured origin and fall back to request origin.
+    }
   }
 
   return request.nextUrl.origin;
@@ -72,7 +78,9 @@ export async function GET(
   const publicOrigin = resolvePublicOrigin(request);
 
   if (!targetPath) {
-    return NextResponse.redirect(new URL('/', publicOrigin));
+    const response = NextResponse.redirect(new URL('/', publicOrigin));
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
+    return response;
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -83,7 +91,15 @@ export async function GET(
     destination.searchParams.set(key, value);
   }
 
-  void logMarketingEntry(request, target, targetPath);
+  const rateLimit = applyIpRateLimit(request, 'marketing:redirect', {
+    max: 80,
+    windowMs: 60 * 1000,
+  });
+  if (rateLimit.ok) {
+    void logMarketingEntry(request, target, targetPath);
+  }
 
-  return NextResponse.redirect(destination);
+  const response = NextResponse.redirect(destination);
+  response.headers.set('Cache-Control', 'no-store, max-age=0');
+  return response;
 }

@@ -1881,10 +1881,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
 
         if (!stopRequestDeduped) {
-          void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '\uD559\uC0DD', type: 'exit' })
-            .catch((notifyError: any) => {
-              console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
-            });
+          void sendKakaoNotification(firestore, centerId, {
+            studentId: user.uid,
+            studentName: user.displayName || '\uD559\uC0DD',
+            type: 'exit',
+          }).catch((notifyError: any) => {
+            console.warn('[student-track] exit notification skipped', notifyError?.message || notifyError);
+          });
         }
 
         setIsTimerActive(false);
@@ -1991,10 +1994,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           });
         }
 
-        void sendKakaoNotification(firestore, centerId, { studentName: user.displayName || '\uD559\uC0DD', type: 'entry' })
-          .catch((notifyError: any) => {
-            console.warn('[student-track] entry notification skipped', notifyError?.message || notifyError);
-          });
+        void sendKakaoNotification(firestore, centerId, {
+          studentId: user.uid,
+          studentName: user.displayName || '\uD559\uC0DD',
+          type: 'entry',
+        }).catch((notifyError: any) => {
+          console.warn('[student-track] entry notification skipped', notifyError?.message || notifyError);
+        });
 
         setStartTime(nowTs);
         setIsTimerActive(true);

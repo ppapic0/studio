@@ -1,12 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
 import * as admin from "firebase-admin";
 
+import {
+  applyIpRateLimit,
+  forbiddenJson,
+  hasTrustedBrowserContext,
+  noStoreJson,
+  tooManyRequestsJson,
+} from "@/lib/api-security";
 import { adminDb } from "@/lib/firebase-admin";
 import { resolveMarketingCenterId } from "@/lib/marketing-center";
 
 const WEBSITE_CONSULT_SOURCE = "website";
 const WEBSITE_CONSULT_LABEL = "웹사이트 상담폼";
+
+export const dynamic = "force-dynamic";
 
 function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
@@ -64,13 +73,25 @@ function resolveRequestType(
   return { requestType: "study_center_consult", requestTypeLabel: "관리형 스터디센터 상담" };
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const rateLimit = applyIpRateLimit(request, "consult:create", {
+    max: 5,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!rateLimit.ok) {
+    return tooManyRequestsJson(rateLimit.retryAfterSeconds, "상담 신청이 너무 자주 시도되고 있습니다. 잠시 후 다시 시도해주세요.");
+  }
+
+  if (!hasTrustedBrowserContext(request)) {
+    return forbiddenJson("허용되지 않은 상담 신청 경로입니다.");
+  }
+
   try {
     const body = await request.json();
     const parsed = consultSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
+      return noStoreJson(
         {
           ok: false,
           message: parsed.error.issues[0]?.message ?? "입력값을 확인해주세요.",
@@ -194,10 +215,10 @@ export async function POST(request: Request) {
         ? "입학 대기 신청이 접수되었습니다."
         : "상담 신청이 접수되었습니다.";
 
-    return NextResponse.json({ ok: true, message: successMessage, receiptId, createdAt, requestTypeLabel });
+    return noStoreJson({ ok: true, message: successMessage, receiptId, createdAt, requestTypeLabel });
   } catch (error) {
     console.error("[consult][POST] failed", error);
-    return NextResponse.json(
+    return noStoreJson(
       {
         ok: false,
         message: "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",

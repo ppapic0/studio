@@ -15,10 +15,31 @@ export default function SeedPage() {
   const { activeMembership } = useAppContext();
   const { toast } = useToast();
   const [isSeeding, setIsSeeding] = useState(false);
+  const isAdmin =
+    activeMembership?.role === 'centerAdmin' ||
+    activeMembership?.role === 'owner';
+
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md border-dashed border-2">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-black">개발용 페이지 비활성화</CardTitle>
+            <CardDescription>운영 환경에서는 시드 페이지가 차단됩니다.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   const handleSeed = async () => {
     if (!user || !activeMembership || !firestore) {
       toast({ variant: 'destructive', title: '로그인 및 센터 가입이 필요합니다.' });
+      return;
+    }
+
+    if (!isAdmin) {
+      toast({ variant: 'destructive', title: '센터 관리자만 시딩할 수 있습니다.' });
       return;
     }
 
@@ -50,7 +71,7 @@ export default function SeedPage() {
         <CardContent>
           <Button 
             onClick={handleSeed} 
-            disabled={isSeeding || !activeMembership} 
+            disabled={isSeeding || !activeMembership || !isAdmin}
             className="w-full h-12 rounded-xl font-black text-lg"
           >
             {isSeeding ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '데이터 주입 시작'}
@@ -58,6 +79,11 @@ export default function SeedPage() {
           {!activeMembership && (
             <p className="text-xs text-destructive text-center mt-4 font-bold">
               ※ 먼저 센터에 가입해야 시딩이 가능합니다.
+            </p>
+          )}
+          {activeMembership && !isAdmin && (
+            <p className="mt-4 text-center text-xs font-bold text-destructive">
+              ※ 센터 관리자 계정에서만 시딩을 실행할 수 있습니다.
             </p>
           )}
         </CardContent>

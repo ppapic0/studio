@@ -53,7 +53,7 @@ import {
   ShieldAlert,
   RotateCcw
 } from 'lucide-react';
-import { useCollection, useFirestore, useDoc, useFunctions, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useFirestore, useDoc, useMemoFirebase, useUser } from '@/firebase';
 import { useAppContext, TIERS } from '@/contexts/app-context';
 import { 
   collection, 
@@ -99,7 +99,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { sendKakaoNotification } from '@/lib/kakao-service';
-import { httpsCallable } from 'firebase/functions';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
@@ -192,7 +191,6 @@ const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: st
 export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { user } = useUser();
   const firestore = useFirestore();
-  const functions = useFunctions();
   const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
@@ -257,24 +255,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const canResetPenalty =
     activeMembership?.role === 'centerAdmin' ||
     activeMembership?.role === 'owner';
-  const canTriggerAttendanceSms =
-    activeMembership?.role === 'teacher' ||
-    activeMembership?.role === 'centerAdmin' ||
-    activeMembership?.role === 'owner';
-
-  const triggerAttendanceSms = async (
-    studentId: string,
-    eventType: 'study_start' | 'away_start' | 'study_end'
-  ) => {
-    if (!functions || !centerId || !canTriggerAttendanceSms) return;
-
-    try {
-      const notifyAttendanceSmsFn = httpsCallable(functions, 'notifyAttendanceSms');
-      await notifyAttendanceSmsFn({ centerId, studentId, eventType });
-    } catch (error) {
-      console.warn('[teacher] notifyAttendanceSms failed', error);
-    }
-  };
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const thirtyDaysAgoKey = format(subDays(new Date(), 30), 'yyyy-MM-dd');
 
@@ -1484,18 +1464,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       });
 
       const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
-      sendKakaoNotification(firestore, centerId, {
+      void sendKakaoNotification(firestore, centerId, {
+        studentId,
         studentName,
         type: kakaoType
+      }).catch((notifyError: any) => {
+        console.warn('[teacher-dashboard] attendance notification skipped', notifyError?.message || notifyError);
       });
-
-      if (nextStatus === 'studying' && prevStatus === 'absent') {
-        void triggerAttendanceSms(studentId, 'study_start');
-      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
-        void triggerAttendanceSms(studentId, 'away_start');
-      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
-        void triggerAttendanceSms(studentId, 'study_end');
-      }
       
       toast({ title: "학생 상태가 업데이트되었습니다." });
       setIsManaging(false);

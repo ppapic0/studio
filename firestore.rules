@@ -374,8 +374,12 @@ service cloud.firestore {
       }
 
       match /settings/{settingId} {
-        allow read: if isTeacherOrAdmin(centerId);
+        allow read: if isCenterAdmin(centerId);
         allow write: if isCenterAdmin(centerId);
+      }
+
+      match /settingsPrivate/{settingId} {
+        allow read, write: if false;
       }
 
       match /leaderboards/{boardId}/entries/{entryId} {

@@ -1,19 +1,40 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
+import {
+  applyIpRateLimit,
+  forbiddenJson,
+  hasTrustedBrowserContext,
+  noStoreJson,
+  tooManyRequestsJson,
+} from "@/lib/api-security";
 import { adminDb } from "@/lib/firebase-admin";
 
 function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
 }
 
-export async function GET(request: Request) {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  const rateLimit = applyIpRateLimit(request, "consult:check", {
+    max: 20,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!rateLimit.ok) {
+    return tooManyRequestsJson(rateLimit.retryAfterSeconds, "조회 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+  }
+
+  if (!hasTrustedBrowserContext(request)) {
+    return forbiddenJson("허용되지 않은 조회 경로입니다.");
+  }
+
   const { searchParams } = new URL(request.url);
   const phone = searchParams.get("phone")?.trim();
   const name = searchParams.get("name")?.trim();
   const normalizedPhone = normalizePhone(phone || "");
 
   if (!normalizedPhone || normalizedPhone.length < 8) {
-    return NextResponse.json({ ok: false, message: "연락처를 입력해주세요." }, { status: 400 });
+    return noStoreJson({ ok: false, message: "연락처를 입력해주세요." }, { status: 400 });
   }
 
   try {
@@ -44,7 +65,7 @@ export async function GET(request: Request) {
     const uniqueDocs = Array.from(new Map(docs.map((doc) => [doc.id, doc])).values()).slice(0, 5);
 
     if (uniqueDocs.length === 0) {
-      return NextResponse.json({ ok: true, results: [] });
+      return noStoreJson({ ok: true, results: [] });
     }
 
     const results = uniqueDocs.map((doc) => {
@@ -61,10 +82,10 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ ok: true, results });
+    return noStoreJson({ ok: true, results });
   } catch (error) {
     console.error("[consult/check][GET] failed", error);
-    return NextResponse.json(
+    return noStoreJson(
       { ok: false, message: "조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." },
       { status: 500 },
     );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
 
+import { noStoreJson } from '@/lib/api-security';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
 
@@ -23,6 +24,8 @@ const EMPTY_SNAPSHOT: StudentRankingSnapshot = {
   weekly: [],
   monthly: [],
 };
+
+export const dynamic = 'force-dynamic';
 
 const ACTIVE_LIVE_RANK_STATUSES = new Set(['studying', 'away', 'break']);
 
@@ -146,11 +149,11 @@ export async function GET(request: NextRequest) {
   const centerId = request.nextUrl.searchParams.get('centerId')?.trim() || '';
 
   if (!idToken) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    return noStoreJson({ error: 'unauthorized' }, { status: 401 });
   }
 
   if (!centerId) {
-    return NextResponse.json({ error: 'centerId-required' }, { status: 400 });
+    return noStoreJson({ error: 'centerId-required' }, { status: 400 });
   }
 
   let uid = '';
@@ -158,13 +161,13 @@ export async function GET(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(idToken);
     uid = decoded.uid;
   } catch {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    return noStoreJson({ error: 'unauthorized' }, { status: 401 });
   }
 
   try {
     const allowed = await hasCenterAccess(uid, centerId);
     if (!allowed) {
-      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+      return noStoreJson({ error: 'forbidden' }, { status: 403 });
     }
 
     const nowKst = toKstDate();
@@ -385,7 +388,7 @@ export async function GET(request: NextRequest) {
         .filter((entry): entry is Omit<RankEntry, 'rank'> => Boolean(entry))
     );
 
-    return NextResponse.json({
+    return noStoreJson({
       ...EMPTY_SNAPSHOT,
       daily: dailyEntries,
       weekly: weeklyEntries,
@@ -393,6 +396,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[student-rankings] query failed', error);
-    return NextResponse.json({ error: 'internal' }, { status: 500 });
+    return noStoreJson({ error: 'internal' }, { status: 500 });
   }
 }

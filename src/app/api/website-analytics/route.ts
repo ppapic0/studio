@@ -1,29 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { noStoreJson } from '@/lib/api-security';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 
+export const dynamic = 'force-dynamic';
+
+function normalizeRole(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function canAccessWebsiteAnalytics(role: string) {
+  return role === 'teacher' || role === 'centerAdmin' || role === 'owner' || role === 'admin' || role === 'centerManager';
+}
+
+async function getCenterRole(uid: string, centerId: string) {
+  const [memberSnap, userCenterSnap] = await Promise.all([
+    adminDb.doc(`centers/${centerId}/members/${uid}`).get(),
+    adminDb.doc(`userCenters/${uid}/centers/${centerId}`).get(),
+  ]);
+
+  return normalizeRole(memberSnap.data()?.role || userCenterSnap.data()?.role);
+}
+
 export async function GET(request: NextRequest) {
-  // 인증 확인 — Authorization: Bearer <idToken>
   const authHeader = request.headers.get('authorization') || '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const centerId = request.nextUrl.searchParams.get('centerId')?.trim() || '';
 
   if (!idToken) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    return noStoreJson({ error: 'unauthorized' }, { status: 401 });
   }
 
+  if (!centerId) {
+    return noStoreJson({ error: 'centerId-required' }, { status: 400 });
+  }
+
+  let uid = '';
   try {
-    await adminAuth.verifyIdToken(idToken);
+    uid = (await adminAuth.verifyIdToken(idToken)).uid;
   } catch {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    return noStoreJson({ error: 'unauthorized' }, { status: 401 });
   }
 
   try {
-    // 전역 marketingEntryEvents 컬렉션에서 최신 2000건 조회
-    // centerId와 무관하게 모든 이벤트를 반환 (단일 테넌트 운영 기준)
+    const role = await getCenterRole(uid, centerId);
+    if (!canAccessWebsiteAnalytics(role)) {
+      return noStoreJson({ error: 'forbidden' }, { status: 403 });
+    }
+
     const snapshot = await adminDb
-      .collection('marketingEntryEvents')
+      .collection(`centers/${centerId}/websiteEntryEvents`)
       .orderBy('createdAt', 'desc')
-      .limit(2000)
+      .limit(1500)
       .get();
 
     const events = snapshot.docs.map((doc) => {
@@ -38,15 +66,13 @@ export async function GET(request: NextRequest) {
         view: data.view ?? null,
         sessionId: data.sessionId ?? null,
         visitorId: data.visitorId ?? null,
-        centerId: data.centerId ?? null,
-        // Firestore Timestamp → ISO string
         createdAt: data.createdAt?.toDate?.()?.toISOString() ?? null,
       };
     });
 
-    return NextResponse.json({ events });
+    return noStoreJson({ events });
   } catch (error) {
     console.error('[website-analytics] query failed', error);
-    return NextResponse.json({ error: 'internal' }, { status: 500 });
+    return noStoreJson({ error: 'internal' }, { status: 500 });
   }
 }

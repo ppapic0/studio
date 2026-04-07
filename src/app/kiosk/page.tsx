@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore, useCollection, useFunctions } from '@/firebase';
+import { useFirestore, useCollection } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
@@ -45,7 +45,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { httpsCallable } from 'firebase/functions';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
@@ -53,29 +52,10 @@ import { resolveSeatIdentity } from '@/lib/seat-layout';
 
 export default function KioskPage() {
   const firestore = useFirestore();
-  const functions = useFunctions();
   const { activeMembership } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const centerId = activeMembership?.id;
-  const canTriggerAttendanceSms =
-    activeMembership?.role === 'teacher' ||
-    activeMembership?.role === 'centerAdmin' ||
-    activeMembership?.role === 'owner';
-
-  const triggerAttendanceSms = async (
-    studentId: string,
-    eventType: 'study_start' | 'away_start' | 'study_end'
-  ) => {
-    if (!functions || !centerId || !canTriggerAttendanceSms) return;
-
-    try {
-      const notifyAttendanceSmsFn = httpsCallable(functions, 'notifyAttendanceSms');
-      await notifyAttendanceSmsFn({ centerId, studentId, eventType });
-    } catch (error) {
-      console.warn('[kiosk] notifyAttendanceSms failed', error);
-    }
-  };
 
   const [mode, setMode] = useState<'pin' | 'qr'>('pin');
   const [pin, setPin] = useState('');
@@ -338,18 +318,13 @@ export default function KioskPage() {
 
       // 카카오톡 알림 발송
       const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
-      sendKakaoNotification(firestore, centerId, {
+      void sendKakaoNotification(firestore, centerId, {
+        studentId: student.id,
         studentName: student.name,
         type: kakaoType
+      }).catch((notifyError: any) => {
+        console.warn('[kiosk] attendance notification skipped', notifyError?.message || notifyError);
       });
-
-      if (nextStatus === 'studying' && prevStatus === 'absent') {
-        void triggerAttendanceSms(student.id, 'study_start');
-      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
-        void triggerAttendanceSms(student.id, 'away_start');
-      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
-        void triggerAttendanceSms(student.id, 'study_end');
-      }
 
       const statusLabels: Record<AttendanceCurrent['status'], string> = {
         studying: '입실',
