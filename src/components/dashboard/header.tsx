@@ -57,6 +57,7 @@ import {
   PARENT_POST_LOGIN_ENTRY_MOTION_KEY,
 } from '@/lib/dashboard-motion';
 import { cn } from '@/lib/utils';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useToast } from '@/hooks/use-toast';
@@ -176,8 +177,23 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
     return doc(firestore, 'centers', activeMembership.id, 'members', linkedStudentId);
   }, [firestore, activeMembership?.id, linkedStudentId]);
   const { data: linkedStudentMember } = useDoc<CenterMembership>(linkedStudentMemberRef as any);
-  const parentHeaderTodayLabel = useMemo(() => format(new Date(), 'yyyy. MM. dd (EEE)', { locale: ko }), []);
+  const [parentHeaderTodayLabel, setParentHeaderTodayLabel] = useState('');
   const parentHeaderStudentName = linkedStudentProfile?.name || linkedStudentMember?.displayName || '학생';
+
+  useEffect(() => {
+    if (!isParentMode || typeof window === 'undefined') {
+      setParentHeaderTodayLabel('');
+      return;
+    }
+
+    const syncParentHeaderTodayLabel = () => {
+      setParentHeaderTodayLabel(format(new Date(), 'yyyy. MM. dd (EEE)', { locale: ko }));
+    };
+
+    syncParentHeaderTodayLabel();
+    const intervalId = window.setInterval(syncParentHeaderTodayLabel, 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [isParentMode]);
 
   useEffect(() => {
     if (!isSettingsOpen) {
@@ -297,7 +313,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
       toast({ title: '\uC815\uBCF4\uAC00 \uC131\uACF5\uC801\uC73C\uB85C \uC5C5\uB370\uC774\uD2B8\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' });
       setIsSettingsOpen(false);
     } catch (error: any) {
-      console.error('Settings Update Error:', error);
+      logHandledClientIssue('[dashboard-header] settings update failed', error);
       toast({
         variant: 'destructive',
         title: '\uC5C5\uB370\uC774\uD2B8 \uC2E4\uD328',

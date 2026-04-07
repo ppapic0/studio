@@ -1264,10 +1264,13 @@ function toDateSafe(value: TimestampLike): Date | null {
   return null;
 }
 
-function toRelativeLabel(value: TimestampLike, now = new Date()) {
+function toRelativeLabel(value: TimestampLike, nowMs = 0) {
   const date = toDateSafe(value);
   if (!date) return '최근';
-  const diffMs = now.getTime() - date.getTime();
+  if (!Number.isFinite(nowMs) || nowMs <= 0) {
+    return format(date, 'MM/dd HH:mm', { locale: ko });
+  }
+  const diffMs = nowMs - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60000);
   if (diffMinutes < 1) return '방금 전';
   if (diffMinutes < 60) return `${diffMinutes}분 전`;
@@ -1300,6 +1303,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const [today, setToday] = useState<Date | null>(null);
+  const [liveNowMs, setLiveNowMs] = useState(0);
   const [tab, setTab] = useState<ParentPortalTab>('home');
   const [currentCalendarDate, setCurrentCalendarDate] = useState<Date | null>(null);
 
@@ -1340,6 +1344,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     const syncToday = () => {
       const next = new Date();
+      setLiveNowMs(next.getTime());
       setToday((previous) => {
         if (previous && format(previous, 'yyyy-MM-dd') === format(next, 'yyyy-MM-dd')) {
           return previous;
@@ -2358,7 +2363,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const penaltyRecovery = useMemo(() => {
     const basePoints = Math.max(0, Math.round(Number(growth?.penaltyPoints || 0)));
-    const nowMs = Date.now();
+    const nowMs = liveNowMs;
     const latestPositiveLog = [...(penaltyLogs || [])]
       .filter((log) => Number(log.pointsDelta || 0) > 0)
       .sort((a, b) => {
@@ -2379,7 +2384,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       daysSinceLatestPositive,
       latestPositiveDateLabel: latestPositiveMs > 0 ? format(new Date(latestPositiveMs), 'yyyy.MM.dd', { locale: ko }) : '-',
     };
-  }, [growth?.penaltyPoints, penaltyLogs]);
+  }, [growth?.penaltyPoints, liveNowMs, penaltyLogs]);
   const latestPenaltyHighlight = useMemo(() => {
     const latestPenaltyLog = [...(penaltyLogs || [])]
       .filter((log) => Number(log.pointsDelta || 0) > 0)
@@ -2470,9 +2475,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       const timeStr = inTimePlan.title.split(': ')[1];
       if (timeStr) {
         try {
-          const now = new Date();
-          const scheduledTime = parse(timeStr, 'HH:mm', now);
-          if (isAfter(now, scheduledTime)) {
+          const nowDate = liveNowMs > 0 ? new Date(liveNowMs) : null;
+          if (!nowDate) {
+            return { label: '미입실 (입실 전)', color: 'bg-slate-100 text-slate-400 border-slate-200', icon: Clock };
+          }
+          const scheduledTime = parse(timeStr, 'HH:mm', nowDate);
+          if (isAfter(nowDate, scheduledTime)) {
             return { label: '지각 주의', color: 'bg-orange-50 text-[#FF7A16] border-orange-100', icon: AlertCircle };
           }
         } catch (e) {}
@@ -2480,7 +2488,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     }
 
     return { label: '미입실 (입실 전)', color: 'bg-slate-100 text-slate-400 border-slate-200', icon: Clock };
-  }, [attendanceCurrent, todayLog, todayPlans]);
+  }, [attendanceCurrent, liveNowMs, todayLog, todayPlans]);
 
   // 캘린더 데이터 생성
   const calendarData = useMemo(() => {
@@ -2531,7 +2539,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const announcementNotifications = useMemo<ParentNotificationItem[]>(() => {
-    const now = Date.now();
     return (rawCenterAnnouncements || [])
       .filter((item) => {
         const normalizedStatus = item?.status?.trim?.().toLowerCase();
@@ -2546,14 +2553,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           type: 'announcement',
           title: item?.title || '센터 공지사항',
           body: item?.body || '센터 공지 내용을 확인해 주세요.',
-          createdAtLabel: toRelativeLabel(item?.updatedAt || item?.createdAt),
+          createdAtLabel: toRelativeLabel(item?.updatedAt || item?.createdAt, liveNowMs),
           createdAtMs: timestamp,
-          isRead: now - timestamp >= 3 * 24 * 60 * 60 * 1000,
+          isRead: liveNowMs > 0 ? liveNowMs - timestamp >= 3 * 24 * 60 * 60 * 1000 : false,
           isImportant: false,
           category: 'general',
         };
       });
-  }, [rawCenterAnnouncements]);
+  }, [liveNowMs, rawCenterAnnouncements]);
 
   const notifications: ParentNotificationItem[] = useMemo(() => {
     if (remoteNotifications && remoteNotifications.length > 0) {
@@ -2562,7 +2569,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         type: item.type || 'weekly_report',
         title: item.title || '새 알림',
         body: item.body || '',
-        createdAtLabel: item.createdAtLabel || toRelativeLabel(item.createdAt),
+        createdAtLabel: item.createdAtLabel || toRelativeLabel(item.createdAt, liveNowMs),
         createdAtMs: toDateSafe(item.createdAt)?.getTime() || 0,
         isRead: !!item.isRead,
         isImportant: !!item.isImportant,
@@ -2578,7 +2585,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         type: attendanceCurrent.status === 'studying' ? 'check_in' : 'check_out',
         title: attendanceCurrent.status === 'studying' ? '등원 상태 확인' : '출결 상태 업데이트',
         body: attendanceStatus.label,
-        createdAtLabel: toRelativeLabel((attendanceCurrent as any).updatedAt),
+        createdAtLabel: toRelativeLabel((attendanceCurrent as any).updatedAt, liveNowMs),
         createdAtMs: toDateSafe((attendanceCurrent as any).updatedAt)?.getTime() || 0,
         isRead: false,
         isImportant: attendanceCurrent.status !== 'studying',
@@ -2591,7 +2598,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         type: 'weekly_report',
         title: '학습 리포트 도착',
         body: report.content,
-        createdAtLabel: toRelativeLabel((report as any).updatedAt || (report as any).createdAt),
+        createdAtLabel: toRelativeLabel((report as any).updatedAt || (report as any).createdAt, liveNowMs),
         createdAtMs: toDateSafe((report as any).updatedAt || (report as any).createdAt)?.getTime() || 0,
         isRead: !!report.viewedAt,
         isImportant: true,
@@ -2613,7 +2620,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     }
 
     return [...fallback, ...announcementNotifications];
-  }, [remoteNotifications, attendanceCurrent, attendanceStatus.label, report, recentPenaltyReasons, studentId, yesterdayKey, announcementNotifications]);
+  }, [remoteNotifications, attendanceCurrent, attendanceStatus.label, report, recentPenaltyReasons, studentId, yesterdayKey, announcementNotifications, liveNowMs]);
 
   const sortedNotifications = useMemo(() => {
     return [...notifications].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));

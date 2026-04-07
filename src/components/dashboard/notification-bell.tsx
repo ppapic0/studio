@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { collection, doc, limit, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -28,6 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { StudentNotification } from '@/lib/types';
 import { isAdminRole } from '@/lib/dashboard-access';
 
@@ -90,6 +91,15 @@ export function NotificationBell() {
   const isCenterAdminRole = isAdminRole(activeMembership?.role);
 
   const [selectedFeedback, setSelectedFeedback] = useState<StudentNotification | null>(null);
+  const [nowMs, setNowMs] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncNow = () => setNowMs(Date.now());
+    syncNow();
+    const intervalId = window.setInterval(syncNow, 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const reservationsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !isCenterAdminRole) return null;
@@ -143,7 +153,7 @@ export function NotificationBell() {
         }
       );
     } catch (error) {
-      console.error('mark feedback read failed', error);
+      logHandledClientIssue('[notification-bell] mark feedback read failed', error);
     }
   };
 
@@ -160,7 +170,7 @@ export function NotificationBell() {
         }
       );
     } catch (error) {
-      console.error('mark report read failed', error);
+      logHandledClientIssue('[notification-bell] mark report read failed', error);
     }
   };
 
@@ -190,7 +200,6 @@ export function NotificationBell() {
       payload: feedback,
     }));
 
-    const now = Date.now();
     const announcementItems: NotificationFeedItem[] = (studentAnnouncementRows || [])
       .filter((item) => {
         const normalizedStatus = item?.status?.trim?.().toLowerCase?.();
@@ -210,13 +219,13 @@ export function NotificationBell() {
           title: item?.title || '센터 공지사항',
           description: item?.body || '공지 내용을 확인해 주세요.',
           timestamp,
-          unread: now - timestamp < 3 * 24 * 60 * 60 * 1000,
+          unread: nowMs > 0 ? nowMs - timestamp < 3 * 24 * 60 * 60 * 1000 : false,
           link: '/dashboard/appointments/inquiries',
         };
       });
 
     return [...feedbackItems, ...announcementItems, ...reportItems].sort((a, b) => b.timestamp - a.timestamp).slice(0, 6);
-  }, [feedbacks, reports, studentAnnouncementRows]);
+  }, [feedbacks, nowMs, reports, studentAnnouncementRows]);
 
   const adminFeedItems = useMemo<AdminNotificationItem[]>(() => {
     if (!isCenterAdminRole) return [];
@@ -296,9 +305,10 @@ export function NotificationBell() {
   const hasNew = useMemo(() => {
     if (isCenterAdminRole) return adminFeedItems.some((item) => item.unread);
     if (studentFeedItems.some((item) => item.unread)) return true;
-    const now = Date.now();
-    return reports.some((report) => now - Math.max(toMillis(report.updatedAt), toMillis(report.createdAt)) < 24 * 60 * 60 * 1000);
-  }, [adminFeedItems, studentFeedItems, reports, isCenterAdminRole]);
+    return nowMs > 0
+      ? reports.some((report) => nowMs - Math.max(toMillis(report.updatedAt), toMillis(report.createdAt)) < 24 * 60 * 60 * 1000)
+      : false;
+  }, [adminFeedItems, studentFeedItems, reports, isCenterAdminRole, nowMs]);
 
   if (!activeMembership) {
     return (

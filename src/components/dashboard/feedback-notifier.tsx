@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { StudentNotification } from '@/lib/types';
 
 export function FeedbackNotifier() {
@@ -41,7 +42,7 @@ export function FeedbackNotifier() {
         }
       );
     } catch (error) {
-      console.error('feedback read state update failed', error);
+      logHandledClientIssue('[feedback-notifier] feedback read state update failed', error);
     }
   };
 
