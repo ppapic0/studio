@@ -34,6 +34,30 @@ export function isTeacherOrAdminRole(role?: string | null) {
   return normalizeMembershipRole(role) === 'teacher' || isAdminRole(role);
 }
 
+export function canReadSharedOps(role?: string | null) {
+  return isTeacherOrAdminRole(role);
+}
+
+export function canReadLeadOps(role?: string | null) {
+  return isTeacherOrAdminRole(role);
+}
+
+export function canReadFinance(role?: string | null) {
+  return isAdminRole(role);
+}
+
+export function canManageSettings(role?: string | null) {
+  return isAdminRole(role);
+}
+
+export function canManageStaff(role?: string | null) {
+  return isAdminRole(role);
+}
+
+export function canRunExports(role?: string | null) {
+  return isAdminRole(role);
+}
+
 export function resolveMembershipByRole(
   activeMembership: MembershipLike | null | undefined,
   memberships: MembershipLike[] | null | undefined,

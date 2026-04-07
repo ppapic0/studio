@@ -60,6 +60,7 @@ type UseCenterAdminHeatmapOptions = {
   isActive: boolean;
   selectedClass?: string;
   referenceDate?: Date | null;
+  includeFinancialSignals?: boolean;
   preloadedActiveMembers?: CenterMembership[] | null;
   preloadedActiveMembersLoading?: boolean;
   preloadedProgressList?: GrowthProgress[] | null;
@@ -156,6 +157,7 @@ export function useCenterAdminHeatmap({
   isActive,
   selectedClass = 'all',
   referenceDate,
+  includeFinancialSignals = true,
   preloadedActiveMembers,
   preloadedActiveMembersLoading = false,
   preloadedProgressList,
@@ -263,26 +265,30 @@ export function useCenterAdminHeatmap({
   const { data: todayAppointments, isLoading: appointmentsLoading } = useCollection<CounselingReservation>(appointmentsQuery, { enabled: isActive });
 
   const kpiQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isActive) return null;
+    if (!firestore || !centerId || !isActive || !includeFinancialSignals) return null;
     return query(
       collection(firestore, 'centers', centerId, 'kpiDaily'),
       where('date', '>=', historyStartKey),
       where('date', '<=', todayKey),
       orderBy('date', 'asc')
     );
-  }, [firestore, centerId, isActive, historyStartKey, todayKey]);
-  const { data: kpiHistory, isLoading: kpiLoading } = useCollection<KpiDaily>(kpiQuery, { enabled: isActive });
+  }, [firestore, centerId, includeFinancialSignals, isActive, historyStartKey, todayKey]);
+  const { data: kpiHistory, isLoading: kpiLoading } = useCollection<KpiDaily>(kpiQuery, {
+    enabled: isActive && includeFinancialSignals,
+  });
 
   const invoicesQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isActive) return null;
+    if (!firestore || !centerId || !isActive || !includeFinancialSignals) return null;
     return query(
       collection(firestore, 'centers', centerId, 'invoices'),
       where('cycleEndDate', '>=', Timestamp.fromDate(currentMonthStart)),
       where('cycleEndDate', '<=', Timestamp.fromDate(currentMonthEnd)),
       orderBy('cycleEndDate', 'desc')
     );
-  }, [firestore, centerId, currentMonthEnd, currentMonthStart, isActive]);
-  const { data: invoices, isLoading: invoicesLoading } = useCollection<Invoice>(invoicesQuery, { enabled: isActive });
+  }, [firestore, centerId, currentMonthEnd, currentMonthStart, includeFinancialSignals, isActive]);
+  const { data: invoices, isLoading: invoicesLoading } = useCollection<Invoice>(invoicesQuery, {
+    enabled: isActive && includeFinancialSignals,
+  });
 
   const [statsByDate, setStatsByDate] = useState<Record<string, DailyStudentStat[]>>({});
   const [statsLoading, setStatsLoading] = useState(false);
@@ -532,16 +538,20 @@ export function useCenterAdminHeatmap({
       ? clampHealth(100 - (consultationRequestCount30d / activeParents30d) * 100)
       : 85;
 
-    const latestKpi = (kpiHistory || [])[Math.max(0, (kpiHistory || []).length - 1)];
-    const billingSummary = sumInvoiceWindow(currentMonthInvoices);
-    const collectionRate = billingSummary.billed > 0
+    const latestKpi = includeFinancialSignals
+      ? (kpiHistory || [])[Math.max(0, (kpiHistory || []).length - 1)]
+      : null;
+    const billingSummary = includeFinancialSignals
+      ? sumInvoiceWindow(currentMonthInvoices)
+      : { billed: 0, collected: 0, arrears: 0 };
+    const collectionRate = includeFinancialSignals && billingSummary.billed > 0
       ? clampHealth((billingSummary.collected / billingSummary.billed) * 100)
       : 0;
-    const receivableHealth = billingSummary.billed > 0
+    const receivableHealth = includeFinancialSignals && billingSummary.billed > 0
       ? clampHealth(100 - (billingSummary.arrears / billingSummary.billed) * 100)
       : 100;
     const activeStudentCount = latestKpi?.activeStudentCount || totalStudents;
-    const breakevenStudents = latestKpi?.breakevenStudents ?? null;
+    const breakevenStudents = includeFinancialSignals ? (latestKpi?.breakevenStudents ?? null) : null;
 
     return {
       totalStudents,
@@ -567,6 +577,7 @@ export function useCenterAdminHeatmap({
     attendanceList,
     currentMonthInvoices,
     filteredMembers,
+    includeFinancialSignals,
     kpiHistory,
     parentActivityEvents,
     parentCommunications,
@@ -593,7 +604,9 @@ export function useCenterAdminHeatmap({
       const windowKeys = endIndex >= 6 ? historyKeys.slice(endIndex - 6, endIndex + 1) : historyKeys.slice(0, endIndex + 1);
       const windowStats = windowKeys.flatMap((key) => (statsByDate[key] || []).filter((row) => targetMemberIds.has(row.studentId)));
       const windowReports = windowKeys.flatMap((key) => (reportsByDate.get(key) || []).filter((row) => row?.status === 'sent'));
-      const windowKpis = windowKeys.map((key) => kpiByDate.get(key)).filter(Boolean) as KpiDaily[];
+      const windowKpis = includeFinancialSignals
+        ? (windowKeys.map((key) => kpiByDate.get(key)).filter(Boolean) as KpiDaily[])
+        : [];
       const isTodayPoint = dateKey === todayKey;
 
       const focusScores = filteredMembers.map((member) => {
@@ -701,7 +714,9 @@ export function useCenterAdminHeatmap({
       result.operational.push({ label: format(new Date(`${dateKey}T00:00:00`), 'M/d'), score: operationalScore });
       result.parent.push({ label: format(new Date(`${dateKey}T00:00:00`), 'M/d'), score: parentScore });
       result.risk.push({ label: format(new Date(`${dateKey}T00:00:00`), 'M/d'), score: riskScore });
-      result.billing.push({ label: format(new Date(`${dateKey}T00:00:00`), 'M/d'), score: billingScore });
+      if (includeFinancialSignals) {
+        result.billing.push({ label: format(new Date(`${dateKey}T00:00:00`), 'M/d'), score: billingScore });
+      }
       result.efficiency.push({ label: format(new Date(`${dateKey}T00:00:00`), 'M/d'), score: efficiencyScore });
     });
 
@@ -710,6 +725,7 @@ export function useCenterAdminHeatmap({
     displayKeys,
     filteredMembers,
     historyKeys,
+    includeFinancialSignals,
     kpiByDate,
     parentActivityEvents,
     parentCommunications,
@@ -735,7 +751,7 @@ export function useCenterAdminHeatmap({
     const awayHealth = scoreAwayHealth(summary.avgAwayMinutes);
     const breakevenHealth = scoreBreakevenHealth(summary.activeStudentCount, summary.breakevenStudents);
 
-    return [
+    const nextRows: CenterAdminHeatmapRow[] = [
       createHeatmapRow({
         id: 'operational',
         label: '운영 KPI',
@@ -824,6 +840,38 @@ export function useCenterAdminHeatmap({
         trend: trendByArea.risk,
       }),
       createHeatmapRow({
+        id: 'efficiency',
+        label: '운영 효율',
+        description: '리포트 발송, 코멘트 밀도, 외출시간 안정도를 운영 효율 관점으로 묶었습니다.',
+        metrics: [
+          createHeatmapMetric({
+            id: 'report-regularity',
+            label: '리포트 발송률',
+            value: formatPercent(summary.regularityRate),
+            score: summary.regularityRate,
+            hint: '오늘 발송이 필요한 학생 대비 발송 비율입니다.',
+          }),
+          createHeatmapMetric({
+            id: 'comment-density',
+            label: '코멘트 밀도',
+            value: formatPercent(summary.commentWriteRate),
+            score: summary.commentWriteRate,
+            hint: '충분히 구체적인 리포트 비중입니다.',
+          }),
+          createHeatmapMetric({
+            id: 'away-stability',
+            label: '외출시간 안정도',
+            value: formatMinutes(summary.avgAwayMinutes),
+            score: awayHealth,
+            hint: '외출/휴식 시간을 안정도 점수로 환산했습니다.',
+          }),
+        ],
+        trend: trendByArea.efficiency,
+      }),
+    ];
+
+    if (includeFinancialSignals) {
+      nextRows.splice(3, 0, createHeatmapRow({
         id: 'billing',
         label: '수납',
         description: '현재 월 수납률, 미수금 건전도, 손익분기 커버리지를 묶은 운영 수치입니다.',
@@ -855,38 +903,11 @@ export function useCenterAdminHeatmap({
           }),
         ],
         trend: trendByArea.billing,
-      }),
-      createHeatmapRow({
-        id: 'efficiency',
-        label: '운영 효율',
-        description: '리포트 발송, 코멘트 밀도, 외출시간 안정도를 운영 효율 관점으로 묶었습니다.',
-        metrics: [
-          createHeatmapMetric({
-            id: 'report-regularity',
-            label: '리포트 발송률',
-            value: formatPercent(summary.regularityRate),
-            score: summary.regularityRate,
-            hint: '오늘 발송이 필요한 학생 대비 발송 비율입니다.',
-          }),
-          createHeatmapMetric({
-            id: 'comment-density',
-            label: '코멘트 밀도',
-            value: formatPercent(summary.commentWriteRate),
-            score: summary.commentWriteRate,
-            hint: '충분히 구체적인 리포트 비중입니다.',
-          }),
-          createHeatmapMetric({
-            id: 'away-stability',
-            label: '외출시간 안정도',
-            value: formatMinutes(summary.avgAwayMinutes),
-            score: awayHealth,
-            hint: '외출/휴식 시간을 안정도 점수로 환산했습니다.',
-          }),
-        ],
-        trend: trendByArea.efficiency,
-      }),
-    ];
-  }, [summary, trendByArea]);
+      }));
+    }
+
+    return nextRows;
+  }, [includeFinancialSignals, summary, trendByArea]);
 
   const interventionSignals = useMemo<CenterAdminStudentSeatSignal[]>(() => {
     const nowMs = Date.now();
@@ -897,8 +918,8 @@ export function useCenterAdminHeatmap({
         const stat = todayStatsByStudentId.get(member.id);
         const progress = progressById.get(member.id);
         const studentReports = (reportsByStudentId.get(member.id) || []).filter((report) => report?.status === 'sent');
-        const latestInvoice = currentMonthInvoiceByStudentId.get(member.id);
-        const invoiceStatus: Invoice['status'] | 'none' = latestInvoice?.status ?? 'none';
+        const latestInvoice = includeFinancialSignals ? currentMonthInvoiceByStudentId.get(member.id) : null;
+        const invoiceStatus: Invoice['status'] | 'none' = includeFinancialSignals ? (latestInvoice?.status ?? 'none') : 'none';
         const parentEvents = parentEvents30dByStudentId.get(member.id) || [];
         const parentCommunicationsByStudent = parentCommunications30dByStudentId.get(member.id) || [];
         const appVisits = parentEvents.filter((event) => event.eventType === 'app_visit').length;
@@ -946,7 +967,7 @@ export function useCenterAdminHeatmap({
           stat ? scoreGrowthHealth(Number(stat.studyTimeGrowthRate || 0)) : 80,
         ]);
 
-        const billingScore = scoreStudentInvoiceHealth(invoiceStatus);
+        const billingScore = includeFinancialSignals ? scoreStudentInvoiceHealth(invoiceStatus) : 85;
 
         const efficiencyScore = averageHealth([
           scoreReportRegularity(studentReports, nowMs),
@@ -969,7 +990,7 @@ export function useCenterAdminHeatmap({
           invoiceStatus,
           currentAwayMinutes,
           status: seat?.status || 'absent',
-        });
+        }, { includeFinancialSignals });
         const baseSignal = {
           studentId: member.id,
           seatId: seat?.id || `virtual_${member.id}`,
@@ -994,7 +1015,7 @@ export function useCenterAdminHeatmap({
 
         return {
           ...baseSignal,
-          topReason: buildCenterAdminTopReason(baseSignal),
+          topReason: buildCenterAdminTopReason(baseSignal, { includeFinancialSignals }),
         };
       })
       .filter(Boolean) as CenterAdminStudentSeatSignal[];
@@ -1003,6 +1024,7 @@ export function useCenterAdminHeatmap({
     counselingTodayStudentIds,
     currentMonthInvoiceByStudentId,
     filteredMembers,
+    includeFinancialSignals,
     parentCommunications30dByStudentId,
     parentEvents30dByStudentId,
     progressById,
@@ -1026,14 +1048,18 @@ export function useCenterAdminHeatmap({
     [studentSignals]
   );
 
-  const seatOverlayLegend = useMemo<CenterAdminSeatOverlayLegend>(() => buildCenterAdminSeatLegend(), []);
+  const seatOverlayLegend = useMemo<CenterAdminSeatOverlayLegend>(
+    () => buildCenterAdminSeatLegend({ includeFinancialSignals }),
+    [includeFinancialSignals]
+  );
 
   const seatOverlaySummary = useMemo<CenterAdminSeatOverlaySummary>(
     () =>
       buildCenterAdminSeatOverlaySummary(
-        studentSignals.filter((signal) => selectedClass === 'all' || targetMemberIds.has(signal.studentId))
+        studentSignals.filter((signal) => selectedClass === 'all' || targetMemberIds.has(signal.studentId)),
+        { includeFinancialSignals }
       ),
-    [selectedClass, studentSignals, targetMemberIds]
+    [includeFinancialSignals, selectedClass, studentSignals, targetMemberIds]
   );
 
   const isLoading =
@@ -1044,8 +1070,8 @@ export function useCenterAdminHeatmap({
     parentEventsLoading ||
     parentCommunicationsLoading ||
     appointmentsLoading ||
-    kpiLoading ||
-    invoicesLoading ||
+    (includeFinancialSignals && kpiLoading) ||
+    (includeFinancialSignals && invoicesLoading) ||
     statsLoading;
 
   const weeklyStudyMinutesByStudent = useMemo(

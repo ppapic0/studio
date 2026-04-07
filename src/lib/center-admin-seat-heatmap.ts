@@ -83,6 +83,10 @@ export interface CenterAdminSeatOverlayPresentation {
   isDark: boolean;
 }
 
+type FinancialVisibilityOptions = {
+  includeFinancialSignals?: boolean;
+};
+
 type ScoreToneMeta = {
   surfaceClass: string;
   chipClass: string;
@@ -236,20 +240,26 @@ export function buildCenterAdminSecondaryFlags(params: {
   invoiceStatus: Invoice['status'] | 'none';
   currentAwayMinutes: number;
   status: AttendanceCurrent['status'];
-}) {
+}, options: FinancialVisibilityOptions = {}) {
   const { hasUnreadReport, hasCounselingToday, invoiceStatus, currentAwayMinutes, status } = params;
+  const includeFinancialSignals = options.includeFinancialSignals ?? true;
 
   return [
     hasUnreadReport ? '미열람' : null,
     hasCounselingToday ? '상담' : null,
-    invoiceStatus === 'issued' || invoiceStatus === 'overdue' ? '미수금' : null,
+    includeFinancialSignals && (invoiceStatus === 'issued' || invoiceStatus === 'overdue') ? '미수금' : null,
     currentAwayMinutes >= 20 ? '장기외출' : null,
     status === 'absent' ? '미입실' : null,
   ].filter(Boolean) as string[];
 }
 
-export function buildCenterAdminTopReason(signal: Omit<CenterAdminStudentSeatSignal, 'topReason'>) {
-  if (signal.invoiceStatus === 'overdue') {
+export function buildCenterAdminTopReason(
+  signal: Omit<CenterAdminStudentSeatSignal, 'topReason'>,
+  options: FinancialVisibilityOptions = {},
+) {
+  const includeFinancialSignals = options.includeFinancialSignals ?? true;
+
+  if (includeFinancialSignals && signal.invoiceStatus === 'overdue') {
     return '당월 수납이 overdue 상태라 재확인이 필요합니다.';
   }
   if (signal.hasCounselingToday) {
@@ -276,7 +286,10 @@ export function buildCenterAdminTopReason(signal: Omit<CenterAdminStudentSeatSig
   return '현재는 전반적으로 안정적인 운영 흐름을 유지하고 있습니다.';
 }
 
-export function buildCenterAdminSeatLegend(): CenterAdminSeatOverlayLegend {
+export function buildCenterAdminSeatLegend(
+  options: FinancialVisibilityOptions = {},
+): CenterAdminSeatOverlayLegend {
+  const includeFinancialSignals = options.includeFinancialSignals ?? true;
   return {
     composite: [
       { key: 'stable', label: '85+ 안정', tone: 'bg-emerald-500 text-white' },
@@ -308,12 +321,14 @@ export function buildCenterAdminSeatLegend(): CenterAdminSeatOverlayLegend {
       { key: 'watch', label: '관심 필요', tone: 'bg-amber-100 text-amber-700' },
       { key: 'risk', label: '개입 필요', tone: 'bg-rose-600 text-white' },
     ],
-    billing: [
-      { key: 'paid', label: '완납', tone: 'bg-emerald-500 text-white' },
-      { key: 'issued', label: '청구', tone: 'bg-amber-100 text-amber-700' },
-      { key: 'overdue', label: '연체', tone: 'bg-rose-600 text-white' },
-      { key: 'none', label: '중립', tone: 'bg-slate-100 text-slate-700' },
-    ],
+    billing: includeFinancialSignals
+      ? [
+          { key: 'paid', label: '완납', tone: 'bg-emerald-500 text-white' },
+          { key: 'issued', label: '청구', tone: 'bg-amber-100 text-amber-700' },
+          { key: 'overdue', label: '연체', tone: 'bg-rose-600 text-white' },
+          { key: 'none', label: '중립', tone: 'bg-slate-100 text-slate-700' },
+        ]
+      : [],
     efficiency: [
       { key: 'stable', label: '효율 안정', tone: 'bg-emerald-500 text-white' },
       { key: 'good', label: '양호', tone: 'bg-cyan-500 text-white' },
@@ -330,7 +345,9 @@ export function buildCenterAdminSeatLegend(): CenterAdminSeatOverlayLegend {
 
 export function buildCenterAdminSeatOverlaySummary(
   signals: CenterAdminStudentSeatSignal[],
+  options: FinancialVisibilityOptions = {},
 ): CenterAdminSeatOverlaySummary {
+  const includeFinancialSignals = options.includeFinancialSignals ?? true;
   return signals.reduce<CenterAdminSeatOverlaySummary>(
     (acc, signal) => {
       if (signal.compositeHealth >= 85) acc.healthyCount += 1;
@@ -339,7 +356,7 @@ export function buildCenterAdminSeatOverlaySummary(
 
       if (signal.hasUnreadReport) acc.unreadCount += 1;
       if (signal.hasCounselingToday) acc.counselingCount += 1;
-      if (signal.invoiceStatus === 'overdue') acc.overdueCount += 1;
+      if (includeFinancialSignals && signal.invoiceStatus === 'overdue') acc.overdueCount += 1;
       if (signal.currentAwayMinutes >= 20) acc.awayCount += 1;
       return acc;
     },
@@ -477,11 +494,15 @@ export function getCenterAdminDomainInsight(
 
 export function getCenterAdminDomainSummary(
   signal?: CenterAdminStudentSeatSignal | null,
+  options: FinancialVisibilityOptions = {},
 ): CenterAdminDomainSummaryItem[] {
   if (!signal) return [];
-  return (Object.keys(CENTER_ADMIN_SEAT_DOMAIN_LABELS) as CenterAdminSeatDomainKey[]).map((key) =>
+  const includeFinancialSignals = options.includeFinancialSignals ?? true;
+  return (Object.keys(CENTER_ADMIN_SEAT_DOMAIN_LABELS) as CenterAdminSeatDomainKey[])
+    .filter((key) => includeFinancialSignals || key !== 'billing')
+    .map((key) =>
     getCenterAdminDomainInsight(signal, key),
-  );
+    );
 }
 
 export function getCenterAdminSeatOverlayPresentation(params: {

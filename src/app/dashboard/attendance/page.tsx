@@ -53,6 +53,8 @@ import { deriveRequestOperationsSummary } from '@/lib/attendance-kpi';
 import { AttendanceKpiBoard } from '@/components/dashboard/attendance-kpi-board';
 import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
 import {
+  canManageSettings,
+  canReadFinance,
   isActiveMembershipStatus,
   isTeacherOrAdminRole,
   parseDateInputValue,
@@ -120,6 +122,8 @@ export default function AttendancePage() {
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const centerId = classroomMembership?.id;
   const isTeacherOrAdmin = Boolean(classroomMembership);
+  const canOpenSettings = canManageSettings(activeMembership?.role);
+  const canOpenFinance = canReadFinance(activeMembership?.role);
 
   // 1. 센터 모든 학생 조회
   const studentsQuery = useMemoFirebase(() => {
@@ -725,9 +729,9 @@ export default function AttendancePage() {
         description="오늘 출결, KPI, 신청 관리 화면을 같은 빠른 실행과 날짜 기준으로 이어서 봅니다."
         quickActions={[
           { label: '실시간 교실', icon: <UserCheck className="h-4 w-4" />, href: '/dashboard/teacher' },
-          { label: '문자 콘솔', icon: <ClipboardCheck className="h-4 w-4" />, href: '/dashboard/settings/notifications' },
+          ...(canOpenSettings ? [{ label: '문자 콘솔', icon: <ClipboardCheck className="h-4 w-4" />, href: '/dashboard/settings/notifications' }] : []),
           { label: '리드상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
-          { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
+          ...(canOpenFinance ? [{ label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }] : []),
           { label: '학생 관리', icon: <BarChart3 className="h-4 w-4" />, href: '/dashboard/teacher/students' },
         ]}
       >

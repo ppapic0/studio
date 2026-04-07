@@ -183,7 +183,6 @@ const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: st
   { value: 'penalty', label: '벌점' },
   { value: 'minutes', label: '학습' },
   { value: 'parent', label: '학부모' },
-  { value: 'billing', label: '수납' },
   { value: 'efficiency', label: '효율' },
   { value: 'status', label: '상태' },
 ];
@@ -246,6 +245,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   } = useCenterAdminHeatmap({
     centerId,
     isActive,
+    includeFinancialSignals: false,
     selectedClass,
   });
   const canAdjustPenalty =
@@ -890,7 +890,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [selectedSeat, seatSignalsBySeatId, studentSignalsByStudentId]);
 
   const selectedSeatDomainSummary = useMemo(
-    () => getCenterAdminDomainSummary(selectedSeatSignal),
+    () => getCenterAdminDomainSummary(selectedSeatSignal, { includeFinancialSignals: false }),
     [selectedSeatSignal]
   );
 
@@ -2100,7 +2100,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   { label: '위험', value: seatOverlaySummary.riskCount, tone: 'bg-rose-100 text-rose-700' },
                   { label: '미열람', value: seatOverlaySummary.unreadCount, tone: 'bg-sky-100 text-sky-700' },
                   { label: '상담', value: seatOverlaySummary.counselingCount, tone: 'bg-violet-100 text-violet-700' },
-                  { label: '연체', value: seatOverlaySummary.overdueCount, tone: 'bg-orange-100 text-orange-700' },
                   { label: '장기외출', value: seatOverlaySummary.awayCount, tone: 'bg-amber-100 text-amber-700' },
                 ].map((item) => (
                   <span

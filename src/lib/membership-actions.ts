@@ -5,7 +5,6 @@ import {
   writeBatch, 
   serverTimestamp, 
   Firestore,
-  Timestamp,
   getDoc,
 } from 'firebase/firestore';
 import { format, subDays, startOfDay } from 'date-fns';
@@ -76,7 +75,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     // 멤버십 정보
     batch.set(memberRef, {
       id: sUid, centerId, role: 'student', status: 'active', className: sInfo.class,
-      displayName: sInfo.name, joinedAt: timestamp, updatedAt: timestamp, monthlyFee: 390000
+      displayName: sInfo.name, joinedAt: timestamp, updatedAt: timestamp
     }, { merge: true });
 
     batch.set(userCenterRef, {
@@ -90,6 +89,16 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       id: sUid, name: sInfo.name, className: sInfo.class, schoolName: '트랙고등학교',
       grade: '3학년', seatNo: 0, targetDailyMinutes: 360, parentLinkCode: '123456',
       createdAt: timestamp, updatedAt: timestamp,
+    }, { merge: true });
+
+    const billingProfileRef = doc(db, 'centers', centerId, 'billingProfiles', sUid);
+    batch.set(billingProfileRef, {
+      id: sUid,
+      studentId: sUid,
+      centerId,
+      monthlyFee: 390000,
+      createdAt: timestamp,
+      updatedAt: timestamp,
     }, { merge: true });
 
     // 성장 지표 초기화

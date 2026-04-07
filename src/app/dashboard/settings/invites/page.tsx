@@ -44,7 +44,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { isAdminRole } from '@/lib/dashboard-access';
+import { canManageSettings } from '@/lib/dashboard-access';
 
 type InviteCode = {
   id: string;
@@ -62,7 +62,7 @@ export default function InviteCodesPage() {
   const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
-  const isAdmin = isAdminRole(activeMembership?.role);
+  const isAdmin = canManageSettings(activeMembership?.role);
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);

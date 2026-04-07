@@ -14,7 +14,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { addDays, format, startOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
-import { Invoice, KpiDaily, StudentProfile } from './types';
+import { BillingProfile, Invoice, KpiDaily, StudentProfile } from './types';
 import type { InvoiceTrackCategory } from './invoice-analytics';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -155,13 +155,18 @@ export async function syncDailyKpi(db: Firestore, centerId: string, dateStr: str
     where('status', '==', 'active')
   );
   const membersSnap = await getDocs(membersQuery);
+  const billingProfilesSnap = await getDocs(collection(db, `centers/${centerId}/billingProfiles`));
+  const billingProfilesByStudentId = new Map(
+    billingProfilesSnap.docs.map((docSnap) => [docSnap.id, { id: docSnap.id, ...(docSnap.data() as Omit<BillingProfile, 'id'>) }])
+  );
 
   let dailyAccruedRevenue = 0;
   let activeStudentCount = 0;
 
   membersSnap.docs.forEach((doc) => {
     const data = doc.data();
-    const monthlyFee = data.monthlyFee || 390000;
+    const billingProfile = billingProfilesByStudentId.get(doc.id);
+    const monthlyFee = billingProfile?.monthlyFee || data.monthlyFee || 390000;
     // 28일 기준 일할 계산
     dailyAccruedRevenue += Math.floor(monthlyFee / 28);
     activeStudentCount++;

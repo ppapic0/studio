@@ -46,6 +46,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { CenterMembership, StudentProfile } from '@/lib/types';
+import { canManageSettings } from '@/lib/dashboard-access';
 
 type SessionDoc = {
   id: string;
@@ -74,6 +75,7 @@ export default function SessionCorrectionPage() {
   const firestore = useFirestore();
   const { activeMembership, memberships } = useAppContext();
   const { toast } = useToast();
+  const isSettingsManager = canManageSettings(activeMembership?.role);
 
   const centerId = useMemoFirebase(
     () =>
@@ -96,18 +98,18 @@ export default function SessionCorrectionPage() {
 
   // 학생 목록
   const studentsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isSettingsManager) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'),
       where('role', '==', 'student'),
       where('status', '==', 'active')
     );
-  }, [firestore, centerId]);
-  const { data: studentMembers } = useCollection<CenterMembership>(studentsQuery);
+  }, [firestore, centerId, isSettingsManager]);
+  const { data: studentMembers } = useCollection<CenterMembership>(studentsQuery, { enabled: isSettingsManager });
 
   const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
   useEffect(() => {
-    if (!firestore || !centerId || !studentMembers?.length) return;
+    if (!firestore || !centerId || !isSettingsManager || !studentMembers?.length) return;
     void (async () => {
       const profiles = await Promise.all(
         studentMembers.map(async (m) => {
@@ -118,7 +120,15 @@ export default function SessionCorrectionPage() {
       );
       setStudentProfiles(profiles.filter(Boolean) as StudentProfile[]);
     })();
-  }, [firestore, centerId, studentMembers]);
+  }, [firestore, centerId, isSettingsManager, studentMembers]);
+
+  if (!isSettingsManager) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <p className="font-bold text-muted-foreground">센터 관리자만 세션 보정 화면에 접근할 수 있습니다.</p>
+      </div>
+    );
+  }
 
   const filtered = studentProfiles.filter((s) =>
     !search || s.name.includes(search) || s.grade?.includes(search)

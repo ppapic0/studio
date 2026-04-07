@@ -57,6 +57,7 @@ export interface CenterMembership {
   className?: string;
   phoneNumber?: string;
   linkedStudentIds?: string[];
+  // Legacy read compatibility only. New writes go to billingProfiles.
   monthlyFee?: number;
   baseFee?: number;
   tutoringDiscount?: boolean;
@@ -137,6 +138,7 @@ export interface StudentProfile {
   createdAt: Timestamp;
   parentLinkCode?: string;
   expectedArrivalTime?: string;
+  // Legacy read compatibility only. New writes go to billingProfiles.
   monthlyFee?: number;
   currentEnrollment?: {
     productId: string;
@@ -157,6 +159,24 @@ export interface StudentProfile {
   studyPlannerDiagnostic?: StudyPlannerDiagnosticRecord;
   routineSocialProfile?: RoutineSocialProfile;
   savedRoutineTemplates?: RoutineTemplateSave[];
+}
+
+export interface BillingProfile {
+  id: string;
+  studentId: string;
+  centerId: string;
+  monthlyFee?: number;
+  baseFee?: number;
+  tutoringDiscount?: boolean;
+  siblingDiscount?: boolean;
+  currentEnrollment?: {
+    productId: string;
+    season: 'semester' | 'vacation';
+    studentType: 'student' | 'n_student';
+    cycleStartDate: Timestamp;
+  };
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export type ScheduleSubjectKey = '국어' | '수학' | '영어' | '탐구';

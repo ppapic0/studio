@@ -28,7 +28,7 @@ import {
 import { useCollection, useFirestore } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import type { CenterMembership, DailyStudentStat, GrowthProgress, Invoice, PaymentRecord } from '@/lib/types';
+import type { BillingProfile, CenterMembership, DailyStudentStat, GrowthProgress, Invoice, PaymentRecord } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
   analyzeStudentRisk,
@@ -588,6 +588,12 @@ export function RiskIntelligence() {
   }, [firestore, centerId, isExecutiveViewer]);
   const { data: payments } = useCollection<PaymentRecord>(paymentsQuery, { enabled: isExecutiveViewer });
 
+  const billingProfilesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isExecutiveViewer) return null;
+    return collection(firestore, 'centers', centerId, 'billingProfiles');
+  }, [firestore, centerId, isExecutiveViewer]);
+  const { data: billingProfiles } = useCollection<BillingProfile>(billingProfilesQuery, { enabled: isExecutiveViewer });
+
   useEffect(() => {
     let disposed = false;
     if (!firestore || !centerId || !members || members.length === 0) {
@@ -634,6 +640,10 @@ export function RiskIntelligence() {
 
   const invoiceSummaryByStudent = useMemo(() => buildInvoiceSummary(invoices ?? undefined), [invoices]);
   const recentCollectedAmount30d = useMemo(() => summarizePayment30d(payments ?? undefined), [payments]);
+  const billingProfilesByStudent = useMemo(
+    () => new Map((billingProfiles || []).map((profile) => [profile.studentId || profile.id, profile])),
+    [billingProfiles]
+  );
 
   const riskAnalyses = useMemo(() => {
     if (!members) return [];
@@ -678,6 +688,7 @@ export function RiskIntelligence() {
         }
 
         const invoiceSummary = invoiceSummaryByStudent.get(member.id);
+        const billingProfile = billingProfilesByStudent.get(member.id);
 
         return analyzeStudentRisk(
           {
@@ -708,13 +719,13 @@ export function RiskIntelligence() {
           },
           {
             latestInvoiceAmount: invoiceSummary?.latestInvoiceAmount,
-            monthlyFee: member.monthlyFee,
+            monthlyFee: isExecutiveViewer ? (billingProfile?.monthlyFee ?? member.monthlyFee) : undefined,
             outstandingAmount: invoiceSummary?.outstandingAmount,
           },
         );
       })
       .sort((a, b) => b.dimensions.overall - a.dimensions.overall);
-  }, [invoiceSummaryByStudent, members, progressList, recentStudyByStudent, todayKey, todayStats]);
+  }, [billingProfilesByStudent, invoiceSummaryByStudent, isExecutiveViewer, members, progressList, recentStudyByStudent, todayKey, todayStats]);
 
   const summary = useMemo(() => buildExecutiveRiskSummary(riskAnalyses), [riskAnalyses]);
 

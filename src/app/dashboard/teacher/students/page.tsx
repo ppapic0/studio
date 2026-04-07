@@ -79,7 +79,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
-import { isTeacherOrAdminRole } from '@/lib/dashboard-access';
+import { canManageSettings, canManageStaff, canReadFinance, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 
 function resolveCallableErrorMessage(error: any, fallback: string): string {
   const detailMessage =
@@ -167,6 +167,9 @@ export default function StudentListPage() {
 
   const centerId = activeMembership?.id;
   const isTeacherOrAdmin = isTeacherOrAdminRole(activeMembership?.role);
+  const canManageStudentAccounts = canManageStaff(activeMembership?.role);
+  const canOpenFinance = canReadFinance(activeMembership?.role);
+  const canOpenSettings = canManageSettings(activeMembership?.role);
   const canViewRiskPanel = isTeacherOrAdmin;
   const [showRiskPanel, setShowRiskPanel] = useState(false);
 
@@ -814,10 +817,12 @@ export default function StudentListPage() {
         ]}
         selectLabel="반 필터"
         quickActions={[
-          { label: '신규 가입', icon: <UserPlus className="h-4 w-4" />, onClick: () => setIsAddModalOpen(true) },
+          ...(canManageStudentAccounts ? [{ label: '신규 가입', icon: <UserPlus className="h-4 w-4" />, onClick: () => setIsAddModalOpen(true) }] : []),
           { label: '리드상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
-          { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
-          { label: '문자 보내기', icon: <ChevronRight className="h-4 w-4" />, href: '/dashboard/settings/notifications' },
+          ...(canOpenFinance ? [{ label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }] : []),
+          ...(canOpenSettings
+            ? [{ label: '문자 보내기', icon: <ChevronRight className="h-4 w-4" />, href: '/dashboard/settings/notifications' }]
+            : [{ label: '상담/소통', icon: <ChevronRight className="h-4 w-4" />, href: '/dashboard/appointments' }]),
           { label: '출결 이동', icon: <UserCheck className="h-4 w-4" />, href: '/dashboard/attendance' },
         ]}
       >
@@ -920,7 +925,7 @@ export default function StudentListPage() {
                       </Button>
                     </div>
 
-                    {statusTab === 'withdrawn' && (
+                    {statusTab === 'withdrawn' && canManageStudentAccounts && (
                       <div className="mt-4 pt-4 border-t border-dashed border-rose-100">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

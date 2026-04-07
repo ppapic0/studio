@@ -2,9 +2,12 @@ import 'server-only';
 
 import { adminDb } from '@/lib/firebase-admin';
 import {
+  canManageSettings,
+  canReadFinance,
+  canReadLeadOps,
+  canReadSharedOps,
   isActiveMembershipStatus,
   isAdminRole,
-  isTeacherOrAdminRole,
   resolveMembershipByRole,
 } from '@/lib/dashboard-access';
 
@@ -16,27 +19,39 @@ type DashboardMembership = {
   linkedStudentIds?: unknown;
 };
 
-type DashboardRouteAccess = 'any' | 'teacherOrAdmin' | 'adminOnly';
+type DashboardRouteAccess = 'any' | 'sharedOps' | 'leadOps' | 'finance' | 'settings';
 
 const DASHBOARD_ACCESS_RULES: Array<{
   access: DashboardRouteAccess;
   matcher: (pathname: string) => boolean;
 }> = [
   {
-    access: 'adminOnly',
+    access: 'finance',
     matcher: (pathname) =>
-      pathname.startsWith('/dashboard/revenue') ||
+      pathname.startsWith('/dashboard/revenue') || pathname.startsWith('/dashboard/analytics'),
+  },
+  {
+    access: 'settings',
+    matcher: (pathname) =>
       pathname.startsWith('/dashboard/settings'),
   },
   {
-    access: 'teacherOrAdmin',
+    access: 'leadOps',
+    matcher: (pathname) =>
+      pathname.startsWith('/dashboard/leads'),
+  },
+  {
+    access: 'sharedOps',
     matcher: (pathname) =>
       pathname === '/kiosk' ||
       pathname.startsWith('/dashboard/kiosk') ||
       pathname.startsWith('/dashboard/teacher') ||
       pathname.startsWith('/dashboard/attendance') ||
+      pathname.startsWith('/dashboard/analysis') ||
       pathname.startsWith('/dashboard/reports') ||
-      pathname.startsWith('/dashboard/leads'),
+      pathname.startsWith('/dashboard/student-reports') ||
+      pathname.startsWith('/dashboard/study-history') ||
+      pathname.startsWith('/dashboard/appointments'),
   },
 ];
 
@@ -104,25 +119,46 @@ export function canAccessDashboardPath(
 
   const defaultMembership = resolveDefaultDashboardMembership(memberships);
 
-  if (access === 'adminOnly') {
+  if (access === 'settings') {
     return Boolean(
       resolveMembershipByRole(
         defaultMembership,
         memberships,
         (membership) =>
-          isAdminRole(membership.role) && isActiveMembershipStatus(membership.status)
+          canManageSettings(membership.role) && isActiveMembershipStatus(membership.status)
       )
     );
   }
 
-  if (access === 'teacherOrAdmin') {
+  if (access === 'finance') {
     return Boolean(
       resolveMembershipByRole(
         defaultMembership,
         memberships,
         (membership) =>
-          isTeacherOrAdminRole(membership.role) &&
-          isActiveMembershipStatus(membership.status)
+          canReadFinance(membership.role) && isActiveMembershipStatus(membership.status)
+      )
+    );
+  }
+
+  if (access === 'leadOps') {
+    return Boolean(
+      resolveMembershipByRole(
+        defaultMembership,
+        memberships,
+        (membership) =>
+          canReadLeadOps(membership.role) && isActiveMembershipStatus(membership.status)
+      )
+    );
+  }
+
+  if (access === 'sharedOps') {
+    return Boolean(
+      resolveMembershipByRole(
+        defaultMembership,
+        memberships,
+        (membership) =>
+          canReadSharedOps(membership.role) && isActiveMembershipStatus(membership.status)
       )
     );
   }

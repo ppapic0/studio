@@ -30,8 +30,10 @@ import {
 import { format } from 'date-fns';
 
 import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
+import { canManageStaff, canReadFinance } from '@/lib/dashboard-access';
 import { cn } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
@@ -271,7 +273,10 @@ export function MarketingConsultingCRM({
 }) {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { activeMembership } = useAppContext();
   const { toast } = useToast();
+  const canOpenFinance = canReadFinance(activeMembership?.role);
+  const canDeleteOpsRecords = canManageStaff(activeMembership?.role);
 
   const [activeTab, setActiveTab] = useState<'leads' | 'waitlist'>('leads');
   const [form, setForm] = useState<LeadFormState>(INITIAL_FORM);
@@ -587,7 +592,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleDelete = async (leadId: string) => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canDeleteOpsRecords) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'consultingLeads', leadId));
       if (editingId === leadId) resetForm();
@@ -625,7 +630,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleWebsiteDelete = async (requestId: string) => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canDeleteOpsRecords) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', requestId));
       toast({ title: '웹 상담 접수가 삭제되었습니다.' });
@@ -827,7 +832,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleWaitlistDelete = async (entryId: string, sourceLeadId?: string) => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canDeleteOpsRecords) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'admissionWaitlist', entryId));
       if (sourceLeadId) {
@@ -1351,7 +1356,7 @@ export function MarketingConsultingCRM({
               quickActions={[
                 { label: editingId ? '입력 초기화' : '상담 리드 등록', icon: <PlusCircle className="h-4 w-4" />, onClick: resetForm },
                 { label: '입학 대기 DB', icon: <ListChecks className="h-4 w-4" />, onClick: () => setActiveTab('waitlist') },
-                { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
+                ...(canOpenFinance ? [{ label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }] : []),
                 { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
               ]}
             />
@@ -1495,15 +1500,17 @@ export function MarketingConsultingCRM({
                               {waitlistButtonLabel}
                             </Button>
                           )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
-                            onClick={() => handleDelete(lead.id)}
-                          >
-                            <Trash2 className="mr-1 h-3.5 w-3.5" />
-                            삭제
-                          </Button>
+                          {canDeleteOpsRecords ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
+                              onClick={() => handleDelete(lead.id)}
+                            >
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                              삭제
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                     </CardContent>
@@ -1663,7 +1670,7 @@ export function MarketingConsultingCRM({
               selectLabel="대기 상태"
               quickActions={[
                 { label: '상담 리드 탭', icon: <Users className="h-4 w-4" />, onClick: () => setActiveTab('leads') },
-                { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
+                ...(canOpenFinance ? [{ label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }] : []),
                 { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
               ]}
             >
@@ -1776,15 +1783,17 @@ export function MarketingConsultingCRM({
                               ))}
                             </SelectContent>
                           </Select>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
-                            onClick={() => handleWaitlistDelete(entry.id, entry.sourceLeadId)}
-                          >
-                            <Trash2 className="mr-1 h-3.5 w-3.5" />
-                            삭제
-                          </Button>
+                          {canDeleteOpsRecords ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
+                              onClick={() => handleWaitlistDelete(entry.id, entry.sourceLeadId)}
+                            >
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                              삭제
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                     </CardContent>
@@ -1929,14 +1938,16 @@ export function MarketingConsultingCRM({
                       {promotingWebsiteId === selectedWebsiteRequest.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       {selectedWebsiteRequest.linkedLeadId ? '리드 이동됨' : '리드 DB로 이동'}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-10 rounded-xl font-black text-rose-600"
-                      onClick={() => void handleWebsiteDelete(selectedWebsiteRequest.id)}
-                    >
-                      삭제
-                    </Button>
+                    {canDeleteOpsRecords ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-xl font-black text-rose-600"
+                        onClick={() => void handleWebsiteDelete(selectedWebsiteRequest.id)}
+                      >
+                        삭제
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </>
@@ -1984,14 +1995,16 @@ export function MarketingConsultingCRM({
                         {WAITLIST_STATUS_META[status].label}
                       </Button>
                     ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-10 rounded-xl font-black text-rose-600"
-                      onClick={() => void handleWaitlistDelete(selectedWaitlistEntry.id, selectedWaitlistEntry.sourceLeadId)}
-                    >
-                      삭제
-                    </Button>
+                    {canDeleteOpsRecords ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-xl font-black text-rose-600"
+                        onClick={() => void handleWaitlistDelete(selectedWaitlistEntry.id, selectedWaitlistEntry.sourceLeadId)}
+                      >
+                        삭제
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </>

@@ -166,52 +166,63 @@ service cloud.firestore {
           || (isSignedIn() && request.auth.uid == memberId)
           || (isActiveMember(centerId) && resource.data.role in ['teacher', 'centerAdmin', 'owner'])
           || (isStudent(centerId) && resource.data.role == 'student' && isActiveStatus(resource.data.status));
-        allow write: if isCenterAdmin(centerId);
+        allow create, update, delete: if isCenterAdmin(centerId);
       }
 
       match /students/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && request.auth.uid == studentId)
           || isLinkedParent(centerId, studentId);
-        allow write: if isTeacherOrAdmin(centerId);
+        allow create, update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /growthProgress/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
           || isSelfStudent(studentId)
           || isLinkedParent(centerId, studentId);
-        allow write: if isTeacherOrAdmin(centerId)
+        allow create, update: if isTeacherOrAdmin(centerId)
           || isSelfCenterMember(centerId, studentId);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /attendanceCurrent/{seatId} {
         allow read: if isActiveMember(centerId);
-        allow write: if isTeacherOrAdmin(centerId)
+        allow create: if isTeacherOrAdmin(centerId)
           || (isSignedIn()
               && isSelfCenterMember(centerId, request.auth.uid)
-              && (resource.data.studentId == request.auth.uid || request.resource.data.studentId == request.auth.uid));
+              && request.resource.data.studentId == request.auth.uid);
+        allow update: if isTeacherOrAdmin(centerId)
+          || (isSignedIn()
+              && isSelfCenterMember(centerId, request.auth.uid)
+              && ((resource.data.studentId != null && resource.data.studentId == request.auth.uid)
+                || (request.resource.data.studentId != null && request.resource.data.studentId == request.auth.uid)));
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /studyLogs/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
           || isSelfCenterMember(centerId, studentId)
           || isLinkedParent(centerId, studentId);
-        allow write: if isTeacherOrAdmin(centerId)
+        allow create, update: if isTeacherOrAdmin(centerId)
           || isSelfCenterMember(centerId, studentId);
+        allow delete: if isCenterAdmin(centerId);
 
         match /days/{dateKey} {
           allow read: if isTeacherOrAdmin(centerId)
             || isSelfCenterMember(centerId, studentId)
             || isLinkedParent(centerId, studentId);
-          allow write: if isTeacherOrAdmin(centerId)
+          allow create, update: if isTeacherOrAdmin(centerId)
             || isSelfCenterMember(centerId, studentId);
+          allow delete: if isCenterAdmin(centerId);
 
           match /sessions/{sessionId} {
             allow read: if isTeacherOrAdmin(centerId)
               || isSelfCenterMember(centerId, studentId)
               || isLinkedParent(centerId, studentId);
-            allow write: if isTeacherOrAdmin(centerId)
+            allow create, update: if isTeacherOrAdmin(centerId)
               || isSelfCenterMember(centerId, studentId);
+            allow delete: if isCenterAdmin(centerId);
           }
         }
       }
@@ -220,8 +231,9 @@ service cloud.firestore {
         allow read: if isTeacherOrAdmin(centerId)
           || isSelfCenterMember(centerId, studentId)
           || isLinkedParent(centerId, studentId);
-        allow write: if isTeacherOrAdmin(centerId)
+        allow create, update: if isTeacherOrAdmin(centerId)
           || isSelfCenterMember(centerId, studentId);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /parentAiCache/{studentId}/days/{dateKey} {
@@ -233,15 +245,52 @@ service cloud.firestore {
         allow read: if isTeacherOrAdmin(centerId)
           || isSelfCenterMember(centerId, studentId)
           || isLinkedParent(centerId, studentId);
-        allow write: if isTeacherOrAdmin(centerId)
+        allow create, update: if isTeacherOrAdmin(centerId)
           || (isSelfCenterMember(centerId, studentId)
               && request.resource.data.studentId == request.auth.uid
               && request.resource.data.centerId == centerId);
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /classroomSignals/{dateKey} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /attendanceRecords/{dateKey}/students/{studentId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || isSelfCenterMember(centerId, studentId)
+          || isLinkedParent(centerId, studentId);
+        allow create, update: if isTeacherOrAdmin(centerId)
+          || (isSelfCenterMember(centerId, studentId)
+              && request.resource.data.studentId == request.auth.uid
+              && request.resource.data.dateKey == dateKey
+              && request.resource.data.centerId == centerId);
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /attendanceDailyStats/{dateKey}/students/{studentId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || isSelfCenterMember(centerId, studentId)
+          || isLinkedParent(centerId, studentId);
+        allow create, update: if isTeacherOrAdmin(centerId)
+          || (isSelfCenterMember(centerId, studentId)
+              && request.resource.data.studentId == request.auth.uid
+              && request.resource.data.dateKey == dateKey
+              && request.resource.data.centerId == centerId);
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /attendanceEvents/{eventId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid);
+        allow create, update: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && request.resource.data.studentId == request.auth.uid);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /kpiDaily/{dateKey} {
-        allow read: if isTeacherOrAdmin(centerId);
-        allow write: if isCenterAdmin(centerId);
+        allow read, write: if isCenterAdmin(centerId);
       }
 
       match /invoices/{invoiceId} {
@@ -257,6 +306,11 @@ service cloud.firestore {
           || isLinkedParentFromResource(centerId);
         allow write: if isCenterAdmin(centerId);
       }
+
+      match /billingProfiles/{studentId} {
+        allow read, write: if isCenterAdmin(centerId);
+      }
+
       match /dailyReports/{reportId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
@@ -274,7 +328,8 @@ service cloud.firestore {
       match /centerAnnouncements/{announcementId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isSignedIn() && (hasMembership(centerId) || hasUserCenter(centerId)));
-        allow create, update, delete: if isTeacherOrAdmin(centerId);
+        allow create, update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /counselingReservations/{resId} {
@@ -294,7 +349,8 @@ service cloud.firestore {
         allow read: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
           || isLinkedParentFromResource(centerId);
-        allow write: if isTeacherOrAdmin(centerId);
+        allow create, update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /attendanceRequests/{reqId} {
@@ -312,7 +368,8 @@ service cloud.firestore {
           || isLinkedParentFromResource(centerId);
         allow create: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && request.resource.data.studentId == request.auth.uid);
-        allow update, delete: if isTeacherOrAdmin(centerId);
+        allow update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /parentNotifications/{notificationId} {
@@ -362,36 +419,55 @@ service cloud.firestore {
       }
 
       match /consultingLeads/{leadId} {
-        allow read, write: if isTeacherOrAdmin(centerId);
+        allow read: if isTeacherOrAdmin(centerId);
+        allow create, update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /admissionWaitlist/{entryId} {
-        allow read, write: if isTeacherOrAdmin(centerId);
+        allow read: if isTeacherOrAdmin(centerId);
+        allow create, update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /websiteConsultRequests/{reqId} {
-        allow read, write: if isTeacherOrAdmin(centerId);
+        allow read: if isTeacherOrAdmin(centerId);
+        allow create, update: if isTeacherOrAdmin(centerId);
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /websiteEntryEvents/{eventId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /smsDeliveryLogs/{logId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
       }
 
       match /settings/{settingId} {
-        allow read: if isCenterAdmin(centerId);
-        allow write: if isCenterAdmin(centerId);
+        allow read, write: if isCenterAdmin(centerId);
       }
 
       match /settingsPrivate/{settingId} {
         allow read, write: if false;
       }
 
+      match /integrations/{integrationId} {
+        allow read, write: if isCenterAdmin(centerId);
+      }
+
       match /leaderboards/{boardId}/entries/{entryId} {
         allow read: if isActiveMember(centerId);
-        allow write: if isCenterAdmin(centerId)
+        allow create, update: if isCenterAdmin(centerId)
           || (isSelfCenterMember(centerId, entryId)
               && request.resource.data.studentId == request.auth.uid);
+        allow delete: if isCenterAdmin(centerId);
       }
 
       match /{document=**} {
-        allow read: if isTeacherOrAdmin(centerId);
-        allow write: if isCenterAdmin(centerId);
+        allow read, write: if isCenterAdmin(centerId);
       }
     }
   }

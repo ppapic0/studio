@@ -21,7 +21,7 @@ import {
 import { useCollection, useDoc, useFirestore, useFunctions, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
-import { isAdminRole } from '@/lib/dashboard-access';
+import { canManageSettings } from '@/lib/dashboard-access';
 import type { NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
@@ -505,7 +505,7 @@ export default function NotificationSettingsPage() {
   const isMobile = viewMode === 'mobile';
 
   const centerId = activeMembership?.id;
-  const isAdmin = isAdminRole(activeMembership?.role);
+  const isAdmin = canManageSettings(activeMembership?.role);
 
   const [form, setForm] = useState(DEFAULT_FORM);
   const [smsApiKeyInput, setSmsApiKeyInput] = useState('');

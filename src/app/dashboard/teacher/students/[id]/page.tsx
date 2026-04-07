@@ -34,6 +34,7 @@ import {
   buildStartEndInsight,
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
+import { canManageSettings, canManageStaff, canReadFinance } from '@/lib/dashboard-access';
 import { StudentOperationsGraphBoard, type StudentOperationsTimelinePoint } from '@/components/dashboard/student-operations-graph-board';
 import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
 
@@ -454,10 +455,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const todayKey = format(today, 'yyyy-MM-dd');
   const periodKey = format(today, 'yyyy-MM');
 
-  const isAdmin = activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
   const isStudentSelfView = activeMembership?.role === 'student';
-  const canEditStudentInfo = !isStudentSelfView && (isAdmin || activeMembership?.role === 'teacher');
-  const canEditGrowthData = !isStudentSelfView && isAdmin;
+  const canManageStudentAccounts = !isStudentSelfView && canManageStaff(activeMembership?.role);
+  const canViewFinance = !isStudentSelfView && canReadFinance(activeMembership?.role);
+  const canOpenSettings = !isStudentSelfView && canManageSettings(activeMembership?.role);
+  const canEditStudentInfo = !isStudentSelfView && (canManageStudentAccounts || activeMembership?.role === 'teacher');
+  const canEditGrowthData = canManageStudentAccounts;
   const canWriteCounseling = !isStudentSelfView && canEditStudentInfo;
   const backHref = isStudentSelfView ? '/dashboard/analysis' : '/dashboard/teacher/students';
 
@@ -576,10 +579,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const { data: attendanceRequestsRaw } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: !!centerId });
 
   const invoicesQuery = useMemoFirebase(
-    () => (!firestore || !centerId || !isAdmin ? null : query(collection(firestore, 'centers', centerId, 'invoices'), where('studentId', '==', studentId), limit(120))),
-    [firestore, centerId, studentId, isAdmin]
+    () => (!firestore || !centerId || !canViewFinance ? null : query(collection(firestore, 'centers', centerId, 'invoices'), where('studentId', '==', studentId), limit(120))),
+    [firestore, centerId, studentId, canViewFinance]
   );
-  const { data: invoicesRaw } = useCollection<Invoice>(invoicesQuery, { enabled: !!centerId && isAdmin });
+  const { data: invoicesRaw } = useCollection<Invoice>(invoicesQuery, { enabled: !!centerId && canViewFinance });
 
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
@@ -1304,7 +1307,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           key: 'guardian',
           title: '리포트 미열람 보호자 후속 연락',
           detail: '최근 발송 리포트가 읽히지 않았습니다. 문자나 상담 연결이 필요합니다.',
-          href: '/dashboard/settings/notifications',
+          href: canOpenSettings ? '/dashboard/settings/notifications' : '/dashboard/appointments',
           accent: 'bg-violet-100 text-violet-700',
         }
       : null,
@@ -1317,7 +1320,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           accent: 'bg-sky-100 text-sky-700',
         }
       : null,
-    isAdmin && outstandingAmount > 0
+    canViewFinance && outstandingAmount > 0
       ? {
           key: 'billing',
           title: '수납 상태 점검',
@@ -1357,7 +1360,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       helper: `요청 ${pendingAttendanceRequestsCount}건 · 벌점로그 ${recentPenaltyCount30d}건`,
       tone: 'border-rose-100 bg-rose-50/70 text-rose-700',
     },
-    ...(isAdmin
+    ...(canViewFinance
       ? [
           {
             key: 'billing',
@@ -1429,7 +1432,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       if (request.type === 'absence' && request.status === 'approved') addNumberMapValue(approvedAbsenceByDate, dateKey);
     });
 
-    if (isAdmin) {
+    if (canViewFinance) {
       invoices.forEach((invoice) => {
         const dateKey =
           timestampToDateKey(invoice.updatedAt)
@@ -1521,7 +1524,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     penaltyLogs,
     attendanceRequests,
     invoices,
-    isAdmin,
+    canViewFinance,
     fullSeries,
     todayKey,
     attendanceCurrent?.status,
@@ -1563,7 +1566,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         className: editForm.className || null,
       };
 
-      if (isAdmin) {
+      if (canManageStudentAccounts) {
         payload.memberStatus = editForm.memberStatus;
       }
 
@@ -1571,7 +1574,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         payload.parentLinkCode = normalizedParentLinkCode || null;
       }
 
-      if (isAdmin && editForm.password.length >= 6) {
+      if (canManageStudentAccounts && editForm.password.length >= 6) {
         payload.password = editForm.password;
       }
 
@@ -2085,7 +2088,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           )}
           {!isStudentSelfView && (
             <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-              <Link href="/dashboard/settings/notifications"><MessageSquare className="h-4 w-4" /> 문자 보내기</Link>
+              <Link href={canOpenSettings ? '/dashboard/settings/notifications' : '/dashboard/appointments'}>
+                <MessageSquare className="h-4 w-4" /> {canOpenSettings ? '문자 보내기' : '상담/소통'}
+              </Link>
             </Button>
           )}
           {canEditStudentInfo && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
@@ -2101,7 +2106,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <Sparkles className="h-4 w-4" /> 지표/세션 보정
             </Button>
           )}
-          {isAdmin && <Button variant="destructive" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
+          {canManageStudentAccounts && <Button variant="destructive" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
         </div>
       </div>
 
@@ -2221,7 +2226,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardContent>
           </Card>
 
-          {isAdmin ? (
+          {canViewFinance ? (
             <Card className={cn('rounded-[2rem] border-none shadow-lg bg-white', isAnalysisPresentation && 'analysis-premium-card analysis-full-section-card surface-card surface-card--secondary on-dark rounded-[2rem] shadow-none')}>
               <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
                 <div className={cn(isMobile ? "flex flex-col items-stretch gap-2.5" : "flex items-start justify-between gap-3")}>
@@ -2543,7 +2548,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </>
           )}
 
-          {isAdmin ? (
+          {!isStudentSelfView ? (
             <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]')}>
               <Card className={cn(
                 "rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] shadow-lg",
@@ -2588,7 +2593,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
               <StudentOperationsGraphBoard
                 timeline={operationsTimeline}
-                isAdmin={isAdmin}
+                isAdmin={canViewFinance}
                 isMobile={isMobile}
                 className={isAnalysisPresentation ? 'analysis-chart-stage analysis-full-ops-card' : undefined}
               />
@@ -3863,9 +3868,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">소속 반</Label><Select value={editForm.className || 'none'} onValueChange={(value) => setEditForm({ ...editForm, className: value === 'none' ? '' : value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="none" className="font-bold">미배정</SelectItem>{availableClasses.map((className) => <SelectItem key={className} value={className} className="font-bold">{className}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학교</Label><Input value={editForm.schoolName} onChange={(event) => setEditForm({ ...editForm, schoolName: event.target.value })} className="rounded-xl h-12 border-2 font-bold" /></div>
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학년</Label><Select value={editForm.grade} onValueChange={(value) => setEditForm({ ...editForm, grade: value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1학년">1학년</SelectItem><SelectItem value="2학년">2학년</SelectItem><SelectItem value="3학년">3학년</SelectItem><SelectItem value="N수생">N수생</SelectItem></SelectContent></Select></div>
-            {isAdmin && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학생 상태</Label><Select value={editForm.memberStatus} onValueChange={(value: 'active' | 'onHold' | 'withdrawn') => setEditForm({ ...editForm, memberStatus: value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">재원생</SelectItem><SelectItem value="onHold">휴원생</SelectItem><SelectItem value="withdrawn">퇴원생</SelectItem></SelectContent></Select></div>}
+                  {canManageStudentAccounts && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">학생 상태</Label><Select value={editForm.memberStatus} onValueChange={(value: 'active' | 'onHold' | 'withdrawn') => setEditForm({ ...editForm, memberStatus: value })}><SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">재원생</SelectItem><SelectItem value="onHold">휴원생</SelectItem><SelectItem value="withdrawn">퇴원생</SelectItem></SelectContent></Select></div>}
             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">부모 연동코드 (6자리)</Label><Input value={editForm.parentLinkCode} onChange={(event) => setEditForm({ ...editForm, parentLinkCode: event.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" maxLength={6} className="rounded-xl h-12 border-2 font-bold tracking-[0.2em]" placeholder="123456" /></div>
-            {isAdmin && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">비밀번호 (변경 시에만)</Label><Input type="password" value={editForm.password} onChange={(event) => setEditForm({ ...editForm, password: event.target.value })} className="rounded-xl h-12 border-2 font-bold" placeholder="6자 이상 입력 시 변경" /></div>}
+                  {canManageStudentAccounts && <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground">비밀번호 (변경 시에만)</Label><Input type="password" value={editForm.password} onChange={(event) => setEditForm({ ...editForm, password: event.target.value })} className="rounded-xl h-12 border-2 font-bold" placeholder="6자 이상 입력 시 변경" /></div>}
           </div>
           <DialogFooter className="p-8 bg-muted/20 border-t"><Button onClick={handleUpdateInfo} disabled={isUpdating} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">{isUpdating ? <Loader2 className="h-5 w-5 animate-spin" /> : '정보 저장'}</Button></DialogFooter>
         </DialogContent>

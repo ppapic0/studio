@@ -24,7 +24,8 @@ type ConfirmInvoicePaymentResult = {
 
 function resolveNextHref(role: string | undefined): string {
   if (role === 'parent') return '/dashboard?parentTab=billing';
-  if (role === 'centerAdmin' || role === 'owner' || role === 'teacher') return '/dashboard/revenue';
+  if (role === 'teacher') return '/dashboard/teacher';
+  if (role === 'centerAdmin' || role === 'owner') return '/dashboard/revenue';
   return '/login';
 }
 

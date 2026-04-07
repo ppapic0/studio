@@ -87,6 +87,7 @@ import { autoCheckPaymentReminders } from '@/lib/kakao-service';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
+import { canReadFinance } from '@/lib/dashboard-access';
 
 const OperationalIntelligencePanel = dynamic(
   () => import('@/components/dashboard/operational-intelligence').then((mod) => mod.OperationalIntelligence),
@@ -135,6 +136,7 @@ export default function RevenuePage() {
   const searchParams = useSearchParams();
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
+  const isFinanceViewer = canReadFinance(activeMembership?.role);
   const focusedStudentId = searchParams.get('studentId');
 
   const [activeTab, setActiveTab] = useState('payments'); 
@@ -149,43 +151,43 @@ export default function RevenuePage() {
 
   // 1. KPI 이력 조회
   const kpiQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isFinanceViewer) return null;
     return query(
       collection(firestore, 'centers', centerId, 'kpiDaily'),
       where('date', '>=', `${currentChartMonth}-01`),
       where('date', '<=', `${currentChartMonth}-31`),
       orderBy('date', 'asc')
     );
-  }, [firestore, centerId, currentChartMonth]);
-  const { data: kpiHistory, isLoading: isKpiLoading } = useCollection<KpiDaily>(kpiQuery);
+  }, [firestore, centerId, currentChartMonth, isFinanceViewer]);
+  const { data: kpiHistory, isLoading: isKpiLoading } = useCollection<KpiDaily>(kpiQuery, { enabled: isFinanceViewer });
 
   // 2. 인보이스 전체 조회
   const invoicesQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isFinanceViewer) return null;
     return query(
       collection(firestore, 'centers', centerId, 'invoices'),
       orderBy('cycleEndDate', 'desc')
     );
-  }, [firestore, centerId]);
-  const { data: allInvoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesQuery);
+  }, [firestore, centerId, isFinanceViewer]);
+  const { data: allInvoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesQuery, { enabled: isFinanceViewer });
 
   // 3. 현재 좌석/출결 상태 조회
   const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isFinanceViewer) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
-  }, [firestore, centerId]);
-  const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
+  }, [firestore, centerId, isFinanceViewer]);
+  const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isFinanceViewer });
 
   // 4. 활성 학생 멤버 목록 조회
   const studentMembersQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
+    if (!firestore || !centerId || !isFinanceViewer) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'),
       where('role', '==', 'student'),
       where('status', '==', 'active')
     );
-  }, [firestore, centerId]);
-  const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery);
+  }, [firestore, centerId, isFinanceViewer]);
+  const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery, { enabled: isFinanceViewer });
 
   // --- 배정 학생 우선순위 계산 (미납/연체 우선) ---
   const sortedAssignedStudents = useMemo(() => {
@@ -479,6 +481,13 @@ export default function RevenuePage() {
   };
 
   if (membershipsLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
+  if (!isFinanceViewer) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <p className="font-bold text-muted-foreground">센터 관리자만 수익 분석에 접근할 수 있습니다.</p>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex flex-col gap-8 w-full max-w-[1400px] mx-auto pb-20", isMobile ? "px-1" : "px-4 py-6")}>
