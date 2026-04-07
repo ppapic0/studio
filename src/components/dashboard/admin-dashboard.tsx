@@ -73,7 +73,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, StudyLogDay, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
+import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -250,7 +250,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
-  const [weeklyStudyMinutesByStudent, setWeeklyStudyMinutesByStudent] = useState<Record<string, number>>({});
   const [liveTickMs, setLiveTickMs] = useState<number>(Date.now());
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeBody, setNoticeBody] = useState('');
@@ -271,6 +270,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, []);
 
   useEffect(() => {
+    if (!today) return;
+    const nextDate = new Date(now);
+    if (format(today, 'yyyy-MM-dd') !== format(nextDate, 'yyyy-MM-dd')) {
+      setToday(nextDate);
+    }
+  }, [now, today]);
+
+  useEffect(() => {
     const syncLiveTick = () => setLiveTickMs(Date.now());
     syncLiveTick();
     const tenMinuteTimer = setInterval(syncLiveTick, 10 * 60 * 1000);
@@ -281,15 +288,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
-  const {
-    rows: adminHeatmapRows,
-    interventionSignals: heatmapInterventionSignals,
-    isLoading: adminHeatmapLoading,
-  } = useCenterAdminHeatmap({
-    centerId,
-    isActive,
-    selectedClass,
-  });
 
   const centerRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -417,6 +415,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [resolvedAttendanceList]
   );
 
+  const {
+    rows: adminHeatmapRows,
+    interventionSignals: heatmapInterventionSignals,
+    isLoading: adminHeatmapLoading,
+    weeklyStudyMinutesByStudent,
+  } = useCenterAdminHeatmap({
+    centerId,
+    isActive,
+    selectedClass,
+    referenceDate: today,
+    preloadedActiveMembers: activeMembers,
+    preloadedActiveMembersLoading: membersLoading,
+    preloadedProgressList: progressList,
+    preloadedProgressListLoading: !progressList && isActive,
+    preloadedAttendanceList: attendanceList,
+    preloadedAttendanceListLoading: attendanceLoading,
+  });
+
   const getSeatForRoom = (room: LayoutRoomConfig, roomSeatNo: number): ResolvedAttendanceSeat => {
     const seatId = buildSeatId(room.id, roomSeatNo);
     const existingSeat = seatById.get(seatId);
@@ -441,6 +457,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     centerId,
     isActive,
     selectedClass,
+    referenceDate: today,
     students,
     studentMembers: activeMembers,
     attendanceList: resolvedAttendanceList,
@@ -501,13 +518,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   const allReportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'dailyReports'), limit(600));
+    return query(collection(firestore, 'centers', centerId, 'dailyReports'), orderBy('createdAt', 'desc'), limit(600));
   }, [firestore, centerId]);
   const { data: allReports } = useCollection<DailyReport>(allReportsQuery, { enabled: isActive });
 
   const counselingLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'counselingLogs'), limit(600));
+    return query(collection(firestore, 'centers', centerId, 'counselingLogs'), orderBy('createdAt', 'desc'), limit(600));
   }, [firestore, centerId]);
   const { data: counselingLogs } = useCollection<CounselingLog>(counselingLogsQuery, { enabled: isActive });
   const parentActivityQuery = useMemoFirebase(() => {
@@ -563,54 +580,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (!activeMembers) return [];
     return activeMembers.filter((member) => selectedClass === 'all' || member.className === selectedClass);
   }, [activeMembers, selectedClass]);
-
-  useEffect(() => {
-    if (!firestore || !centerId || !today || !isActive) {
-      setWeeklyStudyMinutesByStudent({});
-      return;
-    }
-
-    const students = filteredStudentMembers.map((member) => member.id).filter(Boolean);
-    if (students.length === 0) {
-      setWeeklyStudyMinutesByStudent({});
-      return;
-    }
-
-    let disposed = false;
-    const loadWeeklyStudyMinutes = async () => {
-      const startKey = format(subDays(today, 6), 'yyyy-MM-dd');
-      const endKey = format(today, 'yyyy-MM-dd');
-
-      const rows = await Promise.all(
-        students.map(async (studentId) => {
-          try {
-            const daysRef = collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days');
-            const snap = await getDocs(
-              query(daysRef, where('dateKey', '>=', startKey), where('dateKey', '<=', endKey))
-            );
-            const total = snap.docs.reduce((sum, d) => {
-              const day = d.data() as StudyLogDay;
-              return sum + Math.max(0, Math.round(day.totalMinutes || 0));
-            }, 0);
-            return [studentId, total] as const;
-          } catch {
-            return [studentId, 0] as const;
-          }
-        })
-      );
-
-      if (!disposed) {
-        setWeeklyStudyMinutesByStudent(Object.fromEntries(rows));
-      }
-    };
-
-    void loadWeeklyStudyMinutes();
-    const timer = setInterval(() => { void loadWeeklyStudyMinutes(); }, 10 * 60 * 1000);
-    return () => {
-      disposed = true;
-      clearInterval(timer);
-    };
-  }, [firestore, centerId, today, isActive, filteredStudentMembers]);
 
   const targetMemberIds = useMemo(
     () => new Set(filteredStudentMembers.map((member) => member.id)),

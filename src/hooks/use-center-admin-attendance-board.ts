@@ -51,6 +51,7 @@ type UseCenterAdminAttendanceBoardOptions = {
   centerId?: string;
   isActive: boolean;
   selectedClass?: string;
+  referenceDate?: Date | null;
   students?: StudentProfile[] | null;
   studentMembers?: CenterMembership[] | null;
   attendanceList?: AttendanceCurrent[] | null;
@@ -62,6 +63,7 @@ export function useCenterAdminAttendanceBoard({
   centerId,
   isActive,
   selectedClass = 'all',
+  referenceDate,
   students,
   studentMembers,
   attendanceList,
@@ -69,7 +71,7 @@ export function useCenterAdminAttendanceBoard({
   nowMs = Date.now(),
 }: UseCenterAdminAttendanceBoardOptions) {
   const firestore = useFirestore();
-  const today = useMemo(() => new Date(), []);
+  const today = useMemo(() => (referenceDate ? new Date(referenceDate) : new Date()), [referenceDate]);
   const todayKey = format(today, 'yyyy-MM-dd');
   const weekKey = format(today, "yyyy-'W'II");
   const historyKeys = useMemo(

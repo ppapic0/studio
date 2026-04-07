@@ -1538,6 +1538,10 @@ async function buildClassroomSignalsForCenter(
   const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
   const weekAgoKey = toDateKey(new Date(nowKst.getTime() - 6 * 24 * 60 * 60 * 1000));
   const penaltyCutoff = admin.firestore.Timestamp.fromMillis(nowKst.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const startOfTodayKst = new Date(nowKst);
+  startOfTodayKst.setHours(0, 0, 0, 0);
+  const endOfTodayKst = new Date(nowKst);
+  endOfTodayKst.setHours(23, 59, 59, 999);
 
   const [membersSnap, attendanceSnap, todayStatsSnap, riskCacheSnap, counselingSnap, reportsSnap, penaltyLogsSnap] =
     await Promise.all([
@@ -1545,8 +1549,14 @@ async function buildClassroomSignalsForCenter(
       db.collection(`centers/${centerId}/attendanceCurrent`).get(),
       db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get(),
       db.doc(`centers/${centerId}/riskCache/${dateKey}`).get(),
-      db.collection(`centers/${centerId}/counselingReservations`).get(),
-      db.collection(`centers/${centerId}/dailyReports`).where("status", "==", "sent").get(),
+      db.collection(`centers/${centerId}/counselingReservations`)
+        .where("scheduledAt", ">=", admin.firestore.Timestamp.fromDate(startOfTodayKst))
+        .where("scheduledAt", "<=", admin.firestore.Timestamp.fromDate(endOfTodayKst))
+        .get(),
+      db.collection(`centers/${centerId}/dailyReports`)
+        .where("dateKey", ">=", weekAgoKey)
+        .where("dateKey", "<=", dateKey)
+        .get(),
       db.collection(`centers/${centerId}/penaltyLogs`).where("createdAt", ">=", penaltyCutoff).get(),
     ]);
 

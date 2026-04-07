@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { endOfDay, format, startOfDay, subDays } from 'date-fns';
-import { collection, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
+import { endOfDay, endOfMonth, format, startOfDay, startOfMonth, subDays } from 'date-fns';
+import { collection, getDocs, orderBy, query, Timestamp, where } from 'firebase/firestore';
 
 import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -59,6 +59,13 @@ type UseCenterAdminHeatmapOptions = {
   centerId?: string;
   isActive: boolean;
   selectedClass?: string;
+  referenceDate?: Date | null;
+  preloadedActiveMembers?: CenterMembership[] | null;
+  preloadedActiveMembersLoading?: boolean;
+  preloadedProgressList?: GrowthProgress[] | null;
+  preloadedProgressListLoading?: boolean;
+  preloadedAttendanceList?: AttendanceCurrent[] | null;
+  preloadedAttendanceListLoading?: boolean;
 };
 
 type ResolvedAttendanceSeat = AttendanceCurrent & {
@@ -148,9 +155,16 @@ export function useCenterAdminHeatmap({
   centerId,
   isActive,
   selectedClass = 'all',
+  referenceDate,
+  preloadedActiveMembers,
+  preloadedActiveMembersLoading = false,
+  preloadedProgressList,
+  preloadedProgressListLoading = false,
+  preloadedAttendanceList,
+  preloadedAttendanceListLoading = false,
 }: UseCenterAdminHeatmapOptions) {
   const firestore = useFirestore();
-  const today = useMemo(() => new Date(), []);
+  const today = useMemo(() => (referenceDate ? new Date(referenceDate) : new Date()), [referenceDate]);
   const todayKey = format(today, 'yyyy-MM-dd');
   const historyKeys = useMemo(
     () => Array.from({ length: 13 }, (_, index) => format(subDays(today, 12 - index), 'yyyy-MM-dd')),
@@ -160,28 +174,40 @@ export function useCenterAdminHeatmap({
   const historyStartKey = historyKeys[0];
   const currentMonth = format(today, 'yyyy-MM');
   const thirtyDaysAgoMs = useMemo(() => subDays(today, 30).getTime(), [today]);
+  const thirtyDaysAgoDate = useMemo(() => subDays(today, 30), [today]);
+  const currentMonthStart = useMemo(() => startOfMonth(today), [today]);
+  const currentMonthEnd = useMemo(() => endOfMonth(today), [today]);
+  const shouldLoadMembers = isActive && preloadedActiveMembers === undefined && !preloadedActiveMembersLoading;
+  const shouldLoadProgress = isActive && preloadedProgressList === undefined && !preloadedProgressListLoading;
+  const shouldLoadAttendance = isActive && preloadedAttendanceList === undefined && !preloadedAttendanceListLoading;
 
   const membersQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isActive) return null;
+    if (!firestore || !centerId || !shouldLoadMembers) return null;
     return query(
       collection(firestore, 'centers', centerId, 'members'),
       where('role', '==', 'student'),
       where('status', '==', 'active')
     );
-  }, [firestore, centerId, isActive]);
-  const { data: activeMembers, isLoading: membersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: isActive });
+  }, [firestore, centerId, shouldLoadMembers]);
+  const { data: fetchedActiveMembers, isLoading: fetchedMembersLoading } = useCollection<CenterMembership>(membersQuery, { enabled: shouldLoadMembers });
+  const activeMembers = preloadedActiveMembers ?? fetchedActiveMembers;
+  const membersLoading = preloadedActiveMembers === undefined ? (preloadedActiveMembersLoading || fetchedMembersLoading) : false;
 
   const progressQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isActive) return null;
+    if (!firestore || !centerId || !shouldLoadProgress) return null;
     return collection(firestore, 'centers', centerId, 'growthProgress');
-  }, [firestore, centerId, isActive]);
-  const { data: progressList, isLoading: progressLoading } = useCollection<GrowthProgress>(progressQuery, { enabled: isActive });
+  }, [firestore, centerId, shouldLoadProgress]);
+  const { data: fetchedProgressList, isLoading: fetchedProgressLoading } = useCollection<GrowthProgress>(progressQuery, { enabled: shouldLoadProgress });
+  const progressList = preloadedProgressList ?? fetchedProgressList;
+  const progressLoading = preloadedProgressList === undefined ? (preloadedProgressListLoading || fetchedProgressLoading) : false;
 
   const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isActive) return null;
+    if (!firestore || !centerId || !shouldLoadAttendance) return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
-  }, [firestore, centerId, isActive]);
-  const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
+  }, [firestore, centerId, shouldLoadAttendance]);
+  const { data: fetchedAttendanceList, isLoading: fetchedAttendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: shouldLoadAttendance });
+  const attendanceList = preloadedAttendanceList ?? fetchedAttendanceList;
+  const attendanceLoading = preloadedAttendanceList === undefined ? (preloadedAttendanceListLoading || fetchedAttendanceLoading) : false;
 
   const resolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(
     () =>
@@ -210,14 +236,20 @@ export function useCenterAdminHeatmap({
 
   const parentEventsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isActive) return null;
-    return collection(firestore, 'centers', centerId, 'parentActivityEvents');
-  }, [firestore, centerId, isActive]);
+    return query(
+      collection(firestore, 'centers', centerId, 'parentActivityEvents'),
+      where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgoDate))
+    );
+  }, [firestore, centerId, isActive, thirtyDaysAgoDate]);
   const { data: parentActivityEvents, isLoading: parentEventsLoading } = useCollection<ParentActivityEvent>(parentEventsQuery, { enabled: isActive });
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isActive) return null;
-    return collection(firestore, 'centers', centerId, 'parentCommunications');
-  }, [firestore, centerId, isActive]);
+    return query(
+      collection(firestore, 'centers', centerId, 'parentCommunications'),
+      where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgoDate))
+    );
+  }, [firestore, centerId, isActive, thirtyDaysAgoDate]);
   const { data: parentCommunications, isLoading: parentCommunicationsLoading } = useCollection<ParentCommunicationEntry>(parentCommunicationsQuery, { enabled: isActive });
 
   const appointmentsQuery = useMemoFirebase(() => {
@@ -245,10 +277,11 @@ export function useCenterAdminHeatmap({
     if (!firestore || !centerId || !isActive) return null;
     return query(
       collection(firestore, 'centers', centerId, 'invoices'),
-      orderBy('cycleEndDate', 'desc'),
-      limit(1000)
+      where('cycleEndDate', '>=', Timestamp.fromDate(currentMonthStart)),
+      where('cycleEndDate', '<=', Timestamp.fromDate(currentMonthEnd)),
+      orderBy('cycleEndDate', 'desc')
     );
-  }, [firestore, centerId, isActive]);
+  }, [firestore, centerId, currentMonthEnd, currentMonthStart, isActive]);
   const { data: invoices, isLoading: invoicesLoading } = useCollection<Invoice>(invoicesQuery, { enabled: isActive });
 
   const [statsByDate, setStatsByDate] = useState<Record<string, DailyStudentStat[]>>({});
@@ -1015,6 +1048,11 @@ export function useCenterAdminHeatmap({
     invoicesLoading ||
     statsLoading;
 
+  const weeklyStudyMinutesByStudent = useMemo(
+    () => Object.fromEntries(weeklyStudyMinutesByStudentId.entries()),
+    [weeklyStudyMinutesByStudentId]
+  );
+
   return {
     rows,
     isLoading,
@@ -1023,5 +1061,6 @@ export function useCenterAdminHeatmap({
     studentSignalsByStudentId,
     seatOverlayLegend,
     seatOverlaySummary,
+    weeklyStudyMinutesByStudent,
   };
 }
