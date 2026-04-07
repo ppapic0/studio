@@ -31,32 +31,35 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
         </div>
 
         <div className="mt-8 sm:hidden">
-          <p className="mb-4 text-center text-[10px] font-black uppercase tracking-[0.26em] text-[#14295F]/46">
-            주요 합격 실적
-          </p>
-          <div className="space-y-2.5">
-            {universities.map((u, index) => (
-              <article
-                key={u.label}
-                className="brand-sheen-panel relative overflow-hidden rounded-[1.45rem] border border-[#14295F]/10 bg-white px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.08)]"
-              >
-                <div className="brand-glow-drift absolute -right-8 top-0 h-20 w-20 rounded-full bg-[#FFB878]/12 blur-2xl" />
-                <div className="relative flex items-start justify-between gap-4">
-                  <div className="min-w-0">
+          <div className="flex items-end justify-between gap-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.26em] text-[#14295F]/46">
+              주요 합격 실적
+            </p>
+            <p className="text-[10px] font-bold text-[#7A8FB2]">좌우로 넘겨서 전체 보기</p>
+          </div>
+          <div className="-mx-4 mt-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-max gap-3">
+              {universities.map((u, index) => (
+                <article
+                  key={u.label}
+                  className="brand-sheen-panel relative w-[10.4rem] flex-none overflow-hidden rounded-[1.45rem] border border-[#14295F]/10 bg-white px-4 py-4 shadow-[0_12px_30px_rgba(20,41,95,0.08)]"
+                >
+                  <div className="brand-glow-drift absolute -right-8 top-0 h-20 w-20 rounded-full bg-[#FFB878]/12 blur-2xl" />
+                  <div className="relative min-h-[7.8rem]">
                     <p className="text-[10px] font-black tracking-[0.16em] text-[#7A8FB2]">
                       RESULT {String(index + 1).padStart(2, '0')}
                     </p>
-                    <h3 className="mt-2 break-keep text-[1.05rem] font-black leading-[1.2] text-[#14295F]">
-                      {u.label}
+                    <p className="brand-number-pop mt-4 text-[2rem] font-black leading-none text-[#14295F]">
+                      {u.value}
+                    </p>
+                    <h3 className="mt-3 break-keep text-[1rem] font-black leading-[1.2] text-[#14295F]">
+                      {mobileUniversityLabelMap[u.label] ?? u.label}
                     </h3>
-                    <p className="mt-1.5 text-[12px] font-semibold text-[#567089]">{u.detail}</p>
+                    <p className="mt-1.5 text-[11px] font-semibold text-[#567089]">{u.detail}</p>
                   </div>
-                  <p className="brand-number-pop shrink-0 text-[1.6rem] font-black leading-none text-[#14295F]">
-                    {u.value}
-                  </p>
-                </div>
-              </article>
-            ))}
+                </article>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -95,17 +98,19 @@ export function ResultsSection({ outcomes, successStory }: ResultsSectionProps) 
               </p>
             </div>
 
-            <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3 lg:min-w-[33rem] lg:flex-1">
+            <div className="-mx-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:pb-0 lg:min-w-[33rem] lg:flex-1">
+              <div className="flex min-w-max gap-2.5 px-1 sm:grid sm:min-w-0 sm:grid-cols-3 sm:gap-3 sm:px-0">
               {successStory.timeline.map((item) => (
                 <article
                   key={item.label}
-                  className="rounded-[0.95rem] border border-white/70 bg-white/84 px-2.5 py-3 text-center shadow-[0_12px_28px_rgba(20,41,95,0.06)] backdrop-blur sm:rounded-[1.15rem] sm:px-4 sm:py-4"
+                  className="w-[8.7rem] flex-none rounded-[0.95rem] border border-white/70 bg-white/84 px-2.5 py-3 text-center shadow-[0_12px_28px_rgba(20,41,95,0.06)] backdrop-blur sm:w-auto sm:rounded-[1.15rem] sm:px-4 sm:py-4"
                 >
                   <p className="text-[9px] font-black tracking-[0.12em] text-[#FF7A16] sm:text-[10px]">{item.label}</p>
                   <p className="mt-1.5 break-keep text-[0.95rem] font-black leading-none text-[#14295F] sm:mt-2 sm:text-[1.15rem]">{item.value}</p>
                   <p className="mt-1.5 text-[9px] font-semibold leading-[1.35] text-[#52677F] sm:mt-2 sm:text-[11px]">{item.detail}</p>
                 </article>
               ))}
+              </div>
             </div>
           </div>
         </div>
