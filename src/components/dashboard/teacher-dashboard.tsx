@@ -193,6 +193,17 @@ const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: st
   { value: 'status', label: '상태' },
 ];
 
+const SEAT_OVERLAY_DESCRIPTIONS: Record<CenterAdminSeatOverlayMode, string> = {
+  composite: '학습, 출결, 상담, 학부모 반응을 한 번에 섞어 운영 위험 신호를 먼저 보여줍니다.',
+  risk: '즉시 개입이 필요한 학생을 우선순위 중심으로 드러내는 보기입니다.',
+  penalty: '누적 벌점과 루틴 누락 흐름을 중심으로 생활 관리 상태를 확인합니다.',
+  minutes: '오늘 실제 공부시간 흐름만 따로 보면서 좌석 체류 대비 학습량을 읽습니다.',
+  parent: '학부모 소통 반응과 미열람 여부를 빠르게 확인하는 운영 보기입니다.',
+  billing: '수납 관련 신호는 관리자 전용이지만, 기존 오버레이 타입 호환을 위해 설명 매핑은 유지합니다.',
+  efficiency: '앉아 있는 시간 대비 집중 효율이 낮은 학생을 찾는 데 초점을 둡니다.',
+  status: '입실, 외출, 복귀, 퇴실 같은 현재 상태만 깔끔하게 보여주는 기본 보기입니다.',
+};
+
 type TeacherSectionHeaderProps = {
   badge: string;
   title: string;
@@ -1048,6 +1059,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const activeSeatOverlayMode: CenterAdminSeatOverlayMode = isEditMode ? 'status' : seatOverlayMode;
+  const activeSeatOverlayOption =
+    SEAT_OVERLAY_OPTIONS.find((item) => item.value === activeSeatOverlayMode) || SEAT_OVERLAY_OPTIONS[0];
+  const activeSeatOverlayLegends = seatOverlayLegend[activeSeatOverlayMode] || [];
+  const selectedRoomLabel = selectedRoomView === 'all' ? '전체 호실' : getRoomLabel(selectedRoomView, roomConfigs);
+  const heatmapSummaryItems = [
+    { label: '안정', value: seatOverlaySummary.healthyCount, tone: 'bg-emerald-100 text-emerald-700' },
+    { label: '주의', value: seatOverlaySummary.warningCount, tone: 'bg-amber-100 text-amber-700' },
+    { label: '위험', value: seatOverlaySummary.riskCount, tone: 'bg-rose-100 text-rose-700' },
+    { label: '미열람', value: seatOverlaySummary.unreadCount, tone: 'bg-sky-100 text-sky-700' },
+    { label: '상담', value: seatOverlaySummary.counselingCount, tone: 'bg-violet-100 text-violet-700' },
+    { label: '장기외출', value: seatOverlaySummary.awayCount, tone: 'bg-[#FFF2E8] text-[#C95A08]' },
+  ];
 
   const selectedSeatSignal = useMemo<CenterAdminStudentSeatSignal | null>(() => {
     if (!selectedSeat) return null;
@@ -2210,70 +2233,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </div>
       </motion.section>
 
-      <motion.section ref={liveBoardSectionRef} className="px-4" {...getDeckMotionProps(0.28, 14)}>
-        <Card className="app-depth-card overflow-hidden rounded-[2.45rem] border-none">
-          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
-            <TeacherSectionHeader
-              badge="실시간 교실"
-              title="한 화면에서 전체 교실 흐름 보기"
-              description="전체는 통합 현황, 호실 선택 시 상세 도면과 배치 수정으로 바로 이어집니다."
-              icon={LayoutGrid}
-              tone="navy"
-              right={
-                selectedRoomView !== 'all' ? (
-                  <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
-                    현재 선택: {getRoomLabel(selectedRoomView, roomConfigs)}
-                  </Badge>
-                ) : (
-                  <Badge className="h-8 rounded-full border-none bg-[#EEF4FF] px-3.5 text-[10px] font-black text-[#2554D7]">
-                    전체 보기
-                  </Badge>
-                )
-              }
-            />
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={selectedRoomView === 'all' ? 'default' : 'outline'}
-                onClick={() => setSelectedRoomView('all')}
-                className={cn(
-                  "rounded-2xl px-4 font-black",
-                  isMobile ? "h-10 flex-1 min-w-[88px]" : "h-11",
-                  selectedRoomView === 'all' ? "bg-primary text-white" : "border-2"
-                )}
-              >
-                전체
-              </Button>
-              {roomConfigs.map((room) => (
-                <Button
-                  key={room.id}
-                  type="button"
-                  variant={selectedRoomView === room.id ? 'default' : 'outline'}
-                  onClick={() => setSelectedRoomView(room.id)}
-                  className={cn(
-                    "rounded-2xl px-4 font-black gap-2",
-                    isMobile ? "h-10 flex-1 min-w-[96px]" : "h-11",
-                    selectedRoomView === room.id ? "bg-primary text-white" : "border-2"
-                  )}
-                >
-                  {room.name}
-                  <Badge
-                    variant="secondary"
-                    className={cn(
-                      "h-5 border-none px-1.5 text-[9px] font-black",
-                      selectedRoomView === room.id ? "bg-white/15 text-white" : "bg-primary/5 text-primary"
-                    )}
-                  >
-                    {room.cols}x{room.rows}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.section>
-
       <motion.section className="px-4" {...getDeckMotionProps(0.34, 14)}>
         <Card className="marketing-card-dark overflow-hidden rounded-[2.55rem] border-none">
           <CardContent className={cn("space-y-6", isMobile ? "p-4" : "p-6 sm:p-7")}>
@@ -2334,6 +2293,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         selectedRoomView={selectedRoomView}
         selectedClass={selectedClass}
         isMobile={isMobile}
+        variant="teacherEditorial"
         isLoading={attendanceBoardLoading}
         summary={attendanceBoardSummary}
         seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
@@ -2343,30 +2303,314 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         onSeatClick={handleSeatClick}
       />
 
-      <motion.section ref={seatInsightSectionRef} className="px-4" {...getDeckMotionProps(0.4, 12)}>
-        <Card className="app-depth-card overflow-hidden rounded-[2.5rem] border-none">
-          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
-            <TeacherSectionHeader
-              badge="도면 학생 히트맵"
-              title="좌석에서 바로 학생 운영 건강도 읽기"
-              description="좌석마다 학생 운영 신호를 바로 보고, 클릭하면 5개 도메인 상세와 개입 이유를 확인합니다."
-              icon={ShieldAlert}
-              tone="navy"
-              right={
-                <>
-                  {isEditMode && (
-                    <Badge className="h-8 rounded-full border-none bg-amber-100 px-3.5 text-[10px] font-black text-amber-700">
-                      편집 중에는 상태 보기만 표시
+      <motion.section ref={liveBoardSectionRef} className="px-4" {...getDeckMotionProps(0.4, 12)}>
+        <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.92fr)]")}>
+          <div className={cn("space-y-5", isMobile ? "order-2" : "order-1")}>
+            <Card className="marketing-card overflow-hidden rounded-[2.75rem] border-none">
+              <CardContent className={cn("space-y-5", isMobile ? "p-4" : "p-5 sm:p-6")}>
+                <TeacherSectionHeader
+                  badge="실시간 교실"
+                  title="좌석 흐름과 배치 수정을 한 캔버스에서"
+                  description="호실별 전체 흐름과 세부 좌석판을 같은 영역에서 보면서, 바로 편집 모드와 학생 상세 보기로 이어집니다."
+                  icon={LayoutGrid}
+                  tone="amber"
+                  right={
+                    <>
+                      <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+                        현재 보기: {selectedRoomLabel}
+                      </Badge>
+                      {isEditMode && (
+                        <Badge className="h-8 rounded-full border-none bg-[#FFF2E8] px-3.5 text-[10px] font-black text-[#C95A08]">
+                          배치 수정 모드
+                        </Badge>
+                      )}
+                    </>
+                  }
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={selectedRoomView === 'all' ? 'default' : 'outline'}
+                    onClick={() => setSelectedRoomView('all')}
+                    className={cn(
+                      "rounded-2xl px-4 font-black",
+                      isMobile ? "h-10 flex-1 min-w-[88px]" : "h-11",
+                      selectedRoomView === 'all' ? "bg-[#14295F] text-white" : "border-2 bg-white/80 text-[#14295F]"
+                    )}
+                  >
+                    전체
+                  </Button>
+                  {roomConfigs.map((room) => (
+                    <Button
+                      key={room.id}
+                      type="button"
+                      variant={selectedRoomView === room.id ? 'default' : 'outline'}
+                      onClick={() => setSelectedRoomView(room.id)}
+                      className={cn(
+                        "rounded-2xl px-4 font-black gap-2",
+                        isMobile ? "h-10 flex-1 min-w-[96px]" : "h-11",
+                        selectedRoomView === room.id ? "bg-[#14295F] text-white" : "border-2 bg-white/80 text-[#14295F]"
+                      )}
+                    >
+                      {room.name}
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "h-5 border-none px-1.5 text-[9px] font-black",
+                          selectedRoomView === room.id ? "bg-white/15 text-white" : "bg-primary/5 text-primary"
+                        )}
+                      >
+                        {room.cols}x{room.rows}
+                      </Badge>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {selectedRoomView === 'all' ? (
+              <Card className="marketing-card-soft overflow-hidden rounded-[2.7rem] border-none">
+                <CardContent className={cn("space-y-5", isMobile ? "p-4" : "p-6 sm:p-7")}>
+                  <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-start justify-between")}>
+                    <div className="min-w-0">
+                      <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#2554D7]">
+                        전체 실시간 교실
+                      </Badge>
+                      <h3 className="mt-3 text-[1.8rem] font-black tracking-tight text-[#14295F]">
+                        두 호실 흐름을 한 화면에서 비교
+                      </h3>
+                      <p className="mt-2 max-w-[40rem] text-xs font-bold leading-5 text-slate-500 sm:text-sm">
+                        호실별 학생 밀도와 좌석 사용 상황을 빠르게 비교하고, 필요한 호실만 바로 상세 보기로 전환할 수 있게 정리했습니다.
+                      </p>
+                    </div>
+                    <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black uppercase text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+                      2-room live
                     </Badge>
+                  </div>
+
+                  <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "xl:grid-cols-2")}>
+                    {roomSummaries.map((room) => (
+                      <Card
+                        key={room.id}
+                        className="overflow-hidden rounded-[2.35rem] border border-[#D7E4FF] bg-white/90 shadow-[0_28px_60px_-40px_rgba(20,41,95,0.28)]"
+                      >
+                        <CardContent className="space-y-5 p-4 sm:p-5">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="grid gap-1">
+                              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/45">Live Room</p>
+                              <h3 className="text-[1.7rem] font-black tracking-tight text-[#14295F]">{room.name}</h3>
+                              <p className="text-xs font-bold text-slate-500">
+                                좌석 클릭으로 학생 상세를 열고, 필요하면 바로 호실 상세 보기로 넘어갈 수 있습니다.
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className="border-none bg-[#EEF4FF] font-black text-[#2554D7]">
+                                {room.cols} x {room.rows}
+                              </Badge>
+                              {room.hasUnsavedChanges && (
+                                <Badge className="border-none bg-[#FFF2E8] text-[#C95A08] font-black text-[10px]">
+                                  미리보기 변경됨
+                                </Badge>
+                              )}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSelectedRoomView(room.id)}
+                                className="h-10 rounded-xl border-2 bg-white font-black text-[#14295F]"
+                              >
+                                상세 편집
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="rounded-[1.4rem] border border-[#D7E4FF] bg-[#F8FBFF] p-3">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">학습 중</p>
+                              <p className="dashboard-number mt-1 text-2xl text-[#2554D7]">{room.studying}</p>
+                            </div>
+                            <div className="rounded-[1.4rem] border border-emerald-100 bg-emerald-50/70 p-3">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">배정 좌석</p>
+                              <p className="dashboard-number mt-1 text-2xl text-emerald-600">{room.assigned}</p>
+                            </div>
+                            <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-3">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">가용 좌석</p>
+                              <p className="dashboard-number mt-1 text-2xl text-slate-700">{room.availableSeats}</p>
+                            </div>
+                          </div>
+
+                          {renderRoomGridCanvas(room, true)}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : selectedRoomConfig ? (
+              <Card
+                className={cn(
+                  "marketing-card-soft overflow-hidden rounded-[2.8rem] border-none transition-all duration-500",
+                  isEditMode ? "ring-4 ring-[#FF7A16]/20" : ""
+                )}
+              >
+                <CardContent className={cn("space-y-5", isMobile ? "p-4" : "p-6 sm:p-7")}>
+                  <TeacherSectionHeader
+                    badge={selectedRoomConfig.name}
+                    title={`${selectedRoomConfig.name} ${isEditMode ? '배치 수정 캔버스' : '실시간 좌석 상황판'}`}
+                    description={
+                      isEditMode
+                        ? '가로·세로 수치를 조정하면서 충돌 셀을 바로 확인하고 저장까지 이어지는 편집 모드입니다.'
+                        : '선택한 호실의 좌석 흐름과 운영 상태를 집중해서 읽는 상세 보기입니다.'
+                    }
+                    icon={Armchair}
+                    tone={isEditMode ? 'amber' : 'navy'}
+                    right={
+                      <>
+                        {selectedClass !== 'all' && (
+                          <Badge className="h-8 rounded-full border-none bg-[#EEF4FF] px-3.5 text-[10px] font-black text-[#2554D7]">
+                            {selectedClass}
+                          </Badge>
+                        )}
+                        <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+                          {selectedRoomConfig.cols}x{selectedRoomConfig.rows}
+                        </Badge>
+                      </>
+                    }
+                  />
+
+                  {isEditMode ? (
+                    <div className="rounded-[2rem] border border-[#FFD7B0] bg-white/90 p-4 shadow-sm">
+                      <div className={cn("flex flex-wrap items-center gap-3", isMobile ? "" : "justify-between")}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-2 rounded-2xl border border-[#FFE3C4] bg-[#FFF8F1] px-3 py-2 shadow-sm">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-[#C95A08]">가로</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={24}
+                              value={roomDrafts[selectedRoomConfig.id]?.cols ?? selectedRoomConfig.cols}
+                              onChange={(event) => handleRoomDraftChange(selectedRoomConfig.id, 'cols', event.target.value)}
+                              className="h-9 w-20 rounded-xl border-2 border-[#FFD7B0] text-center font-black"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 rounded-2xl border border-[#FFE3C4] bg-[#FFF8F1] px-3 py-2 shadow-sm">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-[#C95A08]">세로</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={24}
+                              value={roomDrafts[selectedRoomConfig.id]?.rows ?? selectedRoomConfig.rows}
+                              onChange={(event) => handleRoomDraftChange(selectedRoomConfig.id, 'rows', event.target.value)}
+                              className="h-9 w-20 rounded-xl border-2 border-[#FFD7B0] text-center font-black"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className="h-8 rounded-full border-none bg-[#FFF2E8] px-3.5 text-[10px] font-black text-[#C95A08]">
+                            {selectedRoomSummary?.hasUnsavedChanges ? '미저장 변경 있음' : '현재 배치 기준'}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleCancelRoomDraft(selectedRoomConfig.id)}
+                            className="h-11 rounded-xl border-2 bg-white font-black text-[#14295F]"
+                          >
+                            취소
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={() => handleSaveRoomSettings(selectedRoomConfig.id)}
+                            disabled={isSaving || !selectedRoomSummary?.hasUnsavedChanges}
+                            className="h-11 rounded-xl bg-[#FF7A16] font-black text-white gap-2 hover:bg-[#EB6E12]"
+                          >
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            저장
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-[2rem] border border-[#D7E4FF] bg-white/85 p-4 shadow-sm">
+                      <div className={cn("flex flex-wrap items-center gap-3", isMobile ? "" : "justify-between")}>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="inline-flex items-center rounded-full bg-[#EEF4FF] px-3 py-1 text-[10px] font-black text-[#2554D7]">
+                            학습 중 {selectedRoomSummary?.studying ?? 0}
+                          </span>
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black text-emerald-700">
+                            배정 좌석 {selectedRoomSummary?.assigned ?? 0}
+                          </span>
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-700">
+                            가용 좌석 {selectedRoomSummary?.availableSeats ?? 0}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleToggleEditMode}
+                          className="h-11 rounded-xl border-2 bg-white font-black text-[#14295F]"
+                        >
+                          <Settings2 className="mr-1.5 h-4 w-4" />
+                          배치 수정
+                        </Button>
+                      </div>
+                    </div>
                   )}
-                  {[
-                    { label: '안정', value: seatOverlaySummary.healthyCount, tone: 'bg-emerald-100 text-emerald-700' },
-                    { label: '주의', value: seatOverlaySummary.warningCount, tone: 'bg-amber-100 text-amber-700' },
-                    { label: '위험', value: seatOverlaySummary.riskCount, tone: 'bg-rose-100 text-rose-700' },
-                    { label: '미열람', value: seatOverlaySummary.unreadCount, tone: 'bg-sky-100 text-sky-700' },
-                    { label: '상담', value: seatOverlaySummary.counselingCount, tone: 'bg-violet-100 text-violet-700' },
-                    { label: '장기외출', value: seatOverlaySummary.awayCount, tone: 'bg-amber-100 text-amber-700' },
-                  ].map((item) => (
+
+                  {isEditMode && activeRoomConflicts.length > 0 && (
+                    <div className="rounded-[2rem] border border-rose-200 bg-rose-50/85 p-4 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-rose-600" />
+                        <p className="text-sm font-black text-rose-700">축소 저장 전 정리가 필요한 셀이 있습니다.</p>
+                      </div>
+                      <p className="mt-2 text-xs font-bold leading-relaxed text-rose-700/90">
+                        {activeRoomConflicts
+                          .slice(0, 5)
+                          .map((seat) => formatSeatLabel(seat, roomConfigs))
+                          .join(', ')}
+                        {activeRoomConflicts.length > 5 ? ` 외 ${activeRoomConflicts.length - 5}개` : ''}
+                      </p>
+                    </div>
+                  )}
+
+                  {renderRoomGridCanvas(selectedRoomConfig)}
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+
+          <div ref={seatInsightSectionRef} className={cn("space-y-5", isMobile ? "order-1" : "order-2")}>
+            <Card className="marketing-card-soft overflow-hidden rounded-[2.65rem] border-none">
+              <CardContent className={cn("space-y-5", isMobile ? "p-4" : "p-5 sm:p-6")}>
+                <TeacherSectionHeader
+                  badge="도면 학생 히트맵"
+                  title="운영 위험 신호를 도면에서 읽는 제어 패널"
+                  description="오버레이 모드를 바꾸며 좌석 단위 위험, 학부모 반응, 벌점, 학습 효율을 같은 기준으로 비교할 수 있게 정리했습니다."
+                  icon={ShieldAlert}
+                  tone="navy"
+                  right={
+                    <>
+                      <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+                        현재 보기: {activeSeatOverlayOption.label}
+                      </Badge>
+                      {isEditMode && (
+                        <Badge className="h-8 rounded-full border-none bg-amber-100 px-3.5 text-[10px] font-black text-amber-700">
+                          편집 중에는 상태 보기 고정
+                        </Badge>
+                      )}
+                    </>
+                  }
+                />
+
+                <div className="rounded-[2rem] border border-[#D7E4FF] bg-white/85 p-4 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/45">현재 오버레이</p>
+                  <p className="mt-2 text-sm font-black text-[#14295F]">{activeSeatOverlayOption.label}</p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                    {SEAT_OVERLAY_DESCRIPTIONS[activeSeatOverlayMode]}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {heatmapSummaryItems.map((item) => (
                     <span
                       key={item.label}
                       className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", item.tone)}
@@ -2374,285 +2618,145 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       {item.label} {item.value}
                     </span>
                   ))}
-                </>
-              }
-            />
+                </div>
 
-            <div className="flex flex-wrap gap-2">
-              {SEAT_OVERLAY_OPTIONS.map((option) => (
-                <Button
-                  key={option.value}
-                  type="button"
-                  variant={activeSeatOverlayMode === option.value ? 'default' : 'outline'}
-                  disabled={isEditMode && option.value !== 'status'}
-                  onClick={() => setSeatOverlayMode(option.value)}
-                  className={cn(
-                    "rounded-2xl px-4 font-black",
-                    isMobile ? "h-10" : "h-11",
-                    activeSeatOverlayMode === option.value ? "bg-primary text-white" : "border-2"
-                  )}
-                >
-                  {option.label}
-                </Button>
-              ))}
-            </div>
+                <div className="flex flex-wrap gap-2">
+                  {SEAT_OVERLAY_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={activeSeatOverlayMode === option.value ? 'default' : 'outline'}
+                      disabled={isEditMode && option.value !== 'status'}
+                      onClick={() => setSeatOverlayMode(option.value)}
+                      className={cn(
+                        "rounded-2xl px-4 font-black",
+                        isMobile ? "h-10 flex-1 min-w-[92px]" : "h-11",
+                        activeSeatOverlayMode === option.value ? "bg-[#14295F] text-white" : "border-2 bg-white/80 text-[#14295F]"
+                      )}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
 
-            <div className="flex flex-wrap gap-2">
-              {(seatOverlayLegend[activeSeatOverlayMode] || []).map((legend) => (
-                <span
-                  key={`${activeSeatOverlayMode}_${legend.key}`}
-                  className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", legend.tone)}
-                >
-                  {legend.label}
-                </span>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <div className="rounded-[2rem] border border-[#D7E4FF] bg-[#F7FAFF] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/45">범례</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activeSeatOverlayLegends.map((legend) => (
+                      <span
+                        key={`${activeSeatOverlayMode}_${legend.key}`}
+                        className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", legend.tone)}
+                      >
+                        {legend.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </motion.section>
 
-      {selectedRoomView === 'all' ? (
-        <Card className="mx-4 overflow-hidden rounded-[3rem] border-none bg-white shadow-xl">
-          <CardHeader className="border-b bg-muted/5 px-6 py-5 sm:px-10 sm:py-6">
-            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-center justify-between")}>
-              <div className="grid gap-1">
-                <CardTitle className={cn("flex items-center gap-2 font-black tracking-tight", isMobile ? "text-lg" : "text-xl")}>
-                  <Armchair className={cn("opacity-40", isMobile ? "h-4 w-4" : "h-5 w-5")} />
-                  전체보기 실시간 교실
-                </CardTitle>
-                <CardDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  두 호실을 반반으로 동시에 보고, 학생별 {SEAT_OVERLAY_OPTIONS.find((item) => item.value === activeSeatOverlayMode)?.label || '종합'} 신호를 한눈에 확인합니다.
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="h-6 border-primary/40 px-3 text-[10px] font-black uppercase">
-                2-ROOM LIVE
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className={cn("grid gap-4", isMobile ? "p-4" : "p-6 md:grid-cols-2 md:p-8")}>
-            {roomSummaries.map((room) => (
-              <Card key={room.id} className="overflow-hidden rounded-[2.2rem] border border-primary/10 bg-[#fafafa] shadow-sm">
-                <CardContent className="space-y-5 p-4 sm:p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="grid gap-1">
-                      <p className="text-[10px] font-black uppercase tracking-[0.28em] text-primary/50">Room Live Board</p>
-                      <h3 className="text-2xl font-black tracking-tight text-primary">{room.name}</h3>
-                      <p className="text-xs font-bold text-muted-foreground">
-                        좌석 클릭으로 학생 건강도와 상태를 확인하고, 편집은 상세 화면에서 진행합니다.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className="border-none bg-primary/10 text-primary font-black">
-                        {room.cols} x {room.rows}
+      <motion.section className="px-4" {...getDeckMotionProps(0.48, 12)}>
+        <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
+          <div ref={appointmentsSectionRef} className="lg:col-span-7">
+            <Card className="app-depth-card overflow-hidden rounded-[2.6rem] border-none">
+              <CardContent className={cn("space-y-5", isMobile ? "p-4" : "p-5 sm:p-6")}>
+                <TeacherSectionHeader
+                  badge="오늘 상담 현황"
+                  title="오늘 바로 챙겨야 할 상담 흐름"
+                  description="예약 확정과 승인 대기 상담을 같은 흐름에서 보고, 필요한 일정 관리로 바로 이어질 수 있게 정리했습니다."
+                  icon={MessageSquare}
+                  tone="navy"
+                  right={
+                    <>
+                      <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+                        {appointments.length}건
                       </Badge>
-                      {room.hasUnsavedChanges && (
-                        <Badge className="border-none bg-amber-100 text-amber-700 font-black text-[10px]">
-                          미리보기 변경됨
-                        </Badge>
-                      )}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setSelectedRoomView(room.id)}
-                        className="h-10 rounded-xl border-2 font-black"
-                      >
-                        상세 편집
+                      <Button asChild variant="outline" className="h-10 rounded-xl border-2 bg-white font-black text-[#14295F]">
+                        <Link href="/dashboard/appointments">전체 관리 <ArrowRight className="ml-1.5 h-4 w-4" /></Link>
                       </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">학습 중</p>
-                      <p className="dashboard-number mt-1 text-2xl text-blue-600">{room.studying}</p>
-                    </div>
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">배정 좌석</p>
-                      <p className="dashboard-number mt-1 text-2xl text-emerald-600">{room.assigned}</p>
-                    </div>
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">가용 좌석</p>
-                      <p className="dashboard-number mt-1 text-2xl text-slate-700">{room.availableSeats}</p>
-                    </div>
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">물리 좌석</p>
-                      <p className="dashboard-number mt-1 text-2xl text-primary">{room.physicalSeats}</p>
-                    </div>
-                  </div>
-
-                  {renderRoomGridCanvas(room, true)}
-                </CardContent>
-              </Card>
-            ))}
-          </CardContent>
-        </Card>
-      ) : selectedRoomConfig ? (
-        <Card className={cn(
-          "mx-4 overflow-hidden rounded-[3rem] border-none bg-white shadow-xl transition-all duration-500",
-          isEditMode ? "ring-4 ring-primary/20" : ""
-        )}>
-          <CardHeader className="border-b bg-muted/5 px-6 py-4 sm:px-10 sm:py-6">
-            <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-center justify-between")}>
-              <div className="grid gap-1">
-                <CardTitle className={cn("flex items-center gap-2 font-black tracking-tight", isMobile ? "text-lg" : "text-xl")}>
-                  <Armchair className={cn("opacity-40", isMobile ? "h-4 w-4" : "h-5 w-5")} />
-                  {selectedRoomConfig.name} {isEditMode ? '배치 수정' : '좌석 상황판'}
-                  {selectedClass !== 'all' && (
-                    <Badge variant="secondary" className="ml-2 border-none bg-primary/5 text-primary">
-                      {selectedClass}
-                    </Badge>
-                  )}
-                </CardTitle>
-                <CardDescription className="text-xs font-bold text-muted-foreground">
-                  {selectedRoomConfig.name}만 집중해서 보고, 전체 수치는 상단 KPI에서 함께 확인합니다.
-                </CardDescription>
-              </div>
-
-              {isEditMode ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-2 rounded-2xl border bg-white px-3 py-2 shadow-sm">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">가로</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={24}
-                      value={roomDrafts[selectedRoomConfig.id]?.cols ?? selectedRoomConfig.cols}
-                      onChange={(event) => handleRoomDraftChange(selectedRoomConfig.id, 'cols', event.target.value)}
-                      className="h-9 w-20 rounded-xl border-2 text-center font-black"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 rounded-2xl border bg-white px-3 py-2 shadow-sm">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">세로</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={24}
-                      value={roomDrafts[selectedRoomConfig.id]?.rows ?? selectedRoomConfig.rows}
-                      onChange={(event) => handleRoomDraftChange(selectedRoomConfig.id, 'rows', event.target.value)}
-                      className="h-9 w-20 rounded-xl border-2 text-center font-black"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleCancelRoomDraft(selectedRoomConfig.id)}
-                    className="h-11 rounded-xl border-2 font-black"
-                  >
-                    취소
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => handleSaveRoomSettings(selectedRoomConfig.id)}
-                    disabled={
-                      isSaving ||
-                      !roomSummaries.find((room) => room.id === selectedRoomConfig.id)?.hasUnsavedChanges
-                    }
-                    className="h-11 rounded-xl font-black gap-2"
-                  >
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    저장
-                  </Button>
+                    </>
+                  }
+                />
+                <div className="grid gap-3">
+                  {aptLoading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : appointments.length === 0 ? (
+                    <div className="rounded-[2.3rem] border-2 border-dashed border-[#D7E4FF] bg-white/55 py-16 text-center"><p className="text-sm font-black italic text-slate-400">예정된 상담이 없습니다.</p></div>
+                  ) : appointments.map((apt) => (
+                    <Card key={apt.id} className="rounded-[2rem] border border-[#D7E4FF] bg-white/92 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl border border-primary/10 bg-primary/5">
+                            <span className="text-[10px] font-black leading-none text-primary/60">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'HH:mm') : ''}</span>
+                          </div>
+                          <div className="grid min-w-0 leading-tight">
+                            <span className="truncate text-sm font-black">{apt.studentName} 학생</span>
+                            <span className="max-w-[220px] truncate text-[10px] font-bold text-muted-foreground">{apt.studentNote || '상담 주제 미입력'}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn("border-none text-[9px] font-black", apt.status === 'requested' ? "bg-amber-50 text-amber-600" : "bg-emerald-500 text-white")}>{apt.status === 'requested' ? '승인대기' : '예약확정'}</Badge>
+                          <ChevronRight className="h-4 w-4 opacity-20" />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              ) : (
-                <Badge variant="outline" className="h-6 border-primary/40 px-3 text-[10px] font-black uppercase">
-                  {selectedRoomConfig.cols}x{selectedRoomConfig.rows}
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className={cn("space-y-4", isMobile ? "p-4" : "p-6 sm:p-10")}>
-            {isEditMode && activeRoomConflicts.length > 0 && (
-              <div className="rounded-[2rem] border border-rose-200 bg-rose-50/70 p-4 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-rose-600" />
-                  <p className="text-sm font-black text-rose-700">축소 저장 전 정리가 필요한 셀이 있습니다.</p>
-                </div>
-                <p className="mt-2 text-xs font-bold leading-relaxed text-rose-700/90">
-                  {activeRoomConflicts
-                    .slice(0, 5)
-                    .map((seat) => formatSeatLabel(seat, roomConfigs))
-                    .join(', ')}
-                  {activeRoomConflicts.length > 5 ? ` 외 ${activeRoomConflicts.length - 5}개` : ''}
-                </p>
-              </div>
-            )}
-
-            {renderRoomGridCanvas(selectedRoomConfig)}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <div className={cn("grid gap-6 px-4", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
-        <div ref={appointmentsSectionRef} className="lg:col-span-7 space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-3">
-              <MessageSquare className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-black tracking-tighter">오늘 상담 현황</h2>
-              <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black h-6">{appointments.length}건</Badge>
-            </div>
-            <Button asChild variant="ghost" className="font-black text-xs text-muted-foreground hover:text-primary gap-2"><Link href="/dashboard/appointments">전체 관리 <ArrowRight className="h-4 w-4" /></Link></Button>
+              </CardContent>
+            </Card>
           </div>
-          <div className="grid gap-3">
-            {aptLoading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary opacity-20" /></div> : appointments.length === 0 ? (
-              <div className="py-16 text-center bg-white/50 rounded-[2.5rem] border-2 border-dashed border-muted-foreground/10"><p className="font-black text-muted-foreground/30 text-sm italic">예정된 상담이 없습니다.</p></div>
-            ) : appointments.map((apt) => (
-              <Card key={apt.id} className="rounded-[2rem] border-none shadow-sm bg-white p-5 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98]">
-                <div className="flex items-center gap-4">
-                  <div className="h-11 w-11 rounded-2xl bg-primary/5 border border-primary/10 flex flex-col items-center justify-center shrink-0">
-                    <span className="text-[10px] font-black text-primary/60 leading-none">{apt.scheduledAt ? format(apt.scheduledAt.toDate(), 'HH:mm') : ''}</span>
-                  </div>
-                  <div className="grid leading-tight min-w-0">
-                    <span className="font-black text-sm truncate">{apt.studentName} 학생</span>
-                    <span className="text-[10px] font-bold text-muted-foreground truncate max-w-[200px]">{apt.studentNote || '상담 주제 미입력'}</span>
-                  </div>
+
+          <div ref={reportsSectionRef} className="lg:col-span-5">
+            <Card className="marketing-card-soft overflow-hidden rounded-[2.6rem] border-none">
+              <CardContent className={cn("space-y-5", isMobile ? "p-4" : "p-5 sm:p-6")}>
+                <TeacherSectionHeader
+                  badge="최근 발송 리포트"
+                  title="학부모에게 나간 최근 메시지 확인"
+                  description="최근 발송된 리포트를 빠르게 열어 보고, 열람 여부와 문장 톤을 즉시 점검할 수 있게 정리했습니다."
+                  icon={FileSearch}
+                  tone="emerald"
+                  right={
+                    <Button asChild variant="outline" className="h-10 rounded-xl border-2 bg-white font-black text-emerald-700">
+                      <Link href="/dashboard/reports">리포트 센터 <ArrowRight className="ml-1.5 h-4 w-4" /></Link>
+                    </Button>
+                  }
+                />
+                <div className="grid gap-3">
+                  {!recentReportsFeed || recentReportsFeed.length === 0 ? (
+                    <div className="rounded-[2.3rem] border-2 border-dashed border-emerald-100 bg-white/55 py-16 text-center"><p className="text-sm font-black italic text-slate-400">최근 발송된 리포트가 없습니다.</p></div>
+                  ) : recentReportsFeed.map((report) => (
+                    <button
+                      key={report.id}
+                      type="button"
+                      onClick={() => setSelectedRecentReport(report)}
+                      className="w-full text-left"
+                    >
+                      <Card className="group rounded-[2rem] border border-transparent bg-white/92 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md active:scale-[0.98]">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-4 min-w-0">
+                            <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl bg-emerald-50">
+                              <span className="text-[10px] font-black leading-none text-emerald-600">{report.dateKey.split('-')[2]}</span>
+                              <span className="mt-0.5 whitespace-nowrap text-[7px] font-bold text-emerald-400">{format(new Date(report.dateKey.replace(/-/g, '/')), 'M월', { locale: ko })}</span>
+                            </div>
+                            <div className="grid min-w-0 leading-tight">
+                              <span className="truncate text-sm font-black">{report.studentName} 학생</span>
+                              <p className="max-w-[180px] truncate text-[10px] font-bold text-muted-foreground">{report.content.substring(0, 40)}...</p>
+                            </div>
+                          </div>
+                          <div className={cn("flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-300 shadow-sm transition-all group-hover:bg-emerald-500 group-hover:text-white", report.viewedAt ? "text-emerald-600" : "text-emerald-300")}>
+                            {report.viewedAt ? <CheckCircle2 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </div>
+                        </div>
+                      </Card>
+                    </button>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={cn("font-black text-[9px] border-none", apt.status === 'requested' ? "bg-amber-50 text-amber-600" : "bg-emerald-500 text-white")}>{apt.status === 'requested' ? '승인대기' : '예약확정'}</Badge>
-                  <ChevronRight className="h-4 w-4 opacity-20" />
-                </div>
-              </Card>
-            ))}
+              </CardContent>
+            </Card>
           </div>
         </div>
-
-        <div ref={reportsSectionRef} className="lg:col-span-5 space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-3">
-              <FileSearch className="h-6 w-6 text-emerald-600" />
-              <h2 className="text-2xl font-black tracking-tighter">최근 발송 리포트</h2>
-            </div>
-            <Button asChild variant="ghost" className="font-black text-xs text-muted-foreground hover:text-emerald-600 gap-2"><Link href="/dashboard/reports">리포트 센터 <ArrowRight className="h-4 w-4" /></Link></Button>
-          </div>
-          <div className="grid gap-3">
-            {!recentReportsFeed || recentReportsFeed.length === 0 ? (
-              <div className="py-16 text-center bg-white/50 rounded-[2.5rem] border-2 border-dashed border-muted-foreground/10"><p className="font-black text-muted-foreground/30 text-sm italic">최근 발송된 리포트가 없습니다.</p></div>
-            ) : recentReportsFeed.map((report) => (
-              <button
-                key={report.id}
-                type="button"
-                onClick={() => setSelectedRecentReport(report)}
-                className="w-full text-left"
-              >
-                <Card className="rounded-[2rem] border-none shadow-sm bg-white p-5 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98] border border-transparent hover:border-emerald-200">
-                <div className="flex items-center gap-4">
-                  <div className="h-11 w-11 rounded-2xl bg-emerald-50 flex flex-col items-center justify-center shrink-0">
-                    <span className="text-[10px] font-black text-emerald-600 leading-none">{report.dateKey.split('-')[2]}</span>
-                    <span className="text-[7px] font-bold text-emerald-400 mt-0.5 whitespace-nowrap">{format(new Date(report.dateKey.replace(/-/g, '/')), 'M월', { locale: ko })}</span>
-                  </div>
-                  <div className="grid leading-tight min-w-0">
-                    <span className="font-black text-sm truncate">{report.studentName} 학생</span>
-                    <p className="text-[10px] font-bold text-muted-foreground truncate max-w-[180px]">{report.content.substring(0, 40)}...</p>
-                  </div>
-                </div>
-                <div className={cn("h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-sm", report.viewedAt ? "text-emerald-600" : "text-emerald-300")}>
-                  {report.viewedAt ? <CheckCircle2 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </div>
-                </Card>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      </motion.section>
 
       <Dialog open={!!selectedRecentReport} onOpenChange={(open) => !open && setSelectedRecentReport(null)}>
         <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
