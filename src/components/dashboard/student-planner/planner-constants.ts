@@ -8,7 +8,7 @@ export type RoutineTemplateOption = {
 };
 
 export type StudyPlanMode = 'time' | 'volume';
-export type StudyAmountUnit = '문제' | '페이지' | '챕터' | '지문' | '세트' | '회독' | '직접입력';
+export type StudyAmountUnit = '문제' | '페이지' | '챕터' | '지문' | '세트' | '강' | '회독' | '직접입력';
 export type RecentStudyOption = {
   key: string;
   sourceId: string;
@@ -85,6 +85,7 @@ export const STUDY_AMOUNT_UNIT_OPTIONS: Array<{ value: StudyAmountUnit; label: s
   { value: '챕터', label: '챕터' },
   { value: '지문', label: '지문' },
   { value: '세트', label: '세트' },
+  { value: '강', label: '강' },
   { value: '회독', label: '회독' },
   { value: '직접입력', label: '직접 입력' },
 ];

@@ -806,7 +806,7 @@ export interface StudyPlanItem {
   targetMinutes?: number;
   targetAmount?: number;
   actualAmount?: number;
-  amountUnit?: '문제' | '페이지' | '챕터' | '지문' | '세트' | '회독' | '직접입력';
+  amountUnit?: '문제' | '페이지' | '챕터' | '지문' | '세트' | '강' | '회독' | '직접입력';
   amountUnitLabel?: string;
   startTime?: string;
   endTime?: string;
