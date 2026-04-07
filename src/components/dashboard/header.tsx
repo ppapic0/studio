@@ -64,6 +64,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CenterMembership, StudentProfile, User as UserType } from '@/lib/types';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { clearServerAuthSession } from '@/lib/client-auth-session';
 
 function extractPhoneNumber(source: unknown): string {
   if (!source || typeof source !== 'object') return '';
@@ -236,9 +237,20 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
   }, [isParentMode]);
 
   const handleSignOut = async () => {
-    if (!auth) return;
-    await signOut(auth);
-    router.push('/login');
+    try {
+      await clearServerAuthSession();
+      if (auth) {
+        await signOut(auth);
+      }
+      router.push('/login');
+    } catch (error) {
+      logHandledClientIssue('[dashboard-header] sign out failed', error);
+      toast({
+        variant: 'destructive',
+        title: '로그아웃 실패',
+        description: '로그아웃 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+      });
+    }
   };
 
   const handleUpdateSettings = async () => {

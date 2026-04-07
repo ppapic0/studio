@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
 
@@ -47,6 +47,9 @@ import {
   TERMS_ROUTE,
   TERMS_VERSION,
 } from '@/lib/legal-documents';
+import { AUTH_SESSION_SYNC_SKIP_STORAGE_KEY } from '@/lib/auth-session-shared';
+import { createServerAuthSession } from '@/lib/client-auth-session';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const roleEnum = z.enum(['student', 'teacher', 'parent', 'centerAdmin']);
 
@@ -287,8 +290,12 @@ export function SignupForm() {
     }
 
     setIsLoading(true);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY, '1');
+    }
     router.prefetch('/dashboard');
     let createdUser = false;
+    let signupCompleted = false;
 
     try {
       const inviteCode = (values.inviteCode || '').trim();
@@ -342,6 +349,14 @@ export function SignupForm() {
           }),
         },
       });
+      signupCompleted = true;
+
+      try {
+        await createServerAuthSession(userCredential.user);
+      } catch {
+        await signOut(auth).catch(() => undefined);
+        throw new Error('회원가입은 완료되었지만 브라우저 인증 세션을 준비하지 못했습니다. 로그인 페이지에서 다시 로그인해 주세요.');
+      }
 
       setLoadingStatus('회원가입 완료');
       toast({
@@ -354,15 +369,15 @@ export function SignupForm() {
       router.replace('/dashboard');
       router.refresh();
     } catch (error: any) {
-      if (createdUser && auth.currentUser) {
+      if (createdUser && !signupCompleted && auth.currentUser) {
         try {
           await auth.currentUser.delete();
         } catch (cleanupError) {
-          console.error('Signup rollback failed:', cleanupError);
+          logHandledClientIssue('[signup-form] signup rollback failed', cleanupError);
         }
       }
 
-      console.error('Signup Error:', error);
+      logHandledClientIssue('[signup-form] signup failed', error);
 
       const signupErrorMessage = resolveSignupErrorMessage(error);
       const msgLower = signupErrorMessage.toLowerCase();
@@ -391,6 +406,10 @@ export function SignupForm() {
 
       setIsLoading(false);
       setLoadingStatus('');
+    } finally {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY);
+      }
     }
   }
 

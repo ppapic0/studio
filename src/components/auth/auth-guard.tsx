@@ -1,9 +1,17 @@
 'use client';
 
-import { useUser } from '@/firebase';
-import { usePathname, useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
+import { useAuth, useUser } from '@/firebase';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+
+import {
+  AUTH_SESSION_SYNC_SKIP_STORAGE_KEY,
+  sanitizeDashboardReturnPath,
+} from '@/lib/auth-session-shared';
+import { createServerAuthSession } from '@/lib/client-auth-session';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const PUBLIC_ROUTES = new Set([
   '/',
@@ -25,13 +33,25 @@ function isPublicRoute(pathname: string | null): boolean {
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading: userLoading } = useUser();
+  const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
+  const [isSessionSyncing, setIsSessionSyncing] = useState(false);
+  const [hasTriedSessionSync, setHasTriedSessionSync] = useState(false);
+  const isAuthRoute = pathname === '/login' || pathname === '/signup';
+  const redirectPath = sanitizeDashboardReturnPath(searchParams.get('next'));
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    setHasTriedSessionSync(false);
+    setIsSessionSyncing(false);
+  }, [mounted, pathname, user?.uid]);
 
   useEffect(() => {
     if (userLoading || !mounted) return;
@@ -40,12 +60,51 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       if (!isPublicRoute(pathname)) {
         router.replace('/login');
       }
-    } else {
-      if (pathname === '/login' || pathname === '/signup') {
-        router.replace('/dashboard');
-      }
+      return;
     }
-  }, [user, userLoading, pathname, router, mounted]);
+
+    if (!isAuthRoute || hasTriedSessionSync) {
+      return;
+    }
+
+    if (
+      typeof window !== 'undefined' &&
+      window.sessionStorage.getItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY) === '1'
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncServerSession = async () => {
+      setHasTriedSessionSync(true);
+      setIsSessionSyncing(true);
+
+      try {
+        await createServerAuthSession(user);
+        if (!cancelled) {
+          router.replace(redirectPath);
+        }
+      } catch (error) {
+        logHandledClientIssue('[auth-guard] session sync failed', error);
+        try {
+          await signOut(auth);
+        } catch (signOutError) {
+          logHandledClientIssue('[auth-guard] sign out after session sync failure failed', signOutError);
+        } finally {
+          if (!cancelled) {
+            setIsSessionSyncing(false);
+          }
+        }
+      }
+    };
+
+    void syncServerSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [auth, hasTriedSessionSync, isAuthRoute, mounted, pathname, redirectPath, router, user, userLoading]);
 
   // 하이드레이션 오류 방지
   if (!mounted) {
@@ -57,6 +116,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // 로그인/회원가입 페이지는 인증 체크 없이 노출
+  if (isAuthRoute && user && isSessionSyncing) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm font-bold text-muted-foreground animate-pulse">인증 세션을 준비 중입니다...</p>
+      </div>
+    );
+  }
+
   if (isPublicRoute(pathname)) {
     return <>{children}</>;
   }

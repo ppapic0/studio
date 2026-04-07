@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import {
+  AUTH_SESSION_COOKIE_NAME,
+  isDashboardRoute,
+  sanitizeDashboardReturnPath,
+} from '@/lib/auth-session-shared';
+
 const SECURITY_HEADERS: Array<[string, string]> = [
   ['X-Frame-Options', 'DENY'],
   ['X-Content-Type-Options', 'nosniff'],
@@ -27,6 +33,17 @@ export function middleware(request: NextRequest) {
 
   if (process.env.NODE_ENV === 'production' && pathname.startsWith('/dev')) {
     return applySecurityHeaders(new NextResponse('Not Found', { status: 404 }));
+  }
+
+  if (isDashboardRoute(pathname) && !request.cookies.get(AUTH_SESSION_COOKIE_NAME)?.value) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    loginUrl.search = '';
+    loginUrl.searchParams.set(
+      'next',
+      sanitizeDashboardReturnPath(`${request.nextUrl.pathname}${request.nextUrl.search}`)
+    );
+    return applySecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
   const response = NextResponse.next();

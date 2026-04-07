@@ -13,7 +13,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore, useFunctions } from '@/firebase';
 import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -37,6 +37,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AUTH_SESSION_SYNC_SKIP_STORAGE_KEY,
+  sanitizeDashboardReturnPath,
+} from '@/lib/auth-session-shared';
+import { createServerAuthSession } from '@/lib/client-auth-session';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -53,6 +59,7 @@ const resetSchema = z.object({
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const auth = useAuth();
   const firestore = useFirestore();
   const functions = useFunctions();
@@ -60,6 +67,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [isResetSending, setIsResetSending] = useState(false);
+  const postLoginPath = sanitizeDashboardReturnPath(searchParams.get('next'));
 
   const normalizeMembershipStatus = (value: unknown): string => {
     if (typeof value !== 'string') return '';
@@ -139,6 +147,9 @@ export function LoginForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth) return;
     setIsLoading(true);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY, '1');
+    }
     try {
       const trimmedEmail = values.email.trim();
       const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
@@ -169,12 +180,14 @@ export function LoginForm() {
           emailDomain: trimmedEmail.includes('@') ? trimmedEmail.split('@')[1] : null,
         },
       });
+      await createServerAuthSession(userCredential.user);
       if (typeof window !== 'undefined') {
         setDashboardEntryMotionKeys(resolveDashboardEntryMotionKeys(memberships));
       }
-      router.replace('/dashboard');
+      router.replace(postLoginPath);
     } catch (error: any) {
-      console.error('Login failed:', error);
+      await signOut(auth).catch(() => undefined);
+      logHandledClientIssue('[login-form] login failed', error);
       let errorMessage = '오류가 발생했습니다. 다시 시도해 주세요.';
 
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
@@ -187,6 +200,9 @@ export function LoginForm() {
         description: errorMessage,
       });
     } finally {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY);
+      }
       setIsLoading(false);
     }
   }
@@ -206,7 +222,7 @@ export function LoginForm() {
       setIsResetOpen(false);
       resetForm.reset({ email: '' });
     } catch (error: any) {
-      console.error('Password reset failed:', error);
+      logHandledClientIssue('[login-form] password reset failed', error);
 
       const code = String(error?.code || '').toLowerCase();
       const rawMessage = String(error?.message || '').replace(/^FirebaseError:\s*/i, '').trim();
