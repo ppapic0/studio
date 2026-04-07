@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import {
   AUTH_SESSION_COOKIE_NAME,
-  isDashboardRoute,
-  sanitizeDashboardReturnPath,
+  isProtectedAppRoute,
+  sanitizeProtectedAppReturnPath,
 } from '@/lib/auth-session-shared';
 
 const SECURITY_HEADERS: Array<[string, string]> = [
@@ -35,18 +35,25 @@ export function middleware(request: NextRequest) {
     return applySecurityHeaders(new NextResponse('Not Found', { status: 404 }));
   }
 
-  if (isDashboardRoute(pathname) && !request.cookies.get(AUTH_SESSION_COOKIE_NAME)?.value) {
+  if (isProtectedAppRoute(pathname) && !request.cookies.get(AUTH_SESSION_COOKIE_NAME)?.value) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.search = '';
     loginUrl.searchParams.set(
       'next',
-      sanitizeDashboardReturnPath(`${request.nextUrl.pathname}${request.nextUrl.search}`)
+      sanitizeProtectedAppReturnPath(`${request.nextUrl.pathname}${request.nextUrl.search}`)
     );
     return applySecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
-  const response = NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-track-pathname', pathname);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 
   if (pathname.startsWith('/api/')) {
     response.headers.set('Cache-Control', 'no-store, max-age=0');

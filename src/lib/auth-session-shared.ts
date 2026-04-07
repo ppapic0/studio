@@ -9,8 +9,15 @@ export function isDashboardRoute(pathname: string | null | undefined) {
   return pathname === '/dashboard' || pathname.startsWith('/dashboard/');
 }
 
-export function sanitizeDashboardReturnPath(candidate: string | null | undefined) {
+export function isProtectedAppRoute(pathname: string | null | undefined) {
+  if (!pathname) return false;
+  return isDashboardRoute(pathname) || pathname === '/kiosk';
+}
+
+export function sanitizeProtectedAppReturnPath(candidate: string | null | undefined) {
   if (!candidate || !candidate.startsWith('/')) return '/dashboard';
   if (candidate.startsWith('//')) return '/dashboard';
-  return isDashboardRoute(candidate) ? candidate : '/dashboard';
+  return isProtectedAppRoute(candidate) ? candidate : '/dashboard';
 }
+
+export const sanitizeDashboardReturnPath = sanitizeProtectedAppReturnPath;

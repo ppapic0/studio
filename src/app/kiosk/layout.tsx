@@ -1,29 +1,25 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { getVerifiedServerSession } from '@/lib/server-auth-session';
 import {
   canAccessDashboardPath,
   getServerDashboardMemberships,
 } from '@/lib/server-dashboard-access';
 
-export default async function DashboardLayout({
+export default async function KioskLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const headerStore = await headers();
-  const pathname = headerStore.get('x-track-pathname') || '/dashboard';
   const session = await getVerifiedServerSession();
   if (!session) {
-    redirect('/login');
+    redirect('/login?next=%2Fkiosk');
   }
 
   const memberships = await getServerDashboardMemberships(session.uid);
-  if (!canAccessDashboardPath(pathname, memberships)) {
+  if (!canAccessDashboardPath('/kiosk', memberships)) {
     redirect('/dashboard');
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return <>{children}</>;
 }
