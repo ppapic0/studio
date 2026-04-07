@@ -66,6 +66,40 @@ service cloud.firestore {
       return isActiveMember(centerId) && isRoleTeacherOrAdmin(getMemberRole(centerId));
     }
 
+    function isTeacher(centerId) {
+      return isActiveMember(centerId) && getMemberRole(centerId) == 'teacher';
+    }
+
+    function canTeacherCreateWebsiteLead(centerId) {
+      return isTeacher(centerId)
+        && request.resource.data.source == 'website'
+        && request.resource.data.sourceRequestId is string
+        && request.resource.data.sourceRequestId != ''
+        && request.resource.data.createdByUid == request.auth.uid;
+    }
+
+    function canTeacherLinkLeadToWaitlist(centerId) {
+      return isTeacher(centerId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['addedToWaitlistId', 'addedToWaitlistIds', 'updatedAt']);
+    }
+
+    function canTeacherLinkWebsiteRequestToLead(centerId) {
+      return isTeacher(centerId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['linkedLeadId', 'updatedAt']);
+    }
+
+    function canTeacherCreateWaitlistFromLead(centerId) {
+      return isTeacher(centerId)
+        && request.resource.data.sourceLeadId is string
+        && request.resource.data.sourceLeadId != '';
+    }
+
+    function canTeacherAttachWebsiteWaitlistToLead(centerId) {
+      return isTeacher(centerId)
+        && resource.data.sourceWebsiteRequestId != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sourceLeadId', 'studentName', 'parentPhone', 'school', 'grade', 'updatedAt']);
+    }
+
     function isStudent(centerId) {
       return getMemberRole(centerId) == 'student';
     }
@@ -420,19 +454,22 @@ service cloud.firestore {
 
       match /consultingLeads/{leadId} {
         allow read: if isTeacherOrAdmin(centerId);
-        allow create, update: if isTeacherOrAdmin(centerId);
+        allow create: if isCenterAdmin(centerId) || canTeacherCreateWebsiteLead(centerId);
+        allow update: if isCenterAdmin(centerId) || canTeacherLinkLeadToWaitlist(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
 
       match /admissionWaitlist/{entryId} {
         allow read: if isTeacherOrAdmin(centerId);
-        allow create, update: if isTeacherOrAdmin(centerId);
+        allow create: if isCenterAdmin(centerId) || canTeacherCreateWaitlistFromLead(centerId);
+        allow update: if isCenterAdmin(centerId) || canTeacherAttachWebsiteWaitlistToLead(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
 
       match /websiteConsultRequests/{reqId} {
         allow read: if isTeacherOrAdmin(centerId);
-        allow create, update: if isTeacherOrAdmin(centerId);
+        allow create: if isCenterAdmin(centerId);
+        allow update: if isCenterAdmin(centerId) || canTeacherLinkWebsiteRequestToLead(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
 

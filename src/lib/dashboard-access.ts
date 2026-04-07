@@ -42,6 +42,14 @@ export function canReadLeadOps(role?: string | null) {
   return isTeacherOrAdminRole(role);
 }
 
+export function canTransitionLeadPipeline(role?: string | null) {
+  return isTeacherOrAdminRole(role);
+}
+
+export function canManageLeadRecords(role?: string | null) {
+  return isAdminRole(role);
+}
+
 export function canReadFinance(role?: string | null) {
   return isAdminRole(role);
 }

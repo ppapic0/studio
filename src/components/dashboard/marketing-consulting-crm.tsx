@@ -33,7 +33,7 @@ import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
-import { canManageStaff, canReadFinance } from '@/lib/dashboard-access';
+import { canManageLeadRecords, canReadFinance, canTransitionLeadPipeline } from '@/lib/dashboard-access';
 import { cn } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
@@ -276,7 +276,8 @@ export function MarketingConsultingCRM({
   const { activeMembership } = useAppContext();
   const { toast } = useToast();
   const canOpenFinance = canReadFinance(activeMembership?.role);
-  const canDeleteOpsRecords = canManageStaff(activeMembership?.role);
+  const canManageLeadData = canManageLeadRecords(activeMembership?.role);
+  const canTransitionPipeline = canTransitionLeadPipeline(activeMembership?.role);
 
   const [activeTab, setActiveTab] = useState<'leads' | 'waitlist'>('leads');
   const [form, setForm] = useState<LeadFormState>(INITIAL_FORM);
@@ -526,6 +527,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleEdit = (lead: ConsultingLead) => {
+    if (!canManageLeadData) return;
     setEditingId(lead.id);
     setForm({
       studentName: lead.studentName || '',
@@ -544,7 +546,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleSave = async () => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canManageLeadData) return;
     if (!form.studentName.trim() && !form.parentName.trim()) {
       toast({ variant: 'destructive', title: '입력 필요', description: '학생 이름 또는 학부모 이름을 입력해 주세요.' });
       return;
@@ -592,7 +594,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleDelete = async (leadId: string) => {
-    if (!firestore || !centerId || !canDeleteOpsRecords) return;
+    if (!firestore || !centerId || !canManageLeadData) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'consultingLeads', leadId));
       if (editingId === leadId) resetForm();
@@ -604,7 +606,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleQuickStatusUpdate = async (leadId: string, nextStatus: LeadStatus) => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canManageLeadData) return;
     try {
       await updateDoc(doc(firestore, 'centers', centerId, 'consultingLeads', leadId), {
         status: nextStatus,
@@ -617,7 +619,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleWebsiteStatusUpdate = async (requestId: string, nextStatus: LeadStatus) => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canManageLeadData) return;
     try {
       await updateDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', requestId), {
         status: nextStatus,
@@ -630,7 +632,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleWebsiteDelete = async (requestId: string) => {
-    if (!firestore || !centerId || !canDeleteOpsRecords) return;
+    if (!firestore || !centerId || !canManageLeadData) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', requestId));
       toast({ title: '웹 상담 접수가 삭제되었습니다.' });
@@ -641,7 +643,7 @@ export function MarketingConsultingCRM({
   };
 
   const handlePromoteWebsiteRequest = async (request: WebsiteConsultRequest) => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canTransitionPipeline) return;
     setPromotingWebsiteId(request.id);
     try {
       const linkedWaitlistEntries = waitlistBySourceWebsiteRequestId.get(request.id) || [];
@@ -706,6 +708,7 @@ export function MarketingConsultingCRM({
   };
 
   const openWaitlistModal = (lead: ConsultingLead) => {
+    if (!canTransitionPipeline) return;
     const existingEntries = waitlistBySourceLeadId.get(lead.id) || [];
     const existingActiveServiceTypes = new Set<ServiceType>(
       existingEntries.filter((entry) => entry.status !== 'cancelled').map((entry) => entry.serviceType)
@@ -741,7 +744,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleSaveWaitlist = async () => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canTransitionPipeline) return;
     if (!waitlistModal.studentName.trim()) {
       toast({ variant: 'destructive', title: '입력 필요', description: '학생 이름을 입력해 주세요.' });
       return;
@@ -819,7 +822,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleWaitlistStatusUpdate = async (entryId: string, nextStatus: WaitlistStatus) => {
-    if (!firestore || !centerId) return;
+    if (!firestore || !centerId || !canManageLeadData) return;
     try {
       await updateDoc(doc(firestore, 'centers', centerId, 'admissionWaitlist', entryId), {
         status: nextStatus,
@@ -832,7 +835,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleWaitlistDelete = async (entryId: string, sourceLeadId?: string) => {
-    if (!firestore || !centerId || !canDeleteOpsRecords) return;
+    if (!firestore || !centerId || !canManageLeadData) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'admissionWaitlist', entryId));
       if (sourceLeadId) {
@@ -1095,38 +1098,42 @@ export function MarketingConsultingCRM({
                           >
                             상세 보기
                           </Button>
-                          <Select
-                            value={request.status || 'new'}
-                            onValueChange={(value) => handleWebsiteStatusUpdate(request.id, value as LeadStatus)}
-                          >
-                            <SelectTrigger className="h-9 min-w-[120px] rounded-lg text-xs font-black">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(STATUS_META).map(([value, meta]) => (
-                                <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {canManageLeadData ? (
+                            <Select
+                              value={request.status || 'new'}
+                              onValueChange={(value) => handleWebsiteStatusUpdate(request.id, value as LeadStatus)}
+                            >
+                              <SelectTrigger className="h-9 min-w-[120px] rounded-lg text-xs font-black">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(STATUS_META).map(([value, meta]) => (
+                                  <SelectItem key={value} value={value}>{meta.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : null}
                           <Button
                             type="button"
                             variant="outline"
                             className="h-9 rounded-lg px-3 text-xs font-black"
                             onClick={() => void handlePromoteWebsiteRequest(request)}
-                            disabled={promotingWebsiteId === request.id || !!request.linkedLeadId}
+                            disabled={!canTransitionPipeline || promotingWebsiteId === request.id || !!request.linkedLeadId}
                           >
                             {promotingWebsiteId === request.id && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
                             {request.linkedLeadId ? '리드 이동됨' : '리드 DB로 이동'}
                           </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
-                            onClick={() => void handleWebsiteDelete(request.id)}
-                          >
-                            <Trash2 className="mr-1 h-3.5 w-3.5" />
-                            삭제
-                          </Button>
+                          {canManageLeadData ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
+                              onClick={() => void handleWebsiteDelete(request.id)}
+                            >
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                              삭제
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -1180,164 +1187,171 @@ export function MarketingConsultingCRM({
             </div>
 
             {/* ── 상담 리드 등록 폼 ── */}
-            <div className="rounded-xl border border-slate-100 p-4">
-              <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-2')}>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">학생 이름</Label>
-                  <Input
-                    value={form.studentName}
-                    onChange={(e) => setForm((p) => ({ ...p, studentName: e.target.value }))}
-                    placeholder="예: 김재윤"
-                    className="h-10 rounded-lg"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">학부모 이름</Label>
-                  <Input
-                    value={form.parentName}
-                    onChange={(e) => setForm((p) => ({ ...p, parentName: e.target.value }))}
-                    placeholder="예: 김OO"
-                    className="h-10 rounded-lg"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">학부모 전화번호</Label>
-                  <Input
-                    value={form.parentPhone}
-                    onChange={(e) => setForm((p) => ({ ...p, parentPhone: e.target.value }))}
-                    placeholder="010-1234-5678"
-                    className="h-10 rounded-lg"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">학생 전화번호 (선택)</Label>
-                  <Input
-                    value={form.studentPhone}
-                    onChange={(e) => setForm((p) => ({ ...p, studentPhone: e.target.value }))}
-                    placeholder="010-0000-0000"
-                    className="h-10 rounded-lg"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">학교 (선택)</Label>
-                  <Input
-                    value={form.school}
-                    onChange={(e) => setForm((p) => ({ ...p, school: e.target.value }))}
-                    placeholder="예: 대치중"
-                    className="h-10 rounded-lg"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">학년 (선택)</Label>
-                  <Input
-                    value={form.grade}
-                    onChange={(e) => setForm((p) => ({ ...p, grade: e.target.value }))}
-                    placeholder="예: 중2"
-                    className="h-10 rounded-lg"
-                  />
-                </div>
-
-                {/* ── 유입 경로 ── */}
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">유입 경로</Label>
-                  <Select
-                    value={form.referralRoute}
-                    onValueChange={(value) => setForm((p) => ({ ...p, referralRoute: value as ReferralRoute, referrerName: '' }))}
-                  >
-                    <SelectTrigger className="h-10 rounded-lg font-bold">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REFERRAL_ROUTES.map((route) => (
-                        <SelectItem key={route} value={route} className="font-semibold">{route}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* ── 추천인 (추천 선택 시만) ── */}
-                {form.referralRoute === '추천' && (
+            {canManageLeadData ? (
+              <div className="rounded-xl border border-slate-100 p-4">
+                <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-2')}>
                   <div className="grid gap-1.5">
-                    <Label className="text-xs font-black">추천인 이름</Label>
+                    <Label className="text-xs font-black">학생 이름</Label>
                     <Input
-                      value={form.referrerName}
-                      onChange={(e) => setForm((p) => ({ ...p, referrerName: e.target.value }))}
-                      placeholder="예: 홍길동 학부모님"
+                      value={form.studentName}
+                      onChange={(e) => setForm((p) => ({ ...p, studentName: e.target.value }))}
+                      placeholder="예: 김재윤"
                       className="h-10 rounded-lg"
                     />
                   </div>
-                )}
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">학부모 이름</Label>
+                    <Input
+                      value={form.parentName}
+                      onChange={(e) => setForm((p) => ({ ...p, parentName: e.target.value }))}
+                      placeholder="예: 김OO"
+                      className="h-10 rounded-lg"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">학부모 전화번호</Label>
+                    <Input
+                      value={form.parentPhone}
+                      onChange={(e) => setForm((p) => ({ ...p, parentPhone: e.target.value }))}
+                      placeholder="010-1234-5678"
+                      className="h-10 rounded-lg"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">학생 전화번호 (선택)</Label>
+                    <Input
+                      value={form.studentPhone}
+                      onChange={(e) => setForm((p) => ({ ...p, studentPhone: e.target.value }))}
+                      placeholder="010-0000-0000"
+                      className="h-10 rounded-lg"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">학교 (선택)</Label>
+                    <Input
+                      value={form.school}
+                      onChange={(e) => setForm((p) => ({ ...p, school: e.target.value }))}
+                      placeholder="예: 대치중"
+                      className="h-10 rounded-lg"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">학년 (선택)</Label>
+                    <Input
+                      value={form.grade}
+                      onChange={(e) => setForm((p) => ({ ...p, grade: e.target.value }))}
+                      placeholder="예: 중2"
+                      className="h-10 rounded-lg"
+                    />
+                  </div>
 
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">상담일</Label>
-                  <Input
-                    type="date"
-                    value={form.consultationDate}
-                    onChange={(e) => setForm((p) => ({ ...p, consultationDate: e.target.value }))}
-                    className="h-10 rounded-lg"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">상태</Label>
-                  <Select
-                    value={form.status}
-                    onValueChange={(value) => setForm((p) => ({ ...p, status: value as LeadStatus }))}
-                  >
-                    <SelectTrigger className="h-10 rounded-lg font-bold">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(STATUS_META).map(([value, meta]) => (
-                        <SelectItem key={value} value={value} className="font-semibold">{meta.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-black">상담 유형</Label>
-                  <Select
-                    value={form.serviceType}
-                    onValueChange={(value) =>
-                      setForm((p) => ({
-                        ...p,
-                        serviceType: value === SERVICE_TYPE_NONE ? '' : (value as ServiceType),
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="h-10 rounded-lg font-bold">
-                      <SelectValue placeholder="선택 안함" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={SERVICE_TYPE_NONE} className="font-semibold text-slate-400">선택 안함</SelectItem>
-                      {(Object.entries(SERVICE_TYPE_META) as [ServiceType, { label: string; color: string }][]).map(([value, meta]) => (
-                        <SelectItem key={value} value={value} className="font-semibold">{meta.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5 md:col-span-2">
-                  <Label className="text-xs font-black">메모</Label>
-                  <Textarea
-                    value={form.memo}
-                    onChange={(e) => setForm((p) => ({ ...p, memo: e.target.value }))}
-                    placeholder="상담 내용, 관심 과목, 후속 연락 일정 등을 기록하세요."
-                    className="min-h-[92px] rounded-lg"
-                  />
-                </div>
-              </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">유입 경로</Label>
+                    <Select
+                      value={form.referralRoute}
+                      onValueChange={(value) => setForm((p) => ({ ...p, referralRoute: value as ReferralRoute, referrerName: '' }))}
+                    >
+                      <SelectTrigger className="h-10 rounded-lg font-bold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REFERRAL_ROUTES.map((route) => (
+                          <SelectItem key={route} value={route} className="font-semibold">{route}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button type="button" className="h-10 rounded-lg font-black" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : editingId ? <Save className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                  {editingId ? '리드 수정 저장' : '상담 리드 등록'}
-                </Button>
-                {editingId && (
-                  <Button type="button" variant="outline" className="h-10 rounded-lg font-black" onClick={resetForm}>
-                    편집 취소
+                  {form.referralRoute === '추천' && (
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs font-black">추천인 이름</Label>
+                      <Input
+                        value={form.referrerName}
+                        onChange={(e) => setForm((p) => ({ ...p, referrerName: e.target.value }))}
+                        placeholder="예: 홍길동 학부모님"
+                        className="h-10 rounded-lg"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">상담일</Label>
+                    <Input
+                      type="date"
+                      value={form.consultationDate}
+                      onChange={(e) => setForm((p) => ({ ...p, consultationDate: e.target.value }))}
+                      className="h-10 rounded-lg"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">상태</Label>
+                    <Select
+                      value={form.status}
+                      onValueChange={(value) => setForm((p) => ({ ...p, status: value as LeadStatus }))}
+                    >
+                      <SelectTrigger className="h-10 rounded-lg font-bold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(STATUS_META).map(([value, meta]) => (
+                          <SelectItem key={value} value={value} className="font-semibold">{meta.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs font-black">상담 유형</Label>
+                    <Select
+                      value={form.serviceType}
+                      onValueChange={(value) =>
+                        setForm((p) => ({
+                          ...p,
+                          serviceType: value === SERVICE_TYPE_NONE ? '' : (value as ServiceType),
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-10 rounded-lg font-bold">
+                        <SelectValue placeholder="선택 안함" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={SERVICE_TYPE_NONE} className="font-semibold text-slate-400">선택 안함</SelectItem>
+                        {(Object.entries(SERVICE_TYPE_META) as [ServiceType, { label: string; color: string }][]).map(([value, meta]) => (
+                          <SelectItem key={value} value={value} className="font-semibold">{meta.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1.5 md:col-span-2">
+                    <Label className="text-xs font-black">메모</Label>
+                    <Textarea
+                      value={form.memo}
+                      onChange={(e) => setForm((p) => ({ ...p, memo: e.target.value }))}
+                      placeholder="상담 내용, 관심 과목, 후속 연락 일정 등을 기록하세요."
+                      className="min-h-[92px] rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" className="h-10 rounded-lg font-black" onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : editingId ? <Save className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                    {editingId ? '리드 수정 저장' : '상담 리드 등록'}
                   </Button>
-                )}
+                  {editingId && (
+                    <Button type="button" variant="outline" className="h-10 rounded-lg font-black" onClick={resetForm}>
+                      편집 취소
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-sm font-black text-slate-700">선생님 계정은 리드 DB를 조회하고 이동만 할 수 있어요.</p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                  수동 등록, 직접 수정, 상태 변경, 삭제는 관리자 계정에서만 가능합니다. 대신 웹 접수를 상담 리드로 옮기거나, 상담 리드를 입학 대기로 넘기는 작업은 그대로 진행할 수 있습니다.
+                </p>
+              </div>
+            )}
 
             <AdminWorkbenchCommandBar
               eyebrow="홍보/상담 워크벤치"
@@ -1354,7 +1368,9 @@ export function MarketingConsultingCRM({
               ]}
               selectLabel="리드 상태"
               quickActions={[
-                { label: editingId ? '입력 초기화' : '상담 리드 등록', icon: <PlusCircle className="h-4 w-4" />, onClick: resetForm },
+                ...(canManageLeadData
+                  ? [{ label: editingId ? '입력 초기화' : '상담 리드 등록', icon: <PlusCircle className="h-4 w-4" />, onClick: resetForm }]
+                  : []),
                 { label: '입학 대기 DB', icon: <ListChecks className="h-4 w-4" />, onClick: () => setActiveTab('waitlist') },
                 ...(canOpenFinance ? [{ label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }] : []),
                 { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
@@ -1461,29 +1477,32 @@ export function MarketingConsultingCRM({
                           >
                             상세 보기
                           </Button>
-                          <Select
-                            value={lead.status || 'new'}
-                            onValueChange={(value) => handleQuickStatusUpdate(lead.id, value as LeadStatus)}
-                          >
-                            <SelectTrigger className="h-9 min-w-[120px] rounded-lg text-xs font-black">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(STATUS_META).map(([value, meta]) => (
-                                <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-lg px-3 text-xs font-black"
-                            onClick={() => handleEdit(lead)}
-                          >
-                            수정
-                          </Button>
-                          {/* ── 입학 대기 등록 버튼 (상담완료·등록완료) ── */}
-                          {(lead.status === 'consulted' || lead.status === 'enrolled') && (
+                          {canManageLeadData ? (
+                            <Select
+                              value={lead.status || 'new'}
+                              onValueChange={(value) => handleQuickStatusUpdate(lead.id, value as LeadStatus)}
+                            >
+                              <SelectTrigger className="h-9 min-w-[120px] rounded-lg text-xs font-black">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(STATUS_META).map(([value, meta]) => (
+                                  <SelectItem key={value} value={value}>{meta.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : null}
+                          {canManageLeadData ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 rounded-lg px-3 text-xs font-black"
+                              onClick={() => handleEdit(lead)}
+                            >
+                              수정
+                            </Button>
+                          ) : null}
+                          {canTransitionPipeline && (
                             <Button
                               type="button"
                               variant="outline"
@@ -1500,7 +1519,7 @@ export function MarketingConsultingCRM({
                               {waitlistButtonLabel}
                             </Button>
                           )}
-                          {canDeleteOpsRecords ? (
+                          {canManageLeadData ? (
                             <Button
                               type="button"
                               variant="outline"
@@ -1708,7 +1727,7 @@ export function MarketingConsultingCRM({
                   </p>
                   {waitlistSummary.total === 0 && (
                     <p className="mt-1 text-xs font-medium text-slate-400">
-                      홍보/상담 리드 탭에서 상담완료 학생의 "입학 대기 등록" 버튼을 누르세요.
+                      홍보/상담 리드 탭에서 "입학 대기 등록" 버튼으로 바로 넘길 수 있어요.
                     </p>
                   )}
                 </div>
@@ -1770,25 +1789,27 @@ export function MarketingConsultingCRM({
                           >
                             상세 보기
                           </Button>
-                          <Select
-                            value={entry.status || 'waiting'}
-                            onValueChange={(value) => handleWaitlistStatusUpdate(entry.id, value as WaitlistStatus)}
-                          >
-                            <SelectTrigger className="h-9 min-w-[110px] rounded-lg text-xs font-black">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(WAITLIST_STATUS_META).map(([value, meta]) => (
-                                <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {canDeleteOpsRecords ? (
+                          {canManageLeadData ? (
+                            <Select
+                              value={entry.status || 'waiting'}
+                              onValueChange={(value) => handleWaitlistStatusUpdate(entry.id, value as WaitlistStatus)}
+                            >
+                              <SelectTrigger className="h-9 min-w-[110px] rounded-lg text-xs font-black">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(WAITLIST_STATUS_META).map(([value, meta]) => (
+                                  <SelectItem key={value} value={value}>{meta.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : null}
+                          {canManageLeadData ? (
                             <Button
                               type="button"
                               variant="outline"
                               className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
-                              onClick={() => handleWaitlistDelete(entry.id, entry.sourceLeadId)}
+                              onClick={() => void handleWaitlistDelete(entry.id, entry.sourceLeadId)}
                             >
                               <Trash2 className="mr-1 h-3.5 w-3.5" />
                               삭제
@@ -1867,17 +1888,21 @@ export function MarketingConsultingCRM({
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">바로 할 일</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" className="h-10 rounded-xl font-black" onClick={() => handleEdit(selectedLead)}>
-                      수정 이어서 하기
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-10 rounded-xl font-black"
-                      onClick={() => openWaitlistModal(selectedLead)}
-                    >
-                      입학 대기 등록
-                    </Button>
+                    {canManageLeadData ? (
+                      <Button type="button" className="h-10 rounded-xl font-black" onClick={() => handleEdit(selectedLead)}>
+                        수정 이어서 하기
+                      </Button>
+                    ) : null}
+                    {canTransitionPipeline ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-xl font-black"
+                        onClick={() => openWaitlistModal(selectedLead)}
+                      >
+                        입학 대기 등록
+                      </Button>
+                    ) : null}
                   </div>
                   {((waitlistBySourceLeadId.get(selectedLead.id) || []).length > 0) ? (
                     <div className="mt-4 rounded-xl border border-orange-100 bg-orange-50/70 p-3">
@@ -1933,12 +1958,12 @@ export function MarketingConsultingCRM({
                       type="button"
                       className="h-10 rounded-xl font-black"
                       onClick={() => void handlePromoteWebsiteRequest(selectedWebsiteRequest)}
-                      disabled={promotingWebsiteId === selectedWebsiteRequest.id || !!selectedWebsiteRequest.linkedLeadId}
+                      disabled={!canTransitionPipeline || promotingWebsiteId === selectedWebsiteRequest.id || !!selectedWebsiteRequest.linkedLeadId}
                     >
                       {promotingWebsiteId === selectedWebsiteRequest.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       {selectedWebsiteRequest.linkedLeadId ? '리드 이동됨' : '리드 DB로 이동'}
                     </Button>
-                    {canDeleteOpsRecords ? (
+                    {canManageLeadData ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -1983,19 +2008,19 @@ export function MarketingConsultingCRM({
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">바로 할 일</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(['waiting', 'admitted', 'cancelled'] as WaitlistStatus[]).map((status) => (
-                      <Button
-                        key={status}
-                        type="button"
-                        variant={selectedWaitlistEntry.status === status ? 'default' : 'outline'}
-                        className="h-10 rounded-xl font-black"
-                        onClick={() => void handleWaitlistStatusUpdate(selectedWaitlistEntry.id, status)}
-                      >
-                        {WAITLIST_STATUS_META[status].label}
-                      </Button>
-                    ))}
-                    {canDeleteOpsRecords ? (
+                  {canManageLeadData ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(['waiting', 'admitted', 'cancelled'] as WaitlistStatus[]).map((status) => (
+                        <Button
+                          key={status}
+                          type="button"
+                          variant={selectedWaitlistEntry.status === status ? 'default' : 'outline'}
+                          className="h-10 rounded-xl font-black"
+                          onClick={() => void handleWaitlistStatusUpdate(selectedWaitlistEntry.id, status)}
+                        >
+                          {WAITLIST_STATUS_META[status].label}
+                        </Button>
+                      ))}
                       <Button
                         type="button"
                         variant="outline"
@@ -2004,8 +2029,12 @@ export function MarketingConsultingCRM({
                       >
                         삭제
                       </Button>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm font-bold text-slate-500">
+                      선생님 계정에서는 입학 대기 상태 수정과 삭제는 관리자만 처리할 수 있습니다.
+                    </p>
+                  )}
                 </div>
               </>
             ) : null}

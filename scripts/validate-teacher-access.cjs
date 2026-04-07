@@ -49,6 +49,8 @@ try {
   const {
     canReadSharedOps,
     canReadLeadOps,
+    canTransitionLeadPipeline,
+    canManageLeadRecords,
     canReadFinance,
     canManageSettings,
     canManageStaff,
@@ -67,6 +69,9 @@ try {
 
   assert.equal(canReadSharedOps('teacher'), true, 'teacher should access shared ops');
   assert.equal(canReadLeadOps('teacher'), true, 'teacher should access lead ops');
+  assert.equal(canTransitionLeadPipeline('teacher'), true, 'teacher should transition lead pipeline');
+  assert.equal(canManageLeadRecords('teacher'), false, 'teacher should not manage lead records');
+  assert.equal(canManageLeadRecords('centerAdmin'), true, 'admin should manage lead records');
   assert.equal(canReadFinance('teacher'), false, 'teacher should not access finance');
   assert.equal(canReadFinance('centerAdmin'), true, 'admin should access finance');
   assert.equal(canManageSettings('teacher'), false, 'teacher should not manage settings');
@@ -138,6 +143,26 @@ try {
   assert.equal(domainSummary.some((item) => item.key === 'billing'), false, 'billing domain should be hidden');
 
   const firestoreRules = fs.readFileSync(path.join(repoRoot, 'firestore.rules'), 'utf8');
+  assert.match(
+    firestoreRules,
+    /function canTeacherCreateWebsiteLead\(centerId\)\s*\{[\s\S]*request\.resource\.data\.source == 'website'[\s\S]*request\.resource\.data\.sourceRequestId is string[\s\S]*request\.resource\.data\.createdByUid == request\.auth\.uid;[\s\S]*\}/,
+    'teacher website-to-lead transitions should be limited',
+  );
+  assert.match(
+    firestoreRules,
+    /match \/consultingLeads\/\{leadId\}\s*\{[\s\S]*allow create: if isCenterAdmin\(centerId\) \|\| canTeacherCreateWebsiteLead\(centerId\);[\s\S]*allow update: if isCenterAdmin\(centerId\) \|\| canTeacherLinkLeadToWaitlist\(centerId\);[\s\S]*allow delete: if isCenterAdmin\(centerId\);[\s\S]*\}/,
+    'consultingLeads should allow teacher transitions only',
+  );
+  assert.match(
+    firestoreRules,
+    /match \/admissionWaitlist\/\{entryId\}\s*\{[\s\S]*allow create: if isCenterAdmin\(centerId\) \|\| canTeacherCreateWaitlistFromLead\(centerId\);[\s\S]*allow update: if isCenterAdmin\(centerId\) \|\| canTeacherAttachWebsiteWaitlistToLead\(centerId\);[\s\S]*allow delete: if isCenterAdmin\(centerId\);[\s\S]*\}/,
+    'admissionWaitlist should allow teacher transitions only',
+  );
+  assert.match(
+    firestoreRules,
+    /match \/websiteConsultRequests\/\{reqId\}\s*\{[\s\S]*allow create: if isCenterAdmin\(centerId\);[\s\S]*allow update: if isCenterAdmin\(centerId\) \|\| canTeacherLinkWebsiteRequestToLead\(centerId\);[\s\S]*allow delete: if isCenterAdmin\(centerId\);[\s\S]*\}/,
+    'websiteConsultRequests should allow teacher link updates only',
+  );
   assert.match(
     firestoreRules,
     /match \/billingProfiles\/\{studentId\}\s*\{\s*allow read, write: if isCenterAdmin\(centerId\);/s,
