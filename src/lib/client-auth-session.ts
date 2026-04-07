@@ -3,7 +3,7 @@ import type { User } from 'firebase/auth';
 import { AUTH_SESSION_API_ROUTE } from '@/lib/auth-session-shared';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 
-const AUTH_SESSION_REQUEST_TIMEOUT_MS = 8000;
+const AUTH_SESSION_REQUEST_TIMEOUT_MS = 5000;
 
 type SessionRouteResponse = {
   ok?: boolean;

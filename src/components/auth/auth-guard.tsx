@@ -151,19 +151,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // 로그인/회원가입 페이지는 인증 체크 없이 노출
-  if (isAuthRoute && user && isSessionSyncing) {
-    return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-sm font-bold text-muted-foreground animate-pulse">인증 세션을 준비 중입니다...</p>
-      </div>
-    );
-  }
-
   if (isPublicRoute(pathname)) {
     return (
       <>
+        {isAuthRoute && user && isSessionSyncing ? (
+          <div className="fixed inset-x-0 top-4 z-[120] flex justify-center px-4">
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-[#d7e2f6] bg-white/95 px-4 py-2 text-sm font-bold text-[#425a75] shadow-[0_12px_28px_-18px_rgba(20,41,95,0.32)] backdrop-blur">
+              <Loader2 className="h-4 w-4 animate-spin text-[#14295F]" />
+              로그인 상태를 정리하고 있어요.
+            </div>
+          </div>
+        ) : null}
         {authRouteSyncError && isAuthRoute ? (
           <div className="fixed inset-x-0 top-4 z-[120] flex justify-center px-4">
             <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 shadow-lg">
