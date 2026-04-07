@@ -18,7 +18,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { GrowthProgress } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -285,6 +285,7 @@ function RewardModal({
   open,
   onOpenChange,
   selectedBox,
+  boxContextLabel,
   boxStage,
   onReveal,
   revealedReward,
@@ -297,6 +298,7 @@ function RewardModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedBox: StudentHomeRewardBox | null;
+  boxContextLabel?: string | null;
   boxStage: BoxStage;
   onReveal: () => void;
   revealedReward: number | null;
@@ -320,6 +322,11 @@ function RewardModal({
             <DialogTitle className="text-left text-xl font-black tracking-tight">
               {revealedReward !== null ? "보상 획득" : "상자 열기"}
             </DialogTitle>
+            {boxContextLabel ? (
+              <DialogDescription className="mt-1 text-left text-[12px] font-semibold text-white/72">
+                {boxContextLabel}
+              </DialogDescription>
+            ) : null}
           </DialogHeader>
           <div
             className={cn(
@@ -354,6 +361,9 @@ function RewardModal({
                 <div className="text-sm font-black text-[var(--accent-orange-soft)]">
                   {selectedBox ? `${selectedBox.hour}시간 상자` : "포인트 상자"}
                 </div>
+                {boxContextLabel ? (
+                  <div className="mt-1 text-[11px] font-semibold text-white/70">{boxContextLabel}</div>
+                ) : null}
                 <div className="mt-2 text-xl font-black tracking-tight text-white">터치해서 열기</div>
               </div>
             ) : (
@@ -534,6 +544,8 @@ export function StudentHomeGamePanel({
   isVaultOpen,
   onVaultChange,
   selectedBox,
+  vaultReadyBoxCount,
+  boxContextLabel,
   boxStage,
   onRevealBox,
   revealedReward,
@@ -583,6 +595,8 @@ export function StudentHomeGamePanel({
   isVaultOpen: boolean;
   onVaultChange: (open: boolean) => void;
   selectedBox: StudentHomeRewardBox | null;
+  vaultReadyBoxCount?: number;
+  boxContextLabel?: string | null;
   boxStage: BoxStage;
   onRevealBox: () => void;
   revealedReward: number | null;
@@ -595,7 +609,7 @@ export function StudentHomeGamePanel({
     const label = minutes >= 60 ? `${Math.max(1, Math.round(minutes / 60))}h` : `${minutes}m`;
     return { id: `trend-mark-${index}`, label };
   });
-  const hasMoreReadyBoxes = totalAvailableBoxes > 1;
+  const hasMoreReadyBoxes = (vaultReadyBoxCount ?? totalAvailableBoxes) > 0;
   const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false);
   const rankPreview = selectedHomeRank.preview.slice(0, 3);
   const rankLiveBadge = selectedHomeRank.isLive ? selectedHomeRank.liveBadge || "LIVE" : null;
@@ -1190,6 +1204,7 @@ export function StudentHomeGamePanel({
         open={isVaultOpen}
         onOpenChange={onVaultChange}
         selectedBox={selectedBox}
+        boxContextLabel={boxContextLabel}
         boxStage={boxStage}
         onReveal={onRevealBox}
         revealedReward={revealedReward}
