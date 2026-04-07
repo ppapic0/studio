@@ -129,7 +129,7 @@ export function SignupForm() {
   const requiredSignupConsentsAccepted = termsConsent && privacyConsent && age14Consent;
   const signupConsentDescription =
     selectedRole === 'student' || selectedRole === 'parent'
-      ? '학생 정보, 연락처, 학생·학부모 연동에 필요한 항목을 확인한 뒤 가입을 진행합니다.'
+      ? '학생 본인 번호, 학부모 본인 번호, 학생·학부모 연동 코드까지 포함한 수집 항목을 확인한 뒤 가입을 진행합니다.'
       : '계정 생성과 센터 가입 처리에 필요한 개인정보 수집 및 이용 내용을 확인한 뒤 가입을 진행합니다.';
 
   const resolveSignupErrorMessage = (error: any): string => {
@@ -719,7 +719,7 @@ export function SignupForm() {
                           [필수] 개인정보 수집 및 이용에 동의합니다.
                         </FormLabel>
                         <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
-                          계정 생성, 센터 가입 처리, 학생·학부모 연동, 학생 정보 관리에 필요한 범위만 수집합니다.
+                          계정 생성, 센터 가입 처리, 학생·학부모 연동, 학생 본인 번호와 학부모 본인 번호 등 서비스 운영에 필요한 범위만 수집합니다.
                         </p>
                         <Link
                           href={PRIVACY_ROUTE}

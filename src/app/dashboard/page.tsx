@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
@@ -10,6 +11,7 @@ import { useUser, useFunctions, useFirestore, useMemoFirebase, useDoc } from '@/
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2, RefreshCw, Compass, Sparkles, Link2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +33,14 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { type StudentProfile, type User as UserType, type UserStudyProfile } from '@/lib/types';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
+import {
+  buildClientConsentSnapshot,
+  MARKETING_CONSENT_VERSION,
+  PRIVACY_ROUTE,
+  PRIVACY_VERSION,
+  TERMS_ROUTE,
+  TERMS_VERSION,
+} from '@/lib/legal-documents';
 
 const inviteFormSchema = z.object({
   inviteCode: z.string().trim().min(1, '초대 코드를 입력해 주세요.'),
@@ -42,6 +52,23 @@ const parentLinkFormSchema = z.object({
 });
 
 const PLAN_TRACK_ONBOARDING_VERSION = 1;
+
+type LegalConsentFormState = {
+  termsConsent: boolean;
+  privacyConsent: boolean;
+  age14Consent: boolean;
+  marketingEmailConsent: boolean;
+};
+
+function hasAcceptedCurrentConsent(
+  consent: {
+    agreed?: unknown;
+    version?: unknown;
+  } | null | undefined,
+  version: string
+): boolean {
+  return consent?.agreed === true && consent?.version === version;
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object') return false;
@@ -142,6 +169,14 @@ export default function DashboardPage() {
   const [phoneCaptureValue, setPhoneCaptureValue] = useState('');
   const [isPhoneCaptureSaving, setIsPhoneCaptureSaving] = useState(false);
   const [savedPhoneFallback, setSavedPhoneFallback] = useState('');
+  const [isLegalConsentDialogOpen, setIsLegalConsentDialogOpen] = useState(false);
+  const [isLegalConsentSaving, setIsLegalConsentSaving] = useState(false);
+  const [legalConsentForm, setLegalConsentForm] = useState<LegalConsentFormState>({
+    termsConsent: false,
+    privacyConsent: false,
+    age14Consent: false,
+    marketingEmailConsent: false,
+  });
   const [hasFinishedStudentOnboarding, setHasFinishedStudentOnboarding] = useState(false);
   const studentOnboardingPresentationRef = useRef(false);
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
@@ -169,6 +204,19 @@ export default function DashboardPage() {
     resolver: zodResolver(parentLinkFormSchema),
     defaultValues: { studentLinkCode: '', parentPhoneNumber: '' },
   });
+
+  const hasCurrentTermsConsent = hasAcceptedCurrentConsent(userProfile?.legalConsents?.terms, TERMS_VERSION);
+  const hasCurrentPrivacyConsent = hasAcceptedCurrentConsent(userProfile?.legalConsents?.privacy, PRIVACY_VERSION);
+  const hasCurrentAge14Consent = hasAcceptedCurrentConsent(userProfile?.legalConsents?.age14, PRIVACY_VERSION);
+  const hasCurrentMarketingEmailConsent = hasAcceptedCurrentConsent(
+    userProfile?.legalConsents?.marketingEmail,
+    MARKETING_CONSENT_VERSION
+  );
+  const hasCurrentRequiredLegalConsents =
+    hasCurrentTermsConsent && hasCurrentPrivacyConsent && hasCurrentAge14Consent;
+  const needsLegalConsentPrompt = Boolean(user && !isUserProfileLoading && !hasCurrentRequiredLegalConsents);
+  const requiredLegalConsentsAccepted =
+    legalConsentForm.termsConsent && legalConsentForm.privacyConsent && legalConsentForm.age14Consent;
 
   const resolvedSelfPhone = useMemo(() => {
     if (!activeMembership) return '';
@@ -219,8 +267,34 @@ export default function DashboardPage() {
   }, [activeMembership, user, isStudentProfileLoading, isUserProfileLoading]);
 
   useEffect(() => {
+    if (!user || isUserProfileLoading) return;
+    setLegalConsentForm({
+      termsConsent: hasCurrentTermsConsent,
+      privacyConsent: hasCurrentPrivacyConsent,
+      age14Consent: hasCurrentAge14Consent,
+      marketingEmailConsent: hasCurrentMarketingEmailConsent,
+    });
+  }, [
+    user,
+    isUserProfileLoading,
+    hasCurrentTermsConsent,
+    hasCurrentPrivacyConsent,
+    hasCurrentAge14Consent,
+    hasCurrentMarketingEmailConsent,
+  ]);
+
+  useEffect(() => {
+    if (!user || isUserProfileLoading) return;
+    setIsLegalConsentDialogOpen(needsLegalConsentPrompt);
+  }, [user, isUserProfileLoading, needsLegalConsentPrompt]);
+
+  useEffect(() => {
     if (!activeMembership || !user) return;
     if (activeMembership.role !== 'student' && activeMembership.role !== 'parent') return;
+    if (needsLegalConsentPrompt || isLegalConsentSaving) {
+      setIsPhoneCaptureOpen(false);
+      return;
+    }
     if (!isPhoneLookupReady) return;
     if (effectiveSelfPhone) {
       setIsPhoneCaptureOpen(false);
@@ -228,7 +302,7 @@ export default function DashboardPage() {
     }
     setPhoneCaptureValue((prev) => prev || '');
     setIsPhoneCaptureOpen(true);
-  }, [activeMembership, user, effectiveSelfPhone, isPhoneLookupReady]);
+  }, [activeMembership, user, effectiveSelfPhone, isPhoneLookupReady, needsLegalConsentPrompt, isLegalConsentSaving]);
 
   useEffect(() => {
     if (!shouldForceStudentOnboarding || !userProfileRef || studentOnboardingPresentationRef.current) return;
@@ -252,8 +326,109 @@ export default function DashboardPage() {
     });
   }, [shouldForceStudentOnboarding, studentProfileRef, studentRoutineOnboarding?.presentedAt, userProfileRef]);
 
+  const buildDashboardLegalConsentsPayload = useCallback(() => {
+    return {
+      terms: buildClientConsentSnapshot({
+        agreed: legalConsentForm.termsConsent,
+        version: TERMS_VERSION,
+        source: 'dashboard',
+      }),
+      privacy: buildClientConsentSnapshot({
+        agreed: legalConsentForm.privacyConsent,
+        version: PRIVACY_VERSION,
+        source: 'dashboard',
+      }),
+      age14: buildClientConsentSnapshot({
+        agreed: legalConsentForm.age14Consent,
+        version: PRIVACY_VERSION,
+        source: 'dashboard',
+      }),
+      marketingEmail: buildClientConsentSnapshot({
+        agreed: legalConsentForm.marketingEmailConsent,
+        version: MARKETING_CONSENT_VERSION,
+        source: 'dashboard',
+        channel: 'email',
+      }),
+    };
+  }, [legalConsentForm]);
+
+  const handleSaveLegalConsents = useCallback(async () => {
+    if (!user || !firestore || !userProfileRef) {
+      toast({
+        variant: 'destructive',
+        title: '저장 준비 중',
+        description: '계정 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.',
+      });
+      return;
+    }
+
+    if (!requiredLegalConsentsAccepted) {
+      toast({
+        variant: 'destructive',
+        title: '필수 동의 확인',
+        description: '이용약관, 개인정보 수집 및 이용, 만 14세 이상 확인에 모두 동의해 주세요.',
+      });
+      return;
+    }
+
+    setIsLegalConsentSaving(true);
+    try {
+      await setDoc(
+        userProfileRef,
+        {
+          id: user.uid,
+          email: user.email || userProfile?.email || '',
+          displayName:
+            user.displayName ||
+            userProfile?.displayName ||
+            activeMembership?.displayName ||
+            '사용자',
+          createdAt: userProfile?.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          legalConsents: buildDashboardLegalConsentsPayload(),
+        },
+        { merge: true }
+      );
+
+      setIsLegalConsentDialogOpen(false);
+      toast({
+        title: '개인정보 동의 저장 완료',
+        description: '현재 약관과 개인정보 수집·이용 동의가 계정에 반영되었습니다.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '동의 저장 실패',
+        description: resolveCallableErrorMessage(error, '동의 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsLegalConsentSaving(false);
+    }
+  }, [
+    activeMembership?.displayName,
+    buildDashboardLegalConsentsPayload,
+    firestore,
+    requiredLegalConsentsAccepted,
+    toast,
+    user,
+    userProfile?.createdAt,
+    userProfile?.displayName,
+    userProfile?.email,
+    userProfileRef,
+  ]);
+
   async function onInviteSubmit(values: z.infer<typeof inviteFormSchema>) {
     if (!user || !functions) return;
+
+    if (needsLegalConsentPrompt) {
+      setIsLegalConsentDialogOpen(true);
+      toast({
+        variant: 'destructive',
+        title: '개인정보 동의 필요',
+        description: '센터 가입 전에 현재 개인정보 수집 및 이용 동의를 먼저 완료해 주세요.',
+      });
+      return;
+    }
 
     setIsInviteSubmitting(true);
     try {
@@ -279,6 +454,16 @@ export default function DashboardPage() {
   async function onParentLinkSubmit(values: z.infer<typeof parentLinkFormSchema>) {
     if (!user || !functions) return;
 
+    if (needsLegalConsentPrompt) {
+      setIsLegalConsentDialogOpen(true);
+      toast({
+        variant: 'destructive',
+        title: '개인정보 동의 필요',
+        description: '학생 연동 전에 현재 개인정보 수집 및 이용 동의를 먼저 완료해 주세요.',
+      });
+      return;
+    }
+
     const normalizedPhone = normalizePhone(values.parentPhoneNumber || '');
     if (!isValidKoreanMobilePhone(normalizedPhone)) {
       parentLinkForm.setError('parentPhoneNumber', {
@@ -294,6 +479,7 @@ export default function DashboardPage() {
         role: 'parent',
         studentLinkCode: values.studentLinkCode.trim(),
         parentPhoneNumber: normalizedPhone,
+        legalConsents: buildDashboardLegalConsentsPayload(),
       });
 
       if (result.data?.ok) {
@@ -455,6 +641,193 @@ export default function DashboardPage() {
     }
   };
 
+  const legalConsentDialog = user ? (
+    <Dialog
+      open={isLegalConsentDialogOpen}
+      onOpenChange={(open) => {
+        if (needsLegalConsentPrompt || isLegalConsentSaving) return;
+        setIsLegalConsentDialogOpen(open);
+      }}
+    >
+      <DialogContent
+        className={cn(
+          'rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-xl',
+          needsLegalConsentPrompt && '[&>button]:hidden'
+        )}
+        onPointerDownOutside={(event) => {
+          if (needsLegalConsentPrompt) event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (needsLegalConsentPrompt) event.preventDefault();
+        }}
+      >
+        <div className="rounded-t-[2rem] bg-[#14295F] px-6 py-6 text-white sm:px-7">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-[1.8rem] font-black tracking-[-0.04em]">
+              개인정보 처리 동의 확인
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-sm font-bold leading-6 text-white/78">
+              서비스 운영 과정에서 이름, 이메일, 역할, 학교명, 학생·학부모 연동 코드, 학생 본인 번호, 학부모 본인 번호를 처리합니다.
+              계속 이용하려면 현재 약관과 개인정보처리방침 동의가 필요합니다.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="grid gap-4 px-6 py-6 sm:px-7">
+          <div className="rounded-[1.5rem] border border-[#14295F]/10 bg-[#f8fbff] p-4">
+            <p className="text-sm font-black text-[#14295F]">현재 수집 항목</p>
+            <div className="mt-3 grid gap-2 text-[11px] font-semibold leading-5 text-[#14295F]/70">
+              <p>계정 정보: 이름, 이메일, 역할, 학교명</p>
+              <p>연동 정보: 학생·학부모 연동 코드, 센터 초대 코드</p>
+              <p>연락 정보: 학생 본인 휴대폰번호, 학부모 본인 휴대폰번호</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-[1.6rem] border border-[#14295F]/10 bg-[#f8fbff] p-4">
+            <div className="grid gap-1">
+              <p className="text-sm font-black text-[#14295F]">필수 동의</p>
+              <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                아래 항목에 동의해야 서비스 이용을 계속할 수 있습니다.
+              </p>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={legalConsentForm.termsConsent}
+                  onCheckedChange={(checked) =>
+                    setLegalConsentForm((prev) => ({ ...prev, termsConsent: Boolean(checked) }))
+                  }
+                  disabled={isLegalConsentSaving}
+                  className="mt-1 h-5 w-5 rounded-md border-[#14295F]/20 data-[state=checked]:border-[#14295F] data-[state=checked]:bg-[#14295F] data-[state=checked]:text-white"
+                />
+                <div className="grid gap-1">
+                  <p className="text-sm font-black text-[#14295F]">[필수] 이용약관에 동의합니다.</p>
+                  <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                    서비스 이용 조건, 운영 공지, 계정 관리 기준을 확인합니다.
+                  </p>
+                  <Link
+                    href={TERMS_ROUTE}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] font-black text-[#FF7A16] underline underline-offset-4"
+                  >
+                    이용약관 전문 보기
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={legalConsentForm.privacyConsent}
+                  onCheckedChange={(checked) =>
+                    setLegalConsentForm((prev) => ({ ...prev, privacyConsent: Boolean(checked) }))
+                  }
+                  disabled={isLegalConsentSaving}
+                  className="mt-1 h-5 w-5 rounded-md border-[#14295F]/20 data-[state=checked]:border-[#14295F] data-[state=checked]:bg-[#14295F] data-[state=checked]:text-white"
+                />
+                <div className="grid gap-1">
+                  <p className="text-sm font-black text-[#14295F]">[필수] 개인정보 수집 및 이용에 동의합니다.</p>
+                  <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                    계정 생성, 학생·학부모 연동, 학생 본인 번호와 학부모 본인 번호 관리, 센터 운영 연락에 필요한 범위만 수집합니다.
+                  </p>
+                  <Link
+                    href={PRIVACY_ROUTE}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] font-black text-[#FF7A16] underline underline-offset-4"
+                  >
+                    개인정보처리방침 전문 보기
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-[#14295F]/10 bg-white px-4 py-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={legalConsentForm.age14Consent}
+                  onCheckedChange={(checked) =>
+                    setLegalConsentForm((prev) => ({ ...prev, age14Consent: Boolean(checked) }))
+                  }
+                  disabled={isLegalConsentSaving}
+                  className="mt-1 h-5 w-5 rounded-md border-[#14295F]/20 data-[state=checked]:border-[#14295F] data-[state=checked]:bg-[#14295F] data-[state=checked]:text-white"
+                />
+                <div className="grid gap-1">
+                  <p className="text-sm font-black text-[#14295F]">[필수] 만 14세 이상입니다.</p>
+                  <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                    현재는 별도 법정대리인 동의 절차 없이 만 14세 이상 사용자만 계정을 이용할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-[1.6rem] border border-[#FF7A16]/12 bg-[#fff7ef] p-4">
+            <div className="grid gap-1">
+              <p className="text-sm font-black text-[#14295F]">선택 동의</p>
+              <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                아래 항목은 선택이며, 동의하지 않아도 서비스 이용은 가능합니다.
+              </p>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-[#FF7A16]/15 bg-white px-4 py-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={legalConsentForm.marketingEmailConsent}
+                  onCheckedChange={(checked) =>
+                    setLegalConsentForm((prev) => ({ ...prev, marketingEmailConsent: Boolean(checked) }))
+                  }
+                  disabled={isLegalConsentSaving}
+                  className="mt-1 h-5 w-5 rounded-md border-[#FF7A16]/28 data-[state=checked]:border-[#FF7A16] data-[state=checked]:bg-[#FF7A16] data-[state=checked]:text-white"
+                />
+                <div className="grid gap-1">
+                  <p className="text-sm font-black text-[#14295F]">[선택] 이메일로 혜택·이벤트·신규 프로그램 안내를 받겠습니다.</p>
+                  <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
+                    운영 연락과 별도로, 이메일 홍보 안내에만 사용됩니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="border-t border-[#14295F]/8 bg-[#f8fbff] px-6 py-5 sm:px-7">
+          <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            {!needsLegalConsentPrompt && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 rounded-2xl border-[#14295F]/12 font-black text-[#14295F]"
+                onClick={() => setIsLegalConsentDialogOpen(false)}
+                disabled={isLegalConsentSaving}
+              >
+                나중에 볼게요
+              </Button>
+            )}
+            <Button
+              type="button"
+              className="h-12 rounded-2xl bg-[#FF7A16] font-black text-white hover:bg-[#e86d11]"
+              onClick={() => void handleSaveLegalConsents()}
+              disabled={isLegalConsentSaving || !requiredLegalConsentsAccepted}
+            >
+              {isLegalConsentSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  동의 저장 중...
+                </>
+              ) : (
+                '동의하고 계속하기'
+              )}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ) : null;
+
   if (membershipsLoading) {
     return (
       <div className="flex h-[70vh] w-full flex-col items-center justify-center gap-6">
@@ -474,11 +847,21 @@ export default function DashboardPage() {
     const userRole = activeMembership.role;
 
     if (userRole === 'centerAdmin' || userRole === 'owner') {
-      return <AdminDashboard isActive={true} />;
+      return (
+        <>
+          <AdminDashboard isActive={true} />
+          {legalConsentDialog}
+        </>
+      );
     }
 
     if (userRole === 'teacher') {
-      return <TeacherDashboard isActive={true} />;
+      return (
+        <>
+          <TeacherDashboard isActive={true} />
+          {legalConsentDialog}
+        </>
+      );
     }
 
     if (userRole === 'parent') {
@@ -487,6 +870,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-3">
             <ParentDashboard isActive={true} />
           </div>
+          {legalConsentDialog}
           <Dialog open={isPhoneCaptureOpen} onOpenChange={(open) => { if (effectiveSelfPhone) setIsPhoneCaptureOpen(open); }}>
             <DialogContent className="rounded-[2.5rem] border-none p-0 shadow-2xl sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
               <div className="bg-primary px-6 py-6 text-white">
@@ -521,13 +905,16 @@ export default function DashboardPage() {
 
     if (userRole === 'student' && shouldForceStudentOnboarding) {
       return (
-        <RoutineOnboardingFlow
-          studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
-          onSaveRoutineProfile={handleSaveStudentRoutineProfile}
-          onContinueToPlanner={() => setHasFinishedStudentOnboarding(true)}
-          autoContinueOnSave
-          allowSkip={false}
-        />
+        <>
+          <RoutineOnboardingFlow
+            studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
+            onSaveRoutineProfile={handleSaveStudentRoutineProfile}
+            onContinueToPlanner={() => setHasFinishedStudentOnboarding(true)}
+            autoContinueOnSave
+            allowSkip={false}
+          />
+          {legalConsentDialog}
+        </>
       );
     }
 
@@ -536,6 +923,7 @@ export default function DashboardPage() {
         <div className={cn('flex flex-col', isMobile ? 'gap-4' : 'gap-8')}>
           <StudentDashboard isActive={true} />
         </div>
+        {legalConsentDialog}
         <Dialog open={isPhoneCaptureOpen} onOpenChange={(open) => { if (effectiveSelfPhone) setIsPhoneCaptureOpen(open); }}>
           <DialogContent className="rounded-[2.5rem] border-none p-0 shadow-2xl sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
             <div className="bg-primary px-6 py-6 text-white">
@@ -569,46 +957,48 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex min-h-[70vh] flex-col items-center justify-center space-y-10 px-4 text-center">
-      <div className="space-y-4">
-        <div className="mx-auto w-fit rounded-[2.5rem] bg-primary/10 p-6 shadow-inner">
-          <Sparkles className="h-12 w-12 animate-bounce text-primary" />
+    <>
+      {legalConsentDialog}
+      <div className="flex min-h-[70vh] flex-col items-center justify-center space-y-10 px-4 text-center">
+        <div className="space-y-4">
+          <div className="mx-auto w-fit rounded-[2.5rem] bg-primary/10 p-6 shadow-inner">
+            <Sparkles className="h-12 w-12 animate-bounce text-primary" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tighter">{'\uC544\uC9C1 \uC18C\uC18D\uB41C \uC13C\uD130\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4'}</h1>
+            <p className="mx-auto max-w-sm font-bold leading-relaxed text-muted-foreground">
+              {'\uAC00\uC785 \uC9C1\uD6C4\uC5D0\uB294 \uC815\uBCF4 \uB3D9\uAE30\uD654\uAC00 \uB2A6\uC5B4\uC9C8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}
+              <br />
+              {'\uB2E4\uC2DC \uD655\uC778\uC744 \uB204\uB974\uAC70\uB098 \uCF54\uB4DC\uB97C \uB2E4\uC2DC \uC785\uB825\uD574 \uC8FC\uC138\uC694.'}
+            </p>
+          </div>
         </div>
-        <div className="space-y-2">
-          <h1 className="text-4xl font-black tracking-tighter">{'\uC544\uC9C1 \uC18C\uC18D\uB41C \uC13C\uD130\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4'}</h1>
-          <p className="mx-auto max-w-sm font-bold leading-relaxed text-muted-foreground">
-            {'\uAC00\uC785 \uC9C1\uD6C4\uC5D0\uB294 \uC815\uBCF4 \uB3D9\uAE30\uD654\uAC00 \uB2A6\uC5B4\uC9C8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}
-            <br />
-            {'\uB2E4\uC2DC \uD655\uC778\uC744 \uB204\uB974\uAC70\uB098 \uCF54\uB4DC\uB97C \uB2E4\uC2DC \uC785\uB825\uD574 \uC8FC\uC138\uC694.'}
-          </p>
-        </div>
-      </div>
 
-      <div className="grid w-full max-w-xl gap-3 sm:grid-cols-3">
-        <Button
-          variant="outline"
-          size="lg"
-          className="h-14 rounded-2xl border-2 text-base font-black shadow-sm"
-          onClick={() => window.location.reload()}
-        >
-          <RefreshCw className="mr-2 h-5 w-5" /> {'\uB2E4\uC2DC \uD655\uC778'}
-        </Button>
+        <div className="grid w-full max-w-xl gap-3 sm:grid-cols-3">
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-14 rounded-2xl border-2 text-base font-black shadow-sm"
+            onClick={() => window.location.reload()}
+          >
+            <RefreshCw className="mr-2 h-5 w-5" /> {'\uB2E4\uC2DC \uD655\uC778'}
+          </Button>
 
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button size="lg" className="h-14 rounded-2xl text-base font-black shadow-xl">
-              {'\uCD08\uB300 \uCF54\uB4DC\uB85C \uAC00\uC785'}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="rounded-[2.5rem] border-none p-8 shadow-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-3xl font-black tracking-tighter">{'\uCD08\uB300 \uCF54\uB4DC \uC785\uB825'}</DialogTitle>
-              <DialogDescription className="pt-2 font-bold">
-                {'\uC13C\uD130\uC5D0\uC11C \uBC1B\uC740 \uCD08\uB300 \uCF54\uB4DC\uB85C \uAC00\uC785\uC744 \uC644\uB8CC\uD569\uB2C8\uB2E4.'}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...inviteForm}>
-              <form onSubmit={inviteForm.handleSubmit(onInviteSubmit)} className="space-y-6 pt-4">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button size="lg" className="h-14 rounded-2xl text-base font-black shadow-xl">
+                {'\uCD08\uB300 \uCF54\uB4DC\uB85C \uAC00\uC785'}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-[2.5rem] border-none p-8 shadow-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-3xl font-black tracking-tighter">{'\uCD08\uB300 \uCF54\uB4DC \uC785\uB825'}</DialogTitle>
+                <DialogDescription className="pt-2 font-bold">
+                  {'\uC13C\uD130\uC5D0\uC11C \uBC1B\uC740 \uCD08\uB300 \uCF54\uB4DC\uB85C \uAC00\uC785\uC744 \uC644\uB8CC\uD569\uB2C8\uB2E4.'}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...inviteForm}>
+                <form onSubmit={inviteForm.handleSubmit(onInviteSubmit)} className="space-y-6 pt-4">
                 <FormField
                   control={inviteForm.control}
                   name="inviteCode"
@@ -633,10 +1023,10 @@ export default function DashboardPage() {
                     {isInviteSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : '\uC13C\uD130 \uAC00\uC785 \uC644\uB8CC'}
                   </Button>
                 </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
 
         <Dialog>
           <DialogTrigger asChild>
@@ -710,8 +1100,9 @@ export default function DashboardPage() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

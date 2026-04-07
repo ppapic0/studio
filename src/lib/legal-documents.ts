@@ -14,8 +14,10 @@ export const SIGNUP_DATA_FIELDS = [
   '비밀번호',
   '역할',
   '학교명',
-  '휴대폰번호',
-  '학생/초대 코드',
+  '학생 본인 휴대폰번호',
+  '학부모 본인 휴대폰번호',
+  '학생/학부모 연동 코드',
+  '센터 초대 코드',
 ] as const;
 
 export const CONSULT_DATA_FIELDS = [
@@ -41,7 +43,7 @@ export const CONSULT_RETENTION_LABEL = '3년';
 export const MARKETING_ANALYTICS_RETENTION_LABEL = '1년';
 export const MEMBER_RETENTION_LABEL = '회원 탈퇴 시까지 및 관련 법령 보관기간';
 
-export type ConsentSource = 'signup' | 'consult';
+export type ConsentSource = 'signup' | 'consult' | 'dashboard';
 
 export type ClientConsentSnapshot = {
   agreed: boolean;

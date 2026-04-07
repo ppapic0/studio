@@ -3,6 +3,21 @@ import { Timestamp } from "firebase/firestore";
 
 export type WithId<T> = T & { id: string };
 
+export interface LegalConsentSnapshot {
+  agreed: boolean;
+  version?: string;
+  agreedAt?: Timestamp | null;
+  source?: string;
+  channel?: string;
+}
+
+export interface UserLegalConsents {
+  terms?: LegalConsentSnapshot;
+  privacy?: LegalConsentSnapshot;
+  age14?: LegalConsentSnapshot;
+  marketingEmail?: LegalConsentSnapshot;
+}
+
 export interface User {
   id: string;
   displayName: string;
@@ -10,6 +25,7 @@ export interface User {
   profileImageUrl?: string;
   schoolName?: string; 
   phoneNumber?: string;
+  legalConsents?: UserLegalConsents;
   targetDailyMinutes?: number;
   targetDailyMinutesSource?: 'default' | 'routine' | 'manual';
   examCountdowns?: Array<{
