@@ -324,6 +324,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isOperationsMemoOpen, setIsOperationsMemoOpen] = useState(false);
   const [isImmediateInterventionSheetOpen, setIsImmediateInterventionSheetOpen] = useState(false);
   const [isAttendancePriorityDialogOpen, setIsAttendancePriorityDialogOpen] = useState(false);
+  const [isControlAlertsDialogOpen, setIsControlAlertsDialogOpen] = useState(false);
   const [selectedHomeAxisId, setSelectedHomeAxisId] = useState<string | null>(null);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
@@ -545,6 +546,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const {
+    seatSignals: attendanceSeatSignals,
     seatSignalsBySeatId: attendanceSeatSignalsBySeatId,
     summary: attendanceBoardSummary,
     isLoading: attendanceBoardLoading,
@@ -2204,6 +2206,72 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       });
   }, [attendanceSeatSignalsBySeatId]);
 
+  const lateOrAbsentAlertRows = useMemo(() => {
+    return attendanceSeatSignals
+      .filter((signal) => signal.attendanceDisplayStatus === 'confirmed_late' || signal.boardStatus === 'absent')
+      .sort((left, right) => {
+        const leftPriority = left.boardStatus === 'absent' ? 0 : 1;
+        const rightPriority = right.boardStatus === 'absent' ? 0 : 1;
+        if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+
+        const roomOrderDelta =
+          (roomOrderById.get(left.roomId || '') ?? Number.MAX_SAFE_INTEGER)
+          - (roomOrderById.get(right.roomId || '') ?? Number.MAX_SAFE_INTEGER);
+        if (roomOrderDelta !== 0) return roomOrderDelta;
+
+        const seatDelta = (left.roomSeatNo ?? Number.MAX_SAFE_INTEGER) - (right.roomSeatNo ?? Number.MAX_SAFE_INTEGER);
+        if (seatDelta !== 0) return seatDelta;
+
+        return left.studentName.localeCompare(right.studentName, 'ko');
+      })
+      .map((signal) => {
+        const roomName = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '좌석 미배정';
+        const roomLabel = signal.roomSeatNo ? `${roomName} ${signal.roomSeatNo}번` : roomName;
+        return {
+          key: signal.seatId,
+          studentId: signal.studentId,
+          studentName: signal.studentName,
+          className: signal.className,
+          issueLabel: signal.boardStatus === 'absent' ? '미입실' : '지각',
+          roomLabel,
+          detailLabel: signal.note,
+        };
+      });
+  }, [attendanceSeatSignals, roomNameById, roomOrderById]);
+
+  const longAwayAlertRows = useMemo(() => {
+    return attendanceSeatSignals
+      .filter((signal) => signal.isLongAway)
+      .sort((left, right) => {
+        if (right.currentAwayMinutes !== left.currentAwayMinutes) {
+          return right.currentAwayMinutes - left.currentAwayMinutes;
+        }
+
+        const roomOrderDelta =
+          (roomOrderById.get(left.roomId || '') ?? Number.MAX_SAFE_INTEGER)
+          - (roomOrderById.get(right.roomId || '') ?? Number.MAX_SAFE_INTEGER);
+        if (roomOrderDelta !== 0) return roomOrderDelta;
+
+        const seatDelta = (left.roomSeatNo ?? Number.MAX_SAFE_INTEGER) - (right.roomSeatNo ?? Number.MAX_SAFE_INTEGER);
+        if (seatDelta !== 0) return seatDelta;
+
+        return left.studentName.localeCompare(right.studentName, 'ko');
+      })
+      .map((signal) => {
+        const roomName = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '좌석 미배정';
+        const roomLabel = signal.roomSeatNo ? `${roomName} ${signal.roomSeatNo}번` : roomName;
+        return {
+          key: signal.seatId,
+          studentId: signal.studentId,
+          studentName: signal.studentName,
+          className: signal.className,
+          awayMinutes: signal.currentAwayMinutes,
+          roomLabel,
+          detailLabel: signal.note,
+        };
+      });
+  }, [attendanceSeatSignals, roomNameById, roomOrderById]);
+
   function renderAttendanceDashboardSection() {
     return (
       <Dialog open={isAttendanceFullscreenOpen} onOpenChange={setIsAttendanceFullscreenOpen}>
@@ -3179,9 +3247,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F]">
           동기화 {liveSyncLabel}
         </Badge>
-        <Badge className="h-8 rounded-full border-none bg-[#FF7A16] px-3.5 text-[10px] font-black text-white">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setIsControlAlertsDialogOpen(true)}
+          className="h-8 rounded-full border-none bg-[#FF7A16] px-3.5 text-[10px] font-black text-white shadow-none transition-[transform,background-color,box-shadow] hover:-translate-y-0.5 hover:bg-[#FF8A31] hover:shadow-[0_14px_24px_-20px_rgba(255,122,22,0.92)]"
+        >
           긴급 흐름 {totalControlAlerts}건
-        </Badge>
+        </Button>
       </AdminWorkbenchCommandBar>
 
       {hasMetricsReady ? (
@@ -3363,6 +3436,210 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </SheetContent>
           </Sheet>
+
+          <Dialog open={isControlAlertsDialogOpen} onOpenChange={setIsControlAlertsDialogOpen}>
+            <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'max-h-[92vh] flex flex-col sm:max-w-3xl')}>
+              <div className={cn(studioDialogHeaderClassName, 'flex-shrink-0')}>
+                <DialogHeader className="space-y-3 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">긴급 흐름</Badge>
+                    <Badge className="border-none bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white">
+                      {totalControlAlerts}건
+                    </Badge>
+                    {selectedClass !== 'all' ? (
+                      <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                        {selectedClass}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <DialogTitle className="text-2xl font-black tracking-tight">긴급 흐름 상세</DialogTitle>
+                  <DialogDescription className="text-sm font-medium text-white/75">
+                    현재 집계된 미입실·지각, 장기 외출, 즉시 개입 학생을 한 번에 확인할 수 있습니다.
+                  </DialogDescription>
+                  <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+                    <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">미입실·지각</p>
+                      <p className="dashboard-number mt-2 text-[1.6rem] text-white">{lateOrAbsentAlertRows.length}</p>
+                    </div>
+                    <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">장기 외출</p>
+                      <p className="dashboard-number mt-2 text-[1.6rem] text-white">{longAwayAlertRows.length}</p>
+                    </div>
+                    <div className="rounded-[1.35rem] border border-[#FFB677]/28 bg-[#FF7A16]/18 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/68">즉시 개입</p>
+                      <p className="dashboard-number mt-2 text-[1.6rem] text-white">{urgentInterventionStudents.length}</p>
+                    </div>
+                  </div>
+                </DialogHeader>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+                <div className="space-y-4">
+                  <section className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_36px_-30px_rgba(20,41,95,0.18)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className={studioSectionEyebrowClassName}>미입실·지각</p>
+                        <h3 className="mt-2 text-lg font-black tracking-tight text-[#14295F]">출결 확인이 필요한 학생</h3>
+                        <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                          오늘 입실 증거가 없거나 지각으로 기록된 학생입니다.
+                        </p>
+                      </div>
+                      <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
+                        {lateOrAbsentAlertRows.length}명
+                      </Badge>
+                    </div>
+
+                    {lateOrAbsentAlertRows.length === 0 ? (
+                      <div className="mt-4 rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-5 py-8 text-center text-sm font-bold text-[#5c6e97]">
+                        현재 미입실·지각 대상이 없습니다.
+                      </div>
+                    ) : (
+                      <div className="mt-4 grid gap-3">
+                        {lateOrAbsentAlertRows.map((item) => (
+                          <div key={item.key} className="rounded-[1.4rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#C95A08]">
+                                    {item.issueLabel}
+                                  </Badge>
+                                  {item.className ? (
+                                    <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#14295F]">
+                                      {item.className}
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                <p className="mt-3 text-base font-black text-[#14295F]">{item.studentName}</p>
+                                <p className="mt-1 text-[12px] font-bold leading-6 text-[#5c6e97]">{item.detailLabel}</p>
+                              </div>
+                              <p className="text-right text-[11px] font-black text-[#5c6e97]">{item.roomLabel}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_36px_-30px_rgba(20,41,95,0.18)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className={studioSectionEyebrowClassName}>장기 외출</p>
+                        <h3 className="mt-2 text-lg font-black tracking-tight text-[#14295F]">복귀 확인이 필요한 학생</h3>
+                        <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                          외출 또는 휴식이 20분 이상 이어진 학생입니다.
+                        </p>
+                      </div>
+                      <Badge className="h-7 rounded-full border-none bg-[#FFF1E6] px-2.5 text-[10px] font-black text-[#C95A08]">
+                        {longAwayAlertRows.length}명
+                      </Badge>
+                    </div>
+
+                    {longAwayAlertRows.length === 0 ? (
+                      <div className="mt-4 rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-5 py-8 text-center text-sm font-bold text-[#5c6e97]">
+                        현재 장기 외출 대상이 없습니다.
+                      </div>
+                    ) : (
+                      <div className="mt-4 grid gap-3">
+                        {longAwayAlertRows.map((item) => (
+                          <div key={item.key} className="rounded-[1.4rem] border border-[#DCE7FF] bg-[#FFF8F2] px-4 py-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#C95A08]">
+                                    외출 {item.awayMinutes}분
+                                  </Badge>
+                                  {item.className ? (
+                                    <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#14295F]">
+                                      {item.className}
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                <p className="mt-3 text-base font-black text-[#14295F]">{item.studentName}</p>
+                                <p className="mt-1 text-[12px] font-bold leading-6 text-[#5c6e97]">{item.detailLabel}</p>
+                              </div>
+                              <p className="text-right text-[11px] font-black text-[#5c6e97]">{item.roomLabel}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_36px_-30px_rgba(20,41,95,0.18)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className={studioSectionEyebrowClassName}>즉시 개입</p>
+                        <h3 className="mt-2 text-lg font-black tracking-tight text-[#14295F]">면담 또는 집중 개입 우선 학생</h3>
+                        <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                          좌석 히트맵 기준으로 우선순위가 높은 학생입니다.
+                        </p>
+                      </div>
+                      <Badge className="h-7 rounded-full border-none bg-[#FFE7D3] px-2.5 text-[10px] font-black text-[#C95A08]">
+                        {urgentInterventionStudents.length}명
+                      </Badge>
+                    </div>
+
+                    {urgentInterventionStudents.length === 0 ? (
+                      <div className="mt-4 rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-5 py-8 text-center text-sm font-bold text-[#5c6e97]">
+                        현재 즉시 개입 대상이 없습니다.
+                      </div>
+                    ) : (
+                      <div className="mt-4 grid gap-3">
+                        {urgentInterventionStudents.map((signal, index) => {
+                          const roomName = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '미배정';
+                          const roomLabel = signal.roomSeatNo ? `${roomName} ${signal.roomSeatNo}번` : roomName;
+                          return (
+                            <div
+                              key={`${signal.studentId}-${signal.seatId}`}
+                              className={cn(
+                                'rounded-[1.4rem] border px-4 py-4',
+                                index === 0 ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-[#F7FAFF]'
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge className={cn(
+                                      'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                                      index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]'
+                                    )}>
+                                      {index + 1}순위
+                                    </Badge>
+                                    {signal.className ? (
+                                      <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F]">
+                                        {signal.className}
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                  <p className="mt-3 text-base font-black text-[#14295F]">{signal.studentName}</p>
+                                  <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                                    {roomLabel} · {signal.attendanceStatus}
+                                  </p>
+                                  <p className="mt-1 text-[12px] font-black leading-6 text-[#C95A08]">{signal.topReason}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">위험 점수</p>
+                                  <p className="dashboard-number mt-2 text-[1.45rem] text-[#14295F]">{signal.compositeHealth}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              </div>
+
+              <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" className="h-11 rounded-xl border-[#DCE7FF] px-5 font-black text-[#14295F]">
+                    닫기
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={isAttendancePriorityDialogOpen} onOpenChange={setIsAttendancePriorityDialogOpen}>
             <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-xl')}>
