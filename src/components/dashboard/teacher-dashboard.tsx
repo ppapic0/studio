@@ -1935,115 +1935,232 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const activeRoomConflicts = selectedRoomConfig
     ? roomResizeConflicts.get(selectedRoomConfig.id) || []
     : [];
+  const showInlineSeatInsightControls = !isMobile && Boolean(selectedRoomConfig);
+
+  const renderSeatOverlayControlPanel = ({ compact = false, inline = false } = {}) => (
+    <div
+      ref={inline ? seatInsightSectionRef : undefined}
+      className={cn(
+        "space-y-4",
+        compact && "w-[320px] shrink-0 rounded-[2.2rem] border border-[#D7E4FF] bg-white/95 p-4 shadow-[0_22px_40px_-28px_rgba(20,41,95,0.22)]"
+      )}
+    >
+      {compact ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
+              도면 학생 히트맵
+            </Badge>
+            <Badge className="h-6 rounded-full border border-[#D7E4FF] bg-white px-2.5 text-[10px] font-black text-[#14295F]">
+              {activeSeatOverlayOption.label}
+            </Badge>
+            {isEditMode ? (
+              <Badge className="h-6 rounded-full border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">
+                상태 고정
+              </Badge>
+            ) : null}
+          </div>
+          <div>
+            <p className="text-base font-black tracking-tight text-[#14295F]">도면 옆 제어 패널</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+              빈 공간에서 바로 눌러 오버레이를 바꾸고 좌석 위험 신호를 비교합니다.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <TeacherSectionHeader
+          badge="도면 학생 히트맵"
+          title="운영 위험 신호를 도면에서 읽는 제어 패널"
+          description="오버레이 모드를 바꾸며 좌석 단위 위험, 학부모 반응, 벌점, 학습 효율을 같은 기준으로 비교할 수 있게 정리했습니다."
+          icon={ShieldAlert}
+          tone="navy"
+          right={
+            <>
+              <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+                현재 보기: {activeSeatOverlayOption.label}
+              </Badge>
+              {isEditMode && (
+                <Badge className="h-8 rounded-full border-none bg-amber-100 px-3.5 text-[10px] font-black text-amber-700">
+                  편집 중에는 상태 보기 고정
+                </Badge>
+              )}
+            </>
+          }
+        />
+      )}
+
+      <div className={cn("rounded-[2rem] border border-[#D7E4FF] bg-white/85 shadow-sm", compact ? "p-3.5" : "p-4")}>
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">현재 오버레이</p>
+        <p className="mt-2 text-sm font-black text-[#14295F]">{activeSeatOverlayOption.label}</p>
+        <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+          {SEAT_OVERLAY_DESCRIPTIONS[activeSeatOverlayMode]}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {heatmapSummaryItems.map((item) => (
+          <span
+            key={item.label}
+            className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", item.tone)}
+          >
+            {item.label} {item.value}
+          </span>
+        ))}
+      </div>
+
+      <div className={cn("flex flex-wrap gap-2", compact && "gap-1.5")}>
+        {SEAT_OVERLAY_OPTIONS.map((option) => (
+          <Button
+            key={option.value}
+            type="button"
+            variant={activeSeatOverlayMode === option.value ? 'default' : 'outline'}
+            disabled={isEditMode && option.value !== 'status'}
+            onClick={() => setSeatOverlayMode(option.value)}
+            className={cn(
+              "rounded-2xl font-black",
+              compact ? "h-10 min-w-[88px] px-3 text-[12px]" : isMobile ? "h-10 flex-1 min-w-[92px] px-4" : "h-11 px-4",
+              activeSeatOverlayMode === option.value ? "bg-[#14295F] text-white" : "border-2 bg-white/80 text-[#14295F]"
+            )}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
+
+      <div className={cn("rounded-[2rem] border border-[#D7E4FF] bg-[#F7FAFF]", compact ? "p-3.5" : "p-4")}>
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">범례</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {activeSeatOverlayLegends.map((legend) => (
+            <span
+              key={`${activeSeatOverlayMode}_${legend.key}`}
+              className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", legend.tone)}
+            >
+              {legend.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   const renderRoomGridCanvas = (room: LayoutRoomConfig, compact = false) => (
     <ScrollArea className="w-full max-w-full">
       <div
         className={cn(
-          'mx-auto w-fit rounded-[2.5rem] border-2 border-muted/30 bg-[#fafafa]',
-          compact ? 'p-3 sm:p-4' : isMobile ? 'p-4' : 'p-6 sm:p-10 shadow-inner'
+          compact || !showInlineSeatInsightControls
+            ? 'mx-auto w-fit rounded-[2.5rem] border-2 border-muted/30 bg-[#fafafa]'
+            : 'flex min-w-full items-start justify-between gap-5',
+          compact ? 'p-3 sm:p-4' : isMobile ? 'p-4' : showInlineSeatInsightControls ? '' : 'p-6 sm:p-10 shadow-inner'
         )}
       >
         <div
-          className="grid gap-2"
-          style={{ gridTemplateColumns: `repeat(${room.cols}, minmax(${compact ? 52 : 64}px, 1fr))` }}
+          className={cn(
+            'rounded-[2.5rem] border-2 border-muted/30 bg-[#fafafa]',
+            compact ? 'p-3 sm:p-4' : isMobile ? 'p-4' : 'p-6 sm:p-10 shadow-inner'
+          )}
         >
-          {Array.from({ length: room.cols }).map((_, colIndex) => (
-            <div key={`${room.id}_${colIndex}`} className="flex flex-col gap-2">
-              {Array.from({ length: room.rows }).map((_, rowIndex) => {
-                const roomSeatNo = colIndex * room.rows + rowIndex + 1;
-                const seat = getSeatForRoom(room, roomSeatNo);
-                const student = seat.studentId ? studentsById.get(seat.studentId) : undefined;
-                const studentMember = seat.studentId ? studentMembersById.get(seat.studentId) : undefined;
-                const occupantId = typeof seat.studentId === 'string' ? seat.studentId : '';
-                const occupantName = student?.name || studentMember?.displayName || (occupantId ? '배정됨' : '');
-                const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
-                const seatSignal =
-                  (occupantId ? seatSignalsBySeatId.get(seat.id) : null) ||
-                  (occupantId ? studentSignalsByStudentId.get(occupantId) || null : null);
-                const overlayPresentation = getCenterAdminSeatOverlayPresentation({
-                  signal: seatSignal,
-                  mode: activeSeatOverlayMode,
-                  status: seat.status,
-                  isEditMode,
-                });
-                const isAisle = seat.type === 'aisle';
-                const nameTextClass =
-                  occupantId && overlayPresentation.isDark ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]' : 'text-slate-950';
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${room.cols}, minmax(${compact ? 52 : 64}px, 1fr))` }}
+          >
+            {Array.from({ length: room.cols }).map((_, colIndex) => (
+              <div key={`${room.id}_${colIndex}`} className="flex flex-col gap-2">
+                {Array.from({ length: room.rows }).map((_, rowIndex) => {
+                  const roomSeatNo = colIndex * room.rows + rowIndex + 1;
+                  const seat = getSeatForRoom(room, roomSeatNo);
+                  const student = seat.studentId ? studentsById.get(seat.studentId) : undefined;
+                  const studentMember = seat.studentId ? studentMembersById.get(seat.studentId) : undefined;
+                  const occupantId = typeof seat.studentId === 'string' ? seat.studentId : '';
+                  const occupantName = student?.name || studentMember?.displayName || (occupantId ? '배정됨' : '');
+                  const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
+                  const seatSignal =
+                    (occupantId ? seatSignalsBySeatId.get(seat.id) : null) ||
+                    (occupantId ? studentSignalsByStudentId.get(occupantId) || null : null);
+                  const overlayPresentation = getCenterAdminSeatOverlayPresentation({
+                    signal: seatSignal,
+                    mode: activeSeatOverlayMode,
+                    status: seat.status,
+                    isEditMode,
+                  });
+                  const isAisle = seat.type === 'aisle';
+                  const nameTextClass =
+                    occupantId && overlayPresentation.isDark ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]' : 'text-slate-950';
 
-                return (
-                  <div
-                    key={`${room.id}_${roomSeatNo}`}
-                    onClick={() => handleSeatClick(seat)}
-                    className={cn(
-                      'relative aspect-square cursor-pointer overflow-hidden border-2 outline-none shadow-sm transition-all duration-500',
-                      compact ? 'min-w-[52px] rounded-[1.1rem] p-1' : 'min-w-[64px] rounded-2xl p-1',
-                      'flex flex-col items-center justify-center',
-                      isFilteredOut ? 'border-transparent bg-muted/10 opacity-20 grayscale' :
-                      isAisle ? 'border-transparent bg-transparent text-transparent hover:bg-muted/10' :
-                      occupantId ? overlayPresentation.surfaceClass :
-                      'border-primary/40 bg-white text-primary/5 hover:border-primary/60',
-                      isEditMode && isAisle && 'border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20'
-                    )}
-                  >
-                    {!isAisle && (
-                      <span
-                        className={cn(
-                          'absolute left-1.5 top-1 font-black',
-                          compact ? 'text-[6px]' : 'text-[7px]',
-                          occupantId && overlayPresentation.isDark ? 'opacity-70' : 'opacity-40'
-                        )}
-                      >
-                        {roomSeatNo}
-                      </span>
-                    )}
-                    {seat.seatZone && !isAisle && isEditMode && (
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          'absolute right-1 top-1 border-none px-1 font-black',
-                          compact ? 'h-3 text-[5px]' : 'h-3.5 text-[6px]',
-                          occupantId ? overlayPresentation.flagClass : 'bg-primary/5 text-primary/40'
-                        )}
-                      >
-                        {seat.seatZone.charAt(0)}
-                      </Badge>
-                    )}
-                    {isAisle ? (
-                      isEditMode && <MapIcon className={cn(compact ? 'h-2.5 w-2.5' : 'h-3 w-3', 'opacity-40')} />
-                    ) : occupantId ? (
-                      <div
-                        className={cn(
-                          'flex h-full w-full flex-col items-center justify-center text-center',
-                          compact ? 'px-1 pt-2' : 'px-1.5'
-                        )}
-                      >
+                  return (
+                    <div
+                      key={`${room.id}_${roomSeatNo}`}
+                      onClick={() => handleSeatClick(seat)}
+                      className={cn(
+                        'relative aspect-square cursor-pointer overflow-hidden border-2 outline-none shadow-sm transition-all duration-500',
+                        compact ? 'min-w-[52px] rounded-[1.1rem] p-1' : 'min-w-[64px] rounded-2xl p-1',
+                        'flex flex-col items-center justify-center',
+                        isFilteredOut ? 'border-transparent bg-muted/10 opacity-20 grayscale' :
+                        isAisle ? 'border-transparent bg-transparent text-transparent hover:bg-muted/10' :
+                        occupantId ? overlayPresentation.surfaceClass :
+                        'border-primary/40 bg-white text-primary/5 hover:border-primary/60',
+                        isEditMode && isAisle && 'border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20'
+                      )}
+                    >
+                      {!isAisle && (
                         <span
                           className={cn(
-                            'w-full font-black tracking-tight whitespace-normal break-keep text-center',
-                            nameTextClass,
-                            compact
-                              ? 'text-[10px] leading-[1.12] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
-                              : 'text-[12px] leading-[1.18] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
+                            'absolute left-1.5 top-1 font-black',
+                            compact ? 'text-[6px]' : 'text-[7px]',
+                            occupantId && overlayPresentation.isDark ? 'opacity-70' : 'opacity-40'
                           )}
                         >
-                          {occupantName}
+                          {roomSeatNo}
                         </span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center">
-                        <span className={cn('font-black uppercase tracking-tighter opacity-100', compact ? 'text-[6px]' : 'text-[7px]')}>
-                          빈좌석
-                        </span>
-                        {isEditMode && <UserPlus className={cn(compact ? 'h-2 w-2' : 'h-2.5 w-2.5', 'mt-0.5 text-primary/40')} />}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                      )}
+                      {seat.seatZone && !isAisle && isEditMode && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'absolute right-1 top-1 border-none px-1 font-black',
+                            compact ? 'h-3 text-[5px]' : 'h-3.5 text-[6px]',
+                            occupantId ? overlayPresentation.flagClass : 'bg-primary/5 text-primary/40'
+                          )}
+                        >
+                          {seat.seatZone.charAt(0)}
+                        </Badge>
+                      )}
+                      {isAisle ? (
+                        isEditMode && <MapIcon className={cn(compact ? 'h-2.5 w-2.5' : 'h-3 w-3', 'opacity-40')} />
+                      ) : occupantId ? (
+                        <div
+                          className={cn(
+                            'flex h-full w-full flex-col items-center justify-center text-center',
+                            compact ? 'px-1 pt-2' : 'px-1.5'
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'w-full font-black tracking-tight whitespace-normal break-keep text-center',
+                              nameTextClass,
+                              compact
+                                ? 'text-[10px] leading-[1.12] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
+                                : 'text-[12px] leading-[1.18] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
+                            )}
+                          >
+                            {occupantName}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className={cn('font-black uppercase tracking-tighter opacity-100', compact ? 'text-[6px]' : 'text-[7px]')}>
+                            빈좌석
+                          </span>
+                          {isEditMode && <UserPlus className={cn(compact ? 'h-2 w-2' : 'h-2.5 w-2.5', 'mt-0.5 text-primary/40')} />}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
+        {showInlineSeatInsightControls && !compact ? renderSeatOverlayControlPanel({ compact: true, inline: true }) : null}
       </div>
       <ScrollBar orientation="horizontal" />
     </ScrollArea>
@@ -2402,7 +2519,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       />
 
       <motion.section ref={liveBoardSectionRef} className="px-4" {...getDeckMotionProps(0.4, 12)}>
-        <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.92fr)]")}>
+        <div className={cn("grid gap-6", isMobile || showInlineSeatInsightControls ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.92fr)]")}>
           <div className={cn("space-y-5", isMobile ? "order-2" : "order-1")}>
             <Card className="marketing-card overflow-hidden rounded-[2.75rem] border-none">
               <CardContent className={cn("space-y-5", isMobile ? "p-4" : "p-5 sm:p-6")}>
@@ -2676,83 +2793,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             ) : null}
           </div>
 
+          {!showInlineSeatInsightControls ? (
           <div ref={seatInsightSectionRef} className={cn("space-y-5", isMobile ? "order-1" : "order-2")}>
             <Card className="marketing-card-soft overflow-hidden rounded-[2.65rem] border-none">
               <CardContent className={cn("space-y-5", isMobile ? "p-4" : "p-5 sm:p-6")}>
-                <TeacherSectionHeader
-                  badge="도면 학생 히트맵"
-                  title="운영 위험 신호를 도면에서 읽는 제어 패널"
-                  description="오버레이 모드를 바꾸며 좌석 단위 위험, 학부모 반응, 벌점, 학습 효율을 같은 기준으로 비교할 수 있게 정리했습니다."
-                  icon={ShieldAlert}
-                  tone="navy"
-                  right={
-                    <>
-                      <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
-                        현재 보기: {activeSeatOverlayOption.label}
-                      </Badge>
-                      {isEditMode && (
-                        <Badge className="h-8 rounded-full border-none bg-amber-100 px-3.5 text-[10px] font-black text-amber-700">
-                          편집 중에는 상태 보기 고정
-                        </Badge>
-                      )}
-                    </>
-                  }
-                />
-
-                <div className="rounded-[2rem] border border-[#D7E4FF] bg-white/85 p-4 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">현재 오버레이</p>
-                  <p className="mt-2 text-sm font-black text-[#14295F]">{activeSeatOverlayOption.label}</p>
-                  <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
-                    {SEAT_OVERLAY_DESCRIPTIONS[activeSeatOverlayMode]}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {heatmapSummaryItems.map((item) => (
-                    <span
-                      key={item.label}
-                      className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", item.tone)}
-                    >
-                      {item.label} {item.value}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {SEAT_OVERLAY_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      type="button"
-                      variant={activeSeatOverlayMode === option.value ? 'default' : 'outline'}
-                      disabled={isEditMode && option.value !== 'status'}
-                      onClick={() => setSeatOverlayMode(option.value)}
-                      className={cn(
-                        "rounded-2xl px-4 font-black",
-                        isMobile ? "h-10 flex-1 min-w-[92px]" : "h-11",
-                        activeSeatOverlayMode === option.value ? "bg-[#14295F] text-white" : "border-2 bg-white/80 text-[#14295F]"
-                      )}
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-
-                <div className="rounded-[2rem] border border-[#D7E4FF] bg-[#F7FAFF] p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">범례</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {activeSeatOverlayLegends.map((legend) => (
-                      <span
-                        key={`${activeSeatOverlayMode}_${legend.key}`}
-                        className={cn("inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black", legend.tone)}
-                      >
-                        {legend.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                {renderSeatOverlayControlPanel()}
               </CardContent>
             </Card>
           </div>
+          ) : null}
         </div>
       </motion.section>
 

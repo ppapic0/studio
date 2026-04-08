@@ -1,11 +1,27 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, Loader2, Search, Sparkles } from 'lucide-react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import {
+  type LucideIcon,
+  AlertCircle,
+  ArrowUpRight,
+  CalendarClock,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  DoorOpen,
+  Loader2,
+  MapPinned,
+  Search,
+  ShieldAlert,
+  Sparkles,
+  UserCheck,
+} from 'lucide-react';
 import { Firestore } from 'firebase/firestore';
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -60,23 +76,39 @@ function useDesktopLayout() {
   return isDesktop;
 }
 
-function SummaryMetricCard({
+function MetricSummaryCard({
   label,
   value,
   hint,
+  icon: Icon,
   accentClass,
+  iconClass,
 }: {
   label: string;
   value: string;
   hint: string;
+  icon: LucideIcon;
   accentClass: string;
+  iconClass: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white px-5 py-4 shadow-[0_16px_35px_-32px_rgba(15,23,42,0.45)]">
-      <div className={cn('absolute inset-y-0 left-0 w-1.5', accentClass)} />
-      <p className="pl-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-2 pl-2 text-[1.75rem] font-black tracking-tight text-[#14295F]">{value}</p>
-      <p className="mt-2 pl-2 text-xs font-bold leading-relaxed text-slate-500">{hint}</p>
+    <div
+      className={cn(
+        'group relative overflow-hidden rounded-[1.9rem] border px-5 py-5 shadow-[0_20px_45px_-36px_rgba(20,41,95,0.38)] transition-all duration-300 motion-reduce:transition-none',
+        accentClass
+      )}
+    >
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#FF7A16] via-[#FF9D52] to-transparent opacity-80" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+          <p className="mt-3 text-[2rem] font-black tracking-[-0.04em] text-[#14295F]">{value}</p>
+        </div>
+        <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border', iconClass)}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <p className="mt-3 text-xs font-bold leading-relaxed text-slate-500">{hint}</p>
     </div>
   );
 }
@@ -85,38 +117,134 @@ function OpsSummaryCard({
   label,
   value,
   hint,
+  icon: Icon,
 }: {
   label: string;
   value: string;
   hint: string;
+  icon: LucideIcon;
 }) {
   return (
-    <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{value}</p>
-      <p className="mt-1 text-xs font-bold text-slate-500">{hint}</p>
+    <div className="rounded-[1.5rem] border border-[#14295F]/10 bg-white/92 px-4 py-4 shadow-[0_16px_30px_-34px_rgba(20,41,95,0.45)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
+          <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{value}</p>
+        </div>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-[#14295F]/10 bg-[#F4F7FF] text-[#14295F]">
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] font-bold leading-relaxed text-slate-500">{hint}</p>
     </div>
   );
 }
 
-function DenseHeaderCell({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={cn('text-[10px] font-black uppercase tracking-[0.16em] text-slate-400', className)}>
-      {children}
-    </div>
-  );
-}
-
-function DenseValueCell({
+function StudentMetricPill({
+  label,
   value,
-  tone = 'text-[#14295F]',
-  align = 'text-left',
+  tone,
 }: {
+  label: string;
   value: string;
   tone?: string;
-  align?: string;
 }) {
-  return <div className={cn('text-sm font-black', tone, align)}>{value}</div>;
+  return (
+    <div className="rounded-[1.25rem] border border-slate-200 bg-white/90 px-3 py-3 shadow-[0_12px_24px_-28px_rgba(20,41,95,0.36)]">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
+      <p className={cn('mt-2 text-sm font-black tracking-tight text-[#14295F]', tone)}>{value}</p>
+    </div>
+  );
+}
+
+function StudentPriorityCard({
+  row,
+  index,
+  isSelected,
+  onSelect,
+}: {
+  row: AttendanceStudentKpiRow;
+  index: number;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  const riskMeta = getAttendanceRiskMeta(row.stabilityScore);
+  const accentClass =
+    row.riskLevel === 'critical'
+      ? 'bg-rose-500'
+      : row.riskLevel === 'risk'
+        ? 'bg-[#FF7A16]'
+        : row.riskLevel === 'watch'
+          ? 'bg-sky-500'
+          : 'bg-emerald-500';
+
+  return (
+    <motion.button
+      type="button"
+      onClick={onSelect}
+      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+      animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.28, delay: Math.min(index * 0.035, 0.18) }}
+      whileHover={reduceMotion ? undefined : { y: -2 }}
+      whileTap={reduceMotion ? undefined : { scale: 0.995 }}
+      className={cn(
+        'group relative w-full overflow-hidden rounded-[2rem] border text-left transition-all duration-300 motion-reduce:transition-none',
+        isSelected
+          ? 'border-[#14295F]/30 bg-[linear-gradient(135deg,#FFFFFF_0%,#F3F7FF_100%)] shadow-[0_28px_60px_-38px_rgba(20,41,95,0.42)] ring-2 ring-[#14295F]/10'
+          : 'border-slate-200 bg-white hover:border-[#14295F]/20 hover:shadow-[0_24px_48px_-38px_rgba(20,41,95,0.3)]'
+      )}
+    >
+      <div className={cn('absolute inset-y-5 left-0 w-1.5 rounded-r-full', accentClass)} />
+      <div className="p-5 pl-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-lg font-black tracking-tight text-[#14295F]">{row.studentName}</p>
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-[#F7F9FF] px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                {row.className}
+              </Badge>
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-2.5 py-1 text-[10px] font-black text-slate-600">
+                {row.roomLabel}
+              </Badge>
+            </div>
+            <p className="mt-3 line-clamp-2 text-sm font-bold leading-relaxed text-slate-600">{row.topIssue}</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Badge className={cn('rounded-full border px-3 py-1 text-[10px] font-black', riskMeta.tone)}>
+              {riskMeta.label}
+            </Badge>
+            <Badge className={cn('rounded-full border px-3 py-1 text-[10px] font-black', getRequestStatusTone(row.recentRequestStatus))}>
+              {getRequestStatusLabel(row.recentRequestStatus)}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <StudentMetricPill label="출석률" value={`${row.attendanceRate}%`} />
+          <StudentMetricPill label="지각" value={`${row.lateCount}회`} tone="text-amber-700" />
+          <StudentMetricPill label="결석" value={`${row.absenceCount}회`} tone="text-rose-700" />
+          <StudentMetricPill label="평균 외출" value={formatMinutesAsLabel(row.averageAwayMinutes)} tone="text-sky-700" />
+          <StudentMetricPill label="최근 하원" value={row.latestCheckOutLabel} tone="text-slate-700" />
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+            안정도 {row.stabilityScore} · 최근 신청 {row.recentRequestCount}건
+          </p>
+          <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#14295F]">
+            상세 보기
+            <ChevronRight
+              className={cn(
+                'h-4 w-4 transition-transform duration-300 motion-reduce:transition-none',
+                isSelected ? 'translate-x-0.5' : 'group-hover:translate-x-0.5'
+              )}
+            />
+          </div>
+        </div>
+      </div>
+    </motion.button>
+  );
 }
 
 function getRequestStatusLabel(status: AttendanceStudentKpiRow['recentRequestStatus']) {
@@ -165,14 +293,14 @@ function AttendanceTimelineStrip({
   onFocusDateKey: (dateKey: string) => void;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 rounded-[1.7rem] border border-[#14295F]/10 bg-white/92 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">최근 출결 스트립</p>
-          <p className="mt-1 text-xs font-bold text-slate-500">최근 {row.timeline.length}일 흐름을 짧게 비교합니다.</p>
+          <p className="mt-1 text-xs font-bold text-slate-500">최근 {row.timeline.length}일 흐름을 압축해 비교합니다.</p>
         </div>
-        <Badge variant="outline" className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600">
-          기본 {row.timeline.length}일
+        <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-[#F7F9FF] px-3 py-1 text-[11px] font-black text-[#14295F]">
+          최근 {row.timeline.length}일
         </Badge>
       </div>
       <div className="-mx-1 overflow-x-auto pb-1">
@@ -188,7 +316,7 @@ function AttendanceTimelineStrip({
                 onMouseEnter={() => onFocusDateKey(day.dateKey)}
                 onFocus={() => onFocusDateKey(day.dateKey)}
                 className={cn(
-                  'min-w-[72px] rounded-[1.2rem] border px-3 py-3 text-left shadow-sm transition-all',
+                  'min-w-[74px] rounded-[1.2rem] border px-3 py-3 text-left shadow-sm transition-all duration-200 motion-reduce:transition-none',
                   getAttendanceStatusTone(day.status),
                   day.isOffDay && 'opacity-60',
                   isActive && 'ring-2 ring-[#14295F]/20'
@@ -212,15 +340,17 @@ function DetailStat({
   label,
   value,
   hint,
+  toneClass,
 }: {
   label: string;
   value: string;
   hint: string;
+  toneClass?: string;
 }) {
   return (
-    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
+    <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[#F8FAFF] px-4 py-4">
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
-      <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{value}</p>
+      <p className={cn('mt-2 text-lg font-black tracking-tight text-[#14295F]', toneClass)}>{value}</p>
       <p className="mt-1 text-[11px] font-bold text-slate-500">{hint}</p>
     </div>
   );
@@ -255,54 +385,55 @@ function DetailPanel({ row }: { row: AttendanceStudentKpiRow | null }) {
   const requestPreview = expandedRequests ? row.requestHistory : row.requestHistory.slice(0, 4);
 
   return (
-    <div className="space-y-5 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.34)]">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">학생 개인 상세</p>
-            <h3 className="text-2xl font-black tracking-tight text-[#14295F]">{row.studentName}</h3>
+    <div className="space-y-4 rounded-[2.2rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.35)]">
+      <div className="overflow-hidden rounded-[1.9rem] border border-[#14295F]/10 bg-[linear-gradient(135deg,#F5F8FF_0%,#FFFFFF_60%,#FFF4EA_100%)] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#14295F]/45">선택 학생 브리프</p>
+            <h3 className="text-[1.75rem] font-black tracking-[-0.04em] text-[#14295F]">{row.studentName}</h3>
             <p className="text-sm font-bold text-slate-500">{buildAttendanceStudentSubtitle(row)}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', riskMeta.tone)}>
-              {riskMeta.label}
+            <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', riskMeta.tone)}>{riskMeta.label}</Badge>
+            <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', getRequestStatusTone(row.recentRequestStatus))}>
+              신청 {getRequestStatusLabel(row.recentRequestStatus)}
             </Badge>
-            <Badge variant="outline" className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+            <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white/85 px-3 py-1 text-[10px] font-black text-[#14295F]">
               안정도 {row.stabilityScore}
             </Badge>
           </div>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
+        <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+          <div className="rounded-[1.5rem] border border-white/60 bg-white/90 p-4 shadow-[0_18px_35px_-35px_rgba(20,41,95,0.25)]">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">오늘 핵심 이슈</p>
             <p className="mt-2 text-base font-black leading-relaxed text-[#14295F]">{row.topIssue}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Badge variant="outline" className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-[#F7F9FF] px-3 py-1 text-[11px] font-black text-[#14295F]">
                 출석률 {row.attendanceRate}%
               </Badge>
-              <Badge variant="outline" className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
                 지각 {row.lateCount}회
               </Badge>
-              <Badge variant="outline" className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
                 결석 {row.absenceCount}회
               </Badge>
             </div>
           </div>
 
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">바로 할 일</p>
+          <div className="rounded-[1.5rem] border border-[#14295F]/10 bg-[#14295F] p-4 text-white shadow-[0_24px_45px_-35px_rgba(20,41,95,0.5)]">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/65">바로 할 일</p>
             <div className="mt-3 space-y-2">
               {row.suggestions.length === 0 ? (
-                <div className="rounded-2xl bg-white px-3 py-3 text-sm font-bold text-slate-500">
+                <div className="rounded-[1.1rem] bg-white/12 px-3 py-3 text-sm font-bold leading-relaxed text-white/90">
                   추가 조치 없이 현재 흐름을 유지하면 됩니다.
                 </div>
               ) : (
                 row.suggestions.slice(0, 2).map((suggestion) => (
-                  <div key={suggestion} className="rounded-2xl bg-white px-3 py-3">
+                  <div key={suggestion} className="rounded-[1.1rem] bg-white/12 px-3 py-3">
                     <div className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                      <span className="text-sm font-bold leading-relaxed text-slate-700">{suggestion}</span>
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB980]" />
+                      <span className="text-sm font-bold leading-relaxed text-white/92">{suggestion}</span>
                     </div>
                   </div>
                 ))
@@ -314,25 +445,19 @@ function DetailPanel({ row }: { row: AttendanceStudentKpiRow | null }) {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <DetailStat label="출석률" value={`${row.attendanceRate}%`} hint={`지각 ${row.lateCount}회 · 결석 ${row.absenceCount}회`} />
-        <DetailStat label="평균 외출" value={formatMinutesAsLabel(row.averageAwayMinutes)} hint={`${row.awayDayCount}일 · ${row.awayCount}회`} />
+        <DetailStat label="평균 외출" value={formatMinutesAsLabel(row.averageAwayMinutes)} hint={`${row.awayDayCount}일 · ${row.awayCount}회`} toneClass="text-sky-700" />
         <DetailStat label="최근 하원" value={row.latestCheckOutLabel} hint={`하원 기록 완료율 ${row.checkoutCompletionRate}%`} />
-        <DetailStat
-          label="신청 상태"
-          value={getRequestStatusLabel(row.recentRequestStatus)}
-          hint={`최근 신청 ${row.recentRequestCount}건`}
-        />
+        <DetailStat label="신청 상태" value={getRequestStatusLabel(row.recentRequestStatus)} hint={`최근 신청 ${row.recentRequestCount}건`} />
       </div>
 
       <AttendanceTimelineStrip row={row} focusedDateKey={focusedDateKey} onFocusDateKey={setFocusedDateKey} />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
+        <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-white/92 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">선택 날짜 상세</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">
-                짧은 상태 스트립에서 선택한 하루의 기록입니다.
-              </p>
+              <p className="mt-1 text-xs font-bold text-slate-500">짧은 상태 스트립에서 선택한 하루의 기록입니다.</p>
             </div>
             {focusedDay ? (
               <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', getAttendanceStatusTone(focusedDay.status))}>
@@ -343,33 +468,52 @@ function DetailPanel({ row }: { row: AttendanceStudentKpiRow | null }) {
           {focusedDay ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <DetailStat label="공부 시간" value={formatMinutesAsLabel(focusedDay.studyMinutes)} hint={focusedDay.dateKey} />
-              <DetailStat label="등원 오차" value={formatSignedMinutes(focusedDay.lateMinutes)} hint={focusedDay.expectedArrivalTime || '예정 시각 없음'} />
-              <DetailStat label="외출" value={focusedDay.awayCount > 0 ? `${focusedDay.awayCount}회` : '없음'} hint={formatMinutesAsLabel(focusedDay.awayMinutes)} />
-              <DetailStat label="하원" value={focusedDay.checkOutAt ? focusedDay.checkOutAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '-'} hint={focusedDay.hasCheckoutRecord ? '기록 완료' : '기록 없음'} />
+              <DetailStat
+                label="등원 오차"
+                value={formatSignedMinutes(focusedDay.lateMinutes)}
+                hint={focusedDay.expectedArrivalTime || '예정 시각 없음'}
+                toneClass={focusedDay.lateMinutes > 0 ? 'text-amber-700' : 'text-emerald-700'}
+              />
+              <DetailStat label="외출" value={focusedDay.awayCount > 0 ? `${focusedDay.awayCount}회` : '없음'} hint={formatMinutesAsLabel(focusedDay.awayMinutes)} toneClass="text-sky-700" />
+              <DetailStat
+                label="하원"
+                value={
+                  focusedDay.checkOutAt
+                    ? focusedDay.checkOutAt.toLocaleTimeString('ko-KR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                      })
+                    : '-'
+                }
+                hint={focusedDay.hasCheckoutRecord ? '기록 완료' : '기록 없음'}
+              />
             </div>
           ) : (
-            <div className="mt-4 rounded-2xl bg-white px-4 py-6 text-sm font-bold text-slate-400">선택 가능한 출결 기록이 없습니다.</div>
+            <div className="mt-4 rounded-[1.4rem] border border-dashed border-[#14295F]/10 bg-[#F8FAFF] px-4 py-6 text-sm font-bold text-slate-400">
+              선택 가능한 출결 기록이 없습니다.
+            </div>
           )}
         </div>
 
-        <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
+        <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-white/92 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">등원 시각 추이</p>
               <p className="mt-1 text-xs font-bold text-slate-500">최근 5개 유효 등원 기록만 간결하게 보여줍니다.</p>
             </div>
-            <Badge variant="outline" className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+            <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-[#F7F9FF] px-3 py-1 text-[11px] font-black text-[#14295F]">
               평균 {formatSignedMinutes(row.averageArrivalOffsetMinutes)}
             </Badge>
           </div>
           <div className="mt-4 space-y-2">
             {recentArrivalTrend.length === 0 ? (
-              <div className="rounded-2xl bg-white px-4 py-6 text-sm font-bold text-slate-400">
+              <div className="rounded-[1.4rem] border border-dashed border-[#14295F]/10 bg-[#F8FAFF] px-4 py-6 text-sm font-bold text-slate-400">
                 등원 기록이 아직 충분하지 않습니다.
               </div>
             ) : (
               recentArrivalTrend.map((day) => (
-                <div key={day.dateKey} className="flex items-center justify-between rounded-2xl bg-white px-3 py-3">
+                <div key={day.dateKey} className="flex items-center justify-between rounded-[1.25rem] border border-[#14295F]/10 bg-[#F8FAFF] px-3 py-3">
                   <div>
                     <p className="text-sm font-black text-[#14295F]">{day.dateLabel}</p>
                     <p className="mt-1 text-[11px] font-bold text-slate-500">{day.expectedArrivalTime || '예정 없음'}</p>
@@ -384,7 +528,7 @@ function DetailPanel({ row }: { row: AttendanceStudentKpiRow | null }) {
         </div>
       </div>
 
-      <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
+      <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-white/92 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">신청 이력</p>
@@ -396,12 +540,12 @@ function DetailPanel({ row }: { row: AttendanceStudentKpiRow | null }) {
         </div>
         <div className="mt-4 space-y-2">
           {requestPreview.length === 0 ? (
-            <div className="rounded-2xl bg-white px-4 py-6 text-sm font-bold text-slate-400">
+            <div className="rounded-[1.4rem] border border-dashed border-[#14295F]/10 bg-[#F8FAFF] px-4 py-6 text-sm font-bold text-slate-400">
               최근 기간 내 신청 내역이 없습니다.
             </div>
           ) : (
             requestPreview.map((request) => (
-              <div key={request.id} className="rounded-2xl bg-white px-3 py-3">
+              <div key={request.id} className="rounded-[1.25rem] border border-[#14295F]/10 bg-[#F8FAFF] px-3 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-black text-[#14295F]">
@@ -438,6 +582,7 @@ export function AttendanceKpiBoard({
 }: AttendanceKpiBoardProps) {
   const [periodDays, setPeriodDays] = useState<AttendanceKpiPeriod>(30);
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [classFilter, setClassFilter] = useState('all');
   const [roomFilter, setRoomFilter] = useState('all');
   const [riskFilter, setRiskFilter] = useState<RiskFilter>('all');
@@ -445,6 +590,7 @@ export function AttendanceKpiBoard({
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const isDesktop = useDesktopLayout();
+  const reduceMotion = useReducedMotion();
 
   const { isLoading, error, rows, summary, requestOperations, availableRooms, periodOptions } = useAttendanceKpi({
     firestore,
@@ -470,14 +616,14 @@ export function AttendanceKpiBoard({
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
-      if (search && !row.studentName.toLowerCase().includes(search.toLowerCase())) return false;
+      if (deferredSearch && !row.studentName.toLowerCase().includes(deferredSearch.toLowerCase())) return false;
       if (classFilter !== 'all' && row.className !== classFilter) return false;
       if (roomFilter !== 'all' && row.roomId !== roomFilter) return false;
       if (riskFilter !== 'all' && row.riskLevel !== riskFilter) return false;
       if (requestFilter !== 'all' && row.recentRequestStatus !== requestFilter) return false;
       return true;
     });
-  }, [classFilter, requestFilter, riskFilter, roomFilter, rows, search]);
+  }, [classFilter, deferredSearch, requestFilter, riskFilter, roomFilter, rows]);
 
   useEffect(() => {
     if (!filteredRows.length) {
@@ -490,6 +636,13 @@ export function AttendanceKpiBoard({
   }, [filteredRows, selectedStudentId]);
 
   const selectedRow = filteredRows.find((row) => row.studentId === selectedStudentId) || filteredRows[0] || null;
+  const periodLabel = periodOptions.find((option) => option.value === periodDays)?.label ?? `${periodDays}일`;
+  const activeFilterCount =
+    Number(Boolean(search.trim())) +
+    Number(classFilter !== 'all') +
+    Number(roomFilter !== 'all') +
+    Number(riskFilter !== 'all') +
+    Number(requestFilter !== 'all');
   const summaryHighlight = useMemo(() => {
     if (summary.criticalCount > 0) {
       return `긴급 학생 ${summary.criticalCount}명이 있어 오늘은 무단결석, 장기 외출, 하원 누락부터 먼저 확인하는 것이 좋습니다.`;
@@ -499,6 +652,90 @@ export function AttendanceKpiBoard({
     }
     return '전체 출결 흐름은 비교적 안정적입니다. 반복 지각과 외출시간 위주로 미세 조정하면 됩니다.';
   }, [summary.criticalCount, summary.riskCount]);
+  const operationsHighlight =
+    requestOperations.overduePendingCount > 0
+      ? `24시간 초과 요청 ${requestOperations.overduePendingCount}건이 있어 보호자 응답 지연이 생기기 전 먼저 닫는 것이 좋습니다.`
+      : requestOperations.pendingTodayCount > 0
+        ? `오늘 처리할 신청 ${requestOperations.pendingTodayCount}건을 먼저 확인하면 출결 상태와 보호자 응답이 함께 정리됩니다.`
+        : '신청 처리 흐름은 안정적입니다. 학생별 출석 패턴 비교에 더 집중해도 됩니다.';
+
+  const primaryMetrics = [
+    {
+      label: '출석률',
+      value: `${summary.attendanceRate}%`,
+      hint: '기준 루틴 대비 실제 출석 비율',
+      icon: UserCheck,
+      accentClass: 'border-emerald-100 bg-[linear-gradient(180deg,#FFFFFF_0%,#F5FFF9_100%)]',
+      iconClass: 'border-emerald-100 bg-emerald-50 text-emerald-600',
+    },
+    {
+      label: '지각률',
+      value: `${summary.lateRate}%`,
+      hint: '반복 지각 패턴 우선 확인',
+      icon: Clock3,
+      accentClass: 'border-amber-100 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF9F2_100%)]',
+      iconClass: 'border-amber-100 bg-amber-50 text-amber-600',
+    },
+    {
+      label: '무단결석률',
+      value: `${summary.unexcusedAbsenceRate}%`,
+      hint: '즉시 상담이 필요한 결석 비율',
+      icon: ShieldAlert,
+      accentClass: 'border-rose-100 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF5F7_100%)]',
+      iconClass: 'border-rose-100 bg-rose-50 text-rose-600',
+    },
+    {
+      label: '평균 외출',
+      value: formatMinutesAsLabel(summary.averageAwayMinutes),
+      hint: '학습 흐름 이탈 평균 시간',
+      icon: DoorOpen,
+      accentClass: 'border-sky-100 bg-[linear-gradient(180deg,#FFFFFF_0%,#F4FAFF_100%)]',
+      iconClass: 'border-sky-100 bg-sky-50 text-sky-600',
+    },
+    {
+      label: '하원 완료율',
+      value: `${summary.checkoutCompletionRate}%`,
+      hint: '보호자 안내까지 닫힌 기록 비율',
+      icon: MapPinned,
+      accentClass: 'border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F5F8FF_100%)]',
+      iconClass: 'border-[#14295F]/10 bg-[#F4F7FF] text-[#14295F]',
+    },
+    {
+      label: '신청 SLA',
+      value: `${summary.requestSlaComplianceRate}%`,
+      hint: '신청을 제때 처리한 운영 비율',
+      icon: CalendarClock,
+      accentClass: 'border-violet-100 bg-[linear-gradient(180deg,#FFFFFF_0%,#FAF6FF_100%)]',
+      iconClass: 'border-violet-100 bg-violet-50 text-violet-600',
+    },
+  ] as const;
+
+  const operationsMetrics = [
+    {
+      label: '오늘 대기 신청',
+      value: `${requestOperations.pendingTodayCount}`,
+      hint: '당일 처리 필요한 요청',
+      icon: Sparkles,
+    },
+    {
+      label: '24시간 초과 미처리',
+      value: `${requestOperations.overduePendingCount}`,
+      hint: '운영 후속 지연 요청',
+      icon: ShieldAlert,
+    },
+    {
+      label: '평균 처리시간',
+      value: `${requestOperations.averageProcessingHours}h`,
+      hint: '신청 응답 속도',
+      icon: Clock3,
+    },
+    {
+      label: '반복 신청 학생',
+      value: `${requestOperations.repeatRequesterCount}`,
+      hint: '반복 보호자 커뮤니케이션 대상',
+      icon: UserCheck,
+    },
+  ] as const;
 
   const handleSelectStudent = (studentId: string) => {
     setSelectedStudentId(studentId);
@@ -506,68 +743,148 @@ export function AttendanceKpiBoard({
   };
 
   return (
-    <Card className="rounded-[2.5rem] border-none bg-white shadow-xl ring-1 ring-border/50">
-      <CardHeader className="space-y-5 border-b bg-muted/5 p-8">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="grid gap-1">
-            <CardTitle className="text-xl font-black tracking-tight">출결 KPI 보드</CardTitle>
-            <CardDescription className="text-xs font-bold text-muted-foreground">
-              요약 → 학생 리스트 → 개인 상세 순서로 출결 리스크와 조치 우선순위를 빠르게 파악합니다.
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge className="rounded-full border-none bg-rose-100 px-3 py-1 text-xs font-black text-rose-700">
-              긴급 {summary.criticalCount}
-            </Badge>
-            <Badge className="rounded-full border-none bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">
-              위험 {summary.riskCount}
-            </Badge>
-            <Badge className="rounded-full border-none bg-sky-100 px-3 py-1 text-xs font-black text-sky-700">
-              주의 {summary.watchCount}
-            </Badge>
-            <Badge className="rounded-full border-none bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
-              안정 {summary.stableCount}
-            </Badge>
-          </div>
-        </div>
+    <Card className="overflow-hidden rounded-[2.8rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#F8FAFF_0%,#FFFFFF_32%,#FFFFFF_100%)] shadow-[0_30px_90px_-54px_rgba(20,41,95,0.35)]">
+      <CardHeader className="space-y-6 p-5 sm:p-8">
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.35 }}
+          className="overflow-hidden rounded-[2.4rem] bg-[linear-gradient(135deg,#14295F_0%,#1B377C_58%,#2F59B8_100%)] p-6 text-white shadow-[0_36px_80px_-46px_rgba(20,41,95,0.75)] sm:p-8"
+        >
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(300px,0.82fr)]">
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="rounded-full border border-white/15 bg-white/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                  출결 KPI 보드
+                </Badge>
+                <Badge className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black text-white/85">
+                  기간 {periodLabel}
+                </Badge>
+                <Badge className="rounded-full border border-[#FFB980]/30 bg-[#FF7A16] px-3 py-1 text-[10px] font-black text-white">
+                  학생 {filteredRows.length}명
+                </Badge>
+              </div>
 
-        <div className="rounded-[1.75rem] border border-[#14295F]/10 bg-[linear-gradient(135deg,#EEF4FF_0%,#FFFFFF_100%)] p-5 shadow-[0_20px_40px_-34px_rgba(20,41,95,0.35)]">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#14295F] text-white">
-              <Sparkles className="h-4 w-4" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[1.4rem] border border-white/15 bg-white/12">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/55">Attendance Intelligence</p>
+                    <h2 className="text-[2rem] font-black tracking-[-0.05em] text-white">출결 KPI 보드</h2>
+                  </div>
+                </div>
+                <p className="max-w-2xl text-sm font-bold leading-relaxed text-white/78">
+                  요약 → 필터 → 학생 우선순위 → 개인 상세 흐름으로 출결 리스크와 바로 처리할 학생을 더 빠르게 읽습니다.
+                </p>
+              </div>
+
+              <div className="rounded-[1.75rem] border border-white/10 bg-white/10 p-4 backdrop-blur-md">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">운영 하이라이트</p>
+                <p className="mt-2 text-base font-black leading-relaxed text-white">{summaryHighlight}</p>
+                <p className="mt-3 text-sm font-bold leading-relaxed text-white/74">{operationsHighlight}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#14295F]/45">운영 요약</p>
-              <p className="mt-1 text-sm font-black leading-relaxed text-[#14295F]">{summaryHighlight}</p>
+
+            <div className="flex flex-col gap-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Badge className="justify-center rounded-[1.2rem] border border-rose-300/20 bg-rose-400/12 px-4 py-3 text-[11px] font-black text-rose-50">
+                  긴급 {summary.criticalCount}
+                </Badge>
+                <Badge className="justify-center rounded-[1.2rem] border border-orange-300/20 bg-orange-400/12 px-4 py-3 text-[11px] font-black text-orange-50">
+                  위험 {summary.riskCount}
+                </Badge>
+                <Badge className="justify-center rounded-[1.2rem] border border-sky-300/20 bg-sky-400/12 px-4 py-3 text-[11px] font-black text-sky-50">
+                  주의 {summary.watchCount}
+                </Badge>
+                <Badge className="justify-center rounded-[1.2rem] border border-emerald-300/20 bg-emerald-400/12 px-4 py-3 text-[11px] font-black text-emerald-50">
+                  안정 {summary.stableCount}
+                </Badge>
+              </div>
+
+              <div className="grid flex-1 gap-3">
+                <div className="rounded-[1.6rem] border border-white/10 bg-white/10 p-4 backdrop-blur-md">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">현재 우선순위</p>
+                  <p className="mt-2 text-2xl font-black tracking-[-0.04em] text-white">
+                    {selectedRow ? selectedRow.studentName : filteredRows.length > 0 ? filteredRows[0]?.studentName : '선택 대기'}
+                  </p>
+                  <p className="mt-2 text-sm font-bold leading-relaxed text-white/78">
+                    {selectedRow ? selectedRow.topIssue : '필터를 조정하면 해당 조건의 학생을 바로 비교할 수 있습니다.'}
+                  </p>
+                </div>
+                <div className="rounded-[1.6rem] border border-white/10 bg-white/10 p-4 backdrop-blur-md">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">필터 상태</p>
+                      <p className="mt-2 text-2xl font-black tracking-[-0.04em] text-white">{activeFilterCount}개</p>
+                    </div>
+                    <ArrowUpRight className="h-5 w-5 text-white/75" />
+                  </div>
+                  <p className="mt-2 text-sm font-bold leading-relaxed text-white/74">
+                    현재 위험도 높은 순으로 정렬하며, 검색과 조건이 적용된 결과만 보여줍니다.
+                  </p>
+                </div>
+              </div>
             </div>
+          </div>
+        </motion.div>
+
+        <div className="grid gap-3 xl:grid-cols-6">
+          {primaryMetrics.map((metric, index) => (
+            <motion.div
+              key={metric.label}
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.25, delay: 0.04 * index }}
+            >
+              <MetricSummaryCard {...metric} />
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="rounded-[2rem] border border-[#14295F]/10 bg-[#F7F9FF] p-4 shadow-[0_20px_40px_-38px_rgba(20,41,95,0.35)]">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">운영 스트립</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">핵심 6개 지표 아래에 오늘 처리 흐름만 얇게 따로 모았습니다.</p>
+            </div>
+            <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-[#14295F]">
+              현재 {filteredRows.length}명 추적 중
+            </Badge>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {operationsMetrics.map((metric, index) => (
+              <motion.div
+                key={metric.label}
+                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.24, delay: 0.05 * index }}
+              >
+                <OpsSummaryCard {...metric} />
+              </motion.div>
+            ))}
           </div>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-3">
-          <SummaryMetricCard label="출석률" value={`${summary.attendanceRate}%`} hint="기준 루틴 대비 실제 출석 비율" accentClass="bg-emerald-500" />
-          <SummaryMetricCard label="지각률" value={`${summary.lateRate}%`} hint="반복 지각 패턴 우선 확인" accentClass="bg-amber-500" />
-          <SummaryMetricCard label="무단결석률" value={`${summary.unexcusedAbsenceRate}%`} hint="즉시 상담이 필요한 결석 비율" accentClass="bg-rose-500" />
-        </div>
-
-        <div className="grid gap-3 xl:grid-cols-3">
-          <SummaryMetricCard label="평균 외출" value={formatMinutesAsLabel(summary.averageAwayMinutes)} hint="학습 흐름 이탈 평균 시간" accentClass="bg-sky-500" />
-          <SummaryMetricCard label="하원 완료율" value={`${summary.checkoutCompletionRate}%`} hint="보호자 안내까지 닫힌 기록 비율" accentClass="bg-[#14295F]" />
-          <SummaryMetricCard label="신청 SLA" value={`${summary.requestSlaComplianceRate}%`} hint="신청을 제때 처리한 운영 비율" accentClass="bg-violet-500" />
-        </div>
-
-        <div className="sticky top-0 z-10 -mx-2 rounded-[1.6rem] border border-slate-200 bg-white/95 px-2 py-2 shadow-sm backdrop-blur">
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.25, delay: 0.08 }}
+          className="sticky top-0 z-10 rounded-[2rem] border border-[#14295F]/10 bg-white/96 p-4 shadow-[0_18px_36px_-30px_rgba(20,41,95,0.28)] backdrop-blur-md"
+        >
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_repeat(5,minmax(0,1fr))]">
-            <div className="flex h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4">
+            <div className="flex h-12 items-center gap-3 rounded-[1.25rem] border border-[#14295F]/10 bg-[#F8FAFF] px-4">
               <Search className="h-4 w-4 text-slate-400" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="학생명 검색"
-                className="h-9 border-none px-0 font-bold shadow-none focus-visible:ring-0"
+                className="h-9 border-none bg-transparent px-0 font-bold text-[#14295F] shadow-none placeholder:text-slate-400 focus-visible:ring-0"
               />
             </div>
             <Select value={periodDays.toString()} onValueChange={(value) => setPeriodDays(Number(value) as AttendanceKpiPeriod)}>
-              <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-white font-bold">
+              <SelectTrigger className="h-12 rounded-[1.25rem] border-[#14295F]/10 bg-[#F8FAFF] font-bold text-[#14295F]">
                 <SelectValue placeholder="기간" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl">
@@ -579,7 +896,7 @@ export function AttendanceKpiBoard({
               </SelectContent>
             </Select>
             <Select value={classFilter} onValueChange={setClassFilter}>
-              <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-white font-bold">
+              <SelectTrigger className="h-12 rounded-[1.25rem] border-[#14295F]/10 bg-[#F8FAFF] font-bold text-[#14295F]">
                 <SelectValue placeholder="반" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl">
@@ -592,7 +909,7 @@ export function AttendanceKpiBoard({
               </SelectContent>
             </Select>
             <Select value={roomFilter} onValueChange={setRoomFilter}>
-              <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-white font-bold">
+              <SelectTrigger className="h-12 rounded-[1.25rem] border-[#14295F]/10 bg-[#F8FAFF] font-bold text-[#14295F]">
                 <SelectValue placeholder="호실" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl">
@@ -605,7 +922,7 @@ export function AttendanceKpiBoard({
               </SelectContent>
             </Select>
             <Select value={riskFilter} onValueChange={(value) => setRiskFilter(value as RiskFilter)}>
-              <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-white font-bold">
+              <SelectTrigger className="h-12 rounded-[1.25rem] border-[#14295F]/10 bg-[#F8FAFF] font-bold text-[#14295F]">
                 <SelectValue placeholder="위험도" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl">
@@ -617,7 +934,7 @@ export function AttendanceKpiBoard({
               </SelectContent>
             </Select>
             <Select value={requestFilter} onValueChange={(value) => setRequestFilter(value as RequestFilter)}>
-              <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-white font-bold">
+              <SelectTrigger className="h-12 rounded-[1.25rem] border-[#14295F]/10 bg-[#F8FAFF] font-bold text-[#14295F]">
                 <SelectValue placeholder="신청 상태" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl">
@@ -629,155 +946,85 @@ export function AttendanceKpiBoard({
               </SelectContent>
             </Select>
           </div>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-2">
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
-              현재 위험도 높은 순으로 정렬
-            </p>
-            <Badge variant="outline" className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600">
-              기간 {periodOptions.find((option) => option.value === periodDays)?.label ?? `${periodDays}일`}
-            </Badge>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#14295F]/8 pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-[#14295F]">
+                기간 {periodLabel}
+              </Badge>
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+                활성 필터 {activeFilterCount}개
+              </Badge>
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+                결과 {filteredRows.length}명
+              </Badge>
+            </div>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">현재 위험도 높은 순으로 정렬</p>
           </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <OpsSummaryCard label="오늘 대기 신청" value={`${requestOperations.pendingTodayCount}`} hint="당일 처리 필요한 요청" />
-          <OpsSummaryCard label="24시간 초과 미처리" value={`${requestOperations.overduePendingCount}`} hint="운영 후속 지연 요청" />
-          <OpsSummaryCard label="평균 처리시간" value={`${requestOperations.averageProcessingHours}h`} hint="신청 응답 속도" />
-          <OpsSummaryCard label="반복 신청 학생" value={`${requestOperations.repeatRequesterCount}`} hint="반복 보호자 커뮤니케이션 대상" />
-        </div>
+        </motion.div>
       </CardHeader>
 
-      <CardContent className="p-6 sm:p-8">
+      <CardContent className="px-5 pb-5 sm:px-8 sm:pb-8">
         {isLoading ? (
           <div className="flex justify-center py-24">
-            <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#14295F] opacity-20" />
           </div>
         ) : error ? (
           <div className="rounded-[1.75rem] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700">
             {error}
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
-            <div className="space-y-3">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.04fr)_minmax(420px,0.96fr)]">
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">학생 우선순위</p>
+                  <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-[#14295F]">지금 먼저 봐야 할 학생</h3>
+                </div>
+                <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-[#F8FAFF] px-3 py-1 text-[11px] font-black text-[#14295F]">
+                  위험도 · 출석 흐름 기준
+                </Badge>
+              </div>
               {filteredRows.length === 0 ? (
-                <div className="rounded-[2rem] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-16 text-center">
+                <div className="rounded-[2rem] border border-dashed border-[#14295F]/15 bg-[#F8FAFF] px-6 py-16 text-center">
                   <AlertCircle className="mx-auto h-8 w-8 text-slate-300" />
                   <p className="mt-3 text-sm font-black text-slate-500">조건에 맞는 학생이 없습니다.</p>
                 </div>
               ) : (
-                <>
-                  <div className="hidden rounded-[1.5rem] border border-slate-200 bg-slate-50/70 px-5 py-3 lg:grid lg:grid-cols-[minmax(0,2.2fr)_0.9fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr_0.9fr] lg:gap-3">
-                    <DenseHeaderCell>학생</DenseHeaderCell>
-                    <DenseHeaderCell>위험도</DenseHeaderCell>
-                    <DenseHeaderCell className="text-right">출석률</DenseHeaderCell>
-                    <DenseHeaderCell className="text-right">지각</DenseHeaderCell>
-                    <DenseHeaderCell className="text-right">결석</DenseHeaderCell>
-                    <DenseHeaderCell className="text-right">평균 외출</DenseHeaderCell>
-                    <DenseHeaderCell className="text-right">최근 하원</DenseHeaderCell>
-                    <DenseHeaderCell className="text-right">신청 상태</DenseHeaderCell>
-                  </div>
-
-                  {filteredRows.map((row) => {
-                    const riskMeta = getAttendanceRiskMeta(row.stabilityScore);
-                    const isSelected = selectedRow?.studentId === row.studentId;
-                    const accentClass =
-                      row.riskLevel === 'critical'
-                        ? 'bg-rose-500'
-                        : row.riskLevel === 'risk'
-                          ? 'bg-amber-500'
-                          : row.riskLevel === 'watch'
-                            ? 'bg-sky-500'
-                            : 'bg-emerald-500';
-
-                    return (
-                      <button
-                        key={row.studentId}
-                        type="button"
-                        onClick={() => handleSelectStudent(row.studentId)}
-                        className={cn(
-                          'w-full rounded-[1.8rem] border bg-white text-left transition-all',
-                          isSelected
-                            ? 'border-[#14295F] shadow-[0_18px_42px_-34px_rgba(20,41,95,0.45)]'
-                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/70'
-                        )}
-                      >
-                        <div className="lg:hidden">
-                          <div className="flex items-start gap-4 px-4 py-4">
-                            <div className={cn('mt-0.5 h-[82px] w-[5px] shrink-0 rounded-full', accentClass)} />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-base font-black tracking-tight text-[#14295F]">{row.studentName}</p>
-                                    <Badge variant="outline" className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-slate-600">
-                                      {row.className}
-                                    </Badge>
-                                  </div>
-                                  <p className="mt-2 line-clamp-2 text-xs font-bold leading-relaxed text-slate-500">{row.topIssue}</p>
-                                </div>
-                                <Badge className={cn('rounded-full border px-3 py-1 text-[10px] font-black', riskMeta.tone)}>
-                                  {riskMeta.label}
-                                </Badge>
-                              </div>
-                              <div className="mt-3 grid grid-cols-2 gap-2">
-                                <DetailStat label="출석률" value={`${row.attendanceRate}%`} hint="최근 기간" />
-                                <DetailStat label="지각/결석" value={`${row.lateCount}/${row.absenceCount}`} hint="지각/결석" />
-                                <DetailStat label="평균 외출" value={formatMinutesAsLabel(row.averageAwayMinutes)} hint="외출 평균" />
-                                <DetailStat label="최근 하원" value={row.latestCheckOutLabel} hint={getRequestStatusLabel(row.recentRequestStatus)} />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="hidden lg:grid lg:grid-cols-[minmax(0,2.2fr)_0.9fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr_0.9fr] lg:items-center lg:gap-3 lg:px-5 lg:py-4">
-                          <div className="flex items-start gap-4">
-                            <div className={cn('mt-0.5 h-[74px] w-[5px] shrink-0 rounded-full', accentClass)} />
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-base font-black tracking-tight text-[#14295F]">{row.studentName}</p>
-                                <Badge variant="outline" className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-slate-600">
-                                  {row.className}
-                                </Badge>
-                                <Badge variant="outline" className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-slate-600">
-                                  {row.roomLabel}
-                                </Badge>
-                              </div>
-                              <p className="mt-2 line-clamp-1 text-sm font-bold text-slate-500">{row.topIssue}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-start">
-                            <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', riskMeta.tone)}>
-                              {riskMeta.label}
-                            </Badge>
-                          </div>
-                          <DenseValueCell value={`${row.attendanceRate}%`} align="text-right" />
-                          <DenseValueCell value={`${row.lateCount}회`} tone="text-amber-700" align="text-right" />
-                          <DenseValueCell value={`${row.absenceCount}회`} tone="text-rose-700" align="text-right" />
-                          <DenseValueCell value={formatMinutesAsLabel(row.averageAwayMinutes)} tone="text-sky-700" align="text-right" />
-                          <DenseValueCell value={row.latestCheckOutLabel} tone="text-slate-700" align="text-right" />
-                          <div className="flex justify-end">
-                            <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', getRequestStatusTone(row.recentRequestStatus))}>
-                              {getRequestStatusLabel(row.recentRequestStatus)}
-                            </Badge>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </>
+                <div className="space-y-3">
+                  {filteredRows.map((row, index) => (
+                    <StudentPriorityCard
+                      key={row.studentId}
+                      row={row}
+                      index={index}
+                      isSelected={selectedRow?.studentId === row.studentId}
+                      onSelect={() => handleSelectStudent(row.studentId)}
+                    />
+                  ))}
+                </div>
               )}
             </div>
 
-            <div className="hidden lg:block">
-              <DetailPanel row={selectedRow} />
+            <div className="hidden xl:block">
+              <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pr-1">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={selectedRow?.studentId ?? 'empty'}
+                    initial={reduceMotion ? false : { opacity: 0, x: 18 }}
+                    animate={reduceMotion ? undefined : { opacity: 1, x: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, x: -12 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.22 }}
+                  >
+                    <DetailPanel row={selectedRow} />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         )}
       </CardContent>
 
       <Sheet open={!isDesktop && mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
-      <SheetContent side="bottom" motionPreset="dashboard-premium" className="max-h-[88vh] overflow-y-auto rounded-t-[2rem] border-none px-0 pb-8 pt-12">
+        <SheetContent side="bottom" motionPreset="dashboard-premium" className="max-h-[88vh] overflow-y-auto rounded-t-[2rem] border-none px-0 pb-8 pt-12">
           <div className="px-6">
             <SheetHeader className="mb-4 text-left">
               <SheetTitle className="text-xl font-black tracking-tight text-[#14295F]">
