@@ -49,7 +49,18 @@ type CenterAdminHeatmapChartsProps = {
   onActiveRowChange?: (rowId: string) => void;
 };
 
-function getTonePalette(score: number) {
+function getTonePalette(score: number, options?: { brandOrange?: boolean }) {
+  if (options?.brandOrange) {
+    return {
+      fill: '#FF7A16',
+      stroke: '#E56D10',
+      badgeClass: 'bg-[#FFF2E8] text-[#C95A08]',
+      chipClass: 'border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF7F1_0%,#FFFFFF_100%)] text-[#C95A08]',
+      surfaceClass: 'bg-[#FFF8F2]',
+      textClass: 'text-[#C95A08]',
+      glowClass: 'shadow-[0_24px_48px_-38px_rgba(255,122,22,0.26)]',
+    };
+  }
   const tone = getHeatmapTone(score);
   if (tone === 'stable') {
     return {
@@ -171,7 +182,8 @@ export function CenterAdminHeatmapCharts({
   };
 
   const activeRow = rows.find((row) => row.id === resolvedActiveRowId) || rows.find((row) => row.id === lowestRowId) || null;
-  const activePalette = getTonePalette(activeRow?.summaryScore ?? 75);
+  const activeRowUsesBrandOrange = activeRow?.id === 'operational';
+  const activePalette = getTonePalette(activeRow?.summaryScore ?? 75, { brandOrange: activeRowUsesBrandOrange });
   const activeMetricPreview = activeRow?.metrics.slice(0, 3) || [];
   const activeTrendData = activeRow?.trend.map((point) => ({
     label: point.label,
@@ -292,7 +304,14 @@ export function CenterAdminHeatmapCharts({
 
               {activeRow ? (
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_300px]">
-                  <div className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_36px_-32px_rgba(20,41,95,0.2)]">
+                  <div
+                    className={cn(
+                      'rounded-[1.8rem] border p-4',
+                      activeRowUsesBrandOrange
+                        ? 'border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F2_0%,#FFFFFF_100%)] shadow-[0_18px_36px_-32px_rgba(255,122,22,0.18)]'
+                        : 'border-[#DCE7FF] bg-white shadow-[0_18px_36px_-32px_rgba(20,41,95,0.2)]'
+                    )}
+                  >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="space-y-2">
                         <div className={cn('flex items-center gap-2', activePalette.textClass)}>
@@ -323,7 +342,14 @@ export function CenterAdminHeatmapCharts({
                         </p>
                       </div>
 
-                      <div className="rounded-[1.55rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4">
+                      <div
+                        className={cn(
+                          'rounded-[1.55rem] border p-4',
+                          activeRowUsesBrandOrange
+                            ? 'border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F2_0%,#FFFFFF_100%)]'
+                            : 'border-[#DCE7FF] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)]'
+                        )}
+                      >
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">최근 추이</p>
@@ -379,7 +405,14 @@ export function CenterAdminHeatmapCharts({
                   </div>
 
                   <div className="space-y-4">
-                      <div className="rounded-[1.75rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_16px_30px_-28px_rgba(20,41,95,0.18)]">
+                      <div
+                        className={cn(
+                          'rounded-[1.75rem] border bg-white p-4',
+                          activeRowUsesBrandOrange
+                            ? 'border-[#FFD7BA] shadow-[0_16px_30px_-28px_rgba(255,122,22,0.18)]'
+                            : 'border-[#DCE7FF] shadow-[0_16px_30px_-28px_rgba(20,41,95,0.18)]'
+                        )}
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-black text-[#14295F]">대표 지표</p>
                           <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
@@ -388,7 +421,7 @@ export function CenterAdminHeatmapCharts({
                       </div>
                       <div className="mt-3 grid gap-2">
                         {activeMetricPreview.map((metric) => {
-                          const metricPalette = getTonePalette(metric.score);
+                          const metricPalette = getTonePalette(metric.score, { brandOrange: activeRowUsesBrandOrange });
                           return (
                             <div
                               key={metric.id}
@@ -408,7 +441,14 @@ export function CenterAdminHeatmapCharts({
                       </div>
                     </div>
 
-                    <div className="rounded-[1.75rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] p-4 shadow-[0_16px_30px_-28px_rgba(20,41,95,0.18)]">
+                    <div
+                      className={cn(
+                        'rounded-[1.75rem] border p-4',
+                        activeRowUsesBrandOrange
+                          ? 'border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F2_0%,#FFFFFF_100%)] shadow-[0_16px_30px_-28px_rgba(255,122,22,0.16)]'
+                          : 'border-[#DCE7FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] shadow-[0_16px_30px_-28px_rgba(20,41,95,0.18)]'
+                      )}
+                    >
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">바로 조치</p>
                       <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">이어서 열 화면만 남겼습니다.</p>
                       <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
