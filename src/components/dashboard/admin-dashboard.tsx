@@ -2335,6 +2335,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <CenterAdminAttendanceBoard
                 roomConfigs={roomConfigs}
                 selectedRoomView={selectedRoomView === 'all' ? 'all' : selectedRoomView}
+                onRoomViewChange={setSelectedRoomView}
                 selectedClass={selectedClass}
                 isMobile={isMobile}
                 seatDetailLevel="nameOnly"

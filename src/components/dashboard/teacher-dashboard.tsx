@@ -827,6 +827,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       .sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0))
       .slice(0, 5);
   }, [rawRecentReports]);
+  const latestUnreadRecentReport = useMemo(
+    () => recentReportsFeed.find((report) => !report.viewedAt) || null,
+    [recentReportsFeed]
+  );
 
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -929,7 +933,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             actionLabel: '리포트 보기',
             icon: Eye,
             toneClass: 'bg-[#FFF2E8] text-[#C95A08]',
-            onClick: () => scrollToSection(reportsSectionRef),
+            onClick: () => {
+              if (latestUnreadRecentReport) {
+                setSelectedRecentReport(latestUnreadRecentReport);
+                return;
+              }
+              scrollToSection(reportsSectionRef);
+            },
           }
         : null,
     ].filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -939,6 +949,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     appointments,
     attendanceBoardSummary.lateOrAbsentCount,
     attendanceBoardSummary.longAwayCount,
+    latestUnreadRecentReport,
     now,
     seatOverlaySummary.riskCount,
     unreadReportCount,
@@ -2372,6 +2383,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       <CenterAdminAttendanceBoard
         roomConfigs={roomConfigs}
         selectedRoomView={selectedRoomView}
+        onRoomViewChange={setSelectedRoomView}
         selectedClass={selectedClass}
         isMobile={isMobile}
         variant="teacherEditorial"

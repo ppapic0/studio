@@ -23,6 +23,7 @@ type ResolvedAttendanceSeat = AttendanceCurrent & {
 type CenterAdminAttendanceBoardProps = {
   roomConfigs: LayoutRoomConfig[];
   selectedRoomView: 'all' | string;
+  onRoomViewChange?: (roomId: 'all' | string) => void;
   selectedClass: string;
   isMobile: boolean;
   seatDetailLevel?: 'default' | 'nameOnly';
@@ -80,6 +81,7 @@ function isAttentionSignal(signal: CenterAdminAttendanceSeatSignal) {
 export function CenterAdminAttendanceBoard({
   roomConfigs,
   selectedRoomView,
+  onRoomViewChange,
   selectedClass,
   isMobile,
   seatDetailLevel = 'default',
@@ -200,7 +202,7 @@ export function CenterAdminAttendanceBoard({
           <div
             className="grid gap-2.5"
             style={{
-              gridTemplateColumns: `repeat(${room.cols}, minmax(${isMobile ? 74 : 86}px, 1fr))`,
+              gridTemplateColumns: `repeat(${room.cols}, minmax(${isMobile ? 82 : 98}px, 1fr))`,
             }}
           >
             {Array.from({ length: room.cols }).map((_, colIndex) => (
@@ -242,20 +244,30 @@ export function CenterAdminAttendanceBoard({
                       onClick={() => onSeatClick(seat)}
                       disabled={isFilteredOut}
                       className={cn(
-                        'relative aspect-square rounded-[1.45rem] border-2 p-2 text-left shadow-[0_18px_30px_-26px_rgba(20,41,95,0.34)] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7]/35 hover:-translate-y-0.5 hover:shadow-[0_22px_34px_-24px_rgba(20,41,95,0.38)]',
+                        'relative aspect-square rounded-[1.45rem] border-2 p-2.5 text-left shadow-[0_18px_30px_-26px_rgba(20,41,95,0.34)] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7]/35 hover:-translate-y-0.5 hover:shadow-[0_22px_34px_-24px_rgba(20,41,95,0.38)]',
                         presentation.surfaceClass,
                         isFilteredOut && 'opacity-20 grayscale hover:translate-y-0 hover:shadow-none'
                       )}
                     >
-                      <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#14295F]/38">
+                      <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#14295F]/46">
                         {roomSeatNo}
                       </span>
-                      <div className="flex h-full flex-col justify-end gap-1.5 pt-4">
-                        <p className="line-clamp-2 break-keep text-[11px] font-black leading-[1.15] text-[#14295F]">
+                      <div className="flex h-full flex-col justify-end gap-2 pt-5">
+                        <p
+                          className={cn(
+                            'line-clamp-2 break-keep font-black leading-[1.1] tracking-tight text-[#14295F]',
+                            isMobile ? 'text-[12px]' : 'text-[13px]'
+                          )}
+                        >
                           {displayName}
                         </p>
                         {!isNameOnly && (
-                          <span className="inline-flex w-fit items-center rounded-full border border-white/80 bg-white/82 px-2 py-0.5 text-[8px] font-black text-[#14295F]">
+                          <span
+                            className={cn(
+                              'inline-flex w-fit items-center rounded-full border border-white/85 bg-white/88 px-2.5 py-1 font-black tracking-tight text-[#14295F] shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
+                              isMobile ? 'text-[9px]' : 'text-[10px]'
+                            )}
+                          >
                             {studyTimeLabel}
                           </span>
                         )}
@@ -328,6 +340,39 @@ export function CenterAdminAttendanceBoard({
               {scopeLabel}
             </Badge>
           </div>
+          {roomConfigs.length > 0 && onRoomViewChange ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant={selectedRoomView === 'all' ? 'default' : 'outline'}
+                onClick={() => onRoomViewChange('all')}
+                className={cn(
+                  'h-8 rounded-full px-3 text-[11px] font-black',
+                  selectedRoomView === 'all'
+                    ? 'border-[#14295F] bg-[#14295F] text-white hover:bg-[#10214B]'
+                    : 'border-[#DCE7FF] bg-white text-[#14295F] hover:border-[#BFD1F8] hover:bg-[#F7FAFF]'
+                )}
+              >
+                전체 보기
+              </Button>
+              {roomConfigs.map((room) => (
+                <Button
+                  key={room.id}
+                  type="button"
+                  variant={selectedRoomView === room.id ? 'default' : 'outline'}
+                  onClick={() => onRoomViewChange(room.id)}
+                  className={cn(
+                    'h-8 rounded-full px-3 text-[11px] font-black',
+                    selectedRoomView === room.id
+                      ? 'border-[#FF7A16] bg-[#FF7A16] text-white hover:bg-[#E56D12]'
+                      : 'border-[#DCE7FF] bg-white text-[#14295F] hover:border-[#FFD2AF] hover:bg-[#FFF8F2]'
+                  )}
+                >
+                  {room.name}
+                </Button>
+              ))}
+            </div>
+          ) : null}
           <div className="space-y-2">
             <h2 className="text-xl font-black tracking-tight text-[#14295F] sm:text-[1.55rem]">
               {selectedRoom ? `${selectedRoom.name} 출석 흐름` : '좌석별 출석 흐름 스냅샷'}
@@ -438,9 +483,17 @@ export function CenterAdminAttendanceBoard({
           const snapshot = roomSnapshots.find((item) => item.id === room.id);
 
           return (
-            <div
+            <button
               key={room.id}
-              className="rounded-[1.85rem] border border-[#E2EAF8] bg-white p-4 text-[#14295F] shadow-[0_22px_40px_-34px_rgba(20,41,95,0.24)]"
+              type="button"
+              onClick={() => onRoomViewChange?.(room.id)}
+              disabled={!onRoomViewChange}
+              className={cn(
+                'rounded-[1.85rem] border border-[#E2EAF8] bg-white p-4 text-left text-[#14295F] shadow-[0_22px_40px_-34px_rgba(20,41,95,0.24)] transition-[transform,border-color,box-shadow] duration-200',
+                onRoomViewChange
+                  ? 'hover:-translate-y-0.5 hover:border-[#FFB67B] hover:shadow-[0_28px_42px_-30px_rgba(20,41,95,0.24)]'
+                  : 'cursor-default'
+              )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -469,7 +522,7 @@ export function CenterAdminAttendanceBoard({
               </div>
 
               <div className="mt-4">{renderMiniSeatMosaic(room)}</div>
-            </div>
+            </button>
           );
         })}
       </div>
