@@ -184,8 +184,8 @@ export function CenterAdminHeatmapCharts({
 
   if (isLoading) {
     return (
-      <Card className={cn('overflow-hidden rounded-[2.5rem] border border-[#14295F]/10 bg-white shadow-xl', className)}>
-        <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8">
+      <Card className={cn('overflow-hidden rounded-[2.1rem] border border-[#DCE7FF] bg-white shadow-[0_20px_40px_-34px_rgba(20,41,95,0.22)]', className)}>
+        <CardContent className="flex min-h-[240px] flex-col items-center justify-center gap-4 p-7">
           <Loader2 className="h-10 w-10 animate-spin text-[#14295F] opacity-25" />
           <p className="text-sm font-black uppercase tracking-[0.24em] text-slate-500">운영 그래프 동기화 중</p>
         </CardContent>
@@ -197,43 +197,43 @@ export function CenterAdminHeatmapCharts({
     <>
       <Card
         className={cn(
-          'overflow-hidden rounded-[2.5rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#f6f8ff_0%,#ffffff_58%,#fff7ef_100%)] shadow-[0_28px_60px_-46px_rgba(20,41,95,0.48)]',
+          'overflow-hidden rounded-[2.1rem] border border-[#DCE7FF] bg-white shadow-[0_20px_44px_-36px_rgba(20,41,95,0.22)]',
           className
         )}
       >
-        <CardHeader className="border-b border-white/12 bg-[linear-gradient(135deg,#14295F_0%,#17326B_68%,#FF7A16_138%)] px-5 py-5 text-white sm:px-7 sm:py-6">
+        <CardHeader className="border-b border-[#DCE7FF] bg-[linear-gradient(180deg,#FBFDFF_0%,#F4F8FF_100%)] px-5 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid gap-1.5">
-              <div className="flex items-center gap-2 text-white/72">
-                <Sparkles className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-[0.28em]">Insight Studio</span>
+              <div className="flex items-center gap-2 text-[#5c6e97]">
+                <Sparkles className="h-4 w-4 text-[#2554D7]" />
+                <span className="text-[10px] font-black uppercase tracking-[0.24em]">대표 차트</span>
               </div>
-              <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-white sm:text-2xl">
-                <BarChart3 className="h-5 w-5 text-white/80" />
+              <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F] sm:text-[1.7rem]">
+                <BarChart3 className="h-5 w-5 text-[#2554D7]" />
                 {title}
               </CardTitle>
-              <CardDescription className="text-xs font-bold text-white/74">{description}</CardDescription>
+              <CardDescription className="text-xs font-bold leading-5 text-[#5c6e97]">{description}</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge className="h-7 rounded-full border-none bg-white/14 px-3 text-[10px] font-black text-white">
-                기본 선택: 최저 점수 축
+              <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#2554D7]">
+                기본 선택: 가장 약한 축
               </Badge>
-              <Badge className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-black text-[#14295F]">
+              <Badge className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-black text-[#14295F] shadow-sm">
                 {scopeLabel}
               </Badge>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-5 p-5 sm:p-7">
+        <CardContent className="space-y-4 p-4 sm:p-5">
           {rows.length === 0 ? (
-            <div className="rounded-[2rem] border-2 border-dashed border-[#14295F]/10 bg-white px-6 py-12 text-center">
+            <div className="rounded-[1.7rem] border-2 border-dashed border-[#DCE7FF] bg-[#FBFDFF] px-6 py-10 text-center">
               <p className="text-sm font-black text-slate-500">표시할 운영 그래프 데이터가 없습니다.</p>
             </div>
           ) : (
             <>
               <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                <div className="inline-flex min-w-max gap-2 rounded-full bg-[#14295F]/5 p-1">
+                <div className="inline-flex min-w-max gap-2 rounded-full bg-[#F4F8FF] p-1">
                   {rows.map((row) => {
                     const rowPalette = getTonePalette(row.summaryScore);
                     const isActive = activeRow?.id === row.id;
@@ -244,10 +244,10 @@ export function CenterAdminHeatmapCharts({
                         type="button"
                         onClick={() => setActiveRowId(row.id)}
                         className={cn(
-                          'group flex min-w-[148px] items-center justify-between gap-3 rounded-full border px-4 py-3 text-left transition-[transform,box-shadow,border-color,background-color,color] duration-200 hover:-translate-y-0.5',
+                          'group flex min-w-[138px] items-center justify-between gap-3 rounded-full border px-3.5 py-2.5 text-left transition-[transform,box-shadow,border-color,background-color,color] duration-200 hover:-translate-y-0.5',
                           isActive
-                            ? 'border-[#FF7A16]/25 bg-white text-[#14295F] shadow-[0_20px_38px_-28px_rgba(20,41,95,0.42)] ring-1 ring-[#FF7A16]/25'
-                            : 'border-transparent bg-transparent text-slate-500 hover:border-[#14295F]/10 hover:bg-white/84 hover:text-[#14295F]'
+                            ? 'border-[#FF7A16]/25 bg-white text-[#14295F] shadow-[0_16px_32px_-26px_rgba(20,41,95,0.24)] ring-1 ring-[#FF7A16]/20'
+                            : 'border-transparent bg-transparent text-slate-500 hover:border-[#DCE7FF] hover:bg-white hover:text-[#14295F]'
                         )}
                       >
                         <div className="min-w-0">
@@ -271,13 +271,13 @@ export function CenterAdminHeatmapCharts({
               </div>
 
               {activeRow ? (
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-                  <div className="rounded-[2rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_18px_44px_-36px_rgba(20,41,95,0.28)]">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_300px]">
+                  <div className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_36px_-32px_rgba(20,41,95,0.2)]">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="space-y-2">
                         <div className={cn('flex items-center gap-2', activePalette.textClass)}>
                           <BarChart3 className="h-4 w-4" />
-                          <span className="text-[10px] font-black uppercase tracking-[0.24em]">Selected Axis</span>
+                          <span className="text-[10px] font-black uppercase tracking-[0.22em]">선택 축</span>
                         </div>
                         <div>
                           <h3 className="text-2xl font-black tracking-tight text-[#14295F]">{activeRow.label}</h3>
@@ -289,7 +289,7 @@ export function CenterAdminHeatmapCharts({
                           {activeRow.summaryLabel} {activeRow.summaryScore}점
                         </Badge>
                         <Badge className="h-7 rounded-full border border-[#FF7A16]/18 bg-[#FFF2E8] px-3 text-[10px] font-black text-[#C95A08]">
-                          우선 분석 축
+                          먼저 볼 축
                         </Badge>
                       </div>
                     </div>
@@ -303,7 +303,7 @@ export function CenterAdminHeatmapCharts({
                         </p>
                       </div>
 
-                      <div className="rounded-[1.6rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4">
+                      <div className="rounded-[1.55rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">최근 추이</p>
@@ -359,10 +359,10 @@ export function CenterAdminHeatmapCharts({
                   </div>
 
                   <div className="space-y-4">
-                    <div className="rounded-[2rem] border border-[#14295F]/10 bg-white p-4 shadow-[0_16px_34px_-30px_rgba(20,41,95,0.24)]">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-black text-[#14295F]">대표 지표</p>
-                        <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
+                      <div className="rounded-[1.75rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_16px_30px_-28px_rgba(20,41,95,0.18)]">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-black text-[#14295F]">대표 지표</p>
+                          <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
                           {activeMetricPreview.length}개
                         </Badge>
                       </div>
@@ -388,11 +388,11 @@ export function CenterAdminHeatmapCharts({
                       </div>
                     </div>
 
-                    <div className="rounded-[2rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#14295F_0%,#17326B_100%)] p-4 text-white shadow-[0_22px_48px_-36px_rgba(20,41,95,0.55)]">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Next Action</p>
-                      <p className="mt-2 text-lg font-black tracking-tight">바로 이어서 조치하기</p>
-                      <p className="mt-1 text-xs font-bold leading-5 text-white/74">
-                        관련 화면 이동과 개입 우선 학생 확인을 여기서 이어갑니다.
+                    <div className="rounded-[1.75rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] p-4 shadow-[0_16px_30px_-28px_rgba(20,41,95,0.18)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">바로 조치</p>
+                      <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">이어서 열 화면만 남겼습니다.</p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                        관련 화면 이동과 개입 우선 학생 확인을 여기서 바로 이어갑니다.
                       </p>
                       <div className="mt-4 grid gap-2">
                         {activeRow.href ? (
@@ -421,7 +421,7 @@ export function CenterAdminHeatmapCharts({
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-10 rounded-xl border-white/18 bg-white/10 text-sm font-black text-white transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-white/16"
+                          className="h-10 rounded-xl border-[#DCE7FF] bg-white text-sm font-black text-[#14295F] transition-[transform,background-color,border-color] hover:-translate-y-0.5 hover:border-[#FF7A16]/24 hover:bg-[#FFF8F2]"
                           onClick={() => setSelectedRowId(activeRow.id)}
                         >
                           개입 우선 학생 보기
