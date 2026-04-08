@@ -53,6 +53,12 @@ export interface CenterAdminAttendanceBoardSummary {
   returnedCount: number;
   checkedOutCount: number;
   longAwayCount: number;
+  excusedAbsentCount: number;
+  plannedCount: number;
+  studyingFamilyCount: number;
+  attentionFamilyCount: number;
+  restFamilyCount: number;
+  exitFamilyCount: number;
 }
 
 type AttendanceBoardPresentation = {
@@ -65,70 +71,70 @@ type AttendanceBoardPresentation = {
 
 const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, AttendanceBoardPresentation> = {
   present: {
-    surfaceClass: 'border-sky-400 bg-sky-200 text-sky-950',
-    chipClass: 'bg-sky-700 text-white',
+    surfaceClass: 'border-[#8DB6FF] bg-[#EEF4FF] text-[#14295F]',
+    chipClass: 'bg-[#2554D7] text-white',
     chipLabel: '공부중',
-    flagClass: 'bg-white/95 text-sky-800',
+    flagClass: 'bg-white/95 text-[#2554D7]',
     isDark: false,
   },
   late: {
-    surfaceClass: 'border-amber-400 bg-amber-200 text-amber-950',
-    chipClass: 'bg-amber-600 text-white',
+    surfaceClass: 'border-[#FFC88F] bg-[#FFF4E8] text-[#14295F]',
+    chipClass: 'bg-[#FF9A42] text-white',
     chipLabel: '지각 입실',
-    flagClass: 'bg-white/95 text-amber-800',
+    flagClass: 'bg-white/95 text-[#C95A08]',
     isDark: false,
   },
   routine_missing: {
-    surfaceClass: 'border-rose-400 bg-rose-200 text-rose-950',
-    chipClass: 'bg-rose-600 text-white',
+    surfaceClass: 'border-[#FFC18E] bg-[#FFF2E6] text-[#14295F]',
+    chipClass: 'bg-[#FF7A16] text-white',
     chipLabel: '루틴 누락',
-    flagClass: 'bg-white/95 text-rose-800',
+    flagClass: 'bg-white/95 text-[#C95A08]',
     isDark: false,
   },
   present_missing_routine: {
-    surfaceClass: 'border-orange-400 bg-orange-200 text-orange-950',
-    chipClass: 'bg-orange-600 text-white',
+    surfaceClass: 'border-[#FFB680] bg-[#FFF0E1] text-[#14295F]',
+    chipClass: 'bg-[#FF7A16] text-white',
     chipLabel: '입실·루틴누락',
-    flagClass: 'bg-white/95 text-orange-800',
+    flagClass: 'bg-white/95 text-[#C95A08]',
     isDark: false,
   },
   away: {
-    surfaceClass: 'border-amber-400 bg-amber-200 text-amber-950',
-    chipClass: 'bg-amber-600 text-white',
+    surfaceClass: 'border-[#A6E2D1] bg-[#ECFBF6] text-[#14295F]',
+    chipClass: 'bg-[#1F9E7A] text-white',
     chipLabel: '외출/휴식',
-    flagClass: 'bg-white/95 text-amber-800',
+    flagClass: 'bg-white/95 text-[#1F9E7A]',
     isDark: false,
   },
   returned: {
-    surfaceClass: 'border-cyan-400 bg-cyan-200 text-cyan-950',
-    chipClass: 'bg-cyan-700 text-white',
+    surfaceClass: 'border-[#AFCCFF] bg-[#F3F8FF] text-[#14295F]',
+    chipClass: 'bg-[#2554D7] text-white',
     chipLabel: '복귀 후 공부',
-    flagClass: 'bg-white/95 text-cyan-800',
+    flagClass: 'bg-white/95 text-[#2554D7]',
     isDark: false,
   },
   checked_out: {
-    surfaceClass: 'border-slate-400 bg-slate-300 text-slate-950',
+    surfaceClass: 'border-[#CAD5E8] bg-[#F4F7FB] text-[#14295F]',
     chipClass: 'bg-slate-800 text-white',
     chipLabel: '퇴실',
-    flagClass: 'bg-white/95 text-slate-800',
+    flagClass: 'bg-white/95 text-slate-700',
     isDark: false,
   },
   absent: {
-    surfaceClass: 'border-rose-500 bg-rose-200 text-rose-950',
-    chipClass: 'bg-rose-700 text-white',
+    surfaceClass: 'border-[#FFAA92] bg-[#FFF0EB] text-[#14295F]',
+    chipClass: 'bg-[#F45B35] text-white',
     chipLabel: '미입실',
-    flagClass: 'bg-white/95 text-rose-800',
+    flagClass: 'bg-white/95 text-[#D54E2B]',
     isDark: false,
   },
   excused_absent: {
-    surfaceClass: 'border-slate-300 bg-slate-200 text-slate-800',
+    surfaceClass: 'border-[#D5DEEB] bg-[#F7F9FC] text-[#14295F]',
     chipClass: 'bg-slate-600 text-white',
     chipLabel: '예정 결석',
     flagClass: 'bg-white/95 text-slate-700',
     isDark: false,
   },
   planned: {
-    surfaceClass: 'border-slate-200 bg-white text-slate-700',
+    surfaceClass: 'border-[#E0E7F2] bg-[#FBFCFE] text-[#14295F]',
     chipClass: 'bg-slate-100 text-slate-700',
     chipLabel: '입실 예정',
     flagClass: 'bg-slate-100 text-slate-600',
@@ -281,9 +287,9 @@ export function getAttendanceBoardPresentation(signal: CenterAdminAttendanceSeat
 }
 
 export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSignal[]): CenterAdminAttendanceBoardSummary {
-  return signals.reduce<CenterAdminAttendanceBoardSummary>(
+  const summary = signals.reduce<CenterAdminAttendanceBoardSummary>(
     (acc, signal) => {
-      if (signal.seatStatus === 'studying') acc.normalPresentCount += 1;
+      if (signal.boardStatus === 'present') acc.normalPresentCount += 1;
       if (signal.attendanceDisplayStatus === 'confirmed_late' || signal.boardStatus === 'absent') acc.lateOrAbsentCount += 1;
       if (
         signal.attendanceDisplayStatus === 'missing_routine' ||
@@ -294,6 +300,8 @@ export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSi
       if (signal.boardStatus === 'away') acc.awayCount += 1;
       if (signal.boardStatus === 'returned') acc.returnedCount += 1;
       if (signal.boardStatus === 'checked_out') acc.checkedOutCount += 1;
+      if (signal.boardStatus === 'excused_absent') acc.excusedAbsentCount += 1;
+      if (signal.boardStatus === 'planned') acc.plannedCount += 1;
       if (signal.isLongAway) acc.longAwayCount += 1;
       return acc;
     },
@@ -305,6 +313,19 @@ export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSi
       returnedCount: 0,
       checkedOutCount: 0,
       longAwayCount: 0,
+      excusedAbsentCount: 0,
+      plannedCount: 0,
+      studyingFamilyCount: 0,
+      attentionFamilyCount: 0,
+      restFamilyCount: 0,
+      exitFamilyCount: 0,
     }
   );
+
+  summary.studyingFamilyCount = summary.normalPresentCount + summary.returnedCount;
+  summary.attentionFamilyCount = summary.lateOrAbsentCount + summary.routineMissingCount;
+  summary.restFamilyCount = summary.awayCount;
+  summary.exitFamilyCount = summary.checkedOutCount + summary.excusedAbsentCount + summary.plannedCount;
+
+  return summary;
 }

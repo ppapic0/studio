@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -327,6 +327,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isControlAlertsDialogOpen, setIsControlAlertsDialogOpen] = useState(false);
   const [selectedHomeAxisId, setSelectedHomeAxisId] = useState<string | null>(null);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
+  const hasInitializedRoomViewRef = useRef(false);
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
@@ -417,10 +418,25 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   );
 
   useEffect(() => {
+    if (hasInitializedRoomViewRef.current || roomConfigs.length === 0) return;
+    hasInitializedRoomViewRef.current = true;
+    if (selectedRoomView === 'all') {
+      setSelectedRoomView(roomConfigs[0].id);
+    }
+  }, [roomConfigs, selectedRoomView]);
+
+  useEffect(() => {
+    if (roomConfigs.length === 0) {
+      if (selectedRoomView !== 'all') {
+        setSelectedRoomView('all');
+      }
+      return;
+    }
+
     if (selectedRoomView === 'all') return;
     const hasSelectedRoom = roomConfigs.some((room) => room.id === selectedRoomView);
     if (!hasSelectedRoom) {
-      setSelectedRoomView('all');
+      setSelectedRoomView(roomConfigs[0].id);
     }
   }, [roomConfigs, selectedRoomView]);
 
@@ -2392,7 +2408,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const parentContactCompactPreview = parentContactRecommendations.slice(0, 2);
   const topFocusLeader = topFocusCompactPreview[0] || null;
   const bottomFocusLeader = bottomFocusCompactPreview[0] || null;
-  const primaryParentContactTarget = parentContactCompactPreview[0] || null;
   const leadAnnouncement = recentAnnouncementsPreview[0] || null;
   const leadTeacherActivity = teacherActivityPreviewRows[0] || null;
   const compactQuickActionLinks = quickActionLinks.slice(0, 3);
@@ -2422,7 +2437,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     adminHeatmapRows.find((row) => row.id === selectedHomeAxis?.id)
     || adminHeatmapRows[0]
     || null;
-  const selectedHomeMetricPreview = (selectedHomeHeatmapRow?.metrics || []).slice(0, 3);
   const roomOverviewRows = roomConfigs.map((room) => {
     let focusedCount = 0;
     let alertCount = 0;
@@ -3019,7 +3033,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     {selectedHomeAxis ? `${selectedHomeAxis.label}부터 먼저 봅니다.` : '운영 5축에서 약한 축부터 봅니다.'}
                   </CardTitle>
                   <CardDescription className="mt-2 max-w-[42rem] text-sm font-bold leading-6 text-white/60">
-                    {selectedHomeHeatmapRow?.description || '대표 축 하나만 크게 보고, 필요한 화면만 이어서 열 수 있습니다.'}
+                    선택 축 추이와 개입 버튼만 이 영역에서 바로 봅니다.
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -3029,77 +3043,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </CardHeader>
             <CardContent className="space-y-4 p-5">
-              {/* Axis selector tabs */}
-              <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                <div className="inline-flex min-w-max gap-2">
-                  {centerHealthAxes.map((axis) => (
-                    <button key={axis.id} type="button" onClick={() => setSelectedHomeAxisId(axis.id)} className={cn('admin-card-lift rounded-[1.2rem] border px-4 py-3 text-left', selectedHomeAxisId === axis.id ? 'border-[#FFB57A]/30 bg-white text-[#14295F] shadow-[0_18px_30px_-24px_rgba(20,41,95,0.28)]' : 'border-white/10 bg-white/10 text-white/80 hover:border-[#FFB57A]/26 hover:text-white')}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-65">{axis.label}</p>
-                      <div className="mt-1 flex items-center gap-2">
-                        <p className="text-sm font-black">{axis.summaryScore}점</p>
-                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-black', selectedHomeAxisId === axis.id ? axis.tone.badge : 'bg-white/10 text-white/78')}>{axis.summaryLabel}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Heatmap chart + metrics */}
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_320px]">
-                <div className="rounded-[1.85rem] border border-white/10 bg-white/10 p-1.5">
-                  {heatmapGraphSection}
-                </div>
-                <div className="space-y-3">
-                  <div className="rounded-[1.65rem] border border-white/10 bg-white/10 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">핵심 지표</p>
-                    <div className="mt-3 grid gap-2">
-                      {selectedHomeMetricPreview.length === 0 ? (
-                        <div className="rounded-[1.2rem] border border-white/10 bg-white/10 px-3 py-4 text-center text-[11px] font-bold text-white/60">대표 지표를 불러오는 중입니다.</div>
-                      ) : (
-                        selectedHomeMetricPreview.map((metric) => (
-                          <div key={metric.id} className="rounded-[1.2rem] border border-white/10 bg-white/10 px-3 py-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-black text-white">{metric.label}</p>
-                              <p className="text-sm font-black text-white">{metric.value}</p>
-                            </div>
-                            <p className="mt-1 text-[11px] font-bold leading-5 text-white/60">{metric.hint}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    {selectedHomeHeatmapRow?.href && (
-                      <Button asChild type="button" className="mt-3 h-10 w-full rounded-xl bg-[#FF7A16] text-sm font-black text-white hover:bg-[#E56D10]">
-                        <Link href={selectedHomeHeatmapRow.href}>이어서 볼 화면<ArrowUpRight data-icon="inline-end" /></Link>
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Focus + Parent summary */}
-                  <div className="rounded-[1.65rem] border border-white/10 bg-white/10 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">집중 · 학부모</p>
-                    <div className="mt-3 space-y-2">
-                      <div className="rounded-[1.15rem] border border-white/10 bg-white/10 px-3 py-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/50">오늘 상위</p>
-                        <p className="mt-1 text-sm font-black text-white">{topFocusLeader ? topFocusLeader.name : '집계 없음'}</p>
-                        <p className="mt-0.5 text-[11px] font-bold leading-5 text-white/60">
-                          {topFocusLeader ? `${topFocusLeader.className} · ${getTopPerformerHighlight(topFocusLeader)}` : '상위 학생 데이터가 없습니다.'}
-                        </p>
-                      </div>
-                      <div className="rounded-[1.15rem] border border-white/10 bg-white/10 px-3 py-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/50">학부모 반응</p>
-                        <p className="mt-1 text-sm font-black text-white">
-                          {primaryParentContactTarget ? primaryParentContactTarget.parentName : `상담 ${metrics.consultationRequestCount30d}건`}
-                        </p>
-                        <p className="mt-0.5 text-[11px] font-bold leading-5 text-white/60">
-                          {primaryParentContactTarget ? primaryParentContactTarget.recommendedAction : `앱 방문 ${metrics.parentVisitCount30d}회 · 활성 ${metrics.activeParentCount30d}명`}
-                        </p>
-                      </div>
-                    </div>
-                    <Button type="button" variant="outline" className="mt-3 h-10 w-full rounded-xl border-white/10 bg-white/10 text-sm font-black text-white hover:border-[#FFB57A]/32 hover:bg-[#FF7A16]/12 hover:text-[#FFD7BA]" onClick={() => setIsParentTrustDialogOpen(true)}>
-                      학부모 상세 보기
-                    </Button>
-                  </div>
-                </div>
+              <div className="rounded-[1.95rem] border border-white/12 bg-white/8 p-2 sm:p-3">
+                {heatmapGraphSection}
               </div>
             </CardContent>
           </Card>

@@ -321,6 +321,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
+  const hasInitializedRoomViewRef = useRef(false);
   const [roomDrafts, setRoomDrafts] = useState<Record<string, { rows: number; cols: number }>>({});
   const [seatOverlayMode, setSeatOverlayMode] = useState<CenterAdminSeatOverlayMode>('composite');
   const [selectedSeatInsightKey, setSelectedSeatInsightKey] = useState<CenterAdminSeatDomainKey | null>(null);
@@ -379,10 +380,25 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [persistedRooms]);
 
   useEffect(() => {
+    if (hasInitializedRoomViewRef.current || persistedRooms.length === 0) return;
+    hasInitializedRoomViewRef.current = true;
+    if (selectedRoomView === 'all') {
+      setSelectedRoomView(persistedRooms[0].id);
+    }
+  }, [persistedRooms, selectedRoomView]);
+
+  useEffect(() => {
+    if (persistedRooms.length === 0) {
+      if (selectedRoomView !== 'all') {
+        setSelectedRoomView('all');
+      }
+      return;
+    }
+
     if (selectedRoomView === 'all') return;
     const hasSelectedRoom = persistedRooms.some((room) => room.id === selectedRoomView);
     if (!hasSelectedRoom) {
-      setSelectedRoomView('all');
+      setSelectedRoomView(persistedRooms[0].id);
     }
   }, [persistedRooms, selectedRoomView]);
 
