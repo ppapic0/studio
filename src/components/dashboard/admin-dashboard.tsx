@@ -31,6 +31,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
   ResponsiveContainer,
   ComposedChart,
   LineChart,
@@ -314,6 +321,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
   const [isStudyingStudentsDialogOpen, setIsStudyingStudentsDialogOpen] = useState(false);
   const [isAttendanceFullscreenOpen, setIsAttendanceFullscreenOpen] = useState(false);
+  const [isOperationsMemoOpen, setIsOperationsMemoOpen] = useState(false);
+  const [isImmediateInterventionSheetOpen, setIsImmediateInterventionSheetOpen] = useState(false);
+  const [isAttendancePriorityDialogOpen, setIsAttendancePriorityDialogOpen] = useState(false);
+  const [selectedHomeAxisId, setSelectedHomeAxisId] = useState<string | null>(null);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
@@ -2195,114 +2206,52 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   function renderAttendanceDashboardSection() {
     return (
-      <>
-        <Card className="overflow-hidden rounded-[2.5rem] border-none bg-[linear-gradient(180deg,#14295F_0%,#17397F_100%)] shadow-[0_28px_76px_-46px_rgba(20,41,95,0.56)]">
-          <CardHeader className="border-b border-white/10 px-4 py-5 text-white sm:px-5 sm:py-6">
-            <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-end justify-between')}>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="h-6 rounded-full border-none bg-white/12 px-2.5 text-[10px] font-black uppercase tracking-[0.24em] text-white">
-                    좌석 관제
+      <Dialog open={isAttendanceFullscreenOpen} onOpenChange={setIsAttendanceFullscreenOpen}>
+        <DialogContent className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden rounded-[2.4rem] border-none bg-[linear-gradient(180deg,#F7FAFF_0%,#EFF4FF_100%)] p-0 shadow-[0_24px_80px_rgba(20,41,95,0.28)]">
+          <div className={cn(studioDialogHeaderClassName, 'border-b border-white/10 px-5 py-5 sm:px-6')}>
+            <DialogHeader className="gap-2 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="h-6 border-none bg-white/12 px-2.5 text-[10px] font-black text-white">
+                  실시간 교실 상세
+                </Badge>
+                {selectedClass !== 'all' && (
+                  <Badge className="h-6 border-none bg-white px-2.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.24)]">
+                    {selectedClass}
                   </Badge>
-                  <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.24)]">
-                    동기화 {liveSyncLabel}
-                  </Badge>
-                  {selectedClass !== 'all' ? (
-                    <Badge className="h-6 rounded-full border-none bg-white/12 px-2.5 text-[10px] font-black text-white">
-                      {selectedClass}
-                    </Badge>
-                  ) : null}
-                </div>
-                <CardTitle className="mt-3 font-aggro-display text-[1.75rem] font-black tracking-tight text-white sm:text-[2rem]">
-                  실시간 좌석 관제
-                </CardTitle>
-                <CardDescription className="mt-2 max-w-[36rem] text-xs font-bold leading-5 text-white/78 sm:text-sm">
-                  방 선택, 전체보기, 학생 진입을 한 화면 안에 붙여 바로 조작하는 운영 콘솔처럼 정리했습니다.
-                </CardDescription>
+                )}
               </div>
-
-              <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
-                <div className={cn(studioGlassPanelClassName, 'px-4 py-3')}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">실시간 착석</p>
-                  <p className="dashboard-number mt-2 text-[1.7rem] text-white">{metrics.checkedInCount}명</p>
+              <DialogTitle className="font-aggro-display text-[2rem] font-black tracking-tight text-white">
+                등하원 관제 전체보기
+              </DialogTitle>
+              <DialogDescription className="text-xs font-bold text-white/76">
+                홈에서는 요약만 보고, 상세 좌석 배치와 학생 상태는 여기서 바로 확인합니다.
+              </DialogDescription>
+              <div className={cn('mt-3 grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+                <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">착석</p>
+                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{metrics.checkedInCount}</p>
                 </div>
-                <div className={cn(studioGlassPanelClassName, 'px-4 py-3')}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">미입실·지각</p>
-                  <p className="dashboard-number mt-2 text-[1.7rem] text-white">{attendanceBoardSummary.lateOrAbsentCount}명</p>
+                <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">미입실·지각</p>
+                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{attendanceBoardSummary.lateOrAbsentCount}</p>
                 </div>
-                <div className={cn(studioGlassPanelClassName, 'px-4 py-3')}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">장기 외출</p>
-                  <p className="dashboard-number mt-2 text-[1.7rem] text-white">{attendanceBoardSummary.longAwayCount}명</p>
+                <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">장기 외출</p>
+                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{attendanceBoardSummary.longAwayCount}</p>
                 </div>
-                <div className="rounded-[1.75rem] border border-[#FFB677]/30 bg-[#FF7A16]/16 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/68">즉시 개입</p>
-                  <p className="dashboard-number mt-2 text-[1.7rem] text-white">{urgentInterventionStudents.length}명</p>
+                <div className="rounded-[1.35rem] border border-[#FFB677]/28 bg-[#FF7A16]/18 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/68">즉시 개입</p>
+                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{urgentInterventionStudents.length}</p>
                 </div>
               </div>
-            </div>
+            </DialogHeader>
+          </div>
 
-            <div className={cn('mt-5 flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedRoomView('all');
-                    setIsAttendanceFullscreenOpen(true);
-                  }}
-                  className="h-11 rounded-2xl border-white/14 bg-white text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.3)] hover:bg-white/92"
-                >
-                  <LayoutGrid className="mr-2 h-4 w-4" />
-                  관제 전체보기
-                </Button>
-                {roomConfigs.map((room) => (
-                  <Button
-                    key={room.id}
-                    type="button"
-                    variant={selectedRoomView === room.id ? 'default' : 'outline'}
-                    onClick={() => setSelectedRoomView(room.id)}
-                    className={cn(
-                      'h-11 rounded-2xl px-4 font-black',
-                      selectedRoomView === room.id
-                        ? 'bg-white text-[#14295F] hover:bg-white/90'
-                        : 'border-white/18 bg-white/10 text-white hover:bg-white/16'
-                    )}
-                  >
-                    {room.name}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge className="h-8 rounded-full border-none bg-white/12 px-3 text-[10px] font-black text-white">
-                  관제 범위 {selectedClass === 'all' ? '센터 전체' : selectedClass}
-                </Badge>
-                <Badge className="h-8 rounded-full border-none bg-white/12 px-3 text-[10px] font-black text-white">
-                  루틴 누락 {attendanceBoardSummary.routineMissingCount}명
-                </Badge>
-                <Badge className="h-8 rounded-full border-none bg-white/12 px-3 text-[10px] font-black text-white">
-                  외출/복귀 {attendanceBoardSummary.awayCount + attendanceBoardSummary.returnedCount}건
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-4 bg-[linear-gradient(180deg,rgba(247,250,255,0.06)_0%,rgba(255,255,255,0.06)_100%)] p-4 sm:p-5">
-            <div className="flex flex-wrap gap-2">
-              <Badge className="h-8 rounded-full border-none bg-white/12 px-3 text-[10px] font-black text-white">
-                루틴 누락 {attendanceBoardSummary.routineMissingCount}명
-              </Badge>
-              <Badge className="h-8 rounded-full border-none bg-white/12 px-3 text-[10px] font-black text-white">
-                연락 우선 {todayAttendanceContactTargets.length}명
-              </Badge>
-              <Badge className="h-8 rounded-full border-none bg-white/12 px-3 text-[10px] font-black text-white">
-                외출/복귀 {attendanceBoardSummary.awayCount + attendanceBoardSummary.returnedCount}건
-              </Badge>
-            </div>
-
-            <div className="rounded-[2rem] border border-white/10 bg-white/96 p-3 shadow-[0_24px_40px_-34px_rgba(20,41,95,0.34)]">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+            <div className="rounded-[2rem] border border-[#DCE7FF] bg-white p-3 shadow-[0_26px_40px_-32px_rgba(20,41,95,0.22)]">
               <CenterAdminAttendanceBoard
                 roomConfigs={roomConfigs}
-                selectedRoomView={selectedRoomView}
+                selectedRoomView={selectedRoomView === 'all' ? 'all' : selectedRoomView}
                 selectedClass={selectedClass}
                 isMobile={isMobile}
                 seatDetailLevel="nameOnly"
@@ -2315,99 +2264,41 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 studentMembersById={studentMembersById}
                 getSeatForRoom={getSeatForRoom}
                 onSeatClick={(seat) => {
+                  setIsAttendanceFullscreenOpen(false);
                   if (seat.studentId) {
                     setSelectedFocusStudentId(seat.studentId);
                   }
                 }}
               />
             </div>
-          </CardContent>
-        </Card>
-
-        <Dialog open={isAttendanceFullscreenOpen} onOpenChange={setIsAttendanceFullscreenOpen}>
-          <DialogContent className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden rounded-[2.4rem] border-none bg-[linear-gradient(180deg,#F7FAFF_0%,#EFF4FF_100%)] p-0 shadow-[0_24px_80px_rgba(20,41,95,0.28)]">
-            <div className={cn(studioDialogHeaderClassName, 'border-b border-white/10 px-5 py-5 sm:px-6')}>
-              <DialogHeader className="gap-2 text-left">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="h-6 border-none bg-white/12 px-2.5 text-[10px] font-black text-white">
-                    FULL SCREEN
-                  </Badge>
-                  {selectedClass !== 'all' && (
-                    <Badge className="h-6 border-none bg-white px-2.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.24)]">
-                      {selectedClass}
-                    </Badge>
-                  )}
-                </div>
-                <DialogTitle className="font-aggro-display text-[2rem] font-black tracking-tight text-white">
-                  등하원 관제 전체보기
-                </DialogTitle>
-                <DialogDescription className="text-xs font-bold text-white/76">
-                  두 호실을 한 화면에서 크게 확인합니다. `Esc`를 누르면 대시보드로 돌아갑니다.
-                </DialogDescription>
-                <div className={cn('mt-3 grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
-                  <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">착석</p>
-                    <p className="dashboard-number mt-2 text-[1.6rem] text-white">{metrics.checkedInCount}</p>
-                  </div>
-                  <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">미입실·지각</p>
-                    <p className="dashboard-number mt-2 text-[1.6rem] text-white">{attendanceBoardSummary.lateOrAbsentCount}</p>
-                  </div>
-                  <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">장기 외출</p>
-                    <p className="dashboard-number mt-2 text-[1.6rem] text-white">{attendanceBoardSummary.longAwayCount}</p>
-                  </div>
-                  <div className="rounded-[1.35rem] border border-[#FFB677]/28 bg-[#FF7A16]/18 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/68">즉시 개입</p>
-                    <p className="dashboard-number mt-2 text-[1.6rem] text-white">{urgentInterventionStudents.length}</p>
-                  </div>
-                </div>
-              </DialogHeader>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-              <div className="rounded-[2rem] border border-[#DCE7FF] bg-white p-3 shadow-[0_26px_40px_-32px_rgba(20,41,95,0.22)]">
-                <CenterAdminAttendanceBoard
-                  roomConfigs={roomConfigs}
-                  selectedRoomView="all"
-                  selectedClass={selectedClass}
-                  isMobile={isMobile}
-                  seatDetailLevel="nameOnly"
-                  shellMode="embedded"
-                  showHeader={false}
-                  isLoading={attendanceBoardLoading}
-                  summary={attendanceBoardSummary}
-                  seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
-                  studentsById={studentsById}
-                  studentMembersById={studentMembersById}
-                  getSeatForRoom={getSeatForRoom}
-                  onSeatClick={(seat) => {
-                    setIsAttendanceFullscreenOpen(false);
-                    if (seat.studentId) {
-                      setSelectedFocusStudentId(seat.studentId);
-                    }
-                  }}
-                />
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
-  const heatmapGraphSection = (
-    <CenterAdminHeatmapCharts
-      title="대표 운영 차트"
-      description="가장 약한 축 하나를 먼저 보고, 필요한 개입 학생만 이어서 확인합니다."
-      rows={adminHeatmapRows}
-      interventionSignals={heatmapInterventionSignals}
-      scopeLabel={selectedClass === 'all' ? '센터 전체' : selectedClass}
-      isLoading={adminHeatmapLoading}
-      actionHref="/dashboard/teacher"
-      actionLabel="실시간 교실 이동"
-    />
-  );
+  useEffect(() => {
+    if (adminHeatmapRows.length === 0) {
+      if (selectedHomeAxisId !== null) {
+        setSelectedHomeAxisId(null);
+      }
+      return;
+    }
+
+    if (selectedHomeAxisId && adminHeatmapRows.some((row) => row.id === selectedHomeAxisId)) {
+      return;
+    }
+
+    const lowestRow = adminHeatmapRows.reduce((lowest, current) => {
+      if (current.summaryScore < lowest.summaryScore) return current;
+      if (current.summaryScore === lowest.summaryScore && current.label.localeCompare(lowest.label, 'ko') < 0) {
+        return current;
+      }
+      return lowest;
+    });
+
+    setSelectedHomeAxisId(lowestRow.id);
+  }, [adminHeatmapRows, selectedHomeAxisId]);
 
   if (!isActive) return null;
 
@@ -2440,6 +2331,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const topAdminPriority = todayActionQueue[0] || null;
   const primaryUrgentIntervention = urgentInterventionStudents[0] || null;
   const secondaryUrgentInterventions = urgentInterventionStudents.slice(1, 4);
+  const primaryUrgentRoomLabel =
+    primaryUrgentIntervention?.roomId
+      ? roomNameById.get(primaryUrgentIntervention.roomId) || primaryUrgentIntervention.roomId || '미배정'
+      : '미배정';
   const primaryAttendanceContactTarget = todayAttendanceContactTargets[0] || null;
   const secondaryAttendanceContactTargets = todayAttendanceContactTargets.slice(1, 4);
   const totalControlAlerts =
@@ -2448,6 +2343,83 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     centerHealthAxes.length > 0
       ? centerHealthAxes.reduce((lowest, axis) => (axis.summaryScore < lowest.summaryScore ? axis : lowest))
       : null;
+  const weakestAxisScoreLabel = weakestAxis ? `${weakestAxis.summaryScore}점` : 'N/A';
+  const weakestAxisHeadline = weakestAxis ? `${weakestAxis.label} ${weakestAxis.summaryScore}점` : '현재 운영 흐름은 안정적입니다.';
+  const selectedHomeAxis =
+    centerHealthAxes.find((axis) => axis.id === selectedHomeAxisId)
+    || weakestAxis
+    || centerHealthAxes[0]
+    || null;
+  const selectedHomeHeatmapRow =
+    adminHeatmapRows.find((row) => row.id === selectedHomeAxis?.id)
+    || adminHeatmapRows[0]
+    || null;
+  const roomOverviewRows = roomConfigs.map((room) => {
+    let focusedCount = 0;
+    let alertCount = 0;
+    let awayCount = 0;
+
+    for (let roomSeatNo = 1; roomSeatNo <= room.rows * room.cols; roomSeatNo += 1) {
+      const seat = getSeatForRoom(room, roomSeatNo);
+      if (seat.type === 'aisle' || !seat.studentId) continue;
+      const signal = attendanceSeatSignalsBySeatId.get(seat.id);
+      if (!signal) continue;
+
+      if (signal.boardStatus === 'present' || signal.boardStatus === 'returned') focusedCount += 1;
+      if (signal.boardStatus === 'away') awayCount += 1;
+      if (
+        signal.boardStatus === 'absent'
+        || signal.boardStatus === 'late'
+        || signal.boardStatus === 'routine_missing'
+        || signal.boardStatus === 'present_missing_routine'
+        || signal.attendanceRiskLevel === 'risk'
+      ) {
+        alertCount += 1;
+      }
+    }
+
+    return {
+      id: room.id,
+      name: room.name,
+      focusedCount,
+      awayCount,
+      alertCount,
+      totalSeats: room.rows * room.cols,
+    };
+  });
+  const homeStatusMeta =
+    totalControlAlerts >= 5 || (weakestAxis?.summaryScore ?? 100) < 60
+      ? {
+          label: '즉시 점검',
+          badgeClass: 'bg-[#FF7A16] text-white',
+          toneClass: 'border-[#FFD7BA] bg-[#FFF8F2]',
+          summary: `긴급 신호 ${totalControlAlerts}건이 올라와 있어 ${weakestAxis?.label || '운영 흐름'}부터 먼저 확인해야 합니다.`,
+        }
+      : totalControlAlerts > 0 || (weakestAxis?.summaryScore ?? 100) < 75
+        ? {
+            label: '주의',
+            badgeClass: 'bg-[#FFF2E8] text-[#C95A08]',
+            toneClass: 'border-[#DCE7FF] bg-white',
+            summary: `${topAdminPriority?.title || '예외 학생'}만 정리하면 되고, ${weakestAxis?.label || '운영 흐름'}을 이어서 점검하면 됩니다.`,
+          }
+        : {
+            label: '안정',
+            badgeClass: 'bg-[#EEF4FF] text-[#2554D7]',
+            toneClass: 'border-[#DCE7FF] bg-white',
+            summary: '전반 운영은 안정적입니다. 예외 학생과 약한 축만 짧게 확인하면 충분합니다.',
+          };
+  const getTopPerformerHighlight = (row: typeof topFocusCompactPreview[number]) => {
+    if (row.completion >= 95) {
+      return `계획 완수 ${row.completion}%`;
+    }
+    if (row.todayMinutes >= 240) {
+      return `오늘 공부 ${Math.floor(row.todayMinutes / 60)}h ${row.todayMinutes % 60}m`;
+    }
+    if (row.studyMinutes >= 1200) {
+      return `주간 학습 ${Math.floor(row.studyMinutes / 60)}h ${row.studyMinutes % 60}m`;
+    }
+    return `집중 흐름 ${row.score}점`;
+  };
   const studioWhiteCardClassName =
     'rounded-[2.1rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_20px_48px_-38px_rgba(20,41,95,0.32)]';
   const studioInsetCardClassName =
@@ -2466,13 +2438,677 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     'rounded-[1.7rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_36px_-32px_rgba(20,41,95,0.18)]';
   const studioSectionEyebrowClassName =
     'text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]';
+  const heatmapGraphSection = (
+    <CenterAdminHeatmapCharts
+      title="대표 운영 차트"
+      description="선택한 축 기준으로 추이와 개입 우선 학생만 간결하게 이어서 확인합니다."
+      rows={adminHeatmapRows}
+      interventionSignals={heatmapInterventionSignals}
+      scopeLabel={selectedClass === 'all' ? '센터 전체' : selectedClass}
+      isLoading={adminHeatmapLoading}
+      actionHref="/dashboard/teacher"
+      actionLabel="실시간 교실 이동"
+      activeRowId={selectedHomeAxisId}
+      onActiveRowChange={setSelectedHomeAxisId}
+    />
+  );
+  const handleHomePriorityAction = (item: (typeof todayActionQueue)[number] | null | undefined) => {
+    if (!item) return;
+
+    if (item.key === 'intervention') {
+      setIsImmediateInterventionSheetOpen(true);
+      return;
+    }
+
+    if (item.key === 'attendance') {
+      setIsAttendancePriorityDialogOpen(true);
+      return;
+    }
+
+    if (item.key === 'away') {
+      setSelectedRoomView('all');
+      setIsAttendanceFullscreenOpen(true);
+      return;
+    }
+
+    if (item.actionType === 'dialog' || item.key === 'guardian') {
+      setIsParentTrustDialogOpen(true);
+    }
+  };
+  const handleOpenAttendanceOverview = (roomId: 'all' | string = 'all') => {
+    setSelectedRoomView(roomId);
+    setIsAttendanceFullscreenOpen(true);
+  };
+  const handleImmediateStudentSelect = (studentId: string) => {
+    setIsImmediateInterventionSheetOpen(false);
+    setSelectedFocusStudentId(studentId);
+  };
+  function renderHomeHeroSection() {
+    return (
+      <motion.section className="space-y-4 px-1" {...getStudioMotionProps(0.08, 18)}>
+        <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.18fr)_360px_360px]')}>
+          <Card className={cn(studioWhiteCardClassName, homeStatusMeta.toneClass, 'overflow-hidden')}>
+            <CardHeader className="border-b border-[#E4ECFF] pb-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={studioSectionEyebrowClassName}>오늘 운영 상태</p>
+                  <CardTitle className="mt-2 text-[1.75rem] font-black tracking-tight text-[#14295F] sm:text-[1.95rem]">
+                    한눈에 보고 바로 움직이는 운영 요약
+                  </CardTitle>
+                  <CardDescription className="mt-2 max-w-[36rem] text-sm font-bold leading-6 text-[#5c6e97]">
+                    {homeStatusMeta.summary}
+                  </CardDescription>
+                </div>
+                <Badge className={cn('rounded-full border-none px-3 py-1 text-[10px] font-black', homeStatusMeta.badgeClass)}>
+                  {homeStatusMeta.label}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 p-5">
+              <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'sm:grid-cols-3')}>
+                <div className="rounded-[1.45rem] border border-[#DCE7FF] bg-white px-4 py-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">긴급 조치</p>
+                  <p className="dashboard-number mt-2 text-[2rem] text-[#14295F]">{totalControlAlerts}</p>
+                  <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">지금 바로 확인할 흐름</p>
+                </div>
+                <div className="rounded-[1.45rem] border border-[#DCE7FF] bg-[#F8FBFF] px-4 py-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">신경 쓸 영역</p>
+                  <p className="mt-2 text-base font-black text-[#14295F]">{weakestAxis?.label || '운영 지표 준비 중'}</p>
+                  <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">{weakestAxis ? `${weakestAxis.summaryScore}점` : '상세 집계 대기'}</p>
+                </div>
+                <div className="rounded-[1.45rem] border border-[#DCE7FF] bg-white px-4 py-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">마지막 동기화</p>
+                  <p className="mt-2 text-base font-black text-[#14295F]">{liveSyncLabel}</p>
+                  <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">운영 범위 {selectedClass === 'all' ? '센터 전체' : selectedClass}</p>
+                </div>
+              </div>
+
+              <div className="rounded-[1.55rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">지금 바로 확인할 것</p>
+                <p className="mt-2 text-base font-black text-[#14295F]">
+                  {topAdminPriority?.title || '긴급 조치는 없고, 운영 흐름만 짧게 확인하면 됩니다.'}
+                </p>
+                <p className="mt-1 text-[12px] font-bold leading-6 text-[#5c6e97]">
+                  {topAdminPriority?.detail || '요약 카드와 대표 차트만 읽고 필요한 상세 화면으로 이어가면 됩니다.'}
+                </p>
+              </div>
+
+              <div className={cn('flex gap-2.5', isMobile ? 'flex-col' : 'items-center')}>
+                {topAdminPriority?.href && !['intervention', 'attendance', 'away', 'guardian'].includes(topAdminPriority.key) ? (
+                  <Button asChild type="button" className="h-11 rounded-2xl bg-[#14295F] px-5 text-sm font-black text-white hover:bg-[#10224C]">
+                    <Link href={topAdminPriority.href}>
+                      {topAdminPriority.actionLabel}
+                      <ArrowUpRight data-icon="inline-end" />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="h-11 rounded-2xl bg-[#14295F] px-5 text-sm font-black text-white hover:bg-[#10224C]"
+                    onClick={() => handleHomePriorityAction(topAdminPriority)}
+                  >
+                    {topAdminPriority?.actionLabel || '실시간 교실 보기'}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 rounded-2xl border-[#DCE7FF] bg-white px-5 text-sm font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                  onClick={() => setIsOperationsMemoOpen(true)}
+                >
+                  운영 메모 열기
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={cn(studioWhiteCardClassName, 'overflow-hidden')}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className={studioSectionEyebrowClassName}>실시간 교실 요약</p>
+                  <CardTitle className="mt-2 text-lg font-black tracking-tight text-[#14295F]">좌석 흐름은 요약만 먼저 봅니다.</CardTitle>
+                  <CardDescription className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                    홈에서는 숫자와 방별 상태만 보고, 좌석 배치도 전체는 상세 패널에서 엽니다.
+                  </CardDescription>
+                </div>
+                <Badge className="rounded-full border-none bg-[#EEF4FF] px-2.5 py-1 text-[10px] font-black text-[#2554D7]">
+                  {roomOverviewRows.length}개 호실
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-[1.25rem] border border-[#DCE7FF] bg-white px-3 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">착석</p>
+                  <p className="dashboard-number mt-2 text-[1.5rem] text-[#14295F]">{metrics.checkedInCount}</p>
+                </div>
+                <div className="rounded-[1.25rem] border border-[#DCE7FF] bg-[#F8FBFF] px-3 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">미입실·지각</p>
+                  <p className="dashboard-number mt-2 text-[1.5rem] text-[#14295F]">{attendanceBoardSummary.lateOrAbsentCount}</p>
+                </div>
+                <div className="rounded-[1.25rem] border border-[#FFD7BA] bg-[#FFF8F2] px-3 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C95A08]">장기 외출</p>
+                  <p className="dashboard-number mt-2 text-[1.5rem] text-[#C95A08]">{attendanceBoardSummary.longAwayCount}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                {roomOverviewRows.slice(0, 2).map((room) => (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => handleOpenAttendanceOverview(room.id)}
+                    className="rounded-[1.35rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-3 text-left transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/24 hover:bg-white"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-[#14295F]">{room.name}</p>
+                        <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                          공부중 {room.focusedCount}명 · 경고 {room.alertCount}건 · 외출 {room.awayCount}명
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-[#5c6e97]" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 w-full rounded-2xl border-[#DCE7FF] bg-white font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                onClick={() => handleOpenAttendanceOverview('all')}
+              >
+                전체 보기
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className={cn(studioWhiteCardClassName, primaryUrgentIntervention && 'border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F2_0%,#FFFFFF_100%)]')}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className={studioSectionEyebrowClassName}>즉시 개입 학생</p>
+                  <CardTitle className="mt-2 text-lg font-black tracking-tight text-[#14295F]">상위 3명만 먼저 노출합니다.</CardTitle>
+                  <CardDescription className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                    위험 점수와 한 줄 이유만 홈에 두고, 전체 우선순위는 오른쪽 드로어로 분리합니다.
+                  </CardDescription>
+                </div>
+                <Badge className="rounded-full border-none bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white">
+                  {urgentInterventionStudents.length}명
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {urgentInterventionStudents.length === 0 ? (
+                <div className="rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-4 py-8 text-center text-xs font-bold text-[#5c6e97]">
+                  현재 즉시 개입이 필요한 학생 신호가 없습니다.
+                </div>
+              ) : (
+                urgentInterventionStudents.slice(0, 3).map((signal, index) => {
+                  const roomLabel = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '미배정';
+                  return (
+                    <button
+                      key={`${signal.studentId}-${signal.seatId}`}
+                      type="button"
+                      onClick={() => setSelectedFocusStudentId(signal.studentId)}
+                      className={cn(
+                        'w-full rounded-[1.4rem] border px-4 py-3 text-left transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white',
+                        index === 0
+                          ? 'border-[#FFD7BA] bg-[#FFF8F2] hover:border-[#FF7A16]/28'
+                          : 'border-[#DCE7FF] bg-[#F7FAFF] hover:border-[#FF7A16]/24'
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={cn(
+                              'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                              index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]'
+                            )}>
+                              {index + 1}순위
+                            </Badge>
+                            {signal.className ? (
+                              <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F]">
+                                {signal.className}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="mt-2 text-sm font-black text-[#14295F]">{signal.studentName}</p>
+                          <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                            {roomLabel} · {signal.topReason}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">위험 점수</p>
+                          <p className="dashboard-number mt-2 text-[1.35rem] text-[#14295F]">{signal.compositeHealth}</p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 w-full rounded-2xl border-[#DCE7FF] bg-white font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                onClick={() => setIsImmediateInterventionSheetOpen(true)}
+              >
+                전체 우선순위 보기
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,0.82fr)_minmax(0,0.82fr)_minmax(0,1.18fr)]')}>
+          <button
+            type="button"
+            onClick={() => setIsOperationsMemoOpen(true)}
+            className={cn(studioMetricCardClassName, 'text-left transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/20 hover:shadow-[0_24px_36px_-30px_rgba(20,41,95,0.22)]')}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className={studioSectionEyebrowClassName}>운영 메모</p>
+                <p className="mt-2 text-base font-black text-[#14295F]">{topAdminPriority?.title || '오늘 메모 없음'}</p>
+                <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-6 text-[#5c6e97]">
+                  {topAdminPriority?.detail || '긴급 조치가 없어서 기본 흐름만 확인하면 됩니다.'}
+                </p>
+              </div>
+              <ChevronRight className="mt-1 h-4 w-4 text-[#5c6e97]" />
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsAttendancePriorityDialogOpen(true)}
+            className={cn(studioMetricCardClassName, 'text-left transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/20 hover:shadow-[0_24px_36px_-30px_rgba(20,41,95,0.22)]')}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className={studioSectionEyebrowClassName}>출결 연락 우선</p>
+                <p className="mt-2 text-base font-black text-[#14295F]">
+                  {primaryAttendanceContactTarget ? `${todayAttendanceContactTargets.length}명 확인 필요` : '현재 연락 우선 없음'}
+                </p>
+                <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-6 text-[#5c6e97]">
+                  {primaryAttendanceContactTarget
+                    ? `${primaryAttendanceContactTarget.studentName} · ${primaryAttendanceContactTarget.issueLabel}`
+                    : '미입실, 지각, 루틴 누락 학생은 현재 안정 구간입니다.'}
+                </p>
+              </div>
+              <Phone className="mt-1 h-4 w-4 text-[#C95A08]" />
+            </div>
+          </button>
+
+          <Card className={studioWhiteCardClassName}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className={studioSectionEyebrowClassName}>오늘의 TOP 3</p>
+                  <CardTitle className="mt-2 text-lg font-black tracking-tight text-[#14295F]">누가 잘하고 있는지도 바로 읽힙니다.</CardTitle>
+                  <CardDescription className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                    홈에서는 상위 3명과 무엇을 잘하고 있는지만 보여주고, 학생 KPI는 클릭 후 이어집니다.
+                  </CardDescription>
+                </div>
+                <Badge className="rounded-full border-none bg-[#EEF4FF] px-2.5 py-1 text-[10px] font-black text-[#2554D7]">
+                  TOP 3
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {topFocusCompactPreview.length === 0 ? (
+                <div className="rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-4 py-8 text-center text-xs font-bold text-[#5c6e97]">
+                  오늘의 상위 학생 집계가 아직 준비되지 않았습니다.
+                </div>
+              ) : (
+                topFocusCompactPreview.map((student, index) => (
+                  <button
+                    key={student.studentId}
+                    type="button"
+                    onClick={() => setSelectedFocusStudentId(student.studentId)}
+                    className={cn(
+                      'w-full rounded-[1.35rem] border px-4 py-3 text-left transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-[#2554D7]/24 hover:bg-white',
+                      index === 0 ? 'border-[#DCE7FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)]' : 'border-[#DCE7FF] bg-[#F7FAFF]'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={cn(
+                            'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                            index === 0 ? 'bg-[#14295F] text-white' : 'bg-[#EEF4FF] text-[#2554D7]'
+                          )}>
+                            {index + 1}위
+                          </Badge>
+                          <p className="truncate text-sm font-black text-[#14295F]">{student.name}</p>
+                        </div>
+                        <p className="mt-2 text-[12px] font-bold leading-6 text-[#5c6e97]">
+                          {student.className} · {getTopPerformerHighlight(student)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">집중 점수</p>
+                        <p className="dashboard-number mt-2 text-[1.35rem] text-[#14295F]">{student.score}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </motion.section>
+    );
+  }
+  function renderHomeInsightsSection() {
+    return (
+      <motion.section className="space-y-4 px-1 pb-10" {...getStudioMotionProps(0.14, 18)}>
+        <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.18fr)_360px]')}>
+          <div className={studioWhiteCardClassName}>
+            <div className={cn('flex gap-4 border-b border-[#DCE7FF] px-5 pb-4 pt-5 sm:px-6', isMobile ? 'flex-col' : 'items-start justify-between')}>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="rounded-full border-none bg-[#14295F] px-2.5 py-1 text-[10px] font-black text-white">
+                    운영 5축
+                  </Badge>
+                  <Badge className="rounded-full border-none bg-[#EEF4FF] px-2.5 py-1 text-[10px] font-black text-[#2554D7]">
+                    대표 차트 1개
+                  </Badge>
+                </div>
+                <h2 className="mt-3 font-aggro-display text-[1.75rem] font-black tracking-tight text-[#14295F]">
+                  {selectedHomeAxis ? `${selectedHomeAxis.label}부터 먼저 봅니다.` : '운영 5축 상태를 먼저 봅니다.'}
+                </h2>
+                <p className="mt-2 max-w-[44rem] text-xs font-bold leading-5 text-[#5c6e97]">
+                  {selectedHomeHeatmapRow?.description || '홈에서는 하나의 대표 축만 크게 보고, 다른 상세 흐름은 클릭 후 이어서 확인합니다.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge className="rounded-full border-none bg-white px-3 py-1 text-[10px] font-black text-[#14295F] shadow-sm">
+                  {selectedClass === 'all' ? '센터 전체' : selectedClass}
+                </Badge>
+                {selectedHomeAxis ? (
+                  <Badge className="rounded-full border-none bg-[#FFF2E8] px-3 py-1 text-[10px] font-black text-[#C95A08]">
+                    {selectedHomeAxis.summaryScore}점
+                  </Badge>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="overflow-hidden bg-[linear-gradient(180deg,rgba(20,41,95,0.04)_0%,rgba(255,122,22,0.04)_100%)] p-4 sm:p-5">
+              <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                <div className="inline-flex min-w-max gap-2">
+                  {centerHealthAxes.map((axis) => (
+                    <button
+                      key={axis.id}
+                      type="button"
+                      onClick={() => setSelectedHomeAxisId(axis.id)}
+                      className={cn(
+                        'rounded-full border px-4 py-2.5 text-left transition-[transform,border-color,background-color,box-shadow] duration-200 hover:-translate-y-0.5',
+                        selectedHomeAxisId === axis.id
+                          ? 'border-[#FF7A16]/24 bg-white shadow-[0_18px_32px_-28px_rgba(20,41,95,0.24)]'
+                          : 'border-[#DCE7FF] bg-[#F7FAFF] hover:border-[#2554D7]/18 hover:bg-white'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">{axis.label}</p>
+                          <p className="mt-1 text-sm font-black text-[#14295F]">{axis.summaryScore}점</p>
+                        </div>
+                        <Badge className={cn('rounded-full border-none px-2 py-1 text-[10px] font-black', axis.tone.badge)}>
+                          {axis.summaryLabel}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <CenterAdminHeatmapCharts
+                  title="대표 운영 차트"
+                  description="선택한 축 기준으로 추이와 개입 우선 학생만 간결하게 이어서 확인합니다."
+                  rows={adminHeatmapRows}
+                  interventionSignals={heatmapInterventionSignals}
+                  scopeLabel={selectedClass === 'all' ? '센터 전체' : selectedClass}
+                  isLoading={adminHeatmapLoading}
+                  actionHref="/dashboard/teacher"
+                  actionLabel="실시간 교실 이동"
+                  activeRowId={selectedHomeAxisId}
+                  onActiveRowChange={setSelectedHomeAxisId}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <Card className={studioWhiteCardClassName}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className={studioSectionEyebrowClassName}>집중 / 학부모 요약</p>
+                    <CardDescription className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                      홈에서는 판단에 필요한 핵심 수치만 남기고, 상세는 기존 다이얼로그로 연결합니다.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg border-[#DCE7FF] bg-white px-3 text-[11px] font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                    onClick={() => setIsParentTrustDialogOpen(true)}
+                  >
+                    상세 보기
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className={studioSoftPanelClassName}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-black text-[#14295F]">집중 흐름</p>
+                    <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
+                      {metrics.focusKpi.score}점
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                    완료율 {metrics.focusKpi.completion}% · {metrics.focusKpi.risks[0] || metrics.focusKpi.actions[0] || '집중 흐름을 안정적으로 유지 중입니다.'}
+                  </p>
+                  <div className="mt-3 grid gap-2">
+                    <div className="rounded-[1rem] border border-[#DCE7FF] bg-white px-3 py-2.5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#2554D7]">상위 흐름</p>
+                      <p className="mt-1 text-sm font-black text-[#14295F]">{topFocusLeader ? topFocusLeader.name : '집계 없음'}</p>
+                      <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">
+                        {topFocusLeader ? `${topFocusLeader.className} · ${getTopPerformerHighlight(topFocusLeader)}` : '집중 우수 학생 데이터가 없습니다.'}
+                      </p>
+                    </div>
+                    <div className="rounded-[1rem] border border-[#FFD7BA] bg-[#FFF8F2] px-3 py-2.5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C95A08]">보완 필요</p>
+                      <p className="mt-1 text-sm font-black text-[#14295F]">{bottomFocusLeader ? bottomFocusLeader.name : '집계 없음'}</p>
+                      <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">
+                        {bottomFocusLeader ? `${bottomFocusLeader.className} · 완료율 ${bottomFocusLeader.completion}%` : '보완 학생 데이터가 없습니다.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.55rem] border border-[#FFD7BA] bg-[#FFF8F2] px-4 py-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-black text-[#14295F]">학부모 반응</p>
+                    <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#C95A08]">
+                      상담 {metrics.consultationRequestCount30d}건
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                    앱 방문 {metrics.parentVisitCount30d}회 · 활성 학부모 {metrics.activeParentCount30d}명
+                  </p>
+                  <div className="mt-3 rounded-[1rem] border border-white bg-white px-3 py-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C95A08]">우선 연락 추천</p>
+                    <p className="mt-1 text-sm font-black text-[#14295F]">
+                      {primaryParentContactTarget ? primaryParentContactTarget.parentName : '현재 우선 연락 대상이 없습니다.'}
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                      {primaryParentContactTarget ? primaryParentContactTarget.recommendedAction : '학부모 반응은 안정 구간입니다.'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={studioMetricCardClassName}>
+              <CardHeader className="px-0 pb-3 pt-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base font-black tracking-tight text-[#14295F]">
+                      {selectedHomeAxis?.label || '지금 보는 축'} 대표 지표
+                    </CardTitle>
+                    <CardDescription className="mt-1 text-xs font-bold text-[#5c6e97]">
+                      현재 선택한 축에서 가장 먼저 읽을 3개 지표만 정리했습니다.
+                    </CardDescription>
+                  </div>
+                  {selectedHomeAxis ? (
+                    <Badge className={cn('rounded-full border-none px-2.5 py-1 text-[10px] font-black', selectedHomeAxis.tone.badge)}>
+                      {selectedHomeAxis.summaryLabel}
+                    </Badge>
+                  ) : null}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 px-0 pb-0">
+                {(selectedHomeHeatmapRow?.metrics || []).slice(0, 3).map((metric) => (
+                  <div key={metric.id} className="rounded-[1.2rem] border border-[#DCE7FF] bg-[#F7FAFF] px-3 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-black text-[#14295F]">{metric.label}</p>
+                      <p className="text-sm font-black text-[#14295F]">{metric.value}</p>
+                    </div>
+                    <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">{metric.hint}</p>
+                  </div>
+                ))}
+
+                {selectedHomeHeatmapRow?.href ? (
+                  <Button asChild type="button" className="mt-2 h-10 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:bg-[#10224C]">
+                    <Link href={selectedHomeHeatmapRow.href}>
+                      이어서 볼 화면
+                      <ArrowUpRight data-icon="inline-end" />
+                    </Link>
+                  </Button>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="rounded-[1.85rem] border border-[#DCE7FF] bg-white/94 px-4 py-4 shadow-[0_22px_40px_-34px_rgba(20,41,95,0.22)]">
+          <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
+            <div>
+              <div className="flex items-center gap-2">
+                <UserCog className="h-4 w-4 text-[#2554D7]" />
+                <p className={studioSectionEyebrowClassName}>유틸리티</p>
+              </div>
+              <p className="mt-1 text-sm font-black text-[#14295F]">공지, 계정, OpenClaw는 하단 보조 바에서만 다룹니다.</p>
+            </div>
+            <Badge className="w-fit rounded-full border-none bg-[#EEF4FF] px-2.5 py-1 text-[10px] font-black text-[#2554D7]">
+              기본 시야에서는 접힘
+            </Badge>
+          </div>
+
+          <div className={cn('mt-3 grid gap-3', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1.05fr)]')}>
+            <div className={cn(studioInsetCardClassName, 'flex h-full flex-col gap-3 px-4 py-3')}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-[#2554D7]" />
+                    <p className={studioSectionEyebrowClassName}>공지</p>
+                  </div>
+                  <p className="mt-1 truncate text-sm font-black text-[#14295F]">{leadAnnouncement?.title || '최근 공지가 없습니다.'}</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 rounded-full bg-[#FF7A16] px-3 text-[10px] font-black text-white hover:bg-[#E56D10]"
+                  onClick={() => setIsAnnouncementDialogOpen(true)}
+                >
+                  공지 작성
+                </Button>
+              </div>
+              <p className="line-clamp-2 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                {leadAnnouncement?.body || '최근 등록 공지가 없어서 바로 새 공지를 작성할 수 있습니다.'}
+              </p>
+            </div>
+
+            <div className={cn(studioInsetCardClassName, 'flex h-full flex-col gap-3 px-4 py-3')}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <UserCog className="h-4 w-4 text-[#2554D7]" />
+                    <p className={studioSectionEyebrowClassName}>계정 / 활동</p>
+                  </div>
+                  <p className="mt-1 truncate text-sm font-black text-[#14295F]">
+                    {leadTeacherActivity ? leadTeacherActivity.teacherName : `운영 계정 ${teacherRows.length}명`}
+                  </p>
+                </div>
+                <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
+                  {teacherRows.length}명
+                </Badge>
+              </div>
+              <p className="text-[11px] font-bold leading-5 text-[#5c6e97]">
+                {leadTeacherActivity
+                  ? `${leadTeacherActivity.roleLabel} · 상담일지 ${leadTeacherActivity.logs.length}건 · 발송 리포트 ${leadTeacherActivity.sentReports.length}건`
+                  : '최근 운영 활동 요약이 없습니다. 계정 관리에서 현재 계정을 바로 확인할 수 있습니다.'}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-fit rounded-full border-[#D7E4FF] px-3 text-[10px] font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                onClick={() => setIsTeacherManagementDialogOpen(true)}
+              >
+                계정 관리
+              </Button>
+            </div>
+
+            <div className="flex h-full flex-col gap-3 rounded-[1.5rem] border border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F2_0%,#FFFFFF_100%)] px-4 py-3 shadow-[0_18px_34px_-30px_rgba(255,122,22,0.2)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <OpenClawStatusIcon className={cn('h-4 w-4', openClawStatusMeta.iconClassName)} />
+                    <p className={studioSectionEyebrowClassName}>OpenClaw 상태</p>
+                  </div>
+                  <p className="mt-1 text-sm font-black text-[#14295F]">{openClawStatusMeta.description}</p>
+                </div>
+                <Badge className={cn('rounded-full border px-2.5 py-1 text-[10px] font-black', openClawStatusMeta.badgeClass)}>
+                  {openClawStatusMeta.label}
+                </Badge>
+              </div>
+              <p className="text-[11px] font-bold leading-5 text-[#5c6e97]">
+                최근 성공 {openClawLastExportLabel} · 최근 요청 {openClawLastRequestedLabel}
+              </p>
+              <Button
+                type="button"
+                className="h-9 rounded-full bg-[#14295F] text-[11px] font-black text-white transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-[#10224C]"
+                disabled={isOpenClawActionDisabled}
+                onClick={handleGenerateOpenClawSnapshot}
+              >
+                {isOpenClawBusy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    생성 중
+                  </>
+                ) : (
+                  '스냅샷 생성'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+    );
+  }
 
   return (
     <div className={cn('mx-auto flex w-full max-w-[1520px] flex-col gap-6', isMobile ? 'px-1 pb-8' : 'px-4 py-6')}>
       <AdminWorkbenchCommandBar
         eyebrow="센터 운영"
         title="센터관리자 운영실"
-        description="실시간 관제와 바로 조치할 화면만 먼저 두고, 나머지 분석과 도구는 아래에서 압축해 보여줍니다."
+        description="상태는 한눈에 보고, 필요한 학생과 교실만 바로 열 수 있게 정리한 운영 홈입니다."
         variant="adminStudio"
         quickActions={workbenchQuickActions}
         selectValue={selectedClass}
@@ -2487,9 +3123,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F]">
           동기화 {liveSyncLabel}
         </Badge>
-        <Badge className="h-8 rounded-full border-none bg-[#EEF4FF] px-3.5 text-[10px] font-black text-[#2554D7]">
-          착석 {metrics.checkedInCount}명
-        </Badge>
         <Badge className="h-8 rounded-full border-none bg-[#FF7A16] px-3.5 text-[10px] font-black text-white">
           긴급 흐름 {totalControlAlerts}건
         </Badge>
@@ -2497,6 +3130,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       {hasMetricsReady ? (
         <>
+          {renderHomeHeroSection()}
+          {false && (
 
           <motion.section className="space-y-4 px-1" {...getStudioMotionProps(0.08, 18)}>
             <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.55fr)_360px]')}>
@@ -2533,7 +3168,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <div className="rounded-[1.35rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">약한 축</p>
                         <p className="mt-2 text-sm font-black text-[#14295F]">{weakestAxis?.label || '운영 지표 준비 중'}</p>
-                        <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">{weakestAxis ? `${weakestAxis.summaryScore}점` : 'N/A'}</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">{weakestAxisScoreLabel}</p>
                       </div>
                     </div>
                     <div className="rounded-[1.45rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-3">
@@ -2543,8 +3178,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           ? `${primaryUrgentIntervention.studentName} · ${primaryUrgentIntervention.topReason}`
                           : primaryAttendanceContactTarget
                             ? `${primaryAttendanceContactTarget.studentName} · ${primaryAttendanceContactTarget.issueLabel}`
-                            : weakestAxis
-                              ? `${weakestAxis.label} ${weakestAxis.summaryScore}점`
+                            : weakestAxis?.label
+                              ? weakestAxisHeadline
                               : '현재 운영 흐름은 안정적입니다.'}
                       </p>
                       <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
@@ -2595,7 +3230,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                 </div>
                                 <p className="mt-3 text-base font-black text-[#14295F]">{primaryUrgentIntervention.studentName}</p>
                                 <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
-                                  {(primaryUrgentIntervention.roomId ? roomNameById.get(primaryUrgentIntervention.roomId) || primaryUrgentIntervention.roomId : '미배정')} · {primaryUrgentIntervention.attendanceStatus}
+                                  {primaryUrgentRoomLabel} · {primaryUrgentIntervention.attendanceStatus}
                                 </p>
                                 <p className="mt-1 text-sm font-black text-[#C95A08]">{primaryUrgentIntervention.topReason}</p>
                               </div>
@@ -2726,7 +3361,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
           </motion.section>
+          )}
 
+          {renderHomeInsightsSection()}
+          {renderAttendanceDashboardSection()}
+          {false && (
           <motion.section className="space-y-4 px-1 pb-10" {...getStudioMotionProps(0.14, 18)}>
             <div className={studioWhiteCardClassName}>
               <div className={cn('flex gap-4 border-b border-[#DCE7FF] px-5 pb-4 pt-5 sm:px-6', isMobile ? 'flex-col' : 'items-start justify-between')}>
@@ -2936,7 +3575,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       {leadAnnouncement
                         ? (() => {
                             const createdAt = toTimestampDateSafe(leadAnnouncement.createdAt);
-                            return createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm') : '방금 전 등록';
+                            if (!createdAt) return '방금 전 등록';
+                            return format(createdAt as Date, 'yyyy.MM.dd HH:mm');
                           })()
                         : '바로 작성 가능'}
                     </p>
@@ -3033,6 +3673,242 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
           </motion.section>
+          )}
+
+          <Sheet open={isOperationsMemoOpen} onOpenChange={setIsOperationsMemoOpen}>
+            <SheetContent
+              side="right"
+              motionPreset="dashboard-premium"
+              className="w-[96vw] max-w-[96vw] border-none bg-[linear-gradient(180deg,#F7FAFF_0%,#FFFFFF_100%)] p-0 sm:max-w-xl"
+            >
+              <div className={cn(studioDialogHeaderClassName, 'border-b border-white/10 px-5 py-5')}>
+                <SheetHeader className="gap-2 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">운영 메모</Badge>
+                    <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                      {selectedClass === 'all' ? '센터 전체' : selectedClass}
+                    </Badge>
+                  </div>
+                  <SheetTitle className="text-[1.8rem] font-black tracking-tight text-white">
+                    오늘 바로 확인할 항목
+                  </SheetTitle>
+                  <SheetDescription className="text-sm font-bold leading-6 text-white/76">
+                    홈에서는 한 줄만 보이고, 전체 우선순위와 자주 여는 화면은 이 드로어에서 확인합니다.
+                  </SheetDescription>
+                </SheetHeader>
+              </div>
+              <div className="flex h-[calc(100dvh-8.5rem)] flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5">
+                <div className="space-y-3">
+                  {todayActionQueue.map((item) => {
+                    const PriorityIcon = item.icon;
+                    return (
+                      <div key={item.key} className="rounded-[1.55rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={cn('inline-flex size-8 items-center justify-center rounded-2xl', item.toneClass)}>
+                                <PriorityIcon className="h-4 w-4" />
+                              </span>
+                              <p className="text-sm font-black text-[#14295F]">{item.title}</p>
+                            </div>
+                            <p className="mt-2 text-[12px] font-bold leading-6 text-[#5c6e97]">{item.detail}</p>
+                          </div>
+                          {item.href && !['intervention', 'attendance', 'away', 'guardian'].includes(item.key) ? (
+                            <Button asChild type="button" size="sm" className="h-8 rounded-full bg-[#14295F] px-3 text-[10px] font-black text-white hover:bg-[#10224C]">
+                              <Link href={item.href}>{item.actionLabel}</Link>
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-full border-[#DCE7FF] bg-white px-3 text-[10px] font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                              onClick={() => {
+                                setIsOperationsMemoOpen(false);
+                                handleHomePriorityAction(item);
+                              }}
+                            >
+                              {item.actionLabel}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="rounded-[1.55rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className={studioSectionEyebrowClassName}>빠른 이동</p>
+                      <p className="mt-1 text-sm font-black text-[#14295F]">자주 여는 운영 화면</p>
+                    </div>
+                    <Badge className="rounded-full border-none bg-[#EEF4FF] px-2.5 py-1 text-[10px] font-black text-[#2554D7]">
+                      {quickActionLinks.length}개
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {quickActionLinks.map((item) => {
+                      const QuickIcon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className="flex items-center justify-between rounded-[1.15rem] border border-[#DCE7FF] bg-[#F7FAFF] px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/24 hover:bg-white"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="inline-flex size-8 items-center justify-center rounded-[0.9rem] bg-[#14295F] text-white">
+                              <QuickIcon className="h-4 w-4" />
+                            </span>
+                            <div>
+                              <p className="text-sm font-black text-[#14295F]">{item.label}</p>
+                              <p className="text-[10px] font-bold text-[#5c6e97]">{item.description}</p>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-[#5c6e97]" />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={isImmediateInterventionSheetOpen} onOpenChange={setIsImmediateInterventionSheetOpen}>
+            <SheetContent
+              side="right"
+              motionPreset="dashboard-premium"
+              className="w-[96vw] max-w-[96vw] border-none bg-[linear-gradient(180deg,#FFF8F2_0%,#FFFFFF_100%)] p-0 sm:max-w-xl"
+            >
+              <div className={cn(studioDialogHeaderClassName, 'border-b border-white/10 px-5 py-5')}>
+                <SheetHeader className="gap-2 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">즉시 개입 학생</Badge>
+                    <Badge className="border-none bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white">
+                      {urgentInterventionStudents.length}명
+                    </Badge>
+                  </div>
+                  <SheetTitle className="text-[1.8rem] font-black tracking-tight text-white">
+                    우선순위 전체 보기
+                  </SheetTitle>
+                  <SheetDescription className="text-sm font-bold leading-6 text-white/76">
+                    홈에서는 상위 3명만 보이고, 전체 개입 대상과 이유는 여기서 확인합니다.
+                  </SheetDescription>
+                </SheetHeader>
+              </div>
+              <div className="flex h-[calc(100dvh-8.5rem)] flex-col gap-3 overflow-y-auto px-4 py-4 sm:px-5">
+                {urgentInterventionStudents.length === 0 ? (
+                  <div className="rounded-[1.7rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-12 text-center text-sm font-bold text-[#5c6e97]">
+                    현재 즉시 개입 대상이 없습니다.
+                  </div>
+                ) : (
+                  urgentInterventionStudents.map((signal, index) => {
+                    const roomLabel = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '미배정';
+                    return (
+                      <button
+                        key={`${signal.studentId}-${signal.seatId}`}
+                        type="button"
+                        onClick={() => handleImmediateStudentSelect(signal.studentId)}
+                        className={cn(
+                          'rounded-[1.55rem] border px-4 py-4 text-left transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white',
+                          index === 0 ? 'border-[#FFD7BA] bg-[#FFF8F2] hover:border-[#FF7A16]/28' : 'border-[#DCE7FF] bg-white hover:border-[#FF7A16]/20'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className={cn(
+                                'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                                index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]'
+                              )}>
+                                {index + 1}순위
+                              </Badge>
+                              {signal.className ? (
+                                <Badge className="h-6 rounded-full border-none bg-[#F7FAFF] px-2.5 text-[10px] font-black text-[#14295F]">
+                                  {signal.className}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="mt-3 text-base font-black text-[#14295F]">{signal.studentName}</p>
+                            <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                              {roomLabel} · {signal.attendanceStatus}
+                            </p>
+                            <p className="mt-1 text-[12px] font-black leading-6 text-[#C95A08]">{signal.topReason}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">위험 점수</p>
+                            <p className="dashboard-number mt-2 text-[1.45rem] text-[#14295F]">{signal.compositeHealth}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Dialog open={isAttendancePriorityDialogOpen} onOpenChange={setIsAttendancePriorityDialogOpen}>
+            <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-xl')}>
+              <div className={studioDialogHeaderClassName}>
+                <DialogHeader className="space-y-2 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">출결 연락 우선</Badge>
+                    <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                      {todayAttendanceContactTargets.length}명
+                    </Badge>
+                  </div>
+                  <DialogTitle className="text-2xl font-black tracking-tight">연락이 필요한 학생</DialogTitle>
+                  <DialogDescription className="text-sm font-medium text-white/75">
+                    홈에서는 상태만 보고, 미입실·지각·루틴 누락 대상의 세부 정보는 여기서 확인합니다.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+                {todayAttendanceContactTargets.length === 0 ? (
+                  <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-10 text-center text-sm font-bold text-[#5c6e97]">
+                    현재 바로 연락이 필요한 출결 대상이 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {todayAttendanceContactTargets.map((target, index) => (
+                      <div key={target.studentId} className={cn(
+                        'rounded-[1.45rem] border px-4 py-4 shadow-[0_18px_32px_-28px_rgba(20,41,95,0.16)]',
+                        index === 0 ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white'
+                      )}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className={cn(
+                                'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                                index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]'
+                              )}>
+                                {index === 0 ? '연락 1순위' : `${index + 1}순위`}
+                              </Badge>
+                              <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#C95A08]">
+                                {target.issueLabel}
+                              </Badge>
+                            </div>
+                            <p className="mt-3 text-base font-black text-[#14295F]">{target.studentName}</p>
+                            <p className="mt-1 text-[12px] font-bold leading-6 text-[#5c6e97]">{target.detailLabel}</p>
+                          </div>
+                          <Phone className="mt-1 h-4 w-4 text-[#C95A08]" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" className="h-11 rounded-xl border-[#DCE7FF] px-5 font-black text-[#14295F]">
+                    닫기
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       ) : (
         <div className="flex flex-col items-center justify-center py-40 gap-4 opacity-20">

@@ -130,37 +130,15 @@ export function AdminWorkbenchCommandBar({
             <div
               className={cn(
                 isAdminStudio
-                  ? 'flex flex-wrap gap-2 lg:justify-end'
+                  ? 'rounded-[1.25rem] border border-[#DCE7FF] bg-[#F8FBFF] p-1.5 lg:max-w-[560px]'
                   : 'flex flex-wrap gap-2'
               )}
             >
-              {quickActions.map((action) => {
-                const button = (
-                  <Button
-                    key={action.label}
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      'h-10 rounded-xl px-4 text-xs font-black',
-                      isTeacherWorkbench
-                        ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
-                        : isAdminStudio
-                          ? 'h-9 rounded-full border-[#DCE7FF] bg-[#F7FAFF] px-3 text-[#14295F] transition-[transform,background-color,border-color] hover:-translate-y-0.5 hover:border-[#FF7A16]/24 hover:bg-white'
-                          : 'border-slate-200 bg-white text-[#17306f]'
-                    )}
-                    onClick={action.onClick}
-                    disabled={action.disabled}
-                  >
-                    {action.icon ? <span className="mr-1.5 inline-flex items-center">{action.icon}</span> : null}
-                    {action.label}
-                  </Button>
-                );
-
-                if (action.href) {
-                  return (
+              <div className={cn(isAdminStudio ? 'flex flex-wrap gap-1' : 'flex flex-wrap gap-2')}>
+                {quickActions.map((action) => {
+                  const button = (
                     <Button
                       key={action.label}
-                      asChild
                       type="button"
                       variant="outline"
                       className={cn(
@@ -168,20 +146,44 @@ export function AdminWorkbenchCommandBar({
                         isTeacherWorkbench
                           ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
                           : isAdminStudio
-                            ? 'h-9 rounded-full border-[#DCE7FF] bg-[#F7FAFF] px-3 text-[#14295F] transition-[transform,background-color,border-color] hover:-translate-y-0.5 hover:border-[#FF7A16]/24 hover:bg-white'
+                            ? 'h-9 rounded-[0.95rem] border-white bg-white px-3 text-[#14295F] shadow-[0_10px_24px_-22px_rgba(20,41,95,0.4)] transition-[transform,background-color,border-color] hover:-translate-y-0.5 hover:border-[#FF7A16]/24 hover:bg-[#FFF8F2]'
                             : 'border-slate-200 bg-white text-[#17306f]'
                       )}
+                      onClick={action.onClick}
+                      disabled={action.disabled}
                     >
-                      <Link href={action.href}>
-                        {action.icon ? <span className="mr-1.5 inline-flex items-center">{action.icon}</span> : null}
-                        {action.label}
-                      </Link>
+                      {action.icon ? <span className="mr-1.5 inline-flex items-center">{action.icon}</span> : null}
+                      {action.label}
                     </Button>
                   );
-                }
 
-                return button;
-              })}
+                  if (action.href) {
+                    return (
+                      <Button
+                        key={action.label}
+                        asChild
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          'h-10 rounded-xl px-4 text-xs font-black',
+                          isTeacherWorkbench
+                            ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
+                            : isAdminStudio
+                              ? 'h-9 rounded-[0.95rem] border-white bg-white px-3 text-[#14295F] shadow-[0_10px_24px_-22px_rgba(20,41,95,0.4)] transition-[transform,background-color,border-color] hover:-translate-y-0.5 hover:border-[#FF7A16]/24 hover:bg-[#FFF8F2]'
+                              : 'border-slate-200 bg-white text-[#17306f]'
+                        )}
+                      >
+                        <Link href={action.href}>
+                          {action.icon ? <span className="mr-1.5 inline-flex items-center">{action.icon}</span> : null}
+                          {action.label}
+                        </Link>
+                      </Button>
+                    );
+                  }
+
+                  return button;
+                })}
+              </div>
             </div>
           ) : null}
         </div>

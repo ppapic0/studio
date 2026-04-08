@@ -45,6 +45,8 @@ type CenterAdminHeatmapChartsProps = {
   actionHref?: string;
   actionLabel?: string;
   className?: string;
+  activeRowId?: string | null;
+  onActiveRowChange?: (rowId: string) => void;
 };
 
 function getTonePalette(score: number) {
@@ -124,8 +126,10 @@ export function CenterAdminHeatmapCharts({
   actionHref,
   actionLabel,
   className,
+  activeRowId: controlledActiveRowId,
+  onActiveRowChange,
 }: CenterAdminHeatmapChartsProps) {
-  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+  const [internalActiveRowId, setInternalActiveRowId] = useState<string | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
   const lowestRowId = useMemo(() => {
@@ -141,16 +145,32 @@ export function CenterAdminHeatmapCharts({
   }, [rows]);
 
   useEffect(() => {
-    setActiveRowId(lowestRowId);
-  }, [scopeLabel, lowestRowId]);
+    if (controlledActiveRowId !== undefined) return;
+    setInternalActiveRowId(lowestRowId);
+  }, [scopeLabel, lowestRowId, controlledActiveRowId]);
 
   useEffect(() => {
-    if (!activeRowId) return;
-    if (rows.some((row) => row.id === activeRowId)) return;
-    setActiveRowId(lowestRowId);
-  }, [rows, activeRowId, lowestRowId]);
+    if (controlledActiveRowId !== undefined) return;
+    if (!internalActiveRowId) return;
+    if (rows.some((row) => row.id === internalActiveRowId)) return;
+    setInternalActiveRowId(lowestRowId);
+  }, [rows, internalActiveRowId, lowestRowId, controlledActiveRowId]);
 
-  const activeRow = rows.find((row) => row.id === activeRowId) || rows.find((row) => row.id === lowestRowId) || null;
+  useEffect(() => {
+    if (controlledActiveRowId !== undefined) return;
+    if (!lowestRowId) return;
+    onActiveRowChange?.(lowestRowId);
+  }, [controlledActiveRowId, lowestRowId, onActiveRowChange]);
+
+  const resolvedActiveRowId = controlledActiveRowId ?? internalActiveRowId;
+  const handleActiveRowChange = (rowId: string) => {
+    if (controlledActiveRowId === undefined) {
+      setInternalActiveRowId(rowId);
+    }
+    onActiveRowChange?.(rowId);
+  };
+
+  const activeRow = rows.find((row) => row.id === resolvedActiveRowId) || rows.find((row) => row.id === lowestRowId) || null;
   const activePalette = getTonePalette(activeRow?.summaryScore ?? 75);
   const activeMetricPreview = activeRow?.metrics.slice(0, 3) || [];
   const activeTrendData = activeRow?.trend.map((point) => ({
@@ -242,7 +262,7 @@ export function CenterAdminHeatmapCharts({
                       <button
                         key={row.id}
                         type="button"
-                        onClick={() => setActiveRowId(row.id)}
+                        onClick={() => handleActiveRowChange(row.id)}
                         className={cn(
                           'group flex min-w-[138px] items-center justify-between gap-3 rounded-full border px-3.5 py-2.5 text-left transition-[transform,box-shadow,border-color,background-color,color] duration-200 hover:-translate-y-0.5',
                           isActive
