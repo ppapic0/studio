@@ -325,6 +325,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [roomDrafts, setRoomDrafts] = useState<Record<string, { rows: number; cols: number }>>({});
   const [seatOverlayMode, setSeatOverlayMode] = useState<CenterAdminSeatOverlayMode>('composite');
   const [selectedSeatInsightKey, setSelectedSeatInsightKey] = useState<CenterAdminSeatDomainKey | null>(null);
+  const [isSeatSecondaryExpanded, setIsSeatSecondaryExpanded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -1165,6 +1166,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       return [...selectedSeatDomainSummary].sort((a, b) => a.score - b.score)[0]?.key || selectedSeatDomainSummary[0].key;
     });
   }, [selectedSeatDomainSummary]);
+
+  useEffect(() => {
+    setIsSeatSecondaryExpanded(false);
+  }, [selectedSeat?.id]);
 
   const selectedAttendanceSignal = useMemo<CenterAdminAttendanceSeatSignal | null>(() => {
     if (!selectedSeat) return null;
@@ -3160,10 +3165,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     >
                       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,166,77,0.18),transparent_26%)]" />
                       <div className="pointer-events-none absolute -right-10 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
-                      <div className={cn("relative space-y-5", isMobile ? "p-5" : "p-6 sm:p-7 lg:p-8")}>
-                        <DialogHeader className="space-y-5">
-                          <div className={cn("flex gap-5", isMobile ? "flex-col" : "items-start justify-between")}>
-                            <div className="min-w-0">
+                      <div className={cn("relative space-y-4", isMobile ? "p-5" : "p-6 sm:p-6 lg:p-7")}>
+                        <DialogHeader className="space-y-4">
+                          <div className={cn("flex gap-4", isMobile ? "flex-col" : "items-start justify-between")}>
+                            <div className="min-w-0 space-y-3">
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge className="h-6 rounded-full border border-white/10 bg-white/10 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-white">
                                   학생 운영 브리프
@@ -3180,282 +3185,197 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   </Badge>
                                 )}
                               </div>
-                              <DialogTitle className="mt-4 text-2xl font-black tracking-tighter sm:text-3xl lg:text-[2.15rem]">
-                                {studentsById.get(selectedSeat.studentId || '')?.name || '학생'}
-                              </DialogTitle>
-                              <DialogDescription className="mt-3 max-w-[42rem] text-sm font-bold leading-6 text-white/82">
-                                {selectedSeatSignal?.topReason || selectedAttendanceSignal?.note || '오늘 가장 먼저 확인할 상태와 대응 포인트를 한 화면에서 정리했습니다.'}
-                              </DialogDescription>
+                              <div className="space-y-2">
+                                <DialogTitle className="text-2xl font-black tracking-tighter sm:text-3xl">
+                                  {selectedStudentName}
+                                </DialogTitle>
+                                <DialogDescription className="max-w-[44rem] text-sm font-bold leading-6 text-white/84">
+                                  {selectedSeatSignal?.topReason || selectedAttendanceSignal?.note || '오늘 가장 먼저 확인할 상태와 대응 포인트를 한 화면에서 정리했습니다.'}
+                                </DialogDescription>
+                              </div>
                             </div>
 
-                            <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "min-w-[270px] grid-cols-2")}>
-                              <div className="rounded-[1.6rem] border border-white/10 bg-white/10 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                            <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "min-w-[250px] grid-cols-2")}>
+                              <div className="rounded-[1.45rem] border border-white/10 bg-white/10 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">실시간 세션</p>
-                                <p className="mt-2 text-xl font-black tabular-nums text-white">{timeInfo?.session || '-'}</p>
+                                <p className="mt-1.5 text-lg font-black tabular-nums text-white">{timeInfo?.session || '-'}</p>
                               </div>
-                              <div className="rounded-[1.6rem] border border-white/10 bg-white/10 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                              <div className="rounded-[1.45rem] border border-white/10 bg-white/10 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">오늘 누적</p>
-                                <p className="mt-2 text-xl font-black tabular-nums text-white">{timeInfo?.total || '-'}</p>
+                                <p className="mt-1.5 text-lg font-black tabular-nums text-white">{timeInfo?.total || '-'}</p>
                               </div>
                             </div>
                           </div>
                         </DialogHeader>
-                        {selectedSeat.studentId && (
-                          <div className="grid gap-3">
-                            <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "lg:grid-cols-4")}>
-                              <div className="rounded-[1.55rem] border border-white/10 bg-white/10 px-4 py-3">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">오늘 판정</p>
-                                <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal?.boardLabel || '확인중'}</p>
-                              </div>
-                              <div className="rounded-[1.55rem] border border-white/10 bg-white/10 px-4 py-3">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">최근 7일</p>
-                                <p className="mt-2 text-sm font-black text-white">{selectedAttendanceSignal?.attendanceRiskLabel || '데이터 없음'}</p>
-                              </div>
-                              <div className="rounded-[1.55rem] border border-white/10 bg-white/10 px-4 py-3">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">최근 리포트</p>
-                                <p className="mt-2 text-sm font-black text-white">{latestSelectedReport?.dateKey || '발송 없음'}</p>
-                              </div>
-                              <div className="rounded-[1.55rem] border border-white/10 bg-white/10 px-4 py-3">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">현재 벌점</p>
-                                <p className="mt-2 text-sm font-black text-white">{selectedPenaltyRecovery.effectivePoints}점</p>
-                              </div>
-                            </div>
 
-                            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]")}>
-                              <motion.div {...getDeckMotionProps(0.03, 10)} className="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                        <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
+                          <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/58">오늘 판정</p>
+                            <p className="mt-1.5 text-sm font-black text-white">{selectedAttendanceSignal?.boardLabel || '확인중'}</p>
+                          </div>
+                          <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/58">최근 7일</p>
+                            <p className="mt-1.5 text-sm font-black text-white">{selectedAttendanceSignal?.attendanceRiskLabel || '데이터 없음'}</p>
+                          </div>
+                          <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/58">최근 리포트</p>
+                            <p className="mt-1.5 text-sm font-black text-white">{latestSelectedReport?.dateKey || '발송 없음'}</p>
+                          </div>
+                          <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/58">현재 벌점</p>
+                            <p className="mt-1.5 text-sm font-black text-white">{selectedPenaltyRecovery.effectivePoints}점</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F7F9FC]">
+                      <Tabs defaultValue="status" className="flex h-full min-h-0 w-full flex-col">
+                        <div className="shrink-0 border-b border-[#DDE7FF] bg-white/88 backdrop-blur-sm">
+                          <div className={cn("px-4 py-4", isMobile ? "" : "sm:px-6 sm:py-5")}>
+                            <TabsList className="grid h-auto w-full grid-cols-4 rounded-[1.35rem] bg-[#EEF4FF] p-1">
+                              <TabsTrigger value="status" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-[#14295F] data-[state=active]:shadow-sm">실시간 상태</TabsTrigger>
+                              <TabsTrigger value="history" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">학습 히스토리</TabsTrigger>
+                              <TabsTrigger value="penalty" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-sm">벌점 관리</TabsTrigger>
+                              <TabsTrigger value="reports" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm">리포트 내역</TabsTrigger>
+                            </TabsList>
+                          </div>
+                        </div>
+
+                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                          <TabsContent value="status" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-12 data-[state=active]:flex data-[state=active]:flex-col sm:p-6 sm:pb-14 space-y-5">
+                            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]")}>
+                              <motion.div {...getDeckMotionProps(0.03, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-5 shadow-sm">
                                 <div className="flex flex-wrap items-center gap-2">
                                   {selectedSeatSignal ? (
                                     <>
-                                      <Badge className={cn("border-none font-black", selectedSeatPresentation.chipClass)}>
+                                      <Badge
+                                        className={cn(
+                                          "border-none font-black",
+                                          selectedSeatPresentation.isDark
+                                            ? "bg-[#14295F] text-white"
+                                            : selectedSeatPresentation.chipClass
+                                        )}
+                                      >
                                         {selectedSeatSignal.primaryChip}
                                       </Badge>
                                       {selectedSeatSignal.secondaryFlags.map((flag) => (
-                                        <Badge key={`${selectedSeat.id}_${flag}`} className={cn("border-none font-black", selectedSeatPresentation.flagClass)}>
+                                        <Badge
+                                          key={`${selectedSeat.id}_${flag}`}
+                                          className={cn(
+                                            "font-black",
+                                            selectedSeatPresentation.isDark
+                                              ? "border border-[#D7E4FF] bg-[#F7FAFF] text-[#5C6E97]"
+                                              : selectedSeatPresentation.flagClass
+                                          )}
+                                        >
                                           {flag}
                                         </Badge>
                                       ))}
                                     </>
                                   ) : (
-                                    <Badge className="border-none bg-white/16 font-black text-white">운영 신호 확인중</Badge>
+                                    <Badge className="border-none bg-[#EEF4FF] font-black text-[#2554D7]">운영 신호 확인중</Badge>
                                   )}
                                 </div>
-                                <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-white/55">오늘 개입 요약</p>
-                                <p className="mt-2 text-lg font-black leading-snug text-white">
+                                <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-[#5C6E97]">First Check</p>
+                                <h4 className="mt-2 text-xl font-black leading-snug tracking-tight text-[#14295F]">
                                   {selectedSeatSignal?.topReason || selectedAttendanceSignal?.note || '지금 바로 개입이 필요한 포인트가 없습니다.'}
-                                </p>
-                                <p className="mt-3 text-xs font-bold leading-6 text-white/78">
-                                  {selectedAttendanceSignal?.note || '출결 신호와 운영 히트맵을 함께 읽어 오늘 필요한 대응을 먼저 보여줍니다.'}
+                                </h4>
+                                <p className="mt-3 text-sm font-bold leading-6 text-[#5C6E97]">
+                                  {selectedSeatDomainInsight
+                                    ? `대응: ${selectedSeatDomainInsight.action}`
+                                    : selectedAttendanceSignal?.note || '상단 브리프 기준으로 가장 먼저 확인할 상태를 요약합니다.'}
                                 </p>
                               </motion.div>
 
-                              <motion.div {...getDeckMotionProps(0.06, 10)} className="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-                                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">선택된 AI 해석</p>
-                                {selectedSeatDomainInsight ? (
-                                  <>
-                                    <div className="mt-3 flex items-center justify-between gap-3">
-                                      <p className="text-base font-black text-white">
-                                        {selectedSeatDomainInsight.label} {selectedSeatDomainInsight.score}점
-                                      </p>
-                                      <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
-                                        {selectedSeatDomainInsight.score}
-                                      </Badge>
-                                    </div>
-                                    <p className="mt-3 text-sm font-bold leading-relaxed text-white/88">
-                                      {selectedSeatDomainInsight.analysis}
-                                    </p>
-                                    <p className="mt-3 text-xs font-bold leading-relaxed text-white/72">
-                                      대응: {selectedSeatDomainInsight.action}
-                                    </p>
-                                  </>
-                                ) : (
-                                  <p className="mt-3 text-sm font-bold leading-relaxed text-white/78">
-                                    도메인 점수를 선택하면 왜 이 점수가 나왔는지와 바로 할 대응을 짧게 보여줍니다.
-                                  </p>
-                                )}
-                              </motion.div>
-                            </div>
-
-                            {selectedSeatSignal && (
-                              <div className="rounded-[2rem] border border-white/10 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <p className="text-[11px] font-bold text-white/74">
-                                    점수를 누르면 개입 이유와 다음 대응이 바로 바뀝니다.
-                                  </p>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">
-                                    도메인 선택
-                                  </p>
-                                </div>
-                                <div className={cn("mt-3 grid gap-2", isMobile ? "grid-cols-2" : "sm:grid-cols-5")}>
-                                  {selectedSeatDomainSummary.map((domain) => {
-                                    const isActive = domain.key === selectedSeatInsightKey;
-                                    return (
-                                      <button
-                                        key={domain.key}
-                                        type="button"
-                                        onClick={() => setSelectedSeatInsightKey(domain.key)}
-                                        className={cn(
-                                          "rounded-[1.35rem] border px-3 py-3 text-center transition-all",
-                                          isActive
-                                            ? "border-white bg-white/22 shadow-lg shadow-black/10"
-                                            : "border-white/10 bg-white/8 hover:bg-white/14"
-                                        )}
-                                      >
-                                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{domain.label}</p>
-                                        <Badge className={cn("mt-2 border-none font-black", domain.badgeClass)}>
-                                          {domain.score}
-                                        </Badge>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F7F9FC]">
-                      <div className={cn("grid h-full min-h-0 flex-1 overflow-hidden", isMobile ? "grid-cols-1" : "lg:grid-cols-[340px_minmax(0,1fr)]")}>
-                        <div className="border-b border-[#DDE7FF] bg-white/82 backdrop-blur-sm lg:border-b-0 lg:border-r">
-                          <div className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
-                            <motion.div {...getDeckMotionProps(0.08, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-5 shadow-sm">
-                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]">First Check</p>
-                              <h4 className="mt-3 text-lg font-black tracking-tight text-[#14295F]">오늘 먼저 볼 개입 포인트</h4>
-                              <p className="mt-2 text-sm font-bold leading-6 text-[#5c6e97]">
-                                {selectedSeatSignal?.topReason || selectedAttendanceSignal?.note || '지금 바로 개입이 필요한 포인트가 없습니다.'}
-                              </p>
-                              {selectedSeatDomainInsight && (
-                                <div className="mt-4 rounded-[1.5rem] border border-[#D7E4FF] bg-[#F8FBFF] p-4">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <p className="text-sm font-black text-[#14295F]">{selectedSeatDomainInsight.label}</p>
-                                    <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
-                                      {selectedSeatDomainInsight.score}
-                                    </Badge>
+                              <motion.div {...getDeckMotionProps(0.06, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/48">Quick Action</p>
+                                    <h4 className="mt-2 text-lg font-black tracking-tight text-[#14295F]">
+                                      {isEditMode ? '좌석 관리 액션' : '지금 바로 실행'}
+                                    </h4>
                                   </div>
-                                  <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                                    대응: {selectedSeatDomainInsight.action}
-                                  </p>
+                                  <Badge className={cn(
+                                    "h-7 rounded-full border-none px-3 text-[10px] font-black",
+                                    isEditMode ? "bg-[#FFF2E8] text-[#C95A08]" : "bg-[#EEF4FF] text-[#2554D7]"
+                                  )}>
+                                    {isEditMode ? '편집 모드' : '실시간 조치'}
+                                  </Badge>
                                 </div>
-                              )}
-                            </motion.div>
+                                <p className="mt-2 text-sm font-bold leading-6 text-slate-500">
+                                  {selectedSeatAvailabilityCopy}
+                                </p>
 
-                            <motion.div {...getDeckMotionProps(0.12, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
-                              <div className="flex items-center justify-between gap-2">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/48">Quick Action</p>
-                                  <h4 className="mt-2 text-lg font-black tracking-tight text-[#14295F]">
-                                    {isEditMode ? '좌석 관리 액션' : '지금 바로 실행'}
-                                  </h4>
-                                </div>
                                 {isEditMode ? (
-                                  <Badge className="h-7 rounded-full border-none bg-[#FFF2E8] px-3 text-[10px] font-black text-[#C95A08]">편집 모드</Badge>
-                                ) : (
-                                  <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#2554D7]">실시간 조치</Badge>
-                                )}
-                              </div>
-
-                              {isEditMode ? (
-                                <div className="mt-4 space-y-3">
-                                  <div className="space-y-2">
-                                    <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
-                                    <Select value={selectedSeat.seatZone || '미정'} onValueChange={handleUpdateZone}>
-                                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
-                                        <SelectValue placeholder="구역 선택" />
-                                      </SelectTrigger>
-                                      <SelectContent className="rounded-xl border-none shadow-2xl">
-                                        <SelectItem value="미정" className="font-bold">미정</SelectItem>
-                                        <SelectItem value="A존 (집중)" className="font-bold">A존 (집중)</SelectItem>
-                                        <SelectItem value="B존 (표준)" className="font-bold">B존 (표준)</SelectItem>
-                                        <SelectItem value="고정석" className="font-bold">고정석</SelectItem>
-                                        <SelectItem value="자유석" className="font-bold">자유석</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                  <div className="mt-4 space-y-3">
+                                    <div className="rounded-[1.45rem] border border-[#D7E4FF] bg-[#F8FBFF] px-4 py-3">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">현재 설정</p>
+                                      <p className="mt-1 text-sm font-black text-[#14295F]">
+                                        {selectedSeatModeLabel} · {selectedSeatZoneLabel}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
+                                      <Select value={selectedSeat.seatZone || '미정'} onValueChange={handleUpdateZone}>
+                                        <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
+                                          <SelectValue placeholder="구역 선택" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                                          <SelectItem value="미정" className="font-bold">미정</SelectItem>
+                                          <SelectItem value="A존 (집중)" className="font-bold">A존 (집중)</SelectItem>
+                                          <SelectItem value="B존 (표준)" className="font-bold">B존 (표준)</SelectItem>
+                                          <SelectItem value="고정석" className="font-bold">고정석</SelectItem>
+                                          <SelectItem value="자유석" className="font-bold">자유석</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="h-12 w-full rounded-xl font-black shadow-lg shadow-rose-100">
+                                      좌석 배정 해제
+                                    </Button>
+                                    <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="h-11 w-full rounded-xl border-2 font-black gap-2">
+                                      <ArrowRightLeft className="h-4 w-4" />
+                                      통로로 전환하기
+                                    </Button>
                                   </div>
-                                  <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="h-12 w-full rounded-xl font-black shadow-lg shadow-rose-100">
-                                    좌석 배정 해제
-                                  </Button>
-                                  <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="h-11 w-full rounded-xl border-2 font-black gap-2">
-                                    <ArrowRightLeft className="h-4 w-4" />
-                                    통로로 전환하기
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div className="mt-4 grid grid-cols-2 gap-3">
-                                  <Button onClick={() => handleStatusUpdate('studying')} disabled={isSaving} className="h-20 rounded-[1.6rem] bg-blue-600 font-black text-white shadow-lg shadow-blue-200 hover:bg-blue-700">
-                                    <div className="flex flex-col items-center gap-1">
-                                      <Zap className="h-5 w-5 fill-current" />
-                                      <span className="text-sm leading-none">입실 확인</span>
-                                    </div>
-                                  </Button>
-                                  <Button variant="outline" onClick={() => handleStatusUpdate('absent')} disabled={isSaving} className="h-20 rounded-[1.6rem] border-2 border-rose-100 font-black text-rose-600 hover:bg-rose-50">
-                                    <div className="flex flex-col items-center gap-1">
-                                      <AlertCircle className="h-5 w-5" />
-                                      <span className="text-sm leading-none">퇴실 처리</span>
-                                    </div>
-                                  </Button>
-                                </div>
-                              )}
-                            </motion.div>
-
-                            <motion.div {...getDeckMotionProps(0.16, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
-                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/48">Operator Memo</p>
-                              <div className="mt-4 space-y-3">
-                                <div className="rounded-[1.35rem] bg-[#F7FAFF] px-4 py-3">
-                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">최근 학습 기록</p>
-                                  <p className="mt-1 text-sm font-black text-[#14295F]">
-                                    {selectedStudentHistoryMetrics.latestDateKey ? `${selectedStudentHistoryMetrics.latestDateKey} · ${formatDurationMinutes(selectedStudentHistoryMetrics.latestMinutes)}` : '기록 없음'}
-                                  </p>
-                                </div>
-                                <div className="rounded-[1.35rem] bg-[#FFF7F7] px-4 py-3">
-                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-rose-500">최근 벌점</p>
-                                  <p className="mt-1 text-sm font-black text-slate-700">
-                                    {latestSelectedPenaltyLog?.reason || '최근 벌점 기록 없음'}
-                                  </p>
-                                </div>
-                                <div className="rounded-[1.35rem] bg-[#FFF9F0] px-4 py-3">
-                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-600">최근 리포트</p>
-                                  <p className="mt-1 text-sm font-black text-slate-700">
-                                    {latestSelectedReport?.dateKey || '발송 이력 없음'}
-                                  </p>
-                                </div>
-                              </div>
-                            </motion.div>
-                          </div>
-                        </div>
-
-                        <div className="min-h-0 flex flex-col overflow-hidden">
-                          <Tabs defaultValue="status" className="flex h-full min-h-0 w-full flex-col">
-                            <div className={cn("px-4 pt-4", isMobile ? "" : "sm:px-6 sm:pt-6")}>
-                              <TabsList className="grid h-auto w-full grid-cols-4 rounded-[1.35rem] bg-[#EEF4FF] p-1">
-                                <TabsTrigger value="status" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-[#14295F] data-[state=active]:shadow-sm">실시간 상태</TabsTrigger>
-                                <TabsTrigger value="history" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">학습 히스토리</TabsTrigger>
-                                <TabsTrigger value="penalty" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-sm">벌점 관리</TabsTrigger>
-                                <TabsTrigger value="reports" className="rounded-[1rem] px-2 py-3 font-black text-[11px] tracking-tight text-slate-500 data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm">리포트 내역</TabsTrigger>
-                              </TabsList>
+                                ) : (
+                                  <div className="mt-4 grid grid-cols-2 gap-3">
+                                    <Button onClick={() => handleStatusUpdate('studying')} disabled={isSaving} className="h-16 rounded-[1.45rem] bg-blue-600 font-black text-white shadow-lg shadow-blue-200 hover:bg-blue-700">
+                                      <div className="flex flex-col items-center gap-1">
+                                        <Zap className="h-5 w-5 fill-current" />
+                                        <span className="text-sm leading-none">입실 확인</span>
+                                      </div>
+                                    </Button>
+                                    <Button variant="outline" onClick={() => handleStatusUpdate('absent')} disabled={isSaving} className="h-16 rounded-[1.45rem] border-2 border-rose-100 font-black text-rose-600 hover:bg-rose-50">
+                                      <div className="flex flex-col items-center gap-1">
+                                        <AlertCircle className="h-5 w-5" />
+                                        <span className="text-sm leading-none">퇴실 처리</span>
+                                      </div>
+                                    </Button>
+                                  </div>
+                                )}
+                              </motion.div>
                             </div>
 
-                            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                          <TabsContent value="status" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 pb-28 data-[state=active]:flex data-[state=active]:flex-col sm:p-8 sm:pb-32 space-y-6">
                             <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-4")}>
-                              <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                              <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-white p-4 shadow-sm">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">오늘 판정</p>
-                                <p className="mt-3 text-lg font-black text-[#14295F]">{selectedAttendanceSignal?.boardLabel || '확인중'}</p>
+                                <p className="mt-2 text-base font-black text-[#14295F]">{selectedAttendanceSignal?.boardLabel || '확인중'}</p>
                                 <p className="mt-2 text-xs font-bold text-slate-500">{selectedAttendanceSignal?.note || '현재 상태를 기준으로 운영 신호를 표시합니다.'}</p>
                               </div>
-                              <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                              <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-white p-4 shadow-sm">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">루틴 예정</p>
-                                <p className="mt-3 text-lg font-black text-[#14295F]">{selectedAttendanceSignal?.routineExpectedArrivalTime || '미설정'}</p>
+                                <p className="mt-2 text-base font-black text-[#14295F]">{selectedAttendanceSignal?.routineExpectedArrivalTime || '미설정'}</p>
                                 <p className="mt-2 text-xs font-bold text-slate-500">도착 루틴과 실제 출결 흐름을 함께 확인합니다.</p>
                               </div>
-                              <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                              <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-white p-4 shadow-sm">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">오늘 공부</p>
-                                <p className="mt-3 text-lg font-black text-[#14295F]">{selectedAttendanceSignal?.todayStudyLabel || timeInfo?.total || '-'}</p>
+                                <p className="mt-2 text-base font-black text-[#14295F]">{selectedAttendanceSignal?.todayStudyLabel || timeInfo?.total || '-'}</p>
                                 <p className="mt-2 text-xs font-bold text-slate-500">실시간 세션과 누적 시간을 같이 읽습니다.</p>
                               </div>
-                              <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
+                              <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-white p-4 shadow-sm">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">복귀/퇴실</p>
-                                <p className="mt-3 text-lg font-black text-[#14295F]">
+                                <p className="mt-2 text-base font-black text-[#14295F]">
                                   {selectedAttendanceSignal?.isReturned
                                     ? '복귀'
                                     : selectedAttendanceSignal?.isCheckedOut
@@ -3464,9 +3384,110 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                         ? '외출 중'
                                         : '진행 중'}
                                 </p>
-                                <p className="mt-2 text-xs font-bold text-slate-500">{isEditMode ? '좌측 관리 패널에서 수정할 수 있습니다.' : '빠른 조치는 좌측 즉시 액션에서 처리합니다.'}</p>
+                                <p className="mt-2 text-xs font-bold text-slate-500">
+                                  {isEditMode ? '바로 위 관리 액션에서 설정을 수정할 수 있습니다.' : '빠른 조치는 위 액션 카드에서 바로 처리합니다.'}
+                                </p>
                               </div>
                             </div>
+
+                            <motion.div {...getDeckMotionProps(0.09, 10)} className="rounded-[1.9rem] border border-[#D7E4FF] bg-white p-4 shadow-sm">
+                              <button
+                                type="button"
+                                onClick={() => setIsSeatSecondaryExpanded((current) => !current)}
+                                className="flex w-full items-center justify-between gap-3 text-left"
+                              >
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5C6E97]">보조 정보</p>
+                                  <p className="mt-1 text-sm font-black text-[#14295F]">AI 해석 · 도메인 점수 · 운영 메모</p>
+                                </div>
+                                <ChevronRight className={cn("h-4 w-4 text-[#5C6E97] transition-transform", isSeatSecondaryExpanded && "rotate-90")} />
+                              </button>
+
+                              {isSeatSecondaryExpanded ? (
+                                <div className="mt-4 space-y-4 border-t border-[#E4ECFA] pt-4">
+                                  <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-[#F8FBFF] p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5C6E97]">선택된 AI 해석</p>
+                                        <p className="mt-1 text-base font-black text-[#14295F]">
+                                          {selectedSeatDomainInsight ? `${selectedSeatDomainInsight.label} ${selectedSeatDomainInsight.score}점` : '도메인 해석 준비중'}
+                                        </p>
+                                      </div>
+                                      {selectedSeatDomainInsight ? (
+                                        <Badge className={cn("border-none font-black", selectedSeatDomainInsight.badgeClass)}>
+                                          {selectedSeatDomainInsight.score}
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+                                    <p className="mt-3 text-sm font-bold leading-6 text-slate-600">
+                                      {selectedSeatDomainInsight?.analysis || '도메인 점수를 선택하면 왜 이 점수가 나왔는지와 바로 할 대응을 보여줍니다.'}
+                                    </p>
+                                    {selectedSeatDomainInsight ? (
+                                      <p className="mt-3 text-xs font-bold leading-5 text-slate-500">
+                                        대응: {selectedSeatDomainInsight.action}
+                                      </p>
+                                    ) : null}
+                                  </div>
+
+                                  {selectedSeatSignal ? (
+                                    <div>
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <p className="text-[11px] font-bold text-slate-500">
+                                          점수를 누르면 개입 이유와 다음 대응이 바로 바뀝니다.
+                                        </p>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                          도메인 선택
+                                        </p>
+                                      </div>
+                                      <div className={cn("mt-3 grid gap-2", isMobile ? "grid-cols-2" : "sm:grid-cols-5")}>
+                                        {selectedSeatDomainSummary.map((domain) => {
+                                          const isActive = domain.key === selectedSeatInsightKey;
+                                          return (
+                                            <button
+                                              key={domain.key}
+                                              type="button"
+                                              onClick={() => setSelectedSeatInsightKey(domain.key)}
+                                              className={cn(
+                                                "rounded-[1.25rem] border px-3 py-3 text-center transition-all",
+                                                isActive
+                                                  ? "border-[#14295F] bg-[#14295F] text-white shadow-lg shadow-[#14295F]/10"
+                                                  : "border-[#D7E4FF] bg-[#F8FBFF] text-[#14295F] hover:border-[#BFD1F8] hover:bg-white"
+                                              )}
+                                            >
+                                              <p className={cn("text-[10px] font-black uppercase tracking-[0.16em]", isActive ? "text-white/70" : "text-slate-500")}>{domain.label}</p>
+                                              <Badge className={cn("mt-2 border-none font-black", isActive ? "bg-white/14 text-white" : domain.badgeClass)}>
+                                                {domain.score}
+                                              </Badge>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ) : null}
+
+                                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "sm:grid-cols-3")}>
+                                    <div className="rounded-[1.45rem] bg-[#F7FAFF] px-4 py-3">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">최근 학습 기록</p>
+                                      <p className="mt-1 text-sm font-black text-[#14295F]">
+                                        {selectedStudentHistoryMetrics.latestDateKey ? `${selectedStudentHistoryMetrics.latestDateKey} · ${formatDurationMinutes(selectedStudentHistoryMetrics.latestMinutes)}` : '기록 없음'}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-[1.45rem] bg-[#FFF7F7] px-4 py-3">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-rose-500">최근 벌점</p>
+                                      <p className="mt-1 text-sm font-black text-slate-700">
+                                        {latestSelectedPenaltyLog?.reason || '최근 벌점 기록 없음'}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-[1.45rem] bg-[#FFF9F0] px-4 py-3">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-600">최근 리포트</p>
+                                      <p className="mt-1 text-sm font-black text-slate-700">
+                                        {latestSelectedReport?.dateKey || '발송 이력 없음'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </motion.div>
 
                             <div className="space-y-4">
                               <div className="flex items-center justify-between px-1">
@@ -3517,7 +3538,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
-                          <TabsContent value="history" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 pb-28 data-[state=active]:flex data-[state=active]:flex-col sm:p-8 sm:pb-32 space-y-6">
+                          <TabsContent value="history" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-12 data-[state=active]:flex data-[state=active]:flex-col sm:p-6 sm:pb-14 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <TrendingUp className="h-4 w-4 text-emerald-600" />
                               <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600">최근 학습 시간 변화</h4>
@@ -3565,7 +3586,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
-                          <TabsContent value="penalty" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 pb-28 data-[state=active]:flex data-[state=active]:flex-col sm:p-8 sm:pb-32 space-y-6">
+                          <TabsContent value="penalty" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-12 data-[state=active]:flex data-[state=active]:flex-col sm:p-6 sm:pb-14 space-y-6">
                             <div className="flex items-center justify-between gap-2 px-1">
                               <div className="flex items-center gap-2">
                                 <ShieldAlert className="h-4 w-4 text-rose-600" />
@@ -3687,7 +3708,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
-                          <TabsContent value="reports" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 pb-36 data-[state=active]:flex data-[state=active]:flex-col sm:p-8 sm:pb-40 space-y-6">
+                          <TabsContent value="reports" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-12 data-[state=active]:flex data-[state=active]:flex-col sm:p-6 sm:pb-14 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <FileText className="h-4 w-4 text-amber-600" />
                               <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-600">최근 발송된 리포트 (5건)</h4>
@@ -3759,8 +3780,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         </div>
                       </Tabs>
                     </div>
-                  </div>
-
                       <Dialog open={isPenaltyGuideOpen} onOpenChange={setIsPenaltyGuideOpen}>
                         <DialogContent
                           className={cn(
@@ -4010,7 +4029,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           )}
                         </DialogContent>
                       </Dialog>
-                    </div>
                   </>
                 );
               })()}
