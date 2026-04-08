@@ -2139,9 +2139,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </motion.section>
 
       <motion.section className="px-4" {...getDeckMotionProps(0.1, 18)}>
-        <Card className="marketing-card relative overflow-hidden rounded-[2.75rem] border-none">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(244,248,255,0.85)_0%,rgba(255,255,255,0)_100%)]" />
-          <CardContent className={cn("relative space-y-5", isMobile ? "p-4" : "p-5 sm:p-6")}>
+        <Card className="marketing-card relative overflow-visible rounded-[2.75rem] border-none">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 rounded-t-[2.75rem] bg-[linear-gradient(180deg,rgba(244,248,255,0.85)_0%,rgba(255,255,255,0)_100%)]" />
+          <CardContent className={cn("relative space-y-5", isMobile ? "p-4 pb-5" : "p-5 pb-6 sm:p-6 sm:pb-7")}>
             <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
               <div>
                 <div className="flex items-center gap-2">
@@ -2170,7 +2170,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 현재 바로 처리해야 할 우선순위 항목이 없습니다.
               </div>
             ) : (
-              <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.28fr)_360px]")}>
+              <div className={cn("-mx-1 grid gap-3 px-1 pb-1", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.28fr)_360px]")}>
                 <motion.div {...getDeckMotionProps(0.14, 14)}>
                   <div className="app-depth-card-warm rounded-[2rem] border px-5 py-5 sm:px-6 sm:py-6">
                     <div className="flex items-start justify-between gap-4">
