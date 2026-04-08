@@ -2159,7 +2159,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       excused_absent: 9,
     };
 
-    return Object.values(attendanceSeatSignalsBySeatId || {})
+    return attendanceSeatSignals
       .filter((signal) => {
         if (signal.boardStatus === 'absent' || signal.boardStatus === 'late') return true;
         if (signal.boardStatus === 'routine_missing' || signal.boardStatus === 'present_missing_routine') return true;
@@ -2179,7 +2179,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         }
         return left.studentName.localeCompare(right.studentName, 'ko');
       })
-      .slice(0, 4)
       .map((signal) => {
         const issueLabel =
           signal.boardStatus === 'absent'
@@ -2204,7 +2203,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           detailLabel,
         };
       });
-  }, [attendanceSeatSignalsBySeatId]);
+  }, [attendanceSeatSignals]);
 
   const lateOrAbsentAlertRows = useMemo(() => {
     return attendanceSeatSignals
@@ -3644,7 +3643,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <Dialog open={isAttendancePriorityDialogOpen} onOpenChange={setIsAttendancePriorityDialogOpen}>
             <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-xl')}>
               <div className={studioDialogHeaderClassName}>
-                <DialogHeader className="space-y-2 text-left">
+                <DialogHeader className="text-left">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">출결 연락 우선</Badge>
                     <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
@@ -3652,9 +3651,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     </Badge>
                   </div>
                   <DialogTitle className="text-2xl font-black tracking-tight">연락이 필요한 학생</DialogTitle>
-                  <DialogDescription className="text-sm font-medium text-white/75">
-                    홈에서는 상태만 보고, 미입실·지각·루틴 누락 대상의 세부 정보는 여기서 확인합니다.
-                  </DialogDescription>
                 </DialogHeader>
               </div>
               <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">

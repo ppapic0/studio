@@ -7,6 +7,7 @@ import { ChevronRight, ShieldAlert, Trophy, Armchair, Phone } from 'lucide-react
 import { cn } from '@/lib/utils';
 import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
+import type { ComponentType } from 'react';
 
 /* ═══════════════════════════════════════════
    A. Attendance Overview Card
