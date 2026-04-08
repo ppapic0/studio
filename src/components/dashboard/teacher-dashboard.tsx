@@ -943,8 +943,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       value: formatDurationMinutes(stats.totalCenterMinutes),
       footnote: '실제 공부시간 기준',
       icon: Activity,
-      iconClass: 'bg-emerald-400/12 text-emerald-100',
-      valueClass: 'text-emerald-100',
+      iconClass: 'bg-white/10 text-white',
+      valueClass: 'text-white',
     },
     {
       key: 'avg',
@@ -952,8 +952,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       value: formatDurationMinutes(stats.avgMinutes),
       footnote: '현재 필터 기준 평균',
       icon: Users,
-      iconClass: 'bg-sky-400/12 text-sky-100',
-      valueClass: 'text-sky-100',
+      iconClass: 'bg-white/10 text-white',
+      valueClass: 'text-white',
     },
     {
       key: 'top20',
@@ -961,8 +961,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       value: formatDurationMinutes(stats.top20Avg),
       footnote: '상위권 기준점',
       icon: Trophy,
-      iconClass: 'bg-amber-400/14 text-[#FFE6C9]',
-      valueClass: 'text-[#FFE6C9]',
+      iconClass: 'bg-white/10 text-white',
+      valueClass: 'text-white',
     },
   ];
 
@@ -2046,11 +2046,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       <Monitor className="h-7 w-7 text-white" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.34em] text-white/55">통합 관제 센터</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.34em] text-white/78">통합 관제 센터</p>
                       <h1 className={cn("mt-2 font-aggro-display text-white", isMobile ? "text-[2.15rem]" : "text-[3.2rem] leading-[0.98]")}>
                         실시간 관제 홈
                       </h1>
-                      <p className={cn("mt-3 max-w-[40rem] font-bold text-white/78", isMobile ? "text-sm leading-6" : "text-[15px] leading-7")}>
+                      <p className={cn("mt-3 max-w-[40rem] font-bold text-white", isMobile ? "text-sm leading-6" : "text-[15px] leading-7")}>
                         상담, 출결, 좌석 리스크, 리포트 후속까지 오늘 먼저 개입해야 할 흐름을 한 덱으로 정리했습니다.
                         선생님이 들어오자마자 지금 처리할 일부터 바로 보이도록 상단 위계를 다시 세웠습니다.
                       </p>
@@ -2060,19 +2060,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                 <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
                   <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">오늘 우선순위</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/78">오늘 우선순위</p>
                     <p className="mt-2 text-lg font-black tracking-tight text-white">
                       {teacherActionQueue.length > 0 ? `${teacherActionQueue.length}건 바로 확인` : '즉시 처리 항목 없음'}
                     </p>
                   </div>
                   <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">실시간 교실</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/78">실시간 교실</p>
                     <p className="mt-2 text-lg font-black tracking-tight text-white">
                       {selectedRoomView === 'all' ? '전체 호실 보기' : getRoomLabel(selectedRoomView, roomConfigs)}
                     </p>
                   </div>
                   <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">학생 리스크</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/78">학생 리스크</p>
                     <p className="mt-2 text-lg font-black tracking-tight text-white">
                       위험 {seatOverlaySummary.riskCount}명 · 미열람 {seatOverlaySummary.unreadCount}건
                     </p>
@@ -2082,7 +2082,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
               <div className="space-y-3">
                 <div className="rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-white/60">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-white/80">
                     <Filter className="h-3.5 w-3.5" />
                     반 선택
                   </div>
@@ -2113,11 +2113,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">{item.label}</p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/78">{item.label}</p>
                           <p className={cn("dashboard-number mt-2 whitespace-nowrap text-[1.4rem] leading-none sm:text-[1.75rem]", item.valueClass)}>
                             {item.value}
                           </p>
-                          <p className="mt-2 text-[11px] font-bold text-white/58">{item.footnote}</p>
+                          <p className="mt-2 text-[11px] font-bold text-white/78">{item.footnote}</p>
                         </div>
                         <span className={cn("inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem]", item.iconClass)}>
                           <item.icon className="h-[18px] w-[18px]" />
