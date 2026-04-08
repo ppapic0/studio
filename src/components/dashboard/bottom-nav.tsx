@@ -117,7 +117,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
         'z-50 transition-all duration-300',
         useBrandNav
           ? isParent
-            ? 'h-[5.9rem] rounded-t-[1.55rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1.5 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] shadow-[0_-14px_28px_rgba(10,20,52,0.42)] sm:h-[6.05rem]'
+            ? 'h-[5.9rem] rounded-t-[1.6rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#163267_0%,#14295F_56%,#0e1f49_100%)] px-1.5 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] shadow-[0_-16px_32px_rgba(10,20,52,0.44)] sm:h-[6.05rem]'
             : 'h-[6.35rem] rounded-t-[1.75rem] border-x border-t border-[#223a71] bg-[linear-gradient(180deg,#14295F_0%,#0e1f49_100%)] px-1.5 pb-[calc(env(safe-area-inset-bottom)+0.48rem)] shadow-[0_-16px_32px_rgba(10,20,52,0.46)]'
           : 'h-20 border-t border-black/[0.06] bg-white/95 pb-6 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-2xl',
         isParent || isMobileMode ? 'relative' : 'fixed bottom-0 left-0 right-0 md:hidden',
@@ -175,10 +175,14 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                   isParent ? 'p-[0.36rem] sm:p-[0.42rem]' : useBrandNav ? 'p-2.5' : 'p-2',
                   isActive
                     ? useBrandNav
-                      ? 'bg-[#FF7A16] text-[#14295F] shadow-[0_10px_18px_rgba(255,122,22,0.40)]'
+                      ? isParent
+                        ? 'bg-white text-[#14295F] shadow-[0_14px_22px_rgba(8,18,45,0.34)] ring-1 ring-[#ffcf9f]'
+                        : 'bg-[#FF7A16] text-[#14295F] shadow-[0_10px_18px_rgba(255,122,22,0.40)]'
                       : `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg`
                     : useBrandNav
-                      ? 'bg-white/10 text-white/90'
+                      ? isParent
+                        ? 'bg-white/8 text-white/86'
+                        : 'bg-white/10 text-white/90'
                       : 'group-hover:bg-muted/50'
                 )}
               >
@@ -198,7 +202,9 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                   useBrandNav
                     ? isActive
                       ? 'text-white opacity-100'
-                      : 'text-white opacity-90'
+                      : isParent
+                        ? 'text-white/78'
+                        : 'text-white opacity-90'
                     : isActive
                       ? 'opacity-100'
                       : 'opacity-45'
@@ -207,7 +213,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                 {item.label}
               </span>
 
-              {isActive && useBrandNav && <div className="absolute bottom-[0.78rem] h-1.5 w-1.5 rounded-full bg-[#FF7A16]" />}
+              {isActive && useBrandNav && <div className={cn('absolute bottom-[0.78rem] h-1.5 w-1.5 rounded-full', isParent ? 'bg-[#FF7A16]' : 'bg-[#FF7A16]')} />}
               {isActive && !useBrandNav && (
                 <div
                   className={cn(

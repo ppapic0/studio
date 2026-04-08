@@ -124,12 +124,18 @@ export function MainNav({ isMobile = false }: MainNavProps) {
   const userNavItems = navItems[userRole] || [];
 
   const isStudent = userRole === 'student';
+  const isParent = userRole === 'parent';
   const isAdminRole = userRole === 'centerAdmin' || userRole === 'owner';
   const activeParentTab = searchParams.get('parentTab') || 'home';
 
-  const navClass = cn('flex-1 items-start px-3 text-sm font-medium pt-0', isMobile ? 'flex flex-col gap-5 text-lg' : 'flex flex-col gap-4');
+  const navClass = cn(
+    'flex-1 items-start px-3 text-sm font-medium pt-0',
+    isMobile ? 'flex flex-col gap-5 text-lg' : 'flex flex-col gap-4',
+    isParent && !isMobile && 'gap-2'
+  );
   const linkClass = cn(
-    'relative flex items-center gap-3 rounded-[0.9rem] px-3.5 py-2.5 text-[#5c6e88] transition-all duration-100 ease-out hover:text-[#14295F] hover:bg-[rgba(20,41,95,0.05)] active:scale-[0.98] group overflow-hidden',
+    'relative flex items-center gap-3 rounded-[0.9rem] px-3.5 py-2.5 text-[#5c6e88] transition-all duration-150 ease-out hover:text-[#14295F] hover:bg-[rgba(20,41,95,0.05)] active:scale-[0.98] group overflow-hidden',
+    isParent && 'rounded-[1.25rem] border border-transparent bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3 shadow-[0_18px_30px_-28px_rgba(20,41,95,0.18)] hover:border-[#d8e4fb] hover:bg-[linear-gradient(180deg,#ffffff_0%,#f3f8ff_100%)]',
     isMobile ? 'text-lg' : ''
   );
 
@@ -148,22 +154,24 @@ export function MainNav({ isMobile = false }: MainNavProps) {
         className={cn(
           linkClass,
           isActive && (
-            isStudent
+            isParent
+              ? 'border-[#25427d] bg-[linear-gradient(135deg,#1d3c79_0%,#14295f_100%)] text-white shadow-[0_24px_34px_-26px_rgba(20,41,95,0.42)] hover:text-white hover:bg-transparent'
+              : isStudent
               ? 'bg-[linear-gradient(135deg,#315AAE,#14295F)] text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.18)] hover:text-white hover:bg-transparent'
               : 'bg-[linear-gradient(135deg,#1e4898,#14295f)] text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.14)] hover:text-white hover:bg-transparent'
           )
         )}
       >
         {isActive && !isStudent && (
-          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white/50" />
+          <span className={cn('absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full', isParent ? 'bg-[#FF7A16]' : 'bg-white/50')} />
         )}
         <item.icon className={cn(
           'h-[1.05rem] w-[1.05rem] flex-shrink-0 transition-all duration-200',
-          isActive ? 'text-white' : 'text-[#8a9daf] group-hover:text-[#14295F] group-hover:scale-105'
+          isActive ? 'text-white' : isParent ? 'text-[#6a7fa6] group-hover:text-[#14295F] group-hover:scale-105' : 'text-[#8a9daf] group-hover:text-[#14295F] group-hover:scale-105'
         )} />
         <span className={cn(
           'whitespace-nowrap truncate',
-          isActive ? 'font-bold' : 'font-semibold'
+          isActive ? 'font-bold' : isParent ? 'font-black text-[#355381]' : 'font-semibold'
         )}>
           {item.label}
         </span>

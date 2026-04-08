@@ -229,6 +229,8 @@ type ParentMetricToneStyle = {
 
 type ParentAnalyticsToneStyle = {
   card: string;
+  glow: string;
+  ribbon: string;
   iconWrap: string;
   icon: string;
   eyebrow: string;
@@ -301,40 +303,48 @@ const PARENT_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentMetricToneStyle>
 
 const PARENT_ANALYTICS_TONE_STYLES: Record<ParentAnalyticsTone, ParentAnalyticsToneStyle> = {
   growth: {
-    card: 'border-[#d9e6ff] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_55%,#edf5ff_100%)] shadow-[0_20px_40px_-28px_rgba(20,41,95,0.30)]',
-    iconWrap: 'border-[#d6e4ff] bg-white/90',
+    card: 'border-[#dce6fb] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_58%,#f3f7ff_100%)] shadow-[0_24px_44px_-30px_rgba(20,41,95,0.18)]',
+    glow: 'bg-[#8fb6ff]/24',
+    ribbon: 'from-[#3d72df] via-[#204ca3] to-[#14295F]',
+    iconWrap: 'border-[#d8e5ff] bg-white/94',
     icon: 'text-[#204ca3]',
-    eyebrow: 'text-[#5d79a5]',
-    badge: 'border-[#cae4df] bg-[#ecfbf6] text-[#0f8a72]',
-    chartShell: 'border-[#dbe7ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(237,245,255,0.94)_100%)]',
-    insight: 'border-[#dce8ff] bg-white/86 text-[#39537d]',
+    eyebrow: 'text-[#6382b5]',
+    badge: 'border-[#d7e5ff] bg-[#eef4ff] text-[#204ca3]',
+    chartShell: 'border-[#dde8fd] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(241,246,255,0.96)_100%)]',
+    insight: 'border-[#dde7fb] bg-[#f8fbff] text-[#3d5886]',
   },
   rhythm: {
-    card: 'border-[#d8f1eb] bg-[linear-gradient(180deg,#f7fffc_0%,#ffffff_56%,#eefcf7_100%)] shadow-[0_20px_40px_-28px_rgba(16,185,129,0.22)]',
-    iconWrap: 'border-[#d6f0e6] bg-white/90',
-    icon: 'text-[#11967a]',
-    eyebrow: 'text-[#4b7b70]',
-    badge: 'border-[#caefe3] bg-[#ecfbf5] text-[#15836b]',
-    chartShell: 'border-[#d6f0e6] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(236,251,245,0.96)_100%)]',
-    insight: 'border-[#d7f0e7] bg-white/86 text-[#35695e]',
+    card: 'border-[#d9eee7] bg-[linear-gradient(180deg,#ffffff_0%,#f7fefb_58%,#effbf6_100%)] shadow-[0_24px_44px_-30px_rgba(16,185,129,0.14)]',
+    glow: 'bg-[#85dfbf]/22',
+    ribbon: 'from-[#42d4a5] via-[#10b981] to-[#0f766e]',
+    iconWrap: 'border-[#d6f0e5] bg-white/94',
+    icon: 'text-[#0f8a72]',
+    eyebrow: 'text-[#5c877d]',
+    badge: 'border-[#d3efe5] bg-[#ecfbf5] text-[#0f8a72]',
+    chartShell: 'border-[#d7efe7] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(239,251,246,0.96)_100%)]',
+    insight: 'border-[#d9eee8] bg-[#f7fffb] text-[#35695e]',
   },
   window: {
-    card: 'border-[#dce4ff] bg-[linear-gradient(180deg,#fafbff_0%,#ffffff_56%,#f1f4ff_100%)] shadow-[0_20px_40px_-28px_rgba(85,99,255,0.20)]',
-    iconWrap: 'border-[#dce5ff] bg-white/90',
-    icon: 'text-[#5363ff]',
-    eyebrow: 'text-[#66719a]',
-    badge: 'border-[#e1ddff] bg-[#f5f2ff] text-[#6c52d9]',
-    chartShell: 'border-[#dde4ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(241,244,255,0.96)_100%)]',
-    insight: 'border-[#e1e6ff] bg-white/86 text-[#475587]',
+    card: 'border-[#dde4ff] bg-[linear-gradient(180deg,#ffffff_0%,#fafbff_58%,#f4f5ff_100%)] shadow-[0_24px_44px_-30px_rgba(99,102,241,0.14)]',
+    glow: 'bg-[#b1b8ff]/18',
+    ribbon: 'from-[#8b5cf6] via-[#6366f1] to-[#3b5fcd]',
+    iconWrap: 'border-[#e0e5ff] bg-white/94',
+    icon: 'text-[#5966ef]',
+    eyebrow: 'text-[#6f79ab]',
+    badge: 'border-[#e3e0ff] bg-[#f4f3ff] text-[#6a54db]',
+    chartShell: 'border-[#e0e5ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(244,245,255,0.96)_100%)]',
+    insight: 'border-[#e2e5fb] bg-[#fafbff] text-[#48588b]',
   },
   away: {
-    card: 'border-[#ffdbe2] bg-[linear-gradient(180deg,#fffafc_0%,#ffffff_56%,#fff1f4_100%)] shadow-[0_20px_40px_-28px_rgba(225,29,72,0.18)]',
-    iconWrap: 'border-[#ffdbe2] bg-white/90',
-    icon: 'text-[#d53f64]',
-    eyebrow: 'text-[#b45a6f]',
-    badge: 'border-[#ffd5de] bg-[#fff1f4] text-[#c73a5d]',
-    chartShell: 'border-[#ffe0e7] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,241,244,0.96)_100%)]',
-    insight: 'border-[#ffe2e8] bg-white/86 text-[#8a4b5a]',
+    card: 'border-[#ffe0e5] bg-[linear-gradient(180deg,#ffffff_0%,#fffafb_58%,#fff3f6_100%)] shadow-[0_24px_44px_-30px_rgba(225,29,72,0.12)]',
+    glow: 'bg-[#ffadc0]/18',
+    ribbon: 'from-[#ff97ae] via-[#e25473] to-[#b43254]',
+    iconWrap: 'border-[#ffe0e7] bg-white/94',
+    icon: 'text-[#d24664]',
+    eyebrow: 'text-[#b56a7a]',
+    badge: 'border-[#ffdbe3] bg-[#fff2f5] text-[#c43b5a]',
+    chartShell: 'border-[#ffe2e8] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(255,244,246,0.96)_100%)]',
+    insight: 'border-[#ffe1e7] bg-[#fff9fb] text-[#8a4b5a]',
   },
 };
 
@@ -384,6 +394,39 @@ const PARENT_HOME_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentHomeMetricT
 const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing'];
 const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
 const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
+
+const PARENT_DASHBOARD_TAB_META = {
+  home: {
+    label: '홈 브리프',
+    shortLabel: '홈',
+    description: '오늘 공부, 출결, 벌점, 알림을 가장 먼저 읽는 탭입니다.',
+    icon: Home,
+  },
+  studyDetail: {
+    label: '학습 흐름',
+    shortLabel: '학습',
+    description: '월간 캘린더와 날짜별 학습 기록을 차분하게 확인합니다.',
+    icon: History,
+  },
+  data: {
+    label: '학습 분석',
+    shortLabel: '데이터',
+    description: '최근 성장, 리듬, 생활 흐름을 그래프로 읽는 탭입니다.',
+    icon: FileText,
+  },
+  communication: {
+    label: '소통 센터',
+    shortLabel: '소통',
+    description: '센터 공지, 알림, 상담과 문의를 한 흐름으로 확인합니다.',
+    icon: MessageCircle,
+  },
+  billing: {
+    label: '수납 센터',
+    shortLabel: '수납',
+    description: '대표 청구서와 결제 현황을 가장 빠르게 확인하는 탭입니다.',
+    icon: CreditCard,
+  },
+} as const;
 
 function normalizeParentPortalTab(value: string | null): ParentPortalTab {
   if (value === 'life') return 'data';
@@ -591,12 +634,19 @@ function ParentAnalyticsCard({
   const toneStyle = PARENT_ANALYTICS_TONE_STYLES[tone];
 
   return (
-    <Card className={cn('relative min-w-0 overflow-hidden rounded-[2rem] border p-5 shadow-sm transition-[transform,box-shadow] duration-200 active:scale-[0.992] sm:p-6', toneStyle.card, className)}>
-      <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-white/50 blur-3xl" />
+    <Card
+      className={cn(
+        'group relative min-w-0 overflow-hidden rounded-[2.1rem] border p-4 shadow-sm transition-[transform,box-shadow,border-color] duration-300 active:scale-[0.992] md:hover:-translate-y-1 md:hover:shadow-[0_28px_48px_-32px_rgba(20,41,95,0.22)] sm:p-5',
+        toneStyle.card,
+        className
+      )}
+    >
+      <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', toneStyle.ribbon)} />
+      <div className={cn('pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full blur-3xl', toneStyle.glow)} />
       <div className="relative z-10">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]', toneStyle.iconWrap, toneStyle.icon)}>
+            <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.1rem] border shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_14px_24px_-22px_rgba(20,41,95,0.22)]', toneStyle.iconWrap, toneStyle.icon)}>
               {icon}
             </div>
             <div className="min-w-0">
@@ -611,7 +661,7 @@ function ParentAnalyticsCard({
             {badge}
           </span>
         </div>
-        <div className={cn('mt-4 overflow-hidden rounded-[1.45rem] border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] sm:p-4', toneStyle.chartShell)}>
+        <div className={cn('mt-4 overflow-hidden rounded-[1.45rem] border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.94)] sm:p-4', toneStyle.chartShell)}>
           {children}
         </div>
         <div className={cn('mt-4 rounded-[1.2rem] border px-3.5 py-3 text-[11px] font-bold leading-relaxed sm:text-[11.5px]', toneStyle.insight)}>
@@ -640,21 +690,179 @@ function ParentSectionHeader({
   return (
     <div className={cn('flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between', className)}>
       <div className="min-w-0">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#d8e4ff] bg-white/92 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5472a4] shadow-sm">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#eef4ff] text-[#14295F]">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#d7e3fb] bg-[#eef4ff] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#4265a4] shadow-[0_12px_24px_-22px_rgba(20,41,95,0.22)]">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#14295F] text-white shadow-sm">
             {icon}
           </span>
           {eyebrow}
         </div>
-        <h3 className="mt-3 text-[1.5rem] font-black leading-none tracking-tight text-[#14295F] sm:text-[1.85rem]">
+        <h3 className="mt-3 text-[1.42rem] font-black leading-none tracking-tight text-[#14295F] sm:text-[1.72rem]">
           {title}
         </h3>
-        <p className="mt-2 max-w-[34rem] break-keep text-[13px] font-bold leading-[1.75] text-slate-500 sm:text-[14px]">
+        <p className="mt-2 max-w-[36rem] break-keep text-[13px] font-bold leading-[1.72] text-slate-500 sm:text-[13.5px]">
           {description}
         </p>
       </div>
-      {badges ? <div className="flex flex-wrap items-center gap-2 self-start">{badges}</div> : null}
+      {badges ? <div className="flex flex-wrap items-center gap-2 self-start sm:max-w-[46%] sm:justify-end">{badges}</div> : null}
     </div>
+  );
+}
+
+function ParentDashboardTabRail({
+  tab,
+  activeStudentLabel,
+  todayLabel,
+  linkedStudents,
+  studentId,
+  onStudentChange,
+  onTabChange,
+  totalMinutes,
+  unreadRecentCount,
+  reportsCount,
+  hasOutstandingInvoice,
+  showEntryMotion,
+}: {
+  tab: ParentPortalTab;
+  activeStudentLabel: string;
+  todayLabel: string;
+  linkedStudents: LinkedStudentOption[];
+  studentId: string | null | undefined;
+  onStudentChange: (nextStudentId: string) => void;
+  onTabChange: (value: string) => void;
+  totalMinutes: number;
+  unreadRecentCount: number;
+  reportsCount: number;
+  hasOutstandingInvoice: boolean;
+  showEntryMotion: boolean;
+}) {
+  const currentTabMeta =
+    PARENT_DASHBOARD_TAB_META[tab as keyof typeof PARENT_DASHBOARD_TAB_META] ?? PARENT_DASHBOARD_TAB_META.home;
+  const CurrentTabIcon = currentTabMeta.icon;
+
+  return (
+    <section
+      className={cn(
+        'relative overflow-hidden rounded-[2.4rem] border border-[#24427e] bg-[linear-gradient(145deg,#1b3a76_0%,#14295F_54%,#0d1c45_100%)] p-5 shadow-[0_32px_72px_-46px_rgba(20,41,95,0.54)] sm:p-6',
+        showEntryMotion && 'parent-shell-enter parent-entry-delay-1'
+      )}
+    >
+      <div className="soft-glow absolute -right-10 top-0 h-28 w-28 rounded-full bg-[#ffba78]/26 blur-3xl" />
+      <div className="soft-glow absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-[#77a5ff]/18 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(255,122,22,0.22),transparent_34%)]" />
+
+      <div className="relative z-10 space-y-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[10px] font-black text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.65)] backdrop-blur-sm">
+                Parent Mode
+              </Badge>
+              <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[10px] font-black text-white/92 shadow-[0_12px_24px_-22px_rgba(5,10,28,0.65)] backdrop-blur-sm">
+                {todayLabel}
+              </Badge>
+              <Badge variant="outline" className="h-7 rounded-full border border-[#ffb870]/28 bg-[#FF7A16]/14 px-3 text-[10px] font-black text-[#ffe2c6] shadow-[0_12px_24px_-22px_rgba(255,122,22,0.45)] backdrop-blur-sm">
+                현재 탭 {currentTabMeta.label}
+              </Badge>
+            </div>
+
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.2rem] border border-white/12 bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+                <CurrentTabIcon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/58">{activeStudentLabel}</p>
+                <h2 className="mt-2 break-keep text-[1.34rem] font-black leading-[1.15] tracking-[-0.04em] text-white sm:text-[1.68rem]">
+                  {currentTabMeta.label}
+                </h2>
+                <p className="mt-2 max-w-2xl break-keep text-[12.5px] font-bold leading-[1.7] text-white/76 sm:text-[13px]">
+                  {currentTabMeta.description}
+                </p>
+              </div>
+            </div>
+
+            {linkedStudents.length > 1 && (
+              <div className="max-w-[250px]">
+                <Label className="mb-2 ml-1 block text-[10px] font-black uppercase tracking-[0.18em] text-white/58">
+                  확인 중인 자녀
+                </Label>
+                <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={onStudentChange}>
+                  <SelectTrigger className="h-12 rounded-[1.1rem] border border-white/14 bg-white/10 px-4 text-left font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_30px_-26px_rgba(10,20,52,0.42)] backdrop-blur-sm">
+                    <SelectValue placeholder={activeStudentLabel} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border border-slate-200 bg-white">
+                    {linkedStudents.map((item) => (
+                      <SelectItem key={item.id} value={item.id} className="font-bold">
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[27rem]">
+            <div className="rounded-[1.35rem] border border-white/12 bg-white/10 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/54">오늘 공부</p>
+              <p className="mt-2 text-[1rem] font-black text-white">{toHm(totalMinutes)}</p>
+            </div>
+            <div className="rounded-[1.35rem] border border-white/12 bg-white/10 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/54">미확인 알림</p>
+              <p className="mt-2 text-[1rem] font-black text-white">{unreadRecentCount}건</p>
+            </div>
+            <div className="rounded-[1.35rem] border border-white/12 bg-white/10 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/54">리포트</p>
+              <p className="mt-2 text-[1rem] font-black text-white">{reportsCount}건</p>
+            </div>
+            <div className="rounded-[1.35rem] border border-white/12 bg-white/10 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/54">수납 상태</p>
+              <p className="mt-2 text-[1rem] font-black text-white">{hasOutstandingInvoice ? '확인 필요' : '안정'}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[1.7rem] border border-white/12 bg-white/8 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {PARENT_PORTAL_TABS.map((item) => {
+              const meta = PARENT_DASHBOARD_TAB_META[item as keyof typeof PARENT_DASHBOARD_TAB_META];
+              const TabIcon = meta.icon;
+              const isActive = tab === item;
+
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => onTabChange(item)}
+                  className={cn(
+                    'group relative flex items-center gap-2 rounded-[1.25rem] border px-3 py-3 text-left transition-[transform,background,box-shadow,border-color] duration-300 active:scale-[0.985]',
+                    isActive
+                      ? 'border-[#ffd4a8] bg-[linear-gradient(180deg,#fff5eb_0%,#ffe6ca_100%)] text-[#14295F] shadow-[0_18px_30px_-24px_rgba(255,122,22,0.32)]'
+                      : 'border-white/10 bg-white/6 text-white/78 hover:border-white/18 hover:bg-white/10'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.95rem] transition-colors duration-300',
+                      isActive ? 'bg-[#14295F] text-white' : 'bg-white/10 text-white/84'
+                    )}
+                  >
+                    <TabIcon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={cn('text-[11px] font-black tracking-tight', isActive ? 'text-[#14295F]' : 'text-white')}>
+                      {meta.shortLabel}
+                    </p>
+                    <p className={cn('mt-0.5 line-clamp-1 text-[9px] font-black uppercase tracking-[0.12em]', isActive ? 'text-[#d0690f]' : 'text-white/44')}>
+                      {meta.label}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -3176,7 +3384,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   if (!isActive) return null;
 
   return (
-    <div className={cn("relative space-y-4 pb-[calc(6.2rem+env(safe-area-inset-bottom))] md:space-y-5", isMobile ? "px-0" : "mx-auto max-w-5xl px-4")}>
+    <div className={cn("relative isolate space-y-4 pb-[calc(6.2rem+env(safe-area-inset-bottom))] md:space-y-5", isMobile ? "px-0" : "mx-auto max-w-5xl px-4")}>
       {growthCelebration && (
         <ParentGrowthCelebration
           celebration={growthCelebration}
@@ -3185,36 +3393,22 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         />
       )}
 
-      {linkedStudents.length > 1 && (
-        <section
-          className={cn(
-            'rounded-[1.85rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#f8fbff_72%,#f2f7ff_100%)] p-4 shadow-[0_18px_34px_-28px_rgba(20,41,95,0.18)] sm:p-5',
-            showEntryMotion && 'parent-card-enter parent-entry-delay-1'
-          )}
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Student Switch</p>
-              <h3 className="mt-1 text-lg font-black tracking-tight text-[#14295F]">확인할 자녀를 선택하세요</h3>
-              <p className="mt-1 text-sm font-bold text-slate-500">여러 자녀가 연결되어 있다면, 여기서 빠르게 전환할 수 있어요.</p>
-            </div>
-            <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={handleStudentChange}>
-              <SelectTrigger className="h-12 w-full rounded-[1.1rem] border border-[#d7e4ff] bg-white px-4 text-left font-black text-[#14295F] shadow-[0_14px_26px_-24px_rgba(20,41,95,0.28)] sm:w-[220px]">
-                <SelectValue placeholder="자녀 선택" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border border-slate-200 bg-white">
-                {linkedStudents.map((item) => (
-                  <SelectItem key={item.id} value={item.id} className="font-bold">
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </section>
-      )}
-
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
+        <ParentDashboardTabRail
+          tab={tab}
+          activeStudentLabel={activeStudentLabel}
+          todayLabel={today ? format(today, 'yyyy. MM. dd (EEE)', { locale: ko }) : '오늘'}
+          linkedStudents={linkedStudents}
+          studentId={studentId}
+          onStudentChange={handleStudentChange}
+          onTabChange={handleTabChange}
+          totalMinutes={totalMinutes}
+          unreadRecentCount={unreadRecentCount}
+          reportsCount={reportsArchive.length}
+          hasOutstandingInvoice={Boolean(primaryInvoice && (primaryInvoice.status === 'issued' || primaryInvoice.status === 'overdue'))}
+          showEntryMotion={showEntryMotion}
+        />
+
         <TabsContent value="home" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
           <section
             className={cn(
@@ -3663,71 +3857,72 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </TabsContent>
 
             <TabsContent value="studyDetail" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <header className={cn("flex justify-between items-center px-1 sm:px-2", isMobile ? "flex-col gap-4" : "flex-row")}>
-                <div className="flex flex-col gap-1">
-                  <h3 className={cn("font-black tracking-tighter text-primary", isMobile ? "text-2xl" : "text-4xl")}>기록트랙</h3>
-                  <p className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">학습 흐름 요약</p>
-                  {linkedStudents.length > 1 && (
-                    <div className="mt-3 w-full max-w-[240px]">
-                      <Label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
-                        확인 중인 자녀
-                      </Label>
-                      <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={handleStudentChange}>
-                        <SelectTrigger className="h-11 rounded-2xl border bg-white/90 px-4 text-left font-black shadow-sm">
-                          <SelectValue placeholder={activeStudentLabel} />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl border bg-white">
-                          {linkedStudents.map((item) => (
-                            <SelectItem key={item.id} value={item.id} className="font-bold">
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-                <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.4rem] border border-[#F0D9BB] bg-[linear-gradient(180deg,#fffdf8_0%,#fff3e4_100%)] p-1.5 shadow-[0_20px_40px_-30px_rgba(180,96,22,0.18)] ring-1 ring-white/70">
-                  <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled={!calendarBaseDate}
-                    className="h-9 w-9 rounded-[1rem] bg-white/78 text-[#7D4B16] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#FFF0DD] hover:text-[#8D4A11]"
-                    onClick={() => {
-                      if (!calendarBaseDate) return;
-                      setCurrentCalendarDate(subMonths(calendarBaseDate, 1));
-                    }}
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </Button>
-                  <div className="flex min-w-[120px] items-center justify-center rounded-[1rem] border border-[#F3DFC4] bg-white/92 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_14px_30px_-24px_rgba(180,96,22,0.16)]">
-                    <span className="font-black text-sm tracking-tight text-[#7D4B16]">
-                      {calendarBaseDate ? format(calendarBaseDate, 'yyyy년 M월') : '--'}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled={!calendarBaseDate}
-                    className="h-9 w-9 rounded-[1rem] bg-white/78 text-[#7D4B16] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#FFF0DD] hover:text-[#8D4A11]"
-                    onClick={() => {
-                      if (!calendarBaseDate) return;
-                      setCurrentCalendarDate(addMonths(calendarBaseDate, 1));
-                    }}
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </Button>
-                </div>
-              </header>
+              <section
+                className={cn(
+                  'overflow-hidden rounded-[2.2rem] border border-[#dce6fb] bg-[linear-gradient(145deg,#ffffff_0%,#f8fbff_74%,#fff8ef_100%)] p-4 shadow-[0_26px_54px_-40px_rgba(20,41,95,0.2)] sm:p-5',
+                  showEntryMotion && 'parent-card-enter parent-entry-delay-2'
+                )}
+              >
+                <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end', isMobile && 'gap-3')}>
+                  <ParentSectionHeader
+                    icon={<History className="h-3.5 w-3.5" />}
+                    eyebrow="Study Timeline"
+                    title="학습 캘린더와 날짜별 기록"
+                    description="달력에서 하루를 누르면 그날 공부시간과 흐름을 바로 읽을 수 있게 정리했습니다."
+                    badges={
+                      <>
+                        <Badge variant="outline" className="h-7 rounded-full border border-[#d9e4fb] bg-white px-3 text-[10px] font-black text-[#5472a4] shadow-sm">
+                          {activeStudentLabel}
+                        </Badge>
+                        <Badge variant="outline" className="h-7 rounded-full border border-[#ffe0c1] bg-[#fff4e8] px-3 text-[10px] font-black text-[#c86812] shadow-sm">
+                          월간 흐름
+                        </Badge>
+                      </>
+                    }
+                  />
 
-              <Card className="relative mx-auto w-full overflow-hidden rounded-[3rem] border border-[#F0D9BB] bg-[radial-gradient(circle_at_top_left,rgba(255,184,101,0.16),transparent_24%),linear-gradient(180deg,#ffffff_0%,#fff8ef_100%)] shadow-[0_28px_70px_-52px_rgba(120,79,44,0.26)] ring-1 ring-white/70">
+                  <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.35rem] border border-[#dbe6fb] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] p-1.5 shadow-[0_18px_34px_-28px_rgba(20,41,95,0.18)]">
+                    <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={!calendarBaseDate}
+                      className="h-9 w-9 rounded-[1rem] bg-[#eef4ff] text-[#14295F] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#dfe9ff] hover:text-[#10244f]"
+                      onClick={() => {
+                        if (!calendarBaseDate) return;
+                        setCurrentCalendarDate(subMonths(calendarBaseDate, 1));
+                      }}
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                    <div className="flex min-w-[136px] items-center justify-center rounded-[1rem] border border-[#dce6fb] bg-white px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_14px_28px_-24px_rgba(20,41,95,0.16)]">
+                      <span className="font-black text-sm tracking-tight text-[#14295F]">
+                        {calendarBaseDate ? format(calendarBaseDate, 'yyyy년 M월') : '--'}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={!calendarBaseDate}
+                      className="h-9 w-9 rounded-[1rem] bg-[#fff4e8] text-[#c86812] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#ffe6cb] hover:text-[#a8540d]"
+                      onClick={() => {
+                        if (!calendarBaseDate) return;
+                        setCurrentCalendarDate(addMonths(calendarBaseDate, 1));
+                      }}
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
+              </section>
+
+              <Card className="relative mx-auto w-full overflow-hidden rounded-[2.7rem] border border-[#dce6fb] bg-[radial-gradient(circle_at_top_left,rgba(255,184,101,0.14),transparent_24%),linear-gradient(180deg,#ffffff_0%,#f8fbff_72%,#f1f6ff_100%)] shadow-[0_28px_70px_-48px_rgba(20,41,95,0.22)] ring-1 ring-white/80">
                 <CardContent className="relative p-0">
-                  <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-primary/10", isMobile ? "px-3 py-3" : "px-5 py-4")}>
-                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#9B6C3D]">월간 흐름 요약</span>
+                  <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-[#dce6fb]", isMobile ? "px-3 py-3" : "px-5 py-4")}>
+                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5874a4]">월간 흐름 요약</span>
                     <div className="flex flex-wrap gap-1.5">
                       {PARENT_CALENDAR_LEGEND.map((item) => (
-                        <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-[#EED9BF] bg-white/92 px-2.5 py-1 text-[8px] font-black text-[#7D4B16] shadow-[0_10px_22px_-20px_rgba(180,96,22,0.12)] sm:text-[9px]">
+                        <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-[#dde6f8] bg-white/94 px-2.5 py-1 text-[8px] font-black text-[#4f648f] shadow-[0_12px_24px_-22px_rgba(20,41,95,0.12)] sm:text-[9px]">
                           <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
                           {item.label}
                         </span>
@@ -3740,8 +3935,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         key={day}
                         className={cn(
                           isMobile ? "py-1.5 text-[8px]" : "rounded-[1rem] border py-2.5 text-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]",
-                          "border-[#EFDCC3] bg-[linear-gradient(180deg,#FFFDF8_0%,#FFF6EA_100%)] text-center font-black uppercase tracking-[0.18em]",
-                          i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#9B6C3D]"
+                          "border-[#dce6fb] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] text-center font-black uppercase tracking-[0.18em]",
+                          i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#5976a7]"
                         )}
                       >
                         {day}
@@ -3861,9 +4056,9 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
 
               {!selectedCalendarDate && (
-                <div className="mx-1 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-muted-foreground/10 bg-muted/20 px-4 py-2.5">
-                  <Info className="h-3.5 w-3.5 shrink-0 text-primary/30" />
-                  <p className="text-center text-[11px] font-bold leading-relaxed text-muted-foreground/50">날짜를 누르면 그날의 핵심 기록만 볼 수 있어요.</p>
+                <div className="mx-1 flex items-center justify-center gap-2 rounded-[1.4rem] border border-dashed border-[#dbe6fb] bg-[#f7fbff] px-4 py-2.5 shadow-[0_16px_28px_-26px_rgba(20,41,95,0.12)]">
+                  <Info className="h-3.5 w-3.5 shrink-0 text-[#6d86b4]" />
+                  <p className="text-center text-[11px] font-bold leading-relaxed text-[#5874a4]">날짜를 누르면 그날의 핵심 기록만 볼 수 있어요.</p>
                 </div>
               )}
             </TabsContent>
@@ -3871,32 +4066,36 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <TabsContent value="data" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
               <Card
                 className={cn(
-                  'overflow-hidden rounded-[2.15rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#fbfdff_0%,#ffffff_58%,#f5f8ff_100%)] p-5 shadow-[0_24px_54px_-42px_rgba(20,41,95,0.28)] sm:p-6',
+                  'relative overflow-hidden rounded-[2.3rem] border border-[#24427e] bg-[linear-gradient(145deg,#1b3a76_0%,#14295F_56%,#10224d_100%)] p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.52)] sm:p-6',
                   showEntryMotion && 'parent-card-enter parent-entry-delay-2'
                 )}
               >
-                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div className="soft-glow absolute -right-8 top-0 h-24 w-24 rounded-full bg-[#ffb56e]/24 blur-3xl" />
+                <div className="soft-glow absolute left-0 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-[#77a6ff]/16 blur-3xl" />
+                <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                   <div className="min-w-0">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#d8e4ff] bg-white/92 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5472a4] shadow-sm">
-                      <FileText className="h-3.5 w-3.5 text-[#14295F]" />
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.6)] backdrop-blur-sm">
+                      <FileText className="h-3.5 w-3.5 text-[#ffe1c2]" />
                       학습 분석 리포트
                     </div>
-                    <h3 className="mt-3 break-keep text-[1.28rem] font-black tracking-tight text-[#14295F] sm:text-[1.42rem]">
+                    <h3 className="mt-3 break-keep text-[1.32rem] font-black tracking-tight text-white sm:text-[1.52rem]">
                       {activeStudentLabel} 학생의 최근 학습 흐름을
                       <br className="hidden sm:block" />
                       차분하게 읽을 수 있게 정리했어요
                     </h3>
-                    <p className="mt-2 break-keep text-[12.5px] font-bold leading-[1.7] text-slate-500 sm:text-[13px]">
+                    <p className="mt-2 max-w-2xl break-keep text-[12.5px] font-bold leading-[1.7] text-white/76 sm:text-[13px]">
                       최근 42일 학습시간과 최근 14일 리듬 데이터를 바탕으로, 학부모님이 핵심 변화만 빠르게 파악할 수 있게 구성했습니다.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                    <Badge variant="outline" className="h-8 justify-center rounded-full border border-[#d9e6ff] bg-white/92 px-4 text-[10px] font-black text-[#14295F] shadow-sm">
-                      최근 6주 학습시간
-                    </Badge>
-                    <Badge variant="outline" className="h-8 justify-center rounded-full border border-[#d7f0e6] bg-white/92 px-4 text-[10px] font-black text-[#15836b] shadow-sm">
-                      최근 14일 리듬
-                    </Badge>
+                    <div className="rounded-[1.15rem] border border-white/12 bg-white/10 px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/54">학습시간 창</p>
+                      <p className="mt-1 text-[12px] font-black text-white">최근 6주</p>
+                    </div>
+                    <div className="rounded-[1.15rem] border border-white/12 bg-white/10 px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/54">리듬 창</p>
+                      <p className="mt-1 text-[12px] font-black text-white">최근 14일</p>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -4242,7 +4441,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="communication" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <Card className="rounded-[2.35rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#fbfdff_0%,#ffffff_72%,#fff8f0_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.20)] sm:p-6">
+              <Card className={cn('rounded-[2.4rem] border border-[#dbe5fb] bg-[linear-gradient(145deg,#ffffff_0%,#f8fbff_72%,#fff8f1_100%)] p-5 shadow-[0_28px_52px_-40px_rgba(20,41,95,0.2)] sm:p-6', showEntryMotion && 'parent-card-enter parent-entry-delay-2')}>
                 <ParentSectionHeader
                   icon={<Bell className="h-3.5 w-3.5" />}
                   eyebrow="Communication"
@@ -4368,7 +4567,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 )}
               </Card>
-              <Card className="rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8">
+              <Card className={cn('rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8', showEntryMotion && 'parent-card-enter parent-entry-delay-3')}>
                 <ParentSectionHeader
                   icon={<Send className="h-3.5 w-3.5" />}
                   eyebrow="Support"
@@ -4398,7 +4597,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#fefcff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8">
+              <Card className={cn('rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#fefcff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8', showEntryMotion && 'parent-card-enter parent-entry-delay-4')}>
                 <ParentSectionHeader
                   icon={<MessageCircle className="h-3.5 w-3.5" />}
                   eyebrow="Inquiry"
@@ -4464,7 +4663,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8">
+              <Card className={cn('rounded-[2.5rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(20,41,95,0.18)] sm:p-8', showEntryMotion && 'parent-card-enter parent-entry-delay-4')}>
                 <ParentSectionHeader
                   icon={<Bell className="h-3.5 w-3.5" />}
                   eyebrow="Replies"
@@ -4529,7 +4728,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="billing" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <Card className="overflow-hidden rounded-[2.35rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#fbfdff_0%,#ffffff_52%,#f6f9ff_100%)] p-5 shadow-[0_28px_58px_-42px_rgba(20,41,95,0.24)] sm:p-6">
+              <Card className={cn('overflow-hidden rounded-[2.4rem] border border-[#dfe7fb] bg-[linear-gradient(180deg,#fbfdff_0%,#ffffff_52%,#f6f9ff_100%)] p-5 shadow-[0_30px_60px_-42px_rgba(20,41,95,0.24)] sm:p-6', showEntryMotion && 'parent-card-enter parent-entry-delay-2')}>
                 <div className="space-y-5">
                   <ParentSectionHeader
                     icon={<CreditCard className="h-3.5 w-3.5" />}
