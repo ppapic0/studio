@@ -90,10 +90,18 @@ export function AdminWorkbenchCommandBar({
         className
       )}
     >
-      <div className="flex flex-col gap-5">
+      {isAdminStudio ? (
+        <>
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-white/24" />
+          <div className="pointer-events-none absolute -left-16 top-8 h-40 w-40 rounded-full bg-[#FF7A16]/16 blur-3xl" />
+          <div className="pointer-events-none absolute -right-16 bottom-0 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+        </>
+      ) : null}
+
+      <div className={cn('flex flex-col gap-5', isAdminStudio && 'relative z-10')}>
         <div className={cn(
           'flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between',
-          isAdminStudio && 'lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end'
+          isAdminStudio && 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)] lg:items-start'
         )}>
           <div className="space-y-1">
             {eyebrow ? (
@@ -127,7 +135,18 @@ export function AdminWorkbenchCommandBar({
           </div>
 
           {quickActions.length > 0 ? (
-            <div className={cn('flex flex-wrap gap-2', isAdminStudio && 'lg:justify-end')}>
+            <div
+              className={cn(
+                isAdminStudio
+                  ? 'grid gap-2 rounded-[1.9rem] border border-white/10 bg-[#0D2252]/26 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:grid-cols-2'
+                  : 'flex flex-wrap gap-2'
+              )}
+            >
+              {isAdminStudio ? (
+                <p className="px-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/50 sm:col-span-2">
+                  Quick Routes
+                </p>
+              ) : null}
               {quickActions.map((action) => {
                 const button = (
                   <Button
@@ -139,7 +158,7 @@ export function AdminWorkbenchCommandBar({
                       isTeacherWorkbench
                         ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
                         : isAdminStudio
-                          ? 'h-11 rounded-[1.15rem] border-white/14 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-white/16'
+                          ? 'h-12 w-full justify-start rounded-[1.15rem] border-white/14 bg-white/10 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-white/16'
                           : 'border-slate-200 bg-white text-[#17306f]'
                     )}
                     onClick={action.onClick}
@@ -162,7 +181,7 @@ export function AdminWorkbenchCommandBar({
                         isTeacherWorkbench
                           ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
                           : isAdminStudio
-                            ? 'h-11 rounded-[1.15rem] border-white/14 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-white/16'
+                            ? 'h-12 w-full justify-start rounded-[1.15rem] border-white/14 bg-white/10 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-white/16'
                             : 'border-slate-200 bg-white text-[#17306f]'
                       )}
                     >
@@ -183,7 +202,8 @@ export function AdminWorkbenchCommandBar({
         {(onSearchChange || onPeriodChange || (onSelectChange && selectOptions?.length) || children) ? (
           <div className={cn(
             'flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between',
-            isAdminStudio && 'rounded-[1.8rem] border border-white/10 bg-white/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+            isAdminStudio &&
+              'rounded-[1.95rem] border border-white/10 bg-[#0D2252]/22 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
           )}>
             <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center">
               {onPeriodChange ? (
@@ -270,7 +290,17 @@ export function AdminWorkbenchCommandBar({
               ) : null}
             </div>
 
-            {children ? <div className={cn('flex flex-wrap gap-3', isAdminStudio && 'xl:justify-end')}>{children}</div> : null}
+            {children ? (
+              <div
+                className={cn(
+                  'flex flex-wrap gap-3',
+                  isAdminStudio &&
+                    'rounded-[1.35rem] border border-white/10 bg-white/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] xl:justify-end'
+                )}
+              >
+                {children}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

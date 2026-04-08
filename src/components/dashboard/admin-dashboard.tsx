@@ -2503,6 +2503,74 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const secondaryUrgentInterventions = urgentInterventionStudents.slice(1, 4);
   const primaryAttendanceContactTarget = todayAttendanceContactTargets[0] || null;
   const secondaryAttendanceContactTargets = todayAttendanceContactTargets.slice(1, 4);
+  const totalControlAlerts =
+    attendanceBoardSummary.lateOrAbsentCount + attendanceBoardSummary.longAwayCount + urgentInterventionStudents.length;
+  const weakestAxis =
+    centerHealthAxes.length > 0
+      ? centerHealthAxes.reduce((lowest, axis) => (axis.summaryScore < lowest.summaryScore ? axis : lowest))
+      : null;
+  const commandModeMeta =
+    totalControlAlerts >= 10
+      ? {
+          badge: 'High Alert',
+          title: '즉시 대응 모드',
+          description: '출결 경고와 학생 개입 신호가 겹친 상태라서 좌석 관제와 연락 흐름을 먼저 붙여야 합니다.',
+          panelClassName: 'rounded-[1.85rem] border border-[#FFB677]/30 bg-[#FF7A16]/16 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]',
+          badgeClassName: 'border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#C95A08]',
+        }
+      : totalControlAlerts >= 4
+        ? {
+            badge: 'Attention Flow',
+            title: '주의 관찰 모드',
+            description: '긴급 신호는 제한적이지만 누적되기 쉬운 흐름이 있어서 우선순위 보드와 액션 레일을 함께 봐야 합니다.',
+            panelClassName:
+              'rounded-[1.85rem] border border-white/12 bg-white/10 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]',
+            badgeClassName: 'border-none bg-white/12 px-2.5 py-1 text-[10px] font-black text-white',
+          }
+        : {
+            badge: 'Stable Flow',
+            title: '안정 운영 모드',
+            description: '즉시 폭주 신호는 낮아서 관제 흐름을 유지하면서 분석 레일과 리드 관리까지 넓게 볼 수 있습니다.',
+            panelClassName:
+              'rounded-[1.85rem] border border-white/12 bg-white/10 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]',
+            badgeClassName: 'border-none bg-white/12 px-2.5 py-1 text-[10px] font-black text-white',
+          };
+  const controlBriefLines = [
+    {
+      key: 'priority',
+      eyebrow: '최우선',
+      title: topAdminPriority?.title || '현재 운영 흐름은 안정적입니다.',
+      detail:
+        topAdminPriority?.detail ||
+        '즉시 긴급 큐가 비어 있으니 좌석 관제와 분석 레일을 넓게 점검하면서 다음 신호를 기다리면 됩니다.',
+      icon: AlertTriangle,
+      iconClassName: 'bg-[#FF7A16]/18 text-[#FFD7BA]',
+    },
+    {
+      key: 'student',
+      eyebrow: '개입 학생',
+      title: primaryUrgentIntervention?.studentName || '즉시 개입 대기 없음',
+      detail:
+        primaryUrgentIntervention?.topReason ||
+        '현재는 학생 360으로 바로 넘길 긴급 학생 신호가 없습니다. 좌석 흐름만 유지하면 됩니다.',
+      icon: ShieldAlert,
+      iconClassName: 'bg-white/12 text-white',
+    },
+    {
+      key: 'contact',
+      eyebrow: '연락 우선',
+      title:
+        primaryAttendanceContactTarget?.studentName ||
+        parentContactCompactPreview[0]?.parentName ||
+        '연락 우선 대상 없음',
+      detail:
+        primaryAttendanceContactTarget?.detailLabel ||
+        parentContactCompactPreview[0]?.recommendedAction ||
+        '출결과 학부모 반응 모두 안정 구간이라 즉시 연락이 필요한 대상이 없습니다.',
+      icon: Phone,
+      iconClassName: 'bg-[#2554D7]/24 text-white',
+    },
+  ];
   const studioWhiteCardClassName =
     'rounded-[2.1rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_20px_48px_-38px_rgba(20,41,95,0.32)]';
   const studioInsetCardClassName =
@@ -2543,7 +2611,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           실시간 착석 {metrics.checkedInCount}명
         </Badge>
         <Badge className="h-8 rounded-full border-none bg-[#FF7A16] px-3.5 text-[10px] font-black text-white">
-          긴급 흐름 {attendanceBoardSummary.lateOrAbsentCount + attendanceBoardSummary.longAwayCount + urgentInterventionStudents.length}건
+          긴급 흐름 {totalControlAlerts}건
         </Badge>
       </AdminWorkbenchCommandBar>
 
@@ -2552,7 +2620,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           <motion.section className="space-y-4 px-1" {...getStudioMotionProps(0.02, 20)}>
             <Card className="overflow-hidden rounded-[3rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.2),transparent_22%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.16),transparent_20%),linear-gradient(135deg,#0F214A_0%,#173879_44%,#2554D7_100%)] shadow-[0_32px_86px_-48px_rgba(20,41,95,0.62)]">
               <CardContent className={cn('space-y-5 text-white', isMobile ? 'p-5' : 'p-6 sm:p-7')}>
-                <div className={cn('flex gap-5', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                <div className={cn('grid gap-5', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start')}>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className="h-6 rounded-full border-none bg-white/12 px-2.5 text-[10px] font-black uppercase tracking-[0.18em] text-white">
@@ -2562,7 +2630,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         {selectedClass === 'all' ? '센터 전체' : selectedClass}
                       </Badge>
                       <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">
-                        긴급 신호 {attendanceBoardSummary.lateOrAbsentCount + attendanceBoardSummary.longAwayCount + urgentInterventionStudents.length}건
+                        긴급 신호 {totalControlAlerts}건
                       </Badge>
                     </div>
                     <h2 className="mt-4 font-aggro-display text-[2.2rem] font-black tracking-tight sm:text-[2.8rem]">
@@ -2595,27 +2663,50 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   </div>
 
-                  <div className={cn('grid gap-3', isMobile ? 'grid-cols-3' : 'min-w-[320px] grid-cols-1')}>
-                    <div className={cn(studioGlassPanelClassName, 'px-4 py-3')}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">오늘 학습</p>
-                      <p className="dashboard-number mt-2 text-[1.9rem] text-white">{(metrics.totalTodayMins / 60).toFixed(1)}시간</p>
+                  <div className="grid gap-3">
+                    <div className={commandModeMeta.panelClassName}>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">Control Mode</p>
+                        <Badge className={commandModeMeta.badgeClassName}>{commandModeMeta.badge}</Badge>
+                      </div>
+                      <p className="mt-3 text-[1.35rem] font-black tracking-tight text-white">{commandModeMeta.title}</p>
+                      <p className="mt-2 text-xs font-semibold leading-5 text-white/74">{commandModeMeta.description}</p>
                     </div>
-                    <div className={cn(studioGlassPanelClassName, 'px-4 py-3')}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">실시간 착석</p>
-                      <p className="dashboard-number mt-2 text-[1.9rem] text-white">{metrics.checkedInCount}명</p>
+                    <div className={cn(studioGlassPanelClassName, 'px-4 py-4')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">Weakest Axis</p>
+                          <p className="mt-2 text-lg font-black tracking-tight text-white">
+                            {weakestAxis?.label || '운영 지표 준비 중'}
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
+                            {weakestAxis?.description || '데이터가 준비되면 가장 약한 운영 축을 이곳에서 먼저 보여줍니다.'}
+                          </p>
+                        </div>
+                        <Badge className="border-none bg-white/12 px-2.5 py-1 text-[10px] font-black text-white">
+                          {weakestAxis ? `${weakestAxis.summaryScore}점` : 'N/A'}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="rounded-[1.7rem] border border-[#FFB677]/30 bg-[#FF7A16]/16 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/64">주의 흐름</p>
-                      <p className="dashboard-number mt-2 text-[1.9rem] text-white">
-                        {attendanceBoardSummary.lateOrAbsentCount + attendanceBoardSummary.longAwayCount}건
-                      </p>
+                    <div className={cn(studioGlassPanelClassName, 'px-4 py-4')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">Sync / Study</p>
+                          <p className="dashboard-number mt-2 text-[1.9rem] text-white">{(metrics.totalTodayMins / 60).toFixed(1)}h</p>
+                          <p className="mt-1 text-xs font-semibold text-white/72">실시간 착석 {metrics.checkedInCount}명</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">업데이트</p>
+                          <p className="mt-2 text-lg font-black text-white">{liveSyncLabel}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.08fr)_420px]')}>
                   <div className={cn(studioGlassPanelClassName, 'p-5')}>
-                    <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                    <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start')}>
                       <div className="min-w-0">
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/56">현재 메인 브리핑</p>
                         <p className="mt-3 text-[1.45rem] font-black tracking-tight text-white">
@@ -2624,34 +2715,59 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         <p className="mt-2 max-w-[34rem] text-sm font-semibold leading-6 text-white/72">
                           {topAdminPriority?.detail || '좌석 흐름과 보호자 반응, 운영 리드를 함께 점검하면서 다음 신호를 기다리면 됩니다.'}
                         </p>
-                      </div>
-                      <div className="shrink-0 rounded-[1.45rem] border border-white/12 bg-white/10 px-4 py-3 text-right">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">동기화</p>
-                        <p className="mt-2 text-xl font-black text-white">{liveSyncLabel}</p>
-                      </div>
-                    </div>
 
-                    <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
-                      <div className="rounded-[1.55rem] border border-white/10 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">좌석 리스크</p>
-                        <p className="mt-2 text-lg font-black text-white">미입실·지각 {attendanceBoardSummary.lateOrAbsentCount}명</p>
-                        <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
-                          장기 외출 {attendanceBoardSummary.longAwayCount}명 · 루틴 누락 {attendanceBoardSummary.routineMissingCount}명
-                        </p>
+                        <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
+                          <div className="rounded-[1.55rem] border border-white/10 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">좌석 리스크</p>
+                            <p className="mt-2 text-lg font-black text-white">미입실·지각 {attendanceBoardSummary.lateOrAbsentCount}명</p>
+                            <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
+                              장기 외출 {attendanceBoardSummary.longAwayCount}명 · 루틴 누락 {attendanceBoardSummary.routineMissingCount}명
+                            </p>
+                          </div>
+                          <div className="rounded-[1.55rem] border border-white/10 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">학생 개입</p>
+                            <p className="mt-2 text-lg font-black text-white">즉시 개입 {urgentInterventionStudents.length}명</p>
+                            <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
+                              {primaryUrgentIntervention?.topReason || '현재는 즉시 개입이 필요한 학생 신호가 없습니다.'}
+                            </p>
+                          </div>
+                          <div className="rounded-[1.55rem] border border-white/10 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">학부모 / 리드</p>
+                            <p className="mt-2 text-lg font-black text-white">우선 연락 {parentContactRecommendations.length}명</p>
+                            <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
+                              상담·리드 {metrics.leadPipelineCount30d}건 · 최근 30일 상담 요청 {metrics.consultationRequestCount30d}건
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="rounded-[1.55rem] border border-white/10 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">학생 개입</p>
-                        <p className="mt-2 text-lg font-black text-white">즉시 개입 {urgentInterventionStudents.length}명</p>
-                        <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
-                          {primaryUrgentIntervention?.topReason || '현재는 즉시 개입이 필요한 학생 신호가 없습니다.'}
-                        </p>
-                      </div>
-                      <div className="rounded-[1.55rem] border border-white/10 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/56">학부모 / 리드</p>
-                        <p className="mt-2 text-lg font-black text-white">우선 연락 {parentContactRecommendations.length}명</p>
-                        <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
-                          상담·리드 {metrics.leadPipelineCount30d}건 · 최근 30일 상담 요청 {metrics.consultationRequestCount30d}건
-                        </p>
+                      <div className="rounded-[1.65rem] border border-white/10 bg-[#0D2252]/26 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/58">지휘 노트</p>
+                            <p className="mt-2 text-sm font-black tracking-tight text-white">지금 바로 확인할 흐름</p>
+                          </div>
+                          <Badge className="border-none bg-white/12 px-2.5 py-1 text-[10px] font-black text-white">{liveSyncLabel}</Badge>
+                        </div>
+                        <div className="mt-4 space-y-2.5">
+                          {controlBriefLines.map((item, index) => {
+                            const BriefIcon = item.icon;
+                            return (
+                              <div key={item.key} className="flex gap-3 rounded-[1.3rem] border border-white/10 bg-white/10 p-3">
+                                <span className={cn('inline-flex h-10 w-10 items-center justify-center rounded-[1rem]', item.iconClassName)}>
+                                  <BriefIcon className="h-4 w-4" />
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">{item.eyebrow}</p>
+                                    <span className="text-[10px] font-black text-white/32">{String(index + 1).padStart(2, '0')}</span>
+                                  </div>
+                                  <p className="mt-1 truncate text-sm font-black text-white">{item.title}</p>
+                                  <p className="mt-1 text-[11px] font-semibold leading-5 text-white/70">{item.detail}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2755,23 +2871,23 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 const snapshotInner = (
                   <div
                     className={cn(
-                      'flex h-full flex-col justify-between rounded-[1.8rem] border p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.24)] transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-[#FF7A16]/24 hover:shadow-[0_26px_44px_-34px_rgba(20,41,95,0.34)]',
+                      'flex h-full flex-col gap-3 rounded-[1.65rem] border px-4 py-3 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.22)] transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-[#FF7A16]/24 hover:shadow-[0_24px_40px_-32px_rgba(20,41,95,0.32)]',
                       item.surfaceClassName
                     )}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]">{item.label}</p>
-                        <p className="dashboard-number mt-2 text-3xl tracking-tight text-[#14295F]">{item.value}</p>
-                      </div>
-                      <span className={cn('inline-flex h-11 w-11 items-center justify-center rounded-[1.15rem] shadow-sm', item.iconClassName)}>
+                    <div className="flex items-center gap-3">
+                      <span className={cn('inline-flex h-11 w-11 items-center justify-center rounded-[1.1rem] shadow-sm', item.iconClassName)}>
                         <item.icon className="h-5 w-5" />
                       </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]">{item.label}</p>
+                          <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#14295F]">{item.actionLabel}</span>
+                        </div>
+                        <p className="dashboard-number mt-1 text-[1.9rem] tracking-tight text-[#14295F]">{item.value}</p>
+                      </div>
                     </div>
-                    <div className="mt-4 flex items-end justify-between gap-3">
-                      <p className="text-[11px] font-bold leading-5 text-[#5c6e97]">{item.detail}</p>
-                      <span className="shrink-0 text-[11px] font-black text-[#14295F]">{item.actionLabel}</span>
-                    </div>
+                    <p className="text-[11px] font-bold leading-5 text-[#5c6e97]">{item.detail}</p>
                   </div>
                 );
 
