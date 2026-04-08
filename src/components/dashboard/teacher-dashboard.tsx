@@ -3283,8 +3283,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     </div>
 
-                    <div className="flex min-h-0 flex-1 flex-col bg-[#F7F9FC]">
-                      <div className={cn("grid min-h-0 flex-1", isMobile ? "grid-cols-1" : "lg:grid-cols-[340px_minmax(0,1fr)]")}>
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F7F9FC]">
+                      <div className={cn("grid h-full min-h-0 flex-1 overflow-hidden", isMobile ? "grid-cols-1" : "lg:grid-cols-[340px_minmax(0,1fr)]")}>
                         <div className="border-b border-[#DDE7FF] bg-white/82 backdrop-blur-sm lg:border-b-0 lg:border-r">
                           <div className={cn("space-y-4", isMobile ? "p-4" : "p-5 sm:p-6")}>
                             <motion.div {...getDeckMotionProps(0.08, 10)} className="rounded-[2rem] border border-[#D7E4FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-5 shadow-sm">
@@ -3392,7 +3392,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           </div>
                         </div>
 
-                        <div className="min-h-0 flex flex-col">
+                        <div className="min-h-0 flex flex-col overflow-hidden">
                           <Tabs defaultValue="status" className="flex h-full min-h-0 w-full flex-col">
                             <div className={cn("px-4 pt-4", isMobile ? "" : "sm:px-6 sm:pt-6")}>
                               <TabsList className="grid h-auto w-full grid-cols-4 rounded-[1.35rem] bg-[#EEF4FF] p-1">
@@ -3403,8 +3403,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               </TabsList>
                             </div>
 
-                            <div className="min-h-0 flex-1 overflow-hidden">
-                          <TabsContent value="status" className="mt-0 h-full overflow-y-auto custom-scrollbar p-6 pb-28 sm:p-8 sm:pb-32 space-y-6">
+                            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                          <TabsContent value="status" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 pb-28 data-[state=active]:flex data-[state=active]:flex-col sm:p-8 sm:pb-32 space-y-6">
                             <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-4")}>
                               <div className="rounded-[1.85rem] border border-[#D7E4FF] bg-white p-5 shadow-sm">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/48">오늘 판정</p>
@@ -3485,7 +3485,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
-                          <TabsContent value="history" className="mt-0 h-full overflow-y-auto custom-scrollbar p-6 pb-28 sm:p-8 sm:pb-32 space-y-6">
+                          <TabsContent value="history" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 pb-28 data-[state=active]:flex data-[state=active]:flex-col sm:p-8 sm:pb-32 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <TrendingUp className="h-4 w-4 text-emerald-600" />
                               <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600">최근 학습 시간 변화</h4>
@@ -3533,7 +3533,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
-                          <TabsContent value="penalty" className="mt-0 h-full overflow-y-auto custom-scrollbar p-6 pb-28 sm:p-8 sm:pb-32 space-y-6">
+                          <TabsContent value="penalty" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 pb-28 data-[state=active]:flex data-[state=active]:flex-col sm:p-8 sm:pb-32 space-y-6">
                             <div className="flex items-center justify-between gap-2 px-1">
                               <div className="flex items-center gap-2">
                                 <ShieldAlert className="h-4 w-4 text-rose-600" />
@@ -3655,7 +3655,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </TabsContent>
 
-                          <TabsContent value="reports" className="mt-0 h-full min-h-0 overflow-y-auto custom-scrollbar p-6 pb-36 sm:p-8 sm:pb-40 space-y-6">
+                          <TabsContent value="reports" className="mt-0 min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 pb-36 data-[state=active]:flex data-[state=active]:flex-col sm:p-8 sm:pb-40 space-y-6">
                             <div className="flex items-center gap-2 px-1">
                               <FileText className="h-4 w-4 text-amber-600" />
                               <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-600">최근 발송된 리포트 (5건)</h4>
