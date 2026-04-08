@@ -33,7 +33,7 @@ type QuickAction = {
 type AdminWorkbenchCommandBarProps = {
   eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   variant?: 'default' | 'teacherWorkbench' | 'adminStudio';
   searchValue?: string;
   searchPlaceholder?: string;
@@ -116,14 +116,16 @@ export function AdminWorkbenchCommandBar({
                   ? 'font-aggro-display text-[1.35rem] font-black text-white sm:text-[1.55rem]'
                   : 'text-xl font-black text-[#14295F]'
             )}>{title}</h2>
-            <p className={cn(
-              'font-semibold leading-5',
-              isTeacherWorkbench
-                ? 'max-w-3xl text-[12px] text-[#5c6e97]'
-                : isAdminStudio
-                  ? 'max-w-2xl text-[11px] text-white/72 sm:text-[12px]'
-                  : 'text-xs text-[#5c6e97]'
-            )}>{description}</p>
+            {description ? (
+              <p className={cn(
+                'font-semibold leading-5',
+                isTeacherWorkbench
+                  ? 'max-w-3xl text-[12px] text-[#5c6e97]'
+                  : isAdminStudio
+                    ? 'max-w-2xl text-[11px] text-white/72 sm:text-[12px]'
+                    : 'text-xs text-[#5c6e97]'
+              )}>{description}</p>
+            ) : null}
           </div>
 
           {quickActions.length > 0 ? (

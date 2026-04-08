@@ -2111,10 +2111,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     <Filter className="h-3.5 w-3.5" />
                     반 선택
                   </div>
-                  <div className="mt-3 flex items-center gap-2 rounded-[1.3rem] border border-white/10 bg-white/92 p-1.5 pl-4 text-[#14295F] shadow-[0_18px_34px_-24px_rgba(0,0,0,0.45)]">
-                    <Filter className="h-3.5 w-3.5 shrink-0 text-[#14295F]/45" />
+                  <div className="mt-3 flex items-center gap-2 rounded-[1.3rem] border border-white/10 bg-white/[0.06] p-1.5 pl-4 text-white shadow-[0_18px_34px_-24px_rgba(0,0,0,0.45)]">
+                    <Filter className="h-3.5 w-3.5 shrink-0 text-white/55" />
                     <Select value={selectedClass} onValueChange={setSelectedClass}>
-                      <SelectTrigger className="h-9 w-full border-none bg-transparent px-0 text-left text-xs font-black shadow-none focus:ring-0">
+                      <SelectTrigger className="h-9 w-full border-none bg-transparent px-0 text-left text-xs font-black text-white shadow-none placeholder:text-white/55 focus:ring-0 [&_svg]:text-white/55">
                         <SelectValue placeholder="반 선택" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-none shadow-2xl">

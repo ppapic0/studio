@@ -2403,6 +2403,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   ];
 
   const liveSyncLabel = format(liveTickMs || now || Date.now(), 'HH:mm');
+  const liveDateLabel = format(today || new Date(), 'MM.dd');
   const topFocusCompactPreview = topFocusPreview.slice(0, 3);
   const bottomFocusCompactPreview = bottomFocusPreview.slice(0, 3);
   const parentContactCompactPreview = parentContactRecommendations.slice(0, 2);
@@ -2562,7 +2563,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const heatmapGraphSection = (
     <CenterAdminHeatmapCharts
       title="대표 운영 차트"
-      description="선택한 축 기준으로 추이와 개입 우선 학생만 간결하게 이어서 확인합니다."
       rows={adminHeatmapRows}
       interventionSignals={heatmapInterventionSignals}
       scopeLabel={selectedClass === 'all' ? '센터 전체' : selectedClass}
@@ -2717,6 +2717,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <div className={cn('flex gap-3', isMobile ? 'flex-wrap' : 'items-center')}>
                 <div className="flex items-center gap-2 rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-2.5">
                   <Clock className="h-3.5 w-3.5 text-white/50" />
+                  <span className="text-[10px] font-black text-white/60">{liveDateLabel}</span>
                   <span className="admin-kpi-number text-lg text-white">{liveSyncLabel}</span>
                 </div>
                 <div className="flex gap-1.5">
@@ -3022,23 +3023,23 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         {/* ═══ D. Center Health Axes — 운영 5축 ═══ */}
         <motion.div {...getStudioMotionProps(0.28, 16)}>
           <Card className="overflow-hidden rounded-[2.25rem] border border-[#17326B] admin-surface-dark text-white shadow-[0_30px_70px_-44px_rgba(20,41,95,0.72)]">
-            <CardHeader className="border-b border-white/10 pb-4">
+            <CardHeader className="border-b border-[#DCE7FF] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,255,0.94)_100%)] pb-4">
               <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-black text-white">운영 5축</Badge>
-                    <Badge className="rounded-full border border-[#FFB57A]/30 bg-[#FF7A16]/14 px-2.5 py-1 text-[10px] font-black text-[#FFD7BA]">대표 차트</Badge>
+                    <Badge className="rounded-full border border-[#DCE7FF] bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">운영 5축</Badge>
+                    <Badge className="rounded-full border border-[#FFD7BA] bg-[#FFF2E8] px-2.5 py-1 text-[10px] font-black text-[#14295F]">대표 차트</Badge>
                   </div>
-                  <CardTitle className="mt-3 admin-section-title text-[1.55rem] tracking-tight text-white">
+                  <CardTitle className="mt-3 admin-section-title text-[1.55rem] tracking-tight text-[#14295F]">
                     {selectedHomeAxis ? `${selectedHomeAxis.label}부터 먼저 봅니다.` : '운영 5축에서 약한 축부터 봅니다.'}
                   </CardTitle>
-                  <CardDescription className="mt-2 max-w-[42rem] text-sm font-bold leading-6 text-white/60">
+                  <CardDescription className="mt-2 max-w-[42rem] text-sm font-bold leading-6 text-[#5c6e97]">
                     선택 축 추이와 개입 버튼만 이 영역에서 바로 봅니다.
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-black text-white">{selectedClass === 'all' ? '센터 전체' : selectedClass}</Badge>
-                  {selectedHomeAxis && <Badge className="rounded-full border border-[#FFB57A]/30 bg-[#FF7A16]/14 px-3 py-1 text-[10px] font-black text-[#FFD7BA]">{selectedHomeAxis.summaryScore}점 · {selectedHomeAxis.summaryLabel}</Badge>}
+                  <Badge className="rounded-full border border-[#DCE7FF] bg-white px-3 py-1 text-[10px] font-black text-[#14295F]">{selectedClass === 'all' ? '센터 전체' : selectedClass}</Badge>
+                  {selectedHomeAxis && <Badge className="rounded-full border border-[#FFD7BA] bg-[#FFF2E8] px-3 py-1 text-[10px] font-black text-[#14295F]">{selectedHomeAxis.summaryScore}점 · {selectedHomeAxis.summaryLabel}</Badge>}
                 </div>
               </div>
             </CardHeader>
@@ -3176,7 +3177,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       <AdminWorkbenchCommandBar
         eyebrow="센터 운영"
         title="센터관리자 운영실"
-        description="긴급 조치, 교실 상태, 개입 학생, 대표 인사이트만 먼저 보이도록 정리한 운영 홈입니다."
         variant="adminStudio"
         quickActions={workbenchQuickActions}
         selectValue={selectedClass}

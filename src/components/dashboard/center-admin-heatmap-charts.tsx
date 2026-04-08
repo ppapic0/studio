@@ -37,7 +37,7 @@ import {
 
 type CenterAdminHeatmapChartsProps = {
   title: string;
-  description: string;
+  description?: string;
   rows: CenterAdminHeatmapRow[];
   interventionSignals: CenterAdminStudentSeatSignal[];
   scopeLabel?: string;
@@ -203,13 +203,13 @@ export function CenterAdminHeatmapCharts({
   const selectedRow = rows.find((row) => row.id === selectedRowId) || null;
   const selectedDomainKey = (selectedRow?.id || null) as CenterAdminSeatDomainKey | null;
 
-  const topStudents = useMemo(() => {
-    if (!selectedDomainKey) return [];
+  const rankStudentsForDomain = (domainKey: CenterAdminSeatDomainKey | null, limit: number) => {
+    if (!domainKey) return [];
 
     return interventionSignals
       .map((signal) => ({
         signal,
-        insight: getCenterAdminDomainInsight(signal, selectedDomainKey),
+        insight: getCenterAdminDomainInsight(signal, domainKey),
       }))
       .sort((a, b) => {
         if (a.insight.score !== b.insight.score) return a.insight.score - b.insight.score;
@@ -218,7 +218,17 @@ export function CenterAdminHeatmapCharts({
         }
         return a.signal.todayMinutes - b.signal.todayMinutes;
       })
-      .slice(0, 5);
+      .slice(0, limit);
+  };
+
+  const activeDomainKey = (activeRow?.id || null) as CenterAdminSeatDomainKey | null;
+
+  const activeTopStudents = useMemo(() => {
+    return rankStudentsForDomain(activeDomainKey, 3);
+  }, [activeDomainKey, interventionSignals]);
+
+  const topStudents = useMemo(() => {
+    return rankStudentsForDomain(selectedDomainKey, 5);
   }, [interventionSignals, selectedDomainKey]);
 
   if (isLoading) {
@@ -251,7 +261,9 @@ export function CenterAdminHeatmapCharts({
                 <BarChart3 className="h-5 w-5 text-[#2554D7]" />
                 {title}
               </CardTitle>
-              <CardDescription className="text-xs font-bold leading-5 text-[#5c6e97]">{description}</CardDescription>
+              {description ? (
+                <CardDescription className="text-xs font-bold leading-5 text-[#5c6e97]">{description}</CardDescription>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#2554D7]">
@@ -324,9 +336,8 @@ export function CenterAdminHeatmapCharts({
                       <span className="text-[10px] font-black uppercase tracking-[0.22em]">선택 축</span>
                     </div>
                     <h3 className="mt-3 text-[1.65rem] font-black tracking-tight text-[#14295F]">{activeRow.label}</h3>
-                    <p className="mt-1 text-sm font-bold leading-6 text-slate-500">{activeRow.description}</p>
 
-                    <div className={cn('mt-4 rounded-[1.35rem] border p-4', activePalette.chipClass, activePalette.glowClass)}>
+                    <div className={cn('mt-3 rounded-[1.35rem] border p-4', activePalette.chipClass, activePalette.glowClass)}>
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">현재 점수</p>
                       <div className="mt-2 flex items-end justify-between gap-3">
                         <p className="dashboard-number text-4xl tracking-tight">{activeRow.summaryScore}</p>
@@ -424,6 +435,50 @@ export function CenterAdminHeatmapCharts({
                           {metric.label} {metric.value}
                         </div>
                       ))}
+                    </div>
+
+                    <div className="mt-3 rounded-[1.25rem] border border-[#E5EDFF] bg-white/85 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">개입 우선</p>
+                          <p className="mt-1 text-sm font-black text-[#14295F]">지금 볼 학생 TOP 3</p>
+                        </div>
+                        <Badge className={cn('h-6 rounded-full border-none px-2.5 text-[10px] font-black', activePalette.badgeClass)}>
+                          {activeTopStudents.length}명
+                        </Badge>
+                      </div>
+
+                      {activeTopStudents.length === 0 ? (
+                        <div className="mt-3 rounded-[1rem] border border-dashed border-[#DCE7FF] bg-[#F8FBFF] px-3 py-4 text-center text-[11px] font-bold text-slate-400">
+                          개입 우선 학생이 아직 없습니다.
+                        </div>
+                      ) : (
+                        <div className="mt-3 space-y-2">
+                          {activeTopStudents.map(({ signal, insight }, index) => (
+                            <div
+                              key={`${activeRow.id}_${signal.studentId}`}
+                              className="flex items-start gap-3 rounded-[1rem] border border-[#E7EEFB] bg-[#FAFCFF] px-3 py-2.5"
+                            >
+                              <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black', activePalette.chipClass)}>
+                                {index + 1}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="truncate text-[13px] font-black text-[#14295F]">{signal.studentName}</p>
+                                  {signal.className ? (
+                                    <span className="rounded-full bg-[#EEF4FF] px-2 py-0.5 text-[10px] font-black text-[#5c6e97]">
+                                      {signal.className}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="mt-1 line-clamp-2 text-[11px] font-bold leading-5 text-slate-500">
+                                  {insight.analysis}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </section>
 
