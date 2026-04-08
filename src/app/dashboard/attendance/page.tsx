@@ -726,7 +726,7 @@ export default function AttendancePage() {
       <AdminWorkbenchCommandBar
         eyebrow="출결 워크벤치"
         title="출결 운영 워크벤치"
-        description="오늘 출결, KPI, 신청 관리 화면을 같은 빠른 실행과 날짜 기준으로 이어서 봅니다."
+        description="출결 KPI와 신청 관리 화면을 같은 빠른 실행과 날짜 기준으로 이어서 봅니다."
         quickActions={[
           { label: '실시간 교실', icon: <UserCheck className="h-4 w-4" />, href: '/dashboard/teacher' },
           ...(canOpenSettings ? [{ label: '문자 콘솔', icon: <ClipboardCheck className="h-4 w-4" />, href: '/dashboard/settings/notifications' }] : []),
@@ -746,9 +746,8 @@ export default function AttendancePage() {
         </div>
       </AdminWorkbenchCommandBar>
 
-      <Tabs defaultValue="attendance" className="w-full">
-        <TabsList className="grid grid-cols-3 bg-muted/30 p-1 rounded-2xl border h-14 mb-8 max-w-2xl">
-          <TabsTrigger value="attendance" className="rounded-xl font-black gap-2"><UserCheck className="h-4 w-4" /> 일일 출석체크</TabsTrigger>
+      <Tabs defaultValue="kpi" className="w-full">
+        <TabsList className="grid grid-cols-2 bg-muted/30 p-1 rounded-2xl border h-14 mb-8 max-w-2xl">
           <TabsTrigger value="kpi" className="rounded-xl font-black gap-2"><BarChart3 className="h-4 w-4" /> 출결 KPI</TabsTrigger>
           <TabsTrigger value="requests" className="rounded-xl font-black gap-2"><ClipboardCheck className="h-4 w-4" /> 신청 내역 관리</TabsTrigger>
         </TabsList>

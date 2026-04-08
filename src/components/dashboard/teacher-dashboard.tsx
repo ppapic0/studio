@@ -101,6 +101,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { motion, useReducedMotion } from 'framer-motion';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
+import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import type { CenterAdminAttendanceSeatSignal } from '@/lib/center-admin-attendance-board';
@@ -3052,7 +3053,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={!!selectedRecentReport} onOpenChange={(open) => !open && setSelectedRecentReport(null)}>
-        <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
+        <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "w-[calc(100vw-1.5rem)] max-w-[1100px] max-h-[90vh]")}>
           {selectedRecentReport && (
             <>
               <div className="bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_58%,#FF8B2B_100%)] p-8 text-white relative shrink-0">
@@ -3071,17 +3072,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   </DialogDescription>
                 </DialogHeader>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white space-y-3">
+              <div className="flex-1 overflow-y-auto bg-[#F7F9FC] custom-scrollbar p-6 sm:p-8">
                 <div className="flex items-center justify-between">
                   <Badge className="border-none bg-[#EEF4FF] text-[#14295F] font-black">{selectedRecentReport.dateKey}</Badge>
                   <Badge className={cn("border-none font-black", selectedRecentReport.viewedAt ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>
                     {selectedRecentReport.viewedAt ? '열람 완료' : '미열람'}
                   </Badge>
                 </div>
-                <div className="rounded-2xl border border-[#D7E4FF] bg-[#F8FBFF] p-5">
-                  <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-[#14295F]">
-                    {selectedRecentReport.content?.trim() || '리포트 내용이 없습니다.'}
-                  </p>
+                <div className="mt-4">
+                  <VisualReportViewer
+                    content={selectedRecentReport.content || ''}
+                    aiMeta={selectedRecentReport.aiMeta}
+                    dateKey={selectedRecentReport.dateKey}
+                    studentName={selectedRecentReport.studentName}
+                  />
                 </div>
               </div>
               <DialogFooter className="p-6 bg-white border-t border-[#D7E4FF]">
@@ -3864,7 +3868,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       </Dialog>
 
                       <Dialog open={!!selectedReportPreview} onOpenChange={(open) => !open && setSelectedReportPreview(null)}>
-                        <DialogContent className={cn("overflow-hidden border-none p-0 shadow-2xl", isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "max-h-[90vh] rounded-[2.5rem] sm:max-w-2xl")}>
+                        <DialogContent className={cn("overflow-hidden border-none p-0 shadow-2xl", isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "h-[min(920px,calc(100dvh-1rem))] w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-1rem)] max-w-[1120px] rounded-[2.5rem]")}>
                           {selectedReportPreview && (
                             <motion.div
                               {...getDeckMotionProps(0.04, 16)}
@@ -3888,7 +3892,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                       발송 리포트 상세
                                     </DialogTitle>
                                     <DialogDescription className="max-w-2xl text-sm font-semibold leading-relaxed text-white/82">
-                                      학부모에게 전달된 문장을 그대로 검토하고, 열람 여부와 발송 기준일을 빠르게 확인할 수 있는 상세 화면입니다.
+                                      학부모가 받는 리포트 기준으로 그래프와 코칭 흐름까지 함께 검토할 수 있는 상세 화면입니다.
                                     </DialogDescription>
                                   </div>
                                 </DialogHeader>
@@ -3933,8 +3937,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                     <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_22px_48px_rgba(15,23,42,0.08)] sm:p-6">
                                       <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#14295F]">Report Body</p>
-                                          <p className="mt-1 text-base font-black text-slate-900">학부모 발송 본문</p>
+                                          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#14295F]">Parent Report View</p>
+                                          <p className="mt-1 text-base font-black text-slate-900">학부모 확인 화면 그대로 보기</p>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
                                           <Badge className="border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-700">
@@ -3952,10 +3956,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                           </Badge>
                                         </div>
                                       </div>
-                                      <div className="mt-5 rounded-[1.6rem] border border-amber-100 bg-[#FFF8F0] p-5 sm:p-6">
-                                        <p className="whitespace-pre-wrap text-sm font-semibold leading-7 text-slate-800">
-                                          {selectedReportPreview.content?.trim() || '리포트 내용이 없습니다.'}
-                                        </p>
+                                      <div className="mt-5">
+                                        <VisualReportViewer
+                                          content={selectedReportPreview.content || ''}
+                                          aiMeta={selectedReportPreview.aiMeta}
+                                          dateKey={selectedReportPreview.dateKey}
+                                          studentName={selectedStudentName}
+                                        />
                                       </div>
                                     </div>
                                   </div>
