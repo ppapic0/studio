@@ -2121,22 +2121,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   function renderAttendanceDashboardSection() {
     return (
       <>
-        <Card className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_18px_48px_-36px_rgba(20,41,95,0.32)]">
-          <CardHeader className="border-b border-slate-200/70 bg-slate-50/70 px-4 py-4 sm:px-5">
+        <Card className="overflow-hidden rounded-[2.5rem] border border-[#D7E4FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F5F9FF_100%)] shadow-[0_24px_70px_-50px_rgba(20,41,95,0.34)]">
+          <CardHeader className="border-b border-[#DCE7FF] bg-[linear-gradient(180deg,rgba(244,248,255,0.96)_0%,rgba(255,255,255,0.96)_100%)] px-4 py-5 sm:px-5">
             <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
               <div className="grid gap-1">
-                <div className="flex items-center gap-2 text-primary/70">
+                <div className="flex items-center gap-2 text-[#2554D7]">
                   <ClipboardCheck className="h-4 w-4" />
                   <span className="text-[10px] font-black uppercase tracking-[0.28em]">Real-Time Seat Control</span>
                   {selectedClass !== 'all' ? (
-                    <Badge className="h-5 border-none bg-white px-2 text-[10px] font-black text-slate-700 shadow-sm">
+                    <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.24)]">
                       {selectedClass}
                     </Badge>
                   ) : null}
                 </div>
-                <CardTitle className="text-xl font-black tracking-tight text-[#14295F]">실시간 좌석 관제</CardTitle>
-                <CardDescription className="text-xs font-bold text-slate-500">
-                  좌석과 출결 신호를 먼저 보고, 필요한 학생은 바로 상세 KPI로 연결합니다.
+                <CardTitle className="text-[1.55rem] font-black tracking-tight text-[#14295F]">실시간 좌석 관제 캔버스</CardTitle>
+                <CardDescription className="text-xs font-bold leading-5 text-[#5c6e97]">
+                  좌석 색과 공부시간, 출결 흐름을 한 화면에서 먼저 읽고 필요한 학생은 바로 상세 KPI와 운영 화면으로 이어집니다.
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -2148,8 +2148,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     setIsAttendanceFullscreenOpen(true);
                   }}
                   className={cn(
-                    'h-10 rounded-xl font-black',
-                    selectedRoomView === 'all' ? 'bg-primary text-white hover:bg-primary/95' : 'border-slate-200 bg-white text-[#17306f]'
+                    'h-11 rounded-2xl px-4 font-black',
+                    selectedRoomView === 'all'
+                      ? 'bg-[#14295F] text-white hover:bg-[#102450]'
+                      : 'border-[#D7E4FF] bg-white text-[#14295F]'
                   )}
                 >
                   <LayoutGrid className="mr-2 h-4 w-4" />
@@ -2162,8 +2164,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     variant={selectedRoomView === room.id ? 'default' : 'outline'}
                     onClick={() => setSelectedRoomView(room.id)}
                     className={cn(
-                      'h-10 rounded-xl font-black',
-                      selectedRoomView === room.id ? 'bg-primary text-white hover:bg-primary/95' : 'border-slate-200 bg-white text-[#17306f]'
+                      'h-11 rounded-2xl px-4 font-black',
+                      selectedRoomView === room.id
+                        ? 'bg-[#14295F] text-white hover:bg-[#102450]'
+                        : 'border-[#D7E4FF] bg-white text-[#14295F]'
                     )}
                   >
                     {room.name}
@@ -2172,13 +2176,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-3 sm:p-4">
+          <CardContent className="p-4 sm:p-5">
             <CenterAdminAttendanceBoard
               roomConfigs={roomConfigs}
               selectedRoomView={selectedRoomView}
               selectedClass={selectedClass}
               isMobile={isMobile}
               seatDetailLevel="nameOnly"
+              shellMode="embedded"
+              showHeader={false}
               isLoading={attendanceBoardLoading}
               summary={attendanceBoardSummary}
               seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
@@ -2195,35 +2201,37 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </Card>
 
         <Dialog open={isAttendanceFullscreenOpen} onOpenChange={setIsAttendanceFullscreenOpen}>
-          <DialogContent className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden rounded-[2rem] border-none bg-[#f6f8ff] p-0 shadow-[0_24px_80px_rgba(20,41,95,0.28)]">
-            <div className="border-b border-primary/10 bg-white/90 px-5 py-4 backdrop-blur sm:px-6">
+          <DialogContent className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden rounded-[2.2rem] border-none bg-[linear-gradient(180deg,#F7FAFF_0%,#EFF4FF_100%)] p-0 shadow-[0_24px_80px_rgba(20,41,95,0.28)]">
+            <div className="border-b border-[#DCE7FF] bg-white/90 px-5 py-4 backdrop-blur sm:px-6">
               <DialogHeader className="gap-2 text-left">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="h-6 border-none bg-primary px-2.5 text-[10px] font-black text-white">
+                  <Badge className="h-6 border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
                     FULL SCREEN
                   </Badge>
                   {selectedClass !== 'all' && (
-                    <Badge className="h-6 border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
+                    <Badge className="h-6 border-none bg-white px-2.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.24)]">
                       {selectedClass}
                     </Badge>
                   )}
                 </div>
-                <DialogTitle className="text-2xl font-black tracking-tight text-primary">
+                <DialogTitle className="text-2xl font-black tracking-tight text-[#14295F]">
                   등하원 관제 전체보기
                 </DialogTitle>
-                <DialogDescription className="text-xs font-bold text-muted-foreground">
+                <DialogDescription className="text-xs font-bold text-[#5c6e97]">
                   두 호실을 한 화면에서 크게 확인합니다. `Esc`를 누르면 대시보드로 돌아갑니다.
                 </DialogDescription>
               </DialogHeader>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
               <CenterAdminAttendanceBoard
                 roomConfigs={roomConfigs}
                 selectedRoomView="all"
                 selectedClass={selectedClass}
                 isMobile={isMobile}
                 seatDetailLevel="nameOnly"
+                shellMode="embedded"
+                showHeader={false}
                 isLoading={attendanceBoardLoading}
                 summary={attendanceBoardSummary}
                 seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
