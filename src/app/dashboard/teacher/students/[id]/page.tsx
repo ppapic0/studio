@@ -9,7 +9,7 @@ import { ko } from 'date-fns/locale';
 import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, Timestamp, where, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar, ComposedChart, Line, LineChart as RechartsLineChart } from 'recharts';
-import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, Target, RefreshCw, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore, PenTool } from 'lucide-react';
+import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore, PenTool } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification, DailyReport, AttendanceRequest, PenaltyLog, ParentActivityEvent, Invoice } from '@/lib/types';
@@ -38,13 +38,6 @@ import { canManageSettings, canManageStaff, canReadFinance } from '@/lib/dashboa
 import { StudentOperationsGraphBoard, type StudentOperationsTimelinePoint } from '@/components/dashboard/student-operations-graph-board';
 import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
 import { motion, useReducedMotion } from 'framer-motion';
-
-const STAT_CONFIG = {
-  focus: { label: '집중력', sub: '집중', icon: Target, color: 'text-blue-500', accent: 'bg-blue-50', guide: '몰입 시간을 안정적으로 확보하면 상승합니다.' },
-  consistency: { label: '꾸준함', sub: '꾸준', icon: RefreshCw, color: 'text-emerald-500', accent: 'bg-emerald-50', guide: '매일 비슷한 시간대 루틴이 핵심입니다.' },
-  achievement: { label: '목표달성', sub: '달성', icon: CheckCircle2, color: 'text-amber-500', accent: 'bg-amber-50', guide: '계획 완료율이 높을수록 빠르게 성장합니다.' },
-  resilience: { label: '회복력', sub: '회복', icon: ShieldCheck, color: 'text-rose-500', accent: 'bg-rose-50', guide: '흔들린 날 이후 빠른 회복 능력입니다.' },
-} as const;
 
 const RANGE_MAP = { today: 7, weekly: 14, monthly: 28 } as const;
 type ChartRangeKey = keyof typeof RANGE_MAP;
@@ -4501,7 +4494,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   isAnalysisPresentation ? "text-[#17326B] hover:bg-[#17326B]/5" : "text-white hover:bg-white/10"
                 )}><Settings2 className="h-3.5 w-3.5" /> 수동 보정</Button>}
               </div>
-              <DialogTitle className="text-3xl font-black tracking-tighter">성장 및 스킬 마스터 관리</DialogTitle>
+              <DialogTitle className="text-3xl font-black tracking-tighter">성장 지표 관리</DialogTitle>
             </DialogHeader>
           </div>
 
@@ -4564,26 +4557,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </section>
             )}
 
-            <section className="space-y-6">
-              <h4 className="text-xs font-black uppercase text-[#5c6e97] flex items-center gap-2 whitespace-nowrap"><Activity className="h-4 w-4 text-[#2554d4]" /> 핵심 역량 분석</h4>
-              <div className="grid gap-8">
-                {Object.entries(STAT_CONFIG).map(([key, config]) => {
-                  const statKey = key as keyof typeof editStats;
-                  const value = isEditStats && canEditGrowthData ? (editStats[statKey] || 0) : (progress?.stats?.[statKey] || 0);
-                  const Icon = config.icon;
-                  return (
-                    <div key={key} className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3"><div className={cn('p-2 rounded-xl', config.accent)}><Icon className={cn('h-5 w-5', config.color)} /></div><div><p className="text-sm font-black tracking-tight text-[#14295F]">{config.label}</p><p className="text-[10px] font-bold text-[#5c6e97] uppercase">{config.sub}</p></div></div>
-                        <div className="text-right flex items-baseline gap-1"><span className="text-2xl font-black tabular-nums text-[#14295F]">{value.toFixed(1)}</span><span className="text-[10px] font-bold text-[#9aa9c7]">/ 100</span></div>
-                      </div>
-                      {isEditStats && canEditGrowthData ? <Slider value={[value]} max={100} step={0.5} onValueChange={([next]) => setEditStats({ ...editStats, [statKey]: next })} /> : <div className="h-2.5 w-full rounded-full overflow-hidden bg-[#e7eefb] shadow-inner"><div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${value}%` }} /></div>}
-                      <p className="text-[11px] font-semibold text-[#5c6e97]">{config.guide}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
           </div>
 
           <DialogFooter className="p-8 bg-[#f8fbff] border-t border-[#dbe7ff] shrink-0">
