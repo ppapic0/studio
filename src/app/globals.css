@@ -3732,7 +3732,8 @@ select {
 }
 
 .soft-glow {
-  animation: soft-glow 2.8s ease-in-out infinite;
+  animation: soft-glow 3.4s cubic-bezier(0.24, 0.82, 0.28, 1) infinite;
+  will-change: opacity, transform;
 }
 
 .hero-orb-drift {
@@ -4007,11 +4008,11 @@ select {
 .parent-nav-enter,
 .auth-rise-in {
   opacity: 0;
-  animation: parent-enter-up 0.54s cubic-bezier(0.22, 0.88, 0.24, 1) forwards;
+  animation: parent-enter-up 0.62s cubic-bezier(0.2, 0.88, 0.22, 1) forwards;
 }
 
 .parent-tab-panel[data-state="active"] {
-  animation: parent-panel-enter 0.38s cubic-bezier(0.22, 0.82, 0.24, 1);
+  animation: parent-panel-enter 0.44s cubic-bezier(0.2, 0.82, 0.22, 1);
 }
 
 .parent-entry-delay-1 {
@@ -4032,6 +4033,11 @@ select {
 
 .parent-entry-delay-5 {
   animation-delay: 0.38s;
+}
+
+.parent-home-cta-glow:hover {
+  box-shadow: 0 22px 40px -22px rgba(20, 41, 95, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  transform: translateY(-1px);
 }
 
 .student-shell-enter,

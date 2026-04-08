@@ -68,6 +68,7 @@ type NotificationSettingsDoc = {
   smsTemplateCheckOut?: string;
   smsTemplateStudyStart?: string;
   smsTemplateAwayStart?: string;
+  smsTemplateAwayEnd?: string;
   smsTemplateStudyEnd?: string;
   smsTemplateLateAlert?: string;
   smsApiKeyConfigured?: boolean;
@@ -116,9 +117,10 @@ type SmsDispatchResult =
 
 const SMS_BYTE_LIMIT = 90;
 
-const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "study_end" | "late_alert", string> = {
+const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
   study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
   away_start: "[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.",
+  away_end: "[{centerName}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.",
   study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
   late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
 };
@@ -498,7 +500,7 @@ function applyTemplate(template: string, values: Record<string, string>): string
   }, template);
 }
 
-function normalizeSmsEventType(eventType: AttendanceSmsEventType): "study_start" | "away_start" | "study_end" | "late_alert" {
+function normalizeSmsEventType(eventType: AttendanceSmsEventType): "study_start" | "away_start" | "away_end" | "study_end" | "late_alert" {
   if (eventType === "check_in") return "study_start";
   if (eventType === "check_out") return "study_end";
   return eventType;
@@ -598,7 +600,7 @@ async function loadCenterName(
 
 function resolveTemplateByEvent(
   settings: NotificationSettingsDoc,
-  eventType: "study_start" | "away_start" | "study_end" | "late_alert"
+  eventType: "study_start" | "away_start" | "away_end" | "study_end" | "late_alert"
 ): string {
   if (eventType === "study_start") {
     return settings.smsTemplateStudyStart || settings.smsTemplateCheckIn || DEFAULT_SMS_TEMPLATES.study_start;
@@ -609,13 +611,16 @@ function resolveTemplateByEvent(
   if (eventType === "away_start") {
     return settings.smsTemplateAwayStart || DEFAULT_SMS_TEMPLATES.away_start;
   }
+  if (eventType === "away_end") {
+    return settings.smsTemplateAwayEnd || DEFAULT_SMS_TEMPLATES.away_end;
+  }
   return settings.smsTemplateLateAlert || DEFAULT_SMS_TEMPLATES.late_alert;
 }
 
 function buildSmsDedupeKey(params: {
   centerId: string;
   studentId: string;
-  eventType: "study_start" | "away_start" | "study_end" | "late_alert";
+  eventType: "study_start" | "away_start" | "away_end" | "study_end" | "late_alert";
   eventAt: Date;
 }): string {
   const dateKey = toDateKey(params.eventAt);
@@ -3634,6 +3639,10 @@ export const saveNotificationSettingsSecure = functions.region(region).https.onC
       String(data?.smsTemplateAwayStart || ""),
       "외출 템플릿"
     ) || DEFAULT_SMS_TEMPLATES.away_start,
+    smsTemplateAwayEnd: validateSmsTemplateLength(
+      String(data?.smsTemplateAwayEnd || ""),
+      "복귀 템플릿"
+    ) || DEFAULT_SMS_TEMPLATES.away_end,
     smsTemplateStudyEnd: validateSmsTemplateLength(
       String(data?.smsTemplateStudyEnd || ""),
       "공부 종료 템플릿"

@@ -1990,9 +1990,15 @@ export default function NotificationSettingsPage() {
                 <Badge variant="outline" className="mx-1">{'{expectedTime}'}</Badge>
               </CardDescription>
             </div>
-            <Button type="button" variant="outline" className="h-10 rounded-xl font-black" onClick={applyRecommendedTemplates}>
-              90byte 내 꽉 채운 추천문구
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" className="h-10 rounded-xl font-black" onClick={applyRecommendedTemplates}>
+                90byte 내 꽉 채운 추천문구
+              </Button>
+              <Button type="button" className="h-10 rounded-xl font-black gap-2" onClick={() => void handleSave()} disabled={isSaving || isLoading}>
+                {(isSaving || isLoading) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                템플릿 저장
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 p-6 lg:grid-cols-2">

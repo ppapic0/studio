@@ -237,6 +237,17 @@ type ParentAnalyticsToneStyle = {
   insight: string;
 };
 
+type ParentHomeMetricToneStyle = {
+  glow: string;
+  ribbon: string;
+  eyebrow: string;
+  pill: string;
+  rail: string;
+  railLabel: string;
+  railValue: string;
+  accentText: string;
+};
+
 const PARENT_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentMetricToneStyle> = {
   study: {
     card: 'border-[#d6e3ff] bg-[linear-gradient(180deg,#f7fbff_0%,#ffffff_58%,#eef5ff_100%)] shadow-[0_18px_34px_-24px_rgba(20,41,95,0.30)] ring-1 ring-[#dce8ff]/80',
@@ -324,6 +335,49 @@ const PARENT_ANALYTICS_TONE_STYLES: Record<ParentAnalyticsTone, ParentAnalyticsT
     badge: 'border-[#ffd5de] bg-[#fff1f4] text-[#c73a5d]',
     chartShell: 'border-[#ffe0e7] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,241,244,0.96)_100%)]',
     insight: 'border-[#ffe2e8] bg-white/86 text-[#8a4b5a]',
+  },
+};
+
+const PARENT_HOME_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentHomeMetricToneStyle> = {
+  study: {
+    glow: 'bg-[#8fb4ff]/24',
+    ribbon: 'from-[#2e67cf] via-[#204ca3] to-[#14295F]',
+    eyebrow: 'text-[#315fb7]',
+    pill: 'border-[#d7e4ff] bg-[#eef4ff] text-[#204ca3]',
+    rail: 'border-[#dce7fb] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]',
+    railLabel: 'text-[#6280aa]',
+    railValue: 'text-[#14295F]',
+    accentText: 'text-[#204ca3]',
+  },
+  plan: {
+    glow: 'bg-[#ffb267]/24',
+    ribbon: 'from-[#ffb458] via-[#FF7A16] to-[#d85f08]',
+    eyebrow: 'text-[#c86812]',
+    pill: 'border-[#ffdcb8] bg-[#fff4e8] text-[#c86812]',
+    rail: 'border-[#ffe2c6] bg-[linear-gradient(180deg,#fffaf4_0%,#fff2e6_100%)]',
+    railLabel: 'text-[#c17a3b]',
+    railValue: 'text-[#8f4a09]',
+    accentText: 'text-[#c86812]',
+  },
+  attendance: {
+    glow: 'bg-[#7cc6d9]/20',
+    ribbon: 'from-[#4eb7ca] via-[#2b8ba4] to-[#1c5c70]',
+    eyebrow: 'text-[#2b7a93]',
+    pill: 'border-[#d5edf2] bg-[#eff9fc] text-[#245565]',
+    rail: 'border-[#d8edf2] bg-[linear-gradient(180deg,#fbfeff_0%,#eef9fb_100%)]',
+    railLabel: 'text-[#5d8390]',
+    railValue: 'text-[#173f4a]',
+    accentText: 'text-[#245565]',
+  },
+  penalty: {
+    glow: 'bg-[#ff9fb6]/22',
+    ribbon: 'from-[#ff9caf] via-[#d24664] to-[#8f1534]',
+    eyebrow: 'text-[#c43b5a]',
+    pill: 'border-[#ffd8e0] bg-[#fff2f5] text-[#c43b5a]',
+    rail: 'border-[#ffe0e7] bg-[linear-gradient(180deg,#fffafb_0%,#fff0f3_100%)]',
+    railLabel: 'text-[#ad6170]',
+    railValue: 'text-[#8f1534]',
+    accentText: 'text-[#c43b5a]',
   },
 };
 
@@ -480,6 +534,36 @@ function ParentMetricCardShell({
     >
       <div className={cn('pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full blur-3xl', toneStyle.orb)} />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.52)_0%,rgba(255,255,255,0)_44%)]" />
+      <div className="relative z-10 h-full">{children}</div>
+    </Card>
+  );
+}
+
+function ParentHomeMetricCardShell({
+  tone,
+  className,
+  children,
+  interactive = false,
+  ...props
+}: ComponentPropsWithoutRef<typeof Card> & {
+  tone: ParentMetricTone;
+  children: ReactNode;
+  interactive?: boolean;
+}) {
+  const toneStyle = PARENT_HOME_METRIC_TONE_STYLES[tone];
+
+  return (
+    <Card
+      {...props}
+      className={cn(
+        'group relative min-w-0 overflow-hidden rounded-[1.85rem] border border-[#d9e5fb] bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_56%,#f6f9ff_100%)] p-4 shadow-[0_22px_40px_-32px_rgba(20,41,95,0.24)] ring-1 ring-white/80 transition-[transform,box-shadow,border-color] duration-300 active:scale-[0.985] md:hover:-translate-y-1 md:hover:shadow-[0_28px_44px_-28px_rgba(20,41,95,0.28)] sm:p-5',
+        interactive && 'cursor-pointer md:hover:border-[#bfd2fb]',
+        className
+      )}
+    >
+      <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', toneStyle.ribbon)} />
+      <div className={cn('pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full blur-3xl', toneStyle.glow)} />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.86)_0%,rgba(255,255,255,0)_38%)]" />
       <div className="relative z-10 h-full">{children}</div>
     </Card>
   );
@@ -2826,6 +2910,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     penaltyRecovery.effectivePoints,
     attendanceStatus.label,
   ]);
+  const homeStudyTone = PARENT_HOME_METRIC_TONE_STYLES.study;
+  const homePlanTone = PARENT_HOME_METRIC_TONE_STYLES.plan;
+  const homeAttendanceTone = PARENT_HOME_METRIC_TONE_STYLES.attendance;
+  const homePenaltyTone = PARENT_HOME_METRIC_TONE_STYLES.penalty;
 
   const selectedDateLog = useMemo(() => {
     if (!selectedDateKey) return null;
@@ -3130,218 +3218,202 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         <TabsContent value="home" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
           <section
             className={cn(
-              'relative overflow-hidden rounded-[2.4rem] border border-[#dbe6fb] bg-[linear-gradient(155deg,#ffffff_0%,#f4f8ff_48%,#fff7ef_100%)] p-5 shadow-[0_24px_54px_-42px_rgba(20,41,95,0.22)] sm:p-6',
+              'relative overflow-hidden rounded-[2.45rem] border border-[#24437f] bg-[linear-gradient(155deg,#1d3d79_0%,#14295F_52%,#0d1c45_100%)] p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.58)] sm:p-6',
               showEntryMotion && 'parent-hero-enter parent-entry-delay-2'
             )}
           >
-            <div className="soft-glow absolute -right-8 top-2 h-24 w-24 rounded-full bg-[#ffc48f]/28 blur-3xl" />
-            <div className="soft-glow absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-[#a8c6ff]/24 blur-3xl" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,41,95,0.06),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,122,22,0.08),transparent_32%)]" />
+            <div className="soft-glow absolute -right-8 top-0 h-28 w-28 rounded-full bg-[#ffbf7d]/24 blur-3xl" />
+            <div className="soft-glow absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-[#7aa6ff]/18 blur-3xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(255,122,22,0.24),transparent_34%)]" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.07)_100%)]" />
 
-            <div className="relative z-10 space-y-4">
+            <div className="relative z-10 space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Badge variant="outline" className="h-7 rounded-full border border-white/80 bg-white/85 px-3 text-[11px] font-black text-[#14295F] shadow-sm">
+                <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[11px] font-black text-white shadow-[0_12px_28px_-22px_rgba(5,10,28,0.6)] backdrop-blur-sm">
                   {today ? format(today, 'yyyy. MM. dd (EEE)', { locale: ko }) : '오늘'}
                 </Badge>
-                <div className="flex items-center gap-2 rounded-full border border-[#d8e6ff] bg-white/85 px-3 py-1.5 shadow-sm">
-                  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">실시간 앱 모니터링</span>
+                <div className="flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-1.5 shadow-[0_12px_28px_-22px_rgba(5,10,28,0.6)] backdrop-blur-sm">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-[#FF7A16]" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/90">실시간 앱 모니터링</span>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#7081a1]">Today Brief</p>
+              <div className="space-y-2.5">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/58">Parent Brief</p>
                 <div className="space-y-2">
-                  <p className="text-[12px] font-black tracking-tight text-[#14295F]/68">{student?.name || '자녀'} 현황</p>
-                  <h2 className="max-w-[18ch] break-keep text-[1.32rem] font-black leading-[1.18] tracking-[-0.042em] text-[#14295F] sm:text-[1.72rem] md:max-w-none md:text-[1.95rem]">
+                  <p className="text-[12px] font-black tracking-tight text-white/72">{student?.name || '자녀'} 오늘 흐름</p>
+                  <h2 className="max-w-[18ch] break-keep text-[1.42rem] font-black leading-[1.14] tracking-[-0.045em] text-white sm:text-[1.82rem] md:max-w-none md:text-[2rem]">
                     {heroTone.title}
                   </h2>
-                  <p className="max-w-2xl break-keep text-[13px] font-bold leading-[1.72] text-slate-600 sm:text-sm md:text-[14px]">
+                  <p className="max-w-2xl break-keep text-[13px] font-bold leading-[1.72] text-white/78 sm:text-sm md:text-[14px]">
                     {heroTone.description}
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-[11px] font-black shadow-sm', heroTone.badgeClassName)}>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'h-7 rounded-full border px-3 text-[11px] font-black shadow-[0_12px_24px_-22px_rgba(5,10,28,0.7)] backdrop-blur-sm',
+                    growthCelebrationCandidate ? 'border-[#ffb56c] bg-[#FF7A16] text-white' : 'border-white/14 bg-white/10 text-white'
+                  )}
+                >
                   {heroTone.badgeLabel}
                 </Badge>
                 {growthCelebrationCandidate && (
-                  <Badge variant="outline" className="h-7 rounded-full border border-[#ffd6ac] bg-[#fff6ec] px-3 text-[11px] font-black text-[#FF7A16] shadow-sm">
+                  <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[11px] font-black text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.7)] backdrop-blur-sm">
                     평균 대비 +{growthCelebrationCandidate.increaseRate}%
                   </Badge>
                 )}
-                <Badge variant="outline" className="h-7 rounded-full border border-[#d8e6ff] bg-[#eef4ff] px-3 text-[11px] font-black text-[#14295F] shadow-sm">
+                <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[11px] font-black text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.7)] backdrop-blur-sm">
                   출결 {attendanceStatus.label.split('(')[0].trim()}
                 </Badge>
+              </div>
+
+              <div className="grid gap-3 rounded-[1.55rem] border border-white/12 bg-white/8 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">오늘 먼저 볼 포인트</p>
+                  <p className="mt-1 break-keep text-[14px] font-black tracking-tight text-white">
+                    출결 {attendanceStatus.label.split('(')[0].trim()} · 계획 {planRate}% · 벌점 {penaltyRecovery.effectivePoints}점
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-white/76">
+                  <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5">공부 {toHm(totalMinutes)}</span>
+                  <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5">알림 {recentNotifications.length}건</span>
+                </div>
               </div>
             </div>
           </section>
 
           <div className="grid grid-cols-2 gap-3 xl:gap-4">
-            <ParentMetricCardShell
+            <ParentHomeMetricCardShell
               tone="study"
               className={cn(
                 'md:min-h-[12rem] lg:min-h-[12.6rem]',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-3'
               )}
             >
-              <div className="flex h-full flex-col gap-3">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#56739f]">오늘 공부</span>
-                    {growthCelebrationCandidate ? (
-                      <Badge variant="outline" className="h-6 rounded-full border border-[#d4e3ff] bg-white/90 px-2.5 text-[10px] font-black text-[#204ca3]">
-                        +{growthCelebrationCandidate.increaseRate}%
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="h-6 rounded-full border border-[#d4e3ff] bg-white/90 px-2.5 text-[10px] font-black text-[#204ca3]">
-                        7일 흐름
-                      </Badge>
-                    )}
+              <div className="flex h-full flex-col gap-3.5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', homeStudyTone.eyebrow)}>오늘 공부</p>
+                    <div className="mt-2">
+                      <ParentDurationValue minutes={totalMinutes} className="text-[1.54rem] sm:text-[1.84rem] lg:text-[2rem]" unitClassName={homeStudyTone.accentText} />
+                    </div>
                   </div>
-                  <ParentDurationValue minutes={totalMinutes} className="text-[1.4rem] sm:text-[1.72rem] lg:text-[1.92rem]" />
-                  <p className="text-[11px] font-bold leading-5 text-slate-500">
+                  <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black shadow-sm', homeStudyTone.pill)}>
+                    {growthCelebrationCandidate ? `+${growthCelebrationCandidate.increaseRate}%` : '7일 흐름'}
+                  </Badge>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[12px] font-bold leading-5 text-slate-600">
                     최근 7일 최고 {studyTrendHasActivity ? toHm(studyTrendPeakMinutes) : '기록 대기'}
                   </p>
-                  <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(20,41,95,0.24)]">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">최근 평균</p>
-                      <p className="whitespace-nowrap text-right text-[12px] font-black text-[#14295F]">
-                        {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
-                      </p>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#dbe6fb] pt-2">
-                      <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">전일 대비</p>
-                      <p className="whitespace-nowrap text-right text-[12px] font-black text-[#14295F]">
-                        {studyTrendHasActivity ? formatSignedMinutes(studyDeltaFromYesterday) : '기록 대기'}
-                      </p>
-                    </div>
-                  </div>
+                  <p className="text-[12px] font-bold leading-5 text-slate-500">
+                    전일 대비 {studyTrendHasActivity ? formatSignedMinutes(studyDeltaFromYesterday) : '기록 대기'}
+                  </p>
                 </div>
-                <div className="rounded-[1rem] border border-[#d9e6ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(239,245,255,0.94)_100%)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#56739f]">최근 7일 흐름</p>
-                    <p className="text-[11px] font-black text-[#204ca3]">
-                      {studyTrendHasActivity ? `${dailyStudyTrend.filter((point) => point.minutes > 0).length}일 기록` : '기록 대기'}
+                <div className={cn('mt-auto grid grid-cols-2 gap-2 rounded-[1.2rem] border px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]', homeStudyTone.rail)}>
+                  <div className="min-w-0">
+                    <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homeStudyTone.railLabel)}>최근 평균</p>
+                    <p className={cn('mt-1 text-[12px] font-black', homeStudyTone.railValue)}>
+                      {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
                     </p>
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#dbe6fb] pt-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#56739f]">최고치</p>
-                    <p className="text-[12px] font-black text-[#14295F]">
-                      {studyTrendHasActivity ? toHm(studyTrendPeakMinutes) : '기록 대기'}
+                  <div className="min-w-0 text-right">
+                    <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homeStudyTone.railLabel)}>기록 일수</p>
+                    <p className={cn('mt-1 text-[12px] font-black', homeStudyTone.railValue)}>
+                      {studyTrendHasActivity ? `${dailyStudyTrend.filter((point) => point.minutes > 0).length}일` : '대기'}
                     </p>
                   </div>
                 </div>
               </div>
-            </ParentMetricCardShell>
+            </ParentHomeMetricCardShell>
 
-            <ParentMetricCardShell
+            <ParentHomeMetricCardShell
               tone="plan"
               className={cn(
                 'md:min-h-[12rem] lg:min-h-[12.6rem]',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-3'
               )}
             >
-              <div className="flex h-full flex-col gap-3">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c66a13]">계획 달성</span>
-                    <Badge variant="outline" className="h-6 rounded-full border border-[#ffd8ab] bg-white/90 px-2.5 text-[10px] font-black text-[#b45f0d]">
-                      {planTotal > 0 ? `오늘 ${planDone}/${planTotal}` : '계획 대기'}
-                    </Badge>
+              <div className="flex h-full flex-col gap-3.5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', homePlanTone.eyebrow)}>계획 달성</p>
+                    <div className="mt-2">
+                      <ParentStatValue value={planRate} unit="%" className="text-[1.58rem] sm:text-[1.88rem] lg:text-[2.02rem]" unitClassName={homePlanTone.accentText} />
+                    </div>
                   </div>
-                  <ParentStatValue value={planRate} unit="%" className="text-[1.44rem] sm:text-[1.76rem] lg:text-[1.96rem]" unitClassName="text-[#d09248]" />
-                  <p className="text-[11px] font-bold leading-5 text-slate-500">
+                  <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black shadow-sm', homePlanTone.pill)}>
+                    {planTotal > 0 ? `오늘 ${planDone}/${planTotal}` : '계획 대기'}
+                  </Badge>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[12px] font-bold leading-5 text-slate-600">
                     최근 7일 완료 {planTrendActiveDays > 0 ? `${planTrendCompletedDays}일` : '기록 대기'}
                   </p>
-                  <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_18px_-18px_rgba(210,109,18,0.24)]">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">주간 평균</p>
-                      <p className="whitespace-nowrap text-right text-[12px] font-black text-[#9b5910]">
-                        {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
-                      </p>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#ffe0c2] pt-2">
-                      <p className="whitespace-nowrap break-keep text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">완료일</p>
-                      <p className="whitespace-nowrap text-right text-[12px] font-black text-[#9b5910]">
-                        {planTrendActiveDays > 0 ? `${planTrendCompletedDays}/${planTrendActiveDays}일` : '최근 7일 대기'}
-                      </p>
-                    </div>
-                  </div>
+                  <p className="text-[12px] font-bold leading-5 text-slate-500">
+                    주간 평균 {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
+                  </p>
                 </div>
-                <div className="rounded-[1rem] border border-[#ffe0bf] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,247,236,0.95)_100%)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#c66a13]">최근 7일 달성</p>
-                    <p className="text-[11px] font-black text-[#b45f0d]">
-                      {planTrendActiveDays > 0 ? `${planTrendAverageRate}%` : '계획 대기'}
+                <div className={cn('mt-auto grid grid-cols-2 gap-2 rounded-[1.2rem] border px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]', homePlanTone.rail)}>
+                  <div className="min-w-0">
+                    <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homePlanTone.railLabel)}>완료일</p>
+                    <p className={cn('mt-1 text-[12px] font-black', homePlanTone.railValue)}>
+                      {planTrendActiveDays > 0 ? `${planTrendCompletedDays}/${planTrendActiveDays}일` : '최근 7일 대기'}
                     </p>
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#ffe0c2] pt-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#c66a13]">활성일</p>
-                    <p className="text-[12px] font-black text-[#9b5910]">
+                  <div className="min-w-0 text-right">
+                    <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homePlanTone.railLabel)}>활성일</p>
+                    <p className={cn('mt-1 text-[12px] font-black', homePlanTone.railValue)}>
                       {planTrendActiveDays > 0 ? `${planTrendActiveDays}일` : '기록 대기'}
                     </p>
                   </div>
                 </div>
               </div>
-            </ParentMetricCardShell>
+            </ParentHomeMetricCardShell>
 
-            <ParentMetricCardShell
+            <ParentHomeMetricCardShell
               tone="attendance"
               className={cn(
                 'md:min-h-[11rem] lg:min-h-[11.4rem]',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-4'
               )}
             >
-              <div className="flex h-full flex-col justify-between gap-3">
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.14em] text-[#477281]">출결 상태</span>
-                    <Badge variant="outline" className="h-6 rounded-full border border-[#d4eaef] bg-white/90 px-2.5 text-[10px] font-black text-[#245565]">
-                      실시간
-                    </Badge>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.2rem] border border-white/80 bg-white/88 shadow-[0_10px_16px_-16px_rgba(27,114,141,0.36)]">
-                      <attendanceStatus.icon className="h-[1.125rem] w-[1.125rem] text-[#1b728d]" />
+              <div className="flex h-full flex-col gap-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem] border border-[#d4eaef] bg-[#eff9fc] shadow-[0_12px_24px_-20px_rgba(27,114,141,0.36)]">
+                      <attendanceStatus.icon className="h-[1.15rem] w-[1.15rem] text-[#1b728d]" />
                     </div>
                     <div className="min-w-0">
-                      <div className="mb-1.5 flex items-center gap-2">
-                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-[0.12em] text-[#245565]">앱 연동 중</span>
-                      </div>
-                      <p className="whitespace-nowrap text-[0.9rem] font-black leading-none tracking-[-0.04em] text-[#14295F] sm:text-[1.02rem]">
+                      <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', homeAttendanceTone.eyebrow)}>출결 상태</p>
+                      <p className="mt-2 break-keep text-[0.98rem] font-black leading-[1.3] tracking-[-0.03em] text-[#14295F] sm:text-[1.08rem]">
                         {attendanceStatus.label}
                       </p>
+                      <p className="mt-1 text-[12px] font-bold leading-5 text-slate-500">앱에 연결된 실시간 출결 흐름입니다.</p>
                     </div>
                   </div>
+                  <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black shadow-sm', homeAttendanceTone.pill)}>
+                    실시간
+                  </Badge>
                 </div>
-                <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2.5 shadow-[0_10px_16px_-16px_rgba(27,114,141,0.22)]">
-                  <div className="flex items-center justify-between gap-1.5">
-                    <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#477281]">오늘의 출결기록</p>
-                    <p className="whitespace-nowrap text-[9px] font-black text-[#245565]">{todayAttendanceTimeSummary.dateLabel}</p>
+                <div className={cn('mt-auto grid grid-cols-2 gap-2 rounded-[1.2rem] border px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]', homeAttendanceTone.rail)}>
+                  <div className="min-w-0">
+                    <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homeAttendanceTone.railLabel)}>등원시간</p>
+                    <p className={cn('mt-1 text-[12px] font-black', homeAttendanceTone.railValue)}>{todayAttendanceTimeSummary.checkInLabel}</p>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-1.5">
-                    <div className="min-w-0 rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                      <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#5b7d88]">등원시간</p>
-                      <p className="mt-1 whitespace-nowrap text-[12px] font-black leading-none tracking-[-0.03em] text-[#14295F]">
-                        {todayAttendanceTimeSummary.checkInLabel}
-                      </p>
-                    </div>
-                    <div className="min-w-0 rounded-[0.9rem] border border-[#d6eaef] bg-white/92 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                      <p className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#5b7d88]">하원시간</p>
-                      <p className="mt-1 whitespace-nowrap text-[12px] font-black leading-none tracking-[-0.03em] text-[#14295F]">
-                        {todayAttendanceTimeSummary.checkOutLabel}
-                      </p>
-                    </div>
+                  <div className="min-w-0 text-right">
+                    <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homeAttendanceTone.railLabel)}>하원시간</p>
+                    <p className={cn('mt-1 text-[12px] font-black', homeAttendanceTone.railValue)}>{todayAttendanceTimeSummary.checkOutLabel}</p>
                   </div>
-                  <p className="mt-2 whitespace-nowrap text-[10px] font-bold leading-none tracking-[-0.02em] text-slate-500">앱에서 출결시각 기준</p>
                 </div>
               </div>
-            </ParentMetricCardShell>
+            </ParentHomeMetricCardShell>
 
-            <ParentMetricCardShell
+            <ParentHomeMetricCardShell
               tone="penalty"
               interactive
               role="button"
@@ -3351,50 +3423,60 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 showEntryMotion && 'parent-card-enter parent-entry-delay-4'
               )}
             >
-              <div className="flex h-full flex-col justify-between gap-3">
+              <div className="flex h-full flex-col gap-3.5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d24664]">벌점 지수</span>
-                    <ParentStatValue
-                      value={penaltyRecovery.effectivePoints}
-                      unit="점"
-                      className="text-[1.52rem] text-rose-700 sm:text-[1.78rem] lg:text-[1.96rem]"
-                      unitClassName="text-rose-400"
-                    />
+                  <div className="min-w-0">
+                    <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', homePenaltyTone.eyebrow)}>벌점 지수</p>
+                    <div className="mt-2">
+                      <ParentStatValue
+                        value={penaltyRecovery.effectivePoints}
+                        unit="점"
+                        className="text-[1.6rem] text-[#8f1534] sm:text-[1.9rem] lg:text-[2.04rem]"
+                        unitClassName="text-rose-400"
+                      />
+                    </div>
                   </div>
-                  <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black', penaltyMeta.badge)}>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'h-6 rounded-full border px-2.5 text-[10px] font-black shadow-sm',
+                      penaltyRecovery.effectivePoints === 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : homePenaltyTone.pill
+                    )}
+                  >
                     {penaltyMeta.label}
                   </Badge>
                 </div>
-                <div className="rounded-[1rem] border border-white/80 bg-white/84 px-3 py-2 shadow-[0_10px_16px_-16px_rgba(210,70,100,0.22)]">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#d24664]">최근 벌점 사유</p>
-                    <p className="text-[11px] font-black text-rose-500">
-                      {latestPenaltyHighlight ? `+${latestPenaltyHighlight.points}점` : '기록 없음'}
-                    </p>
-                  </div>
+                <div className="space-y-1.5">
                   {latestPenaltyHighlight ? (
                     <>
-                      <p className="line-clamp-2 break-keep text-[12px] font-black leading-5 text-[#7a1d35]">
+                      <p className="line-clamp-2 break-keep text-[12px] font-black leading-5 text-[#8f1534]">
                         {latestPenaltyHighlight.reason}
                       </p>
-                      <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
-                        {latestPenaltyHighlight.dateLabel} · 원점수 {penaltyRecovery.basePoints}점
-                        {penaltyRecovery.recoveredPoints > 0 ? ` · 회복 -${penaltyRecovery.recoveredPoints}점` : ''}
+                      <p className="text-[12px] font-bold leading-5 text-slate-500">
+                        {latestPenaltyHighlight.dateLabel} · 최근 +{latestPenaltyHighlight.points}점
                       </p>
                     </>
                   ) : (
                     <>
-                      <p className="text-[12px] font-black text-[#7a1d35]">최근 벌점 기록 없음</p>
-                      <p className="mt-2 text-[11px] font-bold leading-5 text-slate-500">
-                        원점수 {penaltyRecovery.basePoints}점
-                        {penaltyRecovery.recoveredPoints > 0 ? ` · 회복 -${penaltyRecovery.recoveredPoints}점` : ' · 회복 기록 대기'}
-                      </p>
+                      <p className="text-[12px] font-black leading-5 text-[#8f1534]">최근 벌점 기록 없음</p>
+                      <p className="text-[12px] font-bold leading-5 text-slate-500">현재 생활 흐름이 안정적으로 유지되고 있어요.</p>
                     </>
                   )}
                 </div>
+                <div className={cn('mt-auto grid grid-cols-2 gap-2 rounded-[1.2rem] border px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]', homePenaltyTone.rail)}>
+                  <div className="min-w-0">
+                    <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homePenaltyTone.railLabel)}>원점수</p>
+                    <p className={cn('mt-1 text-[12px] font-black', homePenaltyTone.railValue)}>{penaltyRecovery.basePoints}점</p>
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homePenaltyTone.railLabel)}>회복 반영</p>
+                    <p className={cn('mt-1 text-[12px] font-black', homePenaltyTone.railValue)}>
+                      {penaltyRecovery.recoveredPoints > 0 ? `-${penaltyRecovery.recoveredPoints}점` : '기록 대기'}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </ParentMetricCardShell>
+            </ParentHomeMetricCardShell>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.06fr_0.94fr]">
@@ -3409,57 +3491,73 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 }
               }}
               className={cn(
-                'group relative overflow-hidden rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#ffffff_0%,#f1f6ff_58%,#fff7ee_100%)] p-5 shadow-[0_22px_40px_-34px_rgba(20,41,95,0.22)] ring-1 ring-[#d7e4ff]/70 transition-[transform,box-shadow] active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_20px_36px_-24px_rgba(20,41,95,0.32)] sm:p-6',
+                'group relative overflow-hidden rounded-[2.1rem] border border-[#d7e4ff] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5 shadow-[0_24px_42px_-34px_rgba(20,41,95,0.24)] ring-1 ring-white/80 transition-[transform,box-shadow,border-color] duration-300 active:scale-[0.99] md:hover:-translate-y-1 md:hover:border-[#bfd1fb] md:hover:shadow-[0_30px_48px_-30px_rgba(20,41,95,0.3)] sm:p-6',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-4'
               )}
             >
-              <div className="absolute right-0 top-0 p-4 opacity-[0.04] transition-transform duration-700 group-hover:rotate-12">
+              <div className="soft-glow absolute right-0 top-0 h-24 w-24 rounded-full bg-[#ffbf7d]/16 blur-3xl" />
+              <div className="absolute right-0 top-0 p-4 opacity-[0.05] transition-transform duration-700 group-hover:translate-x-1 group-hover:-translate-y-1">
                 <MessageCircle className="h-20 w-20 text-[#14295F]" />
               </div>
-              <div className="relative z-10 space-y-3">
+              <div className="relative z-10 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-[#FF7A16]" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#14295F]">우리 아이 리포트</span>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#14295F] text-white shadow-[0_12px_24px_-18px_rgba(20,41,95,0.4)]">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6b7ea5]">우리 아이 리포트</span>
+                      <p className="mt-0.5 text-[13px] font-black tracking-tight text-[#14295F]">가장 먼저 읽을 요약</p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {report?.viewedAt ? (
-                      <Badge variant="outline" className="h-6 rounded-full border-none bg-emerald-100 px-2.5 text-[10px] font-black text-emerald-700">
+                      <Badge variant="outline" className="h-6 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-700">
                         읽음
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/12 px-2.5 text-[10px] font-black text-[#FF7A16]">
+                      <Badge variant="outline" className="h-6 rounded-full border border-[#ffd1a2] bg-[#fff3e8] px-2.5 text-[10px] font-black text-[#FF7A16]">
                         새 리포트
                       </Badge>
                     )}
-                    <ChevronRight className="h-4 w-4 text-slate-300" />
+                    <ChevronRight className="h-4 w-4 text-[#9ab0dd] transition-transform duration-300 group-hover:translate-x-0.5" />
                   </div>
                 </div>
-                <div className="space-y-2 rounded-[1.6rem] border border-white/80 bg-white/84 p-4 shadow-[0_10px_20px_-18px_rgba(20,41,95,0.18)]">
-                  <p className="text-sm font-black tracking-tight text-[#14295F]">
-                    오늘 먼저 볼 리포트
-                  </p>
-                  <p className="line-clamp-4 break-keep text-[13px] font-bold leading-relaxed text-slate-700">
+                <div className="overflow-hidden rounded-[1.7rem] border border-[#1f3b75] bg-[linear-gradient(155deg,#1b3b77_0%,#14295F_58%,#10224f_100%)] p-4 text-white shadow-[0_22px_36px_-26px_rgba(20,41,95,0.5)]">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/62">Today Summary</p>
+                    <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-[10px] font-black text-white/84">바로 보기</span>
+                  </div>
+                  <p className="mt-3 line-clamp-4 break-keep text-[13px] font-bold leading-relaxed text-white/88">
                     {report?.content || '카드를 누르면 자녀의 최근 학습 리포트와 선생님 피드백을 바로 확인할 수 있습니다.'}
                   </p>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-[#dce6fb] bg-[#f8fbff] px-3.5 py-3">
+                  <p className="text-[12px] font-bold text-slate-600">선생님 피드백과 오늘 흐름을 한 번에 확인합니다.</p>
+                  <span className="shrink-0 text-[11px] font-black text-[#FF7A16]">열기</span>
                 </div>
               </div>
             </Card>
 
             <Card
               className={cn(
-                'rounded-[2rem] border border-[#d7e4ff] bg-[linear-gradient(145deg,#fbfdff_0%,#ffffff_68%,#fff8f0_100%)] p-5 shadow-[0_20px_40px_-34px_rgba(20,41,95,0.18)] sm:p-6',
+                'rounded-[2.1rem] border border-[#d7e4ff] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5 shadow-[0_24px_42px_-34px_rgba(20,41,95,0.22)] ring-1 ring-white/80 sm:p-6',
                 showEntryMotion && 'parent-card-enter parent-entry-delay-5'
               )}
             >
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-[#14295F]" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">최근 알림 3개</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef4ff] text-[#14295F] shadow-[0_12px_24px_-20px_rgba(20,41,95,0.28)]">
+                    <Bell className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6b7ea5]">최근 알림 3개</span>
+                    <p className="mt-0.5 text-[13px] font-black tracking-tight text-[#14295F]">센터 소식과 자녀 알림</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {unreadRecentCount > 0 && (
-                    <Badge variant="outline" className="h-6 rounded-full border-none bg-[#FF7A16]/15 px-2.5 text-[10px] font-black text-[#FF7A16]">
+                    <Badge variant="outline" className="h-6 rounded-full border border-[#ffd1a2] bg-[#fff3e8] px-2.5 text-[10px] font-black text-[#FF7A16]">
                       미읽음 {unreadRecentCount}
                     </Badge>
                   )}
@@ -3468,7 +3566,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </Badge>
                 </div>
               </div>
-              <p className="mb-3 text-[11px] font-bold text-slate-500">센터 공지와 자녀 알림을 한곳에서 빠르게 확인할 수 있어요.</p>
+              <p className="mb-3 text-[11px] font-bold text-slate-500">센터 공지와 자녀 알림을 홈에서 빠르게 훑어볼 수 있어요.</p>
 
               {recentNotifications.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
@@ -3484,17 +3582,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         type="button"
                         key={notification.id}
                         className={cn(
-                          'relative w-full overflow-hidden rounded-[1.45rem] border p-4 text-left transition-all',
+                          'relative w-full overflow-hidden rounded-[1.45rem] border p-4 text-left transition-[transform,box-shadow,border-color] duration-300 md:hover:-translate-y-0.5',
                           isRead
-                            ? 'border-[#dde6f9] bg-white'
-                            : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff7ef_0%,#eef4ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/70 md:hover:shadow-md'
+                            ? 'border-[#dde6f9] bg-white md:hover:border-[#cad8f6] md:hover:shadow-[0_18px_30px_-26px_rgba(20,41,95,0.26)]'
+                            : 'border-[#ffcf9e] bg-[linear-gradient(135deg,#fff7ef_0%,#f2f6ff_100%)] shadow-sm ring-1 ring-[#ffd29f]/70 md:hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.2)]'
                         )}
                         onClick={() => void openNotificationDetail(notification)}
                       >
                         {!isRead && (
                           <>
-                            <div className="pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full bg-[#FF7A16]/20 blur-xl" />
-                            <Sparkles className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-[#FF7A16]" />
+                            <div className="pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full bg-[#FF7A16]/18 blur-xl" />
                           </>
                         )}
                         <div className="relative z-10 flex items-start justify-between gap-3">
@@ -3530,26 +3627,27 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <DialogTrigger asChild>
               <Button
                 className={cn(
-                  'h-14 w-full rounded-[1.7rem] bg-[#14295F] text-base font-black text-white shadow-[0_14px_28px_rgba(20,41,95,0.20)] transition-all active:scale-[0.98] hover:bg-[#10224f]',
+                  'group parent-home-cta-glow h-14 w-full rounded-[1.8rem] border border-[#22427e] bg-[linear-gradient(135deg,#1d3d79_0%,#14295F_58%,#FF7A16_160%)] text-base font-black text-white shadow-[0_18px_36px_-22px_rgba(20,41,95,0.44)] transition-[transform,box-shadow,filter] duration-300 active:scale-[0.98] hover:brightness-[1.03]',
                   showEntryMotion && 'parent-card-enter parent-entry-delay-5'
                 )}
               >
                 <TrendingUp className="mr-2 h-5 w-5" />
                 인공지능 학습 인사이트 보기
-                <ChevronRight className="ml-auto h-4 w-4 opacity-40" />
+                <ChevronRight className="ml-auto h-4 w-4 opacity-60 transition-transform duration-300 group-hover:translate-x-0.5" />
               </Button>
             </DialogTrigger>
             <DialogContent className="rounded-[3rem] border-none p-0 shadow-2xl overflow-hidden sm:max-w-md">
-              <div className="relative bg-[#14295F] p-10 text-white">
+              <div className="relative overflow-hidden bg-[linear-gradient(155deg,#1d3d79_0%,#14295F_56%,#0f214d_100%)] p-10 text-white">
+                <div className="soft-glow absolute -right-6 top-0 h-24 w-24 rounded-full bg-[#ffbf7d]/24 blur-3xl" />
                 <Sparkles className="absolute right-0 top-0 h-32 w-32 p-8 opacity-20" />
                 <DialogTitle className="text-2xl font-black tracking-tighter text-white">인공지능 학습 인사이트</DialogTitle>
-                <DialogDescription className="mt-1 text-xs font-bold text-white/70">
+                <DialogDescription className="mt-1 text-xs font-bold text-white/72">
                   자녀의 학습 패턴을 차분하고 보기 쉽게 정리했습니다.
                 </DialogDescription>
               </div>
-              <div className="space-y-3 bg-[#fafafa] p-6">
+              <div className="space-y-3 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-6">
                 {aiInsights.map((insight, i) => (
-                  <div key={i} className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-orange-200">
+                  <div key={i} className="flex items-start gap-4 rounded-2xl border border-[#dbe6fb] bg-white p-5 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.22)] transition-all hover:border-[#ffd2a2]">
                     <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#FF7A16]" />
                     <p className="text-sm font-bold leading-relaxed text-slate-700">{insight}</p>
                   </div>
@@ -3557,7 +3655,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <DialogFooter className="border-t bg-white p-6">
                 <DialogClose asChild>
-                  <Button className="h-14 w-full rounded-2xl bg-[#14295F] text-lg font-black text-white">확인했습니다</Button>
+                  <Button className="h-14 w-full rounded-2xl bg-[#14295F] text-lg font-black text-white shadow-[0_18px_28px_-20px_rgba(20,41,95,0.34)]">확인했습니다</Button>
                 </DialogClose>
               </DialogFooter>
             </DialogContent>
