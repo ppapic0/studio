@@ -207,7 +207,7 @@ const SEAT_OVERLAY_DESCRIPTIONS: Record<CenterAdminSeatOverlayMode, string> = {
 type TeacherSectionHeaderProps = {
   badge: string;
   title: string;
-  description: string;
+  description?: string;
   icon: ComponentType<{ className?: string }>;
   right?: ReactNode;
   tone?: 'navy' | 'emerald' | 'amber';
@@ -268,9 +268,11 @@ function TeacherSectionHeader({
             </h2>
           </div>
         </div>
-        <p className={cn('mt-3 max-w-[42rem] text-xs font-bold leading-5 sm:text-sm', toneStyles.description)}>
-          {description}
-        </p>
+        {description ? (
+          <p className={cn('mt-3 max-w-[42rem] text-xs font-bold leading-5 sm:text-sm', toneStyles.description)}>
+            {description}
+          </p>
+        ) : null}
       </div>
       {right ? <div className="flex shrink-0 flex-wrap gap-2">{right}</div> : null}
     </div>
@@ -2302,7 +2304,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             <TeacherSectionHeader
               badge="최근 30일 추이"
               title="센터 전체 학습 온도 보기"
-              description="실제 공부시간만 기준으로 최근 30일 학습 흐름을 읽고, 상단 우선순위 뒤의 큰 방향을 빠르게 판단합니다."
               icon={TrendingUp}
               tone="emerald"
               onDark
