@@ -305,6 +305,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [manualPenaltyReason, setManualPenaltyReason] = useState('');
   const [isPenaltySaving, setIsPenaltySaving] = useState(false);
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
+  const [isHeroPriorityDialogOpen, setIsHeroPriorityDialogOpen] = useState(false);
+  const [isHeroRoomsDialogOpen, setIsHeroRoomsDialogOpen] = useState(false);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
   const [trendLoading, setTrendLoading] = useState(false);
@@ -2055,18 +2057,26 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 </div>
 
                 <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-                  <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+                  <button
+                    type="button"
+                    onClick={() => setIsHeroPriorityDialogOpen(true)}
+                    className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 text-left backdrop-blur-sm transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.1]"
+                  >
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">오늘 우선순위</p>
                     <p className="mt-2 text-lg font-black tracking-tight text-white">
                       {teacherActionQueue.length > 0 ? `${teacherActionQueue.length}건 바로 확인` : '즉시 처리 항목 없음'}
                     </p>
-                  </div>
-                  <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsHeroRoomsDialogOpen(true)}
+                    className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 text-left backdrop-blur-sm transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.1]"
+                  >
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">실시간 교실</p>
                     <p className="mt-2 text-lg font-black tracking-tight text-white">
                       {selectedRoomView === 'all' ? '전체 호실 보기' : getRoomLabel(selectedRoomView, roomConfigs)}
                     </p>
-                  </div>
+                  </button>
                   <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">학생 리스크</p>
                     <p className="mt-2 text-lg font-black tracking-tight text-white">
@@ -2810,6 +2820,235 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           </div>
         </div>
       </motion.section>
+
+      <Dialog open={isHeroPriorityDialogOpen} onOpenChange={setIsHeroPriorityDialogOpen}>
+        <DialogContent className={cn("overflow-hidden border-none p-0 shadow-2xl", isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "sm:max-w-2xl rounded-[2.4rem]")}>
+          <div className="bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_58%,#FF8B2B_100%)] p-6 text-white sm:p-7">
+            <DialogHeader className="space-y-4 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-white">
+                  오늘 우선순위
+                </Badge>
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                  {teacherActionQueue.length}건
+                </Badge>
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="font-aggro-display text-2xl tracking-tight sm:text-[2rem]">
+                  바로 확인할 항목
+                </DialogTitle>
+                <DialogDescription className="text-sm font-semibold leading-6 text-white/82">
+                  상담, 출결, 학생 리스크, 리포트 후속 가운데 지금 먼저 볼 항목만 추렸습니다.
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+          </div>
+
+          <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] p-5 sm:p-6">
+            {teacherActionQueue.length === 0 ? (
+              <div className="rounded-[1.8rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-12 text-center">
+                <p className="text-base font-black text-[#14295F]">지금 바로 처리할 우선 항목이 없습니다.</p>
+                <p className="mt-2 text-sm font-medium text-[#5c6e97]">현재 대시보드 흐름은 안정적입니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {teacherActionQueue.map((item, index) => {
+                  const QueueIcon = item.icon;
+                  return (
+                    <div key={item.key} className="rounded-[1.7rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={cn("h-6 rounded-full border-none px-2.5 text-[10px] font-black", item.toneClass)}>
+                              {index === 0 ? '최우선' : `${index + 1}순위`}
+                            </Badge>
+                            <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#14295F]">
+                              {item.actionLabel}
+                            </Badge>
+                          </div>
+                          <p className="mt-3 text-base font-black text-[#14295F]">{item.title}</p>
+                          <p className="mt-2 text-[12px] font-bold leading-6 text-[#5c6e97]">{item.detail}</p>
+                        </div>
+                        <span className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem]", item.toneClass)}>
+                          <QueueIcon className="h-[18px] w-[18px]" />
+                        </span>
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button
+                          type="button"
+                          className="h-10 rounded-xl bg-[#FF7A16] px-4 text-sm font-black text-white hover:bg-[#E56D10]"
+                          onClick={() => {
+                            setIsHeroPriorityDialogOpen(false);
+                            item.onClick();
+                          }}
+                        >
+                          {item.actionLabel}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t border-[#D7E4FF] bg-white px-5 py-4 sm:px-6">
+            <Button variant="ghost" onClick={() => setIsHeroPriorityDialogOpen(false)} className="w-full font-black text-[#14295F] hover:bg-[#F1F6FF]">
+              닫기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isHeroRoomsDialogOpen} onOpenChange={setIsHeroRoomsDialogOpen}>
+        <DialogContent className={cn("overflow-hidden border-none p-0 shadow-2xl", isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "sm:max-w-3xl rounded-[2.4rem]")}>
+          <div className="bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_58%,#FF8B2B_100%)] p-6 text-white sm:p-7">
+            <DialogHeader className="space-y-4 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-white">
+                  실시간 교실
+                </Badge>
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                  {roomSummaries.length}개 호실
+                </Badge>
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                  현재 보기 {selectedRoomLabel}
+                </Badge>
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="font-aggro-display text-2xl tracking-tight sm:text-[2rem]">
+                  호실별 실시간 현황
+                </DialogTitle>
+                <DialogDescription className="text-sm font-semibold leading-6 text-white/82">
+                  원하는 호실을 바로 선택하고 실시간 교실 화면으로 이어질 수 있습니다.
+                </DialogDescription>
+              </div>
+              <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+                <div className="rounded-[1.45rem] border border-white/10 bg-white/10 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white">공부 중</p>
+                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{stats.studying}</p>
+                </div>
+                <div className="rounded-[1.45rem] border border-white/10 bg-white/10 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white">외출/휴식</p>
+                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{stats.away}</p>
+                </div>
+                <div className="rounded-[1.45rem] border border-white/10 bg-white/10 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white">전체 좌석</p>
+                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{stats.total}</p>
+                </div>
+                <div className="rounded-[1.45rem] border border-[#FFB677]/28 bg-[#FF7A16]/18 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white">필터</p>
+                  <p className="mt-2 text-sm font-black text-white">{selectedClass === 'all' ? '센터 전체' : selectedClass}</p>
+                </div>
+              </div>
+            </DialogHeader>
+          </div>
+
+          <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] p-5 sm:p-6">
+            <div className="grid gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRoomView('all');
+                  setIsHeroRoomsDialogOpen(false);
+                  scrollToSection(liveBoardSectionRef);
+                }}
+                className={cn(
+                  "rounded-[1.7rem] border p-4 text-left shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5",
+                  selectedRoomView === 'all'
+                    ? 'border-[#FFD7BA] bg-[#FFF8F2]'
+                    : 'border-[#DCE7FF] bg-white hover:border-[#FF7A16]/24'
+                )}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#14295F]">
+                        전체 호실
+                      </Badge>
+                      {selectedRoomView === 'all' ? (
+                        <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">
+                          현재 선택
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-3 text-base font-black text-[#14295F]">전체 실시간 교실 보기</p>
+                    <p className="mt-1 text-[12px] font-bold leading-6 text-[#5c6e97]">
+                      모든 호실을 한 번에 보고 좌석 상태를 바로 확인합니다.
+                    </p>
+                  </div>
+                  <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem] bg-[#EEF4FF] text-[#14295F]">
+                    <LayoutGrid className="h-[18px] w-[18px]" />
+                  </span>
+                </div>
+              </button>
+
+              {roomSummaries.map((room) => (
+                <button
+                  key={room.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoomView(room.id);
+                    setIsHeroRoomsDialogOpen(false);
+                    scrollToSection(liveBoardSectionRef);
+                  }}
+                  className={cn(
+                    "rounded-[1.7rem] border p-4 text-left shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5",
+                    selectedRoomView === room.id
+                      ? 'border-[#FFD7BA] bg-[#FFF8F2]'
+                      : 'border-[#DCE7FF] bg-white hover:border-[#FF7A16]/24'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-black text-[#14295F]">{room.name}</p>
+                        {selectedRoomView === room.id ? (
+                          <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">
+                            현재 선택
+                          </Badge>
+                        ) : null}
+                        {room.hasUnsavedChanges ? (
+                          <Badge className="h-6 rounded-full border-none bg-amber-100 px-2.5 text-[10px] font-black text-amber-700">
+                            수정 중
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <div className={cn("mt-4 grid gap-2", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+                        <div className="rounded-[1.1rem] border border-[#DCE7FF] bg-[#F7FAFF] px-3 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">공부 중</p>
+                          <p className="dashboard-number mt-2 text-[1.35rem] text-[#14295F]">{room.studying}</p>
+                        </div>
+                        <div className="rounded-[1.1rem] border border-[#DCE7FF] bg-[#FFF8F2] px-3 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C95A08]">외출/휴식</p>
+                          <p className="dashboard-number mt-2 text-[1.35rem] text-[#C95A08]">{room.away}</p>
+                        </div>
+                        <div className="rounded-[1.1rem] border border-[#DCE7FF] bg-[#F7FAFF] px-3 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">배정 좌석</p>
+                          <p className="dashboard-number mt-2 text-[1.35rem] text-[#14295F]">{room.assigned}</p>
+                        </div>
+                        <div className="rounded-[1.1rem] border border-[#DCE7FF] bg-white px-3 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">여유 좌석</p>
+                          <p className="dashboard-number mt-2 text-[1.35rem] text-[#14295F]">{room.availableSeats}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem] bg-[#EEF4FF] text-[#14295F]">
+                      <Armchair className="h-[18px] w-[18px]" />
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-[#D7E4FF] bg-white px-5 py-4 sm:px-6">
+            <Button variant="ghost" onClick={() => setIsHeroRoomsDialogOpen(false)} className="w-full font-black text-[#14295F] hover:bg-[#F1F6FF]">
+              닫기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedRecentReport} onOpenChange={(open) => !open && setSelectedRecentReport(null)}>
         <DialogContent className={cn("rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col", isMobile ? "fixed inset-0 w-full h-full max-w-none rounded-none" : "sm:max-w-2xl max-h-[90vh]")}>
