@@ -1865,14 +1865,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     ? 'analysis-tab-trigger min-w-0 rounded-[1rem] font-aggro-display font-black text-xs gap-1.5 px-3 py-2.5'
     : 'min-w-0 rounded-[1.1rem] font-black text-xs gap-1.5 px-3 text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_20px_48px_-36px_rgba(20,41,95,0.58)]';
   const detailChartCardClass = cn(
-    'overflow-hidden rounded-[1.8rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]',
+    'min-w-0 overflow-hidden rounded-[1.8rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]',
     isAnalysisPresentation && 'analysis-chart-stage analysis-chart-stage--warm analysis-full-chart-card border-none'
   );
   const detailGrowthChartCardClass = cn(detailChartCardClass, isAnalysisPresentation && 'analysis-growth-card analysis-full-chart-card--feature');
   const detailChartHeaderClass = cn('relative z-10', isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4');
   const detailChartContentClass = cn('relative z-10 pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5');
   const detailChartPanelClass = cn(
-    'relative rounded-[1.3rem] border bg-[#f8fbff] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]',
+    'relative overflow-hidden rounded-[1.3rem] border bg-[#f8fbff] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]',
     isMobile ? 'p-3' : 'p-4',
     isAnalysisPresentation ? 'analysis-detail-panel border-none' : 'border-[#dbe7ff]'
   );
@@ -2138,6 +2138,49 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       helper: focusKpi.completionRate >= 70 ? '완수 리듬이 유지됩니다.' : '실행 볼륨 점검이 필요합니다.',
       toneClass: 'text-[#d86a11]',
       shellClass: 'border-amber-100 bg-[#fff8ef]',
+    },
+  ] as const;
+  const graphWorkbenchMetrics = [
+    {
+      key: 'range',
+      label: '현재 관찰 범위',
+      value: `최근 ${RANGE_MAP[focusedChartView]}일`,
+      helper: `${displaySeries.length}개 기록 기준`,
+    },
+    {
+      key: 'study',
+      label: '평균 공부시간',
+      value: minutesToLabel(avgStudyMinutes),
+      helper: '그래프 전체 기준선',
+    },
+    {
+      key: 'completion',
+      label: '평균 완수율',
+      value: `${avgCompletionRate}%`,
+      helper: avgCompletionRate >= 70 ? '실행 흐름 안정권' : '실행 밀도 재정비 필요',
+    },
+    {
+      key: 'rhythm',
+      label: '리듬 점수',
+      value: `${rhythmScore}점`,
+      helper: rhythmScore >= 70 ? '시간대 패턴 안정적' : '리듬 흔들림 점검 필요',
+    },
+  ] as const;
+  const graphWorkbenchSteps = [
+    {
+      key: 'growth',
+      label: '성장 비교',
+      detail: '주간 성장과 일자별 변동을 먼저 읽고 학습 볼륨의 방향을 확인합니다.',
+    },
+    {
+      key: 'rhythm',
+      label: '리듬 진단',
+      detail: '리듬 점수와 시작·종료 시각을 함께 보며 생활 패턴의 안정성을 봅니다.',
+    },
+    {
+      key: 'risk',
+      label: '즉시 개입',
+      detail: '외출 흐름과 위험 요약 카드로 지금 바로 손봐야 할 포인트를 잡습니다.',
     },
   ] as const;
   const counselingSummaryCards = [
@@ -2962,7 +3005,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {!isStudentSelfView ? (
-            <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]')}>
+            <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]')}>
               <Card className={cn(
                 "rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] shadow-lg",
                 isAnalysisPresentation && "analysis-premium-card analysis-full-section-card surface-card surface-card--secondary on-dark border-none shadow-none"
@@ -3008,14 +3051,90 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 timeline={operationsTimeline}
                 isAdmin={canViewFinance}
                 isMobile={isMobile}
-                className={isAnalysisPresentation ? 'analysis-chart-stage analysis-full-ops-card' : undefined}
+                className={cn(isAnalysisPresentation ? 'analysis-chart-stage analysis-full-ops-card' : 'min-w-0')}
               />
             </section>
           ) : null}
 
+          {!isAnalysisPresentation ? (
+            <motion.section
+              {...defaultSectionMotion(0.14)}
+              className="grid gap-4"
+            >
+              <div className="rounded-[2.15rem] bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] px-5 py-5 shadow-[0_34px_78px_-50px_rgba(20,41,95,0.74)] sm:px-6 sm:py-6">
+                <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]')}>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="rounded-full border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                        그래프 워크벤치
+                      </Badge>
+                      <Badge className="rounded-full border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                        학생 360
+                      </Badge>
+                      <Badge className="rounded-full border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                        최근 {RANGE_MAP[focusedChartView]}일 기준
+                      </Badge>
+                    </div>
+                    <h3 className="mt-4 font-aggro-display text-[1.6rem] font-black tracking-[-0.04em] text-white">
+                      그래프를 한 번에 읽지 않고, 성장에서 리듬과 위험까지 순서대로 보이게 다시 묶었습니다.
+                    </h3>
+                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-white/80">
+                      기존 그래프는 그대로 유지하면서도, 좁은 화면이나 중간 폭 데스크톱에서 흐름이 깨져 보이지 않도록 그래프 구역을 워크벤치 형태로 재배열했습니다.
+                    </p>
+                    <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
+                      {graphWorkbenchSteps.map((item, index) => (
+                        <div key={item.key} className="rounded-[1.4rem] border border-white/10 bg-white/8 px-4 py-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Step {index + 1}</p>
+                          <p className="mt-2 text-sm font-black tracking-tight text-white">{item.label}</p>
+                          <p className="mt-2 text-xs font-semibold leading-5 text-white/80">{item.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-2')}>
+                    {graphWorkbenchMetrics.map((item) => (
+                      <div key={item.key} className="rounded-[1.4rem] border border-white/10 bg-white/8 px-4 py-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">{item.label}</p>
+                        <p className="mt-3 text-[1.35rem] font-black tracking-tight text-white">{item.value}</p>
+                        <p className="mt-2 text-xs font-semibold leading-5 text-white/80">{item.helper}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.section>
+          ) : null}
+
           {!isMobile && (
-          <section className="analysis-full-chart-stack space-y-4">
-            <div className="grid gap-4 grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
+          <motion.section {...defaultSectionMotion(0.16)} className="analysis-full-chart-stack space-y-5">
+            {!isAnalysisPresentation ? (
+              <div className="rounded-[1.9rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] px-5 py-5 shadow-[0_28px_70px_-56px_rgba(20,41,95,0.36)]">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="rounded-full border border-[#dbe7ff] bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                        심화 그래프 데크
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#2554d4]">
+                        데스크톱 집중 보기
+                      </Badge>
+                    </div>
+                    <h3 className="mt-3 font-aggro-display text-[1.24rem] font-black tracking-[-0.03em] text-[#14295F]">
+                      메인 비교 그래프와 진단 그래프를 분리해, 좁은 3열 구간 없이 읽히도록 정리했습니다.
+                    </h3>
+                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5c6e97]">
+                      상단에서는 성장과 일간 변화를 비교하고, 아래에서는 리듬, 시간대, 외출, 위험 신호를 넓은 카드 폭으로 이어서 볼 수 있습니다.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white px-3 py-1 text-[10px] font-black text-[#2554d4]">성장 비교 2장</Badge>
+                    <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white px-3 py-1 text-[10px] font-black text-[#2554d4]">리듬 진단 3장</Badge>
+                    <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white px-3 py-1 text-[10px] font-black text-[#2554d4]">위험 요약 1장</Badge>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
             <Card className={detailGrowthChartCardClass}>
               <CardHeader className={detailChartHeaderClass}>
                 <div className="flex items-start justify-between gap-4">
@@ -3039,7 +3158,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 {hasWeeklyGrowthData ? (
                   <>
                     <div className={detailChartPanelClass}>
-                      <ResponsiveContainer width="100%" height={262}>
+                      <ResponsiveContainer width="100%" height={282}>
                         <ComposedChart data={weeklyGrowthData} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
                           <defs>
                             <linearGradient id="detailWeeklyGrowthBarGradient" x1="0" y1="0" x2="0" y2="1">
@@ -3112,7 +3231,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 {hasDailyGrowthData ? (
                   <>
                     <div className={detailChartPanelClass}>
-                      <ResponsiveContainer width="100%" height={262}>
+                      <ResponsiveContainer width="100%" height={282}>
                         <ComposedChart data={dailyGrowthWindowData} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
                           <defs>
                             <linearGradient id="detailDailyGrowthBarGradient" x1="0" y1="0" x2="0" y2="1">
@@ -3157,7 +3276,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </Card>
             </div>
 
-            <div className="grid gap-4 grid-cols-3">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
+            <div className="grid gap-4">
             <Card className={detailChartCardClass}>
               <CardHeader className={detailChartHeaderClass}>
                 <div className="flex items-start justify-between gap-4">
@@ -3178,7 +3298,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardHeader>
               <CardContent className={detailChartContentClass}>
                 <div className={detailChartPanelClass}>
-                  <ResponsiveContainer width="100%" height={262}>
+                  <ResponsiveContainer width="100%" height={268}>
                     <AreaChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
                       <defs>
                         <linearGradient id="detailRhythmGradient" x1="0" y1="0" x2="0" y2="1">
@@ -3238,7 +3358,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardHeader>
               <CardContent className={detailChartContentClass}>
                 <div className={detailChartPanelClass}>
-                  <ResponsiveContainer width="100%" height={248}>
+                  <ResponsiveContainer width="100%" height={268}>
                     <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
@@ -3274,6 +3394,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
+            </div>
+
+            <div className="grid gap-4">
             <Card className={detailChartCardClass}>
               <CardHeader className={detailChartHeaderClass}>
                 <div className="flex items-start justify-between gap-4">
@@ -3293,7 +3416,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </CardHeader>
               <CardContent className={detailChartContentClass}>
                 <div className={detailChartPanelClass}>
-                  <ResponsiveContainer width="100%" height={248}>
+                  <ResponsiveContainer width="100%" height={268}>
                     <ComposedChart data={awayTimeData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
                       <defs>
                         <linearGradient id="detailAwayBarGradient" x1="0" y1="0" x2="0" y2="1">
@@ -3363,11 +3486,27 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </CardContent>
             </Card>
-          </section>
+            </div>
+          </motion.section>
           )}
 
           {isMobile ? (
-            <>
+            <motion.section {...defaultSectionMotion(0.18)} className="space-y-4">
+              {!isAnalysisPresentation ? (
+                <div className="rounded-[1.75rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] px-4 py-4 shadow-[0_24px_60px_-52px_rgba(20,41,95,0.34)]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="rounded-full border border-[#dbe7ff] bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                      모바일 그래프 레일
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#2554d4]">
+                      세로 스택 보기
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-sm font-black leading-6 text-[#14295F]">
+                    작은 화면에서는 같은 그래프를 순서대로 끊어 읽을 수 있게 성장, 리듬, 시간대, 외출 흐름으로 정렬했습니다.
+                  </p>
+                </div>
+              ) : null}
               <div className="grid gap-4">
                 <Card className={detailGrowthChartCardClass}>
                   <CardHeader className={detailChartHeaderClass}>
@@ -3394,7 +3533,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     {hasWeeklyGrowthData ? (
                       <>
                         <div className={detailChartPanelClass}>
-                          <ResponsiveContainer width="100%" height={220}>
+                          <ResponsiveContainer width="100%" height={236}>
                             <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
                               <defs>
                                 <linearGradient id="detailWeeklyGrowthBarGradientMobile" x1="0" y1="0" x2="0" y2="1">
@@ -3471,7 +3610,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     {hasDailyGrowthData ? (
                       <>
                         <div className={detailChartPanelClass}>
-                          <ResponsiveContainer width="100%" height={220}>
+                          <ResponsiveContainer width="100%" height={236}>
                             <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
                               <defs>
                                 <linearGradient id="detailDailyGrowthBarGradientMobile" x1="0" y1="0" x2="0" y2="1">
@@ -3536,7 +3675,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardHeader>
                   <CardContent className={detailChartContentClass}>
                     <div className={detailChartPanelClass}>
-                      <ResponsiveContainer width="100%" height={220}>
+                      <ResponsiveContainer width="100%" height={236}>
                         <AreaChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                           <defs>
                             <linearGradient id="detailRhythmGradientMobile" x1="0" y1="0" x2="0" y2="1">
@@ -3598,7 +3737,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardHeader>
                   <CardContent className={detailChartContentClass}>
                     <div className={detailChartPanelClass}>
-                      <ResponsiveContainer width="100%" height={220}>
+                      <ResponsiveContainer width="100%" height={236}>
                         <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 8, right: 6, left: -12, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                           <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
@@ -3655,7 +3794,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardHeader>
                   <CardContent className={detailChartContentClass}>
                     <div className={detailChartPanelClass}>
-                      <ResponsiveContainer width="100%" height={220}>
+                      <ResponsiveContainer width="100%" height={236}>
                         <ComposedChart data={awayTimeData} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
                           <defs>
                             <linearGradient id="detailAwayBarGradientMobile" x1="0" y1="0" x2="0" y2="1">
@@ -3728,7 +3867,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </CardContent>
                 </Card>
               </div>
-            </>
+            </motion.section>
           ) : (
             <>
               <div className="grid gap-6 lg:grid-cols-12">
