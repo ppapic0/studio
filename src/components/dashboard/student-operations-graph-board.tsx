@@ -2,7 +2,6 @@
 
 import {
   Area,
-  AreaChart,
   Bar,
   ComposedChart,
   Line,
@@ -176,63 +175,134 @@ export function StudentOperationsGraphBoard({
   const totalSmsCount = safeTimeline.reduce((sum, item) => sum + item.smsCount, 0);
   const totalInvoiceAmount = safeTimeline.reduce((sum, item) => sum + item.invoiceAmount, 0);
   const peakRiskPulse = safeTimeline.reduce((max, item) => Math.max(max, item.riskPulse), 0);
+  const latestPoint = safeTimeline[safeTimeline.length - 1];
+  const latestStudyMinutes = latestPoint ? Math.round(latestPoint.studyMinutes) : 0;
+  const latestCompletionRate = latestPoint ? Math.round(latestPoint.completionRate) : 0;
+  const highestStudyMinutes = safeTimeline.reduce((max, item) => Math.max(max, item.studyMinutes), 0);
+  const totalContactFlow = safeTimeline.reduce(
+    (sum, item) => sum + item.counselingCount + item.reportCount + item.smsCount,
+    0
+  );
+  const attendanceFocus = [
+    {
+      key: 'present',
+      label: '정상',
+      value: attendanceRollup.confirmed_present + attendanceRollup.confirmed_present_missing_routine,
+      tone: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    {
+      key: 'late',
+      label: '지각',
+      value: attendanceRollup.confirmed_late,
+      tone: 'bg-amber-50 text-amber-700 border-amber-200',
+    },
+    {
+      key: 'absent',
+      label: '미출석',
+      value: attendanceRollup.confirmed_absent,
+      tone: 'bg-rose-50 text-rose-700 border-rose-200',
+    },
+  ] as const;
+  const headerMetrics = [
+    { key: 'study', label: '평균 학습', value: minutesToCompactLabel(averageStudyMinutes) },
+    { key: 'completion', label: '평균 완료율', value: `${averageCompletionRate}%` },
+    { key: 'touch', label: '운영 접촉', value: `${totalManagementTouches}건` },
+    { key: 'guardian', label: '보호자 반응', value: `${totalGuardianTouches}회` },
+  ] as const;
+  const headerSignals = [
+    {
+      key: 'present',
+      label: '정상 등원',
+      value: attendanceRollup.confirmed_present + attendanceRollup.confirmed_present_missing_routine,
+      suffix: '건',
+      tone: 'border-emerald-300/40 bg-emerald-400/12 text-emerald-50',
+    },
+    {
+      key: 'late',
+      label: '지각',
+      value: attendanceRollup.confirmed_late,
+      suffix: '건',
+      tone: 'border-amber-300/40 bg-amber-300/12 text-amber-50',
+    },
+    {
+      key: 'absent',
+      label: '미출석',
+      value: attendanceRollup.confirmed_absent,
+      suffix: '건',
+      tone: 'border-rose-300/40 bg-rose-300/12 text-rose-50',
+    },
+    {
+      key: 'sms',
+      label: '문자 접수',
+      value: totalSmsCount,
+      suffix: '건',
+      tone: 'border-sky-300/40 bg-sky-300/12 text-sky-50',
+    },
+    {
+      key: 'risk',
+      label: '최고 위험도',
+      value: peakRiskPulse,
+      suffix: '점',
+      tone: 'border-violet-300/40 bg-violet-300/12 text-violet-50',
+    },
+  ] as const;
+  const panelCardClass =
+    'group rounded-[1.9rem] border border-[#dbe7ff] bg-white/96 shadow-[0_24px_60px_-42px_rgba(20,41,95,0.34)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#c2d7ff] hover:shadow-[0_28px_68px_-42px_rgba(20,41,95,0.4)] motion-reduce:transform-none motion-reduce:transition-none';
+  const chartFrameClass =
+    'rounded-[1.45rem] border border-[#edf2fb] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f8ff_100%)] p-3';
+  const iconWrapClass =
+    'flex h-8 w-8 items-center justify-center rounded-full border border-[#dbe7ff] bg-[#f5f8ff]';
 
   return (
     <div className={cn('space-y-4', className)}>
-      <Card className="rounded-[1.85rem] border-none bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] shadow-[0_22px_50px_-38px_rgba(20,41,95,0.38)]">
-        <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
+      <Card className="overflow-hidden rounded-[2rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#173D8B_62%,#2554D4_100%)] shadow-[0_28px_70px_-42px_rgba(20,41,95,0.62)]">
+        <CardContent className={cn('relative', isMobile ? 'p-4' : 'p-5')}>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.22),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_28%)]" />
+          <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl space-y-2.5">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="rounded-full border-none bg-[#14295F] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">
+                <Badge className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">
                   운영 그래프 보드
                 </Badge>
-                <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white/90 px-3 py-1 text-[10px] font-black text-[#2554d4]">
+                <Badge className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black text-white/80">
                   최근 4주 기준
                 </Badge>
               </div>
-              <CardTitle className="text-[clamp(1.05rem,1.7vw,1.45rem)] font-black tracking-tight text-[#14295F]">
-                학습, 출결, 보호자 반응, 상담, 문자, 리스크를 한 번에 보여주는 관리 증빙 보드
+              <CardTitle className="text-[clamp(1.08rem,1.8vw,1.5rem)] font-black tracking-tight text-white">
+                최근 4주 출결과 학습 흐름을 중심으로 운영 개입과 보호자 반응까지 함께 읽습니다.
               </CardTitle>
-              <CardDescription className="max-w-4xl text-sm font-semibold leading-6 text-[#5c6e97]">
-                부모님께 보여드릴 때도 바로 설명할 수 있도록, 공부시간만이 아니라 실제 운영 개입 흔적과 보호자 반응까지 함께 묶었습니다.
+              <CardDescription className="max-w-3xl text-sm font-semibold leading-6 text-white/72">
+                설명할 때는 한 장으로, 판단할 때는 출결과 학습을 먼저 볼 수 있게 위계를 다시 세웠습니다.
               </CardDescription>
             </div>
-            <div className={cn('grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-2 xl:grid-cols-4')}>
-              <div className="rounded-[1rem] border border-[#dbe7ff] bg-white/90 px-3.5 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">평균 학습</p>
-                <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">{minutesToCompactLabel(averageStudyMinutes)}</p>
-              </div>
-              <div className="rounded-[1rem] border border-[#dbe7ff] bg-white/90 px-3.5 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">평균 완료율</p>
-                <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">{averageCompletionRate}%</p>
-              </div>
-              <div className="rounded-[1rem] border border-[#dbe7ff] bg-white/90 px-3.5 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">운영 접촉</p>
-                <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">{totalManagementTouches}건</p>
-              </div>
-              <div className="rounded-[1rem] border border-[#dbe7ff] bg-white/90 px-3.5 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">보호자 반응</p>
-                <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">{totalGuardianTouches}회</p>
-              </div>
+
+            <div className={cn('grid gap-2.5', isMobile ? 'grid-cols-2' : 'grid-cols-2 xl:grid-cols-4')}>
+              {headerMetrics.map((metric) => (
+                <div
+                  key={metric.key}
+                  className="rounded-[1rem] border border-white/12 bg-white/10 px-3.5 py-3 backdrop-blur-sm transition-colors duration-300 hover:bg-white/14 motion-reduce:transition-none"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">{metric.label}</p>
+                  <p className="mt-1 text-base font-black tracking-tight text-white">{metric.value}</p>
+                </div>
+              ))}
             </div>
           </div>
-        </CardHeader>
-        <CardContent className={cn('grid gap-2.5', isMobile ? 'px-4 pb-4' : 'px-5 pb-5 md:grid-cols-2 xl:grid-cols-5')}>
-          {(
-            [
-              { key: 'present', label: '정상 등원', value: attendanceRollup.confirmed_present + attendanceRollup.confirmed_present_missing_routine, className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-              { key: 'late', label: '지각', value: attendanceRollup.confirmed_late, className: 'bg-amber-50 text-amber-700 border-amber-200' },
-              { key: 'absent', label: '미출석', value: attendanceRollup.confirmed_absent, className: 'bg-rose-50 text-rose-700 border-rose-200' },
-              { key: 'guardian', label: '문자 접수', value: totalSmsCount, className: 'bg-sky-50 text-sky-700 border-sky-200' },
-              { key: 'risk', label: '최고 위험도', value: peakRiskPulse, className: 'bg-violet-50 text-violet-700 border-violet-200' },
-            ] as const
-          ).map((chip) => (
-            <div key={chip.key} className={cn('rounded-[1rem] border px-3 py-2.5', chip.className)}>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em]">{chip.label}</p>
-              <p className="mt-1 text-sm font-black">{chip.value}{chip.key === 'risk' ? '점' : '건'}</p>
-            </div>
-          ))}
+
+          <div className="relative mt-4 flex flex-wrap gap-2 border-t border-white/12 pt-4">
+            {headerSignals.map((signal) => (
+              <div
+                key={signal.key}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-[11px] font-black backdrop-blur-sm transition-colors duration-300 hover:bg-white/14 motion-reduce:transition-none',
+                  signal.tone
+                )}
+              >
+                <span className="opacity-78">{signal.label}</span>
+                <span className="ml-2 text-white">{signal.value}{signal.suffix}</span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -243,234 +313,327 @@ export function StudentOperationsGraphBoard({
           </CardContent>
         </Card>
       ) : (
-        <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'lg:grid-cols-12')}>
-          <Card className="rounded-[1.75rem] border-none bg-white shadow-lg lg:col-span-5">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
-                    <BadgeCheck className="h-4.5 w-4.5 text-emerald-500" />
-                    출결 관리 스트립
-                  </CardTitle>
-                  <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                    날짜별 출결 판단을 색으로 바로 읽게 구성했습니다.
-                  </CardDescription>
-                </div>
-                <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white/85 text-[10px] font-black text-[#2554d4]">
-                  4주
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <div className="grid grid-cols-7 gap-2 sm:grid-cols-14">
-                {safeTimeline.map((item) => {
-                  const tone = ATTENDANCE_STYLE[item.attendanceStatus];
-                  return (
-                    <div key={item.dateKey} className="space-y-1">
-                      <div className="rounded-[0.9rem] border border-slate-100 bg-slate-50/70 px-2 py-2 text-center shadow-sm">
-                        <div className={cn('mx-auto h-7 rounded-[0.7rem]', tone.block)} />
-                        <p className="mt-2 text-[10px] font-black text-[#14295F]">{item.dateLabel}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(Object.entries(ATTENDANCE_STYLE) as Array<[keyof typeof ATTENDANCE_STYLE, (typeof ATTENDANCE_STYLE)[keyof typeof ATTENDANCE_STYLE]]>).map(([key, style]) => (
-                  <Badge key={key} variant="outline" className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', style.chip)}>
-                    {style.label}
+        <div className="space-y-4">
+          <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'lg:grid-cols-12')}>
+            <Card className={cn(panelCardClass, !isMobile && 'lg:col-span-4')}>
+              <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-3')}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
+                      <span className={iconWrapClass}>
+                        <BadgeCheck className="h-4.5 w-4.5 text-emerald-500" />
+                      </span>
+                      출결 관리 스트립
+                    </CardTitle>
+                    <CardDescription className="text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                      28일 출결 판단을 색 레일로 압축해 빠르게 읽습니다.
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-[#f8fbff] text-[10px] font-black text-[#2554d4]">
+                    4주
                   </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardHeader>
+              <CardContent className={cn('space-y-4 pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+                <div className="grid grid-cols-3 gap-2">
+                  {attendanceFocus.map((item) => (
+                    <div key={item.key} className={cn('rounded-[1rem] border px-3 py-2.5', item.tone)}>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em]">{item.label}</p>
+                      <p className="mt-1 text-sm font-black">{item.value}건</p>
+                    </div>
+                  ))}
+                </div>
 
-          <Card className="rounded-[1.75rem] border-none bg-white shadow-lg lg:col-span-7">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className={chartFrameClass}>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {safeTimeline.map((item) => {
+                      const tone = ATTENDANCE_STYLE[item.attendanceStatus];
+                      return (
+                        <div
+                          key={item.dateKey}
+                          className="rounded-[0.95rem] border border-[#e8eefb] bg-white px-1.5 py-2 text-center shadow-[0_10px_24px_-20px_rgba(20,41,95,0.28)]"
+                        >
+                          <div className={cn('mx-auto h-2 w-full rounded-full', tone.block)} />
+                          <p className="mt-2 text-[9px] font-black leading-none text-[#14295F]">{item.dateLabel}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {(Object.entries(ATTENDANCE_STYLE) as Array<
+                    [keyof typeof ATTENDANCE_STYLE, (typeof ATTENDANCE_STYLE)[keyof typeof ATTENDANCE_STYLE]]
+                  >).map(([key, style]) => (
+                    <Badge key={key} variant="outline" className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', style.chip)}>
+                      {style.label}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={cn(panelCardClass, !isMobile && 'lg:col-span-8')}>
+              <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-3')}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
+                      <span className={iconWrapClass}>
+                        <Activity className="h-4.5 w-4.5 text-[#2554d4]" />
+                      </span>
+                      학습시간 · 계획 이행 동시 추적
+                    </CardTitle>
+                    <CardDescription className="text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                      출결 다음으로 먼저 보는 메인 차트로 공부시간과 완료율을 함께 읽습니다.
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#2554d4]">
+                      최근 학습 {minutesToCompactLabel(latestStudyMinutes)}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full border-[#eadcff] bg-[#faf5ff] px-3 py-1 text-[10px] font-black text-[#7d4ed8]">
+                      최근 완료율 {latestCompletionRate}%
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white px-3 py-1 text-[10px] font-black text-[#14295F]">
+                      최고 학습 {minutesToCompactLabel(highestStudyMinutes)}
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className={cn('pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+                <div className={cn(chartFrameClass, isMobile ? 'h-[240px]' : 'h-[320px]')}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={safeTimeline} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="operationsStudyGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4f7cff" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="#4f7cff" stopOpacity={0.04} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />
+                      <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
+                      <YAxis yAxisId="study" tickLine={false} axisLine={false} width={34} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
+                      <YAxis yAxisId="completion" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} width={34} tick={{ fontSize: 10, fontWeight: 800, fill: '#7d4ed8' }} />
+                      <Tooltip
+                        content={({ active, label, payload }) => (
+                          <CustomOperationsTooltip
+                            active={active}
+                            label={String(label || '')}
+                            rows={[
+                              {
+                                label: '학습시간',
+                                value: minutesToCompactLabel(Number(payload?.find((item) => item.dataKey === 'studyMinutes')?.value || 0)),
+                                color: '#4f7cff',
+                              },
+                              {
+                                label: '완료율',
+                                value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'completionRate')?.value || 0))}%`,
+                                color: '#7d4ed8',
+                              },
+                            ]}
+                          />
+                        )}
+                      />
+                      <Area yAxisId="study" type="monotone" dataKey="studyMinutes" stroke="#4f7cff" strokeWidth={2.8} fill="url(#operationsStudyGradient)" />
+                      <Line yAxisId="completion" type="monotone" dataKey="completionRate" stroke="#7d4ed8" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: '#7d4ed8', stroke: '#ffffff', strokeWidth: 2 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+          </div>
+
+          <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'lg:grid-cols-3')}>
+            <Card className={panelCardClass}>
+              <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-3')}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
+                      <span className={iconWrapClass}>
+                        <MessageCircleMore className="h-4.5 w-4.5 text-[#ff7a16]" />
+                      </span>
+                      운영 접촉 추이
+                    </CardTitle>
+                    <CardDescription className="text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                      상담, 리포트, 문자를 날짜축에서 함께 봅니다.
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="rounded-full border-[#ffe0ca] bg-[#fff5ec] text-[10px] font-black text-[#c95a08]">
+                    총 {totalContactFlow}건
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className={cn('pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+                <div className={cn(chartFrameClass, isMobile ? 'h-[210px]' : 'h-[220px]')}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={safeTimeline} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />
+                      <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
+                      <YAxis tickLine={false} axisLine={false} width={28} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
+                      <Tooltip
+                        content={({ active, label, payload }) => (
+                          <CustomOperationsTooltip
+                            active={active}
+                            label={String(label || '')}
+                            rows={[
+                              { label: '상담', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'counselingCount')?.value || 0))}건`, color: '#ff7a16' },
+                              { label: '리포트', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'reportCount')?.value || 0))}건`, color: '#7d4ed8' },
+                              { label: '문자', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'smsCount')?.value || 0))}건`, color: '#23a8ff' },
+                            ]}
+                          />
+                        )}
+                      />
+                      <Line type="monotone" dataKey="counselingCount" stroke="#ff7a16" strokeWidth={2.5} dot={false} />
+                      <Line type="monotone" dataKey="reportCount" stroke="#7d4ed8" strokeWidth={2.5} dot={false} />
+                      <Line type="monotone" dataKey="smsCount" stroke="#23a8ff" strokeWidth={2.5} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={panelCardClass}>
+              <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-3')}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
+                      <span className={iconWrapClass}>
+                        <Users className="h-4.5 w-4.5 text-emerald-500" />
+                      </span>
+                      보호자 반응 추이
+                    </CardTitle>
+                    <CardDescription className="text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                      앱 방문과 리포트 열람으로 보호자 반응 온도를 봅니다.
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="rounded-full border-[#d9f4ec] bg-[#effcf7] text-[10px] font-black text-emerald-700">
+                    총 {totalGuardianTouches}회
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className={cn('pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+                <div className={cn(chartFrameClass, isMobile ? 'h-[210px]' : 'h-[220px]')}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={safeTimeline} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />
+                      <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
+                      <YAxis tickLine={false} axisLine={false} width={28} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
+                      <Tooltip
+                        content={({ active, label, payload }) => (
+                          <CustomOperationsTooltip
+                            active={active}
+                            label={String(label || '')}
+                            rows={[
+                              { label: '앱 방문', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'appVisits')?.value || 0))}회`, color: '#10b981' },
+                              { label: '리포트 열람', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'reportReads')?.value || 0))}회`, color: '#4f7cff' },
+                            ]}
+                          />
+                        )}
+                      />
+                      <Line type="monotone" dataKey="appVisits" stroke="#10b981" strokeWidth={2.5} dot={false} />
+                      <Line type="monotone" dataKey="reportReads" stroke="#4f7cff" strokeWidth={2.5} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={panelCardClass}>
+              <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-3')}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
+                      <span className={iconWrapClass}>
+                        <ShieldAlert className="h-4.5 w-4.5 text-rose-500" />
+                      </span>
+                      리스크 · 벌점 추이
+                    </CardTitle>
+                    <CardDescription className="text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                      벌점, 출결 요청, 위험 펄스를 같은 레일에서 확인합니다.
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="rounded-full border-[#f9d9e1] bg-[#fff5f8] text-[10px] font-black text-rose-700">
+                    최고 {peakRiskPulse}점
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className={cn('pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+                <div className={cn(chartFrameClass, isMobile ? 'h-[210px]' : 'h-[220px]')}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={safeTimeline} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />
+                      <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
+                      <YAxis yAxisId="count" tickLine={false} axisLine={false} width={28} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
+                      <YAxis yAxisId="risk" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} width={32} tick={{ fontSize: 10, fontWeight: 800, fill: '#ef476f' }} />
+                      <Tooltip
+                        content={({ active, label, payload }) => (
+                          <CustomOperationsTooltip
+                            active={active}
+                            label={String(label || '')}
+                            rows={[
+                              { label: '벌점 건수', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'penaltyCount')?.value || 0))}건`, color: '#ef476f' },
+                              { label: '출결 요청', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'requestCount')?.value || 0))}건`, color: '#ff9b24' },
+                              { label: '위험 펄스', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'riskPulse')?.value || 0))}점`, color: '#7d4ed8' },
+                            ]}
+                          />
+                        )}
+                      />
+                      <Bar yAxisId="count" dataKey="penaltyCount" fill="#fda4af" radius={[8, 8, 2, 2]} maxBarSize={16} />
+                      <Bar yAxisId="count" dataKey="requestCount" fill="#fdba74" radius={[8, 8, 2, 2]} maxBarSize={16} />
+                      <Line yAxisId="risk" type="monotone" dataKey="riskPulse" stroke="#7d4ed8" strokeWidth={2.5} dot={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className={panelCardClass}>
+            <CardHeader className={cn(isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-3')}>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="space-y-1.5">
                   <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
-                    <Activity className="h-4.5 w-4.5 text-[#2554d4]" />
-                    학습시간 · 계획 이행 동시 추적
+                    <span className={iconWrapClass}>
+                      {isAdmin ? (
+                        <WalletCards className="h-4.5 w-4.5 text-emerald-500" />
+                      ) : (
+                        <BellRing className="h-4.5 w-4.5 text-[#2554d4]" />
+                      )}
+                    </span>
+                    {isAdmin ? '수납 · 보호자 반응' : '보호자 반응 · 문자 접수'}
                   </CardTitle>
-                  <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                    공부시간과 완료율을 함께 보면 실제 관리 밀도가 더 잘 드러납니다.
+                  <CardDescription className="text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                    {isAdmin
+                      ? '청구 흐름과 보호자 반응을 같은 시간축에서 보며 운영 설명력을 높입니다.'
+                      : '문자 접수와 보호자 반응을 같은 시간축으로 두고 관리 흐름을 설명합니다.'}
                   </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {isAdmin ? (
+                    <>
+                      <Badge variant="outline" className="rounded-full border-[#d9f4ec] bg-[#effcf7] px-3 py-1 text-[10px] font-black text-emerald-700">
+                        총 청구액 {currencyLabel(totalInvoiceAmount)}
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#2554d4]">
+                        보호자 반응 {totalGuardianTouches}회
+                      </Badge>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="outline" className="rounded-full border-[#d9ecff] bg-[#f3f8ff] px-3 py-1 text-[10px] font-black text-sky-700">
+                        문자 접수 {totalSmsCount}건
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#2554d4]">
+                        보호자 반응 {totalGuardianTouches}회
+                      </Badge>
+                    </>
+                  )}
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              <div className="h-[260px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={safeTimeline} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="operationsStudyGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#4f7cff" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#4f7cff" stopOpacity={0.04} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />
-                    <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
-                    <YAxis yAxisId="study" tickLine={false} axisLine={false} width={34} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
-                    <YAxis yAxisId="completion" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} width={34} tick={{ fontSize: 10, fontWeight: 800, fill: '#7d4ed8' }} />
-                    <Tooltip
-                      content={({ active, label, payload }) => (
-                        <CustomOperationsTooltip
-                          active={active}
-                          label={String(label || '')}
-                          rows={[
-                            {
-                              label: '학습시간',
-                              value: minutesToCompactLabel(Number(payload?.find((item) => item.dataKey === 'studyMinutes')?.value || 0)),
-                              color: '#4f7cff',
-                            },
-                            {
-                              label: '완료율',
-                              value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'completionRate')?.value || 0))}%`,
-                              color: '#7d4ed8',
-                            },
-                          ]}
-                        />
-                      )}
-                    />
-                    <Area yAxisId="study" type="monotone" dataKey="studyMinutes" stroke="#4f7cff" strokeWidth={2.8} fill="url(#operationsStudyGradient)" />
-                    <Line yAxisId="completion" type="monotone" dataKey="completionRate" stroke="#7d4ed8" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: '#7d4ed8', stroke: '#ffffff', strokeWidth: 2 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[1.75rem] border-none bg-white shadow-lg lg:col-span-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
-                <MessageCircleMore className="h-4.5 w-4.5 text-[#ff7a16]" />
-                운영 접촉 추이
-              </CardTitle>
-              <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                상담, 리포트, 문자까지 실제 개입 흔적을 날짜별로 모았습니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="h-[240px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={safeTimeline} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />
-                    <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
-                    <YAxis tickLine={false} axisLine={false} width={28} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
-                    <Tooltip
-                      content={({ active, label, payload }) => (
-                        <CustomOperationsTooltip
-                          active={active}
-                          label={String(label || '')}
-                          rows={[
-                            { label: '상담', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'counselingCount')?.value || 0))}건`, color: '#ff7a16' },
-                            { label: '리포트', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'reportCount')?.value || 0))}건`, color: '#7d4ed8' },
-                            { label: '문자', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'smsCount')?.value || 0))}건`, color: '#23a8ff' },
-                          ]}
-                        />
-                      )}
-                    />
-                    <Line type="monotone" dataKey="counselingCount" stroke="#ff7a16" strokeWidth={2.5} dot={false} />
-                    <Line type="monotone" dataKey="reportCount" stroke="#7d4ed8" strokeWidth={2.5} dot={false} />
-                    <Line type="monotone" dataKey="smsCount" stroke="#23a8ff" strokeWidth={2.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[1.75rem] border-none bg-white shadow-lg lg:col-span-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
-                <Users className="h-4.5 w-4.5 text-emerald-500" />
-                보호자 반응 추이
-              </CardTitle>
-              <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                앱 방문과 리포트 열람 흐름으로 보호자 반응 온도를 보여줍니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="h-[240px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={safeTimeline} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />
-                    <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
-                    <YAxis tickLine={false} axisLine={false} width={28} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
-                    <Tooltip
-                      content={({ active, label, payload }) => (
-                        <CustomOperationsTooltip
-                          active={active}
-                          label={String(label || '')}
-                          rows={[
-                            { label: '앱 방문', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'appVisits')?.value || 0))}회`, color: '#10b981' },
-                            { label: '리포트 열람', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'reportReads')?.value || 0))}회`, color: '#4f7cff' },
-                          ]}
-                        />
-                      )}
-                    />
-                    <Line type="monotone" dataKey="appVisits" stroke="#10b981" strokeWidth={2.5} dot={false} />
-                    <Line type="monotone" dataKey="reportReads" stroke="#4f7cff" strokeWidth={2.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[1.75rem] border-none bg-white shadow-lg lg:col-span-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
-                <ShieldAlert className="h-4.5 w-4.5 text-rose-500" />
-                리스크 · 벌점 추이
-              </CardTitle>
-              <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                벌점, 출결 요청, 위험 펄스를 함께 봐서 관리 우선순위를 잡습니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="h-[240px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={safeTimeline} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />
-                    <XAxis dataKey="dateLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
-                    <YAxis yAxisId="count" tickLine={false} axisLine={false} width={28} tick={{ fontSize: 10, fontWeight: 800, fill: '#6a7da6' }} />
-                    <YAxis yAxisId="risk" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} width={32} tick={{ fontSize: 10, fontWeight: 800, fill: '#ef476f' }} />
-                    <Tooltip
-                      content={({ active, label, payload }) => (
-                        <CustomOperationsTooltip
-                          active={active}
-                          label={String(label || '')}
-                          rows={[
-                            { label: '벌점 건수', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'penaltyCount')?.value || 0))}건`, color: '#ef476f' },
-                            { label: '출결 요청', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'requestCount')?.value || 0))}건`, color: '#ff9b24' },
-                            { label: '위험 펄스', value: `${Math.round(Number(payload?.find((item) => item.dataKey === 'riskPulse')?.value || 0))}점`, color: '#7d4ed8' },
-                          ]}
-                        />
-                      )}
-                    />
-                    <Bar yAxisId="count" dataKey="penaltyCount" fill="#fda4af" radius={[8, 8, 2, 2]} maxBarSize={16} />
-                    <Bar yAxisId="count" dataKey="requestCount" fill="#fdba74" radius={[8, 8, 2, 2]} maxBarSize={16} />
-                    <Line yAxisId="risk" type="monotone" dataKey="riskPulse" stroke="#7d4ed8" strokeWidth={2.5} dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[1.75rem] border-none bg-white shadow-lg lg:col-span-12">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight text-[#14295F]">
-                {isAdmin ? <WalletCards className="h-4.5 w-4.5 text-emerald-500" /> : <BellRing className="h-4.5 w-4.5 text-[#2554d4]" />}
-                {isAdmin ? '수납 · 보호자 반응' : '보호자 반응 · 문자 접수'}
-              </CardTitle>
-              <CardDescription className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                {isAdmin
-                  ? '청구 흐름과 보호자 반응을 같은 시간축으로 보면 운영 비용 대비 개입 효율을 설명하기 좋습니다.'
-                  : '보호자 반응과 문자 접수 흐름을 같이 보여주면 관리 밀도를 전달하기 좋습니다.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="h-[260px] w-full">
+            <CardContent className={cn('pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+              <div className={cn(chartFrameClass, isMobile ? 'h-[220px]' : 'h-[260px]')}>
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={safeTimeline} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#edf2fb" />

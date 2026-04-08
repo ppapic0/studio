@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,8 +18,7 @@ import {
   getDocs,
   writeBatch,
   increment,
-  Timestamp,
-  getDoc
+  Timestamp
 } from 'firebase/firestore';
 import { StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -30,23 +29,16 @@ import {
   LogOut, 
   MonitorSmartphone, 
   Sparkles, 
-  X,
   Clock,
   Zap,
-  CheckCircle2,
   ArrowLeft,
   Coffee,
-  Undo2,
-  QrCode,
-  Scan,
-  Camera,
-  Keyboard
+  Undo2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { sendKakaoNotification } from '@/lib/kakao-service';
-import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 
@@ -57,14 +49,11 @@ export default function KioskPage() {
   const router = useRouter();
   const centerId = activeMembership?.id;
 
-  const [mode, setMode] = useState<'pin' | 'qr'>('pin');
   const [pin, setPin] = useState('');
   const [matchedStudents, setMatchedStudents] = useState<StudentProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-
-  const qrScannerRef = useRef<Html5Qrcode | null>(null);
 
   // 실시간 좌석 현황 조회
   const attendanceQuery = useMemoFirebase(() => {
@@ -92,83 +81,6 @@ export default function KioskPage() {
       type: 'seat',
       updatedAt: Timestamp.now(),
     } as AttendanceCurrent;
-  };
-
-  // QR 스캐너 초기화 및 정리
-  useEffect(() => {
-    if (mode === 'qr' && !showResults) {
-      const html5QrCode = new Html5Qrcode("qr-reader");
-      qrScannerRef.current = html5QrCode;
-
-      html5QrCode.start(
-        { facingMode: "user" }, // 프론트 카메라 (키오스크용)
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        (decodedText) => {
-          // QR 데이터 형식: ATTENDANCE_QR:centerId:studentId
-          if (decodedText.startsWith('ATTENDANCE_QR:')) {
-            const [_, cid, sid] = decodedText.split(':');
-            if (cid === centerId) {
-              handleQrScan(sid);
-            } else {
-              toast({ variant: "destructive", title: "인식 오류", description: "이 센터의 QR 코드가 아닙니다." });
-            }
-          }
-        },
-        (errorMessage) => {
-          // 스캔 중 에러는 무시 (반복 호출됨)
-        }
-      ).catch(err => {
-        console.error("QR Start Error", err);
-      });
-
-      return () => {
-        if (qrScannerRef.current?.isScanning) {
-          qrScannerRef.current.stop().then(() => {
-            qrScannerRef.current?.clear();
-          });
-        }
-      };
-    }
-  }, [mode, showResults, centerId]);
-
-  const handleQrScan = async (studentId: string) => {
-    if (!firestore || !centerId) return;
-    
-    // 스캐너 중지
-    if (qrScannerRef.current?.isScanning) {
-      await qrScannerRef.current.stop();
-    }
-
-    setIsSearching(true);
-    try {
-      const studentDoc = await getDoc(doc(firestore, 'centers', centerId, 'students', studentId));
-      if (studentDoc.exists()) {
-        const studentData = { id: studentDoc.id, ...studentDoc.data() } as StudentProfile;
-        
-        // 해당 학생의 현재 좌석 상태 확인
-        const seat = resolveSeatForStudent(studentData);
-        
-        if (seat && (seat.status === 'absent' || !seat.status)) {
-          // 미입실 상태면 즉시 자동 입실 처리 (있어보이는 원터치 경험)
-          setMatchedStudents([studentData]);
-          handleStatusUpdate(studentData, 'studying');
-        } else {
-          // 입실 중이면 옵션(외출/퇴실) 선택창 노출
-          setMatchedStudents([studentData]);
-          setShowResults(true);
-        }
-      } else {
-        toast({ variant: "destructive", title: "학생 정보 없음" });
-        setMode('pin');
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSearching(false);
-    }
   };
 
   const handleNumberClick = (num: string) => {
@@ -350,7 +262,6 @@ export default function KioskPage() {
     setPin('');
     setMatchedStudents([]);
     setShowResults(false);
-    setMode('qr'); // 기본 모드로 복구
   };
 
   const getStatusInfo = (status?: string) => {
@@ -381,66 +292,29 @@ export default function KioskPage() {
         </div>
       )}
 
-      {!showResults && (
-        <div className="fixed top-8 right-8 z-50 flex gap-2">
-          <Button 
-            variant={mode === 'qr' ? 'default' : 'outline'}
-            onClick={() => { setMode('qr'); setPin(''); }}
-            className="rounded-xl h-12 px-5 font-black gap-2 border-2"
-          >
-            <Scan className="h-4 w-4" /> QR 스캔
-          </Button>
-          <Button 
-            variant={mode === 'pin' ? 'default' : 'outline'}
-            onClick={() => { setMode('pin'); }}
-            className="rounded-xl h-12 px-5 font-black gap-2 border-2"
-          >
-            <Keyboard className="h-4 w-4" /> PIN 입력
-          </Button>
-        </div>
-      )}
-
       <header className="flex flex-col items-center text-center gap-2 mb-12 relative z-10">
         <div className="bg-primary p-5 rounded-[2.5rem] shadow-inner mb-4 animate-in zoom-in duration-700">
           <MonitorSmartphone className="h-12 w-12 text-white" />
         </div>
         <h1 className="text-5xl font-black tracking-tighter text-primary">스마트 출입 키오스크</h1>
-        <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.4em] opacity-40">Analytical Track Intelligence</p>
+        <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.4em] opacity-40">Number Pad Attendance Check-In</p>
       </header>
 
       <div className="w-full max-w-3xl relative z-10">
         {!showResults ? (
-          mode === 'qr' ? (
-            <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in zoom-in duration-500">
-              <CardHeader className="bg-muted/5 border-b p-12 text-center">
-                <CardTitle className="text-3xl font-black tracking-tighter">QR 코드를 스캔하세요</CardTitle>
-                <CardDescription className="font-bold pt-3 text-base">앱에서 '나의 출입 QR'을 열어 카메라에 보여주세요.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-12 flex flex-col items-center">
-                <div className="relative w-full max-w-md aspect-square rounded-[3rem] overflow-hidden border-8 border-primary/5 bg-black/5 flex items-center justify-center">
-                  <div id="qr-reader" className="w-full h-full" />
-                  <div className="absolute inset-0 border-2 border-primary/20 pointer-events-none rounded-[2.5rem]">
-                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-primary/40 animate-pulse" />
-                  </div>
-                  {isSearching && (
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                      <p className="font-black text-primary">학생 정보를 확인 중...</p>
-                    </div>
-                  )}
+          <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in slide-in-from-bottom-8 duration-700">
+            <CardHeader className="bg-muted/5 border-b p-12 text-center">
+              <CardTitle className="text-3xl font-black tracking-tighter">번호 6자리를 입력하세요</CardTitle>
+              <CardDescription className="font-bold pt-3 text-base">출입 확인용 번호를 누르면 학생 정보를 바로 찾습니다.</CardDescription>
+            </CardHeader>
+            <CardContent className="relative p-12 space-y-12">
+              {isSearching && (
+                <div className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                  <p className="font-black text-primary">학생 정보를 확인 중...</p>
                 </div>
-                <p className="mt-8 text-muted-foreground font-bold flex items-center gap-2">
-                  <Camera className="h-4 w-4" /> 카메라 영역 중앙에 QR을 맞춰주세요.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in slide-in-from-bottom-8 duration-700">
-              <CardHeader className="bg-muted/5 border-b p-12 text-center">
-                <CardTitle className="text-3xl font-black tracking-tighter">핀번호를 입력하세요</CardTitle>
-                <CardDescription className="font-bold pt-3 text-base">학부모 연동 코드 6자리를 입력해 주세요.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-12 space-y-12">
+              )}
+              <div className="space-y-4">
                 <div className="flex justify-center gap-4">
                   {[...Array(6)].map((_, i) => (
                     <div 
@@ -454,25 +328,29 @@ export default function KioskPage() {
                     </div>
                   ))}
                 </div>
+                <p className="text-center text-sm font-bold text-muted-foreground">
+                  숫자를 누르면 자동으로 입력되고, 6자리가 채워지면 바로 조회합니다.
+                </p>
+              </div>
 
-                <div className="grid grid-cols-3 gap-5">
-                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-                    <Button 
-                      key={num} 
-                      variant="outline" 
-                      onClick={() => handleNumberClick(num)}
-                      className="h-24 rounded-3xl text-3xl font-black border-2 hover:bg-primary hover:text-white hover:border-primary transition-all active:scale-90 shadow-sm"
-                    >
-                      {num}
-                    </Button>
-                  ))}
-                  <Button variant="ghost" onClick={resetKiosk} className="h-24 rounded-3xl text-xl font-black">초기화</Button>
-                  <Button variant="outline" onClick={() => handleNumberClick('0')} className="h-24 rounded-3xl text-3xl font-black border-2 shadow-sm">0</Button>
-                  <Button variant="ghost" onClick={handleDelete} className="h-24 rounded-3xl"><Delete className="h-10 w-10" /></Button>
-                </div>
-              </CardContent>
-            </Card>
-          )
+              <div className="grid grid-cols-3 gap-5">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
+                  <Button 
+                    key={num} 
+                    variant="outline" 
+                    onClick={() => handleNumberClick(num)}
+                    disabled={isSearching}
+                    className="h-24 rounded-3xl text-3xl font-black border-2 hover:bg-primary hover:text-white hover:border-primary transition-all active:scale-90 shadow-sm"
+                  >
+                    {num}
+                  </Button>
+                ))}
+                <Button variant="ghost" onClick={resetKiosk} disabled={isSearching} className="h-24 rounded-3xl text-xl font-black">초기화</Button>
+                <Button variant="outline" onClick={() => handleNumberClick('0')} disabled={isSearching} className="h-24 rounded-3xl text-3xl font-black border-2 shadow-sm">0</Button>
+                <Button variant="ghost" onClick={handleDelete} disabled={isSearching} className="h-24 rounded-3xl"><Delete className="h-10 w-10" /></Button>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid gap-6 w-full animate-in zoom-in-95 duration-500">
             {matchedStudents.map(student => {
@@ -566,7 +444,7 @@ export default function KioskPage() {
 
       <footer className="mt-16 opacity-30">
         <div className="flex items-center gap-3 font-black text-xs uppercase tracking-[0.5em] text-primary">
-          Smart QR Attendance System
+          Smart Number Attendance System
         </div>
       </footer>
     </div>
