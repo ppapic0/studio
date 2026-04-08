@@ -353,6 +353,101 @@
   .metric-negative { color: #dc2626; }
   .metric-muted    { opacity: 0.55; }
 
+  /* ══════════════════════════════════════════════════════
+     Admin Executive Dashboard — Design System
+     ══════════════════════════════════════════════════════ */
+
+  /* ── Card hover lift — premium feel ── */
+  .admin-card-lift {
+    transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.32s ease,
+                border-color 0.32s ease;
+  }
+  .admin-card-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 28px 52px -28px rgba(20, 41, 95, 0.22);
+  }
+  .admin-card-lift:active {
+    transform: translateY(-1px);
+  }
+
+  /* ── KPI number — SB어그로체 for brand impact ── */
+  .admin-kpi-number {
+    font-family: "TrackDisplay", "Pretendard Variable", system-ui, sans-serif;
+    font-weight: 700;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  /* ── Section title — SB어그로체 branding ── */
+  .admin-section-title {
+    font-family: "TrackDisplay", "Pretendard Variable", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+  }
+
+  /* ── Subtle glow pulse for critical alerts ── */
+  @keyframes admin-glow-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 122, 22, 0); }
+    50% { box-shadow: 0 0 24px 6px rgba(255, 122, 22, 0.10); }
+  }
+  .admin-glow-pulse {
+    animation: admin-glow-pulse 3s ease-in-out infinite;
+  }
+
+  /* ── Alert pulse for urgent items ── */
+  @keyframes admin-alert-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.2); }
+  }
+  .admin-alert-dot {
+    animation: admin-alert-dot 2s ease-in-out infinite;
+  }
+
+  /* ── KPI delta arrow animation ── */
+  @keyframes admin-delta-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+  .admin-delta-up {
+    animation: admin-delta-bounce 2s ease-in-out infinite;
+    color: #16a34a;
+  }
+  .admin-delta-down {
+    animation: admin-delta-bounce 2s ease-in-out infinite;
+    color: #dc2626;
+    transform: rotate(180deg);
+  }
+
+  /* ── Executive header gradient ── */
+  .admin-exec-header {
+    background: radial-gradient(ellipse at top left, rgba(255, 122, 22, 0.12), transparent 40%),
+                linear-gradient(135deg, #14295F 0%, #1B3D89 56%, #2554D7 100%);
+  }
+
+  /* ── Card surface tokens ── */
+  .admin-surface-primary {
+    background: linear-gradient(180deg, #FFFFFF 0%, #F8FBFF 100%);
+    border-color: #DCE7FF;
+  }
+  .admin-surface-elevated {
+    background: linear-gradient(180deg, #FFFFFF 0%, #F3F7FF 100%);
+    border-color: #C8D8F8;
+    box-shadow: 0 24px 48px -32px rgba(20, 41, 95, 0.24);
+  }
+  .admin-surface-dark {
+    background: radial-gradient(ellipse at top right, rgba(255, 122, 22, 0.18), transparent 30%),
+                linear-gradient(135deg, #14295F 0%, #1A3778 58%, #10224C 100%);
+    border-color: #1C3A82;
+  }
+  .admin-surface-alert {
+    background: linear-gradient(180deg, #FFF8F2 0%, #FFFFFF 100%);
+    border-color: #FFD7BA;
+  }
+
   .dashboard-shell {
     word-break: keep-all;
     overflow-wrap: break-word;
