@@ -1167,7 +1167,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const currentlyStudyingStudents = useMemo(() => {
-    return Object.values(attendanceSeatSignalsBySeatId || {})
+    return attendanceSeatSignals
       .filter((signal) => Boolean(
         signal
         && signal.seatStatus === 'studying'
@@ -1192,7 +1192,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             ? `${roomNameById.get(signal.roomId) || signal.roomId} ${signal.roomSeatNo}번`
             : '좌석 확인중',
       }));
-  }, [attendanceSeatSignalsBySeatId, roomNameById, roomOrderById, targetMemberIds]);
+  }, [attendanceSeatSignals, roomNameById, roomOrderById, targetMemberIds]);
 
   useEffect(() => {
     if (!centerAnnouncements?.length || optimisticAnnouncements.length === 0) return;
@@ -3707,7 +3707,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       <Dialog open={isStudyingStudentsDialogOpen} onOpenChange={setIsStudyingStudentsDialogOpen}>
         <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-2xl')}>
           <div className={studioDialogHeaderClassName}>
-            <DialogHeader className="space-y-3 text-left">
+            <DialogHeader className="text-left">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white backdrop-blur">
                   실시간 공부 현황
@@ -3719,9 +3719,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <DialogTitle className="font-aggro-display text-[2rem] font-black tracking-tight">
                 현재 공부중인 학생 {currentlyStudyingStudents.length}명
               </DialogTitle>
-              <DialogDescription className="text-sm font-bold leading-6 text-white/76">
-                현재 좌석 상태가 공부중으로 잡힌 학생만 모아 보여줍니다. 목록에서 바로 학생 KPI로 이동할 수 있습니다.
-              </DialogDescription>
               <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
                 <div className="rounded-[1.45rem] border border-white/10 bg-white/10 px-4 py-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">공부중 인원</p>
