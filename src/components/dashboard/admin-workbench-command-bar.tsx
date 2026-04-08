@@ -34,7 +34,7 @@ type AdminWorkbenchCommandBarProps = {
   eyebrow?: string;
   title: string;
   description: string;
-  variant?: 'default' | 'teacherWorkbench';
+  variant?: 'default' | 'teacherWorkbench' | 'adminStudio';
   searchValue?: string;
   searchPlaceholder?: string;
   onSearchChange?: (value: string) => void;
@@ -76,6 +76,7 @@ export function AdminWorkbenchCommandBar({
   className,
 }: AdminWorkbenchCommandBarProps) {
   const isTeacherWorkbench = variant === 'teacherWorkbench';
+  const isAdminStudio = variant === 'adminStudio';
 
   return (
     <section
@@ -83,7 +84,9 @@ export function AdminWorkbenchCommandBar({
         'sticky top-3 z-20 backdrop-blur-xl',
         isTeacherWorkbench
           ? 'rounded-[2.15rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.98)_100%)] p-5 shadow-[0_24px_56px_-42px_rgba(20,41,95,0.34)]'
-          : 'rounded-[2rem] border border-slate-200/80 bg-white/88 p-4 shadow-[0_18px_48px_-38px_rgba(20,41,95,0.36)]',
+          : isAdminStudio
+            ? 'rounded-[2.5rem] border border-[#D7E4FF] bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.16),transparent_22%),linear-gradient(135deg,rgba(20,41,95,0.98)_0%,rgba(30,59,128,0.96)_52%,rgba(39,84,215,0.92)_100%)] p-5 text-white shadow-[0_28px_70px_-40px_rgba(20,41,95,0.52)]'
+            : 'rounded-[2rem] border border-slate-200/80 bg-white/88 p-4 shadow-[0_18px_48px_-38px_rgba(20,41,95,0.36)]',
         className
       )}
     >
@@ -95,16 +98,29 @@ export function AdminWorkbenchCommandBar({
                 'rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]',
                 isTeacherWorkbench
                   ? 'border border-[#14295F] bg-[#14295F] text-white'
-                  : 'border border-[#dbe7ff] bg-[#eef4ff] text-[#2554d4]'
+                  : isAdminStudio
+                    ? 'border border-white/20 bg-white/12 text-white'
+                    : 'border border-[#dbe7ff] bg-[#eef4ff] text-[#2554d4]'
               )}>
                 {eyebrow}
               </Badge>
             ) : null}
             <h2 className={cn(
-              'tracking-tight text-[#14295F]',
-              isTeacherWorkbench ? 'font-aggro-display text-[1.35rem] font-black' : 'text-xl font-black'
+              'tracking-tight',
+              isTeacherWorkbench
+                ? 'font-aggro-display text-[1.35rem] font-black text-[#14295F]'
+                : isAdminStudio
+                  ? 'font-aggro-display text-[1.9rem] font-black text-white sm:text-[2.2rem]'
+                  : 'text-xl font-black text-[#14295F]'
             )}>{title}</h2>
-            <p className={cn('font-semibold leading-5 text-[#5c6e97]', isTeacherWorkbench ? 'max-w-3xl text-[12px]' : 'text-xs')}>{description}</p>
+            <p className={cn(
+              'font-semibold leading-5',
+              isTeacherWorkbench
+                ? 'max-w-3xl text-[12px] text-[#5c6e97]'
+                : isAdminStudio
+                  ? 'max-w-3xl text-[12px] text-white/76 sm:text-[13px]'
+                  : 'text-xs text-[#5c6e97]'
+            )}>{description}</p>
           </div>
 
           {quickActions.length > 0 ? (
@@ -119,7 +135,9 @@ export function AdminWorkbenchCommandBar({
                       'h-10 rounded-xl px-4 text-xs font-black',
                       isTeacherWorkbench
                         ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
-                        : 'border-slate-200 bg-white text-[#17306f]'
+                        : isAdminStudio
+                          ? 'border-white/14 bg-white/10 text-white hover:bg-white/16'
+                          : 'border-slate-200 bg-white text-[#17306f]'
                     )}
                     onClick={action.onClick}
                     disabled={action.disabled}
@@ -140,7 +158,9 @@ export function AdminWorkbenchCommandBar({
                         'h-10 rounded-xl px-4 text-xs font-black',
                         isTeacherWorkbench
                           ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
-                          : 'border-slate-200 bg-white text-[#17306f]'
+                          : isAdminStudio
+                            ? 'border-white/14 bg-white/10 text-white hover:bg-white/16'
+                            : 'border-slate-200 bg-white text-[#17306f]'
                       )}
                     >
                       <Link href={action.href}>
@@ -163,7 +183,11 @@ export function AdminWorkbenchCommandBar({
               {onPeriodChange ? (
                 <div className={cn(
                   'inline-flex rounded-xl p-1',
-                  isTeacherWorkbench ? 'border border-[#dbe7ff] bg-[#f8fbff]' : 'border border-slate-200 bg-slate-50'
+                  isTeacherWorkbench
+                    ? 'border border-[#dbe7ff] bg-[#f8fbff]'
+                    : isAdminStudio
+                      ? 'border border-white/12 bg-white/10'
+                      : 'border border-slate-200 bg-slate-50'
                 )}>
                   {periodOptions.map((option) => (
                     <button
@@ -173,10 +197,14 @@ export function AdminWorkbenchCommandBar({
                       className={cn(
                         'rounded-lg px-3 py-2 text-[11px] font-black transition-colors',
                         periodValue === option.value
-                          ? 'bg-white text-[#17306f] shadow-sm'
+                          ? isAdminStudio
+                            ? 'bg-white text-[#14295F] shadow-sm'
+                            : 'bg-white text-[#17306f] shadow-sm'
                           : isTeacherWorkbench
                             ? 'text-[#5c6e97] hover:text-[#14295F]'
-                            : 'text-slate-500 hover:text-slate-700'
+                            : isAdminStudio
+                              ? 'text-white/74 hover:text-white'
+                              : 'text-slate-500 hover:text-slate-700'
                       )}
                     >
                       {option.label}
@@ -189,14 +217,15 @@ export function AdminWorkbenchCommandBar({
                 <div className="grid gap-1">
                   <Label className={cn(
                     'text-[10px] font-black uppercase tracking-[0.16em]',
-                    isTeacherWorkbench ? 'text-[#5c6e97]' : 'text-slate-500'
+                    isTeacherWorkbench ? 'text-[#5c6e97]' : isAdminStudio ? 'text-white/60' : 'text-slate-500'
                   )}>
                     {selectLabel}
                   </Label>
                   <Select value={selectValue} onValueChange={onSelectChange}>
                     <SelectTrigger className={cn(
                       'h-11 min-w-[180px] rounded-xl border-2 font-black',
-                      isTeacherWorkbench && 'border-[#dbe7ff] bg-white text-[#14295F]'
+                      isTeacherWorkbench && 'border-[#dbe7ff] bg-white text-[#14295F]',
+                      isAdminStudio && 'border-white/14 bg-white/10 text-white'
                     )}>
                       <SelectValue />
                     </SelectTrigger>
@@ -215,7 +244,11 @@ export function AdminWorkbenchCommandBar({
                 <div className={cn('relative min-w-0 flex-1 xl:max-w-md', searchWidthClassName)}>
                   <Search className={cn(
                     'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2',
-                    isTeacherWorkbench ? 'text-[#7b8db3]' : 'text-slate-400'
+                    isTeacherWorkbench
+                      ? 'text-[#7b8db3]'
+                      : isAdminStudio
+                        ? 'text-white/40'
+                        : 'text-slate-400'
                   )} />
                   <Input
                     value={searchValue}
@@ -223,7 +256,8 @@ export function AdminWorkbenchCommandBar({
                     placeholder={searchPlaceholder}
                     className={cn(
                       'h-11 rounded-xl border-2 pl-10 font-bold',
-                      isTeacherWorkbench && 'border-[#dbe7ff] bg-white text-[#14295F] placeholder:text-[#9aa9c7]'
+                      isTeacherWorkbench && 'border-[#dbe7ff] bg-white text-[#14295F] placeholder:text-[#9aa9c7]',
+                      isAdminStudio && 'border-white/14 bg-white/10 text-white placeholder:text-white/40'
                     )}
                   />
                 </div>
