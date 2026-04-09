@@ -4081,35 +4081,35 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <TabsContent value="data" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
               <Card
                 className={cn(
-                  'relative overflow-hidden rounded-[2.3rem] border border-[#24427e] bg-[linear-gradient(145deg,#1b3a76_0%,#14295F_56%,#10224d_100%)] p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.52)] sm:p-6',
+                  'relative overflow-hidden rounded-[2.3rem] border border-[#d9eadf] bg-[linear-gradient(145deg,#fbfffc_0%,#ffffff_56%,#eef8f1_100%)] p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.14)] sm:p-6',
                   showEntryMotion && 'parent-card-enter parent-entry-delay-2'
                 )}
               >
-                <div className="soft-glow absolute -right-8 top-0 h-24 w-24 rounded-full bg-[#ffb56e]/24 blur-3xl" />
-                <div className="soft-glow absolute left-0 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-[#77a6ff]/16 blur-3xl" />
+                <div className="soft-glow absolute -right-8 top-0 h-24 w-24 rounded-full bg-[#8bd3a3]/18 blur-3xl" />
+                <div className="soft-glow absolute left-0 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-[#c5ecd2]/22 blur-3xl" />
                 <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                   <div className="min-w-0">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.6)] backdrop-blur-sm">
-                      <FileText className="h-3.5 w-3.5 text-[#ffe1c2]" />
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#d5e8db] bg-white/96 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#224f3c] shadow-[0_12px_24px_-22px_rgba(20,41,95,0.12)] backdrop-blur-sm">
+                      <FileText className="h-3.5 w-3.5 text-[#178244]" />
                       학습 분석 리포트
                     </div>
-                    <h3 className="mt-3 break-keep text-[1.32rem] font-black tracking-tight text-white sm:text-[1.52rem]">
+                    <h3 className="mt-3 break-keep text-[1.32rem] font-black tracking-tight text-[#14295F] sm:text-[1.52rem]">
                       {activeStudentLabel} 학생의 최근 학습 흐름을
                       <br className="hidden sm:block" />
                       차분하게 읽을 수 있게 정리했어요
                     </h3>
-                    <p className="mt-2 max-w-2xl break-keep text-[12.5px] font-bold leading-[1.7] text-white/76 sm:text-[13px]">
+                    <p className="mt-2 max-w-2xl break-keep text-[12.5px] font-bold leading-[1.7] text-[#284768] sm:text-[13px]">
                       최근 42일 학습시간과 최근 14일 리듬 데이터를 바탕으로, 학부모님이 핵심 변화만 빠르게 파악할 수 있게 구성했습니다.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                    <div className="rounded-[1.15rem] border border-white/12 bg-white/10 px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/54">학습시간 창</p>
-                      <p className="mt-1 text-[12px] font-black text-white">최근 6주</p>
+                    <div className="rounded-[1.15rem] border border-[#d8eadf] bg-white/96 px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#577763]">학습시간 창</p>
+                      <p className="mt-1 text-[12px] font-black text-[#14295F]">최근 6주</p>
                     </div>
-                    <div className="rounded-[1.15rem] border border-white/12 bg-white/10 px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/54">리듬 창</p>
-                      <p className="mt-1 text-[12px] font-black text-white">최근 14일</p>
+                    <div className="rounded-[1.15rem] border border-[#d8eadf] bg-white/96 px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#577763]">리듬 창</p>
+                      <p className="mt-1 text-[12px] font-black text-[#14295F]">최근 14일</p>
                     </div>
                   </div>
                 </div>
