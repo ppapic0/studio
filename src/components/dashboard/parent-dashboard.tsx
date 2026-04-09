@@ -3079,34 +3079,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [attendanceCurrent?.status, selectedDateCheckInAt, selectedDateCheckOutAt, selectedDateKey, todayKey]);
 
-  const recentLifeAttendanceSummary = useMemo(() => {
-    const isAwayNow = attendanceCurrent?.status === 'away' || attendanceCurrent?.status === 'break';
-    const hasAwayRecord = isAwayNow || !!latestAwayNotification;
-    const hasCheckOutRecord =
-      !!latestCheckOutNotification ||
-      (attendanceCurrent?.status !== 'studying' && (todayLog?.totalMinutes || 0) > 0);
-
-    return {
-      recentStudyDate: latestStudySnapshot?.studyDateLabel || '기록 없음',
-      recentStudyStart: latestStudySnapshot?.studyStartLabel || '기록 없음',
-      awayStatus: isAwayNow
-        ? '현재 외출/휴식 중'
-        : hasAwayRecord
-          ? `최근 외출 기록 (${latestAwayNotification?.createdAtLabel || '확인됨'})`
-          : '외출 기록 없음',
-      checkOutStatus: hasCheckOutRecord
-        ? `퇴실 기록 있음 (${latestCheckOutNotification?.createdAtLabel || '확인됨'})`
-        : '퇴실 기록 없음',
-    };
-  }, [
-    attendanceCurrent?.status,
-    latestAwayNotification?.createdAtLabel,
-    latestCheckOutNotification?.createdAtLabel,
-    latestStudySnapshot?.studyDateLabel,
-    latestStudySnapshot?.studyStartLabel,
-    todayLog?.totalMinutes,
-  ]);
-
   const penaltyMeta = useMemo(() => {
     const points = penaltyRecovery.effectivePoints;
     if (points >= 20) return { label: '퇴원', badge: 'bg-rose-200 text-rose-800 border-rose-300' };
@@ -4521,82 +4493,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 />
                 </div>
 
-                <Card className="relative overflow-hidden rounded-[2rem] border border-[#dbe5f2] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_48%,#f2f6fd_100%)] p-5 shadow-[0_24px_48px_-34px_rgba(20,41,95,0.18)] sm:p-6">
-                  <div className="pointer-events-none absolute -right-12 top-0 h-28 w-28 rounded-full bg-[#d6e7ff]/35 blur-3xl" />
-                  <div className="relative z-10 space-y-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.15rem] border border-[#e1e8f5] bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_10px_20px_-18px_rgba(20,41,95,0.18)]">
-                          <Activity className="h-4.5 w-4.5 text-[#14295F]" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Life Report</p>
-                          <h3 className="mt-1 text-[1.02rem] font-black tracking-tight text-[#14295F]">최근 생활/출결 이슈</h3>
-                          <p className="mt-1 text-[12px] font-bold leading-[1.55] text-slate-500">
-                            최근 학습일, 출결 흐름, 생활 기록을 한 보드에서 차분하게 정리했습니다.
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="h-7 w-fit rounded-full border border-[#d7e2f1] bg-white/92 px-3 text-[10px] font-black text-[#14295F]">
-                        최근 {recentPenaltyReasons.length}건
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      <div className="rounded-[1.2rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">최근 공부일자</p>
-                        <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">{recentLifeAttendanceSummary.recentStudyDate}</p>
-                      </div>
-                      <div className="rounded-[1.2rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">공부 시작 시각</p>
-                        <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">{recentLifeAttendanceSummary.recentStudyStart}</p>
-                      </div>
-                      <div className="rounded-[1.2rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">외출 여부</p>
-                        <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">{recentLifeAttendanceSummary.awayStatus}</p>
-                      </div>
-                      <div className="rounded-[1.2rem] border border-white/90 bg-white/90 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7385a8]">퇴실 여부</p>
-                        <p className="mt-2 text-[1rem] font-black tracking-tight text-[#14295F]">{recentLifeAttendanceSummary.checkOutStatus}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7385a8]">최근 생활 기록</p>
-                        {latestPenaltyReason ? (
-                          <Badge variant="outline" className="h-6 rounded-full border border-rose-200 bg-rose-50 px-2.5 text-[10px] font-black text-rose-700">
-                            최신 {latestPenaltyReason.dateLabel}
-                          </Badge>
-                        ) : null}
-                      </div>
-
-                      {recentPenaltyReasons.length === 0 ? (
-                        <div className="rounded-[1.25rem] border border-[#dde7f4] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_24px_-22px_rgba(20,41,95,0.16)]">
-                          <p className="text-sm font-black text-[#14295F]">기록된 특이사항이 없습니다.</p>
-                          <p className="mt-1 text-[11px] font-bold text-slate-500">현재는 안정적인 생활 흐름을 유지하고 있어요.</p>
-                        </div>
-                      ) : (
-                        <div className="grid gap-2.5">
-                          {recentPenaltyReasons.map((r) => (
-                            <div key={r.id} className="flex flex-col gap-3 rounded-[1.25rem] border border-white/90 bg-white/92 px-4 py-3 shadow-[0_14px_28px_-24px_rgba(20,41,95,0.18)] sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex min-w-0 items-start gap-3">
-                                <div className="mt-0.5 h-9 w-1.5 shrink-0 rounded-full bg-[linear-gradient(180deg,#ffafbf_0%,#d24664_100%)]" />
-                                <div className="min-w-0">
-                                  <p className="text-sm font-black leading-5 text-[#14295F]">{r.reason}</p>
-                                  <p className="mt-1 text-[10px] font-black text-slate-400">{r.dateLabel} · 규정 준수 안내</p>
-                                </div>
-                              </div>
-                              <Badge variant="outline" className="w-fit rounded-full border-none bg-rose-100 px-3 py-1 text-[11px] font-black text-rose-700">
-                                <span className="font-numeric">+{r.points}</span>점
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
               </section>
             </TabsContent>
 
