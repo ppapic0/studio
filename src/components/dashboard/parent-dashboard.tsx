@@ -397,9 +397,9 @@ const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
 
 const PARENT_DASHBOARD_TAB_META = {
   home: {
-    label: '홈 브리프',
+    label: '오늘 흐름',
     shortLabel: '홈',
-    description: '오늘 공부, 출결, 벌점, 알림을 가장 먼저 읽는 탭입니다.',
+    description: '오늘 공부, 출결, 벌점, 알림을 가장 먼저 보는 탭입니다.',
     icon: Home,
   },
   studyDetail: {
@@ -3417,7 +3417,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </div>
 
               <div className="space-y-2.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white">Parent Brief</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white">Today Flow</p>
                 <div className="space-y-2">
                   <p className="text-[12px] font-black tracking-tight text-white">{student?.name || '자녀'} 오늘 흐름</p>
                   <h2 className="max-w-[18ch] break-keep text-[1.42rem] font-black leading-[1.14] tracking-[-0.045em] text-white sm:text-[1.82rem] md:max-w-none md:text-[2rem]">
