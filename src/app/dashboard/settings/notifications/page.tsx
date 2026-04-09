@@ -266,8 +266,7 @@ const DEFAULT_FORM: Required<Pick<NotificationSettings,
   'smsTemplateStudyEnd' |
   'smsTemplateLateAlert' |
   'lateAlertEnabled' |
-  'lateAlertGraceMinutes' |
-  'defaultArrivalTime'
+  'lateAlertGraceMinutes'
 >> = {
   smsEnabled: true,
   smsProvider: 'none',
@@ -281,7 +280,6 @@ const DEFAULT_FORM: Required<Pick<NotificationSettings,
   smsTemplateLateAlert: '[{centerName}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.',
   lateAlertEnabled: true,
   lateAlertGraceMinutes: 20,
-  defaultArrivalTime: '17:00',
 };
 
 const SMS_EVENTS: Array<{ value: SmsConsoleEventType; label: string }> = [
@@ -609,7 +607,6 @@ export default function NotificationSettingsPage() {
       smsTemplateLateAlert: settingsDoc.smsTemplateLateAlert || prev.smsTemplateLateAlert,
       lateAlertEnabled: settingsDoc.lateAlertEnabled ?? prev.lateAlertEnabled,
       lateAlertGraceMinutes: Number(settingsDoc.lateAlertGraceMinutes ?? prev.lateAlertGraceMinutes),
-      defaultArrivalTime: settingsDoc.defaultArrivalTime || prev.defaultArrivalTime,
     }));
   }, [settingsDoc]);
 
@@ -630,9 +627,9 @@ export default function NotificationSettingsPage() {
   const sampleValues = useMemo(() => ({
     studentName: '김재윤',
     time: '18:40',
-    expectedTime: form.defaultArrivalTime || '17:00',
+    expectedTime: '17:00',
     centerName: '트랙센터',
-  }), [form.defaultArrivalTime]);
+  }), []);
 
   const templatePreviews = useMemo(() => {
     return TEMPLATE_META.map((item) => {
@@ -2033,20 +2030,16 @@ export default function NotificationSettingsPage() {
             <Clock3 className="h-5 w-5" /> 지각 알림 규칙
           </CardTitle>
           <CardDescription className="font-bold text-sm">
-            학생이 정해진 시간보다 {form.lateAlertGraceMinutes}분 이상 늦으면 자동으로 지각 알림을 큐에 넣습니다.
+            학생이 직접 정한 등원시간보다 {form.lateAlertGraceMinutes}분 이상 늦으면 자동으로 지각 알림을 큐에 넣습니다. 등원시간이 없는 학생은 제외됩니다.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 p-6 sm:grid-cols-3">
+        <CardContent className="grid gap-4 p-6 sm:grid-cols-2">
           <div className="space-y-2">
             <Label className="text-[11px] font-black uppercase text-muted-foreground">지각 알림 활성화</Label>
             <div className="flex h-11 items-center justify-between rounded-xl border-2 px-3">
               <span className="text-sm font-bold">자동 체크</span>
               <Switch checked={form.lateAlertEnabled} onCheckedChange={(checked) => updateField('lateAlertEnabled', checked)} />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-[11px] font-black uppercase text-muted-foreground">기본 등원 시간</Label>
-            <Input type="time" value={form.defaultArrivalTime} onChange={(e) => updateField('defaultArrivalTime', e.target.value)} className="h-11 rounded-xl border-2 font-bold" />
           </div>
           <div className="space-y-2">
             <Label className="text-[11px] font-black uppercase text-muted-foreground">허용 지각 (분)</Label>

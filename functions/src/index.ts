@@ -75,7 +75,6 @@ type NotificationSettingsDoc = {
   smsApiKeyLastUpdatedAt?: admin.firestore.Timestamp;
   lateAlertEnabled?: boolean;
   lateAlertGraceMinutes?: number;
-  defaultArrivalTime?: string;
 };
 
 type NotificationSettingsSecretDoc = {
@@ -454,8 +453,8 @@ function safeAverageMinutes(values: number[]): number {
   return values.length === 0 ? 0 : Math.round(average(values));
 }
 
-function parseExpectedArrivalMinutes(value: unknown, fallback: string): number | null {
-  const parsed = parseHourMinute(typeof value === "string" && value.trim().length > 0 ? value : fallback);
+function parseExpectedArrivalMinutes(value: unknown): number | null {
+  const parsed = parseHourMinute(value);
   if (!parsed) return null;
   return parsed.hour * 60 + parsed.minute;
 }
@@ -900,7 +899,7 @@ async function queueParentSmsNotification(
   const template = resolveTemplateByEvent(settings, eventType);
 
   const eventTimeLabel = toTimeLabel(eventAt);
-  const expectedTimeLabel = expectedTime || settings.defaultArrivalTime || "정해진 시간";
+  const expectedTimeLabel = expectedTime || "학생이 정한 시간";
   const message = trimSmsToByteLimit(applyTemplate(template, {
     studentName,
     time: eventTimeLabel,
@@ -1188,7 +1187,6 @@ async function runLateArrivalCheckForCenter(
   const graceMinutes = Number.isFinite(Number(settings.lateAlertGraceMinutes))
     ? Math.max(0, Number(settings.lateAlertGraceMinutes))
     : 20;
-  const defaultArrivalTime = settings.defaultArrivalTime || "17:00";
   const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
   const dateKey = toDateKey(nowKst);
 
@@ -1227,7 +1225,7 @@ async function runLateArrivalCheckForCenter(
       ? studentData.name.trim()
       : "학생";
 
-    const expectedTimeRaw = studentData.expectedArrivalTime || defaultArrivalTime;
+    const expectedTimeRaw = asTrimmedString(studentData.expectedArrivalTime);
     const expectedTime = parseHourMinute(expectedTimeRaw);
     if (!expectedTime) continue;
 
@@ -1780,7 +1778,6 @@ async function buildClassroomSignalsForCenter(
   const graceMinutes = Number.isFinite(Number(settings.lateAlertGraceMinutes))
     ? Math.max(0, Number(settings.lateAlertGraceMinutes))
     : 20;
-  const defaultArrivalTime = settings.defaultArrivalTime || "17:00";
   const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
   const weekAgoKey = toDateKey(new Date(nowKst.getTime() - 6 * 24 * 60 * 60 * 1000));
   const penaltyCutoff = admin.firestore.Timestamp.fromMillis(nowKst.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -1954,8 +1951,8 @@ async function buildClassroomSignalsForCenter(
           (seatStatus === "away" || seatStatus === "break") &&
           Math.max(0, Math.floor((nowKst.getTime() - lastCheckInAt.toMillis()) / 60000)) >= 15
       );
-      const expectedArrivalTime = asTrimmedString(student?.expectedArrivalTime, defaultArrivalTime);
-      const expectedArrivalMinutes = parseExpectedArrivalMinutes(expectedArrivalTime, defaultArrivalTime);
+      const expectedArrivalTime = asTrimmedString(student?.expectedArrivalTime);
+      const expectedArrivalMinutes = parseExpectedArrivalMinutes(expectedArrivalTime);
       const hasCurrentAttendance = seatStatus === "studying" || seatStatus === "away" || seatStatus === "break";
       const lateOrAbsent = Boolean(
         expectedArrivalMinutes !== null &&
@@ -2105,7 +2102,7 @@ async function buildClassroomSignalsForCenter(
           "late_or_absent",
           "high",
           context,
-          `예상 등교 시간 ${context.expectedArrivalTime || defaultArrivalTime} 기준으로 미입실 상태입니다.`,
+          `예상 등교 시간 ${context.expectedArrivalTime || "학생이 정한 시간"} 기준으로 미입실 상태입니다.`,
           context.occurredAt
         )
       );
@@ -3655,7 +3652,7 @@ export const saveNotificationSettingsSecure = functions.region(region).https.onC
       lateAlertGraceMinutes: Number.isFinite(Number(data?.lateAlertGraceMinutes))
         ? Math.max(0, Number(data?.lateAlertGraceMinutes))
         : 20,
-      defaultArrivalTime: asTrimmedString(data?.defaultArrivalTime, "17:00"),
+      defaultArrivalTime: admin.firestore.FieldValue.delete(),
       smsApiKey: admin.firestore.FieldValue.delete(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: context.auth.uid,

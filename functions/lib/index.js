@@ -52,6 +52,7 @@ const SMS_BYTE_LIMIT = 90;
 const DEFAULT_SMS_TEMPLATES = {
     study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
     away_start: "[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.",
+    away_end: "[{centerName}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.",
     study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
     late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
 };
@@ -278,8 +279,8 @@ function asTrimmedString(value, fallback = "") {
 function safeAverageMinutes(values) {
     return values.length === 0 ? 0 : Math.round(average(values));
 }
-function parseExpectedArrivalMinutes(value, fallback) {
-    const parsed = parseHourMinute(typeof value === "string" && value.trim().length > 0 ? value : fallback);
+function parseExpectedArrivalMinutes(value) {
+    const parsed = parseHourMinute(value);
     if (!parsed)
         return null;
     return parsed.hour * 60 + parsed.minute;
@@ -426,6 +427,9 @@ function resolveTemplateByEvent(settings, eventType) {
     }
     if (eventType === "away_start") {
         return settings.smsTemplateAwayStart || DEFAULT_SMS_TEMPLATES.away_start;
+    }
+    if (eventType === "away_end") {
+        return settings.smsTemplateAwayEnd || DEFAULT_SMS_TEMPLATES.away_end;
     }
     return settings.smsTemplateLateAlert || DEFAULT_SMS_TEMPLATES.late_alert;
 }
@@ -601,7 +605,7 @@ async function queueParentSmsNotification(db, params) {
     const centerName = await loadCenterName(db, centerId);
     const template = resolveTemplateByEvent(settings, eventType);
     const eventTimeLabel = toTimeLabel(eventAt);
-    const expectedTimeLabel = expectedTime || settings.defaultArrivalTime || "정해진 시간";
+    const expectedTimeLabel = expectedTime || "학생이 정한 시간";
     const message = trimSmsToByteLimit(applyTemplate(template, {
         studentName,
         time: eventTimeLabel,
@@ -831,7 +835,6 @@ async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap
     const graceMinutes = Number.isFinite(Number(settings.lateAlertGraceMinutes))
         ? Math.max(0, Number(settings.lateAlertGraceMinutes))
         : 20;
-    const defaultArrivalTime = settings.defaultArrivalTime || "17:00";
     const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
     const dateKey = toDateKey(nowKst);
     const membersSnap = await db
@@ -866,7 +869,7 @@ async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap
         const studentName = typeof studentData.name === "string" && studentData.name.trim()
             ? studentData.name.trim()
             : "학생";
-        const expectedTimeRaw = studentData.expectedArrivalTime || defaultArrivalTime;
+        const expectedTimeRaw = asTrimmedString(studentData.expectedArrivalTime);
         const expectedTime = parseHourMinute(expectedTimeRaw);
         if (!expectedTime)
             continue;
@@ -1332,7 +1335,6 @@ async function buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey) {
     const graceMinutes = Number.isFinite(Number(settings.lateAlertGraceMinutes))
         ? Math.max(0, Number(settings.lateAlertGraceMinutes))
         : 20;
-    const defaultArrivalTime = settings.defaultArrivalTime || "17:00";
     const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
     const weekAgoKey = toDateKey(new Date(nowKst.getTime() - 6 * 24 * 60 * 60 * 1000));
     const penaltyCutoff = admin.firestore.Timestamp.fromMillis(nowKst.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -1489,8 +1491,8 @@ async function buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey) {
         const awayLong = Boolean(lastCheckInAt &&
             (seatStatus === "away" || seatStatus === "break") &&
             Math.max(0, Math.floor((nowKst.getTime() - lastCheckInAt.toMillis()) / 60000)) >= 15);
-        const expectedArrivalTime = asTrimmedString(student === null || student === void 0 ? void 0 : student.expectedArrivalTime, defaultArrivalTime);
-        const expectedArrivalMinutes = parseExpectedArrivalMinutes(expectedArrivalTime, defaultArrivalTime);
+        const expectedArrivalTime = asTrimmedString(student === null || student === void 0 ? void 0 : student.expectedArrivalTime);
+        const expectedArrivalMinutes = parseExpectedArrivalMinutes(expectedArrivalTime);
         const hasCurrentAttendance = seatStatus === "studying" || seatStatus === "away" || seatStatus === "break";
         const lateOrAbsent = Boolean(expectedArrivalMinutes !== null &&
             !hasCurrentAttendance &&
@@ -1614,7 +1616,7 @@ async function buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey) {
             incidents.push(buildIncident("away_long", "high", context, "외출/휴식 상태가 15분 이상 지속되고 있습니다.", context.occurredAt));
         }
         if (context.lateOrAbsent) {
-            incidents.push(buildIncident("late_or_absent", "high", context, `예상 등교 시간 ${context.expectedArrivalTime || defaultArrivalTime} 기준으로 미입실 상태입니다.`, context.occurredAt));
+            incidents.push(buildIncident("late_or_absent", "high", context, `예상 등교 시간 ${context.expectedArrivalTime || "학생이 정한 시간"} 기준으로 미입실 상태입니다.`, context.occurredAt));
         }
         if (context.effectivePenaltyPoints >= 12) {
             incidents.push(buildIncident("penalty_threshold", "critical", context, `실효 벌점 ${context.effectivePenaltyPoints}점이 임계값을 넘었습니다.`, context.occurredAt));
@@ -2922,13 +2924,14 @@ exports.saveNotificationSettingsSecure = functions.region(region).https.onCall(a
         smsEndpointUrl: asTrimmedString(data === null || data === void 0 ? void 0 : data.smsEndpointUrl),
         smsTemplateStudyStart: validateSmsTemplateLength(String((data === null || data === void 0 ? void 0 : data.smsTemplateStudyStart) || ""), "공부 시작 템플릿") || DEFAULT_SMS_TEMPLATES.study_start,
         smsTemplateAwayStart: validateSmsTemplateLength(String((data === null || data === void 0 ? void 0 : data.smsTemplateAwayStart) || ""), "외출 템플릿") || DEFAULT_SMS_TEMPLATES.away_start,
+        smsTemplateAwayEnd: validateSmsTemplateLength(String((data === null || data === void 0 ? void 0 : data.smsTemplateAwayEnd) || ""), "복귀 템플릿") || DEFAULT_SMS_TEMPLATES.away_end,
         smsTemplateStudyEnd: validateSmsTemplateLength(String((data === null || data === void 0 ? void 0 : data.smsTemplateStudyEnd) || ""), "공부 종료 템플릿") || DEFAULT_SMS_TEMPLATES.study_end,
         smsTemplateLateAlert: validateSmsTemplateLength(String((data === null || data === void 0 ? void 0 : data.smsTemplateLateAlert) || ""), "지각 템플릿") || DEFAULT_SMS_TEMPLATES.late_alert,
         lateAlertEnabled: (data === null || data === void 0 ? void 0 : data.lateAlertEnabled) !== false,
         lateAlertGraceMinutes: Number.isFinite(Number(data === null || data === void 0 ? void 0 : data.lateAlertGraceMinutes))
             ? Math.max(0, Number(data === null || data === void 0 ? void 0 : data.lateAlertGraceMinutes))
             : 20,
-        defaultArrivalTime: asTrimmedString(data === null || data === void 0 ? void 0 : data.defaultArrivalTime, "17:00"),
+        defaultArrivalTime: admin.firestore.FieldValue.delete(),
         smsApiKey: admin.firestore.FieldValue.delete(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedBy: context.auth.uid,

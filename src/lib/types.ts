@@ -1014,7 +1014,6 @@ export interface NotificationSettings {
   smsApiKeyLastUpdatedAt?: Timestamp;
   lateAlertEnabled?: boolean;
   lateAlertGraceMinutes?: number;
-  defaultArrivalTime?: string;
   updatedAt?: Timestamp;
   updatedBy?: string;
 }
