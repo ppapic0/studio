@@ -506,10 +506,16 @@ exports.scheduledRankingRewardSettlement = functions
     const now = new Date();
     const nowKst = toKstDate(now);
     const awardDateKey = toDateKey(nowKst);
-    const centersSnap = await db.collection("centers").get();
     const dailyCandidates = getDailySettlementCandidates(nowKst);
     const weeklyCandidate = getWeeklySettlementCandidate(nowKst);
     const monthlyCandidate = getMonthlySettlementCandidate(nowKst);
+    if (dailyCandidates.length === 0 && !weeklyCandidate && !monthlyCandidate) {
+        functions.logger.info("ranking settlement skipped: no eligible settlement window", {
+            atKst: nowKst.toISOString(),
+        });
+        return null;
+    }
+    const centersSnap = await db.collection("centers").get();
     for (const centerDoc of centersSnap.docs) {
         const centerId = centerDoc.id;
         let contextPromise = null;

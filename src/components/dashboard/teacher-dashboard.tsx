@@ -103,15 +103,20 @@ import { sendKakaoNotification } from '@/lib/kakao-service';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
-import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import type { CenterAdminAttendanceSeatSignal } from '@/lib/center-admin-attendance-board';
 import {
+  buildCenterAdminPrimaryChip,
+  buildCenterAdminSecondaryFlags,
+  buildCenterAdminSeatLegend,
+  buildCenterAdminSeatOverlaySummary,
+  formatCenterAdminWeeklyStudyLabel,
   getCenterAdminDomainSummary,
   getCenterAdminSeatOverlayPresentation,
   type CenterAdminSeatDomainKey,
   type CenterAdminSeatOverlayMode,
   type CenterAdminStudentSeatSignal,
 } from '@/lib/center-admin-seat-heatmap';
+import { useTeacherClassroomSignals } from '@/lib/teacher-classroom-model';
 import {
   ROUTINE_MISSING_PENALTY_POINTS,
   syncAutoAttendanceRecord,
@@ -204,6 +209,83 @@ const SEAT_OVERLAY_DESCRIPTIONS: Record<CenterAdminSeatOverlayMode, string> = {
   efficiency: '앉아 있는 시간 대비 집중 효율이 낮은 학생을 찾는 데 초점을 둡니다.',
   status: '입실, 외출, 복귀, 퇴실 같은 현재 상태만 깔끔하게 보여주는 기본 보기입니다.',
 };
+
+function averageTeacherScores(values: number[]) {
+  if (values.length === 0) return 0;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function getTeacherRiskHealth(params: {
+  riskLevel?: 'stable' | 'watch' | 'risk' | 'critical';
+  penaltyPoints: number;
+  awayMinutes: number;
+}) {
+  const { riskLevel = 'stable', penaltyPoints, awayMinutes } = params;
+  const baseScore =
+    riskLevel === 'critical'
+      ? 18
+      : riskLevel === 'risk'
+        ? 34
+        : riskLevel === 'watch'
+          ? 62
+          : 90;
+
+  if (penaltyPoints >= 12) return Math.min(baseScore, 15);
+  if (penaltyPoints >= 7) return Math.min(baseScore, 30);
+  if (awayMinutes >= 20) return Math.min(baseScore, 42);
+  return baseScore;
+}
+
+function getTeacherOperationalHealth(signal: CenterAdminAttendanceSeatSignal) {
+  if (signal.seatStatus === 'absent') {
+    return signal.todayStudyMinutes > 0 ? 54 : 32;
+  }
+  if (signal.currentAwayMinutes >= 20) return 44;
+  if (signal.todayStudyMinutes >= 240) return 92;
+  if (signal.todayStudyMinutes >= 120) return 76;
+  return 58;
+}
+
+function getTeacherParentHealth(hasUnreadReport: boolean, hasCounselingToday: boolean) {
+  if (hasUnreadReport && hasCounselingToday) return 52;
+  if (hasUnreadReport) return 38;
+  if (hasCounselingToday) return 82;
+  return 88;
+}
+
+function getTeacherEfficiencyHealth(signal: CenterAdminAttendanceSeatSignal, hasUnreadReport: boolean) {
+  if (hasUnreadReport && signal.currentAwayMinutes >= 20) return 34;
+  if (hasUnreadReport) return 48;
+  if (signal.currentAwayMinutes >= 20) return 46;
+  if (signal.recentRoutineMissingCount >= 2) return 58;
+  return 84;
+}
+
+function getTeacherSeatTopReason(params: {
+  attendanceSignal: CenterAdminAttendanceSeatSignal;
+  hasUnreadReport: boolean;
+  hasCounselingToday: boolean;
+  penaltyPoints: number;
+  riskLevel?: 'stable' | 'watch' | 'risk' | 'critical';
+}) {
+  const { attendanceSignal, hasUnreadReport, hasCounselingToday, penaltyPoints, riskLevel = 'stable' } = params;
+  if (penaltyPoints >= 7 && attendanceSignal.currentAwayMinutes >= 20) {
+    return `벌점 ${penaltyPoints}점과 장기 외출이 겹쳐 오늘 바로 개입이 필요합니다.`;
+  }
+  if (riskLevel === 'critical' || riskLevel === 'risk') {
+    return '리스크 신호가 높아 오늘 우선 확인 대상으로 보는 것이 좋습니다.';
+  }
+  if (hasUnreadReport && hasCounselingToday) {
+    return '미열람 리포트와 오늘 상담 일정이 함께 잡혀 있어 소통 후속조치를 먼저 보는 편이 좋습니다.';
+  }
+  if (hasUnreadReport) {
+    return '최근 리포트가 아직 미열람 상태라 학부모 반응을 먼저 확인하는 편이 좋습니다.';
+  }
+  if (attendanceSignal.currentAwayMinutes >= 20) {
+    return `현재 외출/휴식이 ${attendanceSignal.currentAwayMinutes}분 이어져 복귀 관리가 먼저 필요합니다.`;
+  }
+  return attendanceSignal.note || '오늘 가장 먼저 확인할 상태와 대응 포인트를 한 화면에서 정리했습니다.';
+}
 
 type TeacherSectionHeaderProps = {
   badge: string;
@@ -335,17 +417,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, []);
 
   const centerId = activeMembership?.id;
-  const {
-    seatSignalsBySeatId,
-    studentSignalsByStudentId,
-    seatOverlayLegend,
-    seatOverlaySummary,
-  } = useCenterAdminHeatmap({
-    centerId,
-    isActive,
-    includeFinancialSignals: false,
-    selectedClass,
-  });
   const canAdjustPenalty =
     activeMembership?.role === 'teacher' ||
     activeMembership?.role === 'centerAdmin' ||
@@ -355,6 +426,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     activeMembership?.role === 'owner';
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const thirtyDaysAgoKey = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+  const { signals: classroomSignals } = useTeacherClassroomSignals(centerId, todayKey);
 
   const centerRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -557,6 +629,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const { data: todayStats } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
 
   const {
+    seatSignals: attendanceSeatSignals,
     seatSignalsBySeatId: attendanceSeatSignalsBySeatId,
     seatSignalsByStudentId: attendanceSeatSignalsByStudentId,
     summary: attendanceBoardSummary,
@@ -571,6 +644,103 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     todayStats,
     nowMs: now,
   });
+
+  const classroomSeatSignalsByStudentId = useMemo(
+    () => new Map((classroomSignals?.seatSignals || []).map((signal) => [signal.studentId, signal])),
+    [classroomSignals]
+  );
+
+  const teacherSeatSignals = useMemo<CenterAdminStudentSeatSignal[]>(() => {
+    return attendanceSeatSignals.map((attendanceSignal) => {
+      const classroomSignal = classroomSeatSignalsByStudentId.get(attendanceSignal.studentId);
+      const penaltyPoints = Math.max(0, Math.round(Number(classroomSignal?.effectivePenaltyPoints || 0)));
+      const hasUnreadReport = classroomSignal?.hasUnreadReport ?? false;
+      const hasCounselingToday = classroomSignal?.hasCounselingToday ?? false;
+      const riskLevel = classroomSignal?.riskLevel || 'stable';
+      const operationalScore = getTeacherOperationalHealth(attendanceSignal);
+      const parentScore = getTeacherParentHealth(hasUnreadReport, hasCounselingToday);
+      const riskScore = getTeacherRiskHealth({
+        riskLevel,
+        penaltyPoints,
+        awayMinutes: attendanceSignal.currentAwayMinutes,
+      });
+      const efficiencyScore = getTeacherEfficiencyHealth(attendanceSignal, hasUnreadReport);
+      const compositeHealth = averageTeacherScores([
+        operationalScore,
+        parentScore,
+        riskScore,
+        efficiencyScore,
+      ]);
+      const todayMinutes = Math.max(
+        0,
+        Math.round(Number(attendanceSignal.todayStudyMinutes || classroomSignal?.todayMinutes || 0))
+      );
+
+      return {
+        studentId: attendanceSignal.studentId,
+        seatId: attendanceSignal.seatId,
+        studentName: attendanceSignal.studentName,
+        className: attendanceSignal.className,
+        roomId: attendanceSignal.roomId,
+        roomSeatNo: attendanceSignal.roomSeatNo,
+        attendanceStatus: attendanceSignal.seatStatus,
+        compositeHealth,
+        domainScores: {
+          operational: operationalScore,
+          parent: parentScore,
+          risk: riskScore,
+          billing: 85,
+          efficiency: efficiencyScore,
+        },
+        todayMinutes,
+        weeklyStudyMinutes: todayMinutes,
+        weeklyStudyLabel: formatCenterAdminWeeklyStudyLabel(todayMinutes),
+        effectivePenaltyPoints: penaltyPoints,
+        hasUnreadReport,
+        hasCounselingToday,
+        currentAwayMinutes: attendanceSignal.currentAwayMinutes,
+        invoiceStatus: 'none',
+        primaryChip: buildCenterAdminPrimaryChip(compositeHealth),
+        secondaryFlags: buildCenterAdminSecondaryFlags(
+          {
+            hasUnreadReport,
+            hasCounselingToday,
+            invoiceStatus: 'none',
+            currentAwayMinutes: attendanceSignal.currentAwayMinutes,
+            status: attendanceSignal.seatStatus,
+          },
+          { includeFinancialSignals: false }
+        ),
+        topReason: getTeacherSeatTopReason({
+          attendanceSignal,
+          hasUnreadReport,
+          hasCounselingToday,
+          penaltyPoints,
+          riskLevel,
+        }),
+      };
+    });
+  }, [attendanceSeatSignals, classroomSeatSignalsByStudentId]);
+
+  const seatSignalsBySeatId = useMemo(
+    () => new Map(teacherSeatSignals.map((signal) => [signal.seatId, signal])),
+    [teacherSeatSignals]
+  );
+
+  const studentSignalsByStudentId = useMemo(
+    () => new Map(teacherSeatSignals.map((signal) => [signal.studentId, signal])),
+    [teacherSeatSignals]
+  );
+
+  const seatOverlayLegend = useMemo(
+    () => buildCenterAdminSeatLegend({ includeFinancialSignals: false }),
+    []
+  );
+
+  const seatOverlaySummary = useMemo(
+    () => buildCenterAdminSeatOverlaySummary(teacherSeatSignals, { includeFinancialSignals: false }),
+    [teacherSeatSignals]
+  );
 
   useEffect(() => {
     let disposed = false;
