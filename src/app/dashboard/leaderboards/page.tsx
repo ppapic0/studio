@@ -1374,74 +1374,6 @@ function StandingsSidebar({
   );
 }
 
-function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEntry[] }) {
-  const shouldReduceMotion = useReducedMotion();
-  return (
-    <section className={cn(RANKING_SECTION_PANEL_CLASS, 'p-5 text-white md:p-6')}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <div className={cn(RANKING_KICKER_CLASS, 'mb-2')}>
-            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF6C57] shadow-[0_0_16px_rgba(255,108,87,0.9)]" />
-            최근 변동
-          </div>
-          <h3 className="font-aggro-display text-2xl font-black tracking-[-0.04em] text-white">실시간 순위 변화</h3>
-        </div>
-        <div className="rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#B7C7E8]">
-          3~5초 간격 갱신
-        </div>
-      </div>
-
-      <div className="mb-4 rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] px-4 py-3 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]">
-        <div className="text-[11px] font-black tracking-[0.2em] text-[#AFC0E6]">현재 상위권</div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {leaders.map((entry) => (
-            <div
-              key={entry.studentId}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black tracking-[0.16em]',
-                TONE_CLASS_MAP[(entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'orange' : 'red')].chip
-              )}
-            >
-              {entry.rank}위
-              <span className="text-white">{maskLeaderboardStudentName(entry.displayNameSnapshot)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <AnimatePresence initial={false}>
-          {logs.map((log) => {
-            const toneClass = TONE_CLASS_MAP[log.tone];
-            return (
-              <motion.div
-                key={log.id}
-                layout
-                initial={shouldReduceMotion ? false : { opacity: 0, x: -24, scale: 0.97 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={shouldReduceMotion ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: 18, scale: 0.96 }}
-                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.28, ease: 'easeOut' }}
-                className="relative overflow-hidden rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]"
-              >
-                <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r opacity-60', toneClass.line)} />
-                <div className="relative flex items-start gap-3">
-                  <div className={cn('rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
-                    {log.badge}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-base font-black tracking-[-0.02em] text-white">{log.title}</div>
-                    <div className="mt-1 text-sm font-semibold leading-6 text-[#B7C7E8]">{log.detail}</div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
-    </section>
-  );
-}
-
 function DailyWaitingCard({
   windowLabel,
   nextOpensAtLabel,
@@ -1994,13 +1926,11 @@ export default function RankingBattlePage() {
           <div className="space-y-4">
             <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} isMobile />
             <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
-            <LiveActivityLog logs={logs} leaders={liveLeaders} />
           </div>
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
             <div className="space-y-5">
               <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} />
-              <LiveActivityLog logs={logs} leaders={liveLeaders} />
             </div>
             <div className="space-y-5">
               <StandingsSidebar leaders={liveLeaders} viewer={viewer} />
