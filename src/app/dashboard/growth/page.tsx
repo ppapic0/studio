@@ -631,12 +631,10 @@ export default function GrowthPage() {
       ...todayStatus,
       claimedStudyBoxes: nextClaimedBoxes,
       studyBoxRewards: nextRewardEntries,
-      dailyPointAmount: Number(todayStatus.dailyPointAmount || 0) + awardedPoints,
     };
 
     setClaimedBoxes(nextClaimedBoxes);
     setRewardEntries(nextRewardEntries);
-    setPointBalance((prev) => prev + awardedPoints);
     setArrivalEvent({ key: Date.now(), count: availableMilestones.length });
     setFreshReadyHours(availableMilestones);
 
@@ -648,8 +646,6 @@ export default function GrowthPage() {
     void setDoc(
       progressRef,
       {
-        pointsBalance: increment(awardedPoints),
-        totalPointsEarned: increment(awardedPoints),
         dailyPointStatus: {
           [todayKey]: nextDayStatus,
         },
@@ -678,7 +674,6 @@ export default function GrowthPage() {
         liveClaimKeyRef.current = null;
         setClaimedBoxes(persistedClaimedBoxes);
         setRewardEntries(persistedRewardEntries);
-        setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
         setFreshReadyHours([]);
       });
   }, [

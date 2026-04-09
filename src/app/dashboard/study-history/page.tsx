@@ -871,13 +871,9 @@ export default function StudyHistoryPage() {
           updatedAt: serverTimestamp(),
         };
         if (shouldAwardPlanPoints) {
-          progressUpdate.pointsBalance = increment(10);
-          progressUpdate.totalPointsEarned = increment(10);
-          progressUpdate.dailyPointStatus[dateKey].dailyPointAmount = increment(10);
           progressUpdate.dailyPointStatus[dateKey].plan = true;
         }
         if (achievementCount < 5) {
-          progressUpdate.stats = { achievement: increment(0.1) };
           progressUpdate.dailyPointStatus[dateKey].achievementCount = increment(1);
         }
         batch.set(progressRef, progressUpdate, { merge: true });
@@ -885,7 +881,7 @@ export default function StudyHistoryPage() {
         if (shouldAwardPlanPoints) {
           toast({
             title: '오늘 학습 계획 완료',
-            description: '계획 완료 보상 +10포인트가 반영되었습니다.',
+            description: '계획 완료 기록이 저장되었습니다.',
           });
         }
       }

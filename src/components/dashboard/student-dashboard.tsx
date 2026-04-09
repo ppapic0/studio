@@ -1680,8 +1680,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
         const existingSessionDayStatus = (progress?.dailyPointStatus?.[sessionDateKey] || {}) as Record<string, any>;
         const dailyStatusUpdate: Record<string, any> = { ...existingSessionDayStatus };
-        const statsUpdate: Record<string, any> = {};
-        let earnedPointsThisSession = 0;
         let wroteSomething = false;
         let nextFirstSessionAt: Timestamp | null = null;
         let nextLastSessionAt: Timestamp | null = null;
@@ -1715,32 +1713,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             : 0;
           normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
 
-          statsUpdate.focus = increment((sessionMinutes / 60) * 0.1);
-
           const totalMinutesAfterSession = existingSessionDayMinutes + sessionMinutes;
 
           if (totalMinutesAfterSession >= 180 && !progress?.dailyPointStatus?.[sessionDateKey]?.attendance) {
-            earnedPointsThisSession += 20;
             dailyStatusUpdate.attendance = true;
-            toast({ title: '3시간 달성! 출석 포인트가 반영됐어요.' });
+            toast({ title: '3시간 달성!', description: '오늘 출석 달성 기록이 저장됐어요.' });
           }
 
           if (totalMinutesAfterSession >= 360 && !progress?.dailyPointStatus?.[sessionDateKey]?.bonus6h) {
-            statsUpdate.resilience = increment(0.5);
             dailyStatusUpdate.bonus6h = true;
-            earnedPointsThisSession += 15;
-            toast({ title: '6시간 몰입 달성! 보너스 포인트가 반영됐어요.' });
+            toast({ title: '6시간 몰입 달성!', description: '오늘 몰입 기록이 저장됐어요.' });
           }
 
-          if (earnedPointsThisSession > 0) {
-            progressUpdate.pointsBalance = increment(earnedPointsThisSession);
-            progressUpdate.totalPointsEarned = increment(earnedPointsThisSession);
-            dailyStatusUpdate.dailyPointAmount = Number(existingSessionDayStatus.dailyPointAmount || 0) + earnedPointsThisSession;
-          }
-
-          if (Object.keys(statsUpdate).length > 0) {
-            progressUpdate.stats = statsUpdate;
-          }
           if (Object.keys(dailyStatusUpdate).length > 0) {
             progressUpdate.dailyPointStatus = {
               [sessionDateKey]: dailyStatusUpdate,
@@ -2821,12 +2805,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       ...todayPointStatus,
       claimedStudyBoxes: nextClaimedBoxes,
       studyBoxRewards: nextRewardEntries,
-      dailyPointAmount: Number(todayPointStatus.dailyPointAmount || 0) + awardedPoints,
     };
 
     setHomeClaimedBoxes(nextClaimedBoxes);
     setHomeRewardEntries(nextRewardEntries);
-    setHomePointBalance((prev) => prev + awardedPoints);
     setHomeArrivalCount(availableMilestones.length);
     setFreshReadyHours(availableMilestones);
 
@@ -2837,8 +2819,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     homeBoxTimeoutsRef.current.push(clearArrivalId, clearFreshId);
 
     void setDoc(progressRef, {
-      pointsBalance: increment(awardedPoints),
-      totalPointsEarned: increment(awardedPoints),
       dailyPointStatus: {
         [todayKey]: nextDayStatus,
       },
@@ -2855,7 +2835,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       logHandledClientIssue('[student-track] live study box claim failed', error);
       setHomeClaimedBoxes(persistedClaimedBoxes);
       setHomeRewardEntries(persistedRewardEntries);
-      setHomePointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
       setHomeArrivalCount(0);
       setFreshReadyHours([]);
     });
@@ -2867,7 +2846,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     syncedRewardEntries,
     persistedClaimedBoxes,
     persistedRewardEntries,
-    progress?.pointsBalance,
     progressRef,
     todayKey,
     todayPointStatus,
@@ -2927,15 +2905,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         ? existingDayStatus.planTrackHourTaskIds
         : [];
       const nextDayStatus: Record<string, any> = { ...existingDayStatus };
-      const requestedRewards: number[] = [];
-
       if (!completedTaskIds.includes(taskId)) {
-        requestedRewards.push(3);
         nextDayStatus.planTrackCompletedTaskIds = [...completedTaskIds, taskId];
       }
 
       if ((targetTask.targetMinutes || 0) >= 60 && !hourRewardTaskIds.includes(taskId)) {
-        requestedRewards.push(5);
         nextDayStatus.planTrackHourTaskIds = [...hourRewardTaskIds, taskId];
       }
 
@@ -2944,12 +2918,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const completionRatio = todayTaskCount > 0 ? nextCompletedCount / todayTaskCount : 0;
 
       if (completionRatio >= 0.5 && !existingDayStatus.planTrackHalfBonus) {
-        requestedRewards.push(10);
         nextDayStatus.planTrackHalfBonus = true;
       }
 
       if (todayTaskCount > 0 && nextCompletedCount === todayTaskCount && !existingDayStatus.planTrackFullBonus) {
-        requestedRewards.push(30);
         nextDayStatus.planTrackFullBonus = true;
         nextDayStatus.planTrackCompleted = true;
 
@@ -2964,44 +2936,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           todayKey
         );
         if (nextStreak >= 3 && !existingDayStatus.planTrackStreakBonus) {
-          const streakBonus = nextStreak >= 7 ? 7 : 5;
-          requestedRewards.push(streakBonus);
           nextDayStatus.planTrackStreakBonus = true;
           nextDayStatus.planTrackStreakDays = nextStreak;
         }
       }
 
-      const requestedTotal = requestedRewards.reduce((sum, reward) => sum + reward, 0);
-      const remainingAllowance = Math.max(
-        0,
-        PLAN_TRACK_DAILY_POINT_CAP - Number(existingDayStatus.dailyPointAmount || 0)
-      );
-      const awarded = Math.min(requestedTotal, remainingAllowance);
-
-      if (awarded > 0) {
-        await setDoc(progressRef, {
-          pointsBalance: increment(awarded),
-          totalPointsEarned: increment(awarded),
-          dailyPointStatus: {
-            [todayKey]: {
-              ...nextDayStatus,
-              dailyPointAmount: Number(existingDayStatus.dailyPointAmount || 0) + awarded,
-              planTrackPointAmount: Number(existingDayStatus.planTrackPointAmount || 0) + awarded,
-              updatedAt: serverTimestamp(),
-            },
-          },
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-
-        setHomePointBalance((prev) => prev + awarded);
-        setQuestGain({ id: taskId, key: Date.now(), amount: awarded });
-        const clearGainId = setTimeout(() => setQuestGain((prev) => (prev?.id === taskId ? null : prev)), 1200);
-        homeBoxTimeoutsRef.current.push(clearGainId);
-        toast({
-          title: `+${awarded}P`,
-          description: '퀘스트 완료 보상이 반영됐어요.',
-        });
-      } else if (Object.keys(nextDayStatus).length > Object.keys(existingDayStatus).length) {
+      if (Object.keys(nextDayStatus).length > Object.keys(existingDayStatus).length) {
         await setDoc(progressRef, {
           dailyPointStatus: {
             [todayKey]: {

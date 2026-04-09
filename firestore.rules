@@ -177,6 +177,16 @@ service cloud.firestore {
         ]);
     }
 
+    function isAllowedSelfGrowthProgressUpdate(centerId, studentId) {
+      return isSelfCenterMember(centerId, studentId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'pointsBalance',
+          'totalPointsEarned',
+          'seasonLp',
+          'stats',
+        ]);
+    }
+
     match /users/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
 
@@ -247,8 +257,9 @@ service cloud.firestore {
         allow read: if isTeacherOrAdmin(centerId)
           || isSelfStudent(studentId)
           || isLinkedParent(centerId, studentId);
-        allow create, update: if isTeacherOrAdmin(centerId)
-          || isSelfCenterMember(centerId, studentId);
+        allow create: if isTeacherOrAdmin(centerId);
+        allow update: if isTeacherOrAdmin(centerId)
+          || isAllowedSelfGrowthProgressUpdate(centerId, studentId);
         allow delete: if isCenterAdmin(centerId);
       }
 

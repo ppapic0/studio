@@ -1986,7 +1986,6 @@ export default function StudyPlanPage() {
     if (!progressRef || !selectedDateKey) return 0;
 
     const existingDayStatus = (progress?.dailyPointStatus?.[selectedDateKey] || {}) as Record<string, any>;
-    const requestedRewards: number[] = [];
     const nextDayStatus: Record<string, any> = {
       ...existingDayStatus,
     };
@@ -1999,25 +1998,21 @@ export default function StudyPlanPage() {
       : [];
 
     if (!completedTaskIds.includes(item.id)) {
-      requestedRewards.push(3);
       nextDayStatus.planTrackCompletedTaskIds = arrayUnion(item.id);
     }
 
     if ((item.targetMinutes || 0) >= 60 && !hourRewardTaskIds.includes(item.id)) {
-      requestedRewards.push(5);
       nextDayStatus.planTrackHourTaskIds = arrayUnion(item.id);
     }
 
     const completionRatio = totalTaskCount > 0 ? nextCompletedCount / totalTaskCount : 0;
 
     if (completionRatio >= 0.5 && !existingDayStatus.planTrackHalfBonus) {
-      requestedRewards.push(10);
       nextDayStatus.planTrackHalfBonus = true;
     }
 
     let nextStreak = 0;
     if (totalTaskCount > 0 && nextCompletedCount === totalTaskCount && !existingDayStatus.planTrackFullBonus) {
-      requestedRewards.push(30);
       nextDayStatus.planTrackFullBonus = true;
       nextDayStatus.planTrackCompleted = true;
       nextStreak = computePlannerStreak(
@@ -2032,35 +2027,12 @@ export default function StudyPlanPage() {
       );
 
       if (nextStreak >= 3 && !existingDayStatus.planTrackStreakBonus) {
-        const streakBonus = nextStreak >= 7 ? 7 : 5;
-        requestedRewards.push(streakBonus);
         nextDayStatus.planTrackStreakBonus = true;
         nextDayStatus.planTrackStreakDays = nextStreak;
       }
     }
 
-    const requestedTotal = requestedRewards.reduce((sum, reward) => sum + reward, 0);
-    const remainingAllowance = Math.max(
-      0,
-      PLAN_TRACK_DAILY_POINT_CAP - Number(existingDayStatus.dailyPointAmount || 0)
-    );
-    const awarded = Math.min(requestedTotal, remainingAllowance);
-
-    if (awarded > 0) {
-      await setDoc(progressRef, {
-        pointsBalance: increment(awarded),
-        totalPointsEarned: increment(awarded),
-        dailyPointStatus: {
-          [selectedDateKey]: {
-            ...nextDayStatus,
-            dailyPointAmount: increment(awarded),
-            planTrackPointAmount: increment(awarded),
-            updatedAt: serverTimestamp(),
-          },
-        },
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-    } else if (Object.keys(nextDayStatus).length > Object.keys(existingDayStatus).length) {
+    if (Object.keys(nextDayStatus).length > Object.keys(existingDayStatus).length) {
       await setDoc(progressRef, {
         dailyPointStatus: {
           [selectedDateKey]: {
@@ -2072,7 +2044,7 @@ export default function StudyPlanPage() {
       }, { merge: true });
     }
 
-    return awarded;
+    return 0;
   }, [progress?.dailyPointStatus, progressRef, selectedDateKey]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
@@ -2489,20 +2461,17 @@ export default function StudyPlanPage() {
       const existingDayStatus = (progress?.dailyPointStatus?.[selectedDateKey] || {}) as Record<string, any>;
       if (type === 'attend' && progressRef && !existingDayStatus.attendance) {
         await setDoc(progressRef, {
-          pointsBalance: increment(10),
-          totalPointsEarned: increment(10),
           dailyPointStatus: {
             [selectedDateKey]: {
               ...existingDayStatus,
               attendance: true,
-              dailyPointAmount: increment(10),
             },
           },
           updatedAt: serverTimestamp(),
         }, { merge: true });
         toast({
-          title: '출석/루틴 완료 보상',
-          description: '오늘 출석 정보 저장으로 +10포인트가 반영되었습니다.',
+          title: '출석 기록 저장',
+          description: '오늘 출석 정보가 기록되었습니다.',
         });
       }
       if (isToday) {
