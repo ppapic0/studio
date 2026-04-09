@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Check,
   ChevronRight,
   Crown,
   Flame,
   Gift,
+  History,
   Lock,
   Play,
   Swords,
   Target,
   Timer,
   TrendingUp,
-  Wallet,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,12 +27,6 @@ type BoxState = "locked" | "charging" | "ready" | "opened";
 type BoxRarity = "common" | "rare" | "epic";
 type BoxStage = "idle" | "shake" | "burst" | "revealed";
 
-const BOX_RARITY_LABELS: Record<BoxRarity, string> = {
-  common: "커먼",
-  rare: "레어",
-  epic: "에픽",
-};
-
 const HOME_RANK_CARD_BASE =
   "student-utility-card relative w-full overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(89,133,223,0.34),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,188,102,0.14),transparent_40%),linear-gradient(180deg,rgba(7,17,35,0.98)_0%,rgba(12,28,58,0.98)_52%,rgba(20,41,95,0.98)_100%)] text-left shadow-[0_30px_56px_-30px_rgba(0,0,0,0.72)]";
 const HOME_RANK_CARD_INSET =
@@ -45,7 +39,7 @@ const HOME_RANK_CARD_LIVE_BADGE =
 export type StudentHomeQuest = {
   id: string;
   title: string;
-  reward: number;
+  reward?: number;
   done: boolean;
   subjectLabel?: string;
   timeLabel?: string;
@@ -151,29 +145,6 @@ function getRankEntryStatusLabel(entry: StudentHomeRankPreviewEntry) {
   return "대기중";
 }
 
-function RewardCountUp({ value }: { value: number }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let frameId = 0;
-    const startedAt = performance.now();
-    const duration = 720;
-
-    const animate = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(Math.round(value * eased));
-      if (progress < 1) frameId = requestAnimationFrame(animate);
-    };
-
-    setDisplayValue(0);
-    frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
-  }, [value]);
-
-  return <>{displayValue.toLocaleString()}</>;
-}
-
 function RewardHeroChest({
   state,
   stage,
@@ -249,7 +220,7 @@ function QuestRow({
           className="pointer-events-none absolute right-3 top-2 rounded-full border border-[rgba(255,138,31,0.26)] bg-[rgba(255,138,31,0.16)] px-2 py-1 text-[11px] font-black text-[var(--accent-orange-soft)]"
           style={{ animation: "planner-fade-rise 900ms ease-out both" }}
         >
-          +{quest.reward}P
+          완료!
         </span>
       ) : null}
       <span
@@ -283,8 +254,8 @@ function QuestRow({
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">reward</div>
-        <div className="mt-1 text-sm font-black text-[var(--accent-orange-soft)]">+{quest.reward}</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">status</div>
+        <div className="mt-1 text-sm font-black text-[var(--accent-orange-soft)]">{quest.done ? "완료" : "진행"}</div>
       </div>
     </button>
   );
@@ -299,8 +270,7 @@ function RewardModal({
   onReveal,
   revealedReward,
   onNextBox,
-  pointBalance,
-  todayPointGain,
+  todayOpenedBoxCount,
   nextCountdownLabel,
   hasMoreBoxes,
 }: {
@@ -312,8 +282,7 @@ function RewardModal({
   onReveal: () => void;
   revealedReward: number | null;
   onNextBox: () => void;
-  pointBalance: number;
-  todayPointGain: number;
+  todayOpenedBoxCount: number;
   nextCountdownLabel: string;
   hasMoreBoxes: boolean;
 }) {
@@ -373,7 +342,7 @@ function RewardModal({
             {revealedReward === null ? (
               <div className="mt-4">
                 <div className="text-sm font-black text-[var(--accent-orange-soft)]">
-                  {selectedBox ? `${selectedBox.hour}시간 상자` : "포인트 상자"}
+                  {selectedBox ? `${selectedBox.hour}시간 상자` : "보상 상자"}
                 </div>
                 {boxContextLabel ? (
                   <div className="mt-1 text-[11px] font-semibold text-white/70">{boxContextLabel}</div>
@@ -383,11 +352,9 @@ function RewardModal({
             ) : (
               <div className="point-track-reward-burst surface-card surface-card--highlight mt-5 rounded-[1.35rem] px-4 py-5">
                 <div className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--text-on-accent)]">reward</div>
-                <div className="mt-2 text-[2rem] font-black tracking-tight text-[var(--text-on-accent)]">
-                  +<RewardCountUp value={revealedReward} />P
-                </div>
+                <div className="mt-2 text-[2rem] font-black tracking-tight text-[var(--text-on-accent)]">보상 확인 완료</div>
                 <div className="mt-2 text-sm font-semibold text-[rgba(14,28,56,0.76)]">
-                  오늘 +{todayPointGain.toLocaleString()}P · 총 {pointBalance.toLocaleString()}P
+                  오늘 연 상자 {todayOpenedBoxCount}개
                 </div>
                 <div className="mt-3 rounded-full border border-[rgba(14,28,56,0.12)] bg-[rgba(255,255,255,0.56)] px-3 py-2 text-[11px] font-black text-[rgba(14,28,56,0.72)]">
                   다음 상자까지 {nextCountdownLabel}
@@ -429,6 +396,35 @@ function formatPointHistoryDateLabel(dateKey: string) {
   return dateKey;
 }
 
+function getActivityHistorySummary(options: {
+  studyBoxes: number;
+  hasAttendance: boolean;
+  hasPlan: boolean;
+  hasRoutine: boolean;
+  dailyRankRewardRank: number;
+  weeklyRankRewardRank: number;
+  monthlyRankRewardRank: number;
+}) {
+  const {
+    studyBoxes,
+    hasAttendance,
+    hasPlan,
+    hasRoutine,
+    dailyRankRewardRank,
+    weeklyRankRewardRank,
+    monthlyRankRewardRank,
+  } = options;
+
+  if (monthlyRankRewardRank > 0) return `월간 ${monthlyRankRewardRank}위`;
+  if (weeklyRankRewardRank > 0) return `주간 ${weeklyRankRewardRank}위`;
+  if (dailyRankRewardRank > 0) return `일간 ${dailyRankRewardRank}위`;
+  if (studyBoxes > 0) return `상자 ${studyBoxes}개`;
+  if (hasPlan) return "계획 완료";
+  if (hasAttendance) return "출석 기록";
+  if (hasRoutine) return "루틴 기록";
+  return "활동 기록";
+}
+
 function PointHistoryModal({
   open,
   onOpenChange,
@@ -452,20 +448,19 @@ function PointHistoryModal({
       <DialogContent className={cn("max-w-[26rem] overflow-hidden rounded-[2rem] border-[#DCE5F8] bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.18),transparent_26%),linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-0 text-[#17326B] shadow-[0_28px_60px_-30px_rgba(19,50,107,0.24)]", isMobile ? "w-[min(94vw,26rem)]" : "")}>
         <div className={cn("border-b border-[#E4ECFA] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,250,255,0.96))]", isMobile ? "px-5 py-5" : "px-6 py-6")}>
           <DialogHeader className="text-left">
-            <DialogTitle className="text-[1.35rem] font-black tracking-tight text-[#17326B]">일자별 포인트 기록</DialogTitle>
+            <DialogTitle className="text-[1.35rem] font-black tracking-tight text-[#17326B]">일자별 활동 기록</DialogTitle>
           </DialogHeader>
-          <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">최근 30일 동안 하루에 몇 포인트를 얻었는지 한눈에 확인할 수 있어요.</p>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">최근 30일 동안 출석, 계획, 상자, 랭킹 보상 기록을 한눈에 확인할 수 있어요.</p>
         </div>
 
         <div className={cn("max-h-[26rem] space-y-2 overflow-y-auto bg-[#F7FAFF] custom-scrollbar", isMobile ? "px-4 py-4" : "px-5 py-5")}>
           {sortedDates.length === 0 ? (
             <div className="rounded-[1.4rem] border border-dashed border-[#D8E4F8] bg-white/85 px-4 py-10 text-center">
-              <div className="text-sm font-black text-[#17326B]">아직 포인트 기록이 없어요.</div>
-              <div className="mt-1 text-[11px] font-semibold text-[#6B7EA8]">공부를 시작하거나 보상을 받으면 여기에 일자별 내역이 쌓입니다.</div>
+              <div className="text-sm font-black text-[#17326B]">아직 활동 기록이 없어요.</div>
+              <div className="mt-1 text-[11px] font-semibold text-[#6B7EA8]">공부를 시작하거나 계획을 체크하면 여기에 일자별 내역이 쌓입니다.</div>
             </div>
           ) : (
             sortedDates.map(([date, data]) => {
-              const pointAmount = Math.max(0, Number(data?.dailyPointAmount || 0));
               const studyBoxes = Array.isArray(data?.claimedStudyBoxes) ? data.claimedStudyBoxes.length : 0;
               const dailyRankRewardAmount = Math.max(0, Number(data?.dailyRankRewardAmount || data?.dailyTopRewardAmount || 0));
               const dailyRankRewardRank = Math.max(0, Number(data?.dailyRankRewardRank || (dailyRankRewardAmount > 0 ? 1 : 0)));
@@ -473,6 +468,15 @@ function PointHistoryModal({
               const weeklyRankRewardRank = Math.max(0, Number(data?.weeklyRankRewardRank || 0));
               const monthlyRankRewardAmount = Math.max(0, Number(data?.monthlyRankRewardAmount || 0));
               const monthlyRankRewardRank = Math.max(0, Number(data?.monthlyRankRewardRank || 0));
+              const summaryLabel = getActivityHistorySummary({
+                studyBoxes,
+                hasAttendance: Boolean(data?.attendance),
+                hasPlan: Boolean(data?.plan || data?.planTrackCompleted),
+                hasRoutine: Boolean(data?.routine),
+                dailyRankRewardRank,
+                weeklyRankRewardRank,
+                monthlyRankRewardRank,
+              });
 
               return (
                 <div key={date} className="rounded-[1.3rem] border border-[#E1EAF8] bg-white/90 px-4 py-3 shadow-[0_18px_34px_-26px_rgba(19,50,107,0.18)]">
@@ -492,10 +496,8 @@ function PointHistoryModal({
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="dashboard-number text-lg font-black tracking-tight text-[#17326B]">
-                        +{pointAmount.toLocaleString()}P
-                      </div>
-                      <div className="mt-1 text-[10px] font-semibold text-[#6B7EA8]">하루 획득 포인트</div>
+                      <div className="text-sm font-black tracking-tight text-[#17326B]">{summaryLabel}</div>
+                      <div className="mt-1 text-[10px] font-semibold text-[#6B7EA8]">대표 기록</div>
                     </div>
                   </div>
                 </div>
@@ -517,9 +519,6 @@ function PointHistoryModal({
 export function StudentHomeGamePanel({
   isMobile,
   dateLabel,
-  todayPointLabel,
-  completionLabel,
-  streakLabel,
   heroMessage,
   totalMinutesLabel,
   growthLabel,
@@ -539,8 +538,7 @@ export function StudentHomeGamePanel({
   arrivalCount,
   todayStudyLabel,
   growthDeltaPercent,
-  pointBalance,
-  todayPointGain,
+  todayOpenedBoxCount,
   homeFocusSummaryLabel,
   onOpenFocusEditor,
   dailyPointStatus,
@@ -568,9 +566,6 @@ export function StudentHomeGamePanel({
 }: {
   isMobile: boolean;
   dateLabel: string;
-  todayPointLabel: string;
-  completionLabel: string;
-  streakLabel: string;
   heroMessage: string | null;
   totalMinutesLabel: string;
   growthLabel: string;
@@ -590,8 +585,7 @@ export function StudentHomeGamePanel({
   arrivalCount: number;
   todayStudyLabel: string;
   growthDeltaPercent: number;
-  pointBalance: number;
-  todayPointGain: number;
+  todayOpenedBoxCount: number;
   homeFocusSummaryLabel: string;
   onOpenFocusEditor: () => void;
   dailyPointStatus?: GrowthProgress["dailyPointStatus"];
@@ -640,6 +634,10 @@ export function StudentHomeGamePanel({
       : rankPreview.length > 0
         ? "상위 3명만 빠르게 보여줍니다."
         : "공부를 시작하면 순위가 바로 반영됩니다.";
+  const recentActivityDays = useMemo(() => {
+    if (!dailyPointStatus) return 0;
+    return Object.keys(dailyPointStatus).sort((a, b) => b.localeCompare(a)).slice(0, 30).length;
+  }, [dailyPointStatus]);
 
   return (
     <>
@@ -862,12 +860,12 @@ export function StudentHomeGamePanel({
                 className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3 text-left transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,122,22,0.28)]"
               >
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-                  <Wallet className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
-                  포인트
+                  <History className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
+                  활동 기록
                 </div>
-                <div className="font-aggro-display mt-2 text-xl font-black text-[var(--text-primary)]">{pointBalance.toLocaleString()}P</div>
+                <div className="font-aggro-display mt-2 text-xl font-black text-[var(--text-primary)]">{recentActivityDays}일</div>
                 <div className="mt-1 flex items-center justify-between gap-2">
-                  <div className="text-[11px] font-black text-[var(--accent-orange)]">오늘 +{todayPointGain}P</div>
+                  <div className="text-[11px] font-black text-[var(--accent-orange)]">오늘 연 상자 {todayOpenedBoxCount}개</div>
                   <ChevronRight className="h-4 w-4 text-[var(--accent-orange)]" />
                 </div>
               </button>
@@ -1229,8 +1227,7 @@ export function StudentHomeGamePanel({
         onReveal={onRevealBox}
         revealedReward={revealedReward}
         onNextBox={onNextBox}
-        pointBalance={pointBalance}
-        todayPointGain={todayPointGain}
+        todayOpenedBoxCount={todayOpenedBoxCount}
         nextCountdownLabel={nextCountdownLabel}
         hasMoreBoxes={hasMoreReadyBoxes}
       />

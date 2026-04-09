@@ -83,7 +83,7 @@ import {
   type StudentHomeRankState,
   type StudentHomeRewardBox,
 } from '@/components/dashboard/student-home-game-panel';
-import { PLAN_TRACK_DAILY_POINT_CAP, computePlannerStreak } from '@/lib/plan-track';
+import { computePlannerStreak } from '@/lib/plan-track';
 import {
   ROUTINE_MISSING_PENALTY_POINTS,
   syncAutoAttendanceRecord,
@@ -1158,7 +1158,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [homeClaimedBoxes, setHomeClaimedBoxes] = useState<number[]>([]);
   const [homeRewardEntries, setHomeRewardEntries] = useState<ReturnType<typeof coerceStudyBoxRewards>>([]);
   const [homeOpenedBoxes, setHomeOpenedBoxes] = useState<number[]>([]);
-  const [homePointBalance, setHomePointBalance] = useState(0);
   const [homeArrivalCount, setHomeArrivalCount] = useState(0);
   const [freshReadyHours, setFreshReadyHours] = useState<number[]>([]);
   const [isVaultOpen, setIsVaultOpen] = useState(false);
@@ -2287,12 +2286,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   // today plan completion rate
   const todayStudyTasks = fetchedPlans?.filter((p) => p.dateKey === todayKey && (p.category === 'study' || !p.category)) || [];
-  const todayDoneTaskCount = todayStudyTasks.filter((p) => p.done).length;
   const todayTaskCount = todayStudyTasks.length;
-  const todayPlanRate = (() => {
-    if (todayTaskCount === 0) return 0;
-    return Math.round((todayDoneTaskCount / todayTaskCount) * 100);
-  })();
 
   // unread teacher reports
   const unreadReportCount = teacherReports.filter(r => !r.viewedAt).length;
@@ -2606,11 +2600,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => ((progress?.dailyPointStatus?.[yesterdayKey] || {}) as Record<string, any>),
     [progress?.dailyPointStatus, yesterdayKey]
   );
-  const todayPointAmount = Math.max(0, Number(todayPointStatus.dailyPointAmount || 0));
-  const plannerStreakDays = useMemo(
-    () => computePlannerStreak(progress?.dailyPointStatus, todayKey),
-    [progress?.dailyPointStatus, todayKey]
-  );
   const liveTodaySeconds = Math.max(0, Number(todayStudyLog?.totalMinutes || 0) * 60 + localSeconds);
   const liveTodayMinutes = Math.floor(liveTodaySeconds / 60);
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayPointStatus), [todayPointStatus]);
@@ -2650,10 +2639,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
   }, [persistedCarryoverOpenedBoxes]);
-
-  useEffect(() => {
-    setHomePointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
-  }, [progress?.pointsBalance]);
 
   useEffect(() => {
     return () => {
@@ -2732,7 +2717,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => (activeVaultDateKey === yesterdayKey ? persistedCarryoverRewardEntries : homeRewardEntries),
     [activeVaultDateKey, homeRewardEntries, persistedCarryoverRewardEntries, yesterdayKey]
   );
-  const activeVaultPointAmount = Math.max(0, Number(activeVaultDayStatus.dailyPointAmount || 0));
+  const activeVaultOpenedCount = useMemo(
+    () => (activeVaultDateKey === yesterdayKey ? carryoverOpenedBoxes.length : homeOpenedBoxes.length),
+    [activeVaultDateKey, carryoverOpenedBoxes, homeOpenedBoxes, yesterdayKey]
+  );
   const activeVaultContextLabel = activeVaultDateKey === yesterdayKey
     ? '어제 남아 있던 상자예요.'
     : null;
@@ -2796,7 +2784,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     homeLiveClaimKeyRef.current = claimKey;
 
     const rewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone));
-    const awardedPoints = rewards.reduce((sum, reward) => sum + reward.awardedPoints, 0);
     const nextClaimedBoxes = Array.from(new Set([...syncedClaimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
     const nextRewardEntries = [...syncedRewardEntries, ...rewards].sort((a, b) => a.milestone - b.milestone);
     const membershipId = activeMembership.id;
@@ -2861,7 +2848,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       .map((item) => ({
         id: item.id,
         title: item.title || '오늘 할 일',
-        reward: (item.targetMinutes || 0) >= 60 ? 8 : 3,
         done: Boolean(item.done),
         subjectLabel: toKoreanSubjectLabel(item.subject),
         timeLabel: item.targetMinutes ? formatMinutesMini(item.targetMinutes) : undefined,
@@ -3097,9 +3083,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       <StudentHomeGamePanel
         isMobile={isMobile}
         dateLabel={today ? format(today, 'M월 d일 EEEE', { locale: ko }) : ''}
-        todayPointLabel={`🔥 ${todayPointAmount} / ${PLAN_TRACK_DAILY_POINT_CAP} pt`}
-        completionLabel={`${todayPlanRate}% 완료`}
-        streakLabel={`${plannerStreakDays}일 연속`}
         heroMessage={null}
         totalMinutesLabel={formatMinutesToKorean(totalMinutesCount)}
         growthLabel={`${formatMinutesMini(totalMinutesCount)} / ${formatMinutesMini(growthGoalMinutes)}`}
@@ -3119,7 +3102,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         arrivalCount={homeArrivalCount}
         todayStudyLabel={formatMinutesToKorean(totalMinutesCount)}
         growthDeltaPercent={studyVsYesterday}
-        pointBalance={homePointBalance}
         homeFocusSummaryLabel={homeFocusSummaryLabel}
         onOpenFocusEditor={() => setIsExamDialogOpen(true)}
         dailyPointStatus={progress?.dailyPointStatus}
@@ -3143,7 +3125,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         onRevealBox={handleRevealHomeBox}
         revealedReward={revealedHomeReward}
         onNextBox={handleNextHomeBox}
-        todayPointGain={activeVaultPointAmount}
+        todayOpenedBoxCount={activeVaultOpenedCount}
         nextCountdownLabel={formatTimer(nextBoxSecondsLeft)}
       />
 

@@ -275,32 +275,6 @@ function RewardHeroChest({
   );
 }
 
-function RewardCountUp({ value }: { value: number }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let frameId = 0;
-    const duration = 780;
-    const start = performance.now();
-
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(Math.round(value * eased));
-      if (progress < 1) {
-        frameId = requestAnimationFrame(tick);
-      }
-    };
-
-    setDisplayValue(0);
-    frameId = requestAnimationFrame(tick);
-
-    return () => cancelAnimationFrame(frameId);
-  }, [value]);
-
-  return <>{displayValue.toLocaleString()}</>;
-}
-
 function HeroMetricChip({
   icon: Icon,
   label,
@@ -329,7 +303,7 @@ function HeroMetricChip({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
       {floatingGain ? (
         <div key={floatingGain.key} className="point-track-floating-gain">
-          +{floatingGain.amount}P
+          보상 확인
         </div>
       ) : null}
       <div className="flex items-center gap-2.5">
@@ -417,7 +391,7 @@ function InventorySlot({
           <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-on-dark-soft)]">
             <span>
               {box.state === 'opened'
-                ? `+${box.reward || 0}P`
+                ? '확인완료'
                 : box.state === 'ready'
                   ? 'READY'
                   : 'LOCK'}
@@ -583,7 +557,6 @@ export default function GrowthPage() {
 
   const readyBoxes = boxes.filter((box) => box.state === 'ready');
   const totalAvailableBoxes = readyBoxes.length;
-  const todayPointGain = rewardEntries.reduce((sum, reward) => sum + Number(reward.awardedPoints || 0), 0);
   const todayOpenedCount = openedBoxes.length;
 
   const heroMode = totalAvailableBoxes > 0 ? 'ready' : isTimerActive ? 'studying' : 'idle';
@@ -624,7 +597,6 @@ export default function GrowthPage() {
     liveClaimKeyRef.current = claimKey;
 
     const nextRewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone));
-    const awardedPoints = nextRewards.reduce((sum, reward) => sum + reward.awardedPoints, 0);
     const nextClaimedBoxes = Array.from(new Set([...claimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
     const nextRewardEntries = [...rewardEntries, ...nextRewards].sort((a, b) => a.milestone - b.milestone);
     const nextDayStatus = {
@@ -931,8 +903,8 @@ export default function GrowthPage() {
 
         <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
           <div className="surface-card surface-card--light rounded-[1.2rem] px-3 py-3 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">오늘 획득</p>
-            <p className="mt-2 text-base font-black text-[var(--text-primary)]">+{todayPointGain}P</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">오늘 연 상자</p>
+            <p className="mt-2 text-base font-black text-[var(--text-primary)]">{todayOpenedCount}개</p>
           </div>
           <div className="surface-card surface-card--ivory rounded-[1.2rem] px-3 py-3 text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">연 상자</p>
@@ -1003,7 +975,7 @@ export default function GrowthPage() {
             )}
           >
             <DialogHeader className="px-5 pb-0 pt-5">
-              <DialogTitle className="text-left text-xl font-black tracking-tight text-white">포인트 상자 오픈</DialogTitle>
+              <DialogTitle className="text-left text-xl font-black tracking-tight text-white">보상 상자 오픈</DialogTitle>
               <DialogDescription className="text-left text-sm font-bold text-[var(--text-on-dark-soft)]">
                 한 개씩 눌러서 열어보세요.
               </DialogDescription>
@@ -1040,10 +1012,8 @@ export default function GrowthPage() {
                   </p>
                   {boxStage === 'revealed' && revealedReward !== null ? (
                     <div className="point-track-reward-burst">
-                      <p className="text-[2.6rem] font-black tracking-tight text-orange-100">
-                        +<RewardCountUp value={revealedReward} />P
-                      </p>
-                      <p className="mt-1 text-xs font-black text-[var(--text-on-dark-soft)]">현재 포인트 {pointBalance.toLocaleString()}</p>
+                      <p className="text-[2.35rem] font-black tracking-tight text-orange-100">보상 확인 완료</p>
+                      <p className="mt-1 text-xs font-black text-[var(--text-on-dark-soft)]">오늘 연 상자 {todayOpenedCount}개</p>
                     </div>
                   ) : (
                     <p className="mt-2 text-sm font-black text-[var(--text-on-dark)]">
@@ -1055,8 +1025,8 @@ export default function GrowthPage() {
 
               <div className="surface-card surface-card--ghost on-dark mt-4 rounded-[1.4rem] px-4 py-4">
                 <div className="flex items-center justify-between text-sm font-black text-[var(--text-on-dark)]">
-                  <span>오늘 획득</span>
-                  <span>{todayPointGain.toLocaleString()}P</span>
+                  <span>오늘 연 상자</span>
+                  <span>{todayOpenedCount}개</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs font-bold text-[var(--text-on-dark-soft)]">
                   <span>다음 상자까지</span>

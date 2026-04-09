@@ -113,9 +113,6 @@ export default function UiAuditPage() {
         <StudentHomeGamePanel
           isMobile={false}
         dateLabel="3월 31일 화요일"
-        todayPointLabel="🔥 413 / 100 pt"
-        completionLabel="84% 완료"
-        streakLabel="12일 연속"
         heroMessage="루틴, 퀘스트, 보상 흐름이 한눈에 읽히는지 확인합니다."
         totalMinutesLabel="12시간 10분"
         growthLabel="12h / 10h"
@@ -135,8 +132,7 @@ export default function UiAuditPage() {
           isNearNextBox
           arrivalCount={2}
           todayStudyLabel="12시간 10분"
-          pointBalance={4280}
-          todayPointGain={413}
+          todayOpenedBoxCount={3}
           homeFocusSummaryLabel="경희대학교 국어국문학과 / D-18"
           onOpenFocusEditor={() => undefined}
           quests={[

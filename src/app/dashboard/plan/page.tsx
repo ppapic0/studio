@@ -120,7 +120,6 @@ import { AttendanceScheduleSheet } from '@/components/dashboard/student-planner/
 import {
   BUILTIN_PLANNER_TEMPLATES,
   PLAN_DEFAULT_START_TIME,
-  PLAN_TRACK_DAILY_POINT_CAP,
   PLANNER_QUICK_TASK_SUGGESTIONS,
   assignAutoWindowsToTasks,
   buildPlannerTemplateRecentKey,
@@ -490,7 +489,6 @@ export default function StudyPlanPage() {
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [customTemplates, setCustomTemplates] = useState<PlannerTemplateRecord[]>([]);
   const [recentTemplateIds, setRecentTemplateIds] = useState<string[]>([]);
-  const [floatingPointBursts, setFloatingPointBursts] = useState<Array<{ id: number; label: string }>>([]);
   const [taskCopyWeeks, setTaskCopyWeeks] = useState('4');
   const [routineCopyWeeks, setRoutineCopyWeeks] = useState('4');
   const [taskCopyDays, setTaskCopyDays] = useState<number[]>([]);
@@ -1401,28 +1399,6 @@ export default function StudyPlanPage() {
     () => [...studyTasks, ...personalTasks],
     [personalTasks, studyTasks]
   );
-  const completedChecklistCount = useMemo(
-    () => checklistTasks.filter((task) => task.done).length,
-    [checklistTasks]
-  );
-  const completionRate = checklistTasks.length > 0
-    ? Math.round((completedChecklistCount / checklistTasks.length) * 100)
-    : 0;
-  const selectedDayPointStatus = useMemo(
-    () => ((progress?.dailyPointStatus?.[selectedDateKey] || {}) as Record<string, any>),
-    [progress?.dailyPointStatus, selectedDateKey]
-  );
-  const todayPointTotal = Math.min(
-    PLAN_TRACK_DAILY_POINT_CAP,
-    Number(selectedDayPointStatus.dailyPointAmount || 0)
-  );
-  const planTrackPointTotal = Math.max(0, Number(selectedDayPointStatus.planTrackPointAmount || 0));
-  const todayStreakDays = useMemo(
-    () => computePlannerStreak(progress?.dailyPointStatus, selectedDateKey),
-    [progress?.dailyPointStatus, selectedDateKey]
-  );
-  const todayPointGaugeLabel = `${todayPointTotal} / ${PLAN_TRACK_DAILY_POINT_CAP}`;
-  const todayCompletionLabel = checklistTasks.length > 0 ? `${completedChecklistCount}/${checklistTasks.length}` : '0/0';
   const autoSchedulePreview = useMemo(
     () => getNextAutoWindow(studyTasks, Number(newStudyMinutes) || 30, PLAN_DEFAULT_START_TIME),
     [newStudyMinutes, studyTasks]
@@ -1621,14 +1597,6 @@ export default function StudyPlanPage() {
     setActiveRecentStudyKey(item.key);
     setIsRecentStudySheetOpen(false);
   };
-
-  const pushFloatingPointBurst = useCallback((label: string) => {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    setFloatingPointBursts((prev) => [...prev, { id, label }]);
-    window.setTimeout(() => {
-      setFloatingPointBursts((prev) => prev.filter((item) => item.id !== id));
-    }, 950);
-  }, []);
 
   const markTemplateAsRecent = useCallback((templateId: string) => {
     setRecentTemplateIds((prev) => [templateId, ...prev.filter((id) => id !== templateId)].slice(0, 6));
@@ -2936,22 +2904,16 @@ export default function StudyPlanPage() {
 
       const nextCompletedCount =
         checklistTasks.filter((task) => task.id !== completionReviewItem.id && task.done).length + 1;
-      const awarded = await awardPlannerCompletionPoints(
+      await awardPlannerCompletionPoints(
         completionReviewItem,
         nextCompletedCount,
         checklistTasks.length
       );
 
-      if (awarded > 0) {
-        pushFloatingPointBurst(`+${awarded}`);
-      }
-
       toast({
         title: completionWithinPlannedTime ? '제시간에 완료했어요' : '완료 시간까지 함께 기록했어요',
         description: completionWithinPlannedTime
-          ? awarded > 0
-            ? `계획 완료와 함께 +${awarded} 포인트가 반영됐어요.`
-            : '완료 체크가 반영됐어요.'
+          ? '완료 체크가 반영됐어요.'
           : `${overtimeMinutes}분 더 걸린 기록까지 저장했어요.`,
       });
 
@@ -2969,7 +2931,6 @@ export default function StudyPlanPage() {
     completionWithinPlannedTime,
     firestore,
     isStudent,
-    pushFloatingPointBurst,
     selectedDateKey,
     toast,
     user,
@@ -2989,14 +2950,11 @@ export default function StudyPlanPage() {
     });
     if (!item.done && willBeDone) {
       const nextCompletedCount = checklistTasks.filter((task) => task.id !== item.id && task.done).length + 1;
-      const awarded = await awardPlannerCompletionPoints(item, nextCompletedCount, checklistTasks.length);
-      if (awarded > 0) {
-        pushFloatingPointBurst(`+${awarded}`);
-        toast({
-          title: `+${awarded} 포인트`,
-          description: '분량 목표를 채워서 즉시 포인트가 반영됐어요.',
-        });
-      }
+      await awardPlannerCompletionPoints(item, nextCompletedCount, checklistTasks.length);
+      toast({
+        title: '분량 목표를 기록했어요',
+        description: '완료 체크가 저장됐어요.',
+      });
     }
   };
 
