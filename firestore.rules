@@ -283,10 +283,7 @@ service cloud.firestore {
         allow read: if isTeacherOrAdmin(centerId)
           || isSelfCenterMember(centerId, studentId)
           || isLinkedParent(centerId, studentId);
-        allow create, update: if isTeacherOrAdmin(centerId)
-          || (isSelfCenterMember(centerId, studentId)
-              && request.resource.data.studentId == request.auth.uid
-              && request.resource.data.centerId == centerId);
+        allow create, update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
 
@@ -502,7 +499,8 @@ service cloud.firestore {
       match /leaderboards/{boardId}/entries/{entryId} {
         allow read: if isActiveMember(centerId);
         allow create, update: if isCenterAdmin(centerId)
-          || (isSelfCenterMember(centerId, entryId)
+          || (boardId.matches('.*_lp$')
+              && isSelfCenterMember(centerId, entryId)
               && request.resource.data.studentId == request.auth.uid);
         allow delete: if isCenterAdmin(centerId);
       }

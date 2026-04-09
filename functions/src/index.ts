@@ -4630,9 +4630,10 @@ export const scheduledWeeklyReport = functions
   });
 
 /**
- * 세션 문서 생성 시 durationMinutes 유효성 검증 및 LP 서버 보정
+ * 세션 문서 생성 시 durationMinutes 유효성 검증 및 서버 집계 보정
  * - 0분 이하 또는 360분 초과 세션은 경계값으로 클램프
- * - closedReason이 있는 자동 종료 세션은 검증에서 제외
+ * - study-time leaderboard / dailyStudentStats는 세션 생성만 신뢰해 서버에서 누적
+ * - closedReason이 있는 자동 종료 세션도 집계 대상에 포함
  */
 export const onSessionCreated = functions
   .region(region)
@@ -4640,42 +4641,104 @@ export const onSessionCreated = functions
   .onCreate(async (snap, context) => {
     const data = snap.data() as Record<string, any>;
     const { centerId, studentId, dateKey } = context.params;
-
-    // 자동 종료 세션은 Cloud Function 자체가 생성했으므로 재검증 불필요
-    if (data.closedReason) return null;
-
+    const db = admin.firestore();
+    const skipValidation = Boolean(data.closedReason);
     const rawDuration = Number(data.durationMinutes ?? 0);
-    if (!Number.isFinite(rawDuration) || rawDuration < 0) {
-      console.warn("[session-validate] invalid durationMinutes", { centerId, studentId, sessionId: snap.id, rawDuration });
-      await snap.ref.update({ durationMinutes: 0, validationFlag: "clamped_negative" });
-      return null;
+    const MAX_MINUTES = 360;
+
+    let normalizedDuration = Number.isFinite(rawDuration) ? Math.max(0, Math.round(rawDuration)) : 0;
+    let validationFlag: "clamped_negative" | "clamped_max" | null = null;
+    let overageMinutes = 0;
+
+    if (!skipValidation) {
+      if (!Number.isFinite(rawDuration) || rawDuration < 0) {
+        validationFlag = "clamped_negative";
+        normalizedDuration = 0;
+      } else if (rawDuration > MAX_MINUTES) {
+        validationFlag = "clamped_max";
+        normalizedDuration = MAX_MINUTES;
+        overageMinutes = Math.max(0, Math.round(rawDuration - MAX_MINUTES));
+      }
     }
 
-    const MAX_MINUTES = 360;
-    if (rawDuration > MAX_MINUTES) {
-      const clamped = MAX_MINUTES;
-      const db = admin.firestore();
-      const batch = db.batch();
-
-      batch.update(snap.ref, { durationMinutes: clamped, validationFlag: "clamped_max" });
-
-      // dailyStudentStats 보정: 초과분 차감
-      const overageMinutes = rawDuration - clamped;
+    await db.runTransaction(async (t) => {
+      const dayLogRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
       const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
-      batch.set(statRef, {
-        totalStudyMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
+      const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
+      const leaderboardRef = db.doc(`centers/${centerId}/leaderboards/${dateKey.slice(0, 7)}_study-time/entries/${studentId}`);
+
+      const [studentSnap, statSnap] = await Promise.all([
+        t.get(studentRef),
+        t.get(statRef),
+      ]);
+
+      if (validationFlag === "clamped_negative") {
+        console.warn("[session-validate] invalid durationMinutes", {
+          centerId,
+          studentId,
+          sessionId: snap.id,
+          rawDuration,
+        });
+        t.update(snap.ref, { durationMinutes: 0, validationFlag });
+      }
+
+      if (validationFlag === "clamped_max") {
+        t.update(snap.ref, { durationMinutes: normalizedDuration, validationFlag });
+        if (overageMinutes > 0) {
+          t.set(dayLogRef, {
+            totalMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
+      }
+
+      if (normalizedDuration <= 0) {
+        return;
+      }
+
+      const studentData = (studentSnap.data() || {}) as Record<string, unknown>;
+      const statData = (statSnap.data() || {}) as Record<string, unknown>;
+      const currentLongestSessionMinutes = Math.max(0, Number(statData.longestSessionMinutes || 0));
+
+      t.set(statRef, {
+        totalStudyMinutes: admin.firestore.FieldValue.increment(normalizedDuration),
+        sessionCount: admin.firestore.FieldValue.increment(1),
+        longestSessionMinutes: Math.max(normalizedDuration, currentLongestSessionMinutes),
+        studentId,
+        centerId,
+        dateKey,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
 
-      // studyLogs day 보정
-      const logRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
-      batch.set(logRef, {
-        totalMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
+      t.set(leaderboardRef, {
+        studentId,
+        displayNameSnapshot:
+          typeof studentData.name === "string" && studentData.name.trim().length > 0
+            ? studentData.name.trim()
+            : typeof studentData.displayName === "string" && studentData.displayName.trim().length > 0
+              ? studentData.displayName.trim()
+              : "학생",
+        classNameSnapshot:
+          typeof studentData.className === "string" && studentData.className.trim().length > 0
+            ? studentData.className.trim()
+            : null,
+        schoolNameSnapshot:
+          typeof studentData.schoolName === "string" && studentData.schoolName.trim().length > 0
+            ? studentData.schoolName.trim()
+            : null,
+        value: admin.firestore.FieldValue.increment(normalizedDuration),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
+    });
 
-      await batch.commit();
-      console.log("[session-validate] clamped max", { centerId, studentId, sessionId: snap.id, rawDuration, clamped });
+    if (validationFlag === "clamped_max") {
+      console.log("[session-validate] clamped max", {
+        centerId,
+        studentId,
+        sessionId: snap.id,
+        rawDuration,
+        clamped: normalizedDuration,
+      });
     }
 
     return null;

@@ -1759,31 +1759,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }, { merge: true });
           wroteSomething = true;
 
-          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', user.uid);
-          const statSnap = await getDoc(statRef);
-          const currentLongest = Number(statSnap.data()?.longestSessionMinutes ?? 0);
-          batch.set(statRef, {
-            totalStudyMinutes: increment(sessionMinutes),
-            sessionCount: increment(1),
-            longestSessionMinutes: Math.max(sessionMinutes, currentLongest),
-            studentId: user.uid,
-            centerId,
-            dateKey: sessionDateKey,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-          wroteSomething = true;
-
-          const studyTimeRankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', user.uid);
-          batch.set(studyTimeRankRef, {
-            studentId: user.uid,
-            displayNameSnapshot: user.displayName || '학생',
-            classNameSnapshot: activeMembership.className || null,
-            schoolNameSnapshot: studentProfile?.schoolName || null,
-            value: increment(sessionMinutes),
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-          wroteSomething = true;
-
           const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey, 'sessions', sessionId);
           batch.set(sessionRef, {
             centerId,
@@ -1882,30 +1857,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
             await setDoc(sessionStudyLogRef, fallbackStudyLogData, { merge: true });
             if (sessionSeconds > 0) {
-              const fallbackDailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', user.uid);
-              const fallbackDailyStatSnap = await getDoc(fallbackDailyStatRef);
-              const fallbackCurrentLongestSessionMinutes = Number(
-                fallbackDailyStatSnap.data()?.longestSessionMinutes ?? 0
-              );
-
-              await setDoc(fallbackDailyStatRef, {
-                totalStudyMinutes: increment(sessionMinutes),
-                sessionCount: increment(1),
-                longestSessionMinutes: Math.max(sessionMinutes, fallbackCurrentLongestSessionMinutes),
-                studentId: user.uid,
-                centerId,
-                dateKey: sessionDateKey,
-                updatedAt: serverTimestamp(),
-              }, { merge: true });
               await setDoc(progressRef, progressUpdate, { merge: true });
-              await setDoc(doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', user.uid), {
-                studentId: user.uid,
-                displayNameSnapshot: user.displayName || '학생',
-                classNameSnapshot: activeMembership.className || null,
-                schoolNameSnapshot: studentProfile?.schoolName || null,
-                value: increment(sessionMinutes),
-                updatedAt: serverTimestamp(),
-              }, { merge: true });
             }
 
             if (sessionSeconds > 0) {

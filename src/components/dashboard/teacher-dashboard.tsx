@@ -1669,14 +1669,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
           batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
 
-          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', studentId);
-          batch.set(statRef, { totalStudyMinutes: increment(sessionMinutes), studentId, centerId, dateKey: sessionDateKey, updatedAt: serverTimestamp() }, { merge: true });
-
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
-          const progressSnap = await getDoc(progressRef);
-          const p = progressSnap.exists() ? (progressSnap.data() as GrowthProgress) : null;
-          const stats = p?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
-          const periodKey = sessionDateKey.slice(0, 7);
           const progressUpdate: Record<string, any> = {
             stats: {
               focus: increment((sessionMinutes / 60) * 0.1),
@@ -1684,15 +1677,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             updatedAt: serverTimestamp(),
           };
           batch.set(progressRef, progressUpdate, { merge: true });
-
-          const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', studentId);
-          batch.set(rankRef, {
-            studentId,
-            displayNameSnapshot: selectedStudentProfile?.name || selectedStudentName,
-            classNameSnapshot: selectedStudentProfile?.className || null,
-            value: increment(sessionMinutes),
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
         }
       }
 

@@ -180,28 +180,10 @@ export default function KioskPage() {
             createdAt: serverTimestamp()
           });
 
-          const dailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', student.id);
-          batch.set(dailyStatRef, {
-            totalStudyMinutes: increment(durationMinutes),
-            studentId: student.id,
-            centerId,
-            dateKey: todayKey,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', student.id);
           batch.set(progressRef, {
             'stats.focus': increment((durationMinutes / 60) * 0.1),
             updatedAt: serverTimestamp()
-          }, { merge: true });
-
-          const periodKey = todayKey.slice(0, 7);
-          const leaderboardRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', student.id);
-          batch.set(leaderboardRef, {
-            studentId: student.id,
-            displayNameSnapshot: student.name,
-            value: increment(durationMinutes),
-            updatedAt: serverTimestamp(),
           }, { merge: true });
         }
       }

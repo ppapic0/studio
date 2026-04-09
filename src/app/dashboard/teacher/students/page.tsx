@@ -443,18 +443,6 @@ export default function StudentListPage() {
             createdAt: serverTimestamp(),
           });
 
-          const dailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', studentId);
-          batch.set(
-            dailyStatRef,
-            {
-              totalStudyMinutes: increment(sessionMinutes),
-              studentId,
-              centerId,
-              dateKey: sessionDateKey,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
         }
       }
 
