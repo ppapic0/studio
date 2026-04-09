@@ -114,7 +114,18 @@ type SmsDispatchResult =
       responseSummary?: string | null;
     };
 
+type ParentLinkRateLimitDoc = {
+  failedAttemptCount?: number;
+  firstFailedAt?: admin.firestore.Timestamp;
+  lastFailedAt?: admin.firestore.Timestamp;
+  blockedUntil?: admin.firestore.Timestamp;
+  updatedAt?: admin.firestore.Timestamp;
+};
+
 const SMS_BYTE_LIMIT = 90;
+const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
+const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
+const PARENT_LINK_FAILED_ATTEMPT_LOCK_MS = 30 * 60 * 1000;
 
 const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
   study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
@@ -558,6 +569,81 @@ function getNextRetryDelayMinutes(attemptCount: number): number | null {
   if (attemptCount === 2) return 5;
   if (attemptCount === 3) return 15;
   return null;
+}
+
+function buildParentLinkRateLimitRef(db: admin.firestore.Firestore, uid: string) {
+  return db.doc(`users/${uid}/securityGuards/parentLinkRateLimit`);
+}
+
+function getRemainingLockMinutes(target: Date, now = new Date()): number {
+  return Math.max(1, Math.ceil((target.getTime() - now.getTime()) / (60 * 1000)));
+}
+
+async function assertParentLinkRateLimitAllowed(db: admin.firestore.Firestore, uid: string): Promise<void> {
+  const snap = await buildParentLinkRateLimitRef(db, uid).get();
+  if (!snap.exists) return;
+
+  const data = (snap.data() || {}) as ParentLinkRateLimitDoc;
+  const now = new Date();
+  const blockedUntil = toTimestampDate(data.blockedUntil);
+  if (!blockedUntil || blockedUntil.getTime() <= now.getTime()) return;
+
+  const remainingMinutes = getRemainingLockMinutes(blockedUntil, now);
+  throw new functions.https.HttpsError("resource-exhausted", "Parent link temporarily blocked due to repeated failures.", {
+    userMessage: `학생코드 확인 시도가 많아 ${remainingMinutes}분 동안 잠겼습니다. 잠시 후 다시 시도해 주세요.`,
+  });
+}
+
+async function registerParentLinkFailedAttempt(
+  db: admin.firestore.Firestore,
+  uid: string
+): Promise<admin.firestore.Timestamp | null> {
+  const rateLimitRef = buildParentLinkRateLimitRef(db, uid);
+  return db.runTransaction(async (t) => {
+    const snap = await t.get(rateLimitRef);
+    const data = (snap.data() || {}) as ParentLinkRateLimitDoc;
+    const now = new Date();
+    const nowTs = admin.firestore.Timestamp.fromDate(now);
+    const blockedUntil = toTimestampDate(data.blockedUntil);
+
+    if (blockedUntil && blockedUntil.getTime() > now.getTime()) {
+      return admin.firestore.Timestamp.fromDate(blockedUntil);
+    }
+
+    const firstFailedAt = toTimestampDate(data.firstFailedAt);
+    const failedAttemptCount = Math.max(0, Number(data.failedAttemptCount || 0));
+    const isWithinWindow =
+      firstFailedAt !== null && now.getTime() - firstFailedAt.getTime() < PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS;
+    const nextFailedAttemptCount = isWithinWindow ? failedAttemptCount + 1 : 1;
+    const nextFirstFailedAt =
+      isWithinWindow && data.firstFailedAt && typeof data.firstFailedAt.toDate === "function" ? data.firstFailedAt : nowTs;
+    const nextBlockedUntil =
+      nextFailedAttemptCount >= PARENT_LINK_FAILED_ATTEMPT_LIMIT
+        ? admin.firestore.Timestamp.fromDate(new Date(now.getTime() + PARENT_LINK_FAILED_ATTEMPT_LOCK_MS))
+        : null;
+
+    t.set(
+      rateLimitRef,
+      {
+        failedAttemptCount: nextFailedAttemptCount,
+        firstFailedAt: nextFirstFailedAt,
+        lastFailedAt: nowTs,
+        blockedUntil: nextBlockedUntil ?? admin.firestore.FieldValue.delete(),
+        updatedAt: nowTs,
+      },
+      { merge: true }
+    );
+
+    return nextBlockedUntil;
+  });
+}
+
+async function clearParentLinkRateLimit(db: admin.firestore.Firestore, uid: string): Promise<void> {
+  await buildParentLinkRateLimitRef(db, uid).delete();
+}
+
+function shouldCountParentLinkFailedAttempt(error: unknown): boolean {
+  return error instanceof functions.https.HttpsError && error.code === "failed-precondition";
 }
 
 function calculateSmsBytes(message: string): number {
@@ -2967,9 +3053,14 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
 
   const emailFromToken = context.auth.token.email || null;
   const tokenDisplayName = context.auth.token.name || null;
+  const isParentLinkFlow = role === "parent";
 
   try {
-    return await db.runTransaction(async (t) => {
+    if (isParentLinkFlow) {
+      await assertParentLinkRateLimitAllowed(db, uid);
+    }
+
+    const result = await db.runTransaction(async (t) => {
       let centerId = "";
       let targetClassName: string | null = null;
       let inviteRef: admin.firestore.DocumentReference | null = null;
@@ -3374,8 +3465,44 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
 
       return { ok: true, centerId, role };
     });
+
+    if (isParentLinkFlow) {
+      try {
+        await clearParentLinkRateLimit(db, uid);
+      } catch (resetError: any) {
+        console.warn("[completeSignupWithInvite] parent link rate limit reset failed", {
+          uid,
+          message: resetError?.message || resetError,
+        });
+      }
+    }
+
+    return result;
   } catch (e: any) {
     if (e instanceof functions.https.HttpsError) {
+      if (isParentLinkFlow && shouldCountParentLinkFailedAttempt(e)) {
+        try {
+          const blockedUntil = await registerParentLinkFailedAttempt(db, uid);
+          if (blockedUntil) {
+            const remainingMinutes = getRemainingLockMinutes(blockedUntil.toDate());
+            throw new functions.https.HttpsError(
+              "resource-exhausted",
+              "Parent link temporarily blocked due to repeated failures.",
+              {
+                userMessage: `학생코드 확인 시도가 반복되어 ${remainingMinutes}분 동안 잠겼습니다. 잠시 후 다시 시도해 주세요.`,
+              }
+            );
+          }
+        } catch (rateLimitError: any) {
+          if (rateLimitError instanceof functions.https.HttpsError) {
+            throw rateLimitError;
+          }
+          console.warn("[completeSignupWithInvite] parent link rate limit write failed", {
+            uid,
+            message: rateLimitError?.message || rateLimitError,
+          });
+        }
+      }
       throw e;
     }
 
