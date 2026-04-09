@@ -102,7 +102,7 @@ function ShowcaseRow({ screen, reverse = false }: { screen: ShowcaseScreen; reve
             <p className={`text-[12px] font-black tracking-[0.14em] ${style.label}`}>{screen.mode}</p>
           </div>
 
-          <h3 className="mt-4 break-keep text-[clamp(1.45rem,3.4vw,2rem)] font-black leading-[1.16] text-[#14295F]">
+          <h3 className="font-aggro-display mt-4 break-keep text-[clamp(1.45rem,3.4vw,2rem)] font-black leading-[1.16] text-[#14295F]">
             {screen.title}
           </h3>
         </div>
