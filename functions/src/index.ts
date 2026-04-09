@@ -190,6 +190,7 @@ const LATE_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: num
   { rarity: "rare", weight: 30 },
   { rarity: "epic", weight: 10 },
 ];
+const ACTIVE_STUDY_ATTENDANCE_STATUSES = new Set(["studying", "away", "break"]);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -299,6 +300,30 @@ function buildDeterministicStudyBoxReward(params: {
     awardedPoints,
     multiplier: 1,
   };
+}
+
+function getAttendanceActivityRank(status?: string | null): number {
+  if (status === "studying") return 0;
+  if (status === "away" || status === "break") return 1;
+  if (status === "absent") return 3;
+  return 2;
+}
+
+function pickPreferredAttendanceSeatDoc(
+  docs: FirebaseFirestore.QueryDocumentSnapshot[]
+): FirebaseFirestore.QueryDocumentSnapshot | null {
+  if (!docs.length) return null;
+
+  return [...docs].sort((a, b) => {
+    const aData = a.data() as Record<string, unknown>;
+    const bData = b.data() as Record<string, unknown>;
+    const rankDiff = getAttendanceActivityRank(asTrimmedString(aData.status)) - getAttendanceActivityRank(asTrimmedString(bData.status));
+    if (rankDiff !== 0) return rankDiff;
+
+    const aTime = toMillisSafe(aData.lastCheckInAt) || toMillisSafe(aData.updatedAt);
+    const bTime = toMillisSafe(bData.lastCheckInAt) || toMillisSafe(bData.updatedAt);
+    return bTime - aTime;
+  })[0] || null;
 }
 
 function normalizePhoneNumber(raw: unknown): string {
@@ -5859,6 +5884,194 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     openedStudyBoxes: result.openedStudyBoxes,
     pointsBalance: result.pointsBalance,
     totalPointsEarned: result.totalPointsEarned,
+  };
+});
+
+export const stopStudentStudySessionSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const authUid = context.auth.uid;
+
+  const centerId = asTrimmedString(data?.centerId);
+  const fallbackStartTimeMs = Math.floor(parseFiniteNumber(data?.fallbackStartTimeMs) ?? 0);
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+      userMessage: "센터 정보를 다시 확인해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (membership.role !== "student" || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only active students can stop sessions.", {
+      userMessage: "학생 본인만 공부 종료를 기록할 수 있습니다.",
+    });
+  }
+
+  const [studentMemberSnap, studentProfileSnap, attendanceSnap] = await Promise.all([
+    db.doc(`centers/${centerId}/members/${authUid}`).get(),
+    db.doc(`centers/${centerId}/students/${authUid}`).get(),
+    db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(10).get(),
+  ]);
+
+  if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+      userMessage: "학생 정보를 찾지 못했습니다.",
+    });
+  }
+
+  const preferredSeatDoc = pickPreferredAttendanceSeatDoc(attendanceSnap.docs);
+  const seatData = preferredSeatDoc?.data() as Record<string, unknown> | undefined;
+  const seatStatus = asTrimmedString(seatData?.status);
+  const seatStartTimeMs = toMillisSafe(seatData?.lastCheckInAt);
+  const nowMs = Date.now();
+  const hasActiveSeatSession = ACTIVE_STUDY_ATTENDANCE_STATUSES.has(seatStatus) && seatStartTimeMs > 0;
+
+  let resolvedStartTimeMs = hasActiveSeatSession ? seatStartTimeMs : fallbackStartTimeMs;
+  if (!Number.isFinite(resolvedStartTimeMs) || resolvedStartTimeMs <= 0) {
+    throw new functions.https.HttpsError("failed-precondition", "Active session not found.", {
+      userMessage: "종료할 공부 세션을 찾지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    });
+  }
+  if (resolvedStartTimeMs > nowMs) {
+    resolvedStartTimeMs = nowMs;
+  }
+
+  const MAX_MINUTES = 360;
+  const sessionSeconds = Math.max(0, Math.floor((nowMs - resolvedStartTimeMs) / 1000));
+  const sessionMinutes = sessionSeconds > 0 ? Math.min(MAX_MINUTES, Math.max(1, Math.ceil(sessionSeconds / 60))) : 0;
+  const startAt = admin.firestore.Timestamp.fromMillis(resolvedStartTimeMs);
+  const endAt = admin.firestore.Timestamp.fromMillis(nowMs);
+  const sessionDateKey = toDateKey(toKstDate(new Date(resolvedStartTimeMs)));
+  const sessionId = `session_${resolvedStartTimeMs}`;
+  const dayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${sessionDateKey}`);
+  const sessionRef = dayRef.collection("sessions").doc(sessionId);
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const [daySnap, sessionSnap, progressSnap] = await Promise.all([
+      transaction.get(dayRef),
+      transaction.get(sessionRef),
+      transaction.get(progressRef),
+    ]);
+
+    const dayData = daySnap.exists ? (daySnap.data() as Record<string, unknown>) : {};
+    const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+    const existingTotalMinutes = Math.max(0, Math.floor(parseFiniteNumber(dayData.totalMinutes) ?? 0));
+    const duplicatedSession = sessionSnap.exists;
+    const previousFirstSessionAt = toTimestampOrNow(dayData.firstSessionStartAt);
+    const previousLastSessionAt = toTimestampOrNow(dayData.lastSessionEndAt);
+    const awayGapMinutes = previousLastSessionAt
+      ? Math.round((resolvedStartTimeMs - previousLastSessionAt.toMillis()) / 60000)
+      : 0;
+    const normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
+    const nextFirstSessionAt =
+      previousFirstSessionAt && previousFirstSessionAt.toMillis() <= resolvedStartTimeMs
+        ? previousFirstSessionAt
+        : startAt;
+    const nextLastSessionAt =
+      previousLastSessionAt && previousLastSessionAt.toMillis() >= nowMs
+        ? previousLastSessionAt
+        : endAt;
+
+    let totalMinutesAfterSession = existingTotalMinutes;
+    let attendanceAchieved = false;
+    let bonus6hAchieved = false;
+
+    if (!duplicatedSession && sessionMinutes > 0) {
+      totalMinutesAfterSession = existingTotalMinutes + sessionMinutes;
+      const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+        ? (progressData.dailyPointStatus as Record<string, unknown>)
+        : {};
+      const currentDayStatus = isPlainObject(dailyPointStatus[sessionDateKey])
+        ? { ...(dailyPointStatus[sessionDateKey] as Record<string, unknown>) }
+        : {};
+
+      if (totalMinutesAfterSession >= 180 && currentDayStatus.attendance !== true) {
+        currentDayStatus.attendance = true;
+        attendanceAchieved = true;
+      }
+      if (totalMinutesAfterSession >= 360 && currentDayStatus.bonus6h !== true) {
+        currentDayStatus.bonus6h = true;
+        bonus6hAchieved = true;
+      }
+
+      transaction.set(
+        dayRef,
+        {
+          studentId: authUid,
+          centerId,
+          dateKey: sessionDateKey,
+          firstSessionStartAt: nextFirstSessionAt,
+          lastSessionEndAt: nextLastSessionAt,
+          ...(normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {}),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      transaction.set(
+        sessionRef,
+        {
+          centerId,
+          studentId: authUid,
+          dateKey: sessionDateKey,
+          startTime: startAt,
+          endTime: endAt,
+          durationMinutes: sessionMinutes,
+          sessionId,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      if (attendanceAchieved || bonus6hAchieved) {
+        transaction.set(
+          progressRef,
+          {
+            dailyPointStatus: {
+              [sessionDateKey]: {
+                ...currentDayStatus,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+    }
+
+    if (preferredSeatDoc?.ref && hasActiveSeatSession) {
+      transaction.set(
+        preferredSeatDoc.ref,
+        {
+          status: "absent",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    return {
+      duplicatedSession,
+      totalMinutesAfterSession,
+      attendanceAchieved,
+      bonus6hAchieved,
+    };
+  });
+
+  return {
+    ok: true,
+    duplicatedSession: result.duplicatedSession,
+    sessionId,
+    sessionDateKey,
+    sessionMinutes,
+    totalMinutesAfterSession: result.totalMinutesAfterSession,
+    attendanceAchieved: result.attendanceAchieved,
+    bonus6hAchieved: result.bonus6hAchieved,
   };
 });
 

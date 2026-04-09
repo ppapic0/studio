@@ -111,6 +111,7 @@ import {
 } from '@/lib/student-ranking-policy';
 import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
+import { stopStudentStudySessionSecure } from '@/lib/study-session-actions';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
@@ -1681,198 +1682,35 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const safeSeatStart = seatDoc?.data?.()?.lastCheckInAt || Timestamp.fromMillis(safeStartTs);
         const sessionStartAt = toDateSafeAttendance(safeSeatStart) || new Date(safeStartTs);
         const sessionDateKey = format(sessionStartAt, 'yyyy-MM-dd');
-        const sessionStudyLogRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey);
-        const sessionId = `session_${safeSeatStart.toMillis()}`;
-        const sessionSeconds = Math.max(0, Math.floor((nowTs - safeStartTs) / 1000));
-        const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
+        let stopCommitError: any = null;
+        let stopRequestDeduped = false;
+        let finalSessionMinutes = 0;
+        let finalTotalMinutes = Math.max(0, Number(todayStudyLog?.totalMinutes || 0));
+        try {
+          const stopResult = await stopStudentStudySessionSecure({
+            centerId,
+            fallbackStartTimeMs: safeStartTs,
+          });
+          stopRequestDeduped = Boolean(stopResult.duplicatedSession);
+          finalSessionMinutes = Math.max(0, Number(stopResult.sessionMinutes || 0));
+          finalTotalMinutes = Math.max(
+            0,
+            Number(
+              stopResult.totalMinutesAfterSession
+              ?? (sessionDateKey === todayKey
+                ? Number(todayStudyLog?.totalMinutes || 0) + finalSessionMinutes
+                : finalSessionMinutes)
+            )
+          );
 
-        const batch = writeBatch(firestore);
-        const progressUpdate: Record<string, any> = { updatedAt: serverTimestamp() };
-        const existingSessionDayStatus = (progress?.dailyPointStatus?.[sessionDateKey] || {}) as Record<string, any>;
-        const dailyStatusUpdate: Record<string, any> = { ...existingSessionDayStatus };
-        let wroteSomething = false;
-        let nextFirstSessionAt: Timestamp | null = null;
-        let nextLastSessionAt: Timestamp | null = null;
-        let currentSessionEndAt: Timestamp | null = null;
-        let normalizedAwayGapMinutes = 0;
-
-        if (sessionSeconds > 0) {
-          const currentCumulativeMinutes = sessionDateKey === todayKey
-            ? Number(todayStudyLog?.totalMinutes || 0)
-            : 0;
-          let existingSessionDayMinutes = currentCumulativeMinutes;
-          let existingSessionDayData: StudyLogDay | null = sessionDateKey === todayKey
-            ? (todayStudyLog || null)
-            : null;
-          if (sessionDateKey !== todayKey) {
-            const sessionDaySnap = await getDoc(sessionStudyLogRef);
-            existingSessionDayData = sessionDaySnap.exists() ? (sessionDaySnap.data() as StudyLogDay) : null;
-            existingSessionDayMinutes = Number(existingSessionDayData?.totalMinutes || 0);
-          }
-          const previousFirstSessionAt = toDateSafeAttendance(existingSessionDayData?.firstSessionStartAt) || null;
-          const previousLastSessionAt = toDateSafeAttendance(existingSessionDayData?.lastSessionEndAt) || null;
-          nextFirstSessionAt = previousFirstSessionAt && previousFirstSessionAt.getTime() <= sessionStartAt.getTime()
-            ? Timestamp.fromDate(previousFirstSessionAt)
-            : safeSeatStart;
-          currentSessionEndAt = Timestamp.fromMillis(nowTs);
-          nextLastSessionAt = previousLastSessionAt && previousLastSessionAt.getTime() >= nowTs
-            ? Timestamp.fromDate(previousLastSessionAt)
-            : currentSessionEndAt;
-          const awayGapMinutes = previousLastSessionAt
-            ? Math.round((sessionStartAt.getTime() - previousLastSessionAt.getTime()) / 60000)
-            : 0;
-          normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
-
-          const totalMinutesAfterSession = existingSessionDayMinutes + sessionMinutes;
-
-          if (totalMinutesAfterSession >= 180 && !progress?.dailyPointStatus?.[sessionDateKey]?.attendance) {
-            dailyStatusUpdate.attendance = true;
+          if (stopResult.attendanceAchieved) {
             toast({ title: '3시간 달성!', description: '오늘 출석 달성 기록이 저장됐어요.' });
           }
-
-          if (totalMinutesAfterSession >= 360 && !progress?.dailyPointStatus?.[sessionDateKey]?.bonus6h) {
-            dailyStatusUpdate.bonus6h = true;
+          if (stopResult.bonus6hAchieved) {
             toast({ title: '6시간 몰입 달성!', description: '오늘 몰입 기록이 저장됐어요.' });
           }
-
-          if (Object.keys(dailyStatusUpdate).length > 0) {
-            progressUpdate.dailyPointStatus = {
-              [sessionDateKey]: dailyStatusUpdate,
-            };
-          }
-
-          batch.set(sessionStudyLogRef, {
-            studentId: user.uid,
-            centerId: activeMembership.id,
-            dateKey: sessionDateKey,
-            firstSessionStartAt: nextFirstSessionAt,
-            lastSessionEndAt: nextLastSessionAt,
-            ...(normalizedAwayGapMinutes > 0 ? { awayMinutes: increment(normalizedAwayGapMinutes) } : {}),
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-          wroteSomething = true;
-
-          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey, 'sessions', sessionId);
-          batch.set(sessionRef, {
-            centerId,
-            studentId: user.uid,
-            dateKey: sessionDateKey,
-            startTime: safeSeatStart,
-            endTime: currentSessionEndAt || Timestamp.fromMillis(nowTs),
-            durationMinutes: sessionMinutes,
-            sessionId,
-            createdAt: serverTimestamp(),
-          });
-          wroteSomething = true;
-
-          batch.set(progressRef, progressUpdate, { merge: true });
-          wroteSomething = true;
-        }
-        const stopSeatRef = seatDoc?.ref || fallbackSeatRef;
-        let stopSeatPayload: Record<string, any> | null = null;
-        if (stopSeatRef) {
-          stopSeatPayload = {
-            studentId: user.uid,
-            status: 'absent',
-            updatedAt: serverTimestamp(),
-          };
-          if (fallbackSeatIdentity) {
-            stopSeatPayload.seatNo = fallbackSeatIdentity.seatNo;
-            stopSeatPayload.roomId = fallbackSeatIdentity.roomId;
-            stopSeatPayload.roomSeatNo = fallbackSeatIdentity.roomSeatNo;
-            stopSeatPayload.type = 'seat';
-          }
-          if (fallbackSeatZone) {
-            stopSeatPayload.seatZone = fallbackSeatZone;
-          }
-          batch.set(stopSeatRef, stopSeatPayload, { merge: true });
-          wroteSomething = true;
-        }
-
-        if (!wroteSomething) {
-          batch.set(progressRef, { updatedAt: serverTimestamp() }, { merge: true });
-        }
-
-        let stopCommitError: any = null;
-        let usedStopFallback = false;
-        let stopRequestDeduped = false;
-        try {
-          await batch.commit();
         } catch (commitError: any) {
-          const code = String(commitError?.code || '').toLowerCase();
-          const message = String(commitError?.message || '').toLowerCase();
-          const duplicateSession = code.includes('already-exists') || message.includes('already exists');
-          if (duplicateSession) {
-            stopCommitError = null;
-            stopRequestDeduped = true;
-            usedStopFallback = true;
-            if (stopSeatRef && stopSeatPayload) {
-              await setDoc(stopSeatRef, stopSeatPayload, { merge: true });
-            }
-            logHandledClientIssue('[student-track] duplicated stop request ignored', { centerId, userId: user.uid, sessionId });
-          } else {
-            stopCommitError = commitError;
-          }
-        }
-
-        if (stopCommitError && sessionStudyLogRef) {
-          try {
-            const fallbackSessionRef = doc(firestore, 'centers', centerId, 'studyLogs', user.uid, 'days', sessionDateKey, 'sessions', sessionId);
-            const existingSessionSnap = await getDoc(fallbackSessionRef);
-            if (existingSessionSnap.exists()) {
-              if (stopSeatRef && stopSeatPayload) {
-                await setDoc(stopSeatRef, stopSeatPayload, { merge: true });
-              }
-              stopRequestDeduped = true;
-              usedStopFallback = true;
-              stopCommitError = null;
-                logHandledClientIssue('[student-track] stop fallback skipped because session already existed', 'session already existed');
-            } else {
-            const fallbackStudyLogData: any = {
-              studentId: user.uid,
-              centerId: activeMembership.id,
-              dateKey: sessionDateKey,
-              updatedAt: serverTimestamp(),
-            };
-            if (nextFirstSessionAt) {
-              fallbackStudyLogData.firstSessionStartAt = nextFirstSessionAt;
-            }
-            if (nextLastSessionAt) {
-              fallbackStudyLogData.lastSessionEndAt = nextLastSessionAt;
-            }
-
-            if (sessionSeconds > 0 && normalizedAwayGapMinutes > 0) {
-              fallbackStudyLogData.awayMinutes = increment(normalizedAwayGapMinutes);
-            }
-
-            await setDoc(sessionStudyLogRef, fallbackStudyLogData, { merge: true });
-            if (sessionSeconds > 0) {
-              await setDoc(progressRef, progressUpdate, { merge: true });
-            }
-
-            if (sessionSeconds > 0) {
-              await setDoc(fallbackSessionRef, {
-                centerId,
-                studentId: user.uid,
-                dateKey: sessionDateKey,
-                startTime: safeSeatStart,
-                endTime: currentSessionEndAt || Timestamp.fromMillis(nowTs),
-                durationMinutes: sessionMinutes,
-                sessionId,
-                createdAt: serverTimestamp(),
-              });
-            }
-
-            usedStopFallback = true;
-            stopCommitError = null;
-                logHandledClientIssue('[student-track] stop fallback saved core study logs while optional writes were skipped', 'optional writes skipped');
-            }
-          } catch (fallbackError: any) {
-            logHandledClientIssue('[student-track] stop fallback failed', fallbackError);
-          }
-        }
-
-        if (stopCommitError) {
+          stopCommitError = commitError;
           logHandledClientIssue('[student-track] stop commit failed', stopCommitError);
         }
 
@@ -1910,9 +1748,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             description: '기록 저장 중 일부 권한 오류가 발생했습니다. 관리자에게 문의해 주세요.',
           });
         } else {
-          const _newTotalMin = Number(todayStudyLog?.totalMinutes || 0) + sessionMinutes;
           const _fmtMin = (m: number) => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 > 0 ? ` ${m % 60}분` : ''}` : `${m}분`;
-          toast({ title: '집중 종료됨', description: `이번 세션 ${_fmtMin(sessionMinutes)} · 오늘 총 ${_fmtMin(_newTotalMin)} · 상자를 확인해 보세요.` });
+          const sessionLabel = finalSessionMinutes > 0 ? `이번 세션 ${_fmtMin(finalSessionMinutes)} · ` : '';
+          toast({ title: '집중 종료됨', description: `${sessionLabel}오늘 총 ${_fmtMin(finalTotalMinutes)} · 상자를 확인해 보세요.` });
         }
       } else {
         const nowTs = Date.now();
