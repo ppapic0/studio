@@ -6,7 +6,7 @@ import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, setDoc, doc, serverTimestamp, getDocs, getDoc, orderBy, limit } from 'firebase/firestore';
-import { AttendanceCurrent, DailyReport, CenterMembership, StudyPlanItem, StudyLogDay } from '@/lib/types';
+import { AttendanceCurrent, DailyReport, CenterMembership, ParentActivityEvent, StudyPlanItem, StudyLogDay } from '@/lib/types';
 import { 
   Card, 
   CardContent, 
@@ -125,6 +125,7 @@ export default function DailyReportsPage() {
   
   const isMobile = viewMode === 'mobile';
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortMode, setSortMode] = useState<'unsent' | 'parentReads' | 'name'>('unsent');
   
   // 초기 날짜를 어제로 즉시 설정하여 로딩 지연 방지
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => subDays(new Date(), 1));
@@ -163,12 +164,77 @@ export default function DailyReportsPage() {
   }, [firestore, centerId, dateKey]);
   const { data: dailyReports, isLoading: reportsLoading } = useCollection<DailyReport>(reportsQuery);
 
+  const parentActivityQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return collection(firestore, 'centers', centerId, 'parentActivityEvents');
+  }, [firestore, centerId]);
+  const { data: parentActivityEvents } = useCollection<ParentActivityEvent>(parentActivityQuery, { enabled: !!centerId });
+
+  const reportByStudentId = useMemo(
+    () => new Map((dailyReports || []).map((report) => [report.studentId, report])),
+    [dailyReports]
+  );
+
+  const reportReadCount30dByStudentId = useMemo(() => {
+    const counts = new Map<string, number>();
+    const thirtyDaysAgoMs = subDays(new Date(), 30).getTime();
+    (parentActivityEvents || []).forEach((event) => {
+      if (event.eventType !== 'report_read') return;
+      const createdAtMs = event.createdAt?.toMillis?.() ?? 0;
+      if (createdAtMs < thirtyDaysAgoMs) return;
+      counts.set(event.studentId, (counts.get(event.studentId) || 0) + 1);
+    });
+    return counts;
+  }, [parentActivityEvents]);
+
   const filteredStudents = useMemo(() => {
     if (!studentMembers) return [];
-    return studentMembers.filter(s => 
-      s.displayName?.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-  }, [studentMembers, searchTerm]);
+
+    const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+    const filtered = studentMembers.filter((student) =>
+      student.displayName?.toLowerCase().includes(normalizedSearchTerm)
+    );
+
+    const reportStateRank = (studentId: string) => {
+      const report = reportByStudentId.get(studentId);
+      if (!report) return 0;
+      if (report.status === 'draft') return 1;
+      return 2;
+    };
+
+    return filtered.sort((left, right) => {
+      const leftName = left.displayName || '';
+      const rightName = right.displayName || '';
+      const leftReportState = reportStateRank(left.id);
+      const rightReportState = reportStateRank(right.id);
+      const leftReadCount = reportReadCount30dByStudentId.get(left.id) || 0;
+      const rightReadCount = reportReadCount30dByStudentId.get(right.id) || 0;
+
+      if (sortMode === 'parentReads') {
+        if (rightReadCount !== leftReadCount) return rightReadCount - leftReadCount;
+        if (leftReportState !== rightReportState) return leftReportState - rightReportState;
+        return leftName.localeCompare(rightName);
+      }
+
+      if (sortMode === 'name') {
+        return leftName.localeCompare(rightName);
+      }
+
+      if (leftReportState !== rightReportState) return leftReportState - rightReportState;
+      if (rightReadCount !== leftReadCount) return rightReadCount - leftReadCount;
+      return leftName.localeCompare(rightName);
+    });
+  }, [studentMembers, searchTerm, reportByStudentId, reportReadCount30dByStudentId, sortMode]);
+
+  const studentRows = useMemo(
+    () =>
+      filteredStudents.map((student) => ({
+        student,
+        report: reportByStudentId.get(student.id),
+        reportReadCount30d: reportReadCount30dByStudentId.get(student.id) || 0,
+      })),
+    [filteredStudents, reportByStudentId, reportReadCount30dByStudentId]
+  );
 
   const handleOpenWriteModal = async (studentId: string, studentName: string) => {
     setSelectedStudent({ id: studentId, name: studentName });
@@ -441,6 +507,10 @@ export default function DailyReportsPage() {
   };
 
   const isFullLoading = membersLoading || reportsLoading;
+  const unsentStudentCount = useMemo(
+    () => studentRows.filter(({ report }) => report?.status !== 'sent').length,
+    [studentRows]
+  );
 
   return (
     <div className={cn("flex flex-col gap-6 max-w-5xl mx-auto pb-20 px-1", isMobile ? "gap-4" : "gap-8")}>
@@ -484,7 +554,7 @@ export default function DailyReportsPage() {
                 />
               </div>
               <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar max-h-[500px] pr-1">
-                {filteredStudents.map((student) => (
+                {studentRows.map(({ student, reportReadCount30d }) => (
                   <div 
                     key={student.id} 
                     className="p-3 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center gap-3 transition-all active:scale-95"
@@ -493,7 +563,12 @@ export default function DailyReportsPage() {
                     <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-border/50">
                       <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{student.displayName?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <p className="text-sm font-black truncate flex-1">{student.displayName}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black truncate">{student.displayName}</p>
+                      {sortMode === 'parentReads' && reportReadCount30d > 0 && (
+                        <p className="mt-0.5 text-[10px] font-bold text-emerald-600">최근 30일 열람 {reportReadCount30d}회</p>
+                      )}
+                    </div>
                     <ChevronRight className="h-4 w-4 opacity-20" />
                   </div>
                 ))}
@@ -516,12 +591,66 @@ export default function DailyReportsPage() {
           )}
 
           <div className="grid gap-4">
+            <div className={cn("flex gap-2", isMobile ? "flex-col px-1" : "items-center justify-between")}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="rounded-full border-none bg-primary/10 px-3 py-1 text-[10px] font-black text-primary">
+                  미발송 {unsentStudentCount}명
+                </Badge>
+                <Badge className="rounded-full border-none bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700">
+                  기본 정렬 {sortMode === 'unsent' ? '미작성 우선' : sortMode === 'parentReads' ? '열람 많은 순' : '이름순'}
+                </Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sortMode === 'unsent' ? 'default' : 'outline'}
+                  className={cn(
+                    "rounded-full font-black",
+                    sortMode === 'unsent'
+                      ? "bg-primary text-white hover:bg-primary/90"
+                      : "border-primary/15 bg-white text-primary hover:bg-primary/5"
+                  )}
+                  onClick={() => setSortMode('unsent')}
+                >
+                  미작성 우선
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sortMode === 'parentReads' ? 'default' : 'outline'}
+                  className={cn(
+                    "rounded-full font-black",
+                    sortMode === 'parentReads'
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
+                  )}
+                  onClick={() => setSortMode('parentReads')}
+                >
+                  열람 많은 순
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sortMode === 'name' ? 'default' : 'outline'}
+                  className={cn(
+                    "rounded-full font-black",
+                    sortMode === 'name'
+                      ? "bg-slate-700 text-white hover:bg-slate-800"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  )}
+                  onClick={() => setSortMode('name')}
+                >
+                  이름순
+                </Button>
+              </div>
+            </div>
             {isFullLoading ? (
               <div className="flex flex-col items-center justify-center py-40 gap-4">
                 <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
                 <p className="text-sm font-black text-muted-foreground/40 uppercase tracking-[0.2em] whitespace-nowrap">리포트 동기화 중...</p>
               </div>
-            ) : filteredStudents.length === 0 ? (
+            ) : studentRows.length === 0 ? (
               <div className="py-20 text-center flex flex-col items-center gap-6 bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-border/50">
                 <Search className="h-16 w-16 text-muted-foreground opacity-10" />
                 <div className="space-y-1">
@@ -529,8 +658,7 @@ export default function DailyReportsPage() {
                   <p className="text-sm font-bold text-muted-foreground/20 uppercase whitespace-nowrap">다른 이름으로 검색해 보세요</p>
                 </div>
               </div>
-            ) : filteredStudents.map((student) => {
-              const report = dailyReports?.find(r => r.studentId === student.id);
+            ) : studentRows.map(({ student, report, reportReadCount30d }) => {
               const isSent = report?.status === 'sent';
               
               return (
@@ -557,6 +685,11 @@ export default function DailyReportsPage() {
                         <div className="grid gap-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className={cn("font-black tracking-tighter truncate", isMobile ? "text-lg" : "text-3xl")}>{student.displayName}</h3>
+                            {reportReadCount30d > 0 && (
+                              <Badge className="bg-emerald-50 text-emerald-700 font-black px-2 py-0.5 rounded-full border-none text-[9px] whitespace-nowrap">
+                                최근30일 열람 {reportReadCount30d}회
+                              </Badge>
+                            )}
                             {report?.viewedAt && (
                               <Badge className="bg-blue-500/10 text-blue-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter whitespace-nowrap">읽음 확인</Badge>
                             )}
