@@ -2720,7 +2720,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         insights.push(`이번 주 누적 학습은 ${toHm(weeklyTotalStudyMinutes)}으로 목표 대비 ${progressRate}%입니다.`);
       }
     } else {
-      insights.push('학습 로그가 쌓이면 인공지능 인사이트가 자동으로 정교해집니다.');
+      insights.push('학습 로그가 쌓이면 트랙 러닝시스템 인사이트가 자동으로 정교해집니다.');
     }
 
     insights.push(
@@ -3816,7 +3816,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 )}
               >
                 <TrendingUp className="mr-2 h-5 w-5" />
-                인공지능 학습 인사이트 보기
+                트랙 러닝시스템 학습 인사이트 보기
                 <ChevronRight className="ml-auto h-4 w-4 opacity-60 transition-transform duration-300 group-hover:translate-x-0.5" />
               </Button>
             </DialogTrigger>
@@ -3824,7 +3824,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               <div className="relative overflow-hidden bg-[linear-gradient(155deg,#1d3d79_0%,#14295F_56%,#0f214d_100%)] p-10 text-white">
                 <div className="soft-glow absolute -right-6 top-0 h-24 w-24 rounded-full bg-[#ffbf7d]/24 blur-3xl" />
                 <Sparkles className="absolute right-0 top-0 h-32 w-32 p-8 opacity-20" />
-                <DialogTitle className="text-2xl font-black tracking-tighter text-white">인공지능 학습 인사이트</DialogTitle>
+                <DialogTitle className="text-2xl font-black tracking-tighter text-white">트랙 러닝시스템 학습 인사이트</DialogTitle>
                 <DialogDescription className="mt-1 text-xs font-bold text-white/72">
                   자녀의 학습 패턴을 차분하고 보기 쉽게 정리했습니다.
                 </DialogDescription>
