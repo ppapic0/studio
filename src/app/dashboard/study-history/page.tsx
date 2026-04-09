@@ -575,6 +575,7 @@ export default function StudyHistoryPage() {
 
     return [...schedulePreview, ...studyPreview, ...personalPreview];
   }, [scheduleItems, studyTasks, personalTasks]);
+  const shouldHideTodoDetailSections = isMobile && todoPreviewItems.length > 0;
 
   const handleRoutineTemplateSelect = (template: (typeof ROUTINE_TEMPLATE_OPTIONS)[number]) => {
     setSelectedRoutineTemplateKey(template.key);
@@ -1348,7 +1349,9 @@ export default function StudyHistoryPage() {
                             {selectedDateForPlan ? format(selectedDateForPlan, 'M월 d일', { locale: ko }) : '선택 날짜'}에 진행한 할 일
                           </h3>
                           <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500">
-                            루틴, 학습, 기타 일정을 먼저 한 번에 보고 아래에서 자세히 확인하세요.
+                            {shouldHideTodoDetailSections
+                              ? '루틴, 학습, 기타 일정을 한 번에 빠르게 확인할 수 있어요.'
+                              : '루틴, 학습, 기타 일정을 먼저 한 번에 보고 아래에서 자세히 확인하세요.'}
                           </p>
                         </div>
                       </div>
@@ -1419,208 +1422,212 @@ export default function StudyHistoryPage() {
                     </div>
                   </section>
 
-                  {isToday ? (
-                    <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50/80 p-4">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="mt-0.5 h-4 w-4 text-amber-600" />
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-black text-amber-900">오늘 루틴 수정 안내</p>
-                          <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-amber-800/80">
-                            기록트랙에서는 빠른 수정만 하고, 큰 루틴 편집은 계획트랙에서 마무리하는 흐름이 가장 안전해요.
-                          </p>
+                  {!shouldHideTodoDetailSections ? (
+                    <>
+                      {isToday ? (
+                        <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50/80 p-4">
+                          <div className="flex items-start gap-3">
+                            <AlertCircle className="mt-0.5 h-4 w-4 text-amber-600" />
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-black text-amber-900">오늘 루틴 수정 안내</p>
+                              <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-amber-800/80">
+                                기록트랙에서는 빠른 수정만 하고, 큰 루틴 편집은 계획트랙에서 마무리하는 흐름이 가장 안전해요.
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : null}
+                      ) : null}
 
-                  <section className="space-y-3 rounded-[1.65rem] border border-primary/10 bg-white/92 p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/55">루틴</p>
-                        <h3 className="mt-1 text-sm font-black text-primary">빠른 루틴 확인/수정</h3>
-                      </div>
-                      <Badge className="rounded-full border border-primary/10 bg-primary/5 px-3 py-1 text-[10px] font-black text-primary shadow-none">
-                        {scheduleItems.length}개
-                      </Badge>
-                    </div>
+                      <section className="space-y-3 rounded-[1.65rem] border border-primary/10 bg-white/92 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/55">루틴</p>
+                            <h3 className="mt-1 text-sm font-black text-primary">빠른 루틴 확인/수정</h3>
+                          </div>
+                          <Badge className="rounded-full border border-primary/10 bg-primary/5 px-3 py-1 text-[10px] font-black text-primary shadow-none">
+                            {scheduleItems.length}개
+                          </Badge>
+                        </div>
 
-                    {!isActuallyPast && !isParent ? (
-                      <RoutineComposerCard
-                        title="빠른 루틴 추가"
-                        description="템플릿 하나 선택하고 필요한 이름만 수정하면 바로 저장돼요."
-                        value={newRoutineTitle}
-                        onValueChange={(value) => {
-                          setNewRoutineTitle(value);
-                          if (!value.trim()) {
-                            setSelectedRoutineTemplateKey('custom');
-                          }
-                        }}
-                        onSubmit={() => handleAddTask(newRoutineTitle, 'schedule')}
-                        isSubmitting={isSubmitting}
-                        isMobile={isMobile}
-                        compact
-                        selectedTemplateKey={selectedRoutineTemplateKey}
-                        onTemplateSelect={handleRoutineTemplateSelect}
-                        templateOptions={ROUTINE_TEMPLATE_OPTIONS}
-                      />
-                    ) : null}
-
-                    {scheduleItems.length === 0 ? (
-                      <div className="rounded-[1.35rem] border border-dashed border-primary/15 bg-slate-50/70 p-5 text-center">
-                        <p className="text-sm font-black text-primary">등록된 루틴이 없습니다.</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3">
-                        {[...scheduleItems]
-                          .sort((a, b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00'))
-                          .map((item) => (
-                            <ScheduleItemCard
-                              key={item.id}
-                              item={{ id: item.id, title: item.title }}
-                              onUpdateRange={handleUpdateScheduleRange}
-                              onDelete={() => handleDeleteTask(item as WithId<StudyPlanItem>)}
-                              isPast={isActuallyPast}
-                              isToday={isToday}
-                              isMobile={isMobile}
-                              disabled={isParent}
-                            />
-                          ))}
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="space-y-3 rounded-[1.65rem] border border-emerald-100 bg-white/92 p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-600/70">학습</p>
-                        <h3 className="mt-1 text-sm font-black text-slate-900">오늘 학습 계획</h3>
-                      </div>
-                      <Badge className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700 shadow-none">
-                        완료 {completedStudyCount}/{studyTasks.length}
-                      </Badge>
-                    </div>
-
-                    {!isActuallyPast && !isParent ? (
-                      <StudyComposerCard
-                        title="빠른 학습 추가"
-                        description="시간을 못 정해도 괜찮아요. 분량형이나 시간형 중 편한 방식으로 바로 적어보세요."
-                        subjectOptions={SUBJECTS}
-                        subjectValue={newStudySubject}
-                        onSubjectChange={setNewStudySubject}
-                        studyModeValue={newStudyMode}
-                        onStudyModeChange={setNewStudyMode}
-                        minuteValue={newStudyMinutes}
-                        onMinuteChange={setNewStudyMinutes}
-                        amountValue={newStudyTargetAmount}
-                        onAmountChange={setNewStudyTargetAmount}
-                        amountUnitValue={newStudyAmountUnit}
-                        onAmountUnitChange={setNewStudyAmountUnit}
-                        customAmountUnitValue={newStudyCustomAmountUnit}
-                        onCustomAmountUnitChange={setNewStudyCustomAmountUnit}
-                        enableVolumeMinutes={enableVolumeStudyMinutes}
-                        onEnableVolumeMinutesChange={setEnableVolumeStudyMinutes}
-                        taskValue={newStudyTask}
-                        onTaskChange={setNewStudyTask}
-                        onSubmit={() => handleAddTask(newStudyTask, 'study')}
-                        isSubmitting={isSubmitting}
-                        isMobile={isMobile}
-                        compact
-                      />
-                    ) : null}
-
-                    {studyTasks.length === 0 ? (
-                      <div className="rounded-[1.35rem] border border-dashed border-emerald-200 bg-emerald-50/40 p-5 text-center">
-                        <p className="text-sm font-black text-emerald-700">등록된 학습 계획이 없습니다.</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3">
-                        {studyTasks.map((task) => {
-                          const subject = SUBJECTS.find((item) => item.id === (task.subject || 'etc'));
-                          const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
-                          const unitLabel = resolveAmountUnitLabel(task);
-                          return (
-                            <PlanItemCard
-                              key={task.id}
-                              id={task.id}
-                              title={task.title}
-                              checked={task.done}
-                              onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
-                              onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
-                              disabled={isActuallyPast || isParent}
-                              isMobile={isMobile}
-                              tone="emerald"
-                              badgeLabel={`${subject?.label || '기타'} · ${isVolumeTask ? '분량형' : '시간형'}`}
-                              metaLabel={buildStudyTaskMeta(task)}
-                              volumeMeta={isVolumeTask ? {
-                                targetAmount: Math.max(0, task.targetAmount || 0),
-                                actualAmount: Math.max(0, task.actualAmount || 0),
-                                unitLabel,
-                                onCommitActual: (value) => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, value),
-                              } : null}
-                              compact
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="space-y-3 rounded-[1.65rem] border border-amber-100 bg-white/92 p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-600/70">기타</p>
-                        <h3 className="mt-1 text-sm font-black text-slate-900">기타 일정</h3>
-                      </div>
-                      <Badge className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-none">
-                        완료 {completedPersonalCount}/{personalTasks.length}
-                      </Badge>
-                    </div>
-
-                    {!isActuallyPast && !isParent ? (
-                      <div className="flex items-center gap-2 rounded-[1.15rem] border border-amber-100 bg-white/92 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                        <Input
-                          placeholder="예: 병원, 상담, 준비물 챙기기"
-                          value={newPersonalTask}
-                          onChange={(e) => setNewPersonalTask(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
-                          disabled={isSubmitting}
-                          className="h-10 border-none bg-transparent text-sm font-bold shadow-none focus-visible:ring-0"
-                        />
-                        <Button
-                          type="button"
-                          onClick={() => handleAddTask(newPersonalTask, 'personal')}
-                          disabled={isSubmitting || !newPersonalTask.trim()}
-                          className={cn("rounded-xl bg-amber-500 font-black text-white hover:bg-amber-600", isMobile ? "h-10 px-3 text-[11px]" : "h-10 px-4 text-xs")}
-                        >
-                          추가
-                        </Button>
-                      </div>
-                    ) : null}
-
-                    {personalTasks.length === 0 ? (
-                      <div className="rounded-[1.35rem] border border-dashed border-amber-200 bg-amber-50/40 p-5 text-center">
-                        <p className="text-sm font-black text-amber-700">등록된 기타 일정이 없습니다.</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3">
-                        {personalTasks.map((task) => (
-                          <PlanItemCard
-                            key={task.id}
-                            id={task.id}
-                            title={task.title}
-                            checked={task.done}
-                            onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
-                            onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
-                            disabled={isActuallyPast || isParent}
+                        {!isActuallyPast && !isParent ? (
+                          <RoutineComposerCard
+                            title="빠른 루틴 추가"
+                            description="템플릿 하나 선택하고 필요한 이름만 수정하면 바로 저장돼요."
+                            value={newRoutineTitle}
+                            onValueChange={(value) => {
+                              setNewRoutineTitle(value);
+                              if (!value.trim()) {
+                                setSelectedRoutineTemplateKey('custom');
+                              }
+                            }}
+                            onSubmit={() => handleAddTask(newRoutineTitle, 'schedule')}
+                            isSubmitting={isSubmitting}
                             isMobile={isMobile}
-                            tone="amber"
-                            badgeLabel="기타"
+                            compact
+                            selectedTemplateKey={selectedRoutineTemplateKey}
+                            onTemplateSelect={handleRoutineTemplateSelect}
+                            templateOptions={ROUTINE_TEMPLATE_OPTIONS}
+                          />
+                        ) : null}
+
+                        {scheduleItems.length === 0 ? (
+                          <div className="rounded-[1.35rem] border border-dashed border-primary/15 bg-slate-50/70 p-5 text-center">
+                            <p className="text-sm font-black text-primary">등록된 루틴이 없습니다.</p>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3">
+                            {[...scheduleItems]
+                              .sort((a, b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00'))
+                              .map((item) => (
+                                <ScheduleItemCard
+                                  key={item.id}
+                                  item={{ id: item.id, title: item.title }}
+                                  onUpdateRange={handleUpdateScheduleRange}
+                                  onDelete={() => handleDeleteTask(item as WithId<StudyPlanItem>)}
+                                  isPast={isActuallyPast}
+                                  isToday={isToday}
+                                  isMobile={isMobile}
+                                  disabled={isParent}
+                                />
+                              ))}
+                          </div>
+                        )}
+                      </section>
+
+                      <section className="space-y-3 rounded-[1.65rem] border border-emerald-100 bg-white/92 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-600/70">학습</p>
+                            <h3 className="mt-1 text-sm font-black text-slate-900">오늘 학습 계획</h3>
+                          </div>
+                          <Badge className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700 shadow-none">
+                            완료 {completedStudyCount}/{studyTasks.length}
+                          </Badge>
+                        </div>
+
+                        {!isActuallyPast && !isParent ? (
+                          <StudyComposerCard
+                            title="빠른 학습 추가"
+                            description="시간을 못 정해도 괜찮아요. 분량형이나 시간형 중 편한 방식으로 바로 적어보세요."
+                            subjectOptions={SUBJECTS}
+                            subjectValue={newStudySubject}
+                            onSubjectChange={setNewStudySubject}
+                            studyModeValue={newStudyMode}
+                            onStudyModeChange={setNewStudyMode}
+                            minuteValue={newStudyMinutes}
+                            onMinuteChange={setNewStudyMinutes}
+                            amountValue={newStudyTargetAmount}
+                            onAmountChange={setNewStudyTargetAmount}
+                            amountUnitValue={newStudyAmountUnit}
+                            onAmountUnitChange={setNewStudyAmountUnit}
+                            customAmountUnitValue={newStudyCustomAmountUnit}
+                            onCustomAmountUnitChange={setNewStudyCustomAmountUnit}
+                            enableVolumeMinutes={enableVolumeStudyMinutes}
+                            onEnableVolumeMinutesChange={setEnableVolumeStudyMinutes}
+                            taskValue={newStudyTask}
+                            onTaskChange={setNewStudyTask}
+                            onSubmit={() => handleAddTask(newStudyTask, 'study')}
+                            isSubmitting={isSubmitting}
+                            isMobile={isMobile}
                             compact
                           />
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                        ) : null}
+
+                        {studyTasks.length === 0 ? (
+                          <div className="rounded-[1.35rem] border border-dashed border-emerald-200 bg-emerald-50/40 p-5 text-center">
+                            <p className="text-sm font-black text-emerald-700">등록된 학습 계획이 없습니다.</p>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3">
+                            {studyTasks.map((task) => {
+                              const subject = SUBJECTS.find((item) => item.id === (task.subject || 'etc'));
+                              const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
+                              const unitLabel = resolveAmountUnitLabel(task);
+                              return (
+                                <PlanItemCard
+                                  key={task.id}
+                                  id={task.id}
+                                  title={task.title}
+                                  checked={task.done}
+                                  onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
+                                  onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
+                                  disabled={isActuallyPast || isParent}
+                                  isMobile={isMobile}
+                                  tone="emerald"
+                                  badgeLabel={`${subject?.label || '기타'} · ${isVolumeTask ? '분량형' : '시간형'}`}
+                                  metaLabel={buildStudyTaskMeta(task)}
+                                  volumeMeta={isVolumeTask ? {
+                                    targetAmount: Math.max(0, task.targetAmount || 0),
+                                    actualAmount: Math.max(0, task.actualAmount || 0),
+                                    unitLabel,
+                                    onCommitActual: (value) => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, value),
+                                  } : null}
+                                  compact
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+                      </section>
+
+                      <section className="space-y-3 rounded-[1.65rem] border border-amber-100 bg-white/92 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-600/70">기타</p>
+                            <h3 className="mt-1 text-sm font-black text-slate-900">기타 일정</h3>
+                          </div>
+                          <Badge className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-none">
+                            완료 {completedPersonalCount}/{personalTasks.length}
+                          </Badge>
+                        </div>
+
+                        {!isActuallyPast && !isParent ? (
+                          <div className="flex items-center gap-2 rounded-[1.15rem] border border-amber-100 bg-white/92 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                            <Input
+                              placeholder="예: 병원, 상담, 준비물 챙기기"
+                              value={newPersonalTask}
+                              onChange={(e) => setNewPersonalTask(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleAddTask(newPersonalTask, 'personal')}
+                              disabled={isSubmitting}
+                              className="h-10 border-none bg-transparent text-sm font-bold shadow-none focus-visible:ring-0"
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => handleAddTask(newPersonalTask, 'personal')}
+                              disabled={isSubmitting || !newPersonalTask.trim()}
+                              className={cn("rounded-xl bg-amber-500 font-black text-white hover:bg-amber-600", isMobile ? "h-10 px-3 text-[11px]" : "h-10 px-4 text-xs")}
+                            >
+                              추가
+                            </Button>
+                          </div>
+                        ) : null}
+
+                        {personalTasks.length === 0 ? (
+                          <div className="rounded-[1.35rem] border border-dashed border-amber-200 bg-amber-50/40 p-5 text-center">
+                            <p className="text-sm font-black text-amber-700">등록된 기타 일정이 없습니다.</p>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3">
+                            {personalTasks.map((task) => (
+                              <PlanItemCard
+                                key={task.id}
+                                id={task.id}
+                                title={task.title}
+                                checked={task.done}
+                                onToggle={() => handleToggleTask(task as WithId<StudyPlanItem>)}
+                                onDelete={() => handleDeleteTask(task as WithId<StudyPlanItem>)}
+                                disabled={isActuallyPast || isParent}
+                                isMobile={isMobile}
+                                tone="amber"
+                                badgeLabel="기타"
+                                compact
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    </>
+                  ) : null}
 
                   {!isParent ? (
                     <Button asChild className="h-11 w-full rounded-2xl bg-primary font-black text-white shadow-[0_18px_36px_-24px_rgba(20,41,95,0.45)] hover:bg-primary/92">
