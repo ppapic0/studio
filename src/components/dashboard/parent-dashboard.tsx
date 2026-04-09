@@ -150,12 +150,12 @@ function toKoreanSubjectLabel(raw: string): string {
   if (!source) return '기타';
   const key = source.toLowerCase();
 
-  if (key === 'math' || key.includes('수학')) return '수학';
-  if (key === 'english' || key.includes('영어')) return '영어';
-  if (key === 'korean' || key.includes('국어')) return '국어';
-  if (key === 'science' || key.includes('과학')) return '과학';
-  if (key === 'social' || key.includes('사회')) return '사회';
-  if (key === 'history' || key.includes('한국사') || key.includes('역사')) return '한국사';
+  if (key === 'math' || key === 'mat' || key.includes('수학')) return '수학';
+  if (key === 'english' || key === 'eng' || key.includes('영어')) return '영어';
+  if (key === 'korean' || key === 'kor' || key.includes('국어')) return '국어';
+  if (key === 'science' || key === 'sci' || key.includes('과학')) return '과학';
+  if (key === 'social' || key === 'soc' || key.includes('사회')) return '사회';
+  if (key === 'history' || key === 'hist' || key.includes('한국사') || key.includes('역사')) return '한국사';
   if (key === 'essay' || key.includes('논술')) return '논술';
   if (key === 'coding' || key.includes('코딩')) return '코딩';
   if (key === 'etc' || key.includes('기타')) return '기타';
