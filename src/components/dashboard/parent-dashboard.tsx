@@ -3381,20 +3381,22 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       )}
 
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
-        <ParentDashboardTabRail
-          tab={tab}
-          activeStudentLabel={activeStudentLabel}
-          todayLabel={today ? format(today, 'yyyy. MM. dd (EEE)', { locale: ko }) : '오늘'}
-          linkedStudents={linkedStudents}
-          studentId={studentId}
-          onStudentChange={handleStudentChange}
-          onTabChange={handleTabChange}
-          totalMinutes={totalMinutes}
-          unreadRecentCount={unreadRecentCount}
-          reportsCount={reportsArchive.length}
-          hasOutstandingInvoice={Boolean(primaryInvoice && (primaryInvoice.status === 'issued' || primaryInvoice.status === 'overdue'))}
-          showEntryMotion={showEntryMotion}
-        />
+        {!isMobile ? (
+          <ParentDashboardTabRail
+            tab={tab}
+            activeStudentLabel={activeStudentLabel}
+            todayLabel={today ? format(today, 'yyyy. MM. dd (EEE)', { locale: ko }) : '오늘'}
+            linkedStudents={linkedStudents}
+            studentId={studentId}
+            onStudentChange={handleStudentChange}
+            onTabChange={handleTabChange}
+            totalMinutes={totalMinutes}
+            unreadRecentCount={unreadRecentCount}
+            reportsCount={reportsArchive.length}
+            hasOutstandingInvoice={Boolean(primaryInvoice && (primaryInvoice.status === 'issued' || primaryInvoice.status === 'overdue'))}
+            showEntryMotion={showEntryMotion}
+          />
+        ) : null}
 
         <TabsContent value="home" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
           <section
