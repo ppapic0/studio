@@ -1378,9 +1378,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [teacherReportsRaw]);
 
   const attendanceCurrentQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership) return null;
-    return collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent');
-  }, [firestore, activeMembership?.id]);
+    if (!firestore || !activeMembership || !user?.uid) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent'),
+      where('studentId', '==', user.uid)
+    );
+  }, [firestore, activeMembership?.id, user?.uid]);
   const { data: attendanceCurrent, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive });
   const attendanceCurrentByStudent = useMemo(() => {
     const bucket = new Map<string, AttendanceCurrent[]>();

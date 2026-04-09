@@ -221,7 +221,11 @@ service cloud.firestore {
       }
 
       match /attendanceCurrent/{seatId} {
-        allow read: if isActiveMember(centerId);
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isSignedIn()
+              && resource.data.studentId != null
+              && resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromResource(centerId);
         allow create: if isTeacherOrAdmin(centerId)
           || (isSignedIn()
               && isSelfCenterMember(centerId, request.auth.uid)
