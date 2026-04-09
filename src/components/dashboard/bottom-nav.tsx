@@ -162,8 +162,12 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                     : 'h-full justify-center gap-1 group',
                 useBrandNav
                   ? isActive
-                    ? 'text-[#FFE6CB]'
-                    : 'text-white/82'
+                    ? isParent
+                      ? 'text-white'
+                      : 'text-[#FFE6CB]'
+                    : isParent
+                      ? 'text-white/92'
+                      : 'text-white/82'
                   : isActive
                     ? 'text-primary'
                     : 'text-muted-foreground/40'
@@ -176,12 +180,12 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                   isActive
                     ? useBrandNav
                       ? isParent
-                        ? 'bg-[linear-gradient(180deg,#fffaf3_0%,#ffe4c3_100%)] text-[#FF7A16] shadow-[0_16px_24px_rgba(255,122,22,0.24)] ring-1 ring-[#ffcf9f]'
+                        ? 'bg-[linear-gradient(180deg,#ff9a46_0%,#FF7A16_100%)] text-white shadow-[0_16px_24px_rgba(255,122,22,0.28)] ring-1 ring-[#ffc78f]'
                         : 'bg-[#FF7A16] text-[#14295F] shadow-[0_10px_18px_rgba(255,122,22,0.40)]'
                       : `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg`
                     : useBrandNav
                       ? isParent
-                        ? 'bg-white/10 text-white/86 ring-1 ring-white/8'
+                        ? 'bg-white/12 text-white ring-1 ring-white/14'
                         : 'bg-white/10 text-white/90'
                       : 'group-hover:bg-muted/50'
                 )}
@@ -203,7 +207,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                     ? isActive
                       ? 'text-white opacity-100'
                       : isParent
-                        ? 'text-white/82'
+                        ? 'text-white/94'
                         : 'text-white opacity-90'
                     : isActive
                       ? 'opacity-100'
