@@ -1001,26 +1001,32 @@ export default function RevenuePage() {
                 </div>
               </Card>
 
-              <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 overflow-hidden relative">
-                <Sparkles className="absolute -right-4 -top-4 h-32 w-32 opacity-20 rotate-12" />
+              <Card className="rounded-[2.5rem] border-none bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_62%,#4F7CFF_100%)] p-8 text-white shadow-[0_28px_60px_-38px_rgba(20,41,95,0.52)] overflow-hidden relative ring-1 ring-white/10">
+                <Sparkles className="absolute -right-4 -top-4 h-32 w-32 opacity-15 rotate-12 text-white" />
                 <div className="relative z-10 space-y-6">
                   <div className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 opacity-60" />
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60 whitespace-nowrap">매출 건전성 지수</span>
+                    <Activity className="h-5 w-5 text-white/80" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/80 whitespace-nowrap">매출 건전성 지수</span>
                   </div>
                   <div className="grid gap-1">
-                    <h3 className="text-5xl font-black tracking-tighter">{(metrics?.collected && metrics?.accrued) ? Math.round((metrics.collected / metrics.accrued) * 100) : 0}%</h3>
-                    <p className="text-xs font-bold opacity-60">당월 수납 달성률 (수납액/발생액)</p>
+                    <h3 className="text-5xl font-black tracking-tighter text-white">{(metrics?.collected && metrics?.accrued) ? Math.round((metrics.collected / metrics.accrued) * 100) : 0}%</h3>
+                    <p className="text-xs font-bold text-white/88">당월 수납 달성률 (수납액/발생액)</p>
                   </div>
-                  <div className="space-y-4 pt-4 border-t border-white/10">
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase opacity-60"><span>발생 매출</span><span>{formatWon(metrics?.accrued || 0)}</span></div>
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase opacity-60"><span>수납 매출</span><span>{formatWon(metrics?.collected || 0)}</span></div>
+                  <div className="space-y-3 pt-4 border-t border-white/12">
+                    <div className="flex justify-between items-center rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black uppercase text-white/88">
+                      <span>발생 매출</span>
+                      <span className="text-white">{formatWon(metrics?.accrued || 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black uppercase text-white/88">
+                      <span>수납 매출</span>
+                      <span className="text-white">{formatWon(metrics?.collected || 0)}</span>
+                    </div>
                   </div>
                 </div>
               </Card>
 
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group ring-1 ring-border/50">
-                <CardTitle className="text-base font-black mb-6 uppercase tracking-widest text-primary/40 flex items-center gap-2"><PieChart className="h-4 w-4" /> 결제 수단 비중</CardTitle>
+                <CardTitle className="mb-6 flex items-center gap-2 text-base font-black uppercase tracking-widest text-[#5c6e97]"><PieChart className="h-4 w-4 text-[#2554D7]" /> 결제 수단 비중</CardTitle>
                 <div className="space-y-4">
                   <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground whitespace-nowrap">카드 결제 연동</span><span className="text-lg font-black text-blue-600">72%</span></div>
                   <Progress value={72} className="h-1.5" />
@@ -1034,20 +1040,20 @@ export default function RevenuePage() {
 
         <TabsContent value="revenue" className="space-y-8 animate-in fade-in duration-500">
           <section className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-4")}>
-            <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground p-8 overflow-hidden relative">
-              <DollarSign className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12" />
+            <Card className="rounded-[2.5rem] border-none bg-[linear-gradient(135deg,#16316E_0%,#2457C6_65%,#6FA3FF_100%)] p-8 text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.48)] overflow-hidden relative ring-1 ring-white/10">
+              <DollarSign className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12 text-white" />
               <div className="relative z-10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]">당월 발생 매출</p>
-                <h3 className="text-4xl font-black tracking-tighter text-[#14295F]">{formatWon(metrics?.accrued || 0)}</h3>
-                <Badge className="bg-white/20 border-none text-[10px] px-3 text-emerald-400 whitespace-nowrap">발생 기준</Badge>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/80">당월 발생 매출</p>
+                <h3 className="text-4xl font-black tracking-tighter text-white">{formatWon(metrics?.accrued || 0)}</h3>
+                <Badge className="border-none bg-white/16 px-3 text-[10px] text-white whitespace-nowrap">발생 기준</Badge>
               </div>
             </Card>
-            <Card className="rounded-[2.5rem] border-none shadow-xl bg-emerald-600 text-white p-8 overflow-hidden relative">
-              <Wallet className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12" />
+            <Card className="rounded-[2.5rem] border-none bg-[linear-gradient(135deg,#0F766E_0%,#12B981_60%,#6EE7B7_100%)] p-8 text-white shadow-[0_28px_60px_-40px_rgba(5,150,105,0.4)] overflow-hidden relative ring-1 ring-white/10">
+              <Wallet className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12 text-white" />
               <div className="relative z-10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#14295F]">실제 수납 금액</p>
-                <h3 className="text-4xl font-black tracking-tighter text-[#14295F]">{formatWon(metrics?.collected || 0)}</h3>
-                <Badge className="bg-white/20 border-none text-[10px] px-3 text-white whitespace-nowrap">수납 기준</Badge>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/80">실제 수납 금액</p>
+                <h3 className="text-4xl font-black tracking-tighter text-white">{formatWon(metrics?.collected || 0)}</h3>
+                <Badge className="border-none bg-white/16 px-3 text-[10px] text-white whitespace-nowrap">수납 기준</Badge>
               </div>
             </Card>
             <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-border/50">
