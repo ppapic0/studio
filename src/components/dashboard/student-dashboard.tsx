@@ -1881,6 +1881,21 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
             await setDoc(sessionStudyLogRef, fallbackStudyLogData, { merge: true });
             if (sessionSeconds > 0) {
+              const fallbackDailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', user.uid);
+              const fallbackDailyStatSnap = await getDoc(fallbackDailyStatRef);
+              const fallbackCurrentLongestSessionMinutes = Number(
+                fallbackDailyStatSnap.data()?.longestSessionMinutes ?? 0
+              );
+
+              await setDoc(fallbackDailyStatRef, {
+                totalStudyMinutes: increment(sessionMinutes),
+                sessionCount: increment(1),
+                longestSessionMinutes: Math.max(sessionMinutes, fallbackCurrentLongestSessionMinutes),
+                studentId: user.uid,
+                centerId,
+                dateKey: sessionDateKey,
+                updatedAt: serverTimestamp(),
+              }, { merge: true });
               await setDoc(progressRef, progressUpdate, { merge: true });
               await setDoc(doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_study-time`, 'entries', user.uid), {
                 studentId: user.uid,

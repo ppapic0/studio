@@ -133,6 +133,16 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
       totalMinutes: 300, studentId: sUid, dateKey: dateStr, centerId,
       updatedAt: timestamp, createdAt: timestamp
     }, { merge: true });
+
+    const dailyStatRef = doc(db, 'centers', centerId, 'dailyStudentStats', dateStr, 'students', sUid);
+    batch.set(dailyStatRef, {
+      totalStudyMinutes: 300,
+      studentId: sUid,
+      centerId,
+      dateKey: dateStr,
+      updatedAt: timestamp,
+      createdAt: timestamp,
+    }, { merge: true });
   }
 
   // 2. 센터 KPI 데이터 생성 (최근 30일 그래프용)
