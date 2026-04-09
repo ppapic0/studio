@@ -166,7 +166,10 @@ export default function DailyReportsPage() {
 
   const parentActivityQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return collection(firestore, 'centers', centerId, 'parentActivityEvents');
+    return query(
+      collection(firestore, 'centers', centerId, 'parentActivityEvents'),
+      where('eventType', '==', 'report_read')
+    );
   }, [firestore, centerId]);
   const { data: parentActivityEvents } = useCollection<ParentActivityEvent>(parentActivityQuery, { enabled: !!centerId });
 

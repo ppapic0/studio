@@ -5020,46 +5020,51 @@ export const cleanupOldDocuments = functions
     const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(now - 7 * 24 * 60 * 60 * 1000);
     const threeDaysAgo = admin.firestore.Timestamp.fromMillis(now - 3 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = admin.firestore.Timestamp.fromMillis(now - 30 * 24 * 60 * 60 * 1000);
-
-    const centersSnap = await db.collection("centers").get();
-    let totalDeleted = 0;
-
-    const deleteOldDocs = async (
-      colPath: string,
+    const deleteOldDocsByCollectionGroup = async (
+      collectionId: string,
       cutoff: admin.firestore.Timestamp,
-      maxDocs = 500
+      batchSize = 500
     ): Promise<number> => {
-      const snap = await db
-        .collection(colPath)
-        .where("createdAt", "<", cutoff)
-        .limit(maxDocs)
-        .get();
-      if (snap.empty) return 0;
+      let deleted = 0;
 
-      const batch = db.batch();
-      snap.docs.forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-      return snap.size;
+      while (true) {
+        const snap = await db
+          .collectionGroup(collectionId)
+          .where("createdAt", "<", cutoff)
+          .limit(batchSize)
+          .get();
+        if (snap.empty) break;
+
+        const batch = db.batch();
+        snap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+        await batch.commit();
+        deleted += snap.size;
+
+        if (snap.size < batchSize) break;
+      }
+
+      return deleted;
     };
 
-    for (const centerDoc of centersSnap.docs) {
-      const cid = centerDoc.id;
-      const [sq, sdl, sl, sd, la, pn] = await Promise.all([
-        deleteOldDocs(`centers/${cid}/smsQueue`, thirtyDaysAgo),
-        deleteOldDocs(`centers/${cid}/smsDeliveryLogs`, thirtyDaysAgo),
-        deleteOldDocs(`centers/${cid}/smsLogs`, thirtyDaysAgo),
-        deleteOldDocs(`centers/${cid}/smsDedupes`, threeDaysAgo),
-        deleteOldDocs(`centers/${cid}/lateAlerts`, sevenDaysAgo),
-        deleteOldDocs(`centers/${cid}/parentNotifications`, thirtyDaysAgo),
-      ]);
-      const centerTotal = sq + sdl + sl + sd + la + pn;
-      if (centerTotal > 0) {
-        console.log(`[cleanup] center=${cid} deleted=${centerTotal} (smsQueue=${sq} smsDeliveryLogs=${sdl} smsLogs=${sl} smsDedupes=${sd} lateAlerts=${la} parentNotifications=${pn})`);
-      }
-      totalDeleted += centerTotal;
-    }
+    const [sq, sdl, sl, sd, la, pn] = await Promise.all([
+      deleteOldDocsByCollectionGroup("smsQueue", thirtyDaysAgo),
+      deleteOldDocsByCollectionGroup("smsDeliveryLogs", thirtyDaysAgo),
+      deleteOldDocsByCollectionGroup("smsLogs", thirtyDaysAgo),
+      deleteOldDocsByCollectionGroup("smsDedupes", threeDaysAgo),
+      deleteOldDocsByCollectionGroup("lateAlerts", sevenDaysAgo),
+      deleteOldDocsByCollectionGroup("parentNotifications", thirtyDaysAgo),
+    ]);
 
-    console.log("[cleanup] run complete", { centerCount: centersSnap.size, totalDeleted });
+    const totalDeleted = sq + sdl + sl + sd + la + pn;
+    console.log("[cleanup] run complete", {
+      totalDeleted,
+      smsQueueDeleted: sq,
+      smsDeliveryLogsDeleted: sdl,
+      smsLogsDeleted: sl,
+      smsDedupesDeleted: sd,
+      lateAlertsDeleted: la,
+      parentNotificationsDeleted: pn,
+    });
     return null;
   });
 
