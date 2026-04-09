@@ -102,6 +102,19 @@ const OperationalIntelligencePanel = dynamic(
   }
 );
 
+const RiskIntelligencePanel = dynamic(
+  () => import('@/components/dashboard/risk-intelligence').then((mod) => mod.RiskIntelligence),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-col items-center justify-center gap-3 py-16">
+        <Loader2 className="h-7 w-7 animate-spin text-rose-500/40" />
+        <p className="text-xs font-bold text-[#9aa9c7]">리스크 분석을 준비하는 중입니다...</p>
+      </div>
+    ),
+  }
+);
+
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
 
 function toDateSafe(value: TimestampLike): Date | null {
@@ -143,6 +156,7 @@ export default function RevenuePage() {
   const [paymentSubTab, setPaymentSubTab] = useState('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showRiskPanel, setShowRiskPanel] = useState(false);
   const [quickIssueAmount, setQuickIssueAmount] = useState('390000');
   const [currentChartMonth, setCurrentChartMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [timelineMonth, setTimelineMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -265,9 +279,14 @@ export default function RevenuePage() {
 
     const showRisk = searchParams.get('showRisk');
     if (showRisk === '1' || showRisk === 'true') {
-      router.replace('/dashboard/teacher/students?showRisk=1#risk-analysis');
+      setShowRiskPanel(true);
+      setTimeout(() => {
+        if (typeof window === 'undefined') return;
+        const target = document.getElementById('risk-analysis');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!focusedStudentId) return;
@@ -532,6 +551,39 @@ export default function RevenuePage() {
           />
         </div>
       </AdminWorkbenchCommandBar>
+
+      <Card
+        id="risk-analysis"
+        className="rounded-[2rem] border border-[#dbe7ff] bg-white p-5 shadow-[0_24px_56px_-42px_rgba(20,41,95,0.28)]"
+      >
+        <div className={cn('flex items-center justify-between gap-3', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
+          <div className="space-y-1">
+            <Badge className="rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
+              관리자 전용
+            </Badge>
+            <p className="pt-2 text-sm font-black tracking-tight text-[#14295F]">리스크 인텔리전스</p>
+            <p className="text-sm font-semibold text-[#5c6e97]">비즈니스 분석에서 바로 리스크 분석 패널을 열고 운영 리스크를 함께 확인합니다.</p>
+          </div>
+          <Button
+            type="button"
+            variant={showRiskPanel ? 'default' : 'outline'}
+            className={cn(
+              'h-10 rounded-xl font-black',
+              showRiskPanel
+                ? 'bg-[#14295F] text-white hover:bg-[#173D8B]'
+                : 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
+            )}
+            onClick={() => setShowRiskPanel((prev) => !prev)}
+          >
+            {showRiskPanel ? '리스크 분석 닫기' : '리스크 분석 열기'}
+          </Button>
+        </div>
+        {showRiskPanel ? (
+          <div className="pt-5">
+            <RiskIntelligencePanel />
+          </div>
+        ) : null}
+      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-3 bg-muted/30 p-1.5 rounded-[1.5rem] border border-border/50 shadow-inner h-16 max-w-3xl mb-8">

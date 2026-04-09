@@ -2099,9 +2099,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           detail:
             urgentInterventionStudents[0]
               ? `${urgentInterventionStudents[0].studentName} · ${urgentInterventionStudents[0].topReason}`
-              : '좌석 히트맵과 학생 360에서 우선 개입 학생을 먼저 확인하세요.',
-          actionLabel: '학생 360',
-          href: '/dashboard/teacher/students?showRisk=1#risk-analysis',
+              : '비즈니스 분석에서 리스크 인텔리전스를 열어 우선 개입 학생을 먼저 확인하세요.',
+          actionLabel: '비즈니스 분석',
+          href: '/dashboard/revenue?showRisk=1#risk-analysis',
           icon: ShieldAlert,
           toneClass: 'bg-rose-100 text-rose-700',
         },

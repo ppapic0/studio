@@ -78,7 +78,6 @@ import {
 } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import dynamic from 'next/dynamic';
 import { canManageSettings, canManageStaff, canReadFinance, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 
 function resolveCallableErrorMessage(error: any, fallback: string): string {
@@ -115,19 +114,6 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
 
   return fallback;
 }
-
-const RiskIntelligencePanel = dynamic(
-  () => import('@/components/dashboard/risk-intelligence').then((mod) => mod.RiskIntelligence),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="py-16 flex flex-col items-center justify-center gap-3">
-        <Loader2 className="h-7 w-7 animate-spin text-rose-500/40" />
-        <p className="text-xs font-bold text-[#9aa9c7]">리스크 분석을 준비하는 중입니다...</p>
-      </div>
-    ),
-  }
-);
 
 export default function StudentListPage() {
   const { activeMembership, membershipsLoading, viewMode } = useAppContext();
@@ -170,20 +156,13 @@ export default function StudentListPage() {
   const canManageStudentAccounts = canManageStaff(activeMembership?.role);
   const canOpenFinance = canReadFinance(activeMembership?.role);
   const canOpenSettings = canManageSettings(activeMembership?.role);
-  const canViewRiskPanel = isTeacherOrAdmin;
-  const [showRiskPanel, setShowRiskPanel] = useState(false);
 
   useEffect(() => {
     const showRisk = searchParams.get('showRisk');
     if (showRisk === '1' || showRisk === 'true') {
-      setShowRiskPanel(true);
-      setTimeout(() => {
-        if (typeof window === 'undefined') return;
-        const target = document.getElementById('risk-analysis');
-        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 80);
+      router.replace('/dashboard/revenue?showRisk=1#risk-analysis');
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회
   const membersQuery = useMemoFirebase(() => {
@@ -331,9 +310,8 @@ export default function StudentListPage() {
       awayCount,
       absentCount,
       assignedSeatCount,
-      riskOpenCount: showRiskPanel ? 1 : 0,
     };
-  }, [attendanceList, counts.active, showRiskPanel, studentMembers, studentsProfiles]);
+  }, [attendanceList, counts.active, studentMembers, studentsProfiles]);
 
   const handleAddStudent = async () => {
     if (!centerId || !functions) return;
@@ -876,33 +854,6 @@ export default function StudentListPage() {
         </Dialog>
       </header>
 
-      {canViewRiskPanel && (
-        <Card className="rounded-[2rem] border border-[#dbe7ff] bg-white p-5 shadow-[0_24px_56px_-42px_rgba(20,41,95,0.28)]">
-          <div className={cn('flex items-center justify-between gap-3', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
-            <div className="space-y-1">
-              <Badge className="rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
-                관리자 전용
-              </Badge>
-              <p className="pt-2 text-sm font-black tracking-tight text-[#14295F]">리스크 인텔리전스</p>
-              <p className="text-sm font-semibold text-[#5c6e97]">학생관리 센터에서 바로 리스크 분석 패널을 열고 운영 리스크를 함께 확인합니다.</p>
-            </div>
-            <Button
-              type="button"
-              variant={showRiskPanel ? 'default' : 'outline'}
-              className={cn("h-10 rounded-xl font-black", showRiskPanel ? "bg-[#14295F] text-white hover:bg-[#173D8B]" : "border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]")}
-              onClick={() => setShowRiskPanel((prev) => !prev)}
-            >
-              {showRiskPanel ? '리스크 분석 닫기' : '리스크 분석 열기'}
-            </Button>
-          </div>
-          {showRiskPanel && (
-            <div id="risk-analysis" className="pt-5">
-              <RiskIntelligencePanel />
-            </div>
-          )}
-        </Card>
-      )}
-
       <section className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'md:grid-cols-3 xl:grid-cols-6')}>
         {[
           { label: '관리 규모', value: `${operationalSummary.activeStudents}명`, sub: '현재 관리 대상', tone: 'text-[#14295F] bg-[#eef4ff]' },
@@ -910,7 +861,7 @@ export default function StudentListPage() {
           { label: '외출', value: `${operationalSummary.awayCount}명`, sub: '복귀 확인 필요', tone: 'text-amber-700 bg-amber-50' },
           { label: '미입실', value: `${operationalSummary.absentCount}명`, sub: '도착 전 / 퇴실 포함', tone: 'text-rose-700 bg-rose-50' },
           { label: '좌석 연동', value: `${operationalSummary.assignedSeatCount}명`, sub: '도면 연동 가능', tone: 'text-sky-700 bg-sky-50' },
-          { label: '리스크 패널', value: canViewRiskPanel ? (showRiskPanel ? '열림' : '대기') : '-', sub: '센터관리자 분석 패널', tone: 'text-violet-700 bg-violet-50' },
+          { label: '리스크 분석', value: canOpenFinance ? '이동' : '-', sub: canOpenFinance ? '비즈니스 분석에서 확인' : '센터관리자 권한 필요', tone: 'text-violet-700 bg-violet-50' },
         ].map((item) => (
           <Card key={item.label} className="rounded-[1.75rem] border border-[#dbe7ff] bg-white shadow-[0_22px_52px_-46px_rgba(20,41,95,0.32)]">
             <CardContent className="p-4">
