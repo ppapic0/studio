@@ -206,7 +206,7 @@ export function StudyPlanSheet({
           {!isPast ? (
             <StudyComposerCard
               title="새 계획 작성"
-              description="과목, 목표, 할 일을 순서대로 짧게 적고 바로 추가해보세요."
+              description="과목 분류, 실시할 내용, 분량을 순서대로 적으면 바로 추가할 수 있어요."
               subjectOptions={subjectOptions}
               subjectValue={subjectValue}
               onSubjectChange={onSubjectChange}

@@ -196,6 +196,15 @@ export function StudyComposerCard({
             </div>
           </div>
 
+          <div className="mt-3 rounded-[1rem] border border-[#DCE6F5] bg-[#F8FBFF] px-3.5 py-3">
+            <p className="text-[11px] font-black text-[#355185]">입력 순서</p>
+            <div className="mt-2 space-y-1.5 text-[11px] font-semibold leading-5 text-[#5C73A0]">
+              <p><span className="font-black text-[#14295F]">과목 분류</span> : 수학, 영어, 웹개발처럼 큰 과목 이름</p>
+              <p><span className="font-black text-[#14295F]">실시할 내용</span> : 오늘 실제로 할 강의, 단원, 문제 유형</p>
+              <p><span className="font-black text-[#14295F]">분량</span> : 몇 강, 몇 단원, 몇 문제인지 숫자로 입력</p>
+            </div>
+          </div>
+
           <div className="mt-4 flex flex-wrap gap-2">
             {subjectOptions.map((subject) => {
               const isActive = subject.id === subjectValue;
@@ -219,51 +228,60 @@ export function StudyComposerCard({
           </div>
 
           {needsCustomSubject && onCustomSubjectChange ? (
-            <Input
-              value={customSubjectValue}
-              onChange={(event) => onCustomSubjectChange(event.target.value)}
-              disabled={disabled || isSubmitting}
-              placeholder="직접 과목 입력"
-              className="mt-3 h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-            />
+            <div className="mt-3 space-y-1.5">
+              <p className="text-[11px] font-black text-[#5C73A0]">과목 분류</p>
+              <Input
+                value={customSubjectValue}
+                onChange={(event) => onCustomSubjectChange(event.target.value)}
+                disabled={disabled || isSubmitting}
+                placeholder="예: 웹개발, 한국사, 영어"
+                className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
+              />
+            </div>
           ) : null}
 
           {isVolumeMode ? (
             <>
-              <Input
-                value={taskValue}
-                onChange={(event) => onTaskChange(event.target.value)}
-                placeholder="예: 수학 3점 문항 30문제"
-                disabled={disabled || isSubmitting}
-                className="mt-3 h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-              />
-
-              <div className={cn('mt-3 grid gap-2', isMobile ? 'grid-cols-[minmax(0,1fr)_7.4rem]' : 'grid-cols-[minmax(0,1fr)_8rem]')}>
+              <div className="mt-3 space-y-1.5">
+                <p className="text-[11px] font-black text-[#5C73A0]">실시할 내용</p>
                 <Input
-                  type="number"
-                  min={1}
-                  value={amountValue}
-                  onChange={(event) => onAmountChange(event.target.value)}
+                  value={taskValue}
+                  onChange={(event) => onTaskChange(event.target.value)}
+                  placeholder="예: DOM 강의 듣기, 수학 3점 문항 풀이"
                   disabled={disabled || isSubmitting}
-                  placeholder="목표 수치"
-                  className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-center text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
+                  className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
                 />
-                <Select
-                  value={amountUnitValue}
-                  onValueChange={(value) => onAmountUnitChange(value as StudyAmountUnit)}
-                  disabled={disabled || isSubmitting}
-                >
-                  <SelectTrigger className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-[#D7E1F2]">
-                    {STUDY_AMOUNT_UNIT_OPTIONS.map((unit) => (
-                      <SelectItem key={unit.value} value={unit.value}>
-                        {unit.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              </div>
+
+              <div className="mt-3 space-y-1.5">
+                <p className="text-[11px] font-black text-[#5C73A0]">분량</p>
+                <div className={cn('grid gap-2', isMobile ? 'grid-cols-[minmax(0,1fr)_7.4rem]' : 'grid-cols-[minmax(0,1fr)_8rem]')}>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={amountValue}
+                    onChange={(event) => onAmountChange(event.target.value)}
+                    disabled={disabled || isSubmitting}
+                    placeholder="예: 3"
+                    className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-center text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
+                  />
+                  <Select
+                    value={amountUnitValue}
+                    onValueChange={(value) => onAmountUnitChange(value as StudyAmountUnit)}
+                    disabled={disabled || isSubmitting}
+                  >
+                    <SelectTrigger className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-[#D7E1F2]">
+                      {STUDY_AMOUNT_UNIT_OPTIONS.map((unit) => (
+                        <SelectItem key={unit.value} value={unit.value}>
+                          {unit.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {amountUnitValue === '직접입력' ? (
@@ -271,7 +289,7 @@ export function StudyComposerCard({
                   value={customAmountUnitValue}
                   onChange={(event) => onCustomAmountUnitChange(event.target.value)}
                   disabled={disabled || isSubmitting}
-                  placeholder="예: 강, 단원, 세부 목표"
+                  placeholder="예: 강, 단원, 문제, 지문"
                   className="mt-3 h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
                 />
               ) : null}
@@ -301,7 +319,7 @@ export function StudyComposerCard({
                       value={minuteValue}
                       onChange={(event) => onMinuteChange(event.target.value)}
                       disabled={disabled || isSubmitting}
-                      placeholder="예상 분"
+                      placeholder="예: 60"
                       className="h-10 max-w-[7rem] rounded-full border-[#D7E1F2] bg-white text-center text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
                     />
                     <span className="text-[11px] font-black text-[#6E83AB]">분 정도</span>
@@ -310,26 +328,32 @@ export function StudyComposerCard({
               </div>
             </>
           ) : (
-            <Input
-              type="number"
-              min={0}
-              value={minuteValue}
-              onChange={(event) => onMinuteChange(event.target.value)}
-              disabled={disabled || isSubmitting}
-              placeholder="예상 시간(분)"
-              className="mt-3 h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-center text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-            />
+            <div className="mt-3 space-y-1.5">
+              <p className="text-[11px] font-black text-[#5C73A0]">예상 시간</p>
+              <Input
+                type="number"
+                min={0}
+                value={minuteValue}
+                onChange={(event) => onMinuteChange(event.target.value)}
+                disabled={disabled || isSubmitting}
+                placeholder="예: 60"
+                className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-center text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
+              />
+            </div>
           )}
 
           <div className={cn('mt-3 gap-2', isMobile || isVolumeMode ? 'space-y-2' : 'grid grid-cols-[minmax(0,1fr)_8.5rem]')}>
             {!isVolumeMode ? (
-              <Input
-                value={taskValue}
-                onChange={(event) => onTaskChange(event.target.value)}
-                placeholder="예: 영어 단어 복습"
-                disabled={disabled || isSubmitting}
-                className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-              />
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-black text-[#5C73A0]">실시할 내용</p>
+                <Input
+                  value={taskValue}
+                  onChange={(event) => onTaskChange(event.target.value)}
+                  placeholder="예: 영어 단어 복습, 수학 오답 정리"
+                  disabled={disabled || isSubmitting}
+                  className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
+                />
+              </div>
             ) : null}
             <Button
               type="button"
