@@ -2658,6 +2658,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const hasRhythmScoreOnlyTrend = rhythmScoreOnlyTrend.some((item) => item.score > 0);
   const hasStartEndTimeData = startEndTimeTrendData.some((item) => item.startHour !== null || item.endHour !== null);
   const hasAwayTimeData = awayTimeTrendData.some((item) => item.awayMinutes > 0);
+  const parentAnalyticsTickFontSize = isAppMode ? 9 : 10;
+  const parentAnalyticsGrowthMargin = isAppMode ? { top: 8, right: 16, left: 10, bottom: 0 } : { top: 8, right: 6, left: -12, bottom: 0 };
+  const parentAnalyticsRhythmMargin = isAppMode ? { top: 8, right: 12, left: 10, bottom: 0 } : { top: 8, right: 8, left: -6, bottom: 0 };
+  const parentAnalyticsStartEndMargin = isAppMode ? { top: 8, right: 12, left: 12, bottom: 0 } : { top: 8, right: 8, left: -10, bottom: 0 };
+  const parentAnalyticsAwayMargin = isAppMode ? { top: 8, right: 12, left: 12, bottom: 0 } : { top: 8, right: 8, left: -10, bottom: 0 };
+  const parentAnalyticsGrowthLeftAxisWidth = isAppMode ? 44 : 34;
+  const parentAnalyticsGrowthRightAxisWidth = isAppMode ? 40 : 32;
+  const parentAnalyticsRhythmAxisWidth = isAppMode ? 38 : 28;
+  const parentAnalyticsStartEndAxisWidth = isAppMode ? 54 : 40;
+  const parentAnalyticsAwayAxisWidth = isAppMode ? 40 : 30;
 
   const weeklyGrowthInsight = useMemo(() => buildWeeklyStudyInsight(weeklyGrowthData), [weeklyGrowthData]);
   const rhythmInsight = useMemo(() => buildRhythmInsight(rhythmScoreOnlyTrend), [rhythmScoreOnlyTrend]);
@@ -4263,11 +4273,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   {hasWeeklyGrowthData ? (
                     <div className="h-[220px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 6, left: -12, bottom: 0 }}>
+                        <ComposedChart data={weeklyGrowthData} margin={parentAnalyticsGrowthMargin}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7eefb" />
-                          <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} />
-                          <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={34} tickFormatter={(value) => minutesToAxisLabel(Number(value))} />
-                          <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={32} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                          <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={parentAnalyticsTickFontSize} />
+                          <YAxis yAxisId="mins" tickLine={false} axisLine={false} width={parentAnalyticsGrowthLeftAxisWidth} tickFormatter={(value) => minutesToAxisLabel(Number(value))} />
+                          <YAxis yAxisId="growth" orientation="right" tickLine={false} axisLine={false} width={parentAnalyticsGrowthRightAxisWidth} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
                           <Tooltip
                             contentStyle={{ borderRadius: '1rem', border: '1px solid #d7e3fb', boxShadow: '0 18px 36px rgba(20,41,95,0.12)' }}
                             formatter={(value: number, name: string) => {
@@ -4299,7 +4309,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   {hasRhythmScoreOnlyTrend ? (
                     <div className="h-[220px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: -6, bottom: 0 }}>
+                        <ComposedChart data={rhythmScoreOnlyTrend} margin={parentAnalyticsRhythmMargin}>
                           <defs>
                             <linearGradient id="parent-rhythm-area" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#8BE4C7" stopOpacity={0.38} />
@@ -4307,8 +4317,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dff1ea" />
-                          <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={10} />
-                          <YAxis tickLine={false} axisLine={false} width={28} domain={[0, 100]} />
+                          <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={parentAnalyticsTickFontSize} />
+                          <YAxis tickLine={false} axisLine={false} width={parentAnalyticsRhythmAxisWidth} domain={[0, 100]} />
                           <Tooltip
                             contentStyle={{ borderRadius: '1rem', border: '1px solid #d7f0e7', boxShadow: '0 18px 36px rgba(16,185,129,0.12)' }}
                             formatter={(value: number) => [`${Math.round(Number(value || 0))}점`, '리듬 점수']}
@@ -4337,10 +4347,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   {hasStartEndTimeData ? (
                     <div className="h-[220px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                        <RechartsLineChart data={startEndTimeTrendData} margin={parentAnalyticsStartEndMargin}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eaedff" />
-                          <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={10} />
-                          <YAxis tickLine={false} axisLine={false} width={40} domain={startEndYAxisDomain} tickFormatter={(value) => hourToClockLabel(Number(value))} />
+                          <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={parentAnalyticsTickFontSize} />
+                          <YAxis tickLine={false} axisLine={false} width={parentAnalyticsStartEndAxisWidth} domain={startEndYAxisDomain} tickFormatter={(value) => hourToClockLabel(Number(value))} />
                           <Tooltip
                             contentStyle={{ borderRadius: '1rem', border: '1px solid #dde4ff', boxShadow: '0 18px 36px rgba(83,99,255,0.10)' }}
                             formatter={(value: number, name: string) => {
@@ -4373,10 +4383,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="h-[220px] w-full">
                       {hasAwayTimeData ? (
                         <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={awayTimeTrendData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                          <ComposedChart data={awayTimeTrendData} margin={parentAnalyticsAwayMargin}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fde5eb" />
-                            <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={10} />
-                            <YAxis tickLine={false} axisLine={false} width={30} tickFormatter={(value) => `${value}m`} />
+                            <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={parentAnalyticsTickFontSize} />
+                            <YAxis tickLine={false} axisLine={false} width={parentAnalyticsAwayAxisWidth} tickFormatter={(value) => `${value}m`} />
                             <Tooltip
                               contentStyle={{ borderRadius: '1rem', border: '1px solid #ffe0e7', boxShadow: '0 18px 36px rgba(225,29,72,0.10)' }}
                               formatter={(value: number) => [`${Math.round(Number(value || 0))}분`, '이탈시간']}
