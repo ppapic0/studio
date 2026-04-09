@@ -9,7 +9,6 @@ import {
   Loader2,
   ShieldAlert,
   Sparkles,
-  Swords,
   Trophy,
   Zap,
   type LucideIcon,
@@ -79,18 +78,18 @@ const RANGE_META: Record<
 > = {
   daily: {
     label: '일간',
-    title: '오늘의 추월전',
-    subtitle: '지금 쌓는 공부시간이 오늘 순위를 바로 흔듭니다.',
+    title: '오늘 실시간 순위',
+    subtitle: '오늘 누적 공부시간과 순위 흐름을 바로 확인하세요.',
   },
   weekly: {
     label: '주간',
     title: '실시간 경쟁 랭킹',
-    subtitle: '이번 주 전장을 누가 밀고 있는지 한눈에 보세요.',
+    subtitle: '이번 주 상위권 흐름과 내 위치를 한 번에 읽을 수 있습니다.',
   },
   monthly: {
     label: '월간',
-    title: '라이브 배틀 리더보드',
-    subtitle: '장기전으로 끌고 가는 상위권 경쟁 흐름을 확인하세요.',
+    title: '월간 랭킹 흐름',
+    subtitle: '월간 누적 기준으로 상위권 변화와 집중 격차를 확인하세요.',
   },
 };
 
@@ -177,7 +176,7 @@ function maskLeaderboardStudentName(name: string) {
 }
 
 function getBattleTrackLabel(range: RankRange) {
-  return range === 'daily' ? '일간 TRACK' : range === 'weekly' ? '주간 TRACK' : '월간 TRACK';
+  return range === 'daily' ? '일간 랭킹' : range === 'weekly' ? '주간 랭킹' : '월간 랭킹';
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -273,27 +272,27 @@ function buildHeroMessages(params: {
   const messages: string[] = [];
 
   if (mode === 'attack') {
-    messages.push(`지금 ${Math.max(8, Math.min(diffAbove + 1, 18))}분만 더 하면 1위 탈환 가능`);
-    messages.push('조금만 더 하면 판이 바뀝니다');
+    messages.push(`지금 ${Math.max(8, Math.min(diffAbove + 1, 18))}분 더 쌓으면 선두권과 맞닿습니다`);
+    messages.push('상위권과의 간격이 빠르게 줄고 있습니다');
   }
 
   if (mode === 'danger') {
-    messages.push('뒤에서 따라오고 있어요. 방심 금지');
-    messages.push(`지금 멈추면 ${Math.max(8, Math.min(diffBelow + 4, 16))}분 차이로 흔들릴 수 있어요`);
+    messages.push('바로 아래 순위와의 간격이 좁아졌습니다');
+    messages.push(`지금 멈추면 ${Math.max(8, Math.min(diffBelow + 4, 16))}분 차이까지 붙을 수 있어요`);
   }
 
   if (mode === 'defense') {
-    messages.push('지금 페이스 좋습니다. 밀어붙이세요');
-    messages.push('실드가 살아 있습니다. 선두를 지키는 중이에요');
+    messages.push('현재 선두 흐름을 안정적으로 유지하고 있습니다');
+    messages.push('지금 페이스를 유지하면 상위권을 지킬 수 있어요');
   }
 
   if (mode === 'chase') {
-    messages.push('오늘 1위, 아직 충분히 가능합니다');
-    messages.push('지금 안 밀면 올라갈 수 있어요');
+    messages.push('지금 블록이 순위 변화를 만들 수 있는 구간입니다');
+    messages.push('상위권 진입 흐름을 먼저 확인해보세요');
   }
 
   if (viewerRank > 2) {
-    messages.push('상위권 진입 압박 구간입니다. 한 블록만 더 버텨보세요');
+    messages.push('상위권 진입 여부가 이번 블록에 달려 있습니다');
   }
 
   if (latestLog) {
@@ -313,25 +312,25 @@ function buildInitialLogs(entries: BattleEntry[], viewerId: string) {
     {
       id: 'seed-1',
       tone: 'orange' as const,
-      badge: 'LIVE PUSH',
+      badge: '상위권',
       title: `${top?.displayNameSnapshot ?? '성*민'} 님이 25분 추가 기록`,
-      detail: '선두 존에서 오렌지 파동이 더 강해졌어요.',
+      detail: '현재 1위 기준치가 조금 더 올라갔습니다.',
       target: 'top' as const,
     },
     {
       id: 'seed-2',
       tone: 'red' as const,
-      badge: 'PRESSURE',
-      title: `${rival.displayNameSnapshot} 님이 추격 중`,
-      detail: `${Math.max(12, diffAbove)}분 차이 전장으로 압박이 올라오고 있어요.`,
+      badge: '간격 변화',
+      title: `${rival.displayNameSnapshot} 님이 바로 아래에서 올라오고 있어요`,
+      detail: `${Math.max(12, diffAbove)}분 차이 안에서 순위 변화가 다시 커지고 있습니다.`,
       target: 'rival' as const,
     },
     {
       id: 'seed-3',
       tone: 'gold' as const,
-      badge: 'OVERTAKE',
-      title: `지금 ${Math.max(12, Math.min(diffAbove + 1, 24))}분 더 하면 역전권 진입`,
-      detail: '이번 블록만 밀어붙이면 전장 중앙을 넘길 수 있어요.',
+      badge: '상승 구간',
+      title: `지금 ${Math.max(12, Math.min(diffAbove + 1, 24))}분 더 쌓으면 선두권에 가까워집니다`,
+      detail: '이번 블록의 집중 시간이 순위 변화를 만들 수 있어요.',
       target: 'viewer' as const,
     },
   ];
@@ -353,10 +352,10 @@ function buildMainRecommendations(params: {
     recommendations.push({
       id: 'overtake-window',
       tone: 'plan',
-      title: '지금이 치고 올라갈 타이밍이에요',
+      title: '지금이 순위를 끌어올릴 구간입니다',
       action: `오늘 다음 블록을 ${Math.max(40, Math.min(diffAbove + 12, 70))}분 이상으로 잡아보세요.`,
-      reason: `현재 1위와 ${formatGapLabel(diffAbove)} 차이라, 한 블록만 잘 밀어도 전장 중앙을 넘길 수 있어요.`,
-      explainWhy: '추격 거리가 짧을수록 첫 블록을 길게 가져가는 편이 순위 반전에 더 유리해요.',
+      reason: `현재 1위와 ${formatGapLabel(diffAbove)} 차이라 한 번의 긴 블록으로도 간격을 크게 줄일 수 있습니다.`,
+      explainWhy: '상위권과의 간격이 짧을수록 첫 블록을 길게 가져가는 편이 순위 변화에 더 유리합니다.',
       cta: '오늘 계획에 반영하기',
     });
   }
@@ -365,11 +364,11 @@ function buildMainRecommendations(params: {
     recommendations.push({
       id: 'defense-route',
       tone: 'mindset',
-      title: '지금은 선두 방어가 먼저예요',
+      title: '지금은 현재 순위를 안정적으로 지키는 편이 좋습니다',
       action: '새 과목을 넓히기보다, 이미 잡은 핵심 과목 한 블록을 끝까지 지켜보세요.',
-      reason: `${below.displayNameSnapshot} 님과 ${formatGapLabel(diffBelow)} 차이라 방어가 흔들리기 쉬운 구간입니다.`,
-      explainWhy: '격차가 좁을 때는 과목을 늘리는 것보다 이미 잡은 블록을 끊기지 않게 마무리하는 편이 더 안전해요.',
-      cta: '방어 루트 적용하기',
+      reason: `${below.displayNameSnapshot} 님과 ${formatGapLabel(diffBelow)} 차이라 다음 한 블록에서 순위가 바뀔 수 있는 구간입니다.`,
+      explainWhy: '격차가 좁을 때는 과목 수를 늘리는 것보다 이미 잡은 블록을 끊기지 않게 마무리하는 편이 더 안정적입니다.',
+      cta: '현재 흐름 유지하기',
     });
   }
 
@@ -380,7 +379,7 @@ function buildMainRecommendations(params: {
       title: '오늘 마지막 20분은 복습으로 남겨두는 걸 추천해요',
       action: '새 공부를 조금 줄이고, 오늘 한 내용을 오답이나 회상 형태로 짧게 정리해보세요.',
       reason: '바로 다시 꺼내보는 공부가 오늘 쌓은 시간을 실제 점수로 연결하는 데 도움이 됩니다.',
-      explainWhy: '기록만 쌓는 날보다 마지막 복습 블록이 있는 날이 전투 로그에서도 더 안정적인 페이스를 만듭니다.',
+      explainWhy: '기록만 쌓는 날보다 마지막 복습 블록이 있는 날이 최근 흐름에서도 더 안정적인 패턴을 만듭니다.',
       cta: '복습 블록 추가하기',
     });
   }
@@ -392,7 +391,7 @@ function buildMainRecommendations(params: {
       title: '오늘은 총량보다 끊기지 않는 계획이 더 중요해요',
       action: '핵심 과목 1개와 복습 1개만 확실히 끝내는 식으로 블록 수를 줄여보세요.',
       reason: latestThreat.detail,
-      explainWhy: '전장 압박이 커질수록 계획을 크게 잡기보다 끝까지 수행 가능한 구조가 더 유리합니다.',
+      explainWhy: '간격 변화가 커질수록 계획을 크게 잡기보다 끝까지 수행 가능한 구조가 더 유리합니다.',
       cta: '간결한 계획으로 바꾸기',
     });
   }
@@ -454,8 +453,8 @@ function HeroBattleHeader({
   subtitleOverride?: string;
   isMobile?: boolean;
 }) {
-  const heroBadgeLabel = isLive ? 'LIVE BATTLE' : 'WAITING TRACK';
-  const heroStatusLabel = statusLabel || (isLive ? 'LIVE' : '집계 대기');
+  const heroBadgeLabel = isLive ? '실시간 랭킹' : '집계 대기';
+  const heroStatusLabel = statusLabel || (isLive ? '실시간 집계' : '집계 대기');
   const heroSubtitle = subtitleOverride || RANGE_META[range].subtitle;
 
   if (isMobile) {
@@ -482,8 +481,8 @@ function HeroBattleHeader({
           <div className={cn(MOBILE_BATTLE_STRIP_CLASS, 'flex items-center justify-between gap-3 px-4 py-3.5')}>
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[10px] font-black tracking-[0.16em] text-[#BA6815]">
-                <Swords className="h-3.5 w-3.5 shrink-0" />
-                전장 브리핑
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                상위권 흐름
               </div>
               <p className="student-aggro-body mt-1 text-[15px] text-[#132A63]">
                 {activeMessage}
@@ -502,39 +501,48 @@ function HeroBattleHeader({
 
   return (
     <section className={cn(
-      'student-utility-card relative overflow-hidden rounded-[32px] border border-[#E7D2BE] bg-[radial-gradient(circle_at_top,_rgba(255,192,118,0.26),_transparent_34%),linear-gradient(155deg,#FFF9EF_0%,#FFF1DD_62%,#FFE6BD_100%)] text-[#132A63] shadow-[0_28px_80px_rgba(22,45,99,0.12)]',
+      'student-utility-card relative overflow-hidden rounded-[32px] border border-[#E7D2BE] bg-[radial-gradient(circle_at_top,_rgba(255,192,118,0.22),_transparent_34%),linear-gradient(155deg,#FFFDF8_0%,#FFF3E1_56%,#FFE9C6_100%)] text-[#132A63] shadow-[0_28px_80px_rgba(22,45,99,0.1)]',
       isMobile ? 'p-5' : 'p-6 md:p-8'
     )}>
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),transparent_44%,transparent_72%,rgba(255,170,85,0.08))]" />
       <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-[#FFB14B]/18 blur-3xl" />
-      <div className={cn('relative flex flex-col', isMobile ? 'gap-5' : 'gap-6 lg:flex-row lg:items-start lg:justify-between')}>
-        <div className={cn(isMobile ? 'max-w-none' : 'max-w-3xl')}>
-          <div className={cn(
-            'inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/82 text-[#BA6815]',
-            isMobile ? 'mb-3 px-3.5 py-2 text-[11px] font-black tracking-[0.18em]' : 'mb-4 px-4 py-2 text-xs font-black tracking-[0.28em]'
-          )}>
-            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
-            {heroBadgeLabel}
+      <div className="relative space-y-5">
+        <div className={cn('flex flex-col gap-4', isMobile ? '' : 'lg:flex-row lg:items-start lg:justify-between')}>
+          <div className={cn(isMobile ? 'max-w-none' : 'max-w-3xl')}>
+            <div className={cn(
+              'inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/82 text-[#BA6815]',
+              isMobile ? 'mb-3 px-3.5 py-2 text-[11px] font-black tracking-[0.18em]' : 'mb-4 px-4 py-2 text-xs font-black tracking-[0.28em]'
+            )}>
+              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
+              {heroBadgeLabel}
+            </div>
+            <h1 className={cn(
+              'font-aggro-display font-black tracking-[-0.05em] text-[#132A63]',
+              isMobile ? 'text-[2.1rem] leading-[0.92]' : 'text-[2.1rem] leading-[0.94] md:text-[2.8rem]'
+            )}>
+              {RANGE_META[range].title}
+            </h1>
+            <p className={cn(
+              'student-aggro-body max-w-2xl text-[#5B7098]',
+              isMobile ? 'mt-3 text-base leading-8' : 'mt-3 text-sm leading-7 md:text-base'
+            )}>
+              {heroSubtitle}
+            </p>
           </div>
-          <h1 className={cn(
-            'font-aggro-display font-black tracking-[-0.05em] text-[#132A63]',
-            isMobile ? 'text-[2.1rem] leading-[0.92]' : 'text-[2.2rem] leading-[0.94] md:text-[3.1rem]'
-          )}>
-            {RANGE_META[range].title}
-          </h1>
-          <p className={cn(
-            'student-aggro-body max-w-2xl text-[#5B7098]',
-            isMobile ? 'mt-3 text-base leading-8' : 'mt-3 text-sm leading-7 md:text-base'
-          )}>
-            {heroSubtitle}
-          </p>
-          <div className={cn(
-            'max-w-2xl rounded-[24px] border border-[#EDD4BD] bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,249,240,0.92))] backdrop-blur-xl shadow-[0_18px_40px_rgba(20,41,95,0.08)]',
-            isMobile ? 'mt-4 min-h-[116px] px-4 py-4' : 'mt-5 min-h-[72px] px-5 py-4'
-          )}>
+
+          <div className={cn('flex flex-col gap-3', isMobile ? 'w-full' : 'items-start lg:min-w-[220px] lg:items-end')}>
+            <PeriodTabs value={range} onChange={onRangeChange} isMobile={isMobile} />
+            <div className="rounded-full border border-[#F0D8B7] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#C86A10]">
+              {heroStatusLabel}
+            </div>
+          </div>
+        </div>
+
+        <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-[minmax(0,1fr)_220px]')}>
+          <div className="rounded-[24px] border border-[#EDD4BD] bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,249,240,0.92))] px-5 py-4 backdrop-blur-xl shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
             <div className={cn('flex items-center gap-2 font-black text-[#BA6815]', isMobile ? 'mb-2 text-[10px] tracking-[0.16em]' : 'mb-2 text-[11px] tracking-[0.22em]')}>
-              <Swords className="h-4 w-4" />
-              전장 브리핑
+              <Sparkles className="h-4 w-4" />
+              상위권 흐름
             </div>
             <AnimatePresence mode="wait">
               <motion.p
@@ -545,17 +553,23 @@ function HeroBattleHeader({
                 transition={{ duration: 0.28, ease: 'easeOut' }}
                 className={cn(
                   'font-aggro-display font-black leading-snug tracking-[-0.03em] text-[#132A63]',
-                  isMobile ? 'text-[1.05rem]' : 'text-xl md:text-2xl'
+                  isMobile ? 'text-[1.05rem]' : 'text-xl md:text-[1.7rem]'
                 )}
               >
                 {activeMessage}
               </motion.p>
             </AnimatePresence>
           </div>
-        </div>
 
-        <div className={cn(isMobile ? 'w-full' : 'flex justify-end lg:min-w-[220px]')}>
-          <PeriodTabs value={range} onChange={onRangeChange} isMobile={isMobile} />
+          <div className="rounded-[24px] border border-[#EDD4BD] bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(255,246,233,0.92)_100%)] px-5 py-4 shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
+            <div className="text-[10px] font-black tracking-[0.2em] text-[#7A86A2]">집계 범위</div>
+            <div className="mt-2 text-[1.7rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+              {RANGE_META[range].label}
+            </div>
+            <div className="mt-2 text-sm font-semibold text-[#64779C]">
+              {isLive ? '실시간 반영 중' : '다음 오픈 대기'}
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -643,26 +657,26 @@ function BattleGauge({
         <motion.div
           className="absolute inset-y-1 left-0 w-24 rounded-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.62),transparent)] mix-blend-screen"
           animate={{ x: ['-10%', '120%'] }}
-          transition={{ duration: 2.6, repeat: Infinity, ease: 'linear' }}
+          transition={{ duration: 3.4, repeat: Infinity, ease: 'linear' }}
         />
         <motion.div
           className="absolute inset-y-0 w-[3px] bg-white shadow-[0_0_18px_rgba(255,255,255,0.92)]"
           style={{ left: `calc(${marker}% - 1px)` }}
-          animate={{ opacity: [0.65, 1, 0.65], scaleY: [0.85, 1.08, 0.85] }}
-          transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+          animate={{ opacity: [0.7, 0.95, 0.7], scaleY: [0.92, 1.02, 0.92] }}
+          transition={{ duration: 2.1, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
           className="absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-white/30 bg-[radial-gradient(circle,_rgba(255,246,218,0.96)_0%,_rgba(255,178,84,0.92)_50%,_rgba(255,120,56,0.9)_100%)] shadow-[0_0_24px_rgba(255,169,88,0.85)]"
           style={{ left: `calc(${marker}% - 10px)` }}
           animate={{
-            scale: [1, 1.15, 1],
+            scale: [1, 1.06, 1],
             boxShadow: [
-              '0 0 18px rgba(255,169,88,0.55)',
-              '0 0 36px rgba(255,169,88,0.95)',
-              '0 0 18px rgba(255,169,88,0.55)',
+              '0 0 16px rgba(255,169,88,0.45)',
+              '0 0 26px rgba(255,169,88,0.72)',
+              '0 0 16px rgba(255,169,88,0.45)',
             ],
           }}
-          transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
         />
       </div>
       <div className={cn(
@@ -673,13 +687,13 @@ function BattleGauge({
           'rounded-2xl border border-[#FFC27A]/60 bg-[#FFF0D7] text-[#B96510]',
           isMobile ? 'px-3 py-2.5' : 'px-3 py-2'
         )}>
-          내 압박 {formatStudyCompact(leftValue)}
+          내 현재 누적 {formatStudyCompact(leftValue)}
         </div>
         <div className={cn(
           'rounded-2xl border border-[#E6D8C8] bg-white/92 text-right text-[#6E7893]',
           isMobile ? 'px-3 py-2.5' : 'px-3 py-2'
         )}>
-          상대 압박 {formatStudyCompact(rightValue)}
+          비교 기준 {formatStudyCompact(rightValue)}
         </div>
       </div>
     </div>
@@ -763,20 +777,20 @@ function MyBattleCard({
   const diffBelow = below ? Math.max(0, viewer.value - below.value) : 0;
   const statusLabel =
     mode === 'attack'
-      ? '추월각'
+      ? '상승 구간'
       : mode === 'defense'
-        ? '선두 방어'
+        ? '선두 유지'
         : mode === 'danger'
-          ? '방어 경고'
-          : '상위권 압박';
+          ? '간격 주의'
+          : '간격 축소';
   const helperCopy =
     mode === 'attack'
-      ? `1위까지 ${formatGapLabel(diffAbove)}. 지금 판을 밀고 있어요.`
+      ? `1위와 ${formatGapLabel(diffAbove)} 차이입니다. 지금 흐름이면 간격을 크게 줄일 수 있어요.`
       : mode === 'defense'
-        ? `뒤 순위와 ${formatGapLabel(diffBelow)} 차이. 방어막이 유지 중입니다.`
+        ? `2위와 ${formatGapLabel(diffBelow)} 차이입니다. 현재 페이스를 유지하면 선두를 지킬 수 있어요.`
         : mode === 'danger'
-          ? `${below?.displayNameSnapshot ?? '뒤 경쟁자'} 님이 바로 아래에서 추격 중이에요.`
-          : `상위권과 ${formatGapLabel(diffAbove)} 차이. 전진 구간입니다.`;
+          ? `${below?.displayNameSnapshot ?? '바로 아래 학생'} 님과 ${formatGapLabel(diffBelow)} 차이입니다. 다음 블록 집중이 필요해요.`
+          : `상위권과 ${formatGapLabel(diffAbove)} 차이입니다. 지금 한 블록이 순위를 바꿀 수 있어요.`;
 
   if (isMobile) {
     return (
@@ -797,7 +811,7 @@ function MyBattleCard({
               {statusLabel}
             </div>
             <div className="rounded-full border border-[#F0D8B7] bg-white/80 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#7A86A2]">
-              {mode === 'defense' ? 'DEFENSE HOLD' : 'LIVE PUSH'}
+              현재 위치
             </div>
           </div>
 
@@ -810,12 +824,12 @@ function MyBattleCard({
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부중</div>
+                <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부시간</div>
                 <div className="mt-2 text-[1.85rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
                   {formatStudyCompact(viewer.value)}
                 </div>
                 <div className="mt-1 text-[12px] font-black text-[#C86A10]">
-                  {mode === 'defense' ? `방어 ${formatGapLabel(diffBelow)}` : `추월까지 ${formatGapLabel(diffAbove)}`}
+                  {viewer.rank === 1 ? `2위와 ${formatGapLabel(diffBelow)}` : `1위와 ${formatGapLabel(diffAbove)}`}
                 </div>
               </div>
             </div>
@@ -826,8 +840,8 @@ function MyBattleCard({
 
           <div className="mt-3">
             <BattleGauge
-              leftLabel="내 전장"
-              rightLabel={viewer.rank === 1 ? '추격 파동' : '1위 존'}
+              leftLabel="내 현재 누적"
+              rightLabel={viewer.rank === 1 ? '바로 아래 기준' : '1위 기준'}
               leftValue={viewer.value}
               rightValue={viewer.rank === 1 ? (below?.value ?? viewer.value - 10) : (top?.value ?? viewer.value + 10)}
               mode={mode}
@@ -839,13 +853,13 @@ function MyBattleCard({
             <CompactBattleMetric
               label="1위와 차이"
               value={viewer.rank === 1 ? '선두' : formatGapLabel(diffAbove)}
-              hint={viewer.rank === 1 ? '정상 점령 중' : '한 세션 더'}
+              hint={viewer.rank === 1 ? '현재 선두 유지' : '상위권 기준'}
               tone="gold"
             />
             <CompactBattleMetric
               label="바로 아래"
               value={below ? formatGapLabel(diffBelow) : '여유'}
-              hint={below ? `${below.displayNameSnapshot} 추격` : '아래 경쟁 없음'}
+              hint={below ? `${maskLeaderboardStudentName(below.displayNameSnapshot)} 기준` : '아래 경쟁 없음'}
               tone={pressure === 'critical' ? 'red' : 'blue'}
             />
           </div>
@@ -868,58 +882,59 @@ function MyBattleCard({
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.82),transparent_32%,transparent_66%,rgba(255,140,40,0.08))]" />
       <div className="pointer-events-none absolute inset-[1px] rounded-[33px] border border-white/55" />
       <div className="relative">
-        <div className={cn('items-start justify-between gap-4', isMobile ? 'mb-4 space-y-4' : 'mb-5 flex flex-wrap')}>
-          <div>
-            <div className={cn(
-              'inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 font-black text-[#BA6815]',
-              isMobile ? 'mb-2 px-3 py-2 text-[10px] tracking-[0.14em]' : 'mb-2 px-3 py-2 text-[11px] tracking-[0.2em]'
-            )}>
-              <Zap className="h-4 w-4" />
-              {statusLabel}
-            </div>
-            <div className={cn('gap-3', isMobile ? 'space-y-3' : 'flex flex-wrap items-end')}>
-              <div>
-                <div className={cn('font-black text-[#7A86A2]', isMobile ? 'text-[10px] tracking-[0.15em]' : 'text-[11px] tracking-[0.22em]')}>{getBattleTrackLabel(range)}</div>
-                <div className={cn('mt-2 font-black leading-none tracking-[-0.06em] text-[#132A63]', isMobile ? 'text-[3.4rem]' : 'text-6xl')}>
-                  #{viewer.rank}
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="rounded-[28px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF8EE_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#BA6815]">
+                  <Zap className="h-4 w-4" />
+                  {statusLabel}
+                </div>
+                <div className="mt-4 text-[11px] font-black tracking-[0.22em] text-[#7A86A2]">{getBattleTrackLabel(range)}</div>
+                <div className="mt-3 flex flex-wrap items-end gap-4">
+                  <div className="text-6xl font-black leading-none tracking-[-0.06em] text-[#132A63]">#{viewer.rank}</div>
+                  <div className="pb-2">
+                <div className="text-sm font-bold text-[#6E7893]">현재 공부시간 {formatStudyCompact(viewer.value)}</div>
+                    <div className="student-aggro-body mt-2 max-w-xl text-lg leading-8 text-[#C86A10]">{helperCopy}</div>
+                  </div>
                 </div>
               </div>
-              <div className={cn(isMobile ? '' : 'pb-2')}>
-                <div className={cn('font-bold text-[#6E7893]', isMobile ? 'text-sm' : 'text-sm')}>공부중 {formatStudyCompact(viewer.value)}</div>
-                <div className={cn('student-aggro-body mt-2 text-[#C86A10]', isMobile ? 'text-base leading-7' : 'text-lg leading-8')}>{helperCopy}</div>
+
+              <div className="rounded-full border border-[#F0D8B7] bg-[#FFF6EA] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">
+                현재 순위 요약
               </div>
             </div>
           </div>
 
-          <motion.div
-            className={cn(
-              'rounded-[26px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF6EA_100%)] text-right shadow-[0_18px_40px_rgba(20,41,95,0.08)]',
-              isMobile ? 'w-full px-4 py-4 text-left' : 'px-5 py-4'
-            )}
-            animate={{ boxShadow: ['0 0 0 rgba(255,154,56,0.1)', '0 0 30px rgba(255,154,56,0.26)', '0 0 0 rgba(255,154,56,0.1)'] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <div className={cn('font-black text-[#7A86A2]', isMobile ? 'text-[10px] tracking-[0.18em]' : 'text-[11px] tracking-[0.24em]')}>
-              {mode === 'defense' ? 'DEFENSE HOLD' : 'LIVE PUSH'}
+          <div className="grid gap-3">
+            <motion.div
+              className="rounded-[26px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF6EA_100%)] px-5 py-4 shadow-[0_18px_40px_rgba(20,41,95,0.08)]"
+              animate={{ boxShadow: ['0 0 0 rgba(255,154,56,0.08)', '0 0 24px rgba(255,154,56,0.18)', '0 0 0 rgba(255,154,56,0.08)'] }}
+              transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <div className="text-[11px] font-black tracking-[0.24em] text-[#7A86A2]">현재 공부시간</div>
+              <div className="mt-2 text-[2rem] font-black tracking-[-0.05em] text-[#132A63]">{formatStudyClock(viewer.value)}</div>
+              <div className="mt-2 text-sm font-semibold text-[#64779C]">현재 범위 누적 기준</div>
+            </motion.div>
+
+            <div className="rounded-[26px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF6EA_100%)] px-5 py-4 shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
+              <div className="text-[11px] font-black tracking-[0.24em] text-[#7A86A2]">90분 기준</div>
+              <div className="mt-2 text-[2rem] font-black tracking-[-0.05em] text-[#132A63]">+{rewardState.minutesToReward}분</div>
+              <div className="mt-2 text-sm font-semibold text-[#64779C]">다음 누적 기준까지 남은 시간</div>
             </div>
-            <div className={cn('mt-1 font-black text-[#132A63]', isMobile ? 'text-xl' : 'text-2xl')}>
-              {mode === 'defense'
-                ? `방어 ${formatGapLabel(diffBelow)}`
-                : `공부중 +${Math.max(0, rewardState.minutesToReward - 28)}분`}
-            </div>
-          </motion.div>
+          </div>
         </div>
 
-        <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
-          <BattleStatCard label="누적 공부" value={formatStudyCompact(viewer.value)} hint="현재 전투 누적" tone="orange" icon={Clock3} />
-          <BattleStatCard label="1위와 차이" value={viewer.rank === 1 ? '선두' : formatGapLabel(diffAbove)} hint={viewer.rank === 1 ? '정상 점령 중' : '지금 한 세션 더'} tone="gold" icon={Crown} />
-          <BattleStatCard label="바로 아래 차이" value={below ? formatGapLabel(diffBelow) : '여유'} hint={below ? `${below.displayNameSnapshot} 추격` : '아래 경쟁 없음'} tone={pressure === 'critical' ? 'red' : 'blue'} icon={ShieldAlert} />
+        <div className={cn('mt-4 grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-3')}>
+          <BattleStatCard label="현재 누적" value={formatStudyCompact(viewer.value)} hint="현재 범위 기준 누적" tone="orange" icon={Clock3} />
+          <BattleStatCard label="1위와 차이" value={viewer.rank === 1 ? '선두' : formatGapLabel(diffAbove)} hint={viewer.rank === 1 ? '현재 상위 유지' : '상위권 기준'} tone="gold" icon={Crown} />
+          <BattleStatCard label="바로 아래 차이" value={below ? formatGapLabel(diffBelow) : '여유'} hint={below ? `${maskLeaderboardStudentName(below.displayNameSnapshot)} 기준` : '아래 경쟁 없음'} tone={pressure === 'critical' ? 'red' : 'blue'} icon={ShieldAlert} />
         </div>
 
         <div className="mt-5">
           <BattleGauge
-            leftLabel="내 전장"
-            rightLabel={viewer.rank === 1 ? '추격 파동' : '1위 존'}
+            leftLabel="내 현재 누적"
+            rightLabel={viewer.rank === 1 ? '바로 아래 기준' : '1위 기준'}
             leftValue={viewer.value}
             rightValue={viewer.rank === 1 ? (below?.value ?? viewer.value - 10) : (top?.value ?? viewer.value + 10)}
             mode={mode}
@@ -1210,235 +1225,159 @@ function StandingsSidebar({
     2: 'orange',
     3: 'red',
   };
-
-  if (isMobile) {
-    const topLeader = leaders[0] ?? null;
-    const secondaryLeaders = leaders.slice(1, 3);
-
-    return (
-      <aside className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-4 text-[#132A63]')}>
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.74),transparent_36%,transparent_72%,rgba(255,174,90,0.08))]" />
-
-        <div className="relative">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#9A5B12]">
-              <Trophy className="h-3.5 w-3.5" />
-              TOP 3 LIVE
-            </div>
-            <h3 className="mt-3 text-[1.6rem] font-black tracking-[-0.04em] text-[#132A63]">실시간 TOP 3</h3>
-            <p className="student-aggro-body mt-2 text-[13px] text-[#64779C]">
-              지금 전장을 흔들고 있는 상위권입니다. 먼저 흐름부터 보고 바로 아래 내 위치를 확인하세요.
-            </p>
-          </div>
-
-          {topLeader ? (
-            <motion.div
-              key={topLeader.studentId}
-              layout
-              className={cn(
-                MOBILE_BATTLE_INSET_CLASS,
-                'mt-4 relative overflow-hidden px-4 py-4',
-                topLeader.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
-              )}
-              whileHover={{ y: -2, scale: 1.01 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-            >
-              <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', TONE_CLASS_MAP.gold.line)} />
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', TONE_CLASS_MAP.gold.chip)}>
-                    1위
-                    <Crown className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="font-aggro-display mt-3 truncate text-[1.45rem] font-black tracking-[-0.04em] text-[#132A63]">
-                    {maskLeaderboardStudentName(topLeader.displayNameSnapshot)}
-                  </div>
-                  <div className="mt-1 truncate text-[12px] font-semibold text-[#6E7893]">
-                    {formatSchoolName(topLeader.schoolNameSnapshot)}
-                  </div>
-                </div>
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-[#F0D3B2] bg-[#FFF6E8] text-[#C86A10]">
-                  <Trophy className="h-5 w-5" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-end justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부중</div>
-                  <div className="mt-2 text-[2rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
-                    {formatStudyCompact(topLeader.value)}
-                  </div>
-                </div>
-                <div className="rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
-                  {topLeader.isViewer ? '나' : 'LEAD'}
-                </div>
-              </div>
-            </motion.div>
-          ) : null}
-
-          {secondaryLeaders.length ? (
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
-              {secondaryLeaders.map((entry) => {
-                const toneClass = TONE_CLASS_MAP[toneMap[entry.rank] ?? 'blue'];
-
-                return (
-                  <motion.div
-                    key={entry.studentId}
-                    layout
-                    className={cn(
-                      MOBILE_BATTLE_INSET_CLASS,
-                      'relative overflow-hidden px-3.5 py-3',
-                      entry.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
-                    )}
-                    whileHover={{ y: -2, scale: 1.01 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                  >
-                    <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r', toneClass.line)} />
-                    <div className="flex items-start justify-between gap-2">
-                      <div className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.16em]', toneClass.chip)}>
-                        {entry.rank}위
-                      </div>
-                      {entry.isViewer ? (
-                        <div className="rounded-full border border-[#FFBE77] bg-white/92 px-2 py-1 text-[9px] font-black tracking-[0.14em] text-[#C86A10]">
-                          나
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
-                      {maskLeaderboardStudentName(entry.displayNameSnapshot)}
-                    </div>
-                    <div className="mt-1 truncate text-[11px] font-semibold text-[#6E7893]">
-                      {formatSchoolName(entry.schoolNameSnapshot)}
-                    </div>
-                    <div className="mt-3 text-[1.45rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
-                      {formatStudyCompact(entry.value)}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          ) : null}
-
-          <div className={cn(MOBILE_BATTLE_STRIP_CLASS, 'mt-3 flex items-center justify-between gap-3 px-4 py-3.5')}>
-            <div className="min-w-0">
-              <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">내 현재 순위</div>
-              <div className="mt-1 flex items-end gap-2">
-                <div className="text-[1.8rem] font-black leading-none tracking-[-0.06em] text-[#132A63]">#{viewer.rank}</div>
-                <div className="pb-0.5 text-[12px] font-black text-[#64779C]">{formatStudyCompact(viewer.value)} 공부중</div>
-              </div>
-            </div>
-            <div className="rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
-              {viewer.rank <= 3 ? 'TOP ZONE' : 'CHASE'}
-            </div>
-          </div>
-        </div>
-      </aside>
-    );
-  }
+  const topLeader = leaders[0] ?? null;
+  const secondaryLeaders = leaders.slice(1, 3);
+  const viewerSummaryLabel = viewer.rank <= 3 ? '상위권' : viewer.rank <= 5 ? '근접권' : '현재 위치';
 
   return (
     <aside className={cn(
-      'student-utility-card rounded-[30px] border border-[#E6D2BE] bg-[radial-gradient(circle_at_top_right,rgba(255,192,120,0.16),transparent_26%),linear-gradient(180deg,#FFF9F1_0%,#FFF1DE_100%)] text-[#132A63] shadow-[0_20px_48px_rgba(20,41,95,0.1)]',
+      MOBILE_BATTLE_PANEL_CLASS,
+      'student-utility-card relative overflow-hidden text-[#132A63]',
       isMobile ? 'p-4' : 'p-5 md:p-6'
     )}>
-      <div className={cn(isMobile ? 'mb-3' : 'mb-4')}>
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
-          <Trophy className="h-4 w-4" />
-          현재 순위
-        </div>
-        <h3 className={cn('font-black tracking-[-0.04em] text-[#132A63]', isMobile ? 'text-xl' : 'text-2xl')}>실시간 TOP 3</h3>
-        <p className={cn('student-aggro-body mt-2 leading-6 text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>
-          지금 올라와 있는 상위권과 내 현재 위치를 바로 확인해보세요.
-        </p>
-      </div>
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.74),transparent_36%,transparent_72%,rgba(255,174,90,0.08))]" />
 
-      <div className={cn(isMobile ? 'space-y-2.5' : 'space-y-3')}>
-        {leaders.map((entry) => {
-          const toneClass = TONE_CLASS_MAP[toneMap[entry.rank] ?? 'blue'];
-          return (
-            <motion.div
-              key={entry.studentId}
-              layout
-              className={cn(
-                'rounded-[22px] border shadow-[0_14px_28px_rgba(20,41,95,0.08)]',
-                entry.isViewer
-                  ? 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE8C3_100%)]'
-                  : 'border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF8EE_100%)]'
-              )}
-              style={isMobile ? { padding: '14px 16px' } : { padding: '16px' }}
-              whileHover={{ y: -2, scale: 1.01 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-            >
-              {isMobile ? (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
-                        {entry.rank}위
-                        {entry.rank === 1 ? <Crown className="h-3.5 w-3.5" /> : null}
-                      </div>
-                      {entry.isViewer ? (
-                        <div className="rounded-full border border-[#FFBE77] bg-white/92 px-2.5 py-1 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
-                          나
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="font-aggro-display mt-2 truncate text-base font-black tracking-[-0.03em] text-[#132A63]">
-                      {maskLeaderboardStudentName(entry.displayNameSnapshot)}
-                    </div>
-                    <div className="mt-0.5 truncate text-[12px] font-semibold text-[#6E7893]">
-                      {formatSchoolName(entry.schoolNameSnapshot)}
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-[11px] font-black tracking-[0.18em] text-[#7A86A2]">공부중</div>
-                    <div className="mt-1 text-[1.6rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
-                      {formatStudyCompact(entry.value)}
-                    </div>
-                  </div>
+      <div className="relative">
+        <div className={cn(isMobile ? 'mb-3' : 'mb-4')}>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
+            <Trophy className="h-4 w-4" />
+            상위권 인사이트
+          </div>
+          <h3 className={cn('font-black tracking-[-0.04em] text-[#132A63]', isMobile ? 'text-xl' : 'text-2xl')}>
+            현재 상위 3명
+          </h3>
+          <p className={cn('student-aggro-body mt-2 leading-6 text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>
+            현재 누적 공부시간 기준으로 상위권 흐름과 내 위치를 빠르게 확인할 수 있습니다.
+          </p>
+        </div>
+
+        {topLeader ? (
+          <motion.div
+            key={topLeader.studentId}
+            layout
+            className={cn(
+              MOBILE_BATTLE_INSET_CLASS,
+              'relative overflow-hidden px-4 py-4',
+              topLeader.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
+            )}
+            whileHover={{ y: -2, scale: 1.01 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', TONE_CLASS_MAP.gold.line)} />
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', TONE_CLASS_MAP.gold.chip)}>
+                  1위
+                  <Crown className="h-3.5 w-3.5" />
                 </div>
-              ) : (
-                <>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
-                        {entry.rank}위
-                        {entry.rank === 1 ? <Crown className="h-3.5 w-3.5" /> : null}
+                <div className="font-aggro-display mt-3 truncate text-[1.45rem] font-black tracking-[-0.04em] text-[#132A63]">
+                  {maskLeaderboardStudentName(topLeader.displayNameSnapshot)}
+                </div>
+                <div className="mt-1 truncate text-[12px] font-semibold text-[#6E7893]">
+                  {formatSchoolName(topLeader.schoolNameSnapshot)}
+                </div>
+              </div>
+              <div className="rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+                {topLeader.isViewer ? '나' : '현재 기준'}
+              </div>
+            </div>
+            <div className="mt-4 flex items-end justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부시간</div>
+                <div className="mt-2 text-[2rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                  {formatStudyCompact(topLeader.value)}
+                </div>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-[#F0D3B2] bg-[#FFF6E8] text-[#C86A10]">
+                <Trophy className="h-5 w-5" />
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+
+        {secondaryLeaders.length ? (
+          <div className={cn(isMobile ? 'mt-3 grid grid-cols-2 gap-2.5' : 'mt-3 space-y-3')}>
+            {secondaryLeaders.map((entry) => {
+              const toneClass = TONE_CLASS_MAP[toneMap[entry.rank] ?? 'blue'];
+
+              return (
+                <motion.div
+                  key={entry.studentId}
+                  layout
+                  className={cn(
+                    MOBILE_BATTLE_INSET_CLASS,
+                    'relative overflow-hidden px-3.5 py-3',
+                    !isMobile && 'flex items-center justify-between gap-3 px-4 py-4',
+                    entry.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
+                  )}
+                  whileHover={{ y: -2, scale: 1.01 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                >
+                  <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r', toneClass.line)} />
+                  {isMobile ? (
+                    <>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.16em]', toneClass.chip)}>
+                          {entry.rank}위
+                        </div>
+                        {entry.isViewer ? (
+                          <div className="rounded-full border border-[#FFBE77] bg-white/92 px-2 py-1 text-[9px] font-black tracking-[0.14em] text-[#C86A10]">
+                            나
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="font-aggro-display mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
+                      <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
                         {maskLeaderboardStudentName(entry.displayNameSnapshot)}
                       </div>
-                      <div className="mt-1 truncate text-xs font-semibold text-[#6E7893]">
+                      <div className="mt-1 truncate text-[11px] font-semibold text-[#6E7893]">
                         {formatSchoolName(entry.schoolNameSnapshot)}
                       </div>
-                    </div>
-                    {entry.isViewer ? (
-                      <div className="rounded-full border border-[#FFBE77] bg-white/92 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-[#C86A10]">
-                        나
+                      <div className="mt-3 text-[1.45rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                        {formatStudyCompact(entry.value)}
                       </div>
-                    ) : null}
-                  </div>
-                  <div className="mt-4 text-3xl font-black tracking-[-0.05em] text-[#132A63]">
-                    {formatStudyCompact(entry.value)}
-                  </div>
-                </>
-              )}
-            </motion.div>
-          );
-        })}
-      </div>
-
-      <div className={cn(
-        'rounded-[22px] border border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] shadow-[0_14px_28px_rgba(20,41,95,0.08)]',
-        isMobile ? 'mt-3 px-4 py-3.5' : 'mt-4 px-4 py-4'
-      )}>
-        <div className="text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">내 현재 순위</div>
-        <div className="mt-2 flex items-end justify-between gap-3">
-          <div>
-            <div className={cn('font-black tracking-[-0.06em] text-[#132A63]', isMobile ? 'text-[2.2rem]' : 'text-4xl')}>#{viewer.rank}</div>
-            <div className={cn('mt-1 font-semibold text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>{formatStudyClock(viewer.value)} 공부중</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="min-w-0">
+                        <div className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.16em]', toneClass.chip)}>
+                          {entry.rank}위
+                        </div>
+                        <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
+                          {maskLeaderboardStudentName(entry.displayNameSnapshot)}
+                        </div>
+                        <div className="mt-1 truncate text-[11px] font-semibold text-[#6E7893]">
+                          {formatSchoolName(entry.schoolNameSnapshot)}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부시간</div>
+                        <div className="mt-2 text-[1.45rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                          {formatStudyCompact(entry.value)}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
-          <div className="rounded-full border border-[#F0D3B2] bg-[#FFF5E5] px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#9A5B12]">
-            LIVE
+        ) : null}
+
+        <div className={cn(
+          MOBILE_BATTLE_STRIP_CLASS,
+          isMobile ? 'mt-3 flex items-center justify-between gap-3 px-4 py-3.5' : 'mt-4 flex items-center justify-between gap-3 px-4 py-4'
+        )}>
+          <div className="min-w-0">
+            <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">내 현재 순위</div>
+            <div className="mt-1 flex items-end gap-2">
+              <div className={cn('font-black leading-none tracking-[-0.06em] text-[#132A63]', isMobile ? 'text-[1.8rem]' : 'text-[2.2rem]')}>
+                #{viewer.rank}
+              </div>
+              <div className="pb-0.5 text-[12px] font-black text-[#64779C]">{formatStudyCompact(viewer.value)} 누적</div>
+            </div>
+          </div>
+          <div className="rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+            {viewerSummaryLabel}
           </div>
         </div>
       </div>
@@ -1453,16 +1392,32 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
         <div>
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF6C57] shadow-[0_0_16px_rgba(255,108,87,0.9)]" />
-            LIVE FEED
+            최근 변동
           </div>
-          <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">실시간 전투 로그</h3>
+          <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">실시간 순위 변화</h3>
         </div>
         <div className="rounded-full border border-[#E7D5C0] bg-white/92 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#6E7893]">
           3~5초 간격 갱신
         </div>
       </div>
 
-      <LiveTopThreeBoard entries={leaders} />
+      <div className="mb-4 rounded-[22px] border border-[#E8D5C1] bg-white/88 px-4 py-3 shadow-[0_14px_28px_rgba(20,41,95,0.06)]">
+        <div className="text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">현재 상위권</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {leaders.map((entry) => (
+            <div
+              key={entry.studentId}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black tracking-[0.16em]',
+                TONE_CLASS_MAP[(entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'orange' : 'red')].chip
+              )}
+            >
+              {entry.rank}위
+              <span className="text-[#132A63]">{maskLeaderboardStudentName(entry.displayNameSnapshot)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="space-y-3">
         <AnimatePresence initial={false}>
@@ -1516,10 +1471,10 @@ function DailyWaitingCard({
           <h2 className="font-aggro-display text-[2rem] font-black leading-[0.95] tracking-[-0.05em] text-[#132A63] md:text-[2.4rem]">
             오픈 시간에만
             <br />
-            랭킹 트랙이 열려요
+            일간 랭킹이 열려요
           </h2>
           <p className="student-aggro-body mt-3 max-w-2xl text-sm leading-7 text-[#5B7098] md:text-base">
-            {windowLabel}에 공부한 기록만 일간 순위에 실시간 반영됩니다. 지금은 대기 상태라서 다음 오픈 시간에 다시 LIVE로 전환돼요.
+            {windowLabel}에 공부한 기록만 일간 순위에 실시간 반영됩니다. 지금은 대기 상태라서 다음 오픈 시간에 다시 집계가 시작돼요.
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
@@ -1528,8 +1483,8 @@ function DailyWaitingCard({
             <div className="mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-[#132A63]">{nextOpensAtLabel}</div>
           </div>
           <div className="rounded-[22px] border border-[#ECD3B6] bg-white/82 p-4 shadow-[0_14px_28px_rgba(20,41,95,0.06)]">
-            <div className="text-[11px] font-black tracking-[0.18em] text-[#A16B0E]">일간 보상</div>
-            <div className="mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-[#132A63]">1위 500P</div>
+            <div className="text-[11px] font-black tracking-[0.18em] text-[#A16B0E]">반영 기준</div>
+            <div className="mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-[#132A63]">오픈 후 실시간 집계</div>
           </div>
         </div>
       </div>
@@ -1608,19 +1563,19 @@ function RecommendationPanel({
         <div>
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D8BF] bg-white/80 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
             <Sparkles className="h-4 w-4" />
-            오늘의 학습 추천
+            다음 집중 포인트
           </div>
-          <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">최근 기록을 보면 오늘은 이 정도만 바꾸면 됩니다</h3>
+          <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">오늘 계획에서 이 정도만 조정하면 됩니다</h3>
           <p className="mt-2 text-sm font-semibold leading-6 text-[#64779C]">
             최근 계획과 학습 기준을 바탕으로, 바로 오늘 계획에 넣을 수 있는 제안만 추렸어요.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onReopenDiagnosis} className="rounded-full border border-[#E0C19D] bg-white/85 px-4 py-2 text-sm font-black text-[#132A63]">
-            학습 기준 다시 진단하기
+            계획 페이지 열기
           </button>
           <button type="button" onClick={onViewDiagnosis} className="rounded-full border border-[#E0C19D] bg-[#FFF6E8] px-4 py-2 text-sm font-black text-[#9A5B12]">
-            전체 진단 결과 보기
+            진단 결과 보기
           </button>
         </div>
       </div>
@@ -1697,15 +1652,15 @@ function simulateBattleTick(entries: BattleEntry[], viewerId: string): {
       log: {
         id: `log-${Date.now()}`,
         tone: 'gold',
-        badge: 'RANK UP',
-        title: `나: 방금 ${nextViewer.rank}위 진입`,
-        detail: '순위가 실제로 올라갔습니다. 지금 흐름을 더 밀어붙이세요.',
+        badge: '순위 상승',
+        title: `나: 방금 ${nextViewer.rank}위로 올라왔어요`,
+        detail: '순위가 실제로 올라갔습니다. 지금 흐름을 유지해보세요.',
         target: 'viewer',
       },
       floatingEvent: {
         id: `float-${Date.now()}`,
         tone: 'gold',
-        label: 'OVERTAKE',
+        label: '상승',
         target: 'viewer',
       },
     };
@@ -1718,12 +1673,12 @@ function simulateBattleTick(entries: BattleEntry[], viewerId: string): {
       log: {
         id: `log-${Date.now()}`,
         tone: 'orange',
-        badge: 'LIVE PUSH',
+        badge: '집중 증가',
         title: `나: ${delta}분 추가 기록`,
         detail:
           diffAbove > 0
-            ? `지금 ${Math.max(10, Math.min(diffAbove + 1, 20))}분만 더 하면 역전권 진입이에요.`
-            : '현재 선두를 밀어내고 방어막을 유지하고 있어요.',
+            ? `지금 ${Math.max(10, Math.min(diffAbove + 1, 20))}분 더 쌓으면 상위권과 간격이 더 줄어듭니다.`
+            : '현재 선두 흐름을 안정적으로 유지하고 있어요.',
         target: 'viewer',
       },
       floatingEvent: {
@@ -1741,9 +1696,9 @@ function simulateBattleTick(entries: BattleEntry[], viewerId: string): {
       log: {
         id: `log-${Date.now()}`,
         tone: 'blue',
-        badge: 'LEAD PUSH',
+        badge: '상위권 유지',
         title: `${actor.displayNameSnapshot} 님이 ${delta}분 추가 기록`,
-        detail: '1위 존에서 방어막이 다시 두꺼워졌어요.',
+        detail: '상위권 기준치가 다시 조금 올라갔습니다.',
         target: 'top',
       },
       floatingEvent: {
@@ -1760,18 +1715,18 @@ function simulateBattleTick(entries: BattleEntry[], viewerId: string): {
     log: {
       id: `log-${Date.now()}`,
       tone: 'red',
-      badge: 'PRESSURE',
+      badge: '간격 축소',
       title: `${actor.displayNameSnapshot} 님이 ${delta}분 추가 기록`,
       detail:
         nextBelow && nextBelow.studentId === actor.studentId
-          ? `지금 ${Math.max(8, Math.min(nextViewer.value - nextBelow.value, 18))}분 차이까지 추격해 왔어요.`
-          : '아래 경쟁권에서도 파동이 올라오고 있어요.',
+          ? `지금 ${Math.max(8, Math.min(nextViewer.value - nextBelow.value, 18))}분 차이까지 간격이 줄었습니다.`
+          : '바로 아래 구간에서도 변화가 커지고 있어요.',
       target: 'rival',
     },
     floatingEvent: {
       id: `float-${Date.now()}`,
       tone: 'red',
-      label: '추격 중',
+      label: '근접',
       target: 'rival',
     },
   };
@@ -1837,7 +1792,7 @@ export default function RankingBattlePage() {
       .catch(() => {
         if (cancelled) return;
         setSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
-        setFetchError('지금은 실시간 데이터를 불러오지 못해 샘플 전장으로 보여드리고 있어요.');
+        setFetchError('지금은 실시간 데이터를 불러오지 못해 샘플 랭킹으로 보여드리고 있어요.');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -1916,7 +1871,7 @@ export default function RankingBattlePage() {
             viewerRank: viewer.rank,
             latestLog: logs[0] ?? null,
           })
-        : ['지금 전장을 준비하는 중입니다.'],
+        : ['실시간 경쟁 흐름을 준비하는 중입니다.'],
     [mode, diffAbove, diffBelow, logs, viewer]
   );
 
@@ -1945,7 +1900,7 @@ export default function RankingBattlePage() {
     setLogs((prev) => [
       {
         id: `manual-${Date.now()}`,
-        badge: 'TACTIC',
+        badge: '추천 반영',
         tone: toneMap[item.tone],
         title: item.title,
         detail: `${item.action} 이제 오늘 계획에 바로 반영해보세요.`,
@@ -1958,10 +1913,18 @@ export default function RankingBattlePage() {
       {
         id: `manual-float-${Date.now()}`,
         tone: toneMap[item.tone],
-        label: '작전 적용',
+        label: '반영',
         target: 'viewer',
       },
     ]);
+  }
+
+  function handleOpenPlanPage() {
+    router.push('/dashboard/plan');
+  }
+
+  function handleViewDiagnosis() {
+    router.push('/dashboard/plan/diagnosis');
   }
 
   if (loading && !viewer && !isDailyWaiting) {
@@ -1970,7 +1933,7 @@ export default function RankingBattlePage() {
         <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center rounded-[32px] border border-[#E7D3C0] bg-white/92 shadow-[0_28px_80px_rgba(20,41,95,0.08)]">
           <div className="flex items-center gap-3 text-lg font-bold text-[#64779C]">
             <Loader2 className="h-5 w-5 animate-spin" />
-            경쟁 전장을 불러오는 중입니다.
+            실시간 랭킹을 불러오는 중입니다.
           </div>
         </div>
       </main>
@@ -1988,10 +1951,10 @@ export default function RankingBattlePage() {
           <HeroBattleHeader
             range={range}
             onRangeChange={handleRangeChange}
-            activeMessage={`다음 오픈 ${dailyRankWindow.nextOpensAtLabel}부터 일간 랭킹이 다시 LIVE로 열려요.`}
+            activeMessage={`다음 오픈 ${dailyRankWindow.nextOpensAtLabel}부터 일간 랭킹이 다시 실시간으로 열려요.`}
             isLive={false}
             statusLabel="집계 대기"
-            subtitleOverride={`${dailyRankWindow.windowLabel}에 공부한 기록만 일간 경쟁에 반영됩니다.`}
+            subtitleOverride={`${dailyRankWindow.windowLabel}에 공부한 기록만 일간 랭킹에 반영됩니다.`}
             isMobile={isMobile}
           />
 
@@ -2028,7 +1991,7 @@ export default function RankingBattlePage() {
           onRangeChange={handleRangeChange}
           activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]}
           isLive
-          statusLabel="LIVE"
+          statusLabel="실시간 집계"
           isMobile={isMobile}
         />
 
@@ -2040,13 +2003,29 @@ export default function RankingBattlePage() {
 
         {isMobile ? (
           <div className="space-y-4">
-            <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
             <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} rewardState={rewardState} isMobile />
+            <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
+            <LiveActivityLog logs={logs} leaders={liveLeaders} />
+            <RecommendationPanel
+              recommendations={recommendations}
+              onApply={handleApplyRecommendation}
+              onReopenDiagnosis={handleOpenPlanPage}
+              onViewDiagnosis={handleViewDiagnosis}
+            />
           </div>
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
             <div className="space-y-5">
               <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} rewardState={rewardState} />
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
+                <LiveActivityLog logs={logs} leaders={liveLeaders} />
+                <RecommendationPanel
+                  recommendations={recommendations}
+                  onApply={handleApplyRecommendation}
+                  onReopenDiagnosis={handleOpenPlanPage}
+                  onViewDiagnosis={handleViewDiagnosis}
+                />
+              </div>
             </div>
             <div className="space-y-5">
               <StandingsSidebar leaders={liveLeaders} viewer={viewer} />

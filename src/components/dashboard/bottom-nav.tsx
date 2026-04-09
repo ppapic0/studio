@@ -176,12 +176,12 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                   isActive
                     ? useBrandNav
                       ? isParent
-                        ? 'bg-white text-[#14295F] shadow-[0_14px_22px_rgba(8,18,45,0.34)] ring-1 ring-[#ffcf9f]'
+                        ? 'bg-[linear-gradient(180deg,#fffaf3_0%,#ffe4c3_100%)] text-[#FF7A16] shadow-[0_16px_24px_rgba(255,122,22,0.24)] ring-1 ring-[#ffcf9f]'
                         : 'bg-[#FF7A16] text-[#14295F] shadow-[0_10px_18px_rgba(255,122,22,0.40)]'
                       : `bg-gradient-to-br ${currentTier.gradient} text-white shadow-lg`
                     : useBrandNav
                       ? isParent
-                        ? 'bg-white/8 text-white/86'
+                        ? 'bg-white/10 text-white/86 ring-1 ring-white/8'
                         : 'bg-white/10 text-white/90'
                       : 'group-hover:bg-muted/50'
                 )}
@@ -203,7 +203,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                     ? isActive
                       ? 'text-white opacity-100'
                       : isParent
-                        ? 'text-white/78'
+                        ? 'text-white/82'
                         : 'text-white opacity-90'
                     : isActive
                       ? 'opacity-100'

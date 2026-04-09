@@ -135,7 +135,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
   );
   const linkClass = cn(
     'relative flex items-center gap-3 rounded-[0.9rem] px-3.5 py-2.5 text-[#5c6e88] transition-all duration-150 ease-out hover:text-[#14295F] hover:bg-[rgba(20,41,95,0.05)] active:scale-[0.98] group overflow-hidden',
-    isParent && 'rounded-[1.25rem] border border-transparent bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3 shadow-[0_18px_30px_-28px_rgba(20,41,95,0.18)] hover:border-[#d8e4fb] hover:bg-[linear-gradient(180deg,#ffffff_0%,#f3f8ff_100%)]',
+    isParent && 'rounded-[1.25rem] border border-[#ffe2c5] bg-[linear-gradient(180deg,#ffffff_0%,#fff8f1_100%)] px-4 py-3 shadow-[0_18px_30px_-28px_rgba(255,122,22,0.14)] hover:border-[#ffc98d] hover:bg-[linear-gradient(180deg,#ffffff_0%,#fff1e2_100%)]',
     isMobile ? 'text-lg' : ''
   );
 
@@ -155,7 +155,7 @@ export function MainNav({ isMobile = false }: MainNavProps) {
           linkClass,
           isActive && (
             isParent
-              ? 'border-[#25427d] bg-[linear-gradient(135deg,#1d3c79_0%,#14295f_100%)] text-white shadow-[0_24px_34px_-26px_rgba(20,41,95,0.42)] hover:text-white hover:bg-transparent'
+              ? 'border-[#ffbe80] bg-[linear-gradient(135deg,#fffaf3_0%,#ffe7cb_100%)] text-[#14295F] shadow-[0_24px_34px_-26px_rgba(255,122,22,0.22)] hover:text-[#14295F] hover:bg-transparent'
               : isStudent
               ? 'bg-[linear-gradient(135deg,#315AAE,#14295F)] text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.18)] hover:text-white hover:bg-transparent'
               : 'bg-[linear-gradient(135deg,#1e4898,#14295f)] text-white shadow-[0_2px_8px_rgba(20,41,95,0.18),0_6px_16px_-4px_rgba(20,41,95,0.14)] hover:text-white hover:bg-transparent'
@@ -167,11 +167,17 @@ export function MainNav({ isMobile = false }: MainNavProps) {
         )}
         <item.icon className={cn(
           'h-[1.05rem] w-[1.05rem] flex-shrink-0 transition-all duration-200',
-          isActive ? 'text-white' : isParent ? 'text-[#6a7fa6] group-hover:text-[#14295F] group-hover:scale-105' : 'text-[#8a9daf] group-hover:text-[#14295F] group-hover:scale-105'
+          isActive
+            ? isParent
+              ? 'text-[#FF7A16]'
+              : 'text-white'
+            : isParent
+              ? 'text-[#c07427] group-hover:text-[#FF7A16] group-hover:scale-105'
+              : 'text-[#8a9daf] group-hover:text-[#14295F] group-hover:scale-105'
         )} />
         <span className={cn(
           'whitespace-nowrap truncate',
-          isActive ? 'font-bold' : isParent ? 'font-black text-[#355381]' : 'font-semibold'
+          isActive ? 'font-bold' : isParent ? 'font-black text-[#84552a]' : 'font-semibold'
         )}>
           {item.label}
         </span>

@@ -308,6 +308,11 @@ function RewardModal({
   nextCountdownLabel: string;
   hasMoreBoxes: boolean;
 }) {
+  const canRevealSelectedBox =
+    revealedReward === null && Boolean(selectedBox && (selectedBox.state === "ready" || selectedBox.state === "opened"));
+  const revealHeadline =
+    selectedBox?.state === "opened" ? "다시 확인하기" : "터치해서 열기";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -354,7 +359,7 @@ function RewardModal({
               stage={boxStage}
               rarity={selectedBox?.rarity ?? null}
               label={`${selectedBox?.hour || 0}시간 상자`}
-              onClick={revealedReward === null ? onReveal : undefined}
+              onClick={canRevealSelectedBox ? onReveal : undefined}
             />
             {revealedReward === null ? (
               <div className="mt-4">
@@ -364,7 +369,7 @@ function RewardModal({
                 {boxContextLabel ? (
                   <div className="mt-1 text-[11px] font-semibold text-white/70">{boxContextLabel}</div>
                 ) : null}
-                <div className="mt-2 text-xl font-black tracking-tight text-white">터치해서 열기</div>
+                <div className="mt-2 text-xl font-black tracking-tight text-white">{revealHeadline}</div>
               </div>
             ) : (
               <div className="point-track-reward-burst surface-card surface-card--highlight mt-5 rounded-[1.35rem] px-4 py-5">

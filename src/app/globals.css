@@ -3518,7 +3518,7 @@ select {
 @keyframes parent-enter-up {
   0% {
     opacity: 0;
-    transform: translateY(18px) scale(0.982);
+    transform: translateY(24px) scale(0.974);
   }
   100% {
     opacity: 1;
@@ -3529,7 +3529,7 @@ select {
 @keyframes parent-panel-enter {
   0% {
     opacity: 0;
-    transform: translateY(12px) scale(0.994);
+    transform: translateY(16px) scale(0.988);
   }
   100% {
     opacity: 1;
@@ -4008,12 +4008,12 @@ select {
 .parent-nav-enter,
 .auth-rise-in {
   opacity: 0;
-  animation: parent-enter-up 0.62s cubic-bezier(0.2, 0.88, 0.22, 1) forwards;
+  animation: parent-enter-up 0.72s cubic-bezier(0.18, 0.88, 0.22, 1) forwards;
   will-change: opacity, transform;
 }
 
 .parent-tab-panel[data-state="active"] {
-  animation: parent-panel-enter 0.48s cubic-bezier(0.2, 0.82, 0.22, 1);
+  animation: parent-panel-enter 0.56s cubic-bezier(0.18, 0.84, 0.22, 1) both;
   will-change: opacity, transform;
 }
 
@@ -4038,8 +4038,11 @@ select {
 }
 
 .parent-home-cta-glow:hover {
-  box-shadow: 0 22px 40px -22px rgba(20, 41, 95, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
-  transform: translateY(-1px);
+  box-shadow:
+    0 28px 52px -22px rgba(255, 122, 22, 0.46),
+    0 10px 26px -20px rgba(20, 41, 95, 0.22),
+    0 0 0 1px rgba(255, 244, 230, 0.36) inset;
+  transform: translateY(-2px) scale(1.005);
 }
 
 .student-shell-enter,

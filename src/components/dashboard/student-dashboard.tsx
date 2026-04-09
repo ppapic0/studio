@@ -3065,7 +3065,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, []);
 
   const handleRevealHomeBox = useCallback(async () => {
-    if (!selectedHomeBox || selectedHomeBox.state !== 'ready' || isClaimingHomeBox || !progressRef || !activeVaultDateKey) return;
+    const isRevealableBox = selectedHomeBox?.state === 'ready' || selectedHomeBox?.state === 'opened';
+    if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !progressRef || !activeVaultDateKey) return;
 
     setIsClaimingHomeBox(true);
     setHomeBoxStage('shake');

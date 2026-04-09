@@ -191,6 +191,26 @@ function getStudyHistoryFlowLabel(minutes: number) {
   return '깊은 몰입';
 }
 
+function toDateSafe(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate?: unknown }).toDate === 'function') {
+    try {
+      const converted = (value as { toDate: () => Date }).toDate();
+      return Number.isNaN(converted.getTime()) ? null : converted;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function formatAttendanceTimeLabel(value: Date | null, fallback = '미기록') {
+  return value ? format(value, 'HH:mm') : fallback;
+}
+
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
@@ -462,6 +482,14 @@ export default function StudyHistoryPage() {
 
   const selectedDateKey = selectedDateForPlan ? format(selectedDateForPlan, 'yyyy-MM-dd') : null;
 
+  const selectedDateAttendanceRecordRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !targetUid || !selectedDateKey) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'attendanceRecords', selectedDateKey, 'students', targetUid);
+  }, [firestore, activeMembership?.id, targetUid, selectedDateKey]);
+  const { data: selectedDateAttendanceRecord } = useDoc<Record<string, unknown>>(selectedDateAttendanceRecordRef, {
+    enabled: !!targetUid && !!selectedDateKey,
+  });
+
   const reportRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !targetUid || !selectedDateKey) return null;
     return doc(firestore, 'centers', activeMembership.id, 'dailyReports', `${selectedDateKey}_${targetUid}`);
@@ -487,6 +515,70 @@ export default function StudyHistoryPage() {
   const totalQuickPlanCount = scheduleItems.length + studyTasks.length + personalTasks.length;
   const completedQuickPlanCount = completedStudyCount + completedPersonalCount;
   const quickPlanCompletionRate = totalQuickPlanCount > 0 ? Math.round((completedQuickPlanCount / totalQuickPlanCount) * 100) : 0;
+  const selectedDateCheckInAt = useMemo(
+    () => toDateSafe((selectedDateAttendanceRecord?.checkInAt as unknown) || (selectedDateAttendanceRecord?.updatedAt as unknown)),
+    [selectedDateAttendanceRecord]
+  );
+  const selectedDateCheckOutAt = useMemo(
+    () => toDateSafe(selectedDateAttendanceRecord?.checkOutAt as unknown),
+    [selectedDateAttendanceRecord]
+  );
+  const selectedDateAttendanceSummary = useMemo(
+    () => ({
+      checkInLabel: formatAttendanceTimeLabel(selectedDateCheckInAt, '미기록'),
+      checkOutLabel: selectedDateCheckOutAt
+        ? formatAttendanceTimeLabel(selectedDateCheckOutAt)
+        : selectedDateCheckInAt
+          ? '기록 대기'
+          : '미기록',
+    }),
+    [selectedDateCheckInAt, selectedDateCheckOutAt]
+  );
+  const todoPreviewItems = useMemo(() => {
+    const schedulePreview = [...scheduleItems]
+      .sort((a, b) => (a.title.split(': ')[1] || '00:00').localeCompare(b.title.split(': ')[1] || '00:00'))
+      .map((item) => {
+        const [title, rangeLabel] = item.title.split(': ');
+        return {
+          id: `schedule-${item.id}`,
+          categoryLabel: '루틴',
+          categoryClassName: 'border-[#FFD4B0] bg-[#FFF3E7] text-[#C95A00]',
+          title: title || item.title,
+          meta: rangeLabel || '시간 미정',
+          stateLabel: '시간 루틴',
+          stateClassName: 'border-[#FFE3CA] bg-white text-[#B75A0D]',
+          done: false,
+        };
+      });
+
+    const studyPreview = studyTasks.map((task) => ({
+      id: `study-${task.id}`,
+      categoryLabel: '학습',
+      categoryClassName: 'border-[#FFE0C2] bg-[#FFF4E8] text-[#CC620E]',
+      title: task.title,
+      meta: buildStudyTaskMeta(task),
+      stateLabel: task.done ? '완료' : '진행',
+      stateClassName: task.done
+        ? 'border-[#FFD6B1] bg-[#FFF1E2] text-[#C95A00]'
+        : 'border-slate-200 bg-white text-slate-500',
+      done: task.done,
+    }));
+
+    const personalPreview = personalTasks.map((task) => ({
+      id: `personal-${task.id}`,
+      categoryLabel: '기타',
+      categoryClassName: 'border-[#FFE8D2] bg-[#FFF7EF] text-[#D26E18]',
+      title: task.title,
+      meta: '개인 일정',
+      stateLabel: task.done ? '완료' : '진행',
+      stateClassName: task.done
+        ? 'border-[#FFD6B1] bg-[#FFF1E2] text-[#C95A00]'
+        : 'border-slate-200 bg-white text-slate-500',
+      done: task.done,
+    }));
+
+    return [...schedulePreview, ...studyPreview, ...personalPreview];
+  }, [scheduleItems, studyTasks, personalTasks]);
 
   const handleRoutineTemplateSelect = (template: (typeof ROUTINE_TEMPLATE_OPTIONS)[number]) => {
     setSelectedRoutineTemplateKey(template.key);
@@ -1452,25 +1544,87 @@ export default function StudyHistoryPage() {
                 </TabsContent>
 
                 <TabsContent value="today-plan" className="mt-0 space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge className="rounded-full border border-primary/10 bg-white px-3 py-1 text-[10px] font-black text-primary shadow-sm">
-                      루틴 {scheduleItems.length}개
-                    </Badge>
-                    <Badge className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700 shadow-sm">
-                      학습 {studyTasks.length}개
-                    </Badge>
-                    <Badge className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
-                      기타 {personalTasks.length}개
-                    </Badge>
-                    <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
-                      완료율 {quickPlanCompletionRate}%
-                    </Badge>
-                    {isToday ? (
-                      <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black text-amber-700 shadow-sm">
-                        당일 루틴 수정 시 벌점 주의
+                  <section className="space-y-4 rounded-[1.9rem] border border-[#FFD7B5] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,247,239,0.98)_100%)] p-4 shadow-[0_24px_52px_-36px_rgba(201,90,0,0.22)] sm:p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <Badge className="w-fit rounded-full border border-[#FFD3AC] bg-[#FFF3E6] px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#C95A00] shadow-none">
+                          그날 투두 요약
+                        </Badge>
+                        <div>
+                          <h3 className="text-base font-black tracking-tight text-[#14295F] sm:text-lg">
+                            {selectedDateForPlan ? format(selectedDateForPlan, 'M월 d일', { locale: ko }) : '선택 날짜'}에 진행한 할 일
+                          </h3>
+                          <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500">
+                            루틴, 학습, 기타 일정을 먼저 한 번에 보고 아래에서 자세히 확인하세요.
+                          </p>
+                        </div>
+                      </div>
+                      <Badge className="rounded-full border border-[#FFD5B2] bg-white px-3 py-1 text-[10px] font-black text-[#C95A00] shadow-none">
+                        완료율 {quickPlanCompletionRate}%
                       </Badge>
-                    ) : null}
-                  </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className="rounded-full border border-[#FFD5B2] bg-white px-3 py-1 text-[10px] font-black text-[#C95A00] shadow-none">
+                        루틴 {scheduleItems.length}개
+                      </Badge>
+                      <Badge className="rounded-full border border-[#FFD8B8] bg-[#FFF6EC] px-3 py-1 text-[10px] font-black text-[#C95A00] shadow-none">
+                        학습 {studyTasks.length}개
+                      </Badge>
+                      <Badge className="rounded-full border border-[#FFE4CF] bg-[#FFF9F3] px-3 py-1 text-[10px] font-black text-[#D97706] shadow-none">
+                        기타 {personalTasks.length}개
+                      </Badge>
+                    </div>
+
+                    {todoPreviewItems.length === 0 ? (
+                      <div className="rounded-[1.45rem] border border-dashed border-[#FFD9BD] bg-white/90 p-5 text-center">
+                        <p className="text-sm font-black text-[#C95A00]">그날 등록된 할 일이 없습니다.</p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500">등원 기록이 있으면 아래 시간 요약은 그대로 확인할 수 있어요.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-2.5">
+                        {todoPreviewItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className={cn(
+                              "flex items-center gap-3 rounded-[1.2rem] border px-3 py-3 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)] transition-colors",
+                              item.done ? "border-[#FFD6B3] bg-[#FFF6EC]" : "border-[#F3E4D4] bg-white"
+                            )}
+                          >
+                            <div className={cn("rounded-full border px-2.5 py-1 text-[10px] font-black shadow-none", item.categoryClassName)}>
+                              {item.categoryLabel}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-black text-[#14295F]">{item.title}</p>
+                              <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">{item.meta}</p>
+                            </div>
+                            <Badge className={cn("rounded-full px-2.5 py-1 text-[10px] font-black shadow-none", item.stateClassName)}>
+                              {item.stateLabel}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-[1.35rem] border border-[#FFD9BC] bg-white px-4 py-4 shadow-[0_18px_34px_-30px_rgba(201,90,0,0.18)]">
+                        <div className="flex items-center gap-2 text-[#C95A00]">
+                          <MapPin className="h-4 w-4" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">등원시간</p>
+                        </div>
+                        <p className="mt-3 text-2xl font-black tracking-tight text-[#14295F]">{selectedDateAttendanceSummary.checkInLabel}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500">실제 출결 기록 기준</p>
+                      </div>
+                      <div className="rounded-[1.35rem] border border-[#FFD9BC] bg-[#FFF9F3] px-4 py-4 shadow-[0_18px_34px_-30px_rgba(201,90,0,0.16)]">
+                        <div className="flex items-center gap-2 text-[#C95A00]">
+                          <School className="h-4 w-4" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">하원시간</p>
+                        </div>
+                        <p className="mt-3 text-2xl font-black tracking-tight text-[#14295F]">{selectedDateAttendanceSummary.checkOutLabel}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500">실제 출결 기록 기준</p>
+                      </div>
+                    </div>
+                  </section>
 
                   {isToday ? (
                     <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50/80 p-4">
