@@ -1171,26 +1171,28 @@ export default function StudyHistoryPage() {
                       <div className="pointer-events-none absolute inset-x-4 top-0 h-12 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.52),rgba(255,255,255,0)_72%)] opacity-90" />
                     ) : null}
 
-                    <div className="relative z-10 flex h-full flex-col justify-between">
-                      <div className="flex items-start justify-between">
-                        <span
-                          className={cn(
-                            'dashboard-number inline-flex items-center justify-center rounded-full border font-black tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
-                            isMobile ? 'min-w-[1.45rem] px-1.5 py-0.5 text-[9px]' : 'min-w-[2rem] px-2 py-1 text-xs',
-                            idx % 7 === 5 && isCurrentMonth
-                              ? 'border-blue-100 bg-blue-50 text-blue-700'
-                              : idx % 7 === 6 && isCurrentMonth
-                                ? 'border-rose-100 bg-rose-50 text-rose-700'
-                                : 'border-slate-200 bg-white text-slate-700',
-                            isTodayCalendar && 'border-[#9CD6B0] text-[#178244]'
-                          )}
-                        >
-                          {format(day, 'd')}
-                        </span>
-                        <span className={cn(isMobile ? 'h-5 w-5' : 'h-6 w-6')} aria-hidden="true" />
-                      </div>
+                    <div className={cn('relative z-10 flex h-full flex-col', isMobile ? 'justify-center' : 'justify-between')}>
+                      {!isMobile ? (
+                        <div className="flex items-start justify-between">
+                          <span
+                            className={cn(
+                              'dashboard-number inline-flex items-center justify-center rounded-full border font-black tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
+                              'min-w-[2rem] px-2 py-1 text-xs',
+                              idx % 7 === 5 && isCurrentMonth
+                                ? 'border-blue-100 bg-blue-50 text-blue-700'
+                                : idx % 7 === 6 && isCurrentMonth
+                                  ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                  : 'border-slate-200 bg-white text-slate-700',
+                              isTodayCalendar && 'border-[#9CD6B0] text-[#178244]'
+                            )}
+                          >
+                            {format(day, 'd')}
+                          </span>
+                          <span className="h-6 w-6" aria-hidden="true" />
+                        </div>
+                      ) : null}
 
-                      <div className={cn('flex flex-1 items-center justify-center', isMobile ? 'px-0.5 pb-0.5' : 'px-1 pb-2 pt-4')}>
+                      <div className={cn('flex flex-1 items-center justify-center', isMobile ? 'px-0.5' : 'px-1 pb-2 pt-4')}>
                         {shouldRenderTime ? (
                           <span
                             className={cn(
@@ -1244,21 +1246,23 @@ export default function StudyHistoryPage() {
                     <div className="pointer-events-none absolute inset-x-4 top-0 h-14 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.55),rgba(255,255,255,0)_72%)] opacity-80" />
                   )}
 
-                  <div className={cn('relative z-10 flex items-start justify-between gap-1.5', isMobile ? 'mb-auto' : 'mb-3')}>
-                    <span
-                      className={cn(
-                        'inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
-                        isMobile ? 'min-w-[1.5rem] px-1.5 py-0.5 text-[9px]' : 'min-w-[2rem] px-2 py-1 text-xs',
-                        idx % 7 === 5 && isCurrentMonth ? 'border-blue-100 bg-blue-50 text-blue-700' : idx % 7 === 6 && isCurrentMonth ? 'border-rose-100 bg-rose-50 text-rose-700' : 'border-slate-200 bg-white text-slate-700',
-                        isTodayCalendar && 'border-primary/20 text-primary'
-                      )}
-                    >
-                      {format(day, 'd')}
-                    </span>
-                    <span className={cn(isMobile ? 'h-5 w-5' : 'h-6 w-6')} aria-hidden="true" />
-                  </div>
+                  {!isMobile ? (
+                    <div className="relative z-10 mb-3 flex items-start justify-between gap-1.5">
+                      <span
+                        className={cn(
+                          'inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
+                          'min-w-[2rem] px-2 py-1 text-xs',
+                          idx % 7 === 5 && isCurrentMonth ? 'border-blue-100 bg-blue-50 text-blue-700' : idx % 7 === 6 && isCurrentMonth ? 'border-rose-100 bg-rose-50 text-rose-700' : 'border-slate-200 bg-white text-slate-700',
+                          isTodayCalendar && 'border-primary/20 text-primary'
+                        )}
+                      >
+                        {format(day, 'd')}
+                      </span>
+                      <span className="h-6 w-6" aria-hidden="true" />
+                    </div>
+                  ) : null}
 
-                  <div className={cn('mt-auto flex items-center justify-center', isMobile ? 'pb-1' : 'px-1 pt-4')}>
+                  <div className={cn('flex items-center justify-center', isMobile ? 'h-full' : 'mt-auto px-1 pt-4')}>
                     {shouldRenderTime ? (
                       <span
                         className={cn(
