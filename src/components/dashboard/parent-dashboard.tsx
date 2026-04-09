@@ -1404,6 +1404,18 @@ function formatMinutes(minutes: number) {
   return `${h}h ${m}m`;
 }
 
+function formatCalendarMinutes(minutes: number, compact = false) {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const h = Math.floor(safeMinutes / 60);
+  const m = safeMinutes % 60;
+
+  if (!compact) return `${h}h ${m}m`;
+  if (safeMinutes <= 0) return '0m';
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${m}m`;
+}
+
 function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록') {
   if (!value || Number.isNaN(value.getTime())) return emptyLabel;
   return format(value, 'HH:mm');
@@ -1561,6 +1573,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const prefersReducedMotion = usePrefersReducedMotion();
 
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
+  const isAppMode = viewMode === 'mobile';
   const [today, setToday] = useState<Date | null>(null);
   const [liveNowMs, setLiveNowMs] = useState(0);
   const [tab, setTab] = useState<ParentPortalTab>('home');
@@ -3934,10 +3947,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const isCurrentMonth = calendarBaseDate ? isSameMonth(day, calendarBaseDate) : false;
                       const isTodayCalendar = today ? isSameDay(day, today) : false;
                       const isFutureCalendar = isCurrentMonth && !!todayKey && dateKey > todayKey;
-                      const exactTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '';
+                      const exactTimeLabel = isCurrentMonth
+                        ? formatCalendarMinutes(minutes, isAppMode)
+                        : '';
                       const shouldRenderTime = isCurrentMonth && !isFutureCalendar;
-                      const isLongTimeLabel = exactTimeLabel.length >= 6;
-                      const isVeryLongTimeLabel = exactTimeLabel.length >= 7;
+                      const isLongTimeLabel = exactTimeLabel.length >= (isAppMode ? 5 : 6);
+                      const isVeryLongTimeLabel = exactTimeLabel.length >= (isAppMode ? 6 : 7);
 
                       return (
                         <button
@@ -3956,33 +3971,52 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-[#9cd6b0]" />}
                           <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
 
-                          <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isMobile ? "mb-auto" : "mb-3")}>
-                            <span
-                              className={cn(
-                                "font-aggro-display inline-flex items-center justify-center rounded-full border tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                                isMobile ? "min-w-[1.45rem] px-1.5 py-0.5 text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
-                                idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
-                                isTodayCalendar && "border-[#9cd6b0] text-[#178244]"
-                              )}
-                            >
-                              {format(day, 'd')}
-                            </span>
-                            <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
-                          </div>
+                          {!isAppMode ? (
+                            <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isMobile ? "mb-auto" : "mb-3")}>
+                              <span
+                                className={cn(
+                                  "font-aggro-display inline-flex items-center justify-center rounded-full border tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                                  isMobile ? "min-w-[1.45rem] px-1.5 py-0.5 text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
+                                  idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
+                                  isTodayCalendar && "border-[#9cd6b0] text-[#178244]"
+                                )}
+                              >
+                                {format(day, 'd')}
+                              </span>
+                              <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
+                            </div>
+                          ) : null}
 
-                          <div className={cn("mt-auto flex", isMobile ? "justify-center pb-1" : "justify-center px-1 pt-4")}>
+                          <div className={cn(
+                            "flex",
+                            isAppMode
+                              ? "relative z-10 h-full flex-1 items-center justify-center"
+                              : isMobile
+                                ? "mt-auto justify-center pb-1"
+                                : "mt-auto justify-center px-1 pt-4"
+                          )}>
                             {shouldRenderTime ? (
                               <div
                                 className={cn(
                                   "inline-flex w-full max-w-full items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
-                                  isMobile ? "min-h-[2.15rem] px-1 py-2" : "min-h-[3.25rem] px-2.5 py-3",
+                                  isAppMode
+                                    ? "min-h-[3.2rem] px-1.5 py-2.5"
+                                    : isMobile
+                                      ? "min-h-[2.15rem] px-1 py-2"
+                                      : "min-h-[3.25rem] px-2.5 py-3",
                                   getParentCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                                 )}
                               >
                                 <span
                                   className={cn(
                                     "font-aggro-display dashboard-number block whitespace-nowrap tabular-nums leading-none",
-                                    isMobile
+                                    isAppMode
+                                      ? isVeryLongTimeLabel
+                                        ? "text-[0.68rem] tracking-[-0.08em]"
+                                        : isLongTimeLabel
+                                          ? "text-[0.8rem] tracking-[-0.06em]"
+                                          : "text-[0.92rem] tracking-[-0.05em]"
+                                      : isMobile
                                       ? isVeryLongTimeLabel
                                         ? "text-[0.48rem] tracking-[-0.1em]"
                                         : isLongTimeLabel
