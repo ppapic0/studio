@@ -1409,20 +1409,25 @@ function formatAttendanceTimeLabel(value: Date | null, emptyLabel = '미기록')
   return format(value, 'HH:mm');
 }
 
-type ParentCalendarFlowLevel = 'none' | 'warmup' | 'short' | 'steady' | 'deep';
+type ParentCalendarFlowLevel = 'none' | 'light' | 'medium' | 'high';
 
 const PARENT_CALENDAR_THRESHOLDS = {
-  warmup: 180,
-  short: 360,
-  steady: 540,
+  light: 240,
+  medium: 480,
 } as const;
+
+const PARENT_CALENDAR_LEGEND = [
+  { level: 'none', label: '0h 0m', swatch: 'bg-white ring-[#D7E1DA]' },
+  { level: 'light', label: '< 4h', swatch: 'bg-[#E9F8EE] ring-[#B6DFC2]' },
+  { level: 'medium', label: '4h ~ 8h', swatch: 'bg-[#A2DBB4] ring-[#63BE7F]' },
+  { level: 'high', label: '8h+', swatch: 'bg-[#1F8B4D] ring-[#116B38]' },
+] as const;
 
 function getParentCalendarFlowLevel(minutes: number): ParentCalendarFlowLevel {
   if (minutes <= 0) return 'none';
-  if (minutes < PARENT_CALENDAR_THRESHOLDS.warmup) return 'warmup';
-  if (minutes < PARENT_CALENDAR_THRESHOLDS.short) return 'short';
-  if (minutes < PARENT_CALENDAR_THRESHOLDS.steady) return 'steady';
-  return 'deep';
+  if (minutes < PARENT_CALENDAR_THRESHOLDS.light) return 'light';
+  if (minutes < PARENT_CALENDAR_THRESHOLDS.medium) return 'medium';
+  return 'high';
 }
 
 function formatWon(value: number) {
@@ -2780,19 +2785,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const getHeatmapColor = (minutes: number) => {
     const level = getParentCalendarFlowLevel(minutes);
     if (level === 'none') return 'bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(244,248,245,0.996)_100%)] ring-1 ring-inset ring-[#D7E1DA]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_16px_30px_-28px_rgba(82,112,91,0.08)]';
-    if (level === 'warmup') return 'bg-[linear-gradient(180deg,rgba(249,255,250,0.998)_0%,rgba(221,246,228,0.996)_100%)] ring-1 ring-inset ring-[#A6DAB4]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_18px_32px_-28px_rgba(52,138,87,0.12)]';
-    if (level === 'short') return 'bg-[linear-gradient(180deg,rgba(239,252,243,0.998)_0%,rgba(173,233,190,0.997)_100%)] ring-1 ring-inset ring-[#67C485]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-28px_rgba(38,143,78,0.16)]';
-    if (level === 'steady') return 'bg-[linear-gradient(180deg,rgba(217,247,225,0.998)_0%,rgba(81,199,118,0.996)_100%)] ring-1 ring-inset ring-[#239D55]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_36px_-28px_rgba(24,133,70,0.22)]';
-    return 'bg-[linear-gradient(180deg,rgba(168,230,187,0.998)_0%,rgba(24,128,69,0.998)_100%)] ring-1 ring-inset ring-[#0F6B37]/95 shadow-[inset_0_1px_0_rgba(232,250,238,0.38),0_24px_42px_-26px_rgba(12,98,49,0.3)]';
+    if (level === 'light') return 'bg-[linear-gradient(180deg,rgba(249,255,250,0.998)_0%,rgba(228,247,234,0.996)_100%)] ring-1 ring-inset ring-[#B6DFC2]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_18px_32px_-28px_rgba(52,138,87,0.12)]';
+    if (level === 'medium') return 'bg-[linear-gradient(180deg,rgba(239,252,243,0.998)_0%,rgba(177,232,192,0.997)_100%)] ring-1 ring-inset ring-[#67C485]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-28px_rgba(38,143,78,0.16)]';
+    return 'bg-[linear-gradient(180deg,rgba(197,238,209,0.998)_0%,rgba(24,128,69,0.998)_100%)] ring-1 ring-inset ring-[#0F6B37]/95 shadow-[inset_0_1px_0_rgba(232,250,238,0.38),0_24px_42px_-26px_rgba(12,98,49,0.3)]';
   };
 
   const getParentCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
     const level = getParentCalendarFlowLevel(minutes);
     if (level === 'none') return 'border-[#D7E1DA] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(246,249,247,0.99))] text-[#7A8F80] shadow-[0_10px_18px_-18px_rgba(82,112,91,0.08)]';
-    if (level === 'warmup') return 'border-[#A6DAB4] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(230,248,236,0.99))] text-[#3C7F56] shadow-[0_12px_20px_-18px_rgba(52,138,87,0.12)]';
-    if (level === 'short') return 'border-[#63BF7F] bg-[linear-gradient(180deg,rgba(247,255,249,0.98),rgba(201,240,212,0.995))] text-[#1D6E44] shadow-[0_12px_20px_-18px_rgba(38,143,78,0.16)]';
-    if (level === 'steady') return 'border-[#239D55] bg-[linear-gradient(180deg,rgba(235,252,240,0.98),rgba(121,214,150,0.995))] text-[#155D35] shadow-[0_14px_24px_-18px_rgba(24,133,70,0.22)]';
+    if (level === 'light') return 'border-[#B6DFC2] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(233,248,237,0.99))] text-[#3C7F56] shadow-[0_12px_20px_-18px_rgba(52,138,87,0.12)]';
+    if (level === 'medium') return 'border-[#63BF7F] bg-[linear-gradient(180deg,rgba(247,255,249,0.98),rgba(205,241,215,0.995))] text-[#1D6E44] shadow-[0_12px_20px_-18px_rgba(38,143,78,0.16)]';
     return 'border-[#0F6B37] bg-[linear-gradient(180deg,rgba(58,158,96,0.98),rgba(15,107,55,0.998))] text-white shadow-[0_14px_24px_-18px_rgba(12,98,49,0.28)]';
   };
 
@@ -3890,8 +3893,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
               <Card className="relative mx-auto w-full overflow-hidden rounded-[2.7rem] border border-[#d8eadf] bg-[radial-gradient(circle_at_top_left,rgba(91,199,126,0.16),transparent_24%),linear-gradient(180deg,#fcfffd_0%,#ffffff_64%,#eef8f1_100%)] shadow-[0_30px_70px_-48px_rgba(23,120,69,0.14)] ring-1 ring-[#edf6ef]">
                 <CardContent className="relative p-0">
-                  <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-[#d8e7dc]", isMobile ? "px-3 py-3" : "px-5 py-4")}>
+                  <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b border-[#d8e7dc]", isMobile ? "px-3 py-3" : "px-5 py-4")}>
                     <span className="font-aggro-display text-[10px] uppercase tracking-[0.22em] text-[#2d6d47]">월간 흐름 요약</span>
+                    <div className={cn("grid gap-1.5", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+                      {PARENT_CALENDAR_LEGEND.map((item) => (
+                        <div
+                          key={item.level}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#d7e7dc] bg-white/96 px-3 py-1.5 shadow-[0_14px_24px_-22px_rgba(23,120,69,0.12)]"
+                        >
+                          <span className={cn("h-2.5 w-2.5 rounded-full ring-1", item.swatch)} />
+                          <span className="font-aggro-display text-[10px] tracking-[0.02em] text-[#24513c]">
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className={cn("grid grid-cols-7 border-b border-primary/10", isMobile ? "gap-1 px-1.5 py-1.5" : "gap-2 px-5 py-3.5")}>
                     {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
@@ -3915,20 +3931,20 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     ) : calendarData.map((day, idx) => {
                       const dateKey = format(day, 'yyyy-MM-dd');
                       const minutes = calendarMinutesByDateKey.get(dateKey) || 0;
-                      const hasPlans = weeklyPlans?.some((plan) => plan.dateKey === dateKey);
                       const isCurrentMonth = calendarBaseDate ? isSameMonth(day, calendarBaseDate) : false;
                       const isTodayCalendar = today ? isSameDay(day, today) : false;
-                      const flowLevel = getParentCalendarFlowLevel(minutes);
-                      const hasDeepFocus = isCurrentMonth && flowLevel === 'deep';
-                      const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
-                      const exactTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
+                      const isFutureCalendar = isCurrentMonth && !!todayKey && dateKey > todayKey;
+                      const exactTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '';
+                      const shouldRenderTime = isCurrentMonth && !isFutureCalendar;
+                      const isLongTimeLabel = exactTimeLabel.length >= 6;
+                      const isVeryLongTimeLabel = exactTimeLabel.length >= 7;
 
                       return (
                         <button
                           key={dateKey}
                           type="button"
                           onClick={() => setSelectedCalendarDate(day)}
-                          aria-label={format(day, 'M월 d일 (EEEE)', { locale: ko })}
+                          aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${isCurrentMonth ? (isFutureCalendar ? '아직 오지 않은 날짜' : exactTimeLabel) : '이번 달 아님'}`}
                           className={cn(
                             "group relative flex flex-col overflow-hidden rounded-[1.35rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/35",
                             isMobile ? "aspect-square min-h-0 p-1" : "aspect-square min-h-0 p-3.5",
@@ -3951,27 +3967,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             >
                               {format(day, 'd')}
                             </span>
-                            {hasStatusCluster ? (
-                              <div
-                                className={cn(
-                                  "inline-flex items-center gap-1 rounded-full border border-[#d7e7dc]/85 bg-white/96 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.24)]",
-                                  isMobile ? "px-1.5 py-0.5" : "px-2 py-1"
-                                )}
-                              >
-                                {hasPlans && <span className={cn("rounded-full bg-[#1d9b57]", isMobile ? "h-1.5 w-1.5" : "h-2 w-2")} />}
-                                {hasDeepFocus && <Zap className={cn("fill-[#178244] text-[#178244]", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />}
-                              </div>
-                            ) : (
-                              <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
-                            )}
+                            <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
                           </div>
 
                           <div className={cn("mt-auto flex", isMobile ? "justify-center pb-1" : "justify-center px-1 pt-4")}>
-                            {isCurrentMonth ? (
+                            {shouldRenderTime ? (
                               <div
                                 className={cn(
                                   "inline-flex w-full max-w-full items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
-                                  isMobile ? "min-w-[3rem] px-1.5 py-2" : "min-h-[3.25rem] px-3 py-3",
+                                  isMobile ? "min-h-[2.15rem] px-1 py-2" : "min-h-[3.25rem] px-2.5 py-3",
                                   getParentCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                                 )}
                               >
@@ -3979,8 +3983,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                   className={cn(
                                     "font-aggro-display dashboard-number block whitespace-nowrap tabular-nums leading-none",
                                     isMobile
-                                      ? "text-[0.64rem] tracking-[-0.04em]"
-                                      : "text-[0.86rem] tracking-[-0.04em]"
+                                      ? isVeryLongTimeLabel
+                                        ? "text-[0.48rem] tracking-[-0.1em]"
+                                        : isLongTimeLabel
+                                          ? "text-[0.56rem] tracking-[-0.08em]"
+                                          : "text-[0.64rem] tracking-[-0.05em]"
+                                      : isVeryLongTimeLabel
+                                        ? "text-[0.82rem] tracking-[-0.04em]"
+                                        : isLongTimeLabel
+                                          ? "text-[0.9rem] tracking-[-0.04em]"
+                                          : "text-[0.98rem] tracking-[-0.04em]"
                                   )}
                                 >
                                   {exactTimeLabel}
