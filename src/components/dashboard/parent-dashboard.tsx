@@ -758,7 +758,7 @@ function ParentDashboardTabRail({
               <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[10px] font-black text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.65)] backdrop-blur-sm">
                 Parent Mode
               </Badge>
-              <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[10px] font-black text-white/92 shadow-[0_12px_24px_-22px_rgba(5,10,28,0.65)] backdrop-blur-sm">
+              <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[10px] font-black text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.65)] backdrop-blur-sm">
                 {todayLabel}
               </Badge>
               <Badge variant="outline" className="h-7 rounded-full border border-[#ffb870]/28 bg-[#FF7A16]/14 px-3 text-[10px] font-black text-white shadow-[0_12px_24px_-22px_rgba(255,122,22,0.45)] backdrop-blur-sm">
@@ -771,11 +771,11 @@ function ParentDashboardTabRail({
                 <CurrentTabIcon className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/78">{activeStudentLabel}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">{activeStudentLabel}</p>
                 <h2 className="mt-2 break-keep text-[1.34rem] font-black leading-[1.15] tracking-[-0.04em] text-white sm:text-[1.68rem]">
                   {currentTabMeta.label}
                 </h2>
-                <p className="mt-2 max-w-2xl break-keep text-[12.5px] font-bold leading-[1.7] text-white/88 sm:text-[13px]">
+                <p className="mt-2 max-w-2xl break-keep text-[12.5px] font-bold leading-[1.7] text-white sm:text-[13px]">
                   {currentTabMeta.description}
                 </p>
               </div>
@@ -783,7 +783,7 @@ function ParentDashboardTabRail({
 
             {linkedStudents.length > 1 && (
               <div className="max-w-[250px]">
-                <Label className="mb-2 ml-1 block text-[10px] font-black uppercase tracking-[0.18em] text-white/78">
+                <Label className="mb-2 ml-1 block text-[10px] font-black uppercase tracking-[0.18em] text-white">
                   확인 중인 자녀
                 </Label>
                 <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={onStudentChange}>
@@ -804,19 +804,19 @@ function ParentDashboardTabRail({
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[27rem]">
             <div className="rounded-[1.35rem] border border-[#ffd6ab]/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,244,230,0.10)_100%)] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-sm">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/82">오늘 공부</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white">오늘 공부</p>
               <p className="mt-2 text-[1rem] font-black text-white">{toHm(totalMinutes)}</p>
             </div>
             <div className="rounded-[1.35rem] border border-[#ffd6ab]/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,244,230,0.10)_100%)] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-sm">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/82">미확인 알림</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white">미확인 알림</p>
               <p className="mt-2 text-[1rem] font-black text-white">{unreadRecentCount}건</p>
             </div>
             <div className="rounded-[1.35rem] border border-[#ffd6ab]/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,244,230,0.10)_100%)] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-sm">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/82">리포트</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white">리포트</p>
               <p className="mt-2 text-[1rem] font-black text-white">{reportsCount}건</p>
             </div>
             <div className="rounded-[1.35rem] border border-[#ffd6ab]/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,244,230,0.10)_100%)] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-sm">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/82">수납 상태</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white">수납 상태</p>
               <p className="mt-2 text-[1rem] font-black text-white">{hasOutstandingInvoice ? '확인 필요' : '안정'}</p>
             </div>
           </div>
@@ -838,13 +838,13 @@ function ParentDashboardTabRail({
                     'group relative flex items-center gap-2 rounded-[1.25rem] border px-3 py-3 text-left transition-[transform,background,box-shadow,border-color] duration-300 active:scale-[0.985]',
                     isActive
                       ? 'border-[#ffd4a8] bg-[linear-gradient(180deg,#fff5eb_0%,#ffe6ca_100%)] text-[#14295F] shadow-[0_18px_30px_-24px_rgba(255,122,22,0.32)]'
-                      : 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,244,230,0.05)_100%)] text-white/82 hover:border-[#ffd3a2]/24 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.12)_0%,rgba(255,244,230,0.08)_100%)]'
+                      : 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,244,230,0.05)_100%)] text-white hover:border-[#ffd3a2]/24 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.12)_0%,rgba(255,244,230,0.08)_100%)]'
                   )}
                 >
                   <div
                     className={cn(
                       'flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.95rem] transition-colors duration-300',
-                      isActive ? 'bg-[linear-gradient(135deg,#ff973d_0%,#FF7A16_100%)] text-white shadow-[0_14px_24px_-18px_rgba(255,122,22,0.34)]' : 'bg-white/10 text-white/84'
+                      isActive ? 'bg-[linear-gradient(135deg,#ff973d_0%,#FF7A16_100%)] text-white shadow-[0_14px_24px_-18px_rgba(255,122,22,0.34)]' : 'bg-white/10 text-white'
                     )}
                   >
                     <TabIcon className="h-4 w-4" />
@@ -853,7 +853,7 @@ function ParentDashboardTabRail({
                     <p className={cn('text-[11px] font-black tracking-tight', isActive ? 'text-[#14295F]' : 'text-white')}>
                       {meta.shortLabel}
                     </p>
-                    <p className={cn('mt-0.5 line-clamp-1 text-[9px] font-black uppercase tracking-[0.12em]', isActive ? 'text-[#d0690f]' : 'text-white/64')}>
+                    <p className={cn('mt-0.5 line-clamp-1 text-[9px] font-black uppercase tracking-[0.12em]', isActive ? 'text-[#d0690f]' : 'text-white')}>
                       {meta.label}
                     </p>
                   </div>
@@ -3429,18 +3429,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </Badge>
                 <div className="flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-1.5 shadow-[0_12px_28px_-22px_rgba(5,10,28,0.6)] backdrop-blur-sm">
                   <span className="inline-flex h-2 w-2 rounded-full bg-[#FF7A16]" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/90">실시간 앱 모니터링</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white">실시간 앱 모니터링</span>
                 </div>
               </div>
 
               <div className="space-y-2.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/74">Parent Brief</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white">Parent Brief</p>
                 <div className="space-y-2">
-                  <p className="text-[12px] font-black tracking-tight text-white/86">{student?.name || '자녀'} 오늘 흐름</p>
+                  <p className="text-[12px] font-black tracking-tight text-white">{student?.name || '자녀'} 오늘 흐름</p>
                   <h2 className="max-w-[18ch] break-keep text-[1.42rem] font-black leading-[1.14] tracking-[-0.045em] text-white sm:text-[1.82rem] md:max-w-none md:text-[2rem]">
                     {heroTone.title}
                   </h2>
-                  <p className="max-w-2xl break-keep text-[13px] font-bold leading-[1.72] text-white/88 sm:text-sm md:text-[14px]">
+                  <p className="max-w-2xl break-keep text-[13px] font-bold leading-[1.72] text-white sm:text-sm md:text-[14px]">
                     {heroTone.description}
                   </p>
                 </div>
@@ -3468,12 +3468,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
               <div className="grid gap-3 rounded-[1.55rem] border border-white/12 bg-white/8 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm sm:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/74">오늘 먼저 볼 포인트</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white">오늘 먼저 볼 포인트</p>
                   <p className="mt-1 break-keep text-[14px] font-black tracking-tight text-white">
                     출결 {attendanceStatus.label.split('(')[0].trim()} · 계획 {planRate}% · 벌점 {penaltyRecovery.effectivePoints}점
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-white/88">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-white">
                   <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5">공부 {toHm(totalMinutes)}</span>
                   <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5">알림 {recentNotifications.length}건</span>
                 </div>
