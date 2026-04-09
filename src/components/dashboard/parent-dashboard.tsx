@@ -1429,10 +1429,10 @@ const PARENT_CALENDAR_THRESHOLDS = {
 } as const;
 
 const PARENT_CALENDAR_LEGEND = [
-  { level: 'none', label: '0h 0m', swatch: 'bg-white ring-[#D7E1DA]' },
-  { level: 'light', label: '< 4h', swatch: 'bg-[#E9F8EE] ring-[#B6DFC2]' },
-  { level: 'medium', label: '4h ~ 8h', swatch: 'bg-[#A2DBB4] ring-[#63BE7F]' },
-  { level: 'high', label: '8h+', swatch: 'bg-[#1F8B4D] ring-[#116B38]' },
+  { level: 'none', label: '0h 0m', swatch: 'bg-white ring-[#D5E5DB]' },
+  { level: 'light', label: '< 4h', swatch: 'bg-[#E8F8ED] ring-[#BEE3C9]' },
+  { level: 'medium', label: '4h ~ 8h', swatch: 'bg-[#9DDBB0] ring-[#5DB97B]' },
+  { level: 'high', label: '8h+', swatch: 'bg-[#1D8A4C] ring-[#116B38]' },
 ] as const;
 
 function getParentCalendarFlowLevel(minutes: number): ParentCalendarFlowLevel {
@@ -1440,6 +1440,53 @@ function getParentCalendarFlowLevel(minutes: number): ParentCalendarFlowLevel {
   if (minutes < PARENT_CALENDAR_THRESHOLDS.light) return 'light';
   if (minutes < PARENT_CALENDAR_THRESHOLDS.medium) return 'medium';
   return 'high';
+}
+
+function getParentCalendarCellClass(minutes: number, isCurrentMonth: boolean, isMobileView: boolean) {
+  if (!isCurrentMonth) {
+    return 'border border-[#E7EDF7] bg-[linear-gradient(180deg,#FAFBFE_0%,#F3F6FB_100%)] opacity-[0.54] shadow-none';
+  }
+
+  const level = getParentCalendarFlowLevel(minutes);
+  if (isMobileView) {
+    if (level === 'none') {
+      return 'border border-[#D8E5DE] bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(248,251,249,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_14px_26px_-24px_rgba(61,96,72,0.08)]';
+    }
+    if (level === 'light') {
+      return 'border border-[#BCE1C8] bg-[linear-gradient(180deg,rgba(250,255,251,0.998)_0%,rgba(232,248,237,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_16px_30px_-24px_rgba(45,124,74,0.12)]';
+    }
+    if (level === 'medium') {
+      return 'border border-[#67BE82] bg-[linear-gradient(180deg,rgba(242,253,245,0.998)_0%,rgba(190,233,203,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_17px_30px_-24px_rgba(31,125,69,0.16)]';
+    }
+    return 'border border-[#0F6B37] bg-[linear-gradient(180deg,rgba(212,242,221,0.998)_0%,rgba(32,139,77,0.998)_100%)] shadow-[inset_0_1px_0_rgba(235,250,240,0.52),0_20px_34px_-22px_rgba(18,102,54,0.22)]';
+  }
+
+  if (level === 'none') {
+    return 'border border-[#D8E5DE] bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(248,251,249,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_15px_28px_-24px_rgba(61,96,72,0.08)]';
+  }
+  if (level === 'light') {
+    return 'border border-[#BCE1C8] bg-[linear-gradient(180deg,rgba(250,255,251,0.998)_0%,rgba(235,249,239,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_16px_30px_-24px_rgba(45,124,74,0.12)]';
+  }
+  if (level === 'medium') {
+    return 'border border-[#67BE82] bg-[linear-gradient(180deg,rgba(244,253,247,0.998)_0%,rgba(197,235,209,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_17px_30px_-24px_rgba(31,125,69,0.16)]';
+  }
+  return 'border border-[#0F6B37] bg-[linear-gradient(180deg,rgba(214,243,222,0.998)_0%,rgba(32,139,77,0.998)_100%)] shadow-[inset_0_1px_0_rgba(235,250,240,0.56),0_20px_34px_-22px_rgba(18,102,54,0.24)]';
+}
+
+function getParentCalendarValueTone(minutes: number, isCurrentMonth: boolean, isMobileView: boolean) {
+  if (!isCurrentMonth) return 'text-[#C6CFDD]';
+  const level = getParentCalendarFlowLevel(minutes);
+  if (level === 'none') return isMobileView ? 'text-[#6F8475]' : 'text-[#738779]';
+  if (level === 'light') return 'text-[#2F6F48]';
+  if (level === 'medium') return 'text-[#175336]';
+  return 'text-white';
+}
+
+function getParentLegendChipClass(level: ParentCalendarFlowLevel) {
+  if (level === 'none') return 'border-[#D8E5DE] bg-white text-[#708578]';
+  if (level === 'light') return 'border-[#C6E4CF] bg-[#F4FCF6] text-[#3C7C54]';
+  if (level === 'medium') return 'border-[#7BC694] bg-[#E7F7EC] text-[#205D3C]';
+  return 'border-[#1D8A4C] bg-[#1D8A4C] text-white';
 }
 
 function formatWon(value: number) {
@@ -3847,98 +3894,158 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </TabsContent>
 
             <TabsContent value="studyDetail" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <section
+              {!isAppMode ? (
+                <section
+                  className={cn(
+                    'overflow-hidden rounded-[2.2rem] border border-[#d9eadf] bg-[linear-gradient(145deg,#fbfffc_0%,#ffffff_58%,#eef9f1_100%)] p-4 shadow-[0_28px_56px_-40px_rgba(23,120,69,0.14)] sm:p-5',
+                    showEntryMotion && 'parent-card-enter parent-entry-delay-2'
+                  )}
+                >
+                  <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end', isMobile && 'gap-3')}>
+                    <ParentSectionHeader
+                      icon={<History className="h-3.5 w-3.5" />}
+                      eyebrow="Study Timeline"
+                      title="학습 캘린더와 날짜별 기록"
+                      description="달력에서 하루를 누르면 그날 공부시간과 흐름을 바로 읽을 수 있게 정리했습니다."
+                      badges={
+                        <>
+                          <Badge variant="outline" className="h-7 rounded-full border border-[#d7eadc] bg-white px-3 text-[10px] font-black text-[#2b6b45] shadow-sm">
+                            {activeStudentLabel}
+                          </Badge>
+                          <Badge variant="outline" className="h-7 rounded-full border border-[#cfe8d6] bg-[#eef9f1] px-3 text-[10px] font-black text-[#1e8b4d] shadow-sm">
+                            월간 흐름
+                          </Badge>
+                        </>
+                      }
+                    />
+
+                    <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.35rem] border border-[#d8eadf] bg-[linear-gradient(180deg,#ffffff_0%,#f1faf4_100%)] p-1.5 shadow-[0_20px_34px_-28px_rgba(23,120,69,0.12)]">
+                      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={!calendarBaseDate}
+                        className="h-9 w-9 rounded-[1rem] bg-[#edf8f0] text-[#1d8d4f] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#dff3e5] hover:text-[#166e3d]"
+                        onClick={() => {
+                          if (!calendarBaseDate) return;
+                          setCurrentCalendarDate(subMonths(calendarBaseDate, 1));
+                        }}
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </Button>
+                      <div className="flex min-w-[136px] items-center justify-center rounded-[1rem] border border-[#d8eadf] bg-white px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-24px_rgba(23,120,69,0.12)]">
+                        <span className="text-sm font-semibold tracking-tight text-[#154c34]">
+                          {calendarBaseDate ? format(calendarBaseDate, 'yyyy년 M월') : '--'}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={!calendarBaseDate}
+                        className="h-9 w-9 rounded-[1rem] bg-[linear-gradient(180deg,#39b86c_0%,#178244_100%)] text-white shadow-[0_16px_28px_-22px_rgba(23,130,68,0.28)] transition-all hover:brightness-[1.03]"
+                        onClick={() => {
+                          if (!calendarBaseDate) return;
+                          setCurrentCalendarDate(addMonths(calendarBaseDate, 1));
+                        }}
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              <Card
                 className={cn(
-                  'overflow-hidden rounded-[2.2rem] border border-[#d9eadf] bg-[linear-gradient(145deg,#fbfffc_0%,#ffffff_58%,#eef9f1_100%)] p-4 shadow-[0_28px_56px_-40px_rgba(23,120,69,0.14)] sm:p-5',
-                  showEntryMotion && 'parent-card-enter parent-entry-delay-2'
+                  'relative mx-auto w-full overflow-hidden',
+                  isAppMode
+                    ? 'student-utility-card rounded-[3rem] border border-[#D5E8DB] bg-[radial-gradient(circle_at_top_left,rgba(118,208,146,0.12),transparent_26%),linear-gradient(180deg,#FFFFFF_0%,#F7FCF8_100%)] ring-1 ring-white/85 shadow-[0_22px_52px_-44px_rgba(46,117,74,0.14)]'
+                    : 'rounded-[2.7rem] border border-[#d8eadf] bg-[radial-gradient(circle_at_top_left,rgba(91,199,126,0.16),transparent_24%),linear-gradient(180deg,#fcfffd_0%,#ffffff_64%,#eef8f1_100%)] shadow-[0_30px_70px_-48px_rgba(23,120,69,0.14)] ring-1 ring-[#edf6ef]'
                 )}
               >
-                <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end', isMobile && 'gap-3')}>
-                  <ParentSectionHeader
-                    icon={<History className="h-3.5 w-3.5" />}
-                    eyebrow="Study Timeline"
-                    title="학습 캘린더와 날짜별 기록"
-                    description="달력에서 하루를 누르면 그날 공부시간과 흐름을 바로 읽을 수 있게 정리했습니다."
-                    badges={
-                      <>
-                        <Badge variant="outline" className="h-7 rounded-full border border-[#d7eadc] bg-white px-3 text-[10px] font-black text-[#2b6b45] shadow-sm">
-                          {activeStudentLabel}
-                        </Badge>
-                        <Badge variant="outline" className="h-7 rounded-full border border-[#cfe8d6] bg-[#eef9f1] px-3 text-[10px] font-black text-[#1e8b4d] shadow-sm">
-                          월간 흐름
-                        </Badge>
-                      </>
-                    }
-                  />
-
-                  <div className="relative flex items-center gap-2 overflow-hidden rounded-[1.35rem] border border-[#d8eadf] bg-[linear-gradient(180deg,#ffffff_0%,#f1faf4_100%)] p-1.5 shadow-[0_20px_34px_-28px_rgba(23,120,69,0.12)]">
-                    <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-white/90" />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={!calendarBaseDate}
-                      className="h-9 w-9 rounded-[1rem] bg-[#edf8f0] text-[#1d8d4f] shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-all hover:bg-[#dff3e5] hover:text-[#166e3d]"
-                      onClick={() => {
-                        if (!calendarBaseDate) return;
-                        setCurrentCalendarDate(subMonths(calendarBaseDate, 1));
-                      }}
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    <div className="flex min-w-[136px] items-center justify-center rounded-[1rem] border border-[#d8eadf] bg-white px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-24px_rgba(23,120,69,0.12)]">
-                      <span className="text-sm font-semibold tracking-tight text-[#154c34]">
-                        {calendarBaseDate ? format(calendarBaseDate, 'yyyy년 M월') : '--'}
-                      </span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={!calendarBaseDate}
-                      className="h-9 w-9 rounded-[1rem] bg-[linear-gradient(180deg,#39b86c_0%,#178244_100%)] text-white shadow-[0_16px_28px_-22px_rgba(23,130,68,0.28)] transition-all hover:brightness-[1.03]"
-                      onClick={() => {
-                        if (!calendarBaseDate) return;
-                        setCurrentCalendarDate(addMonths(calendarBaseDate, 1));
-                      }}
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-              </section>
-
-              <Card className="relative mx-auto w-full overflow-hidden rounded-[2.7rem] border border-[#d8eadf] bg-[radial-gradient(circle_at_top_left,rgba(91,199,126,0.16),transparent_24%),linear-gradient(180deg,#fcfffd_0%,#ffffff_64%,#eef8f1_100%)] shadow-[0_30px_70px_-48px_rgba(23,120,69,0.14)] ring-1 ring-[#edf6ef]">
                 <CardContent className="relative p-0">
-                  <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b border-[#d8e7dc]", isMobile ? "px-3 py-3" : "px-5 py-4")}>
-                    <span className="font-aggro-display text-[10px] uppercase tracking-[0.22em] text-[#2d6d47]">월간 흐름 요약</span>
-                    <div className={cn("grid gap-1.5", isMobile ? "grid-cols-2" : "grid-cols-4")}>
-                      {PARENT_CALENDAR_LEGEND.map((item) => (
-                        <div
-                          key={item.level}
-                          className="inline-flex items-center gap-2 rounded-full border border-[#d7e7dc] bg-white/96 px-3 py-1.5 shadow-[0_14px_24px_-22px_rgba(23,120,69,0.12)]"
-                        >
-                          <span className={cn("h-2.5 w-2.5 rounded-full ring-1", item.swatch)} />
-                          <span className="text-[10px] font-semibold tracking-[0.02em] text-[#24513c]">
-                            {item.label}
-                          </span>
+                  <div className={cn('border-b border-primary/10', isAppMode ? 'px-4 py-4' : isMobile ? 'px-3 py-3' : 'px-5 py-4')}>
+                    {isAppMode ? (
+                      <div className={cn(isMobile ? 'space-y-3' : 'flex items-end justify-between gap-6')}>
+                        <div className="space-y-2">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-[#E5EBF5] bg-[#F7FAFF] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#6D80A5]">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            STUDY CALENDAR
+                          </div>
+                          <div>
+                            <h3 className={cn('font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1.3rem]' : 'text-[1.62rem]')}>학습 캘린더</h3>
+                            <p className={cn('mt-1 font-semibold text-[#71819C]', isMobile ? 'text-[12px] leading-5' : 'text-sm leading-6')}>
+                              공부시간 중심으로 빠르게 확인해요.
+                            </p>
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                        <div
+                          className={cn(
+                            'rounded-[1.45rem] border border-[#D8E5DE] bg-[linear-gradient(180deg,#FBFEFC_0%,#F1FAF4_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-26px_rgba(46,117,74,0.1)]',
+                            isMobile ? 'px-3 py-3' : 'min-w-[24rem] px-4 py-3.5'
+                          )}
+                        >
+                          <div className={cn('grid gap-1.5', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+                            {PARENT_CALENDAR_LEGEND.map((item) => (
+                              <div
+                                key={item.label}
+                                className={cn('inline-flex items-center justify-center gap-2 rounded-[1rem] border px-2 py-2', getParentLegendChipClass(item.level))}
+                              >
+                                <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full ring-1', item.swatch)} />
+                                <span className={cn('text-center font-black tracking-tight', isMobile ? 'text-[9px]' : 'text-[10px]')}>{item.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={cn("flex flex-wrap items-center justify-between gap-3", isMobile ? "px-0 py-0" : "")}>
+                        <span className="font-aggro-display text-[10px] uppercase tracking-[0.22em] text-[#2d6d47]">월간 흐름 요약</span>
+                        <div className={cn("grid gap-1.5", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+                          {PARENT_CALENDAR_LEGEND.map((item) => (
+                            <div
+                              key={item.level}
+                              className="inline-flex items-center gap-2 rounded-full border border-[#d7e7dc] bg-white/96 px-3 py-1.5 shadow-[0_14px_24px_-22px_rgba(23,120,69,0.12)]"
+                            >
+                              <span className={cn("h-2.5 w-2.5 rounded-full ring-1", item.swatch)} />
+                              <span className="text-[10px] font-semibold tracking-[0.02em] text-[#24513c]">
+                                {item.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className={cn("grid grid-cols-7 border-b border-primary/10", isMobile ? "gap-1 px-1.5 py-1.5" : "gap-2 px-5 py-3.5")}>
+                  <div className={cn("grid grid-cols-7 border-b border-primary/10", isAppMode ? "gap-1.5 px-2 py-2" : isMobile ? "gap-1 px-1.5 py-1.5" : "gap-2 px-5 py-3.5")}>
                     {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                       <div
                         key={day}
                         className={cn(
-                          isMobile ? "py-1.5 text-[8px]" : "rounded-[1rem] border py-2.5 text-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]",
-                          "border-[#d8e7dc] bg-[linear-gradient(180deg,#ffffff_0%,#f3faf5_100%)] text-center font-semibold uppercase tracking-[0.18em]",
-                          i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#5976a7]"
+                          isAppMode
+                            ? 'py-1.5 text-[8px] rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]'
+                            : isMobile
+                              ? "py-1.5 text-[8px]"
+                              : "rounded-[1rem] border py-2.5 text-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]",
+                          isAppMode
+                            ? i === 5
+                              ? 'text-blue-600'
+                              : i === 6
+                                ? 'text-rose-600'
+                                : 'text-primary/60'
+                            : i === 5
+                              ? "text-blue-600"
+                              : i === 6
+                                ? "text-rose-600"
+                                : "text-[#5976a7]",
+                          !isAppMode && "border-[#d8e7dc] bg-[linear-gradient(180deg,#ffffff_0%,#f3faf5_100%)] text-center font-semibold uppercase tracking-[0.18em]"
                         )}
                       >
                         {day}
                       </div>
                     ))}
                   </div>
-                  <div className={cn("grid grid-cols-7", isMobile ? "auto-rows-fr gap-1 px-1.5 pb-1.5 pt-3" : "auto-rows-fr gap-3.5 px-5 pb-5 pt-6")}>
+                  <div className={cn("grid grid-cols-7", isAppMode ? "auto-rows-fr gap-2 px-3 pb-3 pt-4.5" : isMobile ? "auto-rows-fr gap-1 px-1.5 pb-1.5 pt-3" : "auto-rows-fr gap-3.5 px-5 pb-5 pt-6")}>
                     {logsLoading ? (
                       <div className="col-span-7 h-[400px] flex items-center justify-center">
                         <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
@@ -3950,18 +4057,70 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const isTodayCalendar = today ? isSameDay(day, today) : false;
                       const isFutureCalendar = isCurrentMonth && !!todayKey && dateKey > todayKey;
                       const exactTimeLabel = isCurrentMonth
-                        ? formatCalendarMinutes(minutes, isAppMode)
+                        ? formatCalendarMinutes(minutes)
                         : '';
                       const shouldRenderTime = isCurrentMonth && !isFutureCalendar;
-                      const isLongTimeLabel = exactTimeLabel.length >= (isAppMode ? 5 : 6);
-                      const isVeryLongTimeLabel = exactTimeLabel.length >= (isAppMode ? 6 : 7);
+                      const isLongTimeLabel = exactTimeLabel.length >= (isAppMode ? 6 : 6);
+                      const isVeryLongTimeLabel = exactTimeLabel.length >= (isAppMode ? 7 : 7);
+                      const calendarAriaTimeLabel = isCurrentMonth
+                        ? isFutureCalendar
+                          ? '아직 오지 않은 날짜'
+                          : exactTimeLabel
+                        : '이번 달 아님';
+
+                      if (isAppMode) {
+                        const appCalendarCellClass = getParentCalendarCellClass(minutes, isCurrentMonth, true);
+                        const appCalendarValueTone = getParentCalendarValueTone(minutes, isCurrentMonth, true);
+
+                        return (
+                          <button
+                            key={dateKey}
+                            type="button"
+                            onClick={() => setSelectedCalendarDate(day)}
+                            aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}${isCurrentMonth ? ' 학습' : ''}`}
+                            className={cn(
+                              'group relative overflow-hidden rounded-[1.45rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
+                              'aspect-square min-h-0 p-1.5',
+                              appCalendarCellClass,
+                              isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0',
+                              isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-[#7FCB97]/55 shadow-[0_22px_36px_-24px_rgba(26,115,64,0.18)]'
+                            )}
+                          >
+                            {isTodayCalendar ? <div className="pointer-events-none absolute inset-[1px] rounded-[1.35rem] border border-white/88" /> : null}
+                            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/92" />
+                            {isCurrentMonth && minutes > 0 ? (
+                              <div className="pointer-events-none absolute inset-x-4 top-0 h-12 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.52),rgba(255,255,255,0)_72%)] opacity-90" />
+                            ) : null}
+
+                            <div className="relative z-10 flex h-full flex-col justify-center">
+                              <div className="flex flex-1 items-center justify-center px-0.5">
+                                {shouldRenderTime ? (
+                                  <span
+                                    className={cn(
+                                      'dashboard-number block max-w-full whitespace-nowrap font-black leading-none tabular-nums text-center',
+                                      isVeryLongTimeLabel
+                                        ? 'text-[0.5rem] tracking-[-0.11em]'
+                                        : isLongTimeLabel
+                                          ? 'text-[0.56rem] tracking-[-0.1em]'
+                                          : 'text-[0.66rem] tracking-[-0.08em]',
+                                      appCalendarValueTone
+                                    )}
+                                  >
+                                    {exactTimeLabel}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      }
 
                       return (
                         <button
                           key={dateKey}
                           type="button"
                           onClick={() => setSelectedCalendarDate(day)}
-                          aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${isCurrentMonth ? (isFutureCalendar ? '아직 오지 않은 날짜' : exactTimeLabel) : '이번 달 아님'}`}
+                          aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}`}
                           className={cn(
                             "group relative flex flex-col overflow-hidden rounded-[1.35rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/35",
                             isMobile ? "aspect-square min-h-0 p-1" : "aspect-square min-h-0 p-3.5",
