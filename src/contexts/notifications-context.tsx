@@ -117,13 +117,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     const centerId = activeMembership.id;
     const q = query(
       collection(firestore, 'centers', centerId, 'studentNotifications'),
-      where('studentId', '==', user.uid)
+      where('studentId', '==', user.uid),
+      where('type', '==', 'one_line_feedback')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedFeedbacks = snapshot.docs
         .map((d) => ({ id: d.id, ...d.data() } as StudentNotification))
-        .filter((item) => item.type === 'one_line_feedback')
         .sort((a, b) =>
           Math.max(toMillis(b.updatedAt), toMillis(b.createdAt)) -
           Math.max(toMillis(a.updatedAt), toMillis(a.createdAt))
@@ -140,7 +140,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       snapshot.docChanges().forEach((change) => {
         if (change.type !== 'added' && change.type !== 'modified') return;
         const data = { id: change.doc.id, ...change.doc.data() } as StudentNotification;
-        if (data.type !== 'one_line_feedback') return;
         const ts = data.updatedAt?.toDate?.().getTime?.() ?? data.createdAt?.toDate?.().getTime?.() ?? 0;
         if (Date.now() - ts < 20000) {
           setLatestFeedback(data);

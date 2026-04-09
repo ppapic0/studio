@@ -377,6 +377,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
+  const parentActivityWindowStart = useMemo(
+    () => Timestamp.fromDate(subDays(today ?? new Date(), 30)),
+    [today]
+  );
   const getStudioMotionProps = (delay = 0, offset = 18) =>
     prefersReducedMotion
       ? { initial: false as const }
@@ -674,14 +678,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const { data: counselingLogs } = useCollection<CounselingLog>(counselingLogsQuery, { enabled: isActive });
   const parentActivityQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return collection(firestore, 'centers', centerId, 'parentActivityEvents');
-  }, [firestore, centerId]);
+    return query(
+      collection(firestore, 'centers', centerId, 'parentActivityEvents'),
+      where('createdAt', '>=', parentActivityWindowStart)
+    );
+  }, [firestore, centerId, parentActivityWindowStart]);
   const { data: parentActivityEvents } = useCollection<ParentActivityEvent>(parentActivityQuery, { enabled: isActive });
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
-    return collection(firestore, 'centers', centerId, 'parentCommunications');
-  }, [firestore, centerId]);
+    return query(
+      collection(firestore, 'centers', centerId, 'parentCommunications'),
+      where('createdAt', '>=', parentActivityWindowStart)
+    );
+  }, [firestore, centerId, parentActivityWindowStart]);
   const { data: parentCommunications } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
   const normalizedParentCommunications = useMemo(
     () => (parentCommunications || []).map((item) => normalizeParentCommunicationRecord(item)),
