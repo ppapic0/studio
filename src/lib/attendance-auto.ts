@@ -6,14 +6,15 @@ import {
   Firestore,
   getDoc,
   getDocs,
-  increment,
   limit,
   query,
   serverTimestamp,
   Timestamp,
+  updateDoc,
   writeBatch,
   where,
 } from 'firebase/firestore';
+import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
 
 export type AttendanceRecordStatus =
   | 'requested'
@@ -257,7 +258,7 @@ async function fetchAttendanceRoutineInfo(
     limit(12)
   );
   const snap = await getDocs(routineQuery);
-  const scheduleTitles = snap.docs.map((docSnap) => String(docSnap.data()?.title || ''));
+  const scheduleTitles = snap.docs.map((docSnap) => String((docSnap.data() as { title?: unknown })?.title || ''));
   return buildAttendanceRoutineInfo(scheduleTitles);
 }
 
@@ -362,40 +363,32 @@ export async function syncAutoAttendanceRecord(params: {
 
   if (isRoutineMissingDay) {
     payload.routineMissingAtCheckIn = true;
-    if (shouldApplyMissingRoutinePenalty) {
-      payload.routineMissingPenaltyApplied = true;
-    }
   } else {
     payload.routineMissingAtCheckIn = deleteField();
   }
 
   batch.set(recordRef, payload, { merge: true });
 
-  if (shouldApplyMissingRoutinePenalty) {
-    const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
-    batch.set(
-      progressRef,
-      {
-        penaltyPoints: increment(ROUTINE_MISSING_PENALTY_POINTS),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+  await batch.commit();
 
-    const penaltyLogRef = doc(collection(firestore, 'centers', centerId, 'penaltyLogs'));
-    batch.set(penaltyLogRef, {
+  if (shouldApplyMissingRoutinePenalty) {
+    const penaltyResult = await applyPenaltyEventSecure({
       centerId,
       studentId,
-      studentName: studentName || '학생',
-      pointsDelta: ROUTINE_MISSING_PENALTY_POINTS,
-      reason: `루틴 미작성 (${dateKey})`,
       source: 'routine_missing',
-      createdByUserId: confirmedByUserId,
-      createdByName: '자동 규칙',
-      createdAt: serverTimestamp(),
+      reason: `루틴 미작성 (${dateKey})`,
+      pointsDelta: ROUTINE_MISSING_PENALTY_POINTS,
+      penaltyDateKey: dateKey,
+      penaltyKey: `routine_missing:${dateKey}`,
     });
+
+    if (penaltyResult.applied || penaltyResult.duplicate) {
+      await updateDoc(recordRef, {
+        routineMissingPenaltyApplied: true,
+        updatedAt: serverTimestamp(),
+      });
+    }
   }
 
-  await batch.commit();
   return { status: derived.status, wrote: true };
 }

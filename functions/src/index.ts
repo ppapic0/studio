@@ -126,6 +126,14 @@ const SMS_BYTE_LIMIT = 90;
 const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
 const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const PARENT_LINK_FAILED_ATTEMPT_LOCK_MS = 30 * 60 * 1000;
+const ATTENDANCE_REQUEST_PENALTY_POINTS: Record<"late" | "absence", number> = {
+  late: 1,
+  absence: 2,
+};
+const SECURE_PENALTY_SOURCE_POINTS: Record<"manual" | "routine_missing", number> = {
+  manual: 1,
+  routine_missing: 1,
+};
 
 const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
   study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
@@ -458,6 +466,63 @@ function toTimestampOrNow(value: unknown): admin.firestore.Timestamp | null {
 
 function asTrimmedString(value: unknown, fallback = ""): string {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function isValidDateKey(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function toDateKeyFromUnknownTimestamp(value: unknown): string | null {
+  const millis = toMillisSafe(value);
+  if (!Number.isFinite(millis) || millis <= 0) return null;
+  return toDateKey(toKstDate(new Date(millis)));
+}
+
+function buildPenaltyEventLogId(studentId: string, source: string, penaltyKey: string): string {
+  const normalized = `${studentId}_${source}_${penaltyKey}`.replace(/[^A-Za-z0-9_-]/g, "_");
+  return normalized.slice(0, 240);
+}
+
+async function findExistingPenaltyEventLog(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  source: "manual" | "routine_missing";
+  penaltyKey: string;
+  penaltyDateKey: string;
+}): Promise<{ id: string } | null> {
+  const { db, centerId, studentId, source, penaltyKey, penaltyDateKey } = params;
+  const logsSnap = await db
+    .collection(`centers/${centerId}/penaltyLogs`)
+    .where("studentId", "==", studentId)
+    .where("source", "==", source)
+    .limit(source === "manual" ? 80 : 40)
+    .get();
+
+  for (const docSnap of logsSnap.docs) {
+    const data = docSnap.data() as Record<string, unknown>;
+    const existingPenaltyKey = asTrimmedString(data?.penaltyKey);
+    const existingPenaltyDateKey = asTrimmedString(data?.penaltyDateKey);
+    const createdAtDateKey = toDateKeyFromUnknownTimestamp(data?.createdAt);
+    const reasonText = asTrimmedString(data?.reason);
+
+    if (existingPenaltyKey && existingPenaltyKey === penaltyKey) {
+      return { id: docSnap.id };
+    }
+    if (existingPenaltyDateKey && existingPenaltyDateKey === penaltyDateKey) {
+      return { id: docSnap.id };
+    }
+    if (createdAtDateKey === penaltyDateKey) {
+      if (source === "routine_missing") {
+        return { id: docSnap.id };
+      }
+      if (source === "manual" && reasonText.includes("출석 루틴")) {
+        return { id: docSnap.id };
+      }
+    }
+  }
+
+  return null;
 }
 
 function safeAverageMinutes(values: number[]): number {
@@ -4936,6 +5001,289 @@ export const scheduledClassroomSignalsRefresh = functions
 /**
  * 교사/센터관리자가 특정 센터의 교실 관제 신호를 수동 갱신합니다.
  */
+export const applyPenaltyEventSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const authUid = context.auth.uid;
+
+  const centerId = asTrimmedString(data?.centerId);
+  const studentId = asTrimmedString(data?.studentId);
+  const source = asTrimmedString(data?.source) as "manual" | "routine_missing";
+  const penaltyDateKey = asTrimmedString(data?.penaltyDateKey);
+  const reasonInput = asTrimmedString(data?.reason);
+
+  if (!centerId || !studentId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId/studentId is required.", {
+      userMessage: "학생 벌점을 반영할 정보를 다시 확인해 주세요.",
+    });
+  }
+  if (source !== "manual" && source !== "routine_missing") {
+    throw new functions.https.HttpsError("invalid-argument", "Unsupported penalty source.", {
+      userMessage: "벌점 반영 유형이 올바르지 않습니다.",
+    });
+  }
+  if (!isValidDateKey(penaltyDateKey)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid penaltyDateKey.", {
+      userMessage: "벌점 일자 정보가 올바르지 않습니다.",
+    });
+  }
+  if (reasonInput.length < 2) {
+    throw new functions.https.HttpsError("invalid-argument", "Reason is too short.", {
+      userMessage: "벌점 사유를 다시 확인해 주세요.",
+    });
+  }
+
+  const expectedPenaltyKey = source === "manual" ? `same_day_routine:${penaltyDateKey}` : `routine_missing:${penaltyDateKey}`;
+  const penaltyKey = asTrimmedString(data?.penaltyKey, expectedPenaltyKey);
+  if (penaltyKey !== expectedPenaltyKey) {
+    throw new functions.https.HttpsError("invalid-argument", "Unexpected penaltyKey.", {
+      userMessage: "벌점 키가 올바르지 않습니다.",
+    });
+  }
+
+  const expectedPointsDelta = SECURE_PENALTY_SOURCE_POINTS[source];
+  const requestedPointsDelta = Math.round(parseFiniteNumber(data?.pointsDelta) ?? Number.NaN);
+  if (!Number.isFinite(requestedPointsDelta) || requestedPointsDelta !== expectedPointsDelta) {
+    throw new functions.https.HttpsError("invalid-argument", "Unexpected pointsDelta.", {
+      userMessage: "벌점 점수 정보가 올바르지 않습니다.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (!membership.role || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+      userMessage: "현재 계정 상태로는 벌점을 반영할 수 없습니다.",
+    });
+  }
+  if (membership.role === "parent") {
+    throw new functions.https.HttpsError("permission-denied", "Parent cannot apply penalties.", {
+      userMessage: "학부모 계정에서는 벌점을 반영할 수 없습니다.",
+    });
+  }
+  if (membership.role === "student" && studentId !== authUid) {
+    throw new functions.https.HttpsError("permission-denied", "Students can only apply self penalties.", {
+      userMessage: "본인에게만 벌점을 반영할 수 있습니다.",
+    });
+  }
+  if (membership.role !== "student" && membership.role !== "teacher" && !isAdminRole(membership.role)) {
+    throw new functions.https.HttpsError("permission-denied", "Unsupported membership role.", {
+      userMessage: "현재 계정 권한으로는 벌점을 반영할 수 없습니다.",
+    });
+  }
+
+  const [targetMemberSnap, targetStudentSnap, callerMemberSnap] = await Promise.all([
+    db.doc(`centers/${centerId}/members/${studentId}`).get(),
+    db.doc(`centers/${centerId}/students/${studentId}`).get(),
+    db.doc(`centers/${centerId}/members/${authUid}`).get(),
+  ]);
+
+  const targetMemberData = targetMemberSnap.exists ? (targetMemberSnap.data() as Record<string, unknown>) : null;
+  const targetStudentData = targetStudentSnap.exists ? (targetStudentSnap.data() as Record<string, unknown>) : null;
+  const targetRole = normalizeMembershipRoleValue(targetMemberData?.role);
+  if (targetRole && targetRole !== "student") {
+    throw new functions.https.HttpsError("failed-precondition", "Target membership is not a student.", {
+      userMessage: "학생 계정에만 벌점을 반영할 수 있습니다.",
+    });
+  }
+  if (!targetMemberSnap.exists && !targetStudentSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Target student not found.", {
+      userMessage: "학생 정보를 찾지 못했습니다.",
+    });
+  }
+
+  const studentName = asTrimmedString(
+    targetMemberData?.displayName || targetMemberData?.name || targetStudentData?.displayName || targetStudentData?.name,
+    "학생"
+  );
+  const callerMemberData = callerMemberSnap.exists ? (callerMemberSnap.data() as Record<string, unknown>) : null;
+  const callerFallbackName = membership.role === "student" ? "학생" : membership.role === "teacher" ? "선생님" : "운영자";
+  const createdByName = asTrimmedString(
+    callerMemberData?.displayName || callerMemberData?.name || context.auth.token.name,
+    callerFallbackName
+  );
+
+  const existingLegacy = await findExistingPenaltyEventLog({
+    db,
+    centerId,
+    studentId,
+    source,
+    penaltyKey,
+    penaltyDateKey,
+  });
+  if (existingLegacy) {
+    return {
+      applied: false,
+      duplicate: true,
+      penaltyLogId: existingLegacy.id,
+      penaltyPointsDelta: expectedPointsDelta,
+    };
+  }
+
+  const penaltyLogId = buildPenaltyEventLogId(studentId, source, penaltyKey);
+  const penaltyLogRef = db.doc(`centers/${centerId}/penaltyLogs/${penaltyLogId}`);
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+
+  const applied = await db.runTransaction(async (transaction) => {
+    const existingPenaltyLogSnap = await transaction.get(penaltyLogRef);
+    if (existingPenaltyLogSnap.exists) {
+      return false;
+    }
+
+    transaction.set(
+      progressRef,
+      {
+        penaltyPoints: admin.firestore.FieldValue.increment(expectedPointsDelta),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    transaction.set(
+      penaltyLogRef,
+      {
+        centerId,
+        studentId,
+        studentName,
+        pointsDelta: expectedPointsDelta,
+        reason: reasonInput,
+        source,
+        penaltyKey,
+        penaltyDateKey,
+        createdByUserId: authUid,
+        createdByName,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return true;
+  });
+
+  return {
+    applied,
+    duplicate: !applied,
+    penaltyLogId,
+    penaltyPointsDelta: expectedPointsDelta,
+  };
+});
+
+export const submitAttendanceRequestSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const authUid = context.auth.uid;
+
+  const centerId = asTrimmedString(data?.centerId);
+  const requestType = asTrimmedString(data?.requestType) as "late" | "absence";
+  const requestDate = asTrimmedString(data?.requestDate);
+  const reason = asTrimmedString(data?.reason);
+
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+      userMessage: "센터 정보가 누락되었습니다.",
+    });
+  }
+  if (requestType !== "late" && requestType !== "absence") {
+    throw new functions.https.HttpsError("invalid-argument", "requestType is invalid.", {
+      userMessage: "출결 신청 유형이 올바르지 않습니다.",
+    });
+  }
+  if (!requestDate) {
+    throw new functions.https.HttpsError("invalid-argument", "requestDate is required.", {
+      userMessage: "요청 날짜를 선택해 주세요.",
+    });
+  }
+  if (reason.length < 10) {
+    throw new functions.https.HttpsError("invalid-argument", "Reason is too short.", {
+      userMessage: "사유는 10자 이상 입력해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (membership.role !== "student" || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only active students can submit attendance requests.", {
+      userMessage: "학생 본인만 출결 신청을 접수할 수 있습니다.",
+    });
+  }
+
+  const [studentMemberSnap, studentProfileSnap] = await Promise.all([
+    db.doc(`centers/${centerId}/members/${authUid}`).get(),
+    db.doc(`centers/${centerId}/students/${authUid}`).get(),
+  ]);
+
+  if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+      userMessage: "학생 정보를 찾지 못했습니다.",
+    });
+  }
+
+  const studentMemberData = studentMemberSnap.exists ? (studentMemberSnap.data() as Record<string, unknown>) : null;
+  const studentProfileData = studentProfileSnap.exists ? (studentProfileSnap.data() as Record<string, unknown>) : null;
+  const studentName = asTrimmedString(
+    studentMemberData?.displayName || studentMemberData?.name || studentProfileData?.displayName || studentProfileData?.name || context.auth.token.name,
+    "학생"
+  );
+  const penaltyPointsDelta = ATTENDANCE_REQUEST_PENALTY_POINTS[requestType];
+  const requestRef = db.collection(`centers/${centerId}/attendanceRequests`).doc();
+  const penaltyLogRef = db.doc(`centers/${centerId}/penaltyLogs/attendance_request_${requestRef.id}`);
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
+
+  await db.runTransaction(async (transaction) => {
+    transaction.set(requestRef, {
+      studentId: authUid,
+      studentName,
+      centerId,
+      type: requestType,
+      date: requestDate,
+      reason,
+      status: "requested",
+      penaltyApplied: true,
+      penaltyPointsDelta,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    transaction.set(
+      progressRef,
+      {
+        penaltyPoints: admin.firestore.FieldValue.increment(penaltyPointsDelta),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    transaction.set(
+      penaltyLogRef,
+      {
+        centerId,
+        studentId: authUid,
+        studentName,
+        pointsDelta: penaltyPointsDelta,
+        reason: `${requestType === "absence" ? "결석" : "지각"} 신청 - ${reason}`,
+        source: "attendance_request",
+        requestId: requestRef.id,
+        requestType,
+        createdByUserId: authUid,
+        createdByName: studentName,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+
+  return {
+    ok: true,
+    requestId: requestRef.id,
+    penaltyLogId: penaltyLogRef.id,
+    penaltyPointsDelta,
+  };
+});
+
 export const refreshClassroomSignals = functions
   .region(region)
   .runWith({

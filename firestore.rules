@@ -182,6 +182,7 @@ service cloud.firestore {
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'pointsBalance',
           'totalPointsEarned',
+          'penaltyPoints',
           'seasonLp',
           'stats',
         ]);
@@ -437,7 +438,7 @@ service cloud.firestore {
         allow read: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
           || isLinkedParentFromResource(centerId);
-        allow create: if isStudent(centerId) && request.resource.data.studentId == request.auth.uid;
+        allow create: if isTeacherOrAdmin(centerId);
         allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
@@ -446,8 +447,7 @@ service cloud.firestore {
         allow read: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
           || isLinkedParentFromResource(centerId);
-        allow create: if isTeacherOrAdmin(centerId)
-          || (isStudent(centerId) && request.resource.data.studentId == request.auth.uid);
+        allow create: if isTeacherOrAdmin(centerId);
         allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
       }

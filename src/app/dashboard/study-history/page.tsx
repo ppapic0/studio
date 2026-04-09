@@ -100,6 +100,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { StudentTrackSubnav } from '@/components/dashboard/student-track-subnav';
 import {
@@ -689,55 +691,19 @@ export default function StudyHistoryPage() {
   }, [progress?.dailyPointStatus, todayStr]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
-    if (!firestore || !activeMembership || !user || !progressRef || !targetUid || !selectedDateKey) return false;
+    if (!activeMembership || !user || !targetUid || !selectedDateKey) return false;
 
     const penaltyKey = `same_day_routine:${selectedDateKey}`;
-    const existingPenaltySnap = await getDocs(
-      query(
-        collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'),
-        where('studentId', '==', targetUid),
-        where('source', '==', 'manual'),
-        limit(50)
-      )
-    );
-    const hasSameDayPenalty = existingPenaltySnap.docs.some((snap) => {
-      const data = snap.data() as any;
-      const createdAtDateKey = data?.createdAt?.toDate ? format(data.createdAt.toDate(), 'yyyy-MM-dd') : null;
-      const reasonText = String(data?.reason || '');
-      return data?.penaltyKey === penaltyKey || ((data?.penaltyDateKey === selectedDateKey || createdAtDateKey === selectedDateKey) && reasonText.includes('출석 루틴'));
-    });
-    if (hasSameDayPenalty) {
-      return false;
-    }
-
-    const batch = writeBatch(firestore);
-    const penaltyLogRef = doc(collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'));
-
-    batch.set(
-      progressRef,
-      {
-        penaltyPoints: increment(SAME_DAY_ROUTINE_PENALTY_POINTS),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    batch.set(penaltyLogRef, {
+    const result = await applyPenaltyEventSecure({
       centerId: activeMembership.id,
       studentId: targetUid,
-      studentName: user.displayName || '학생',
-      pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
-      reason,
       source: 'manual',
+      reason,
+      pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
       penaltyKey,
       penaltyDateKey: selectedDateKey,
-      createdByUserId: user.uid,
-      createdByName: user.displayName || '학생',
-      createdAt: serverTimestamp(),
     });
-
-    await batch.commit();
-    return true;
+    return Boolean(result.applied);
   };
 
   const handleAddTask = async (title: string, category: 'study' | 'personal' | 'schedule') => {

@@ -109,6 +109,7 @@ import {
   formatStudentRankRewardSummary,
   getDailyRankWindowState,
 } from '@/lib/student-ranking-policy';
+import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
@@ -2083,7 +2084,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [isTimerActive, startTime]);
 
   const handleRequestSubmit = async () => {
-    if (!firestore || !activeMembership || !user || !progressRef) return;
+    if (!activeMembership || !user) return;
 
     const trimmedReason = requestReason.trim();
     if (!requestDate) {
@@ -2105,54 +2106,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
     setIsRequestSubmitting(true);
     try {
-      const requestRef = doc(collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'));
-      const penaltyLogRef = doc(collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'));
-      const batch = writeBatch(firestore);
-
-      batch.set(requestRef, {
-        studentId: user.uid,
-        studentName: user.displayName || '학생',
+      const result = await submitAttendanceRequestSecure({
         centerId: activeMembership.id,
-        type: requestType,
-        date: requestDate,
-        reason: trimmedReason,
-        status: 'requested',
-        penaltyApplied: true,
-        penaltyPointsDelta: penaltyDelta,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      batch.set(progressRef, {
-        penaltyPoints: increment(penaltyDelta),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      batch.set(penaltyLogRef, {
-        centerId: activeMembership.id,
-        studentId: user.uid,
-        studentName: user.displayName || '학생',
-        pointsDelta: penaltyDelta,
-        reason: `${REQUEST_TYPE_LABEL[requestType]} 신청 - ${trimmedReason}`,
-        source: 'attendance_request',
-        requestId: requestRef.id,
         requestType,
-        createdByUserId: user.uid,
-        createdByName: user.displayName || '학생',
-        createdAt: serverTimestamp(),
+        requestDate,
+        reason: trimmedReason,
       });
-
-      await batch.commit();
 
       toast({
         title: `${REQUEST_TYPE_LABEL[requestType]} 신청이 접수되었습니다.`,
-        description: `벌점 ${penaltyDelta}점이 자동 반영되었습니다.`,
+        description: `벌점 ${result.penaltyPointsDelta ?? penaltyDelta}점이 자동 반영되었습니다.`,
       });
       setRequestReason('');
     } catch (e: any) {
-      const errorMessage = typeof e?.message === 'string' && e.message.trim().length > 0
-        ? e.message
-        : '요청 처리 중 오류가 발생했습니다.';
+      const errorMessage = getSafeErrorMessage(e, '요청 처리 중 오류가 발생했습니다.');
       toast({
         variant: 'destructive',
         title: '신청 저장 실패',

@@ -88,6 +88,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
+import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -2016,55 +2017,19 @@ export default function StudyPlanPage() {
   }, [progress?.dailyPointStatus, progressRef, selectedDateKey]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
-    if (!firestore || !activeMembership || !user || !progressRef || !selectedDateKey) return false;
+    if (!activeMembership || !user || !selectedDateKey) return false;
 
     const penaltyKey = `same_day_routine:${selectedDateKey}`;
-    const existingPenaltySnap = await getDocs(
-      query(
-        collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'),
-        where('studentId', '==', user.uid),
-        where('source', '==', 'manual'),
-        limit(50)
-      )
-    );
-    const hasSameDayPenalty = existingPenaltySnap.docs.some((snap) => {
-      const data = snap.data() as any;
-      const createdAtDateKey = data?.createdAt?.toDate ? format(data.createdAt.toDate(), 'yyyy-MM-dd') : null;
-      const reasonText = String(data?.reason || '');
-      return data?.penaltyKey === penaltyKey || ((data?.penaltyDateKey === selectedDateKey || createdAtDateKey === selectedDateKey) && reasonText.includes('출석 루틴'));
-    });
-    if (hasSameDayPenalty) {
-      return false;
-    }
-
-    const penaltyLogRef = doc(collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'));
-    const batch = writeBatch(firestore);
-
-    batch.set(
-      progressRef,
-      {
-        penaltyPoints: increment(SAME_DAY_ROUTINE_PENALTY_POINTS),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    batch.set(penaltyLogRef, {
+    const result = await applyPenaltyEventSecure({
       centerId: activeMembership.id,
       studentId: user.uid,
-      studentName: user.displayName || '학생',
-      pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
-      reason,
       source: 'manual',
+      reason,
+      pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
       penaltyKey,
       penaltyDateKey: selectedDateKey,
-      createdByUserId: user.uid,
-      createdByName: user.displayName || '학생',
-      createdAt: serverTimestamp(),
     });
-
-    await batch.commit();
-    return true;
+    return Boolean(result.applied);
   };
 
   const to24h = (time12h: string, period: '오전' | '오후') => {
