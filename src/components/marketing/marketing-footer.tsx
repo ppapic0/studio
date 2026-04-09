@@ -44,11 +44,11 @@ export function MarketingFooter({ brand, footer }: MarketingFooterProps) {
                 상담 문의
               </a>
             </div>
-            <div className="mt-5 flex flex-wrap items-center gap-3 text-xs font-black text-white/62">
-              <Link href={TERMS_ROUTE} className="transition hover:text-[#FFB273]">
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-xs font-black text-white">
+              <Link href={TERMS_ROUTE} className="text-white transition hover:text-white/88">
                 이용약관
               </Link>
-              <Link href={PRIVACY_ROUTE} className="transition hover:text-[#FFB273]">
+              <Link href={PRIVACY_ROUTE} className="text-white transition hover:text-white/88">
                 개인정보처리방침
               </Link>
             </div>
