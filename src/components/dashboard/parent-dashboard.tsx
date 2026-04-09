@@ -685,7 +685,7 @@ function ParentSectionHeader({
   icon: ReactNode;
   eyebrow: string;
   title: string;
-  description: string;
+  description?: string;
   badges?: ReactNode;
   className?: string;
 }) {
@@ -701,9 +701,11 @@ function ParentSectionHeader({
         <h3 className="mt-3 text-[1.42rem] font-black leading-none tracking-tight text-[#14295F] sm:text-[1.72rem]">
           {title}
         </h3>
-        <p className="mt-2 max-w-[36rem] break-keep text-[13px] font-bold leading-[1.72] text-slate-500 sm:text-[13.5px]">
-          {description}
-        </p>
+        {description ? (
+          <p className="mt-2 max-w-[36rem] break-keep text-[13px] font-bold leading-[1.72] text-slate-500 sm:text-[13.5px]">
+            {description}
+          </p>
+        ) : null}
       </div>
       {badges ? <div className="flex flex-wrap items-center gap-2 self-start sm:max-w-[46%] sm:justify-end">{badges}</div> : null}
     </div>
@@ -3906,7 +3908,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       icon={<History className="h-3.5 w-3.5" />}
                       eyebrow="Study Timeline"
                       title="학습 캘린더와 날짜별 기록"
-                      description="달력에서 하루를 누르면 그날 공부시간과 흐름을 바로 읽을 수 있게 정리했습니다."
                       badges={
                         <>
                           <Badge variant="outline" className="h-7 rounded-full border border-[#d7eadc] bg-white px-3 text-[10px] font-black text-[#2b6b45] shadow-sm">
