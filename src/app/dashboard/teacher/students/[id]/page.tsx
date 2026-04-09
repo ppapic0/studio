@@ -3453,33 +3453,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </Card>
             </div>
 
-            <Card className={cn(detailChartCardClass, isAnalysisPresentation && "analysis-full-conclusion-card")}>
-              <CardHeader className={detailChartHeaderClass}>
-                <CardTitle className={cn("font-aggro-display text-[1.05rem] font-black tracking-tight", analysisRequestedTitleClass)}>
-                  위험 신호 및 지원 우선순위
-                </CardTitle>
-                <CardDescription className={cn("text-[12px] font-semibold leading-5", detailGrowthDescriptionClass)}>
-                  전체 흐름을 한 문장 결론과 우선 대응 포인트로 정리했습니다.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className={cn(detailChartContentClass, 'space-y-3')}>
-                <div className={cn(
-                  "rounded-xl border px-4 py-3",
-                  isAnalysisPresentation ? "analysis-full-conclusion-panel" : "border-[#dbe7ff] bg-[#f8fbff]"
-                )}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">전체분석 요약</p>
-                  <p className="mt-1 text-sm font-black leading-6 text-[#14295F]">{chartInsightHeadline}</p>
-                  <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
-                    최근 {RANGE_MAP[focusedChartView]}일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}% · 리듬 점수 {rhythmScore}점
-                  </p>
-                </div>
-                {riskSignals.length === 0 ? (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">현재 뚜렷한 위험 신호는 없습니다. 유지 전략 중심의 피드백이 적합합니다.</div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">{riskSignals.map((signal) => <Badge key={signal} variant="outline" className="font-black border-rose-200 text-rose-600 bg-rose-50">{signal}</Badge>)}</div>
-                )}
-              </CardContent>
-            </Card>
             </div>
           </motion.section>
           )}
