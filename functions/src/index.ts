@@ -190,7 +190,8 @@ const LATE_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: num
   { rarity: "rare", weight: 30 },
   { rarity: "epic", weight: 10 },
 ];
-const ACTIVE_STUDY_ATTENDANCE_STATUSES = new Set(["studying", "away", "break"]);
+const ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES = ["studying", "away", "break"] as const;
+const ACTIVE_STUDY_ATTENDANCE_STATUSES = new Set<string>(ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1797,7 +1798,7 @@ async function runLateArrivalCheckForCenter(
   attendanceSnap.forEach((seatDoc) => {
     const seatData = seatDoc.data();
     if (!seatData?.studentId) return;
-    if (seatData.status === "studying" || seatData.status === "away" || seatData.status === "break") {
+    if (ACTIVE_STUDY_ATTENDANCE_STATUSES.has(String(seatData.status || ""))) {
       checkedInStudentIds.add(String(seatData.studentId));
     }
   });
@@ -4519,65 +4520,80 @@ export const scheduledSmsQueueDispatcher = functions
     const now = new Date();
     const nowTs = admin.firestore.Timestamp.fromDate(now);
     const processingLeaseUntil = admin.firestore.Timestamp.fromDate(new Date(now.getTime() + 60 * 1000));
-    const centersSnap = await db.collection("centers").get();
+    const [queuedSnap, processingSnap] = await Promise.all([
+      db.collectionGroup("smsQueue").where("status", "==", "queued").limit(120).get(),
+      db.collectionGroup("smsQueue").where("status", "==", "processing").limit(120).get(),
+    ]);
 
     let processed = 0;
+    const touchedCenterIds = new Set<string>();
+    const candidateDocs = [...queuedSnap.docs, ...processingSnap.docs];
 
-    for (const centerDoc of centersSnap.docs) {
-      const centerId = centerDoc.id;
-      const queueCol = db.collection(`centers/${centerId}/smsQueue`);
-      const [queuedSnap, processingSnap] = await Promise.all([
-        queueCol.where("status", "==", "queued").limit(30).get(),
-        queueCol.where("status", "==", "processing").limit(30).get(),
-      ]);
+    for (const queueDoc of candidateDocs) {
+      const claimed = await db.runTransaction(async (tx) => {
+        const freshSnap = await tx.get(queueDoc.ref);
+        if (!freshSnap.exists) return null;
+        const freshData = freshSnap.data() || {};
+        const status = String(freshData.status || "");
+        const nextAttemptAt = toTimestampDate(freshData.nextAttemptAt);
+        const leaseExpiresAt = toTimestampDate(freshData.processingLeaseUntil);
 
-      const candidateDocs = [...queuedSnap.docs, ...processingSnap.docs];
-      for (const queueDoc of candidateDocs) {
-        const claimed = await db.runTransaction(async (tx) => {
-          const freshSnap = await tx.get(queueDoc.ref);
-          if (!freshSnap.exists) return null;
-          const freshData = freshSnap.data() || {};
-          const status = String(freshData.status || "");
-          const nextAttemptAt = toTimestampDate(freshData.nextAttemptAt);
-          const leaseExpiresAt = toTimestampDate(freshData.processingLeaseUntil);
-
-          if (status === "queued") {
-            if (nextAttemptAt && nextAttemptAt.getTime() > now.getTime()) {
-              return null;
-            }
-          } else if (status === "processing") {
-            if (leaseExpiresAt && leaseExpiresAt.getTime() > now.getTime()) {
-              return null;
-            }
-          } else {
+        if (status === "queued") {
+          if (nextAttemptAt && nextAttemptAt.getTime() > now.getTime()) {
             return null;
           }
+        } else if (status === "processing") {
+          if (leaseExpiresAt && leaseExpiresAt.getTime() > now.getTime()) {
+            return null;
+          }
+        } else {
+          return null;
+        }
 
-          const nextAttemptCount = Math.max(0, Number(freshData.attemptCount || 0)) + 1;
-          tx.set(queueDoc.ref, {
-            status: "processing",
-            providerStatus: "processing",
-            attemptCount: nextAttemptCount,
-            processingStartedAt: nowTs,
-            processingLeaseUntil,
-            updatedAt: nowTs,
-          }, { merge: true });
+        const centerId =
+          asTrimmedString(freshData.centerId) ||
+          asTrimmedString(queueDoc.ref.parent.parent?.id);
+        if (!centerId) {
+          return null;
+        }
 
-          return {
-            ...freshData,
-            id: queueDoc.id,
-            attemptCount: nextAttemptCount,
-          };
-        });
+        const nextAttemptCount = Math.max(0, Number(freshData.attemptCount || 0)) + 1;
+        tx.set(queueDoc.ref, {
+          status: "processing",
+          providerStatus: "processing",
+          attemptCount: nextAttemptCount,
+          processingStartedAt: nowTs,
+          processingLeaseUntil,
+          updatedAt: nowTs,
+        }, { merge: true });
 
-        if (!claimed) continue;
+        return {
+          ...freshData,
+          id: queueDoc.id,
+          centerId,
+          attemptCount: nextAttemptCount,
+        };
+      });
 
-        await dispatchSmsQueueItem(db, centerId, queueDoc.ref, claimed, Number(claimed.attemptCount || 1));
-        processed += 1;
-      }
+      if (!claimed) continue;
+
+      touchedCenterIds.add(String(claimed.centerId));
+      await dispatchSmsQueueItem(
+        db,
+        String(claimed.centerId),
+        queueDoc.ref,
+        claimed,
+        Number(claimed.attemptCount || 1)
+      );
+      processed += 1;
     }
 
-    console.log("[sms-dispatcher] run complete", { centerCount: centersSnap.size, processed });
+    console.log("[sms-dispatcher] run complete", {
+      queuedCandidates: queuedSnap.size,
+      processingCandidates: processingSnap.size,
+      touchedCenterCount: touchedCenterIds.size,
+      processed,
+    });
     return null;
   });
 
@@ -4840,7 +4856,10 @@ export const runLateArrivalCheck = functions.region(region).https.onCall(async (
   }
 
   const nowKst = toKstDate();
-  const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
+  const attendanceSnap = await db
+    .collection(`centers/${centerId}/attendanceCurrent`)
+    .where("status", "in", [...ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES])
+    .get();
   const alertsTriggered = await runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap);
   return {
     ok: true,
@@ -4871,12 +4890,17 @@ export const scheduledAttendanceCheck = functions
     const centersSnap = await db.collection("centers").get();
     let totalLateAlerts = 0;
     let totalClosed = 0;
+    let totalActiveSeatsScanned = 0;
 
     for (const centerDoc of centersSnap.docs) {
       const centerId = centerDoc.id;
 
-      // attendanceCurrent 한 번만 읽어 두 작업에 공유
-      const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
+      // 실제 활동 중인 좌석만 읽어 두 작업에 공유
+      const attendanceSnap = await db
+        .collection(`centers/${centerId}/attendanceCurrent`)
+        .where("status", "in", [...ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES])
+        .get();
+      totalActiveSeatsScanned += attendanceSnap.size;
 
       // ── 1. 지각 알림 ──────────────────────────────────────
       totalLateAlerts += await runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap);
@@ -4972,6 +4996,7 @@ export const scheduledAttendanceCheck = functions
 
     console.log("[attendance-check] run complete", {
       centerCount: centersSnap.size,
+      totalActiveSeatsScanned,
       totalLateAlerts,
       totalClosed,
       atKst: nowKst.toISOString(),
