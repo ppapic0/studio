@@ -40,7 +40,6 @@ import {
   UserCheck,
   CalendarX,
   UserMinus,
-  QrCode,
   Plus,
   Trash2,
   Gift
@@ -75,7 +74,6 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, type User as UserType } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
-import { QRCodeSVG } from 'qrcode.react';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
 import {
@@ -2339,8 +2337,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setIsExamSaving(false);
     }
   };
-  const qrData = user ? `ATTENDANCE_QR:${activeMembership?.id}:${user.uid}` : '';
-
   if (!isActive) return null;
   const totalMinutesCount = (todayStudyLog?.totalMinutes || 0) + Math.ceil(localSeconds / 60);
   const hDisplay = Math.floor(totalMinutesCount / 60);
@@ -3718,42 +3714,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             </DialogContent>
           </Dialog>
 
-          <Dialog>
-            <DialogTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  "student-cta w-full rounded-2xl border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] font-black gap-3 flex items-center justify-center text-[#17326B] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
-                  isMobile ? "h-12 text-sm" : "h-14 text-base"
-                )}
-              >
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#D7E3F8] bg-[linear-gradient(180deg,#EFF4FF_0%,#E3EBFB_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                  <QrCode className="h-4 w-4 text-[#17326B]" />
-                </span>
-                나의 출입 QR
-              </button>
-            </DialogTrigger>
-            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 sm:max-w-sm", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "")}>
-              <div className={cn("bg-primary p-8 text-white text-center", isMobile ? "p-6" : "")}>
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-black tracking-tighter text-white">나의 출입 QR</DialogTitle>
-                  <DialogDescription className="text-white/70 font-bold mt-1">센터 입구 카메라에 스캔해 주세요.</DialogDescription>
-                </DialogHeader>
-              </div>
-              <div className={cn("bg-white flex flex-col items-center gap-6", isMobile ? "p-5" : "p-10")}>
-                <div className={cn("rounded-[2rem] bg-[#fafafa] border border-primary/15", isMobile ? "p-4" : "p-6")}>
-                  <QRCodeSVG value={qrData} size={isMobile ? 176 : 200} level="H" includeMargin={false} />
-                </div>
-                <div className="text-center space-y-1">
-                  <p className={cn("font-black text-primary tracking-tight break-keep", isMobile ? "text-lg" : "text-xl")}>{user?.displayName}</p>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">출입 인증용</p>
-                </div>
-              </div>
-              <DialogFooter className={cn("bg-muted/30", isMobile ? "p-4" : "p-6")}>
-                <DialogClose asChild><Button className="w-full h-12 rounded-xl font-black">닫기</Button></DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
       </section>
 
