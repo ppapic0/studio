@@ -1907,6 +1907,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const analysisChartTickColor = '#14295F';
   const analysisChartTickSoftColor = '#14295F';
   const analysisChartAxisLine = { stroke: '#14295F', strokeOpacity: 0.24, strokeWidth: 1 };
+  const mobileAnalysisDualAxisMargin = { top: 8, right: 12, left: 8, bottom: 0 };
+  const mobileAnalysisSingleAxisMargin = { top: 8, right: 10, left: 10, bottom: 0 };
+  const mobileAnalysisMinutesAxisWidth = 42;
+  const mobileAnalysisGrowthAxisWidth = 40;
+  const mobileAnalysisScoreAxisWidth = 36;
+  const mobileAnalysisClockAxisWidth = 48;
+  const mobileAnalysisAwayAxisWidth = 36;
   const analysisChartGridColor = isAnalysisPresentation ? 'rgba(244, 248, 255, 0.34)' : '#f2f2f2';
   const analysisStudyTrendStrokeColor = isAnalysisPresentation ? '#f4f8ff' : 'hsl(var(--primary))';
   const analysisChipPrimaryTextClass = isAnalysisPresentation ? 'text-[#f4f8ff]' : 'text-[#14295F]';
@@ -3501,7 +3508,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       <>
                         <div className={detailChartPanelClass}>
                           <ResponsiveContainer width="100%" height={236}>
-                            <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+                            <ComposedChart data={weeklyGrowthData} margin={mobileAnalysisDualAxisMargin}>
                               <defs>
                                 <linearGradient id="detailWeeklyGrowthBarGradientMobile" x1="0" y1="0" x2="0" y2="1">
                                   <stop offset="0%" stopColor="#2f65ff" />
@@ -3511,8 +3518,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                               </defs>
                               <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                       <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} tickMargin={8} />
-                      <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={34} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                      <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: analysisChartTickSoftColor }} tickLine={false} axisLine={analysisChartAxisLine} width={30} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
+                      <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={mobileAnalysisMinutesAxisWidth} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                      <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: analysisChartTickSoftColor }} tickLine={false} axisLine={analysisChartAxisLine} width={mobileAnalysisGrowthAxisWidth} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
                               <Tooltip
                                 content={(
                                   <AnalysisTrendTooltip
@@ -3578,7 +3585,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       <>
                         <div className={detailChartPanelClass}>
                           <ResponsiveContainer width="100%" height={236}>
-                            <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+                            <ComposedChart data={dailyGrowthWindowData} margin={mobileAnalysisDualAxisMargin}>
                               <defs>
                                 <linearGradient id="detailDailyGrowthBarGradientMobile" x1="0" y1="0" x2="0" y2="1">
                                   <stop offset="0%" stopColor="#76d0ff" />
@@ -3588,8 +3595,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                               </defs>
                               <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} tickMargin={8} interval={1} />
-                      <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={34} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                      <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: analysisChartTickSoftColor }} tickLine={false} axisLine={analysisChartAxisLine} width={30} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                      <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={mobileAnalysisMinutesAxisWidth} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                      <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: analysisChartTickSoftColor }} tickLine={false} axisLine={analysisChartAxisLine} width={mobileAnalysisGrowthAxisWidth} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
                               <Tooltip
                                 content={(
                                   <AnalysisTrendTooltip
@@ -3643,7 +3650,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <CardContent className={detailChartContentClass}>
                     <div className={detailChartPanelClass}>
                       <ResponsiveContainer width="100%" height={236}>
-                        <AreaChart data={rhythmScoreOnlyTrend} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                        <AreaChart data={rhythmScoreOnlyTrend} margin={mobileAnalysisSingleAxisMargin}>
                           <defs>
                             <linearGradient id="detailRhythmGradientMobile" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#17b777" stopOpacity={0.34} />
@@ -3652,7 +3659,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           </defs>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} axisLine={analysisChartAxisLine} tickLine={false} tickMargin={8} interval={1} />
-                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} axisLine={analysisChartAxisLine} tickLine={false} width={26} domain={[0, 100]} />
+                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} axisLine={analysisChartAxisLine} tickLine={false} width={mobileAnalysisScoreAxisWidth} domain={[0, 100]} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
@@ -3705,10 +3712,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <CardContent className={detailChartContentClass}>
                     <div className={detailChartPanelClass}>
                       <ResponsiveContainer width="100%" height={236}>
-                        <RechartsLineChart data={startEndTimeTrendData} margin={{ top: 8, right: 6, left: -12, bottom: 0 }}>
+                        <RechartsLineChart data={startEndTimeTrendData} margin={mobileAnalysisSingleAxisMargin}>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} tickMargin={8} interval={1} />
-                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={40} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
+                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={mobileAnalysisClockAxisWidth} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
@@ -3762,7 +3769,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <CardContent className={detailChartContentClass}>
                     <div className={detailChartPanelClass}>
                       <ResponsiveContainer width="100%" height={236}>
-                        <ComposedChart data={awayTimeData} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+                        <ComposedChart data={awayTimeData} margin={mobileAnalysisSingleAxisMargin}>
                           <defs>
                             <linearGradient id="detailAwayBarGradientMobile" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#ff8aa6" />
@@ -3772,7 +3779,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           </defs>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} tickMargin={8} interval={1} />
-                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={28} tickFormatter={(value) => `${value}m`} />
+                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={mobileAnalysisAwayAxisWidth} tickFormatter={(value) => `${value}m`} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
