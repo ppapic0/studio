@@ -52,6 +52,7 @@ const SMS_BYTE_LIMIT = 90;
 const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
 const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const PARENT_LINK_FAILED_ATTEMPT_LOCK_MS = 30 * 60 * 1000;
+const PARENT_LINK_LOOKUP_COLLECTION = "parentLinkCodeLookup";
 const ATTENDANCE_REQUEST_PENALTY_POINTS = {
     late: 1,
     absence: 2,
@@ -209,6 +210,158 @@ function normalizeParentLinkCodeValue(value) {
         return String(Math.trunc(value)).trim();
     }
     return "";
+}
+function getParentLinkLookupRef(db, code) {
+    return db.doc(`${PARENT_LINK_LOOKUP_COLLECTION}/${code}`);
+}
+function buildParentLinkLookupPayload(params) {
+    const { code, centerId, studentId, studentName, timestamp, createdAt } = params;
+    return {
+        code,
+        centerId,
+        studentId,
+        studentPath: `centers/${centerId}/students/${studentId}`,
+        studentName,
+        updatedAt: timestamp,
+        createdAt: createdAt || timestamp,
+    };
+}
+async function hasParentLinkCodeConflict(db, code, params = {}) {
+    const normalizedCode = normalizeParentLinkCodeValue(code);
+    if (!normalizedCode)
+        return false;
+    const lookupSnap = await getParentLinkLookupRef(db, normalizedCode).get();
+    if (lookupSnap.exists) {
+        const lookupData = lookupSnap.data();
+        const lookupStudentId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.studentId);
+        const lookupCenterId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.centerId);
+        if (lookupStudentId &&
+            lookupCenterId &&
+            !(lookupStudentId === params.exceptStudentId && lookupCenterId === params.exceptCenterId)) {
+            return true;
+        }
+    }
+    let duplicateCandidates = [];
+    try {
+        const duplicateSnap = await db
+            .collectionGroup("students")
+            .where("parentLinkCode", "==", normalizedCode)
+            .limit(20)
+            .get();
+        duplicateCandidates = duplicateSnap.docs;
+    }
+    catch (lookupError) {
+        console.warn("[parent-link-lookup] collectionGroup duplicate lookup failed", {
+            code: normalizedCode,
+            message: (lookupError === null || lookupError === void 0 ? void 0 : lookupError.message) || lookupError,
+        });
+    }
+    const asNumber = Number(normalizedCode);
+    if (Number.isFinite(asNumber)) {
+        try {
+            const duplicateNumberSnap = await db
+                .collectionGroup("students")
+                .where("parentLinkCode", "==", asNumber)
+                .limit(20)
+                .get();
+            for (const docSnap of duplicateNumberSnap.docs) {
+                if (!duplicateCandidates.find((candidate) => candidate.ref.path === docSnap.ref.path)) {
+                    duplicateCandidates.push(docSnap);
+                }
+            }
+        }
+        catch (lookupError) {
+            console.warn("[parent-link-lookup] numeric duplicate lookup failed", {
+                code: normalizedCode,
+                message: (lookupError === null || lookupError === void 0 ? void 0 : lookupError.message) || lookupError,
+            });
+        }
+    }
+    for (const docSnap of duplicateCandidates) {
+        const candidateCenterRef = docSnap.ref.parent.parent;
+        if (!candidateCenterRef)
+            continue;
+        if (docSnap.id === params.exceptStudentId && candidateCenterRef.id === params.exceptCenterId) {
+            continue;
+        }
+        const [candidateMemberSnap, candidateUserCenterSnap] = await Promise.all([
+            db.doc(`centers/${candidateCenterRef.id}/members/${docSnap.id}`).get(),
+            db.doc(`userCenters/${docSnap.id}/centers/${candidateCenterRef.id}`).get(),
+        ]);
+        const candidateMemberData = candidateMemberSnap.exists ? candidateMemberSnap.data() : null;
+        const candidateUserCenterData = candidateUserCenterSnap.exists ? candidateUserCenterSnap.data() : null;
+        const hasActiveMember = candidateMemberSnap.exists &&
+            (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.role) === "student" &&
+            isActiveMembershipStatus(candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.status);
+        const hasActiveUserCenter = candidateUserCenterSnap.exists &&
+            (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.role) === "student" &&
+            isActiveMembershipStatus(candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.status);
+        if (hasActiveMember || hasActiveUserCenter) {
+            return true;
+        }
+    }
+    return false;
+}
+async function reserveParentLinkCodeLookupInTransaction(params) {
+    const { db, transaction, code, centerId, studentId, studentName, timestamp } = params;
+    const normalizedCode = normalizeParentLinkCodeValue(code);
+    if (!normalizedCode)
+        return;
+    const lookupRef = getParentLinkLookupRef(db, normalizedCode);
+    const lookupSnap = await transaction.get(lookupRef);
+    const lookupData = lookupSnap.exists ? lookupSnap.data() : null;
+    const lookupStudentId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.studentId);
+    const lookupCenterId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.centerId);
+    if (lookupSnap.exists && (lookupStudentId !== studentId || lookupCenterId !== centerId)) {
+        throw new functions.https.HttpsError("failed-precondition", "Parent link code is duplicated.", {
+            userMessage: "이미 사용 중인 학부모 연동 코드입니다. 다른 6자리 숫자를 입력해 주세요.",
+        });
+    }
+    transaction.set(lookupRef, buildParentLinkLookupPayload({
+        code: normalizedCode,
+        centerId,
+        studentId,
+        studentName,
+        timestamp,
+        createdAt: lookupData === null || lookupData === void 0 ? void 0 : lookupData.createdAt,
+    }), { merge: true });
+}
+async function resolveParentLinkCandidateFromLookupInTransaction(db, transaction, code) {
+    const normalizedCode = normalizeParentLinkCodeValue(code);
+    if (!normalizedCode)
+        return null;
+    const lookupSnap = await transaction.get(getParentLinkLookupRef(db, normalizedCode));
+    if (!lookupSnap.exists)
+        return null;
+    const lookupData = lookupSnap.data();
+    const centerId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.centerId);
+    const studentId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.studentId);
+    if (!centerId || !studentId)
+        return null;
+    const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
+    const memberRef = db.doc(`centers/${centerId}/members/${studentId}`);
+    const userCenterRef = db.doc(`userCenters/${studentId}/centers/${centerId}`);
+    const [studentSnap, memberSnap, userCenterSnap] = await Promise.all([
+        transaction.get(studentRef),
+        transaction.get(memberRef),
+        transaction.get(userCenterRef),
+    ]);
+    if (!studentSnap.exists)
+        return null;
+    const studentData = studentSnap.data();
+    const memberData = memberSnap.exists ? memberSnap.data() : null;
+    const userCenterData = userCenterSnap.exists ? userCenterSnap.data() : null;
+    const className = (memberData === null || memberData === void 0 ? void 0 : memberData.className) ||
+        (userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.className) ||
+        (studentData === null || studentData === void 0 ? void 0 : studentData.className) ||
+        null;
+    return {
+        centerId,
+        studentId,
+        studentRef,
+        studentData,
+        className,
+    };
 }
 function parseFiniteNumber(value) {
     if (typeof value === "number" && Number.isFinite(value)) {
@@ -1787,7 +1940,7 @@ exports.deleteStudentAccount = functions.region(region).runWith({
     timeoutSeconds: 540,
     memory: "1GB",
 }).https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a, _b, _c;
     const db = admin.firestore();
     const auth = admin.auth();
     if (!context.auth)
@@ -1804,6 +1957,8 @@ exports.deleteStudentAccount = functions.region(region).runWith({
     if (!targetMemberSnap.exists || ((_b = targetMemberSnap.data()) === null || _b === void 0 ? void 0 : _b.role) !== "student") {
         throw new functions.https.HttpsError("failed-precondition", "해당 센터의 학생 계정만 삭제할 수 있습니다.");
     }
+    const targetStudentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
+    const targetParentLinkCode = normalizeParentLinkCodeValue((_c = targetStudentSnap.data()) === null || _c === void 0 ? void 0 : _c.parentLinkCode);
     try {
         const errors = [];
         const paths = [
@@ -1861,6 +2016,23 @@ exports.deleteStudentAccount = functions.region(region).runWith({
                 }
                 catch (e) {
                     errors.push(`leaderboards: ${(e === null || e === void 0 ? void 0 : e.message) || "leaderboard cleanup failed"}`);
+                }
+            })(),
+            (async () => {
+                if (!targetParentLinkCode)
+                    return;
+                try {
+                    const lookupRef = getParentLinkLookupRef(db, targetParentLinkCode);
+                    const lookupSnap = await lookupRef.get();
+                    const lookupData = lookupSnap.exists ? lookupSnap.data() : null;
+                    const lookupStudentId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.studentId);
+                    const lookupCenterId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.centerId);
+                    if (!lookupSnap.exists || (lookupStudentId === studentId && lookupCenterId === centerId)) {
+                        await db.recursiveDelete(lookupRef);
+                    }
+                }
+                catch (e) {
+                    errors.push(`parentLinkCodeLookup: ${(e === null || e === void 0 ? void 0 : e.message) || "lookup cleanup failed"}`);
                 }
             })(),
             (async () => {
@@ -2047,74 +2219,10 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             });
         }
         if (normalizedParentLinkCode && normalizedParentLinkCode !== existingParentLinkCode) {
-            let duplicateCandidates = [];
-            try {
-                const duplicateSnap = await db
-                    .collectionGroup("students")
-                    .where("parentLinkCode", "==", normalizedParentLinkCode)
-                    .limit(20)
-                    .get();
-                duplicateCandidates = duplicateSnap.docs;
-            }
-            catch (lookupError) {
-                console.warn("[updateStudentAccount] collectionGroup duplicate lookup failed, fallback to center scoped lookup", {
-                    centerId,
-                    studentId,
-                    code: normalizedParentLinkCode,
-                    message: (lookupError === null || lookupError === void 0 ? void 0 : lookupError.message) || lookupError,
-                });
-                const localStudentsRef = db.collection(`centers/${centerId}/students`);
-                const localStringSnap = await localStudentsRef
-                    .where("parentLinkCode", "==", normalizedParentLinkCode)
-                    .limit(20)
-                    .get();
-                duplicateCandidates = [...localStringSnap.docs];
-                const asNumber = Number(normalizedParentLinkCode);
-                if (Number.isFinite(asNumber)) {
-                    const localNumberSnap = await localStudentsRef
-                        .where("parentLinkCode", "==", asNumber)
-                        .limit(20)
-                        .get();
-                    for (const docSnap of localNumberSnap.docs) {
-                        if (!duplicateCandidates.find((d) => d.ref.path === docSnap.ref.path)) {
-                            duplicateCandidates.push(docSnap);
-                        }
-                    }
-                }
-            }
-            let hasConflict = false;
-            for (const docSnap of duplicateCandidates) {
-                if (docSnap.id === studentId)
-                    continue;
-                const candidateCenterRef = docSnap.ref.parent.parent;
-                if (!candidateCenterRef)
-                    continue;
-                const candidateMemberSnap = await db.doc(`centers/${candidateCenterRef.id}/members/${docSnap.id}`).get();
-                if (!candidateMemberSnap.exists)
-                    continue;
-                const candidateMemberData = candidateMemberSnap.data();
-                const isActiveStudentCandidate = (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.role) === "student" && isActiveMembershipStatus(candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.status);
-                if (!isActiveStudentCandidate)
-                    continue;
-                const candidateUserCenterSnap = await db.doc(`userCenters/${docSnap.id}/centers/${candidateCenterRef.id}`).get();
-                const candidateUserCenterData = candidateUserCenterSnap.exists ? candidateUserCenterSnap.data() : null;
-                const hasActiveUserCenter = candidateUserCenterSnap.exists &&
-                    (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.role) === "student" &&
-                    isActiveMembershipStatus(candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.status);
-                let hasSeatAssignment = false;
-                if (!hasActiveUserCenter) {
-                    const seatSnap = await db
-                        .collection(`centers/${candidateCenterRef.id}/attendanceCurrent`)
-                        .where("studentId", "==", docSnap.id)
-                        .limit(1)
-                        .get();
-                    hasSeatAssignment = !seatSnap.empty;
-                }
-                if (hasActiveUserCenter || hasSeatAssignment) {
-                    hasConflict = true;
-                    break;
-                }
-            }
+            const hasConflict = await hasParentLinkCodeConflict(db, normalizedParentLinkCode, {
+                exceptStudentId: studentId,
+                exceptCenterId: centerId,
+            });
             if (hasConflict) {
                 throw new functions.https.HttpsError("failed-precondition", "Parent link code is duplicated.", {
                     userMessage: "이미 사용 중인 학부모 연동 코드입니다. 다른 6자리 숫자를 입력해 주세요.",
@@ -2183,6 +2291,46 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         if (canEditOtherStudent && hasClassName)
             studentUpdate.className = normalizedClassName;
         batch.set(studentRef, studentUpdate, { merge: true });
+        if (parentLinkCodeProvided || trimmedDisplayName) {
+            const effectiveParentLinkCode = parentLinkCodeProvided ? normalizedParentLinkCode : existingParentLinkCode;
+            const effectiveStudentName = trimmedDisplayName || asTrimmedString((existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.name) || (existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.displayName), "학생");
+            if (existingParentLinkCode && existingParentLinkCode !== effectiveParentLinkCode) {
+                const oldLookupRef = getParentLinkLookupRef(db, existingParentLinkCode);
+                const oldLookupSnap = await oldLookupRef.get();
+                const oldLookupData = oldLookupSnap.exists ? oldLookupSnap.data() : null;
+                const oldLookupStudentId = asTrimmedString(oldLookupData === null || oldLookupData === void 0 ? void 0 : oldLookupData.studentId);
+                const oldLookupCenterId = asTrimmedString(oldLookupData === null || oldLookupData === void 0 ? void 0 : oldLookupData.centerId);
+                if (!oldLookupSnap.exists || (oldLookupStudentId === studentId && oldLookupCenterId === centerId)) {
+                    batch.delete(oldLookupRef);
+                }
+            }
+            if (effectiveParentLinkCode) {
+                const lookupRef = getParentLinkLookupRef(db, effectiveParentLinkCode);
+                const lookupSnap = await lookupRef.get();
+                const lookupData = lookupSnap.exists ? lookupSnap.data() : null;
+                const lookupStudentId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.studentId);
+                const lookupCenterId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.centerId);
+                if (lookupSnap.exists && (lookupStudentId !== studentId || lookupCenterId !== centerId)) {
+                    throw new functions.https.HttpsError("failed-precondition", "Parent link code is duplicated.", {
+                        userMessage: "이미 사용 중인 학부모 연동 코드입니다. 다른 6자리 숫자를 입력해 주세요.",
+                    });
+                }
+                const lookupPayload = buildParentLinkLookupPayload({
+                    code: effectiveParentLinkCode,
+                    centerId,
+                    studentId,
+                    studentName: effectiveStudentName,
+                    timestamp,
+                    createdAt: lookupData === null || lookupData === void 0 ? void 0 : lookupData.createdAt,
+                });
+                if (lookupSnap.exists) {
+                    batch.set(lookupRef, lookupPayload, { merge: true });
+                }
+                else {
+                    batch.create(lookupRef, lookupPayload);
+                }
+            }
+        }
         const memberRef = db.doc("centers/" + centerId + "/members/" + studentId);
         const memberUpdate = { updatedAt: timestamp };
         if (trimmedDisplayName)
@@ -2472,6 +2620,14 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
         if (isParentLinkFlow) {
             await assertParentLinkRateLimitAllowed(db, uid);
         }
+        if (role === "student" && /^\d{6}$/.test(parentLinkCode)) {
+            const hasConflict = await hasParentLinkCodeConflict(db, parentLinkCode);
+            if (hasConflict) {
+                throw new functions.https.HttpsError("failed-precondition", "Parent link code is duplicated.", {
+                    userMessage: "이미 사용 중인 학부모 연동 코드입니다. 다른 6자리 숫자를 입력해 주세요.",
+                });
+            }
+        }
         const result = await db.runTransaction(async (t) => {
             let centerId = "";
             let targetClassName = null;
@@ -2485,158 +2641,168 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         userMessage: "학생 코드는 6자리 숫자로 입력해주세요.",
                     });
                 }
-                const codeAsNumber = Number(studentLinkCode);
-                const candidateQueries = [
-                    db.collectionGroup("students").where("parentLinkCode", "==", studentLinkCode).limit(20),
-                    db.collectionGroup("students").where("studentLinkCode", "==", studentLinkCode).limit(20),
-                ];
-                if (Number.isFinite(codeAsNumber)) {
-                    candidateQueries.push(db.collectionGroup("students").where("parentLinkCode", "==", codeAsNumber).limit(20), db.collectionGroup("students").where("studentLinkCode", "==", codeAsNumber).limit(20));
+                const lookupCandidate = await resolveParentLinkCandidateFromLookupInTransaction(db, t, studentLinkCode);
+                if (lookupCandidate) {
+                    centerId = lookupCandidate.centerId;
+                    linkedStudentRef = lookupCandidate.studentRef;
+                    linkedStudentData = lookupCandidate.studentData;
+                    linkedStudentId = lookupCandidate.studentId;
+                    targetClassName = lookupCandidate.className || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || null;
                 }
-                const studentDocMap = new Map();
-                try {
-                    const studentSnaps = await Promise.all(candidateQueries.map((candidateQuery) => candidateQuery.get()));
-                    for (const snap of studentSnaps) {
-                        for (const studentDoc of snap.docs) {
-                            studentDocMap.set(studentDoc.ref.path, studentDoc);
-                        }
+                else {
+                    const codeAsNumber = Number(studentLinkCode);
+                    const candidateQueries = [
+                        db.collectionGroup("students").where("parentLinkCode", "==", studentLinkCode).limit(20),
+                        db.collectionGroup("students").where("studentLinkCode", "==", studentLinkCode).limit(20),
+                    ];
+                    if (Number.isFinite(codeAsNumber)) {
+                        candidateQueries.push(db.collectionGroup("students").where("parentLinkCode", "==", codeAsNumber).limit(20), db.collectionGroup("students").where("studentLinkCode", "==", codeAsNumber).limit(20));
                     }
-                }
-                catch (lookupError) {
-                    const lookupCode = String((lookupError === null || lookupError === void 0 ? void 0 : lookupError.code) || "");
-                    const lookupMessage = String((lookupError === null || lookupError === void 0 ? void 0 : lookupError.message) || "");
-                    const isPreconditionLookupError = lookupCode === "9" ||
-                        /failed[_ -]?precondition/i.test(lookupCode) ||
-                        /failed[_ -]?precondition/i.test(lookupMessage);
-                    if (!isPreconditionLookupError) {
-                        throw lookupError;
-                    }
-                    console.warn("[completeSignupWithInvite] collectionGroup lookup failed, fallback to center scan", {
-                        studentLinkCode,
-                        lookupCode,
-                        lookupMessage,
-                    });
-                    const centerSnap = await db.collection("centers").limit(100).get();
-                    for (const centerDoc of centerSnap.docs) {
-                        const studentCollectionSnap = await db.collection(`centers/${centerDoc.id}/students`).limit(1000).get();
-                        for (const studentDoc of studentCollectionSnap.docs) {
-                            const studentData = studentDoc.data();
-                            const parentCode = normalizeParentLinkCodeValue(studentData === null || studentData === void 0 ? void 0 : studentData.parentLinkCode);
-                            const studentCode = normalizeParentLinkCodeValue(studentData === null || studentData === void 0 ? void 0 : studentData.studentLinkCode);
-                            if (parentCode === studentLinkCode || studentCode === studentLinkCode) {
+                    const studentDocMap = new Map();
+                    try {
+                        const studentSnaps = await Promise.all(candidateQueries.map((candidateQuery) => candidateQuery.get()));
+                        for (const snap of studentSnaps) {
+                            for (const studentDoc of snap.docs) {
                                 studentDocMap.set(studentDoc.ref.path, studentDoc);
                             }
                         }
                     }
-                }
-                if (studentDocMap.size === 0) {
-                    throw new functions.https.HttpsError("failed-precondition", "No student found for this link code.", {
-                        userMessage: "No student matched this code. Please check the 6-digit student code and try again.",
+                    catch (lookupError) {
+                        const lookupCode = String((lookupError === null || lookupError === void 0 ? void 0 : lookupError.code) || "");
+                        const lookupMessage = String((lookupError === null || lookupError === void 0 ? void 0 : lookupError.message) || "");
+                        const isPreconditionLookupError = lookupCode === "9" ||
+                            /failed[_ -]?precondition/i.test(lookupCode) ||
+                            /failed[_ -]?precondition/i.test(lookupMessage);
+                        if (!isPreconditionLookupError) {
+                            throw lookupError;
+                        }
+                        console.warn("[completeSignupWithInvite] collectionGroup lookup failed, fallback to center scan", {
+                            studentLinkCode,
+                            lookupCode,
+                            lookupMessage,
+                        });
+                        const centerSnap = await db.collection("centers").limit(100).get();
+                        for (const centerDoc of centerSnap.docs) {
+                            const studentCollectionSnap = await db.collection(`centers/${centerDoc.id}/students`).limit(1000).get();
+                            for (const studentDoc of studentCollectionSnap.docs) {
+                                const studentData = studentDoc.data();
+                                const parentCode = normalizeParentLinkCodeValue(studentData === null || studentData === void 0 ? void 0 : studentData.parentLinkCode);
+                                const studentCode = normalizeParentLinkCodeValue(studentData === null || studentData === void 0 ? void 0 : studentData.studentLinkCode);
+                                if (parentCode === studentLinkCode || studentCode === studentLinkCode) {
+                                    studentDocMap.set(studentDoc.ref.path, studentDoc);
+                                }
+                            }
+                        }
+                    }
+                    if (studentDocMap.size === 0) {
+                        throw new functions.https.HttpsError("failed-precondition", "No student found for this link code.", {
+                            userMessage: "No student matched this code. Please check the 6-digit student code and try again.",
+                        });
+                    }
+                    let candidates = [];
+                    const candidateStudentDocs = Array.from(studentDocMap.values()).filter((studentDoc) => {
+                        const pathSegments = studentDoc.ref.path.split("/");
+                        return pathSegments.length === 4 && pathSegments[0] === "centers" && pathSegments[2] === "students";
                     });
-                }
-                let candidates = [];
-                const candidateStudentDocs = Array.from(studentDocMap.values()).filter((studentDoc) => {
-                    const pathSegments = studentDoc.ref.path.split("/");
-                    return pathSegments.length === 4 && pathSegments[0] === "centers" && pathSegments[2] === "students";
-                });
-                console.info("[completeSignupWithInvite] parent code lookup", {
-                    studentLinkCode,
-                    rawMatchedDocCount: studentDocMap.size,
-                    centerStudentDocCount: candidateStudentDocs.length,
-                });
-                for (const studentDoc of candidateStudentDocs) {
-                    const pathSegments = studentDoc.ref.path.split("/");
-                    const resolvedCenterId = pathSegments[1];
-                    if (!resolvedCenterId)
-                        continue;
-                    const candidateMemberRef = db.doc(`centers/${resolvedCenterId}/members/${studentDoc.id}`);
-                    const candidateUserCenterRef = db.doc(`userCenters/${studentDoc.id}/centers/${resolvedCenterId}`);
-                    const [candidateMemberSnap, candidateUserCenterSnap] = await Promise.all([
-                        t.get(candidateMemberRef),
-                        t.get(candidateUserCenterRef),
-                    ]);
-                    const candidateMemberData = candidateMemberSnap.exists ? candidateMemberSnap.data() : null;
-                    const hasActiveMember = candidateMemberSnap.exists &&
-                        (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.role) === "student" && isActiveMembershipStatus(candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.status);
-                    const candidateUserCenterData = candidateUserCenterSnap.exists ? candidateUserCenterSnap.data() : null;
-                    const hasActiveUserCenter = candidateUserCenterSnap.exists &&
-                        (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.role) === "student" &&
-                        isActiveMembershipStatus(candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.status);
-                    const seatQuery = db
-                        .collection(`centers/${resolvedCenterId}/attendanceCurrent`)
-                        .where("studentId", "==", studentDoc.id)
-                        .limit(1);
-                    const seatSnap = await t.get(seatQuery);
-                    const hasSeatAssignment = !seatSnap.empty;
-                    const studentData = studentDoc.data();
-                    candidates.push({
-                        centerId: resolvedCenterId,
-                        studentDoc,
-                        studentData,
-                        className: (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.className) ||
-                            (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.className) ||
-                            null,
-                        hasActiveMember,
-                        hasActiveUserCenter,
-                        hasSeatAssignment,
-                        updatedAtMs: toMillisSafe(studentData === null || studentData === void 0 ? void 0 : studentData.updatedAt),
-                        createdAtMs: toMillisSafe(studentData === null || studentData === void 0 ? void 0 : studentData.createdAt),
-                    });
-                }
-                if (candidates.length === 0) {
-                    console.warn("[completeSignupWithInvite] no resolvable student candidate", {
+                    console.info("[completeSignupWithInvite] parent code lookup", {
                         studentLinkCode,
                         rawMatchedDocCount: studentDocMap.size,
                         centerStudentDocCount: candidateStudentDocs.length,
                     });
-                    throw new functions.https.HttpsError("failed-precondition", "No student profile could be resolved for this link code.", {
-                        userMessage: "A student was found for this code, but profile linkage failed. Please ask the center admin to verify student data.",
-                    });
-                }
-                const activeMemberCandidates = candidates.filter((candidate) => candidate.hasActiveMember);
-                if (activeMemberCandidates.length > 0) {
-                    candidates = activeMemberCandidates;
-                }
-                const userCenterActiveCandidates = candidates.filter((candidate) => candidate.hasActiveUserCenter);
-                if (userCenterActiveCandidates.length > 0) {
-                    candidates = userCenterActiveCandidates;
-                }
-                if (candidates.length > 1) {
-                    const seatAssignedCandidates = candidates.filter((candidate) => candidate.hasSeatAssignment);
-                    if (seatAssignedCandidates.length > 0) {
-                        candidates = seatAssignedCandidates;
+                    for (const studentDoc of candidateStudentDocs) {
+                        const pathSegments = studentDoc.ref.path.split("/");
+                        const resolvedCenterId = pathSegments[1];
+                        if (!resolvedCenterId)
+                            continue;
+                        const candidateMemberRef = db.doc(`centers/${resolvedCenterId}/members/${studentDoc.id}`);
+                        const candidateUserCenterRef = db.doc(`userCenters/${studentDoc.id}/centers/${resolvedCenterId}`);
+                        const [candidateMemberSnap, candidateUserCenterSnap] = await Promise.all([
+                            t.get(candidateMemberRef),
+                            t.get(candidateUserCenterRef),
+                        ]);
+                        const candidateMemberData = candidateMemberSnap.exists ? candidateMemberSnap.data() : null;
+                        const hasActiveMember = candidateMemberSnap.exists &&
+                            (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.role) === "student" && isActiveMembershipStatus(candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.status);
+                        const candidateUserCenterData = candidateUserCenterSnap.exists ? candidateUserCenterSnap.data() : null;
+                        const hasActiveUserCenter = candidateUserCenterSnap.exists &&
+                            (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.role) === "student" &&
+                            isActiveMembershipStatus(candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.status);
+                        const seatQuery = db
+                            .collection(`centers/${resolvedCenterId}/attendanceCurrent`)
+                            .where("studentId", "==", studentDoc.id)
+                            .limit(1);
+                        const seatSnap = await t.get(seatQuery);
+                        const hasSeatAssignment = !seatSnap.empty;
+                        const studentData = studentDoc.data();
+                        candidates.push({
+                            centerId: resolvedCenterId,
+                            studentDoc,
+                            studentData,
+                            className: (candidateMemberData === null || candidateMemberData === void 0 ? void 0 : candidateMemberData.className) ||
+                                (candidateUserCenterData === null || candidateUserCenterData === void 0 ? void 0 : candidateUserCenterData.className) ||
+                                null,
+                            hasActiveMember,
+                            hasActiveUserCenter,
+                            hasSeatAssignment,
+                            updatedAtMs: toMillisSafe(studentData === null || studentData === void 0 ? void 0 : studentData.updatedAt),
+                            createdAtMs: toMillisSafe(studentData === null || studentData === void 0 ? void 0 : studentData.createdAt),
+                        });
                     }
+                    if (candidates.length === 0) {
+                        console.warn("[completeSignupWithInvite] no resolvable student candidate", {
+                            studentLinkCode,
+                            rawMatchedDocCount: studentDocMap.size,
+                            centerStudentDocCount: candidateStudentDocs.length,
+                        });
+                        throw new functions.https.HttpsError("failed-precondition", "No student profile could be resolved for this link code.", {
+                            userMessage: "A student was found for this code, but profile linkage failed. Please ask the center admin to verify student data.",
+                        });
+                    }
+                    const activeMemberCandidates = candidates.filter((candidate) => candidate.hasActiveMember);
+                    if (activeMemberCandidates.length > 0) {
+                        candidates = activeMemberCandidates;
+                    }
+                    const userCenterActiveCandidates = candidates.filter((candidate) => candidate.hasActiveUserCenter);
+                    if (userCenterActiveCandidates.length > 0) {
+                        candidates = userCenterActiveCandidates;
+                    }
+                    if (candidates.length > 1) {
+                        const seatAssignedCandidates = candidates.filter((candidate) => candidate.hasSeatAssignment);
+                        if (seatAssignedCandidates.length > 0) {
+                            candidates = seatAssignedCandidates;
+                        }
+                    }
+                    if (candidates.length > 1) {
+                        const sortedCandidates = [...candidates].sort((a, b) => {
+                            const aMemberScore = (a.hasActiveMember ? 2 : 0) + (a.hasActiveUserCenter ? 1 : 0);
+                            const bMemberScore = (b.hasActiveMember ? 2 : 0) + (b.hasActiveUserCenter ? 1 : 0);
+                            if (aMemberScore !== bMemberScore)
+                                return bMemberScore - aMemberScore;
+                            const aSeatScore = a.hasSeatAssignment ? 1 : 0;
+                            const bSeatScore = b.hasSeatAssignment ? 1 : 0;
+                            if (aSeatScore !== bSeatScore)
+                                return bSeatScore - aSeatScore;
+                            const aScore = Math.max(a.updatedAtMs, a.createdAtMs);
+                            const bScore = Math.max(b.updatedAtMs, b.createdAtMs);
+                            if (aScore !== bScore)
+                                return bScore - aScore;
+                            return a.studentDoc.id.localeCompare(b.studentDoc.id);
+                        });
+                        candidates = [sortedCandidates[0]];
+                        console.warn("[completeSignupWithInvite] duplicate student link code candidates resolved automatically", {
+                            studentLinkCode,
+                            candidateCount: sortedCandidates.length,
+                            selectedStudentId: sortedCandidates[0].studentDoc.id,
+                            selectedCenterId: sortedCandidates[0].centerId,
+                        });
+                    }
+                    const selected = candidates[0];
+                    centerId = selected.centerId;
+                    linkedStudentRef = selected.studentDoc.ref;
+                    linkedStudentData = selected.studentData;
+                    linkedStudentId = selected.studentDoc.id;
+                    targetClassName = selected.className || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || null;
                 }
-                if (candidates.length > 1) {
-                    const sortedCandidates = [...candidates].sort((a, b) => {
-                        const aMemberScore = (a.hasActiveMember ? 2 : 0) + (a.hasActiveUserCenter ? 1 : 0);
-                        const bMemberScore = (b.hasActiveMember ? 2 : 0) + (b.hasActiveUserCenter ? 1 : 0);
-                        if (aMemberScore !== bMemberScore)
-                            return bMemberScore - aMemberScore;
-                        const aSeatScore = a.hasSeatAssignment ? 1 : 0;
-                        const bSeatScore = b.hasSeatAssignment ? 1 : 0;
-                        if (aSeatScore !== bSeatScore)
-                            return bSeatScore - aSeatScore;
-                        const aScore = Math.max(a.updatedAtMs, a.createdAtMs);
-                        const bScore = Math.max(b.updatedAtMs, b.createdAtMs);
-                        if (aScore !== bScore)
-                            return bScore - aScore;
-                        return a.studentDoc.id.localeCompare(b.studentDoc.id);
-                    });
-                    candidates = [sortedCandidates[0]];
-                    console.warn("[completeSignupWithInvite] duplicate student link code candidates resolved automatically", {
-                        studentLinkCode,
-                        candidateCount: sortedCandidates.length,
-                        selectedStudentId: sortedCandidates[0].studentDoc.id,
-                        selectedCenterId: sortedCandidates[0].centerId,
-                    });
-                }
-                const selected = candidates[0];
-                centerId = selected.centerId;
-                linkedStudentRef = selected.studentDoc.ref;
-                linkedStudentData = selected.studentData;
-                linkedStudentId = selected.studentDoc.id;
-                targetClassName = selected.className || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || null;
             }
             else {
                 inviteRef = db.doc(`inviteCodes/${code}`);
@@ -2743,6 +2909,18 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                     parentUids: admin.firestore.FieldValue.arrayUnion(uid),
                     updatedAt: ts,
                 }, { merge: true });
+                const linkedStudentParentCode = normalizeParentLinkCodeValue(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.parentLinkCode);
+                if (linkedStudentParentCode === studentLinkCode) {
+                    await reserveParentLinkCodeLookupInTransaction({
+                        db,
+                        transaction: t,
+                        code: linkedStudentParentCode,
+                        centerId,
+                        studentId: linkedStudentId,
+                        studentName: asTrimmedString((linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.name) || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.displayName), "학생"),
+                        timestamp: ts,
+                    });
+                }
             }
             const userDocData = {
                 id: uid,
@@ -2790,6 +2968,15 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
             t.set(memberRef, memberData, { merge: true });
             t.set(userCenterRef, userCenterData, { merge: true });
             if (role === "student") {
+                await reserveParentLinkCodeLookupInTransaction({
+                    db,
+                    transaction: t,
+                    code: parentLinkCode,
+                    centerId,
+                    studentId: uid,
+                    studentName: resolvedDisplayName,
+                    timestamp: ts,
+                });
                 t.set(db.doc(`centers/${centerId}/students/${uid}`), {
                     id: uid,
                     name: resolvedDisplayName,
