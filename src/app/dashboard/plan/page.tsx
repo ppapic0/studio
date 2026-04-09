@@ -3507,12 +3507,6 @@ export default function StudyPlanPage() {
               <Badge className="student-aggro-kicker border-none bg-[#14295F]/8 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-[#14295F] shadow-none">
                 이번 주 독서실 일정
               </Badge>
-              <h2 className={cn("font-aggro-display mt-3 font-black tracking-[-0.04em] text-[#17326B]", isMobile ? "text-[1.18rem] leading-7" : "text-[1.55rem] leading-[1.2]")}>
-                월요일부터 일요일까지, 이번 주 출입 계획을 한눈에 확인해요
-              </h2>
-              <p className={cn("student-aggro-body mt-2 break-keep font-semibold text-[#5A6F95]", isMobile ? "text-[12px] leading-5" : "text-sm leading-6")}>
-                주간 overview만 먼저 보고, 자세한 수정은 시트에서 가볍게 이어가면 됩니다.
-              </p>
             </div>
             <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-wrap justify-end")}>
               <Button
