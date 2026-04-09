@@ -199,7 +199,7 @@ export function StudyComposerCard({
           <div className="mt-3 rounded-[1rem] border border-[#DCE6F5] bg-[#F8FBFF] px-3.5 py-3">
             <p className="text-[11px] font-black text-[#355185]">입력 순서</p>
             <div className="mt-2 space-y-1.5 text-[11px] font-semibold leading-5 text-[#5C73A0]">
-              <p><span className="font-black text-[#14295F]">과목 분류</span> : 수학, 영어, 웹개발처럼 큰 과목 이름</p>
+              <p><span className="font-black text-[#14295F]">과목 분류</span> : 국어, 수학, 영어처럼 큰 과목 이름</p>
               <p><span className="font-black text-[#14295F]">실시할 내용</span> : 오늘 실제로 할 강의, 단원, 문제 유형</p>
               <p><span className="font-black text-[#14295F]">분량</span> : 몇 강, 몇 단원, 몇 문제인지 숫자로 입력</p>
             </div>
@@ -234,7 +234,7 @@ export function StudyComposerCard({
                 value={customSubjectValue}
                 onChange={(event) => onCustomSubjectChange(event.target.value)}
                 disabled={disabled || isSubmitting}
-                placeholder="예: 웹개발, 한국사, 영어"
+                placeholder="예: 국어, 한국사, 영어"
                 className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
               />
             </div>
