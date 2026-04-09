@@ -3635,20 +3635,12 @@ export default function StudyPlanPage() {
                 )}
               >
                 {isMobile ? (
-                  <>
-                    <p className={cn(
-                      "student-aggro-kicker text-[9px] font-black uppercase tracking-[0.16em]",
-                      day.hasArrivalPlan ? "text-[#23814E]/58" : "text-[#C65C68]/62"
-                    )}>
-                      {day.weekdayLabel}
-                    </p>
-                    <p className={cn(
-                      "font-aggro-display mt-2 text-[1.45rem] font-black tracking-[-0.03em]",
-                      day.hasArrivalPlan ? "text-[#178244]" : "text-[#D94A61]"
-                    )}>
-                      {day.dateLabel}
-                    </p>
-                  </>
+                  <p className={cn(
+                    "font-aggro-display text-[1.45rem] font-black tracking-[-0.03em]",
+                    day.hasArrivalPlan ? "text-[#178244]" : "text-[#D94A61]"
+                  )}>
+                    {day.dateLabel}
+                  </p>
                 ) : (
                   <>
                     <p className="student-aggro-kicker text-[9px] font-black uppercase tracking-[0.16em] text-[#8AA0C7]">{day.weekdayLabel}</p>
