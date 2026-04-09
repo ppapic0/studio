@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateStudyPlan = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.generateStudyPlan = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
@@ -3541,7 +3541,7 @@ exports.scheduledAttendanceCheck = functions
                 ? Math.round((lastCheckInAt.toMillis() - previousLastSessionAt.toMillis()) / 60000)
                 : 0;
             const normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
-            batch.set(logRef, Object.assign(Object.assign({ totalMinutes: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES), studentId,
+            batch.set(logRef, Object.assign(Object.assign({ studentId,
                 centerId, dateKey: sessionDateKey, firstSessionStartAt: nextFirstSessionAt, lastSessionEndAt: nextLastSessionAt }, (normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {})), { updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
             const sessionRef = logRef.collection("sessions").doc();
             batch.set(sessionRef, {
@@ -3744,6 +3744,21 @@ exports.scheduledWeeklyReport = functions
     console.log("[weekly-report] run complete", { centerCount: centersSnap.size, totalSent });
     return null;
 });
+async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
+    const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
+    const totalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
+        var _a, _b;
+        const raw = Number((_b = (_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.durationMinutes) !== null && _b !== void 0 ? _b : 0);
+        return sum + (Number.isFinite(raw) ? Math.max(0, Math.round(raw)) : 0);
+    }, 0);
+    await db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`).set({
+        studentId,
+        centerId,
+        dateKey,
+        totalMinutes,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+}
 /**
  * 세션 문서 생성 시 durationMinutes 유효성 검증 및 서버 집계 보정
  * - 0분 이하 또는 360분 초과 세션은 경계값으로 클램프
@@ -3763,7 +3778,6 @@ exports.onSessionCreated = functions
     const MAX_MINUTES = 360;
     let normalizedDuration = Number.isFinite(rawDuration) ? Math.max(0, Math.round(rawDuration)) : 0;
     let validationFlag = null;
-    let overageMinutes = 0;
     if (!skipValidation) {
         if (!Number.isFinite(rawDuration) || rawDuration < 0) {
             validationFlag = "clamped_negative";
@@ -3772,11 +3786,9 @@ exports.onSessionCreated = functions
         else if (rawDuration > MAX_MINUTES) {
             validationFlag = "clamped_max";
             normalizedDuration = MAX_MINUTES;
-            overageMinutes = Math.max(0, Math.round(rawDuration - MAX_MINUTES));
         }
     }
     await db.runTransaction(async (t) => {
-        const dayLogRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
         const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
         const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
         const leaderboardRef = db.doc(`centers/${centerId}/leaderboards/${dateKey.slice(0, 7)}_study-time/entries/${studentId}`);
@@ -3795,12 +3807,6 @@ exports.onSessionCreated = functions
         }
         if (validationFlag === "clamped_max") {
             t.update(snap.ref, { durationMinutes: normalizedDuration, validationFlag });
-            if (overageMinutes > 0) {
-                t.set(dayLogRef, {
-                    totalMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                }, { merge: true });
-            }
         }
         if (normalizedDuration <= 0) {
             return;
@@ -3843,6 +3849,15 @@ exports.onSessionCreated = functions
             clamped: normalizedDuration,
         });
     }
+    return null;
+});
+exports.onSessionWritten = functions
+    .region(region)
+    .firestore.document("centers/{centerId}/studyLogs/{studentId}/days/{dateKey}/sessions/{sessionId}")
+    .onWrite(async (_change, context) => {
+    const { centerId, studentId, dateKey } = context.params;
+    const db = admin.firestore();
+    await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
     return null;
 });
 /**

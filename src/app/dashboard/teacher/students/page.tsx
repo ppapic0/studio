@@ -426,7 +426,6 @@ export default function StudentListPage() {
           batch.set(
             logRef,
             {
-              totalMinutes: increment(sessionMinutes),
               studentId,
               centerId,
               dateKey: sessionDateKey,

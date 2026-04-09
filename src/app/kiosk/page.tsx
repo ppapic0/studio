@@ -163,7 +163,6 @@ export default function KioskPage() {
         if (durationMinutes > 0) {
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey);
           batch.set(logRef, {
-            totalMinutes: increment(durationMinutes),
             studentId: student.id,
             centerId: centerId,
             dateKey: todayKey,

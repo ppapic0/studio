@@ -1664,7 +1664,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
         if (sessionSeconds > 0) {
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
-          batch.set(logRef, { totalMinutes: increment(sessionMinutes), studentId, centerId, dateKey: sessionDateKey, updatedAt: serverTimestamp() }, { merge: true });
+          batch.set(logRef, { studentId, centerId, dateKey: sessionDateKey, updatedAt: serverTimestamp() }, { merge: true });
 
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
           batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });

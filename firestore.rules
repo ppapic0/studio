@@ -145,6 +145,38 @@ service cloud.firestore {
         && isLinkedParent(centerId, request.resource.data.studentId);
     }
 
+    function isAllowedSelfStudyLogDayCreate(centerId, studentId, dateKey) {
+      return isSelfCenterMember(centerId, studentId)
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.centerId == centerId
+        && request.resource.data.dateKey == dateKey
+        && request.resource.data.keys().hasOnly([
+          'studentId',
+          'centerId',
+          'dateKey',
+          'firstSessionStartAt',
+          'lastSessionEndAt',
+          'awayMinutes',
+          'updatedAt',
+        ]);
+    }
+
+    function isAllowedSelfStudyLogDayUpdate(centerId, studentId, dateKey) {
+      return isSelfCenterMember(centerId, studentId)
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.centerId == centerId
+        && request.resource.data.dateKey == dateKey
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'studentId',
+          'centerId',
+          'dateKey',
+          'firstSessionStartAt',
+          'lastSessionEndAt',
+          'awayMinutes',
+          'updatedAt',
+        ]);
+    }
+
     match /users/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
 
@@ -250,8 +282,10 @@ service cloud.firestore {
           allow read: if isTeacherOrAdmin(centerId)
             || isSelfCenterMember(centerId, studentId)
             || isLinkedParent(centerId, studentId);
-          allow create, update: if isTeacherOrAdmin(centerId)
-            || isSelfCenterMember(centerId, studentId);
+          allow create: if isTeacherOrAdmin(centerId)
+            || isAllowedSelfStudyLogDayCreate(centerId, studentId, dateKey);
+          allow update: if isTeacherOrAdmin(centerId)
+            || isAllowedSelfStudyLogDayUpdate(centerId, studentId, dateKey);
           allow delete: if isCenterAdmin(centerId);
 
           match /sessions/{sessionId} {

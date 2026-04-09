@@ -1748,7 +1748,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
 
           batch.set(sessionStudyLogRef, {
-            totalMinutes: increment(sessionMinutes),
             studentId: user.uid,
             centerId: activeMembership.id,
             dateKey: sessionDateKey,
@@ -1848,11 +1847,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               fallbackStudyLogData.lastSessionEndAt = nextLastSessionAt;
             }
 
-            if (sessionSeconds > 0) {
-              fallbackStudyLogData.totalMinutes = increment(sessionMinutes);
-              if (normalizedAwayGapMinutes > 0) {
-                fallbackStudyLogData.awayMinutes = increment(normalizedAwayGapMinutes);
-              }
+            if (sessionSeconds > 0 && normalizedAwayGapMinutes > 0) {
+              fallbackStudyLogData.awayMinutes = increment(normalizedAwayGapMinutes);
             }
 
             await setDoc(sessionStudyLogRef, fallbackStudyLogData, { merge: true });

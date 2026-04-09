@@ -4382,7 +4382,6 @@ export const scheduledAttendanceCheck = functions
         const normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
 
         batch.set(logRef, {
-          totalMinutes: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
           studentId,
           centerId,
           dateKey: sessionDateKey,
@@ -4629,6 +4628,30 @@ export const scheduledWeeklyReport = functions
     return null;
   });
 
+async function syncStudyLogDayTotalMinutes(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  studentId: string,
+  dateKey: string
+): Promise<void> {
+  const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
+  const totalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
+    const raw = Number((docSnap.data() as Record<string, unknown>)?.durationMinutes ?? 0);
+    return sum + (Number.isFinite(raw) ? Math.max(0, Math.round(raw)) : 0);
+  }, 0);
+
+  await db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`).set(
+    {
+      studentId,
+      centerId,
+      dateKey,
+      totalMinutes,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
 /**
  * 세션 문서 생성 시 durationMinutes 유효성 검증 및 서버 집계 보정
  * - 0분 이하 또는 360분 초과 세션은 경계값으로 클램프
@@ -4648,7 +4671,6 @@ export const onSessionCreated = functions
 
     let normalizedDuration = Number.isFinite(rawDuration) ? Math.max(0, Math.round(rawDuration)) : 0;
     let validationFlag: "clamped_negative" | "clamped_max" | null = null;
-    let overageMinutes = 0;
 
     if (!skipValidation) {
       if (!Number.isFinite(rawDuration) || rawDuration < 0) {
@@ -4657,12 +4679,10 @@ export const onSessionCreated = functions
       } else if (rawDuration > MAX_MINUTES) {
         validationFlag = "clamped_max";
         normalizedDuration = MAX_MINUTES;
-        overageMinutes = Math.max(0, Math.round(rawDuration - MAX_MINUTES));
       }
     }
 
     await db.runTransaction(async (t) => {
-      const dayLogRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
       const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
       const studentRef = db.doc(`centers/${centerId}/students/${studentId}`);
       const leaderboardRef = db.doc(`centers/${centerId}/leaderboards/${dateKey.slice(0, 7)}_study-time/entries/${studentId}`);
@@ -4684,12 +4704,6 @@ export const onSessionCreated = functions
 
       if (validationFlag === "clamped_max") {
         t.update(snap.ref, { durationMinutes: normalizedDuration, validationFlag });
-        if (overageMinutes > 0) {
-          t.set(dayLogRef, {
-            totalMinutes: admin.firestore.FieldValue.increment(-overageMinutes),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          }, { merge: true });
-        }
       }
 
       if (normalizedDuration <= 0) {
@@ -4741,6 +4755,16 @@ export const onSessionCreated = functions
       });
     }
 
+    return null;
+  });
+
+export const onSessionWritten = functions
+  .region(region)
+  .firestore.document("centers/{centerId}/studyLogs/{studentId}/days/{dateKey}/sessions/{sessionId}")
+  .onWrite(async (_change, context) => {
+    const { centerId, studentId, dateKey } = context.params;
+    const db = admin.firestore();
+    await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
     return null;
   });
 
