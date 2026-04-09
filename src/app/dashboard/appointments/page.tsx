@@ -790,7 +790,7 @@ export function AppointmentsPageContent({
     isStudentTrackTheme
       ? 'student-utility-card shadow-none'
       : isStaff
-        ? 'border border-[#dbe5ff] bg-white shadow-[0_30px_65px_-42px_rgba(20,41,95,0.42)]'
+        ? 'border border-[#dbe5ff] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_58%,#eef4ff_100%)] shadow-[0_30px_65px_-42px_rgba(20,41,95,0.42)]'
         : 'shadow-xl bg-white ring-1 ring-border/50'
   );
   const studentSectionHeaderClass = cn(
@@ -798,7 +798,7 @@ export function AppointmentsPageContent({
     isStudentTrackTheme
       ? 'border-b border-white/10 bg-transparent'
       : isStaff
-        ? 'border-b border-[#dbe5ff] bg-[#f5f8ff]'
+        ? 'border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_54%,rgba(255,122,22,0.1)_100%)]'
         : 'bg-muted/5 border-b'
   );
   const studentSectionTitleClass = cn(
@@ -817,7 +817,7 @@ export function AppointmentsPageContent({
     isStudentTrackTheme
       ? 'surface-card surface-card--ghost on-dark border border-white/10 shadow-none'
       : isStaff
-        ? 'border border-[#dbe5ff] bg-[#eff4ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'
+        ? 'border border-[#dbe5ff] bg-[linear-gradient(135deg,#f8fbff_0%,#eef4ff_55%,#f8f1ff_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]'
         : 'bg-muted/30 border shadow-inner'
   );
   const studentTabTriggerClass = cn(
@@ -838,13 +838,13 @@ export function AppointmentsPageContent({
     isStudentTrackTheme
       ? 'border-t border-white/10 bg-white/[0.03]'
       : isStaff
-        ? 'border-t border-[#dbe5ff] bg-[#f8fbff]'
+        ? 'border-t border-[#dbe5ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]'
         : 'border-t border-muted/10 bg-muted/5'
   );
   const studentGhostPanelClass = isStudentTrackTheme
     ? 'surface-card surface-card--ghost on-dark rounded-[1.25rem] border-white/10 shadow-none'
     : isStaff
-      ? 'rounded-[1.25rem] border border-[#dbe5ff] bg-[#f7faff]'
+      ? 'rounded-[1.25rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#fbfdff_0%,#eef4ff_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]'
       : 'rounded-[1.25rem] border bg-slate-50/40';
   const studentTitleTextClass = isStudentTrackTheme ? 'font-aggro-display text-[var(--text-on-dark)]' : 'text-[#14295F]';
   const studentMetaTextClass = isStudentTrackTheme ? 'text-[var(--text-on-dark-muted)]' : 'text-[#5c6e97]';
@@ -854,12 +854,12 @@ export function AppointmentsPageContent({
     isMobile ? 'rounded-[1.75rem] p-5' : 'rounded-[2.75rem] px-8 py-8'
   );
   const staffPanelShellClass = cn(
-    'w-full overflow-hidden border border-[#dbe5ff] bg-white shadow-[0_28px_60px_-42px_rgba(20,41,95,0.36)]',
+    'w-full overflow-hidden border border-[#dbe5ff] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_55%,#edf3ff_100%)] shadow-[0_28px_60px_-42px_rgba(20,41,95,0.36)]',
     isMobile ? 'rounded-[1.5rem]' : 'rounded-[2.25rem]'
   );
   const staffLabelClass = 'text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]';
-  const staffInsetPanelClass = 'rounded-[1.4rem] border border-[#dbe5ff] bg-[#f8fbff]';
-  const staffInputClass = 'rounded-xl border-[#dbe5ff] bg-white font-bold text-[#14295F] placeholder:text-[#8ca0c7]';
+  const staffInsetPanelClass = 'rounded-[1.4rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#f9fbff_0%,#eef4ff_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]';
+  const staffInputClass = 'rounded-xl border-[#dbe5ff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] font-bold text-[#14295F] placeholder:text-[#8ca0c7]';
 
   return (
     <div
@@ -1028,7 +1028,7 @@ export function AppointmentsPageContent({
 
           <div className={cn('grid gap-5', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1.35fr_0.65fr]')}>
             <Card className={staffPanelShellClass}>
-              <CardHeader className={cn('border-b border-[#dbe5ff] bg-[#f5f8ff]', isMobile ? 'p-5' : 'p-6 sm:p-8')}>
+              <CardHeader className={cn('border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_52%,rgba(255,122,22,0.1)_100%)]', isMobile ? 'p-5' : 'p-6 sm:p-8')}>
                 <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
                   <div className="space-y-2">
                     <p className={staffLabelClass}>공지 운영</p>
@@ -1039,7 +1039,7 @@ export function AppointmentsPageContent({
                       상담트랙에 올리는 공지를 바로 작성하고 최근 발송 이력을 함께 확인합니다.
                     </CardDescription>
                   </div>
-                  <div className="rounded-[1.3rem] border border-[#dbe5ff] bg-white px-4 py-3">
+                  <div className="rounded-[1.3rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#eef4ff_100%)] px-4 py-3 shadow-[0_16px_34px_-28px_rgba(20,41,95,0.22)]">
                     <p className={staffLabelClass}>발송 누적</p>
                     <p className="mt-2 text-xl font-black text-[#14295F]">{staffAnnouncements.length}건</p>
                     <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">학생·학부모 공지 기록</p>
@@ -1115,7 +1115,7 @@ export function AppointmentsPageContent({
                           const audienceLabel =
                             item?.audience === 'student' ? '학생' : item?.audience === 'parent' ? '학부모' : '학생+학부모';
                           return (
-                            <div key={item.id} className="rounded-[1.2rem] border border-[#dbe5ff] bg-white px-4 py-3.5">
+                            <div key={item.id} className="rounded-[1.2rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f4f8ff_100%)] px-4 py-3.5 shadow-[0_14px_28px_-24px_rgba(20,41,95,0.18)]">
                               <div className="flex items-center justify-between gap-2">
                                 <p className="truncate text-sm font-black text-[#14295F]">{item?.title || '공지사항'}</p>
                                 <Badge variant="outline" className="h-6 rounded-full border-[#dbe5ff] bg-[#f6f9ff] px-2.5 text-[10px] font-black text-[#14295F]">
@@ -1137,17 +1137,17 @@ export function AppointmentsPageContent({
               <div className={cn(staffPanelShellClass, 'p-5')}>
                 <p className={staffLabelClass}>즉시 확인</p>
                 <div className="mt-4 grid gap-3">
-                  <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-[#f8fbff] px-4 py-4">
+                  <div className="rounded-[1.25rem] border border-[#ffe0c2] bg-[linear-gradient(135deg,#fff7ef_0%,#ffffff_100%)] px-4 py-4 shadow-[0_16px_32px_-28px_rgba(255,122,22,0.24)]">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">예약 승인 대기</p>
                     <p className="mt-2 text-2xl font-black text-[#14295F]">{staffPendingReservations}건</p>
                     <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">승인 또는 거절 처리가 필요한 예약입니다.</p>
                   </div>
-                  <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-[#f8fbff] px-4 py-4">
+                  <div className="rounded-[1.25rem] border border-[#d7efe0] bg-[linear-gradient(135deg,#f1fbf5_0%,#ffffff_100%)] px-4 py-4 shadow-[0_16px_32px_-28px_rgba(16,185,129,0.2)]">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">미확인 피드백</p>
                     <p className="mt-2 text-2xl font-black text-[#14295F]">{staffUnreadLogs}건</p>
                     <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">학생이 아직 확인하지 않은 상담 일지입니다.</p>
                   </div>
-                  <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-[#f8fbff] px-4 py-4">
+                  <div className="rounded-[1.25rem] border border-[#e3dcff] bg-[linear-gradient(135deg,#f8f5ff_0%,#ffffff_100%)] px-4 py-4 shadow-[0_16px_32px_-28px_rgba(124,58,237,0.18)]">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">열린 요청</p>
                     <p className="mt-2 text-2xl font-black text-[#14295F]">{staffOpenStudentInquiries + staffOpenParentRequests}건</p>
                     <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">학생 질문과 학부모 요청을 합산한 처리 대기입니다.</p>
@@ -1339,7 +1339,7 @@ export function AppointmentsPageContent({
                         isStudentTrackTheme
                           ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none"
                           : isStaff
-                            ? "rounded-[1.5rem] border border-[#dbe5ff] bg-[#fbfdff] mx-4 my-4"
+                            ? "rounded-[1.5rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_58%,#edf4ff_100%)] mx-4 my-4 shadow-[0_20px_42px_-34px_rgba(20,41,95,0.24)]"
                             : "hover:bg-muted/5",
                         isMobile ? "p-5" : "p-6 sm:p-8"
                       )}
@@ -1359,7 +1359,7 @@ export function AppointmentsPageContent({
                             {isStudent ? (res.teacherName || '담당 교사 배정 중') : `${res.studentName} 학생 (담당: ${res.teacherName})`}
                           </p>
                           {isStaff && res.studentNote?.trim() && (
-                            <div className="mt-2 rounded-[1rem] border border-[#dbe5ff] bg-white px-3 py-2.5">
+                            <div className="mt-2 rounded-[1rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f1f6ff_100%)] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
                               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">학생 메모</p>
                               <p className="mt-1 text-sm font-semibold leading-6 text-[#14295F]">{res.studentNote.trim()}</p>
                             </div>
@@ -1436,7 +1436,7 @@ export function AppointmentsPageContent({
                   )}
                 </div>
                 
-                <div className={cn("flex items-center gap-2 p-1.5 rounded-2xl border", isMobile ? "w-full" : "w-auto", isStudentTrackTheme ? "border-white/10 bg-white/[0.06] shadow-none" : isStaff ? "border-[#dbe5ff] bg-white shadow-none" : "bg-white/50 shadow-sm")}>
+                <div className={cn("flex items-center gap-2 p-1.5 rounded-2xl border", isMobile ? "w-full" : "w-auto", isStudentTrackTheme ? "border-white/10 bg-white/[0.06] shadow-none" : isStaff ? "border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#eef4ff_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]" : "bg-white/50 shadow-sm")}>
                   <Filter className={cn("h-3.5 w-3.5 ml-2", isStudentTrackTheme ? "text-[var(--accent-orange-soft)]" : isStaff ? "text-[#14295F]" : "text-emerald-600")} />
                   <Select value={selectedSeason} onValueChange={setSelectedSeason}>
                     <SelectTrigger className={cn("h-9 w-full sm:w-[180px] border-none bg-transparent font-black text-xs shadow-none focus:ring-0", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : isStaff ? "text-[#14295F]" : "")}>
@@ -1470,7 +1470,7 @@ export function AppointmentsPageContent({
                       (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
                       '';
                     return (
-                    <div key={log.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : isStaff ? "rounded-[1.5rem] border border-[#dbe5ff] bg-[#fbfdff] mx-4 my-4" : "hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
+                    <div key={log.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : isStaff ? "rounded-[1.5rem] border border-[#e2dcff] bg-[linear-gradient(135deg,#ffffff_0%,#faf7ff_52%,#eef4ff_100%)] mx-4 my-4 shadow-[0_20px_42px_-34px_rgba(79,84,215,0.18)]" : "hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex flex-wrap items-center gap-2">
@@ -1508,7 +1508,7 @@ export function AppointmentsPageContent({
                         
                         <div className="space-y-3">
                           {studentQuestion && (
-                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-[#66b9ff]/20" : isStaff ? "rounded-[1.25rem] border border-[#dbe5ff] bg-white" : "rounded-[1.25rem] border border-sky-200 bg-sky-50/60", isMobile ? "p-4" : "p-5")}>
+                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-[#66b9ff]/20" : isStaff ? "rounded-[1.25rem] border border-[#d8e7ff] bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_100%)]" : "rounded-[1.25rem] border border-sky-200 bg-sky-50/60", isMobile ? "p-4" : "p-5")}>
                               <p className={cn("mb-1 text-[10px] font-black uppercase tracking-widest", isStudentTrackTheme ? "text-[#9fd6ff]" : isStaff ? "text-[#5c6e97]" : "text-sky-700")}>학생 질문</p>
                               <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : isStaff ? "text-[#14295F]" : "text-sky-900")}>
                                 {studentQuestion}
@@ -1519,7 +1519,7 @@ export function AppointmentsPageContent({
                             <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base", studentBodyTextClass)}>{log.content}</p>
                           </div>
                           {log.improvement && (
-                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-emerald-300/18 flex items-start gap-3" : isStaff ? "rounded-[1.25rem] border border-[#dbe5ff] bg-[#f6f9ff] flex items-start gap-3" : "rounded-[1.25rem] bg-emerald-50 border border-emerald-100 flex items-start gap-3", isMobile ? "p-4" : "p-5")}>
+                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-emerald-300/18 flex items-start gap-3" : isStaff ? "rounded-[1.25rem] border border-[#d7efe0] bg-[linear-gradient(135deg,#f3fbf6_0%,#ffffff_100%)] flex items-start gap-3" : "rounded-[1.25rem] bg-emerald-50 border border-emerald-100 flex items-start gap-3", isMobile ? "p-4" : "p-5")}>
                               <div className={cn("p-1.5 rounded-lg shrink-0", isStudentTrackTheme ? "bg-emerald-400/12" : isStaff ? "bg-white" : "bg-white shadow-sm")}><AlertCircle className={cn("h-3.5 w-3.5", isStudentTrackTheme ? "text-emerald-300" : isStaff ? "text-[#14295F]" : "text-emerald-600")} /></div>
                               <div className="space-y-0.5">
                                 <p className={cn("text-[9px] font-black uppercase tracking-widest leading-none", isStudentTrackTheme ? "text-emerald-300" : isStaff ? "text-[#5c6e97]" : "text-emerald-700")}>실천 권고</p>
@@ -1624,7 +1624,7 @@ export function AppointmentsPageContent({
                       const repliedAtDate = item.repliedAt?.toDate?.();
                       const repliedAtLabel = repliedAtDate ? format(repliedAtDate, 'yyyy.MM.dd HH:mm') : '';
                       return (
-                        <div key={item.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : isStaff ? "space-y-3 rounded-[1.5rem] border border-[#dbe5ff] bg-[#fbfdff] mx-4 my-4" : "space-y-3 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-8")}>
+                        <div key={item.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : isStaff ? "space-y-3 rounded-[1.5rem] border border-[#d9ecff] bg-[linear-gradient(135deg,#ffffff_0%,#f4faff_54%,#eef5ff_100%)] mx-4 my-4 shadow-[0_20px_42px_-34px_rgba(37,84,215,0.18)]" : "space-y-3 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-8")}>
                           <div className="flex items-center gap-2 flex-wrap">
                             {getCommunicationTypeBadge(item)}
                             {getParentStatusBadge(item.status)}
@@ -1635,7 +1635,7 @@ export function AppointmentsPageContent({
                             <p className={cn("whitespace-pre-wrap text-sm font-bold leading-relaxed", studentBodyTextClass)}>{item.body?.trim() || '내용이 없습니다.'}</p>
                           </div>
                           {item.replyBody && (
-                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-emerald-300/18" : isStaff ? "rounded-2xl border border-[#dbe5ff] bg-[#f6f9ff]" : "rounded-2xl border border-emerald-200 bg-emerald-50/70", "p-4")}>
+                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-emerald-300/18" : isStaff ? "rounded-2xl border border-[#d8efe2] bg-[linear-gradient(135deg,#f1fbf5_0%,#ffffff_100%)]" : "rounded-2xl border border-emerald-200 bg-emerald-50/70", "p-4")}>
                               <p className={cn("text-[10px] font-black mb-1", isStudentTrackTheme ? "text-emerald-300" : isStaff ? "text-[#5c6e97]" : "text-emerald-700")}>답변 {item.repliedByName ? `· ${item.repliedByName}` : ''} {repliedAtLabel ? `· ${repliedAtLabel}` : ''}</p>
                               <p className={cn("whitespace-pre-wrap text-sm font-bold leading-relaxed", isStudentTrackTheme ? "text-emerald-100" : isStaff ? "text-[#14295F]" : "text-emerald-900")}>{item.replyBody}</p>
                             </div>
@@ -1669,7 +1669,7 @@ export function AppointmentsPageContent({
         {isStaff && (
           <TabsContent value="parent" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
             <Card className={staffPanelShellClass}>
-              <CardHeader className={cn("border-b border-[#dbe5ff] bg-[#f5f8ff]", isMobile ? "p-6" : "p-6 sm:p-8")}>
+              <CardHeader className={cn("border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_52%,rgba(255,122,22,0.1)_100%)]", isMobile ? "p-6" : "p-6 sm:p-8")}>
                 <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-stretch" : "flex-row")}>
                   <div className="space-y-2">
                     <CardTitle className={cn("font-black text-[#14295F] flex items-center gap-3 break-keep", isMobile ? "text-lg" : "text-xl")}>
@@ -1679,7 +1679,7 @@ export function AppointmentsPageContent({
                   </div>
                   <div className={cn("flex items-center gap-2", isMobile ? "w-full flex-col" : "w-auto")}>
                     <Select value={parentTypeFilter} onValueChange={(value: any) => setParentTypeFilter(value)}>
-                      <SelectTrigger className={cn("h-10 rounded-xl border-[#dbe5ff] bg-white font-bold text-xs text-[#14295F]", isMobile ? "w-full" : "w-[150px]")}>
+                      <SelectTrigger className={cn("h-10 rounded-xl border-[#dbe5ff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] font-bold text-xs text-[#14295F]", isMobile ? "w-full" : "w-[150px]")}>
                         <SelectValue placeholder="요청 유형" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1690,7 +1690,7 @@ export function AppointmentsPageContent({
                       </SelectContent>
                     </Select>
                     <Select value={parentStatusFilter} onValueChange={(value: any) => setParentStatusFilter(value)}>
-                      <SelectTrigger className={cn("h-10 rounded-xl border-[#dbe5ff] bg-white font-bold text-xs text-[#14295F]", isMobile ? "w-full" : "w-[150px]")}>
+                      <SelectTrigger className={cn("h-10 rounded-xl border-[#dbe5ff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] font-bold text-xs text-[#14295F]", isMobile ? "w-full" : "w-[150px]")}>
                         <SelectValue placeholder="처리 상태" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1721,7 +1721,7 @@ export function AppointmentsPageContent({
                       const channelLabel =
                         item.channel === 'visit' ? '방문' : item.channel === 'phone' ? '전화' : item.channel === 'online' ? '온라인' : null;
                       return (
-                        <div key={item.id} className={cn("flex flex-col gap-4 rounded-[1.5rem] border border-[#dbe5ff] bg-[#fbfdff]", isMobile ? "p-5" : "p-6 sm:p-8")}>
+                        <div key={item.id} className={cn("flex flex-col gap-4 rounded-[1.5rem] border border-[#e7dcff] bg-[linear-gradient(135deg,#fffaf3_0%,#f8f5ff_45%,#eef5ff_100%)] shadow-[0_20px_42px_-34px_rgba(20,41,95,0.2)]", isMobile ? "p-5" : "p-6 sm:p-8")}>
                           <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div className="space-y-2 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1748,7 +1748,7 @@ export function AppointmentsPageContent({
                               )}
                             </div>
                           </div>
-                          <div className="rounded-2xl border border-[#dbe5ff] bg-white p-4">
+                          <div className="rounded-2xl border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f4f8ff_100%)] p-4">
                             <p className="whitespace-pre-wrap text-sm font-bold text-[#14295F] leading-relaxed">{item.body?.trim() || '요청 내용이 비어 있습니다.'}</p>
                           </div>
                           <div className="space-y-2">
@@ -1766,7 +1766,7 @@ export function AppointmentsPageContent({
                             </div>
                           </div>
                           {item.replyBody && (
-                            <div className="rounded-2xl border border-[#dbe5ff] bg-[#f6f9ff] p-4">
+                            <div className="rounded-2xl border border-[#d8efe2] bg-[linear-gradient(135deg,#f2fbf6_0%,#ffffff_100%)] p-4">
                               <p className="text-[10px] font-black text-[#5c6e97] mb-1">
                                 최근 답변{item.repliedByName ? ` · ${item.repliedByName}` : ''}
                               </p>
@@ -1782,8 +1782,8 @@ export function AppointmentsPageContent({
                   </div>
                 )}
                 {!showAll && filteredParentCommunications.length > PREVIEW_LIMIT && (
-                  <div className="border-t border-[#dbe5ff] p-5 sm:p-6 flex justify-center bg-[#f8fbff]">
-                    <Button asChild variant="outline" className="rounded-xl border-[#dbe5ff] bg-white font-black text-[#14295F] hover:bg-[#f5f8ff]">
+                  <div className="border-t border-[#dbe5ff] p-5 sm:p-6 flex justify-center bg-[linear-gradient(180deg,#f9fbff_0%,#eef4ff_100%)]">
+                    <Button asChild variant="outline" className="rounded-xl border-[#dbe5ff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] font-black text-[#14295F] hover:bg-[#f5f8ff]">
                       <Link href="/dashboard/appointments/parent-requests">
                         학부모 요청 더보기 <ArrowRight className="ml-1 h-4 w-4" />
                       </Link>
