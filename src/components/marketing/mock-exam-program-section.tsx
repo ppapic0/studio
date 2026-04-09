@@ -122,7 +122,7 @@ export function MockExamProgramSection({ mockExamProgram, surface = 'card' }: Mo
           >
             유료 이용 가능
           </span>
-          <p className={cn('break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/72' : 'text-[#53687F]')}>
+          <p className={cn('break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white' : 'text-[#53687F]')}>
             {spotlightMessage}
           </p>
         </div>
