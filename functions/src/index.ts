@@ -145,6 +145,17 @@ const SECURE_PENALTY_SOURCE_POINTS: Record<"manual" | "routine_missing", number>
   manual: 1,
   routine_missing: 1,
 };
+const SENSITIVE_USER_MESSAGE_PATTERNS = [
+  /\b(firebase|firestore|identitytoolkit|googleapis|gstatic)\b/i,
+  /\b(auth|functions)\/[a-z0-9-]+/i,
+  /\b(permission[-_ ]?denied|failed[-_ ]?precondition|invalid[-_ ]?argument|already[-_ ]?exists|deadline[-_ ]?exceeded|unauthenticated|internal|not[-_ ]?found)\b/i,
+  /\b(api[_ -]?key|apikey|secret|token|credential|service account|bearer|project[_ -]?id)\b/i,
+  /\bhttp\s*\d{3}\b/i,
+  /https?:\/\//i,
+  /\bmissing or insufficient permissions\b/i,
+  /\bat\s+\S+:\d+:\d+/i,
+  /firebaseerror:/i,
+];
 
 const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
   study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
@@ -307,6 +318,63 @@ function normalizeParentLinkCodeValue(value: unknown): string {
     return String(Math.trunc(value)).trim();
   }
   return "";
+}
+
+function normalizeUserFacingErrorMessage(raw: string): string {
+  return raw
+    .replace(/^FirebaseError:\s*/i, "")
+    .replace(/^\d+\s+FAILED_PRECONDITION:?\s*/i, "")
+    .replace(/^\d+\s+INVALID_ARGUMENT:?\s*/i, "")
+    .replace(/^\d+\s+ALREADY_EXISTS:?\s*/i, "")
+    .replace(/^\d+\s+PERMISSION_DENIED:?\s*/i, "")
+    .replace(/^\d+\s+INTERNAL:?\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSensitiveUserFacingErrorMessage(message: string): boolean {
+  const normalized = normalizeUserFacingErrorMessage(message);
+  if (!normalized) return true;
+  if (normalized.length > 180) return true;
+  if (normalized.includes("\n")) return true;
+  return SENSITIVE_USER_MESSAGE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function toSafeUserMessage(error: unknown, fallback: string): string {
+  const candidates: string[] = [];
+
+  if (typeof error === "string") {
+    candidates.push(error);
+  }
+
+  if (error && typeof error === "object") {
+    const record = error as {
+      message?: unknown;
+      details?: unknown;
+    };
+
+    if (typeof record.message === "string") {
+      candidates.push(record.message);
+    }
+
+    if (record.details && typeof record.details === "object") {
+      const details = record.details as { userMessage?: unknown; message?: unknown; error?: unknown };
+      if (typeof details.userMessage === "string") candidates.push(details.userMessage);
+      if (typeof details.message === "string") candidates.push(details.message);
+      if (typeof details.error === "string") candidates.push(details.error);
+    } else if (typeof record.details === "string") {
+      candidates.push(record.details);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const normalized = normalizeUserFacingErrorMessage(candidate);
+    if (!normalized) continue;
+    if (isSensitiveUserFacingErrorMessage(normalized)) continue;
+    return normalized;
+  }
+
+  return fallback;
 }
 
 function getParentLinkLookupRef(db: admin.firestore.Firestore, code: string) {
@@ -3141,7 +3209,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       stack: e?.stack || null,
     });
     throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
-      userMessage: e?.message || "Unknown internal error",
+      userMessage: toSafeUserMessage(e, "학생 정보를 수정하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     });
   }
 });
@@ -3184,7 +3252,7 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       throw e;
     }
     throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
-      userMessage: e?.message || "Unknown internal error",
+      userMessage: toSafeUserMessage(e, "학생 계정 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     });
   }
 });
@@ -3238,7 +3306,7 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
       throw e;
     }
     throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
-      userMessage: e?.message || "Unknown internal error",
+      userMessage: toSafeUserMessage(e, "센터 가입 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     });
   }
 });
@@ -3857,7 +3925,10 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       } else if (lower.includes("invite code has no center information")) {
         userMessage = "학생코드에 연결된 센터 정보가 올바르지 않습니다. 센터 관리자에게 문의해 주세요.";
       } else if (normalizedFailedPreconditionMessage) {
-        userMessage = normalizedFailedPreconditionMessage;
+        userMessage = toSafeUserMessage(
+          normalizedFailedPreconditionMessage,
+          "학생코드 확인에 실패했습니다. 코드가 올바른지 다시 확인해 주세요."
+        );
       }
 
       throw new functions.https.HttpsError("failed-precondition", "Signup precondition failed.", {
@@ -3867,18 +3938,24 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
 
     if (hasInvalidArgument) {
       throw new functions.https.HttpsError("invalid-argument", "Invalid signup input.", {
-        userMessage: normalizedInvalidArgumentMessage || "입력값을 다시 확인해 주세요. 학생코드, 전화번호 등 필수값이 누락되었을 수 있습니다.",
+        userMessage: toSafeUserMessage(
+          normalizedInvalidArgumentMessage,
+          "입력값을 다시 확인해 주세요. 학생코드, 전화번호 등 필수값이 누락되었을 수 있습니다."
+        ),
       });
     }
 
     if (hasAlreadyExists) {
       throw new functions.https.HttpsError("already-exists", "Signup target already exists.", {
-        userMessage: normalizedAlreadyExistsMessage || "이미 연결된 계정입니다. 로그인 후 대시보드에서 확인해 주세요.",
+        userMessage: toSafeUserMessage(
+          normalizedAlreadyExistsMessage,
+          "이미 연결된 계정입니다. 로그인 후 대시보드에서 확인해 주세요."
+        ),
       });
     }
 
     throw new functions.https.HttpsError("internal", "Signup processing failed due to an internal error.", {
-      userMessage: e?.message || "Unknown internal error",
+      userMessage: toSafeUserMessage(e, "회원가입 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     });
   }
 });
