@@ -833,14 +833,9 @@ function ParentDashboardTabRail({
                   >
                     <TabIcon className="h-4 w-4" />
                   </div>
-                  <div className="min-w-0">
-                    <p className={cn('text-[11px] font-black tracking-tight', isActive ? 'text-[#14295F]' : 'text-white')}>
-                      {meta.shortLabel}
-                    </p>
-                    <p className={cn('mt-0.5 line-clamp-1 text-[9px] font-black uppercase tracking-[0.12em]', isActive ? 'text-[#d0690f]' : 'text-white')}>
-                      {meta.label}
-                    </p>
-                  </div>
+                  <p className={cn('min-w-0 text-[11px] font-black tracking-tight', isActive ? 'text-[#14295F]' : 'text-white')}>
+                    {meta.shortLabel}
+                  </p>
                 </button>
               );
             })}
