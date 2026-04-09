@@ -157,6 +157,27 @@ function uniqueStrings(items: Array<string | undefined | null>) {
   );
 }
 
+function getPlanSnapshot(input: DailyReportInput) {
+  const total = input.plans.length;
+  const completed = input.plans.filter((plan) => plan.done).length;
+  const firstPending = input.plans.find((plan) => !plan.done)?.title?.trim();
+  const firstCompleted = input.plans.find((plan) => plan.done)?.title?.trim();
+
+  return {
+    total,
+    completed,
+    firstPending,
+    firstCompleted,
+  };
+}
+
+function getScheduleSnapshot(input: DailyReportInput) {
+  const firstTimedSchedule = input.schedule.find((item) => item.time && item.time !== '-');
+  return firstTimedSchedule
+    ? `${firstTimedSchedule.title} ${firstTimedSchedule.time}`.trim()
+    : null;
+}
+
 function resolvePhraseIndexes(input: DailyReportInput) {
   return parseDailyReportVariationSignature(input.variationSignature)?.phraseIndexes ?? {
     observation: 0,
@@ -273,11 +294,15 @@ function buildFallbackObservation(input: DailyReportInput) {
     '회복 지원형': `${input.studentName} 학생은 오늘의 기록 안에서도 다시 회복할 수 있는 단서를 남겼습니다.`,
   };
   const phraseIndexes = resolvePhraseIndexes(input);
+  const scheduleLead = getScheduleSnapshot(input);
 
   return [
     toneLead[input.variationStyle],
     OBSERVATION_VARIANTS[phraseIndexes.observation](input),
-  ].join(' ');
+    scheduleLead ? `오늘 일정의 기준점은 ${scheduleLead} 흐름이었습니다.` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function buildFallbackInterpretation(input: DailyReportInput) {
@@ -304,13 +329,26 @@ function buildFallbackCoaching(input: DailyReportInput) {
     '회복 지원형': '내일은 평가보다 회복 경험을 쌓는 행동 하나를 먼저 성공시키는 것이 중요합니다.',
   };
   const phraseIndexes = resolvePhraseIndexes(input);
+  const { firstPending, firstCompleted } = getPlanSnapshot(input);
+  const planBridge = firstPending
+    ? `특히 '${firstPending}'를 첫 실행 과제로 당겨 시작 문턱을 낮추겠습니다.`
+    : firstCompleted
+      ? `오늘 이어진 '${firstCompleted}' 흐름이 내일 첫 과제까지 자연스럽게 연결되도록 관리하겠습니다.`
+      : '첫 과제 시작 시점을 짧고 선명하게 고정하겠습니다.';
 
-  return `${actionTone[input.variationStyle]} ${COACHING_VARIANTS[phraseIndexes.coaching](input)}`;
+  return `${actionTone[input.variationStyle]} ${COACHING_VARIANTS[phraseIndexes.coaching](input)} ${planBridge}`;
 }
 
 function buildFallbackHomeConnection(input: DailyReportInput) {
   const phraseIndexes = resolvePhraseIndexes(input);
-  return HOME_CONNECTION_VARIANTS[phraseIndexes.homeConnection](input).trim();
+  const { firstPending, firstCompleted } = getPlanSnapshot(input);
+  const planBridge = firstPending
+    ? `특히 '${firstPending}'를 두고는 결과보다 시작 시간을 먼저 물어봐 주세요.`
+    : firstCompleted
+      ? `오늘 해낸 '${firstCompleted}' 경험을 어떻게 다시 이어갈지 짧게 확인해 주세요.`
+      : '오늘 가장 잘 풀렸던 순간을 먼저 인정해 주시면 좋겠습니다.';
+
+  return `${HOME_CONNECTION_VARIANTS[phraseIndexes.homeConnection](input).trim()} ${planBridge}`.trim();
 }
 
 function buildFallbackTeacherOneLiner(input: DailyReportInput) {
@@ -325,11 +363,15 @@ function buildFallbackTeacherOneLiner(input: DailyReportInput) {
 }
 
 function composeReportContent(input: DailyReportInput, draft: DailyReportDraft) {
+  const planSnapshot = getPlanSnapshot(input);
   const numericObservation = [
     `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)} 학습했고 계획 완료율은 ${Math.round(input.completionRate)}%였습니다.`,
+    planSnapshot.total > 0 ? `오늘 계획 과제는 ${planSnapshot.completed}/${planSnapshot.total}개를 마쳤습니다.` : null,
     `최근 7일 평균은 ${formatDailyReportStudyTime(input.metrics.avg7StudyMinutes)}이며 오늘은 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)}(${formatSignedPercent(input.metrics.growthRate)}) 변화했습니다.`,
     `출결 흐름은 ${input.attendanceLabel}입니다.`,
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return [
     '🕒 오늘 관찰',
@@ -456,7 +498,9 @@ const dailyReportPrompt = ai.definePrompt({
 9. 루틴누락/지각/미입실/퇴실불안정이면 반드시 생활리듬이나 시작 루틴 관점을 한 번 이상 포함하세요.
 10. homeConnection은 압박형 지시 대신 질문형, 인정형, 관계형 피드백으로 작성하세요.
 11. 내부 스테이지는 절대 학생/학부모에게 직접 드러내지 말고, 코칭 깊이를 조절하는 참고 정보로만 사용하세요.
-12. JSON만 반환하세요.`,
+12. 계획 목록이나 생활 루틴에 구체적인 단서가 있으면 observation, coaching, homeConnection 중 최소 한 곳에는 실제 과제/루틴 요소를 한 번 반영하세요.
+13. homeConnection은 학부모가 오늘 바로 써볼 수 있는 자연스러운 말투로 작성하세요.
+14. JSON만 반환하세요.`,
   config: {
     temperature: 0.8,
     safetySettings: [

@@ -146,13 +146,200 @@ function buildOverallSummary({
 }) {
   const headline = aiMeta?.teacherOneLiner?.trim() || buildContentSummarySnippet(content);
   const subline = aiMeta
-    ? `${studentName || '학생'}의 ${dateKey || '오늘'} 리포트입니다. ${toSummaryTone(aiMeta)}`
+    ? `${studentName || '학생'}의 ${dateKey || '오늘'} 리포트입니다. ${toSummaryTone(aiMeta)} ${aiMeta.pedagogyLens ? `${aiMeta.pedagogyLens} 관점으로 핵심만 먼저 정리했습니다.` : ''}`.trim()
     : `${studentName || '학생'}의 ${dateKey || '오늘'} 리포트입니다. 핵심 흐름을 먼저 보고 아래에서 자세한 코칭을 확인할 수 있어요.`;
 
   return {
     headline,
     subline,
   };
+}
+
+function buildInterpretationCopy(aiMeta: DailyReportAiMeta) {
+  const parts = [
+    aiMeta.metrics?.trendSummary,
+    aiMeta.growthBand && aiMeta.completionBand
+      ? `오늘 흐름은 ${aiMeta.growthBand}, 실행 밀도는 ${aiMeta.completionBand} 구간으로 읽힙니다.`
+      : null,
+    aiMeta.routineBand && aiMeta.routineBand !== '정상'
+      ? `생활 리듬은 ${aiMeta.routineBand} 상태라 학습량보다 시작 루틴을 먼저 바로잡는 것이 중요합니다.`
+      : aiMeta.attendanceLabel || null,
+  ]
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item));
+
+  return parts.join(' ');
+}
+
+function buildFamilyQuestion(aiMeta: DailyReportAiMeta, studentName?: string) {
+  const subject = studentName ? `${studentName} 학생에게` : '학생에게';
+
+  if (aiMeta.routineBand && aiMeta.routineBand !== '정상') {
+    return `${subject} 내일 시작을 더 편하게 만들려면 무엇이 필요할지 가볍게 물어봐 주세요.`;
+  }
+
+  if (aiMeta.coachingFocus) {
+    return `${subject} 내일 ${aiMeta.coachingFocus}부터 어떻게 시작해 보고 싶은지 짧게 확인해 주세요.`;
+  }
+
+  return `${subject} 오늘 가장 잘 풀렸던 순간이 언제였는지 먼저 물어봐 주세요.`;
+}
+
+function SummaryHeroMetrics({
+  aiMeta,
+}: {
+  aiMeta?: DailyReportAiMeta | null;
+}) {
+  if (!aiMeta) return null;
+
+  const metrics = [
+    {
+      label: '오늘 학습',
+      value: formatStudyTime(aiMeta.totalStudyMinutes),
+      detail: aiMeta.studyBand || '학습 흐름',
+    },
+    {
+      label: '계획 완료',
+      value: `${Math.round(aiMeta.completionRate || 0)}%`,
+      detail: aiMeta.completionBand || '실행 밀도',
+    },
+    {
+      label: '평균 대비',
+      value: formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg),
+      detail: formatSignedPercent(aiMeta.metrics?.growthRate),
+    },
+  ];
+
+  return (
+    <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      {metrics.map((item) => (
+        <div key={item.label} className="rounded-[1.35rem] border border-white/12 bg-white/10 px-4 py-3 backdrop-blur-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{item.label}</p>
+          <p className="mt-2 text-lg font-black tracking-tight text-white">{item.value}</p>
+          <p className="mt-1 text-xs font-bold text-white/68">{item.detail}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReportInsightBoard({
+  aiMeta,
+}: {
+  aiMeta?: DailyReportAiMeta | null;
+}) {
+  if (!aiMeta) return null;
+
+  const bandBadges = [
+    aiMeta.pedagogyLens,
+    aiMeta.secondaryLens,
+    aiMeta.studyBand,
+    aiMeta.continuityBand,
+    aiMeta.variationStyle,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <div className="rounded-2xl bg-blue-50 p-2 text-blue-600">
+          <TrendingUp className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">오늘 해석</p>
+          <p className="mt-1 text-sm font-black tracking-tight text-slate-900">리포트가 읽어낸 핵심 흐름</p>
+        </div>
+      </div>
+
+      <p className="mt-4 text-base font-black leading-relaxed tracking-tight text-slate-900">
+        {buildInterpretationCopy(aiMeta)}
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {bandBadges.map((item) => (
+          <Badge key={item} variant="outline" className="rounded-full border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-700">
+            {item}
+          </Badge>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결 리듬</p>
+          <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.routineBand || '확인 중'}</p>
+          <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.'}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">성장 흐름</p>
+          <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.growthBand || '분석 중'}</p>
+          <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+            평균 대비 {formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg)} / {formatSignedPercent(aiMeta.metrics?.growthRate)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportActionBoard({
+  aiMeta,
+  studentName,
+}: {
+  aiMeta?: DailyReportAiMeta | null;
+  studentName?: string;
+}) {
+  if (!aiMeta) return null;
+
+  const improvementLead = aiMeta.improvements?.[0] || aiMeta.metrics?.trendSummary || '내일은 한 가지 행동만 먼저 고정해 흐름을 지키겠습니다.';
+  const strengthLead = aiMeta.strengths?.[0] || aiMeta.teacherOneLiner || '오늘 남은 강점을 먼저 인정한 뒤 다음 행동으로 연결해 주세요.';
+
+  return (
+    <div className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <div className="rounded-2xl bg-amber-50 p-2 text-amber-600">
+          <BrainCircuit className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">다음 액션</p>
+          <p className="mt-1 text-sm font-black tracking-tight text-slate-900">교실 코칭과 가정 대화를 한 번에</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[#14295F] px-4 py-4 text-white">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">내일 교실 코칭</p>
+          <p className="mt-2 text-base font-black leading-relaxed tracking-tight">
+            {aiMeta.coachingFocus || '내일 첫 행동을 짧고 선명하게 잡겠습니다.'}
+          </p>
+          <p className="mt-2 text-sm font-bold leading-relaxed text-white/75">{improvementLead}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {aiMeta.pedagogyLens && (
+              <Badge className="border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white">{aiMeta.pedagogyLens}</Badge>
+            )}
+            {aiMeta.secondaryLens && (
+              <Badge className="border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white/85">{aiMeta.secondaryLens}</Badge>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[1.35rem] border border-amber-100 bg-amber-50/60 px-4 py-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700/70">가정 대화 포인트</p>
+          <p className="mt-2 text-base font-black leading-relaxed tracking-tight text-slate-900">
+            {aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.'}
+          </p>
+          <div className="mt-3 grid gap-2">
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">먼저 인정</p>
+              <p className="mt-1 text-sm font-bold leading-relaxed text-slate-700">{strengthLead}</p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">짧게 질문</p>
+              <p className="mt-1 text-sm font-bold leading-relaxed text-slate-700">{buildFamilyQuestion(aiMeta, studentName)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function MiniTrendChart({
@@ -540,15 +727,23 @@ export function VisualReportViewer({
               {dateKey && (
                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white/65">{dateKey}</span>
               )}
+              {aiMeta?.variationStyle && (
+                <Badge className="border-none bg-white/10 text-white/85 font-black">{aiMeta.variationStyle}</Badge>
+              )}
             </div>
             <p className="mt-4 text-xl font-black tracking-tight leading-snug break-keep sm:text-2xl">{overallSummary.headline}</p>
             <p className="mt-2 text-sm font-bold leading-relaxed text-white/80">{overallSummary.subline}</p>
+            <SummaryHeroMetrics aiMeta={aiMeta || null} />
           </CardContent>
         </Card>
       )}
 
       {aiMeta && (
         <>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <ReportInsightBoard aiMeta={aiMeta || null} />
+            <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} />
+          </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
             <MiniTrendChart aiMeta={aiMeta || null} />
             <SignalRadarCard aiMeta={aiMeta || null} />
