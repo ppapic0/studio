@@ -37,6 +37,14 @@ function formatSignedMinutes(value?: number | null) {
   return `${safe >= 0 ? '+' : ''}${safe}분`;
 }
 
+function formatTrendDateLabel(date: string, isToday: boolean) {
+  if (isToday) return '오늘';
+
+  const [month, day] = date.slice(5).split('-');
+  if (!month || !day) return date.slice(5);
+  return `${Number(month)}/${Number(day)}`;
+}
+
 function toSummaryTone(aiMeta?: DailyReportAiMeta | null) {
   if (!aiMeta?.growthBand && !aiMeta?.routineBand) return '차분한 흐름입니다.';
   if (aiMeta.growthBand === '급상승' || aiMeta.growthBand === '상승') {
@@ -161,50 +169,54 @@ function MiniTrendChart({
   const maxMinutes = Math.max(1, ...points.map((point) => Math.max(0, point.minutes || 0)));
 
   return (
-    <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+    <div className="min-w-0 rounded-[1.5rem] border border-slate-100 bg-white p-3 shadow-sm sm:p-4">
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">학습시간 그래프</p>
           <p className="mt-1 text-sm font-black tracking-tight text-slate-900">최근 7일 + 오늘</p>
         </div>
-        <Badge className="border-none bg-blue-50 text-blue-700 font-black">
+        <Badge className="shrink-0 border-none bg-blue-50 text-blue-700 font-black">
           {formatStudyTime(aiMeta.totalStudyMinutes)}
         </Badge>
       </div>
-      <div className="relative mt-4">
-        <div
-          className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-200"
-          style={{
-            top: `${Math.max(10, Math.min(86, 100 - (Math.max(0, Math.round(aiMeta.metrics?.avg7StudyMinutes || 0)) / maxMinutes) * 88))}%`,
-          }}
-        />
-        <div className="mb-2 flex justify-end">
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
-            평균 {formatStudyTime(aiMeta.metrics?.avg7StudyMinutes)}
-          </span>
-        </div>
-        <div className="flex items-end gap-2">
-        {points.map((point, index) => {
-          const height = Math.max(18, Math.round(((point.minutes || 0) / maxMinutes) * 88));
-          const isToday = index === points.length - 1;
-          return (
-            <div key={`${point.date}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-              <div
-                className={cn(
-                  'w-full rounded-t-2xl rounded-b-md transition-all',
-                  isToday ? 'bg-gradient-to-t from-primary to-blue-400' : 'bg-slate-200'
-                )}
-                style={{ height }}
-              />
-              <div className="text-center">
-                <p className={cn('text-[10px] font-black', isToday ? 'text-primary' : 'text-slate-400')}>
-                  {isToday ? '오늘' : point.date.slice(5)}
-                </p>
-                <p className="text-[10px] font-bold text-slate-500">{Math.round(point.minutes || 0)}분</p>
-              </div>
-            </div>
-          );
-        })}
+      <div className="mt-4 overflow-x-auto pb-1">
+        <div className="relative min-w-[17.5rem] sm:min-w-0">
+          <div
+            className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-200"
+            style={{
+              top: `${Math.max(10, Math.min(86, 100 - (Math.max(0, Math.round(aiMeta.metrics?.avg7StudyMinutes || 0)) / maxMinutes) * 88))}%`,
+            }}
+          />
+          <div className="mb-2 flex justify-start sm:justify-end">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500 sm:text-[10px]">
+              평균 {formatStudyTime(aiMeta.metrics?.avg7StudyMinutes)}
+            </span>
+          </div>
+          <div className="flex items-end gap-1.5 sm:gap-2">
+            {points.map((point, index) => {
+              const height = Math.max(18, Math.round(((point.minutes || 0) / maxMinutes) * 88));
+              const isToday = index === points.length - 1;
+              return (
+                <div key={`${point.date}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                  <div
+                    className={cn(
+                      'w-full rounded-t-2xl rounded-b-md transition-all',
+                      isToday ? 'bg-gradient-to-t from-primary to-blue-400' : 'bg-slate-200'
+                    )}
+                    style={{ height }}
+                  />
+                  <div className="text-center">
+                    <p className={cn('text-[9px] font-black sm:text-[10px]', isToday ? 'text-primary' : 'text-slate-400')}>
+                      {formatTrendDateLabel(point.date, isToday)}
+                    </p>
+                    <p className="whitespace-nowrap text-[9px] font-bold text-slate-500 sm:text-[10px]">
+                      {Math.round(point.minutes || 0)}분
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
