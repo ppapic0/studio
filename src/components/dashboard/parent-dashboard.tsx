@@ -1155,7 +1155,7 @@ function RhythmTimeChartDialog({
           </div>
         </Card>
       </DialogTrigger>
-      <DialogContent className="max-w-[95vw] rounded-[2rem] border border-slate-200 p-0 overflow-x-hidden overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="parent-font-dialog max-w-[95vw] rounded-[2rem] border border-slate-200 p-0 overflow-x-hidden overflow-y-auto sm:max-w-3xl">
         <div className="bg-[#14295F] p-6 text-white sm:p-8">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tight">학습 리듬 시간</DialogTitle>
@@ -1330,7 +1330,7 @@ function SubjectStudyChartDialog({
           </div>
         </Card>
       </DialogTrigger>
-      <DialogContent className="max-w-[95vw] rounded-[2rem] border border-slate-200 p-0 overflow-x-hidden overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="parent-font-dialog max-w-[95vw] rounded-[2rem] border border-slate-200 p-0 overflow-x-hidden overflow-y-auto sm:max-w-3xl">
         <div className="bg-[#FF7A16] p-6 text-white sm:p-8">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tight">과목별 학습시간</DialogTitle>
@@ -3844,7 +3844,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <ChevronRight className="ml-auto h-4 w-4 opacity-60 transition-transform duration-300 group-hover:translate-x-0.5" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-[3rem] border-none p-0 shadow-2xl overflow-x-hidden overflow-y-auto sm:max-w-md">
+            <DialogContent className="parent-font-dialog rounded-[3rem] border-none p-0 shadow-2xl overflow-x-hidden overflow-y-auto sm:max-w-md">
               <div className="relative overflow-hidden bg-[linear-gradient(155deg,#1d3d79_0%,#14295F_56%,#0f214d_100%)] p-10 text-white">
                 <div className="soft-glow absolute -right-6 top-0 h-24 w-24 rounded-full bg-[#ffbf7d]/24 blur-3xl" />
                 <Sparkles className="absolute right-0 top-0 h-32 w-32 p-8 opacity-20" />
@@ -4999,7 +4999,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       </Tabs>
 
       <Dialog open={isReportArchiveOpen} onOpenChange={setIsReportArchiveOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] max-h-[82dvh] overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-h-[calc(100dvh-1rem)] md:max-w-4xl">
+        <DialogContent className="parent-font-dialog w-[95vw] max-w-[95vw] max-h-[82dvh] overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-h-[calc(100dvh-1rem)] md:max-w-4xl">
           <div className="bg-[#14295F] p-6 text-white">
             <DialogTitle className="text-xl font-black tracking-tight">우리 아이 학습 리포트</DialogTitle>
             <DialogDescription className="mt-1 text-xs font-bold text-white/70">받은 리포트를 날짜별로 확인할 수 있어요.</DialogDescription>
@@ -5063,7 +5063,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isPenaltyGuideOpen} onOpenChange={setIsPenaltyGuideOpen}>
-        <DialogContent className="overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-lg">
+        <DialogContent className="parent-font-dialog overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-lg">
           <div className="bg-gradient-to-r from-rose-600 to-rose-500 p-6 text-white">
             <DialogTitle className="text-xl font-black tracking-tight">벌점 현황 안내</DialogTitle>
             <DialogDescription className="mt-1 text-xs font-bold text-white/80">
@@ -5115,7 +5115,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={!!selectedNotification} onOpenChange={(open) => { if (!open) setSelectedNotification(null); }}>
-        <DialogContent className="overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-md">
+        <DialogContent className="parent-font-dialog overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-md">
           <div className="bg-[#14295F] p-6 text-white">
             <DialogTitle className="text-xl font-black tracking-tight">알림 상세</DialogTitle>
             <DialogDescription className="mt-1 text-xs font-bold text-white/70">
@@ -5147,7 +5147,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={!!selectedCalendarDate} onOpenChange={(open) => { if (!open) setSelectedCalendarDate(null); }}>
-        <DialogContent className="overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-lg">
+        <DialogContent className="parent-font-dialog overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-lg">
           <div className="relative overflow-hidden bg-[linear-gradient(135deg,#14295F_0%,#1f3e87_55%,#2d5db0_100%)] p-6 text-white">
             <div className="absolute inset-x-0 top-0 h-px bg-white/70" />
             <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-white/12 blur-2xl" />

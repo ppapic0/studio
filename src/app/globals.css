@@ -523,6 +523,85 @@
     line-height: 1.16;
   }
 
+  .parent-app-shell,
+  .parent-font-dialog {
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+  }
+
+  .parent-app-shell :where(
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      p,
+      span,
+      a,
+      button,
+      label,
+      small,
+      strong,
+      em,
+      li,
+      dt,
+      dd,
+      th,
+      td,
+      input,
+      textarea,
+      select,
+      option,
+      [data-slot="card-title"],
+      [data-slot="card-description"],
+      [data-slot="badge"],
+      [role="tab"],
+      .dashboard-number,
+      .tabular-nums,
+      .stat-number,
+      .recharts-text
+    ),
+  .parent-font-dialog :where(
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      p,
+      span,
+      a,
+      button,
+      label,
+      small,
+      strong,
+      em,
+      li,
+      dt,
+      dd,
+      th,
+      td,
+      input,
+      textarea,
+      select,
+      option,
+      [data-slot="card-title"],
+      [data-slot="card-description"],
+      [data-slot="badge"],
+      [role="tab"],
+      .dashboard-number,
+      .tabular-nums,
+      .stat-number,
+      .recharts-text
+    ) {
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+  }
+
+  .parent-app-shell svg text,
+  .parent-font-dialog svg text {
+    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+  }
+
 button,
 input,
 textarea,
