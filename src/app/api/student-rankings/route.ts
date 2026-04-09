@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
 
 import { noStoreJson } from '@/lib/api-security';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminAuth, adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
@@ -395,6 +395,9 @@ export async function GET(request: NextRequest) {
       monthly: monthlyEntries,
     });
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production' && isMissingAdminCredentialsError(error)) {
+      return noStoreJson(EMPTY_SNAPSHOT);
+    }
     console.error('[student-rankings] query failed', error);
     return noStoreJson({ error: 'internal' }, { status: 500 });
   }

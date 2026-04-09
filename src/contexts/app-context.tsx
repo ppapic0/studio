@@ -185,6 +185,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const isLocalQaHost =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+
+      if (process.env.NODE_ENV !== 'production' && isLocalQaHost) {
+        bootstrapResolved = true;
+        applyMembershipState();
+        return;
+      }
+
       try {
         const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
         await ensureMemberships({});

@@ -1597,7 +1597,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           .map((log) => log.requestId as string)
       );
 
-      const requestRef = collection(firestore, 'centers', centerId, 'attendance요청');
+      const requestRef = collection(firestore, 'centers', centerId, 'attendanceRequests');
       const requestSnap = await getDocs(query(requestRef, where('studentId', '==', studentId), limit(30)));
       const requestLogs: PenaltyLog[] = requestSnap.docs
         .map((snap) => ({ id: snap.id, ...(snap.data() as Omit<AttendanceRequest, 'id'>) } as AttendanceRequest))

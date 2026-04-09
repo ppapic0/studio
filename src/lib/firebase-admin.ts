@@ -66,3 +66,14 @@ if (!admin.apps.length) {
 
 export const adminDb = admin.firestore();
 export const adminAuth = admin.auth();
+
+export function isMissingAdminCredentialsError(error: unknown) {
+  if (!error) return false;
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('could not load the default credentials') ||
+    normalized.includes('application default credentials') ||
+    normalized.includes('default credentials are not available')
+  );
+}

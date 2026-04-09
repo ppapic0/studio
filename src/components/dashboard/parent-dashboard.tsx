@@ -1800,6 +1800,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   ) => {
     if (!firestore || !centerId || !studentId || !user) return;
 
+    const isLocalQaHost =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+    if (process.env.NODE_ENV !== 'production' && isLocalQaHost) {
+      return;
+    }
+
     try {
       await addDoc(collection(firestore, 'centers', centerId, 'parentActivityEvents'), {
         centerId,
@@ -1985,7 +1992,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const attendanceCurrent = attendanceCurrentDocs?.[0];
 
   useEffect(() => {
-    if (!isActive || !firestore || !centerId || !studentId || !today) {
+    if (!shouldLoadStudyAnalytics || !firestore || !centerId || !studentId || !today) {
       setCheckInByDateKey({});
       setCheckOutByDateKey({});
       return;
@@ -2024,7 +2031,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           setCheckOutByDateKey(nextCheckOut);
         }
       } catch (error) {
-        logHandledClientIssue('[parent-dashboard] failed to load check-in trend', error);
+        const isLocalQaHost =
+          typeof window !== 'undefined' &&
+          (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+        if (!(process.env.NODE_ENV !== 'production' && isLocalQaHost)) {
+          logHandledClientIssue('[parent-dashboard] failed to load check-in trend', error);
+        }
         if (!cancelled) {
           setCheckInByDateKey({});
           setCheckOutByDateKey({});
@@ -2036,7 +2048,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [isActive, firestore, centerId, studentId, today]);
+  }, [shouldLoadStudyAnalytics, firestore, centerId, studentId, today]);
 
   useEffect(() => {
     if (!shouldLoadStudyAnalytics || !firestore || !centerId || !studentId || !today) {
@@ -2152,8 +2164,19 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     todayKey,
   ]);
 
-  const reportRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !yesterdayKey ? null : doc(firestore, 'centers', centerId, 'dailyReports', `${yesterdayKey}_${studentId}`)), [firestore, centerId, studentId, yesterdayKey]);
-  const { data: report } = useDoc<DailyReport>(reportRef, { enabled: isActive && !!studentId });
+  const recentReportQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId || !yesterdayKey) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'dailyReports'),
+      where('studentId', '==', studentId),
+      where('dateKey', '==', yesterdayKey),
+      limit(1),
+    );
+  }, [firestore, centerId, studentId, yesterdayKey]);
+  const { data: recentReportDocs } = useCollection<DailyReport>(recentReportQuery, {
+    enabled: isActive && !!studentId && !!yesterdayKey,
+  });
+  const report = recentReportDocs?.[0] || null;
   useEffect(() => {
     if (!isActive || !firestore || !centerId || !studentId || !report?.content) return;
 
@@ -2220,7 +2243,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const attendance요청Query = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId) return null;
-    return query(collection(firestore, 'centers', centerId, 'attendance요청'), where('studentId', '==', studentId), limit(30));
+    return query(collection(firestore, 'centers', centerId, 'attendanceRequests'), where('studentId', '==', studentId), limit(30));
   }, [firestore, centerId, studentId]);
   const { data: attendance요청 } = useCollection<AttendanceRequest>(attendance요청Query, { enabled: shouldLoadStudyAnalytics });
 

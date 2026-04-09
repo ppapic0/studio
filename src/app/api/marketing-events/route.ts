@@ -9,7 +9,7 @@ import {
   noStoreJson,
   tooManyRequestsJson,
 } from '@/lib/api-security';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
 import { MARKETING_OPT_OUT_COOKIE, MARKETING_OPT_OUT_VALUE, MARKETING_SESSION_COOKIE, MARKETING_VISITOR_COOKIE } from '@/lib/marketing-tracking-shared';
 
@@ -110,6 +110,9 @@ export async function POST(request: NextRequest) {
 
     return noStoreJson({ ok: true });
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production' && isMissingAdminCredentialsError(error)) {
+      return noStoreJson({ ok: true, skipped: 'missing-admin-credentials' });
+    }
     console.error('[marketing-events][POST] failed', error);
     return noStoreJson({ ok: false }, { status: 500 });
   }

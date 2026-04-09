@@ -173,13 +173,8 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
     return doc(firestore, 'centers', activeMembership.id, 'students', linkedStudentId);
   }, [firestore, activeMembership?.id, linkedStudentId]);
   const { data: linkedStudentProfile } = useDoc<StudentProfile>(linkedStudentRef as any);
-  const linkedStudentMemberRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership?.id || !linkedStudentId) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'members', linkedStudentId);
-  }, [firestore, activeMembership?.id, linkedStudentId]);
-  const { data: linkedStudentMember } = useDoc<CenterMembership>(linkedStudentMemberRef as any);
   const [parentHeaderTodayLabel, setParentHeaderTodayLabel] = useState('');
-  const parentHeaderStudentName = linkedStudentProfile?.name || linkedStudentMember?.displayName || '학생';
+  const parentHeaderStudentName = linkedStudentProfile?.name || '학생';
 
   useEffect(() => {
     if (!isParentMode || typeof window === 'undefined') {

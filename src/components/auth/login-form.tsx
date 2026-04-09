@@ -185,8 +185,13 @@ export function LoginForm() {
       const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, values.password);
       if (functions) {
         try {
-          const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
-          await ensureMemberships({});
+          const isLocalQaHost =
+            typeof window !== 'undefined' &&
+            (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+          if (!(process.env.NODE_ENV !== 'production' && isLocalQaHost)) {
+            const ensureMemberships = httpsCallable(functions, 'ensureCurrentUserMemberships');
+            await ensureMemberships({});
+          }
         } catch {
           // userCenters-backed membership lookup below remains the login gate.
         }
