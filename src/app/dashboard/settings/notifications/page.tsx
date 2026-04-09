@@ -41,12 +41,12 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const SMS_BYTE_LIMIT = 90;
 const STUDENT_SMS_FALLBACK_UID = '__student__';
@@ -1636,25 +1636,33 @@ export default function NotificationSettingsPage() {
         </CardContent>
       </Card>
 
-      <Sheet
+      <Dialog
         open={isStudentDialogOpen && !!selectedBoardStudent}
         onOpenChange={(open) => {
           setIsStudentDialogOpen(open);
           if (!open) setSelectedBoardStudentId(null);
         }}
       >
-      <SheetContent side="right" motionPreset="dashboard-premium" className="w-[96vw] max-w-5xl overflow-y-auto border-l-0 p-0 shadow-2xl">
+        <DialogContent
+          motionPreset="dashboard-premium"
+          className={cn(
+            'overflow-hidden border-none p-0 shadow-2xl',
+            isMobile
+              ? 'fixed left-1/2 top-1/2 max-h-[88svh] w-[95vw] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]'
+              : 'h-[min(920px,calc(100dvh-2rem))] w-[min(1120px,calc(100vw-2rem))] max-w-[1120px] rounded-[2.5rem]'
+          )}
+        >
           {selectedBoardStudent ? (
-            <>
+            <div className="flex max-h-full flex-col bg-white">
               <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white sm:px-8">
-                <SheetHeader className="space-y-2 text-left">
-                  <SheetTitle className="text-2xl font-black tracking-tight text-white">
+                <DialogHeader className="space-y-2 text-left">
+                  <DialogTitle className="text-2xl font-black tracking-tight text-white">
                     {selectedBoardStudent.studentName}
-                  </SheetTitle>
-                  <SheetDescription className="text-sm font-bold text-white/80">
+                  </DialogTitle>
+                  <DialogDescription className="text-sm font-bold text-white/80">
                     {selectedBoardStudent.className} · 오늘 문자 발송 흐름과 수신 번호를 함께 확인합니다.
-                  </SheetDescription>
-                </SheetHeader>
+                  </DialogDescription>
+                </DialogHeader>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Badge className="border-none bg-white/20 text-white font-black">수신 대상 {selectedBoardStudent.recipients.filter((row) => !row.isPhoneMissing).length}명</Badge>
                   <Badge className="border-none bg-white/20 text-white font-black">오늘 발송 {selectedBoardStudent.todaySentCount}건</Badge>
@@ -1664,8 +1672,9 @@ export default function NotificationSettingsPage() {
                 </div>
               </div>
 
-              <div className="grid max-h-[72vh] gap-5 overflow-y-auto p-6 lg:grid-cols-[0.95fr_1.25fr]">
-                <section className="space-y-3">
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
+                <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
+                <section className="min-w-0 space-y-3">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">수신 번호</h3>
                     <p className="mt-1 text-xs font-bold text-slate-500">보호자 번호가 없으면 학생 본인 번호로 fallback 됩니다.</p>
@@ -1737,7 +1746,7 @@ export default function NotificationSettingsPage() {
                   </div>
                 </section>
 
-                <section className="space-y-4">
+                <section className="min-w-0 space-y-4">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">오늘 발송 로그</h3>
                     <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 오늘 접수된 내용과 출결 기록을 함께 보여줍니다.</p>
@@ -1902,11 +1911,12 @@ export default function NotificationSettingsPage() {
                     );
                   })}
                 </section>
+                </div>
               </div>
-            </>
+            </div>
           ) : null}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
