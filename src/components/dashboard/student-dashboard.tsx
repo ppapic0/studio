@@ -1175,6 +1175,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const pendingQuestIdsRef = useRef<Set<string>>(new Set());
   const carryoverAutoOpenSignatureRef = useRef<string | null>(null);
 
+  const getCarryoverAutoOpenStorageKey = useCallback((dateKey: string) => {
+    return `student-dashboard:carryover-auto-open:${user?.uid ?? 'anonymous'}:${dateKey}`;
+  }, [user?.uid]);
+
+  const hasHandledCarryoverAutoOpen = useCallback((dateKey: string) => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.sessionStorage.getItem(getCarryoverAutoOpenStorageKey(dateKey)) === '1';
+    } catch {
+      return false;
+    }
+  }, [getCarryoverAutoOpenStorageKey]);
+
+  const markCarryoverAutoOpenHandled = useCallback((dateKey: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.setItem(getCarryoverAutoOpenStorageKey(dateKey), '1');
+    } catch {
+      // Ignore storage access failures and continue with in-memory guards.
+    }
+  }, [getCarryoverAutoOpenStorageKey]);
+
   useEffect(() => {
     const syncToday = () => {
       const next = new Date();
@@ -2784,15 +2806,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
     const nextSignature = `${yesterdayKey}:${carryoverReadySignature}`;
     if (carryoverAutoOpenSignatureRef.current === nextSignature) return;
+    if (hasHandledCarryoverAutoOpen(yesterdayKey)) {
+      carryoverAutoOpenSignatureRef.current = nextSignature;
+      return;
+    }
 
     carryoverAutoOpenSignatureRef.current = nextSignature;
+    markCarryoverAutoOpenHandled(yesterdayKey);
     setVaultSourceDateKey(yesterdayKey);
     setSelectedBoxHour(carryoverReadyBoxes[0]?.hour ?? null);
     setHomeBoxStage('idle');
     setRevealedHomeReward(null);
     setIsClaimingHomeBox(false);
     setIsVaultOpen(true);
-  }, [carryoverReadyBoxes, carryoverReadySignature, isVaultOpen, todayKey, yesterdayKey]);
+  }, [
+    carryoverReadyBoxes,
+    carryoverReadySignature,
+    hasHandledCarryoverAutoOpen,
+    isVaultOpen,
+    markCarryoverAutoOpenHandled,
+    todayKey,
+    yesterdayKey,
+  ]);
 
   const growthGoalMinutes = Math.max(30, resolvedTargetDailyMinutes.minutes);
   const growthPercent = Math.min(100, (liveTodayMinutes / growthGoalMinutes) * 100);
@@ -3044,12 +3079,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (targetBoxes.length === 0) return;
     const targetHour = hour || targetBoxes[0]?.hour;
     if (!targetHour) return;
-    setVaultSourceDateKey(carryoverReadyBoxes.length > 0 ? yesterdayKey : todayKey);
+    const nextVaultSourceDateKey = carryoverReadyBoxes.length > 0 ? yesterdayKey : todayKey;
+    if (nextVaultSourceDateKey === yesterdayKey) {
+      markCarryoverAutoOpenHandled(yesterdayKey);
+    }
+    setVaultSourceDateKey(nextVaultSourceDateKey);
     setSelectedBoxHour(targetHour);
     setHomeBoxStage('idle');
     setRevealedHomeReward(null);
     setIsVaultOpen(true);
-  }, [carryoverReadyBoxes, readyBoxes, todayKey, yesterdayKey]);
+  }, [carryoverReadyBoxes, markCarryoverAutoOpenHandled, readyBoxes, todayKey, yesterdayKey]);
 
   const handleVaultChange = useCallback((open: boolean) => {
     setIsVaultOpen(open);
