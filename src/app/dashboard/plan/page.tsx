@@ -1493,6 +1493,7 @@ export default function StudyPlanPage() {
       const template = activeScheduleTemplates.find((item) => Array.isArray(item.weekdays) && item.weekdays.includes(getDay(day)));
       const plannedArrival = directSchedule?.arrivalPlannedAt || template?.arrivalPlannedAt || null;
       const plannedDeparture = directSchedule?.departurePlannedAt || template?.departurePlannedAt || null;
+      const hasArrivalPlan = Boolean(plannedArrival && plannedDeparture && !directSchedule?.isAbsent);
       const hasExcursion = Boolean(
         directSchedule?.hasExcursion ||
         directSchedule?.excursionStartAt ||
@@ -1518,6 +1519,7 @@ export default function StudyPlanPage() {
         dateLabel: format(day, 'd'),
         isSelected: selectedDate ? isSameDay(day, selectedDate) : false,
         isToday: isSameDay(day, new Date()),
+        hasArrivalPlan,
         status,
         timeLabel,
         hasExcursion,
@@ -3611,31 +3613,64 @@ export default function StudyPlanPage() {
                 type="button"
                 onClick={() => openAttendanceSheetForDate(day.date, 'today')}
                 className={cn(
-                  "rounded-[1rem] border px-2 py-3 text-left transition-all",
-                  day.isSelected
-                    ? "border-[#17326B] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.3)]"
-                    : "border-[#E5ECF7] bg-white hover:-translate-y-[1px] hover:border-[#FFB665]/70",
-                  day.isToday && !day.isSelected && "border-[#FFB665]/70"
+                  "rounded-[1rem] border px-2 py-3 transition-all",
+                  isMobile
+                    ? cn(
+                        "flex min-h-[6.8rem] flex-col items-center justify-center text-center",
+                        day.hasArrivalPlan
+                          ? "border-[#BFE2C9] bg-[linear-gradient(180deg,#F8FFF9_0%,#E5F7EA_100%)]"
+                          : "border-[#FFD5DB] bg-[linear-gradient(180deg,#FFF8F8_0%,#FFECEE_100%)]",
+                        day.isSelected
+                          ? "ring-2 ring-[#17326B]/35 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.3)]"
+                          : "hover:-translate-y-[1px]",
+                        day.isToday && !day.isSelected && "ring-1 ring-[#17326B]/18"
+                      )
+                    : cn(
+                        "text-left",
+                        day.isSelected
+                          ? "border-[#17326B] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.3)]"
+                          : "border-[#E5ECF7] bg-white hover:-translate-y-[1px] hover:border-[#FFB665]/70",
+                        day.isToday && !day.isSelected && "border-[#FFB665]/70"
+                      )
                 )}
               >
-                <p className="student-aggro-kicker text-[9px] font-black uppercase tracking-[0.16em] text-[#8AA0C7]">{day.weekdayLabel}</p>
-                <p className="font-aggro-display mt-2 text-base font-black tracking-[-0.03em] text-[#17326B]">{day.dateLabel}</p>
-                <Badge
-                  className={cn(
-                    'student-aggro-body mt-3 inline-flex min-h-[1.2rem] max-w-full items-center justify-center rounded-full border px-1.5 py-0 text-center text-[7px] font-black leading-none tracking-[-0.02em] shadow-none',
-                    SCHEDULE_STATUS_BADGE_TONE[day.status] || SCHEDULE_STATUS_BADGE_TONE['미정']
-                  )}
-                >
-                  {day.status}
-                </Badge>
-                {day.timeLabel ? (
-                  <p className="student-aggro-body mt-1 break-keep text-[10px] font-semibold leading-4 text-[#5A6F95]">{day.timeLabel}</p>
-                ) : null}
-                {day.hasExcursion ? (
-                  <Badge className="student-aggro-body mt-2 rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-2 py-0.5 text-[8px] font-black text-[#D86A11] shadow-none">
-                    외출
-                  </Badge>
-                ) : null}
+                {isMobile ? (
+                  <>
+                    <p className={cn(
+                      "student-aggro-kicker text-[9px] font-black uppercase tracking-[0.16em]",
+                      day.hasArrivalPlan ? "text-[#23814E]/58" : "text-[#C65C68]/62"
+                    )}>
+                      {day.weekdayLabel}
+                    </p>
+                    <p className={cn(
+                      "font-aggro-display mt-2 text-[1.45rem] font-black tracking-[-0.03em]",
+                      day.hasArrivalPlan ? "text-[#178244]" : "text-[#D94A61]"
+                    )}>
+                      {day.dateLabel}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="student-aggro-kicker text-[9px] font-black uppercase tracking-[0.16em] text-[#8AA0C7]">{day.weekdayLabel}</p>
+                    <p className="font-aggro-display mt-2 text-base font-black tracking-[-0.03em] text-[#17326B]">{day.dateLabel}</p>
+                    <Badge
+                      className={cn(
+                        'student-aggro-body mt-3 inline-flex min-h-[1.2rem] max-w-full items-center justify-center rounded-full border px-1.5 py-0 text-center text-[7px] font-black leading-none tracking-[-0.02em] shadow-none',
+                        SCHEDULE_STATUS_BADGE_TONE[day.status] || SCHEDULE_STATUS_BADGE_TONE['미정']
+                      )}
+                    >
+                      {day.status}
+                    </Badge>
+                    {day.timeLabel ? (
+                      <p className="student-aggro-body mt-1 break-keep text-[10px] font-semibold leading-4 text-[#5A6F95]">{day.timeLabel}</p>
+                    ) : null}
+                    {day.hasExcursion ? (
+                      <Badge className="student-aggro-body mt-2 rounded-full border border-[#FFE2C5] bg-[#FFF4E8] px-2 py-0.5 text-[8px] font-black text-[#D86A11] shadow-none">
+                        외출
+                      </Badge>
+                    ) : null}
+                  </>
+                )}
               </button>
             ))}
           </div>
