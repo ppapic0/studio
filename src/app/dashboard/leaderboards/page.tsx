@@ -75,17 +75,17 @@ const RANGE_META: Record<
   daily: {
     label: '일간',
     title: '실시간 경쟁 랭킹',
-    subtitle: '오늘 누적 공부시간과 순위 흐름을 차분하게 확인할 수 있습니다.',
+    subtitle: '오늘 상위권 흐름과 내 격차를 바로 읽을 수 있습니다.',
   },
   weekly: {
     label: '주간',
     title: '주간 랭킹',
-    subtitle: '이번 주 상위권 흐름과 현재 위치를 한 화면에서 확인하세요.',
+    subtitle: '이번 주 누적 기준으로 선두권과 내 위치를 비교합니다.',
   },
   monthly: {
     label: '월간',
     title: '월간 랭킹',
-    subtitle: '월간 누적 기준으로 상위권 변화와 집중 격차를 읽을 수 있습니다.',
+    subtitle: '월간 페이스와 추격 여지를 한 화면에서 확인합니다.',
   },
 };
 
@@ -99,37 +99,45 @@ const TONE_CLASS_MAP: Record<
   }
 > = {
   orange: {
-    chip: 'border-[#FFB15B]/70 bg-[#FFF1DC] text-[#C86A10]',
-    glow: 'shadow-[0_0_28px_rgba(255,165,78,0.32)]',
-    line: 'from-[#FFAC55] via-[#FFD5A5] to-transparent',
-    text: 'text-[#C86A10]',
+    chip: 'border-[#FFB66E]/35 bg-[rgba(255,182,110,0.12)] text-[#FFC98F]',
+    glow: 'shadow-[0_0_28px_rgba(255,182,110,0.16)]',
+    line: 'from-[#FFB76C] via-[#FFB76C]/40 to-transparent',
+    text: 'text-[#FFC98F]',
   },
   red: {
-    chip: 'border-[#FF9A95]/70 bg-[#FFF0EF] text-[#C54E4E]',
-    glow: 'shadow-[0_0_28px_rgba(255,106,106,0.28)]',
-    line: 'from-[#FF7A68] via-[#FFD1C8] to-transparent',
-    text: 'text-[#C54E4E]',
+    chip: 'border-[#FF928D]/35 bg-[rgba(255,124,124,0.12)] text-[#FFB4AE]',
+    glow: 'shadow-[0_0_28px_rgba(255,124,124,0.16)]',
+    line: 'from-[#FF8A82] via-[#FF8A82]/35 to-transparent',
+    text: 'text-[#FFB4AE]',
   },
   blue: {
-    chip: 'border-[#9DD4FF]/70 bg-[#F1F8FF] text-[#3261B4]',
-    glow: 'shadow-[0_0_28px_rgba(90,135,236,0.24)]',
-    line: 'from-[#5A87EC] via-[#C2DBFF] to-transparent',
-    text: 'text-[#3261B4]',
+    chip: 'border-[#86B4FF]/35 bg-[rgba(116,164,255,0.12)] text-[#A9C7FF]',
+    glow: 'shadow-[0_0_28px_rgba(116,164,255,0.16)]',
+    line: 'from-[#7DA8FF] via-[#7DA8FF]/35 to-transparent',
+    text: 'text-[#A9C7FF]',
   },
   gold: {
-    chip: 'border-[#F5D07B]/70 bg-[#FFF7E0] text-[#A16B0E]',
-    glow: 'shadow-[0_0_28px_rgba(240,200,110,0.26)]',
-    line: 'from-[#F0C86E] via-[#FFE6A7] to-transparent',
-    text: 'text-[#A16B0E]',
+    chip: 'border-[#F5D07B]/35 bg-[rgba(245,208,123,0.12)] text-[#FFE39E]',
+    glow: 'shadow-[0_0_28px_rgba(245,208,123,0.16)]',
+    line: 'from-[#F5D07B] via-[#F5D07B]/38 to-transparent',
+    text: 'text-[#FFE39E]',
   },
 };
 
+const RANKING_PAGE_SHELL_CLASS =
+  'bg-[radial-gradient(circle_at_top,rgba(86,129,222,0.3),transparent_24%),radial-gradient(circle_at_86%_8%,rgba(255,190,104,0.14),transparent_20%),linear-gradient(180deg,#071120_0%,#0C1D3F_42%,#14295F_100%)] text-white';
 const MOBILE_BATTLE_PANEL_CLASS =
-  'rounded-[1.8rem] border border-[#E8D4BF] bg-[radial-gradient(circle_at_top,rgba(255,190,120,0.2),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,245,233,0.96)_100%)] shadow-[0_24px_50px_-32px_rgba(20,41,95,0.2)]';
+  'rounded-[1.8rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(78,120,213,0.26),transparent_34%),linear-gradient(180deg,rgba(8,19,40,0.96)_0%,rgba(13,30,63,0.98)_100%)] shadow-[0_30px_64px_-34px_rgba(0,0,0,0.82)] backdrop-blur-xl';
 const MOBILE_BATTLE_INSET_CLASS =
-  'rounded-[1.35rem] border border-[#EEDBC7] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,248,239,0.92)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_16px_34px_-28px_rgba(20,41,95,0.16)]';
+  'rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0.03)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_38px_-30px_rgba(0,0,0,0.56)]';
 const MOBILE_BATTLE_STRIP_CLASS =
-  'rounded-[1.2rem] border border-[#F0D9BF] bg-[linear-gradient(180deg,rgba(255,250,242,0.98)_0%,rgba(255,243,225,0.94)_100%)] shadow-[0_14px_28px_-24px_rgba(20,41,95,0.16)]';
+  'rounded-[1.2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.04)_100%)] shadow-[0_18px_34px_-28px_rgba(0,0,0,0.45)]';
+const RANKING_SECTION_PANEL_CLASS =
+  'rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,19,39,0.9)_0%,rgba(13,30,63,0.96)_100%)] shadow-[0_28px_70px_-36px_rgba(0,0,0,0.85)] backdrop-blur-xl';
+const RANKING_KICKER_CLASS =
+  'inline-flex items-center gap-2 rounded-full border border-[#F5C97B]/30 bg-[rgba(255,198,112,0.08)] px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#FFD89A]';
+const RANKING_STATUS_BADGE_CLASS =
+  'rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#B7C7E8]';
 
 function formatSchoolName(value?: string | null) {
   const trimmed = value?.trim();
@@ -398,7 +406,7 @@ function PeriodTabs({
 }) {
   return (
     <div className={cn(
-      'rounded-full border border-[#E5C7A8] bg-white/92 p-1 shadow-[0_14px_36px_rgba(17,39,88,0.08)] backdrop-blur',
+      'rounded-full border border-white/10 bg-[rgba(255,255,255,0.04)] p-1 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.6)] backdrop-blur',
       isMobile ? 'grid w-full grid-cols-3 gap-1.5' : 'inline-flex'
     )}>
       {(Object.keys(RANGE_META) as RankRange[]).map((period) => {
@@ -410,10 +418,10 @@ function PeriodTabs({
             onClick={() => onChange(period)}
             className={cn(
               'rounded-full transition-all',
-              isMobile ? 'px-3 py-2 text-xs font-black tracking-[0.12em]' : 'px-4 py-2 text-sm font-semibold tracking-[0.18em]',
+              isMobile ? 'px-3 py-2 text-xs font-black tracking-[0.12em]' : 'px-4 py-2 text-sm font-black tracking-[0.18em]',
               isActive
-                ? 'bg-gradient-to-r from-[#FF9A38] via-[#FFB861] to-[#FFD08B] text-[#3F2205] shadow-[0_10px_28px_rgba(255,150,56,0.34)]'
-                : 'text-[#576C98] hover:text-[#132A63]'
+                ? 'bg-[linear-gradient(135deg,#FFE09D_0%,#FFBE67_42%,#FF9D42_100%)] text-[#332005] shadow-[0_14px_30px_-18px_rgba(255,170,79,0.58)]'
+                : 'text-[#A7B7D8] hover:bg-[rgba(255,255,255,0.06)] hover:text-white'
             )}
           >
             {RANGE_META[period].label}
@@ -442,26 +450,28 @@ function HeroBattleHeader({
   isMobile?: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
-  const heroBadgeLabel = isLive ? '학습 성과 보드' : '랭킹 집계 안내';
+  const heroBadgeLabel = 'RANKING TRACK';
   const heroStatusLabel = statusLabel || (isLive ? '실시간 반영' : '집계 대기');
   const heroSubtitle = subtitleOverride || RANGE_META[range].subtitle;
 
   if (isMobile) {
     return (
-      <section className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-[#132A63]')}>
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_36%,transparent_72%,rgba(255,171,86,0.08))]" />
-        <div className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-[#FFB14B]/16 blur-3xl" />
+      <section className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-white')}>
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_36%,transparent_72%,rgba(255,191,106,0.08))]" />
+        <div className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-[#4E7ADC]/18 blur-3xl" />
+        <div className="pointer-events-none absolute left-0 top-10 h-32 w-32 rounded-full bg-[#FFB660]/12 blur-3xl" />
         <div className="relative space-y-4">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3.5 py-2 text-[10px] font-black tracking-[0.18em] text-[#BA6815]">
-              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F5C97B]/30 bg-[rgba(255,198,112,0.08)] px-3.5 py-2 text-[10px] font-black tracking-[0.18em] text-[#FFD89A]">
+              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FFBF69] shadow-[0_0_18px_rgba(255,191,105,0.75)]" />
               {heroBadgeLabel}
             </div>
-            <div>
-              <h1 className="max-w-[8.5ch] text-[2.35rem] font-aggro-display font-black leading-[0.94] tracking-[-0.05em] text-[#132A63]">
+            <div className="space-y-3">
+              <div className="text-[10px] font-black tracking-[0.24em] text-[#AFC0E6]">{RANGE_META[range].label} PERFORMANCE</div>
+              <h1 className="max-w-[8.5ch] text-[2.35rem] font-aggro-display font-black leading-[0.9] tracking-[-0.05em] text-white">
                 {RANGE_META[range].title}
               </h1>
-              <p className="student-aggro-body mt-3 max-w-[18rem] text-[14px] text-[#5B7098]">
+              <p className="max-w-[18rem] text-[14px] font-semibold leading-6 text-[#B7C7E8]">
                 {heroSubtitle}
               </p>
             </div>
@@ -469,15 +479,15 @@ function HeroBattleHeader({
 
           <div className={cn(MOBILE_BATTLE_STRIP_CLASS, 'flex items-center justify-between gap-3 px-4 py-3.5')}>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-[10px] font-black tracking-[0.16em] text-[#BA6815]">
+              <div className="flex items-center gap-2 text-[10px] font-black tracking-[0.16em] text-[#FFD89A]">
                 <Sparkles className="h-3.5 w-3.5 shrink-0" />
                 상위권 흐름
               </div>
-              <p className="student-aggro-body mt-1 text-[15px] text-[#132A63]">
+              <p className="mt-1 text-[15px] font-semibold leading-6 text-white">
                 {activeMessage}
               </p>
             </div>
-            <div className="shrink-0 rounded-full border border-[#F2C78F] bg-white/80 px-2.5 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+            <div className="shrink-0 rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-2.5 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#B7C7E8]">
               {heroStatusLabel}
             </div>
           </div>
@@ -490,29 +500,31 @@ function HeroBattleHeader({
 
   return (
     <section className={cn(
-      'student-utility-card relative overflow-hidden rounded-[32px] border border-[#E7D2BE] bg-[radial-gradient(circle_at_top,_rgba(255,192,118,0.22),_transparent_34%),linear-gradient(155deg,#FFFDF8_0%,#FFF3E1_56%,#FFE9C6_100%)] text-[#132A63] shadow-[0_28px_80px_rgba(22,45,99,0.1)]',
+      'student-utility-card relative overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_12%_18%,rgba(82,126,220,0.28),transparent_22%),radial-gradient(circle_at_88%_12%,rgba(255,188,102,0.12),transparent_18%),linear-gradient(135deg,rgba(8,19,39,0.94)_0%,rgba(13,31,67,0.98)_58%,rgba(20,41,95,1)_100%)] text-white shadow-[0_34px_80px_-40px_rgba(0,0,0,0.9)]',
       isMobile ? 'p-5' : 'p-6 md:p-8'
     )}>
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),transparent_44%,transparent_72%,rgba(255,170,85,0.08))]" />
-      <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-[#FFB14B]/18 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%,transparent_72%,rgba(255,191,106,0.08))]" />
+      <div className="pointer-events-none absolute right-0 top-0 h-52 w-52 rounded-full bg-[#4E7ADC]/18 blur-3xl" />
+      <div className="pointer-events-none absolute left-10 top-16 h-40 w-40 rounded-full bg-[#FFB660]/12 blur-3xl" />
       <div className="relative space-y-5">
         <div className={cn('flex flex-col gap-4', isMobile ? '' : 'lg:flex-row lg:items-start lg:justify-between')}>
           <div className={cn(isMobile ? 'max-w-none' : 'max-w-3xl')}>
             <div className={cn(
-              'inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/82 text-[#BA6815]',
+              'inline-flex items-center gap-2 rounded-full border border-[#F5C97B]/30 bg-[rgba(255,198,112,0.08)] text-[#FFD89A]',
               isMobile ? 'mb-3 px-3.5 py-2 text-[11px] font-black tracking-[0.18em]' : 'mb-4 px-4 py-2 text-xs font-black tracking-[0.28em]'
             )}>
-              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF9A38] shadow-[0_0_16px_rgba(255,154,56,0.95)]" />
+              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FFBF69] shadow-[0_0_18px_rgba(255,191,105,0.75)]" />
               {heroBadgeLabel}
             </div>
+            <div className="mb-3 text-[11px] font-black tracking-[0.24em] text-[#AFC0E6]">{RANGE_META[range].label} PERFORMANCE</div>
             <h1 className={cn(
-              'font-aggro-display font-black tracking-[-0.05em] text-[#132A63]',
+              'font-aggro-display font-black tracking-[-0.05em] text-white',
               isMobile ? 'text-[2.1rem] leading-[0.92]' : 'text-[2.1rem] leading-[0.94] md:text-[2.8rem]'
             )}>
               {RANGE_META[range].title}
             </h1>
             <p className={cn(
-              'student-aggro-body max-w-2xl text-[#5B7098]',
+              'max-w-2xl font-semibold text-[#B7C7E8]',
               isMobile ? 'mt-3 text-base leading-8' : 'mt-3 text-sm leading-7 md:text-base'
             )}>
               {heroSubtitle}
@@ -521,15 +533,15 @@ function HeroBattleHeader({
 
           <div className={cn('flex flex-col gap-3', isMobile ? 'w-full' : 'items-start lg:min-w-[220px] lg:items-end')}>
             <PeriodTabs value={range} onChange={onRangeChange} isMobile={isMobile} />
-            <div className="rounded-full border border-[#F0D8B7] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#C86A10]">
+            <div className={RANKING_STATUS_BADGE_CLASS}>
               {heroStatusLabel}
             </div>
           </div>
         </div>
 
         <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-[minmax(0,1fr)_220px]')}>
-          <div className="rounded-[24px] border border-[#EDD4BD] bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,249,240,0.92))] px-5 py-4 backdrop-blur-xl shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
-            <div className={cn('flex items-center gap-2 font-black text-[#BA6815]', isMobile ? 'mb-2 text-[10px] tracking-[0.16em]' : 'mb-2 text-[11px] tracking-[0.22em]')}>
+          <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.06)] px-5 py-4 backdrop-blur-xl shadow-[0_18px_40px_-30px_rgba(0,0,0,0.7)]">
+            <div className={cn('flex items-center gap-2 font-black text-[#FFD89A]', isMobile ? 'mb-2 text-[10px] tracking-[0.16em]' : 'mb-2 text-[11px] tracking-[0.22em]')}>
               <Sparkles className="h-4 w-4" />
               상위권 흐름
             </div>
@@ -541,7 +553,7 @@ function HeroBattleHeader({
                 exit={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -12 }}
                 transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.28, ease: 'easeOut' }}
                 className={cn(
-                  'font-aggro-display font-black leading-snug tracking-[-0.03em] text-[#132A63]',
+                  'font-aggro-display font-black leading-snug tracking-[-0.03em] text-white',
                   isMobile ? 'text-[1.05rem]' : 'text-xl md:text-[1.7rem]'
                 )}
               >
@@ -550,12 +562,12 @@ function HeroBattleHeader({
             </AnimatePresence>
           </div>
 
-          <div className="rounded-[24px] border border-[#EDD4BD] bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(255,246,233,0.92)_100%)] px-5 py-4 shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
-            <div className="text-[10px] font-black tracking-[0.2em] text-[#7A86A2]">집계 범위</div>
-            <div className="mt-2 text-[1.7rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+          <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.06)] px-5 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.7)]">
+            <div className="text-[10px] font-black tracking-[0.2em] text-[#AFC0E6]">집계 범위</div>
+            <div className="mt-2 font-aggro-display text-[1.7rem] font-black leading-none tracking-[-0.05em] text-white">
               {RANGE_META[range].label}
             </div>
-            <div className="mt-2 text-sm font-semibold text-[#64779C]">
+            <div className="mt-2 text-sm font-semibold text-[#B7C7E8]">
               {isLive ? '실시간 반영 중' : '다음 오픈 대기'}
             </div>
           </div>
@@ -620,23 +632,23 @@ function BattleGauge({
 
   return (
     <div className={cn(
-      'rounded-[28px] border border-[#E8D5C1] bg-[linear-gradient(180deg,#FFFCF5_0%,#FFF6E7_100%)] shadow-[0_18px_34px_rgba(20,41,95,0.08)]',
+      'rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.03)_100%)] shadow-[0_18px_34px_-24px_rgba(0,0,0,0.56)]',
       isMobile ? 'p-3.5' : 'p-4'
     )}>
       <div className={cn(
-        'mb-3 flex items-center justify-between font-black tracking-[0.2em] text-[#7A86A2]',
+        'mb-3 flex items-center justify-between font-black tracking-[0.2em] text-[#AFC0E6]',
         isMobile ? 'text-[10px]' : 'text-[11px]'
       )}>
         <span>{leftLabel}</span>
         <span>{rightLabel}</span>
       </div>
       <div className={cn(
-        'relative overflow-hidden rounded-full border border-[#E6D8C8] bg-[#FFF0DD]',
+        'relative overflow-hidden rounded-full border border-white/10 bg-[rgba(255,255,255,0.06)]',
         isMobile ? 'h-12' : 'h-14'
       )}>
-        <div className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,rgba(255,143,38,0.95),rgba(255,193,113,0.92))]" style={{ width: `${marker}%` }} />
+        <div className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,rgba(255,160,70,0.95),rgba(255,214,132,0.92))]" style={{ width: `${marker}%` }} />
         <div
-          className="absolute inset-y-0 right-0 bg-[linear-gradient(270deg,rgba(20,41,95,0.16),rgba(160,182,220,0.32))]"
+          className="absolute inset-y-0 right-0 bg-[linear-gradient(270deg,rgba(132,174,255,0.14),rgba(40,67,120,0.42))]"
           style={{ width: `${100 - marker}%` }}
         />
         <motion.div
@@ -674,13 +686,13 @@ function BattleGauge({
         isMobile ? 'gap-2.5 text-[12px]' : 'gap-3 text-sm'
       )}>
         <div className={cn(
-          'rounded-2xl border border-[#FFC27A]/60 bg-[#FFF0D7] text-[#B96510]',
+          'rounded-2xl border border-[#FFC97C]/25 bg-[rgba(255,201,124,0.08)] text-[#FFE09E]',
           isMobile ? 'px-3 py-2.5' : 'px-3 py-2'
         )}>
           내 현재 누적 {formatStudyCompact(leftValue)}
         </div>
         <div className={cn(
-          'rounded-2xl border border-[#E6D8C8] bg-white/92 text-right text-[#6E7893]',
+          'rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.05)] text-right text-[#B7C7E8]',
           isMobile ? 'px-3 py-2.5' : 'px-3 py-2'
         )}>
           비교 기준 {formatStudyCompact(rightValue)}
@@ -706,9 +718,9 @@ function CompactBattleMetric({
   return (
     <div className={cn(MOBILE_BATTLE_INSET_CLASS, 'student-utility-card relative overflow-hidden px-3.5 py-3')}>
       <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r', toneClass.line)} />
-      <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">{label}</div>
-      <div className="mt-2 text-[1.35rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">{value}</div>
-      <div className={cn('student-aggro-body mt-2 text-[12px] leading-5', toneClass.text)}>{hint}</div>
+      <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">{label}</div>
+      <div className="font-aggro-display mt-2 text-[1.35rem] font-black leading-none tracking-[-0.05em] text-white">{value}</div>
+      <div className={cn('mt-2 text-[12px] font-semibold leading-5', toneClass.text)}>{hint}</div>
     </div>
   );
 }
@@ -728,17 +740,17 @@ function BattleStatCard({
 }) {
   const toneClass = TONE_CLASS_MAP[tone];
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-[#E7D6C4] bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(255,247,237,0.96)_100%)] p-4 shadow-[0_16px_32px_rgba(20,41,95,0.08)]">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_40%,transparent_74%,rgba(255,181,100,0.06))]" />
+    <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0.03)_100%)] p-4 shadow-[0_16px_32px_-24px_rgba(0,0,0,0.56)]">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),transparent_40%,transparent_74%,rgba(255,181,100,0.04))]" />
       <div className="relative">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[10px] font-black tracking-[0.22em] text-[#7A86A2]">{label}</div>
-          <div className={cn('rounded-[1rem] border px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]', toneClass.chip)}>
+          <div className="text-[10px] font-black tracking-[0.22em] text-[#AFC0E6]">{label}</div>
+          <div className={cn('rounded-[1rem] border px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]', toneClass.chip)}>
             <Icon className="h-4 w-4" />
           </div>
         </div>
-        <div className="mt-4 text-[2.55rem] font-black leading-none tracking-[-0.06em] text-[#132A63]">{value}</div>
-        <div className={cn('mt-3 text-[13px] font-black leading-6', toneClass.text)}>{hint}</div>
+        <div className="font-aggro-display mt-4 text-[2.55rem] font-black leading-none tracking-[-0.06em] text-white">{value}</div>
+        <div className={cn('mt-3 text-[13px] font-semibold leading-6', toneClass.text)}>{hint}</div>
       </div>
     </div>
   );
@@ -785,20 +797,20 @@ function MyBattleCard({
     return (
       <motion.section
         layout
-        className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-4 text-[#132A63]')}
+        className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-4 text-white')}
         whileHover={shouldReduceMotion ? undefined : { y: -2 }}
         transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 220, damping: 24 }}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_36%,transparent_72%,rgba(255,156,56,0.08))]" />
-        <div className="pointer-events-none absolute inset-[1px] rounded-[1.72rem] border border-white/60" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_36%,transparent_72%,rgba(255,156,56,0.08))]" />
+        <div className="pointer-events-none absolute inset-[1px] rounded-[1.72rem] border border-white/10" />
 
         <div className="relative">
           <div className="flex items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#BA6815]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F5C97B]/30 bg-[rgba(255,198,112,0.08)] px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#FFD89A]">
               <Zap className="h-3.5 w-3.5" />
               {statusLabel}
             </div>
-            <div className="rounded-full border border-[#F0D8B7] bg-white/80 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#7A86A2]">
+            <div className={RANKING_STATUS_BADGE_CLASS}>
               현재 위치
             </div>
           </div>
@@ -806,22 +818,22 @@ function MyBattleCard({
           <div className={cn(MOBILE_BATTLE_INSET_CLASS, 'mt-3 px-4 py-4')}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">내 현재 순위</div>
-                <div className="mt-2 text-[3.1rem] font-black leading-none tracking-[-0.07em] text-[#132A63]">
+                <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">내 현재 순위</div>
+                <div className="font-aggro-display mt-2 text-[3.1rem] font-black leading-none tracking-[-0.07em] text-white">
                   #{viewer.rank}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부시간</div>
-                <div className="mt-2 text-[1.85rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">현재 공부시간</div>
+                <div className="font-aggro-display mt-2 text-[1.85rem] font-black leading-none tracking-[-0.05em] text-white">
                   {formatStudyCompact(viewer.value)}
                 </div>
-                <div className="mt-1 text-[12px] font-black text-[#C86A10]">
+                <div className="mt-1 text-[12px] font-black text-[#FFC98F]">
                   {viewer.rank === 1 ? `2위와 ${formatGapLabel(diffBelow)}` : `1위와 ${formatGapLabel(diffAbove)}`}
                 </div>
               </div>
             </div>
-            <p className="student-aggro-body mt-3 text-[14px] text-[#C86A10]">
+            <p className="mt-3 text-[14px] font-semibold leading-6 text-[#B7C7E8]">
               {helperCopy}
             </p>
           </div>
@@ -859,43 +871,43 @@ function MyBattleCard({
     <motion.section
       layout
       className={cn(
-        'student-utility-card relative overflow-hidden rounded-[34px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top_right,rgba(255,187,108,0.24),transparent_28%),linear-gradient(180deg,#FFF9F1_0%,#FFF4E8_48%,#FFE7C8_100%)] text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.12)]',
+        'student-utility-card relative overflow-hidden rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(82,126,220,0.22),transparent_28%),linear-gradient(180deg,rgba(8,19,39,0.92)_0%,rgba(14,31,67,0.98)_100%)] text-white shadow-[0_30px_72px_-36px_rgba(0,0,0,0.84)]',
         isMobile ? 'p-5' : 'p-6 md:p-7'
       )}
       whileHover={shouldReduceMotion ? undefined : { y: -4 }}
       transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 220, damping: 24 }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.82),transparent_32%,transparent_66%,rgba(255,140,40,0.08))]" />
-      <div className="pointer-events-none absolute inset-[1px] rounded-[33px] border border-white/55" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_32%,transparent_66%,rgba(255,140,40,0.08))]" />
+      <div className="pointer-events-none absolute inset-[1px] rounded-[33px] border border-white/10" />
       <div className="relative">
-        <div className="rounded-[28px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF8EE_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
+        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0.04)_100%)] px-5 py-5 shadow-[0_18px_40px_-26px_rgba(0,0,0,0.58)]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#BA6815]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#F5C97B]/30 bg-[rgba(255,198,112,0.08)] px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#FFD89A]">
                 <Zap className="h-4 w-4" />
                 {statusLabel}
               </div>
-              <div className="mt-4 text-[11px] font-black tracking-[0.22em] text-[#7A86A2]">{getBattleTrackLabel(range)}</div>
+              <div className="mt-4 text-[11px] font-black tracking-[0.22em] text-[#AFC0E6]">{getBattleTrackLabel(range)}</div>
             </div>
-            <div className="rounded-full border border-[#F0D8B7] bg-[#FFF6EA] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">
+            <div className={RANKING_STATUS_BADGE_CLASS}>
               현재 순위
             </div>
           </div>
 
           <div className="mt-4 grid gap-5 md:grid-cols-[180px_minmax(0,1fr)] md:items-end">
             <div>
-              <div className="text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">내 현재 순위</div>
-              <div className="mt-3 text-6xl font-black leading-none tracking-[-0.06em] text-[#132A63]">#{viewer.rank}</div>
+              <div className="text-[11px] font-black tracking-[0.2em] text-[#AFC0E6]">내 현재 순위</div>
+              <div className="font-aggro-display mt-3 text-6xl font-black leading-none tracking-[-0.06em] text-white">#{viewer.rank}</div>
             </div>
             <div>
-              <div className="text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">현재 공부시간</div>
+              <div className="text-[11px] font-black tracking-[0.2em] text-[#AFC0E6]">현재 공부시간</div>
               <div className="mt-3 flex flex-wrap items-end gap-3">
-                <div className="text-[2.5rem] font-black leading-none tracking-[-0.06em] text-[#132A63]">{formatStudyClock(viewer.value)}</div>
-                <div className="rounded-full border border-[#FFD3AA] bg-[#FFF2E4] px-3 py-1.5 text-[11px] font-black text-[#C86A10]">
+                <div className="font-aggro-display text-[2.5rem] font-black leading-none tracking-[-0.06em] text-white">{formatStudyClock(viewer.value)}</div>
+                <div className="rounded-full border border-[#FFC97C]/25 bg-[rgba(255,201,124,0.08)] px-3 py-1.5 text-[11px] font-black text-[#FFE09E]">
                   {viewer.rank === 1 ? `바로 아래와 ${formatGapLabel(diffBelow)}` : `1위와 ${formatGapLabel(diffAbove)}`}
                 </div>
               </div>
-              <div className="student-aggro-body mt-3 max-w-2xl text-[15px] leading-7 text-[#C86A10]">
+              <div className="mt-3 max-w-2xl text-[15px] font-semibold leading-7 text-[#B7C7E8]">
                 {helperCopy}
               </div>
             </div>
@@ -1209,21 +1221,21 @@ function StandingsSidebar({
   return (
     <aside className={cn(
       MOBILE_BATTLE_PANEL_CLASS,
-      'student-utility-card relative overflow-hidden text-[#132A63]',
+      'student-utility-card relative overflow-hidden text-white',
       isMobile ? 'p-4' : 'p-5 md:p-6'
     )}>
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.74),transparent_36%,transparent_72%,rgba(255,174,90,0.08))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_36%,transparent_72%,rgba(255,174,90,0.08))]" />
 
       <div className="relative">
         <div className={cn(isMobile ? 'mb-3' : 'mb-4')}>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
+          <div className={cn(RANKING_KICKER_CLASS, 'mb-2')}>
             <Trophy className="h-4 w-4" />
             상위권 인사이트
           </div>
-          <h3 className={cn('font-black tracking-[-0.04em] text-[#132A63]', isMobile ? 'text-xl' : 'text-2xl')}>
+          <h3 className={cn('font-aggro-display font-black tracking-[-0.04em] text-white', isMobile ? 'text-xl' : 'text-2xl')}>
             상위권 인사이트
           </h3>
-          <p className={cn('student-aggro-body mt-2 leading-6 text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>
+          <p className={cn('mt-2 font-semibold leading-6 text-[#B7C7E8]', isMobile ? 'text-[13px]' : 'text-sm')}>
             현재 누적 공부시간 기준으로 상위권 흐름과 내 위치를 빠르게 읽을 수 있습니다.
           </p>
         </div>
@@ -1235,7 +1247,7 @@ function StandingsSidebar({
             className={cn(
               MOBILE_BATTLE_INSET_CLASS,
               'relative overflow-hidden px-4 py-4',
-              topLeader.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
+              topLeader.isViewer && 'border-[#F5C97B]/35 bg-[linear-gradient(180deg,rgba(255,209,132,0.14)_0%,rgba(255,255,255,0.04)_100%)]'
             )}
             whileHover={shouldReduceMotion ? undefined : { y: -2, scale: 1.01 }}
             transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
@@ -1247,25 +1259,25 @@ function StandingsSidebar({
                   1위
                   <Crown className="h-3.5 w-3.5" />
                 </div>
-                <div className="font-aggro-display mt-3 truncate text-[1.45rem] font-black tracking-[-0.04em] text-[#132A63]">
+                <div className="font-aggro-display mt-3 truncate text-[1.45rem] font-black tracking-[-0.04em] text-white">
                   {maskLeaderboardStudentName(topLeader.displayNameSnapshot)}
                 </div>
-                <div className="mt-1 truncate text-[12px] font-semibold text-[#6E7893]">
+                <div className="mt-1 truncate text-[12px] font-semibold text-[#AFC0E6]">
                   {formatSchoolName(topLeader.schoolNameSnapshot)}
                 </div>
               </div>
-              <div className="rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+              <div className="rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#B7C7E8]">
                 {topLeader.isViewer ? '나' : '현재 기준'}
               </div>
             </div>
             <div className="mt-4 flex items-end justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부시간</div>
-                <div className="mt-2 text-[2rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">현재 공부시간</div>
+                <div className="font-aggro-display mt-2 text-[2rem] font-black leading-none tracking-[-0.05em] text-white">
                   {formatStudyCompact(topLeader.value)}
                 </div>
               </div>
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-[#F0D3B2] bg-[#FFF6E8] text-[#C86A10]">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-[#F5C97B]/25 bg-[rgba(255,198,112,0.08)] text-[#FFD89A]">
                 <Trophy className="h-5 w-5" />
               </div>
             </div>
@@ -1285,7 +1297,7 @@ function StandingsSidebar({
                     MOBILE_BATTLE_INSET_CLASS,
                     'relative overflow-hidden px-3.5 py-3',
                     !isMobile && 'flex items-center justify-between gap-3 px-4 py-4',
-                    entry.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
+                    entry.isViewer && 'border-[#F5C97B]/35 bg-[linear-gradient(180deg,rgba(255,209,132,0.14)_0%,rgba(255,255,255,0.04)_100%)]'
                   )}
                   whileHover={shouldReduceMotion ? undefined : { y: -2, scale: 1.01 }}
                   transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
@@ -1298,18 +1310,18 @@ function StandingsSidebar({
                           {entry.rank}위
                         </div>
                         {entry.isViewer ? (
-                          <div className="rounded-full border border-[#FFBE77] bg-white/92 px-2 py-1 text-[9px] font-black tracking-[0.14em] text-[#C86A10]">
+                          <div className="rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-2 py-1 text-[9px] font-black tracking-[0.14em] text-[#B7C7E8]">
                             나
                           </div>
                         ) : null}
                       </div>
-                      <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
+                      <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-white">
                         {maskLeaderboardStudentName(entry.displayNameSnapshot)}
                       </div>
-                      <div className="mt-1 truncate text-[11px] font-semibold text-[#6E7893]">
+                      <div className="mt-1 truncate text-[11px] font-semibold text-[#AFC0E6]">
                         {formatSchoolName(entry.schoolNameSnapshot)}
                       </div>
-                      <div className="mt-3 text-[1.45rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                      <div className="font-aggro-display mt-3 text-[1.45rem] font-black leading-none tracking-[-0.05em] text-white">
                         {formatStudyCompact(entry.value)}
                       </div>
                     </>
@@ -1319,16 +1331,16 @@ function StandingsSidebar({
                         <div className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[0.16em]', toneClass.chip)}>
                           {entry.rank}위
                         </div>
-                        <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-[#132A63]">
+                        <div className="font-aggro-display mt-3 truncate text-[1rem] font-black tracking-[-0.03em] text-white">
                           {maskLeaderboardStudentName(entry.displayNameSnapshot)}
                         </div>
-                        <div className="mt-1 truncate text-[11px] font-semibold text-[#6E7893]">
+                        <div className="mt-1 truncate text-[11px] font-semibold text-[#AFC0E6]">
                           {formatSchoolName(entry.schoolNameSnapshot)}
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부시간</div>
-                        <div className="mt-2 text-[1.45rem] font-black leading-none tracking-[-0.05em] text-[#132A63]">
+                        <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">현재 공부시간</div>
+                        <div className="font-aggro-display mt-2 text-[1.45rem] font-black leading-none tracking-[-0.05em] text-white">
                           {formatStudyCompact(entry.value)}
                         </div>
                       </div>
@@ -1345,15 +1357,15 @@ function StandingsSidebar({
           isMobile ? 'mt-3 flex items-center justify-between gap-3 px-4 py-3.5' : 'mt-4 flex items-center justify-between gap-3 px-4 py-4'
         )}>
           <div className="min-w-0">
-            <div className="text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">내 현재 순위</div>
+            <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">내 현재 순위</div>
             <div className="mt-1 flex items-end gap-2">
-              <div className={cn('font-black leading-none tracking-[-0.06em] text-[#132A63]', isMobile ? 'text-[1.8rem]' : 'text-[2.2rem]')}>
+              <div className={cn('font-aggro-display font-black leading-none tracking-[-0.06em] text-white', isMobile ? 'text-[1.8rem]' : 'text-[2.2rem]')}>
                 #{viewer.rank}
               </div>
-              <div className="pb-0.5 text-[12px] font-black text-[#64779C]">{formatStudyCompact(viewer.value)} 누적</div>
+              <div className="pb-0.5 text-[12px] font-black text-[#B7C7E8]">{formatStudyCompact(viewer.value)} 누적</div>
             </div>
           </div>
-          <div className="rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#C86A10]">
+          <div className="rounded-full border border-[#F5C97B]/25 bg-[rgba(255,198,112,0.08)] px-3 py-1.5 text-[10px] font-black tracking-[0.16em] text-[#FFD89A]">
             {viewerSummaryLabel}
           </div>
         </div>
@@ -1365,22 +1377,22 @@ function StandingsSidebar({
 function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEntry[] }) {
   const shouldReduceMotion = useReducedMotion();
   return (
-    <section className="rounded-[30px] border border-[#E6D2BE] bg-[linear-gradient(180deg,#FFF9F0_0%,#FFF0DB_100%)] p-5 text-[#132A63] shadow-[0_20px_54px_rgba(20,41,95,0.1)] md:p-6">
+    <section className={cn(RANKING_SECTION_PANEL_CLASS, 'p-5 text-white md:p-6')}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D3B2] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
+          <div className={cn(RANKING_KICKER_CLASS, 'mb-2')}>
             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FF6C57] shadow-[0_0_16px_rgba(255,108,87,0.9)]" />
             최근 변동
           </div>
-          <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">실시간 순위 변화</h3>
+          <h3 className="font-aggro-display text-2xl font-black tracking-[-0.04em] text-white">실시간 순위 변화</h3>
         </div>
-        <div className="rounded-full border border-[#E7D5C0] bg-white/92 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#6E7893]">
+        <div className="rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#B7C7E8]">
           3~5초 간격 갱신
         </div>
       </div>
 
-      <div className="mb-4 rounded-[22px] border border-[#E8D5C1] bg-white/88 px-4 py-3 shadow-[0_14px_28px_rgba(20,41,95,0.06)]">
-        <div className="text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">현재 상위권</div>
+      <div className="mb-4 rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] px-4 py-3 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]">
+        <div className="text-[11px] font-black tracking-[0.2em] text-[#AFC0E6]">현재 상위권</div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {leaders.map((entry) => (
             <div
@@ -1391,7 +1403,7 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
               )}
             >
               {entry.rank}위
-              <span className="text-[#132A63]">{maskLeaderboardStudentName(entry.displayNameSnapshot)}</span>
+              <span className="text-white">{maskLeaderboardStudentName(entry.displayNameSnapshot)}</span>
             </div>
           ))}
         </div>
@@ -1409,7 +1421,7 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={shouldReduceMotion ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: 18, scale: 0.96 }}
                 transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.28, ease: 'easeOut' }}
-                className="relative overflow-hidden rounded-[22px] border border-[#E8D5C1] bg-white p-4 shadow-[0_14px_28px_rgba(20,41,95,0.08)]"
+                className="relative overflow-hidden rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]"
               >
                 <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r opacity-60', toneClass.line)} />
                 <div className="relative flex items-start gap-3">
@@ -1417,8 +1429,8 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
                     {log.badge}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-base font-black tracking-[-0.02em] text-[#132A63]">{log.title}</div>
-                    <div className="mt-1 text-sm font-semibold leading-6 text-[#64779C]">{log.detail}</div>
+                    <div className="text-base font-black tracking-[-0.02em] text-white">{log.title}</div>
+                    <div className="mt-1 text-sm font-semibold leading-6 text-[#B7C7E8]">{log.detail}</div>
                   </div>
                 </div>
               </motion.div>
@@ -1438,31 +1450,31 @@ function DailyWaitingCard({
   nextOpensAtLabel: string;
 }) {
   return (
-    <section className="student-utility-card relative overflow-hidden rounded-[30px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top_left,rgba(255,187,108,0.18),transparent_28%),linear-gradient(180deg,#FFF9F1_0%,#FFF5EA_48%,#FFECD8_100%)] p-5 text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.1)] md:p-6">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,rgba(255,255,255,0.76),transparent_36%,transparent_74%,rgba(255,165,78,0.08))]" />
+    <section className={cn(RANKING_SECTION_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-white md:p-6')}>
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,rgba(255,255,255,0.08),transparent_36%,transparent_74%,rgba(255,165,78,0.08))]" />
       <div className="relative space-y-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/82 px-3 py-2 text-[11px] font-black tracking-[0.18em] text-[#BA6815]">
+        <div className={RANKING_KICKER_CLASS}>
           <Clock3 className="h-4 w-4" />
           일간 랭킹 집계 대기
         </div>
         <div>
-          <h2 className="font-aggro-display text-[2rem] font-black leading-[0.95] tracking-[-0.05em] text-[#132A63] md:text-[2.4rem]">
+          <h2 className="font-aggro-display text-[2rem] font-black leading-[0.95] tracking-[-0.05em] text-white md:text-[2.4rem]">
             오픈 시간에만
             <br />
             일간 랭킹이 열려요
           </h2>
-          <p className="student-aggro-body mt-3 max-w-2xl text-sm leading-7 text-[#5B7098] md:text-base">
+          <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-[#B7C7E8] md:text-base">
             {windowLabel}에 공부한 기록만 일간 순위에 실시간 반영됩니다. 지금은 대기 상태라서 다음 오픈 시간에 다시 집계가 시작돼요.
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-[22px] border border-[#ECD3B6] bg-white/82 p-4 shadow-[0_14px_28px_rgba(20,41,95,0.06)]">
-            <div className="text-[11px] font-black tracking-[0.18em] text-[#A16B0E]">다음 오픈</div>
-            <div className="mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-[#132A63]">{nextOpensAtLabel}</div>
+          <div className="rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]">
+            <div className="text-[11px] font-black tracking-[0.18em] text-[#AFC0E6]">다음 오픈</div>
+            <div className="font-aggro-display mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-white">{nextOpensAtLabel}</div>
           </div>
-          <div className="rounded-[22px] border border-[#ECD3B6] bg-white/82 p-4 shadow-[0_14px_28px_rgba(20,41,95,0.06)]">
-            <div className="text-[11px] font-black tracking-[0.18em] text-[#A16B0E]">반영 기준</div>
-            <div className="mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-[#132A63]">오픈 후 실시간 집계</div>
+          <div className="rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]">
+            <div className="text-[11px] font-black tracking-[0.18em] text-[#AFC0E6]">반영 기준</div>
+            <div className="font-aggro-display mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-white">오픈 후 실시간 집계</div>
           </div>
         </div>
       </div>
@@ -1494,16 +1506,16 @@ function RecommendationChip({
           : TONE_CLASS_MAP.orange;
 
   return (
-    <details className="group rounded-[24px] border border-[#E9D7C0] bg-white p-4 shadow-[0_18px_42px_rgba(16,38,87,0.08)]">
+    <details className="group rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 shadow-[0_18px_42px_-30px_rgba(0,0,0,0.64)]">
       <summary className="cursor-pointer list-none">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <div className={cn('mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
               {chipMap[recommendation.tone]}
             </div>
-            <h4 className="text-xl font-black tracking-[-0.03em] text-[#132A63]">{recommendation.title}</h4>
-            <p className="mt-2 text-base font-bold text-[#23417B]">{recommendation.action}</p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[#64779C]">{recommendation.reason}</p>
+            <h4 className="font-aggro-display text-xl font-black tracking-[-0.03em] text-white">{recommendation.title}</h4>
+            <p className="mt-2 text-base font-bold text-[#FFE09E]">{recommendation.action}</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#B7C7E8]">{recommendation.reason}</p>
           </div>
           <button
             type="button"
@@ -1511,13 +1523,13 @@ function RecommendationChip({
               event.preventDefault();
               onApply(recommendation);
             }}
-            className="rounded-full bg-[linear-gradient(90deg,#FF9A38,#FFB861)] px-4 py-3 text-sm font-black tracking-[0.04em] text-[#3F2205] shadow-[0_12px_26px_rgba(255,154,56,0.28)] transition hover:translate-y-[-1px]"
+            className="rounded-full bg-[linear-gradient(90deg,#FFE09D,#FFBE67,#FF9D42)] px-4 py-3 text-sm font-black tracking-[0.04em] text-[#332005] shadow-[0_14px_28px_-16px_rgba(255,170,79,0.52)] transition hover:translate-y-[-1px]"
           >
             {recommendation.cta}
           </button>
         </div>
       </summary>
-      <div className="mt-4 rounded-[20px] border border-[#E9D7C0] bg-[#FFF8ED] p-4 text-sm font-semibold leading-7 text-[#5E6F92]">
+      <div className="mt-4 rounded-[20px] border border-white/10 bg-[rgba(255,255,255,0.04)] p-4 text-sm font-semibold leading-7 text-[#B7C7E8]">
         {recommendation.explainWhy}
       </div>
     </details>
@@ -1536,23 +1548,23 @@ function RecommendationPanel({
   onViewDiagnosis: () => void;
 }) {
   return (
-    <section className="rounded-[30px] border border-[#E2D1BC] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFF3DE_100%)] p-5 text-[#132A63] shadow-[0_22px_60px_rgba(16,38,87,0.08)] md:p-6">
+    <section className={cn(RANKING_SECTION_PANEL_CLASS, 'p-5 text-white md:p-6')}>
       <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#F0D8BF] bg-white/80 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#9A5B12]">
+          <div className={cn(RANKING_KICKER_CLASS, 'mb-2')}>
             <Sparkles className="h-4 w-4" />
             다음 집중 포인트
           </div>
-          <h3 className="text-2xl font-black tracking-[-0.04em] text-[#132A63]">오늘 계획에서 이 정도만 조정하면 됩니다</h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-[#64779C]">
+          <h3 className="font-aggro-display text-2xl font-black tracking-[-0.04em] text-white">오늘 계획에서 이 정도만 조정하면 됩니다</h3>
+          <p className="mt-2 text-sm font-semibold leading-6 text-[#B7C7E8]">
             최근 계획과 학습 기준을 바탕으로, 바로 오늘 계획에 넣을 수 있는 제안만 추렸어요.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onReopenDiagnosis} className="rounded-full border border-[#E0C19D] bg-white/85 px-4 py-2 text-sm font-black text-[#132A63]">
+          <button type="button" onClick={onReopenDiagnosis} className="rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-4 py-2 text-sm font-black text-white transition hover:bg-[rgba(255,255,255,0.1)]">
             계획 페이지 열기
           </button>
-          <button type="button" onClick={onViewDiagnosis} className="rounded-full border border-[#E0C19D] bg-[#FFF6E8] px-4 py-2 text-sm font-black text-[#9A5B12]">
+          <button type="button" onClick={onViewDiagnosis} className="rounded-full border border-[#F5C97B]/25 bg-[rgba(255,198,112,0.08)] px-4 py-2 text-sm font-black text-[#FFD89A] transition hover:bg-[rgba(255,198,112,0.14)]">
             진단 결과 보기
           </button>
         </div>
@@ -1906,9 +1918,9 @@ export default function RankingBattlePage() {
 
   if (loading && !viewer && !isDailyWaiting) {
     return (
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,195,122,0.16),_transparent_24%),linear-gradient(180deg,#FFFDF9_0%,#FFF3E4_100%)] px-4 py-8 text-[#132A63]">
-        <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center rounded-[32px] border border-[#E7D3C0] bg-white/92 shadow-[0_28px_80px_rgba(20,41,95,0.08)]">
-          <div className="flex items-center gap-3 text-lg font-bold text-[#64779C]">
+      <main className={cn('student-font-shell min-h-screen px-4 py-8', RANKING_PAGE_SHELL_CLASS)}>
+        <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,19,39,0.88)_0%,rgba(13,30,63,0.94)_100%)] shadow-[0_32px_72px_-36px_rgba(0,0,0,0.88)]">
+          <div className="flex items-center gap-3 text-lg font-bold text-[#B7C7E8]">
             <Loader2 className="h-5 w-5 animate-spin" />
             실시간 랭킹을 불러오는 중입니다.
           </div>
@@ -1921,7 +1933,7 @@ export default function RankingBattlePage() {
     return (
       <main className={cn(
         'student-font-shell',
-        'bg-[radial-gradient(circle_at_top,_rgba(255,186,106,0.18),_transparent_22%),linear-gradient(180deg,#FFFCF8_0%,#FFF3E4_100%)] text-[#132A63]',
+        RANKING_PAGE_SHELL_CLASS,
         isMobile ? 'min-h-0 px-0 py-0' : 'min-h-screen px-4 py-6 md:px-6 md:py-8'
       )}>
         <div className={cn('mx-auto', isMobile ? 'max-w-none space-y-4' : 'max-w-7xl space-y-5')}>
@@ -1936,7 +1948,7 @@ export default function RankingBattlePage() {
           />
 
           {fetchError ? (
-            <div className="rounded-[24px] border border-[#FFB15B]/30 bg-[#FFF4E5] px-4 py-3 text-sm font-semibold text-[#9A5B12]">
+            <div className="rounded-[24px] border border-[#F5C97B]/20 bg-[rgba(255,198,112,0.08)] px-4 py-3 text-sm font-semibold text-[#FFD89A]">
               {fetchError}
             </div>
           ) : null}
@@ -1959,7 +1971,7 @@ export default function RankingBattlePage() {
   return (
     <main className={cn(
       'student-font-shell',
-      'bg-[radial-gradient(circle_at_top,_rgba(255,186,106,0.18),_transparent_22%),linear-gradient(180deg,#FFFCF8_0%,#FFF3E4_100%)] text-[#132A63]',
+      RANKING_PAGE_SHELL_CLASS,
       isMobile ? 'min-h-0 px-0 py-0' : 'min-h-screen px-4 py-6 md:px-6 md:py-8'
     )}>
       <div className={cn('mx-auto', isMobile ? 'max-w-none space-y-4' : 'max-w-7xl space-y-5')}>
@@ -1973,7 +1985,7 @@ export default function RankingBattlePage() {
         />
 
         {fetchError ? (
-          <div className="rounded-[24px] border border-[#FFB15B]/30 bg-[#FFF4E5] px-4 py-3 text-sm font-semibold text-[#9A5B12]">
+          <div className="rounded-[24px] border border-[#F5C97B]/20 bg-[rgba(255,198,112,0.08)] px-4 py-3 text-sm font-semibold text-[#FFD89A]">
             {fetchError}
           </div>
         ) : null}
