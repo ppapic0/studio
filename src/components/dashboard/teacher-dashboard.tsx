@@ -945,6 +945,66 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         : null,
     ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 
+    // Keep the home preview filled through 3 priorities so the desktop deck
+    // always shows rank 1-3 even when only one or two urgent signals exist.
+    if (
+      items.length < 3
+      && pendingAppointments.length === 0
+      && upcomingConfirmedAppointments.length === 0
+    ) {
+      items.push({
+        key: 'counseling-overview',
+        title: appointments.length > 0 ? `오늘 상담 ${appointments.length}건 점검` : '오늘 상담 흐름 확인',
+        detail: appointments.length > 0
+          ? '요청 대기는 없지만 오늘 상담 일정과 기록 흐름을 한 번 더 확인하세요.'
+          : '오늘 상담 요청은 없지만 상담 현황과 상담일지를 짧게 점검해 두세요.',
+        actionLabel: '상담 현황',
+        icon: MessageSquare,
+        toneClass: 'bg-[#EEF4FF] text-[#2554D7]',
+        onClick: () => scrollToSection(appointmentsSectionRef),
+      });
+    }
+
+    if (
+      items.length < 3
+      && attendanceBoardSummary.lateOrAbsentCount === 0
+      && attendanceBoardSummary.longAwayCount === 0
+    ) {
+      items.push({
+        key: 'attendance-overview',
+        title: '실시간 교실 흐름 확인',
+        detail: '이상 신호는 없지만 현재 좌석과 출결 흐름을 한 번 더 점검하세요.',
+        actionLabel: '실시간 교실',
+        icon: Armchair,
+        toneClass: 'bg-[#EEF4FF] text-[#2554D7]',
+        onClick: () => scrollToSection(liveBoardSectionRef),
+      });
+    }
+
+    if (items.length < 3 && seatOverlaySummary.riskCount === 0) {
+      items.push({
+        key: 'risk-overview',
+        title: '학생 히트맵 점검',
+        detail: '위험 학생은 없지만 집중 흐름이 내려간 학생이 없는지 확인하세요.',
+        actionLabel: '학생 히트맵',
+        icon: ShieldAlert,
+        toneClass: 'bg-[#EEF4FF] text-[#2554D7]',
+        onClick: () => scrollToSection(seatInsightSectionRef),
+      });
+    }
+
+    if (items.length < 3 && unreadReportCount === 0) {
+      items.push({
+        key: 'report-overview',
+        title: '최근 리포트 후속 확인',
+        detail: '미열람은 없지만 최근 발송 리포트의 후속 안내 필요 여부를 확인하세요.',
+        actionLabel: '리포트 보기',
+        icon: Eye,
+        toneClass: 'bg-[#FFF2E8] text-[#C95A08]',
+        onClick: () => scrollToSection(reportsSectionRef),
+      });
+    }
+
     return items.slice(0, 3);
   }, [
     appointments,
@@ -2322,7 +2382,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 현재 바로 처리해야 할 우선순위 항목이 없습니다.
               </div>
             ) : (
-              <div className={cn("-mx-1 grid gap-3 px-1 pb-1", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.28fr)_360px]")}>
+              <div className={cn("-mx-1 grid gap-3 px-1 pb-1", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.82fr)]")}>
                 <motion.div {...getDeckMotionProps(0.14, 14)}>
                   <div className="app-depth-card-warm rounded-[2rem] border px-5 py-5 sm:px-6 sm:py-6">
                     <div className="flex items-start justify-between gap-4">
@@ -2356,14 +2416,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </motion.div>
 
-                <div className="grid gap-3">
+                <div className="grid auto-rows-fr gap-2.5 content-start">
                   {secondaryTeacherPriorities.map((item, index) => (
                     <motion.div key={item.key} {...getDeckMotionProps(0.18 + index * 0.05, 12)}>
                       <button
                         type="button"
                         onClick={item.onClick}
                         className={cn(
-                          "group w-full rounded-[1.75rem] px-4 py-4 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5",
+                          "group flex h-full w-full rounded-[1.75rem] px-4 py-3.5 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5",
                           index === 0 ? "app-depth-card" : "marketing-card-soft"
                         )}
                       >
@@ -2380,8 +2440,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                 <item.icon className="h-4 w-4" />
                               </span>
                             </div>
-                            <p className="mt-3 text-base font-black text-[#14295F]">{item.title}</p>
-                            <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
+                            <p className="mt-2.5 text-base font-black text-[#14295F]">{item.title}</p>
+                            <p className="mt-1 line-clamp-2 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
                           </div>
                           <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-300 transition-transform duration-200 group-hover:translate-x-0.5" />
                         </div>
