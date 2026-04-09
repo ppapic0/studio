@@ -67,6 +67,10 @@ type UseCenterAdminHeatmapOptions = {
   preloadedProgressListLoading?: boolean;
   preloadedAttendanceList?: AttendanceCurrent[] | null;
   preloadedAttendanceListLoading?: boolean;
+  preloadedParentActivityEvents?: ParentActivityEvent[] | null;
+  preloadedParentActivityEventsLoading?: boolean;
+  preloadedParentCommunications?: ParentCommunicationEntry[] | null;
+  preloadedParentCommunicationsLoading?: boolean;
 };
 
 type ResolvedAttendanceSeat = AttendanceCurrent & {
@@ -164,6 +168,10 @@ export function useCenterAdminHeatmap({
   preloadedProgressListLoading = false,
   preloadedAttendanceList,
   preloadedAttendanceListLoading = false,
+  preloadedParentActivityEvents,
+  preloadedParentActivityEventsLoading = false,
+  preloadedParentCommunications,
+  preloadedParentCommunicationsLoading = false,
 }: UseCenterAdminHeatmapOptions) {
   const firestore = useFirestore();
   const today = useMemo(() => (referenceDate ? new Date(referenceDate) : new Date()), [referenceDate]);
@@ -182,6 +190,14 @@ export function useCenterAdminHeatmap({
   const shouldLoadMembers = isActive && preloadedActiveMembers === undefined && !preloadedActiveMembersLoading;
   const shouldLoadProgress = isActive && preloadedProgressList === undefined && !preloadedProgressListLoading;
   const shouldLoadAttendance = isActive && preloadedAttendanceList === undefined && !preloadedAttendanceListLoading;
+  const shouldLoadParentEvents =
+    isActive &&
+    preloadedParentActivityEvents === undefined &&
+    !preloadedParentActivityEventsLoading;
+  const shouldLoadParentCommunications =
+    isActive &&
+    preloadedParentCommunications === undefined &&
+    !preloadedParentCommunicationsLoading;
 
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !shouldLoadMembers) return null;
@@ -237,22 +253,38 @@ export function useCenterAdminHeatmap({
   const { data: dailyReports, isLoading: reportsLoading } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
 
   const parentEventsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isActive) return null;
+    if (!firestore || !centerId || !shouldLoadParentEvents) return null;
     return query(
       collection(firestore, 'centers', centerId, 'parentActivityEvents'),
       where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgoDate))
     );
-  }, [firestore, centerId, isActive, thirtyDaysAgoDate]);
-  const { data: parentActivityEvents, isLoading: parentEventsLoading } = useCollection<ParentActivityEvent>(parentEventsQuery, { enabled: isActive });
+  }, [firestore, centerId, shouldLoadParentEvents, thirtyDaysAgoDate]);
+  const { data: fetchedParentActivityEvents, isLoading: fetchedParentEventsLoading } = useCollection<ParentActivityEvent>(
+    parentEventsQuery,
+    { enabled: shouldLoadParentEvents }
+  );
+  const parentActivityEvents = preloadedParentActivityEvents ?? fetchedParentActivityEvents;
+  const parentEventsLoading =
+    preloadedParentActivityEvents === undefined
+      ? (preloadedParentActivityEventsLoading || fetchedParentEventsLoading)
+      : false;
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isActive) return null;
+    if (!firestore || !centerId || !shouldLoadParentCommunications) return null;
     return query(
       collection(firestore, 'centers', centerId, 'parentCommunications'),
       where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgoDate))
     );
-  }, [firestore, centerId, isActive, thirtyDaysAgoDate]);
-  const { data: parentCommunications, isLoading: parentCommunicationsLoading } = useCollection<ParentCommunicationEntry>(parentCommunicationsQuery, { enabled: isActive });
+  }, [firestore, centerId, shouldLoadParentCommunications, thirtyDaysAgoDate]);
+  const { data: fetchedParentCommunications, isLoading: fetchedParentCommunicationsLoading } = useCollection<ParentCommunicationEntry>(
+    parentCommunicationsQuery,
+    { enabled: shouldLoadParentCommunications }
+  );
+  const parentCommunications = preloadedParentCommunications ?? fetchedParentCommunications;
+  const parentCommunicationsLoading =
+    preloadedParentCommunications === undefined
+      ? (preloadedParentCommunicationsLoading || fetchedParentCommunicationsLoading)
+      : false;
 
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isActive) return null;

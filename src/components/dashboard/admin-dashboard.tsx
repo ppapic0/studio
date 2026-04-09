@@ -531,24 +531,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [resolvedAttendanceList]
   );
 
-  const {
-    rows: adminHeatmapRows,
-    interventionSignals: heatmapInterventionSignals,
-    isLoading: adminHeatmapLoading,
-    weeklyStudyMinutesByStudent,
-  } = useCenterAdminHeatmap({
-    centerId,
-    isActive: isActive && !!today,
-    selectedClass,
-    referenceDate: today,
-    preloadedActiveMembers: activeMembers,
-    preloadedActiveMembersLoading: membersLoading,
-    preloadedProgressList: progressList,
-    preloadedProgressListLoading: !progressList && isActive,
-    preloadedAttendanceList: attendanceList,
-    preloadedAttendanceListLoading: attendanceLoading,
-  });
-
   const getSeatForRoom = (room: LayoutRoomConfig, roomSeatNo: number): ResolvedAttendanceSeat => {
     const seatId = buildSeatId(room.id, roomSeatNo);
     const existingSeat = seatById.get(seatId);
@@ -683,7 +665,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       where('createdAt', '>=', parentActivityWindowStart)
     );
   }, [firestore, centerId, parentActivityWindowStart]);
-  const { data: parentActivityEvents } = useCollection<ParentActivityEvent>(parentActivityQuery, { enabled: isActive });
+  const { data: parentActivityEvents, isLoading: parentActivityEventsLoading } = useCollection<ParentActivityEvent>(parentActivityQuery, { enabled: isActive });
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -692,11 +674,33 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       where('createdAt', '>=', parentActivityWindowStart)
     );
   }, [firestore, centerId, parentActivityWindowStart]);
-  const { data: parentCommunications } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
+  const { data: parentCommunications, isLoading: parentCommunicationsLoading } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
   const normalizedParentCommunications = useMemo(
     () => (parentCommunications || []).map((item) => normalizeParentCommunicationRecord(item)),
     [parentCommunications]
   );
+
+  const {
+    rows: adminHeatmapRows,
+    interventionSignals: heatmapInterventionSignals,
+    isLoading: adminHeatmapLoading,
+    weeklyStudyMinutesByStudent,
+  } = useCenterAdminHeatmap({
+    centerId,
+    isActive: isActive && !!today,
+    selectedClass,
+    referenceDate: today,
+    preloadedActiveMembers: activeMembers,
+    preloadedActiveMembersLoading: membersLoading,
+    preloadedProgressList: progressList,
+    preloadedProgressListLoading: !progressList && isActive,
+    preloadedAttendanceList: attendanceList,
+    preloadedAttendanceListLoading: attendanceLoading,
+    preloadedParentActivityEvents: parentActivityEvents,
+    preloadedParentActivityEventsLoading: parentActivityEventsLoading,
+    preloadedParentCommunications: normalizedParentCommunications,
+    preloadedParentCommunicationsLoading: parentCommunicationsLoading,
+  });
 
   const consultingLeadsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
