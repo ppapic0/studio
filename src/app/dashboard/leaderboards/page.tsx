@@ -1995,26 +1995,12 @@ export default function RankingBattlePage() {
             <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} isMobile />
             <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
             <LiveActivityLog logs={logs} leaders={liveLeaders} />
-            <RecommendationPanel
-              recommendations={recommendations}
-              onApply={handleApplyRecommendation}
-              onReopenDiagnosis={handleOpenPlanPage}
-              onViewDiagnosis={handleViewDiagnosis}
-            />
           </div>
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
             <div className="space-y-5">
               <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} />
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
-                <LiveActivityLog logs={logs} leaders={liveLeaders} />
-                <RecommendationPanel
-                  recommendations={recommendations}
-                  onApply={handleApplyRecommendation}
-                  onReopenDiagnosis={handleOpenPlanPage}
-                  onViewDiagnosis={handleViewDiagnosis}
-                />
-              </div>
+              <LiveActivityLog logs={logs} leaders={liveLeaders} />
             </div>
             <div className="space-y-5">
               <StandingsSidebar leaders={liveLeaders} viewer={viewer} />
