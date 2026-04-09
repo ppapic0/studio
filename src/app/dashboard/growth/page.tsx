@@ -303,7 +303,7 @@ function HeroMetricChip({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
       {floatingGain ? (
         <div key={floatingGain.key} className="point-track-floating-gain">
-          보상 확인
+          +{floatingGain.amount}P
         </div>
       ) : null}
       <div className="flex items-center gap-2.5">
@@ -1012,8 +1012,10 @@ export default function GrowthPage() {
                   </p>
                   {boxStage === 'revealed' && revealedReward !== null ? (
                     <div className="point-track-reward-burst">
-                      <p className="text-[2.35rem] font-black tracking-tight text-orange-100">보상 확인 완료</p>
-                      <p className="mt-1 text-xs font-black text-[var(--text-on-dark-soft)]">오늘 연 상자 {todayOpenedCount}개</p>
+                      <p className="text-[2.35rem] font-black tracking-tight text-orange-100">
+                        +{revealedReward.toLocaleString()}P
+                      </p>
+                      <p className="mt-1 text-xs font-black text-[var(--text-on-dark-soft)]">이번 상자 보상이에요.</p>
                     </div>
                   ) : (
                     <p className="mt-2 text-sm font-black text-[var(--text-on-dark)]">

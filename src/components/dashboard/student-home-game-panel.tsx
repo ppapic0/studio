@@ -352,12 +352,14 @@ function RewardModal({
             ) : (
               <div className="point-track-reward-burst surface-card surface-card--highlight mt-5 rounded-[1.35rem] px-4 py-5">
                 <div className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--text-on-accent)]">reward</div>
-                <div className="mt-2 text-[2rem] font-black tracking-tight text-[var(--text-on-accent)]">보상 확인 완료</div>
+                <div className="mt-2 text-[2rem] font-black tracking-tight text-[var(--text-on-accent)]">
+                  +{revealedReward.toLocaleString()}P
+                </div>
                 <div className="mt-2 text-sm font-semibold text-[rgba(14,28,56,0.76)]">
-                  오늘 연 상자 {todayOpenedBoxCount}개
+                  이번 상자 보상이에요.
                 </div>
                 <div className="mt-3 rounded-full border border-[rgba(14,28,56,0.12)] bg-[rgba(255,255,255,0.56)] px-3 py-2 text-[11px] font-black text-[rgba(14,28,56,0.72)]">
-                  다음 상자까지 {nextCountdownLabel}
+                  오늘 연 상자 {todayOpenedBoxCount}개
                 </div>
               </div>
             )}
