@@ -4,17 +4,17 @@ const scoreSheetProofs = [
   {
     label: '6월 모의평가',
     caption: '국어 3등급 · 백분위 82',
-    image: '/marketing/proof/june-score-sheet-proof-v6.jpg',
+    image: '/marketing/proof/june-score-sheet-proof-v7.jpg',
   },
   {
     label: '9월 모의평가',
     caption: '국어 1등급 · 백분위 96',
-    image: '/marketing/proof/september-score-sheet-proof-v6.jpg',
+    image: '/marketing/proof/september-score-sheet-proof-v7.jpg',
   },
   {
     label: '수능',
     caption: '국어 백분위 99',
-    image: '/marketing/proof/csat-score-sheet-proof-v6.jpg',
+    image: '/marketing/proof/csat-score-sheet-proof-v7.jpg',
   },
 ] as const;
 
