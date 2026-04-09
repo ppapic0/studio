@@ -141,40 +141,40 @@ export default function StudentReportsPage() {
                 key={report.id}
                 onClick={() => handleOpenReport(report)}
                 className={cn(
-                  'cursor-pointer overflow-hidden border-none bg-white ring-1 ring-border/50 transition-all duration-300',
-                  isMobile ? 'rounded-[1.75rem] shadow-md active:scale-[0.995]' : 'rounded-[2.5rem] shadow-lg hover:-translate-y-1 hover:shadow-2xl',
+                  'cursor-pointer overflow-hidden border border-white/10 bg-[linear-gradient(180deg,#17326B_0%,#14295F_52%,#10244F_100%)] ring-1 ring-white/8 transition-all duration-300',
+                  isMobile ? 'rounded-[1.75rem] shadow-[0_18px_36px_-22px_rgba(4,10,32,0.56)] active:scale-[0.995]' : 'rounded-[2.5rem] shadow-[0_24px_48px_-24px_rgba(4,10,32,0.52)] hover:-translate-y-1 hover:shadow-[0_28px_56px_-24px_rgba(4,10,32,0.62)]',
                 )}
               >
                 <CardContent className="p-0">
                   <div className={cn('flex items-center', isMobile ? 'gap-3 p-4' : 'gap-6 p-6 sm:p-10')}>
-                    <div className={cn('flex shrink-0 items-center justify-center rounded-2xl border-2 border-primary/10 bg-primary/5', isMobile ? 'h-12 w-12' : 'h-16 w-16 rounded-[1.5rem]')}>
-                      <Calendar className={cn('text-primary', isMobile ? 'h-5 w-5' : 'h-6 w-6')} />
+                    <div className={cn('flex shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]', isMobile ? 'h-12 w-12' : 'h-16 w-16 rounded-[1.5rem]')}>
+                      <Calendar className={cn(isMobile ? 'h-5 w-5' : 'h-6 w-6')} />
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[10px] font-black uppercase tracking-widest leading-none text-primary/40 sm:text-xs">{report.dateKey}</span>
+                        <span className="truncate text-[10px] font-black uppercase tracking-widest leading-none text-[#FFB76C] sm:text-xs">{report.dateKey}</span>
                         <Badge
                           variant="secondary"
                           className={cn(
                             'h-4 shrink-0 border-none px-1.5 text-[8px] font-black',
-                            report.viewedAt ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600',
+                            report.viewedAt ? 'bg-white text-[#FF7A16]' : 'bg-[#FF7A16] text-white',
                           )}
                         >
                           {report.viewedAt ? '읽음' : '신규'}
                         </Badge>
                       </div>
 
-                      <h3 className="truncate text-base font-black tracking-tighter text-primary sm:text-xl">학습 리포트</h3>
-                      <p className="line-clamp-1 text-[10px] font-bold text-muted-foreground/60 sm:text-[11px]">
+                      <h3 className="truncate text-base font-black tracking-tighter text-white sm:text-xl">학습 리포트</h3>
+                      <p className="line-clamp-1 text-[10px] font-bold text-white/72 sm:text-[11px]">
                         {preview || '리포트 내용을 확인해보세요.'}
                       </p>
                     </div>
 
                     {isMobile ? (
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                      <ChevronRight className="h-4 w-4 shrink-0 text-white/72" />
                     ) : (
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/5 text-primary">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10 text-white">
                         <ChevronRight className="h-6 w-6" />
                       </div>
                     )}
