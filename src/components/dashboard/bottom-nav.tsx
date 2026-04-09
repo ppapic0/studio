@@ -203,15 +203,15 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
                 className={cn(
                   'font-black tracking-tight transition-all duration-300 whitespace-nowrap leading-none',
                   isParent ? 'px-0.5 text-center text-[10.4px] sm:text-[10.9px]' : useBrandNav ? 'text-[10.8px]' : 'text-[10px]',
-                  useBrandNav
-                    ? isActive
-                      ? 'text-white opacity-100'
-                      : isParent
-                        ? 'text-white/94'
+                  isParent
+                    ? 'text-white opacity-100 [text-shadow:0_1px_2px_rgba(5,10,28,0.45)]'
+                    : useBrandNav
+                      ? isActive
+                        ? 'text-white opacity-100'
                         : 'text-white opacity-90'
-                    : isActive
-                      ? 'opacity-100'
-                      : 'opacity-45'
+                      : isActive
+                        ? 'opacity-100'
+                        : 'opacity-45'
                 )}
               >
                 {item.label}
