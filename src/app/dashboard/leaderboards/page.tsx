@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import {
   Clock3,
   Crown,
@@ -53,10 +53,6 @@ type FloatingEvent = {
   target: 'top' | 'viewer' | 'rival';
 };
 
-type RewardState = {
-  minutesToReward: number;
-};
-
 type RecommendationTone = 'plan' | 'review' | 'balance' | 'method' | 'mindset';
 
 type BattleRecommendation = {
@@ -78,18 +74,18 @@ const RANGE_META: Record<
 > = {
   daily: {
     label: '일간',
-    title: '오늘 실시간 순위',
-    subtitle: '오늘 누적 공부시간과 순위 흐름을 바로 확인하세요.',
+    title: '실시간 경쟁 랭킹',
+    subtitle: '오늘 누적 공부시간과 순위 흐름을 차분하게 확인할 수 있습니다.',
   },
   weekly: {
     label: '주간',
-    title: '실시간 경쟁 랭킹',
-    subtitle: '이번 주 상위권 흐름과 내 위치를 한 번에 읽을 수 있습니다.',
+    title: '주간 랭킹',
+    subtitle: '이번 주 상위권 흐름과 현재 위치를 한 화면에서 확인하세요.',
   },
   monthly: {
     label: '월간',
-    title: '월간 랭킹 흐름',
-    subtitle: '월간 누적 기준으로 상위권 변화와 집중 격차를 확인하세요.',
+    title: '월간 랭킹',
+    subtitle: '월간 누적 기준으로 상위권 변화와 집중 격차를 읽을 수 있습니다.',
   },
 };
 
@@ -253,14 +249,6 @@ function getPressureLevel(rank: number, diffAbove: number, diffBelow: number): P
   return 'stable';
 }
 
-function buildRewardState(viewerValue: number): RewardState {
-  const cycle = 90;
-  const minutesToReward = cycle - (viewerValue % cycle || cycle);
-  return {
-    minutesToReward,
-  };
-}
-
 function buildHeroMessages(params: {
   mode: BattleMode;
   diffAbove: number;
@@ -272,23 +260,23 @@ function buildHeroMessages(params: {
   const messages: string[] = [];
 
   if (mode === 'attack') {
-    messages.push(`지금 ${Math.max(8, Math.min(diffAbove + 1, 18))}분 더 쌓으면 선두권과 맞닿습니다`);
+    messages.push(`지금 ${Math.max(8, Math.min(diffAbove + 1, 18))}분 더 쌓으면 상위권과 거의 같은 선에 섭니다`);
     messages.push('상위권과의 간격이 빠르게 줄고 있습니다');
   }
 
   if (mode === 'danger') {
     messages.push('바로 아래 순위와의 간격이 좁아졌습니다');
-    messages.push(`지금 멈추면 ${Math.max(8, Math.min(diffBelow + 4, 16))}분 차이까지 붙을 수 있어요`);
+    messages.push(`지금 흐름이 끊기면 ${Math.max(8, Math.min(diffBelow + 4, 16))}분 차이까지 가까워질 수 있어요`);
   }
 
   if (mode === 'defense') {
     messages.push('현재 선두 흐름을 안정적으로 유지하고 있습니다');
-    messages.push('지금 페이스를 유지하면 상위권을 지킬 수 있어요');
+    messages.push('지금 페이스를 유지하면 현재 위치를 안정적으로 지킬 수 있어요');
   }
 
   if (mode === 'chase') {
     messages.push('지금 블록이 순위 변화를 만들 수 있는 구간입니다');
-    messages.push('상위권 진입 흐름을 먼저 확인해보세요');
+    messages.push('상위권 흐름과의 간격을 먼저 확인해보세요');
   }
 
   if (viewerRank > 2) {
@@ -352,10 +340,10 @@ function buildMainRecommendations(params: {
     recommendations.push({
       id: 'overtake-window',
       tone: 'plan',
-      title: '지금이 순위를 끌어올릴 구간입니다',
+      title: '지금은 순위를 끌어올릴 여지가 큰 구간입니다',
       action: `오늘 다음 블록을 ${Math.max(40, Math.min(diffAbove + 12, 70))}분 이상으로 잡아보세요.`,
       reason: `현재 1위와 ${formatGapLabel(diffAbove)} 차이라 한 번의 긴 블록으로도 간격을 크게 줄일 수 있습니다.`,
-      explainWhy: '상위권과의 간격이 짧을수록 첫 블록을 길게 가져가는 편이 순위 변화에 더 유리합니다.',
+      explainWhy: '상위권과의 간격이 짧을수록 첫 블록을 길게 가져가는 편이 현재 흐름을 바꾸는 데 더 효과적입니다.',
       cta: '오늘 계획에 반영하기',
     });
   }
@@ -364,11 +352,11 @@ function buildMainRecommendations(params: {
     recommendations.push({
       id: 'defense-route',
       tone: 'mindset',
-      title: '지금은 현재 순위를 안정적으로 지키는 편이 좋습니다',
+      title: '지금은 현재 위치를 안정적으로 유지하는 편이 좋습니다',
       action: '새 과목을 넓히기보다, 이미 잡은 핵심 과목 한 블록을 끝까지 지켜보세요.',
       reason: `${below.displayNameSnapshot} 님과 ${formatGapLabel(diffBelow)} 차이라 다음 한 블록에서 순위가 바뀔 수 있는 구간입니다.`,
       explainWhy: '격차가 좁을 때는 과목 수를 늘리는 것보다 이미 잡은 블록을 끊기지 않게 마무리하는 편이 더 안정적입니다.',
-      cta: '현재 흐름 유지하기',
+      cta: '현재 흐름 반영하기',
     });
   }
 
@@ -453,8 +441,9 @@ function HeroBattleHeader({
   subtitleOverride?: string;
   isMobile?: boolean;
 }) {
-  const heroBadgeLabel = isLive ? '실시간 랭킹' : '집계 대기';
-  const heroStatusLabel = statusLabel || (isLive ? '실시간 집계' : '집계 대기');
+  const shouldReduceMotion = useReducedMotion();
+  const heroBadgeLabel = isLive ? '학습 성과 보드' : '랭킹 집계 안내';
+  const heroStatusLabel = statusLabel || (isLive ? '실시간 반영' : '집계 대기');
   const heroSubtitle = subtitleOverride || RANGE_META[range].subtitle;
 
   if (isMobile) {
@@ -547,10 +536,10 @@ function HeroBattleHeader({
             <AnimatePresence mode="wait">
               <motion.p
                 key={activeMessage}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.28, ease: 'easeOut' }}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+                animate={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -12 }}
+                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.28, ease: 'easeOut' }}
                 className={cn(
                   'font-aggro-display font-black leading-snug tracking-[-0.03em] text-[#132A63]',
                   isMobile ? 'text-[1.05rem]' : 'text-xl md:text-[1.7rem]'
@@ -617,16 +606,15 @@ function BattleGauge({
   rightLabel,
   leftValue,
   rightValue,
-  mode,
   isMobile = false,
 }: {
   leftLabel: string;
   rightLabel: string;
   leftValue: number;
   rightValue: number;
-  mode: BattleMode;
   isMobile?: boolean;
 }) {
+  const shouldReduceMotion = useReducedMotion();
   const difference = leftValue - rightValue;
   const marker = clamp(50 + (difference / Math.max(leftValue, rightValue, 1)) * 35, 10, 90);
 
@@ -648,35 +636,37 @@ function BattleGauge({
       )}>
         <div className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,rgba(255,143,38,0.95),rgba(255,193,113,0.92))]" style={{ width: `${marker}%` }} />
         <div
-          className={cn(
-            'absolute inset-y-0 right-0 bg-[linear-gradient(270deg,rgba(255,111,95,0.92),rgba(255,177,132,0.72))]',
-            mode === 'defense' && 'bg-[linear-gradient(270deg,rgba(255,140,102,0.88),rgba(255,200,154,0.68))]'
-          )}
+          className="absolute inset-y-0 right-0 bg-[linear-gradient(270deg,rgba(20,41,95,0.16),rgba(160,182,220,0.32))]"
           style={{ width: `${100 - marker}%` }}
         />
         <motion.div
           className="absolute inset-y-1 left-0 w-24 rounded-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.62),transparent)] mix-blend-screen"
-          animate={{ x: ['-10%', '120%'] }}
-          transition={{ duration: 3.4, repeat: Infinity, ease: 'linear' }}
+          animate={shouldReduceMotion ? { opacity: 0.35, x: '0%' } : { x: ['-10%', '120%'] }}
+          transition={shouldReduceMotion ? { duration: 0 } : { duration: 3.4, repeat: Infinity, ease: 'linear' }}
         />
         <motion.div
           className="absolute inset-y-0 w-[3px] bg-white shadow-[0_0_18px_rgba(255,255,255,0.92)]"
           style={{ left: `calc(${marker}% - 1px)` }}
-          animate={{ opacity: [0.7, 0.95, 0.7], scaleY: [0.92, 1.02, 0.92] }}
-          transition={{ duration: 2.1, repeat: Infinity, ease: 'easeInOut' }}
+          animate={shouldReduceMotion ? { opacity: 0.85, scaleY: 1 } : { opacity: [0.7, 0.95, 0.7], scaleY: [0.92, 1.02, 0.92] }}
+          transition={shouldReduceMotion ? { duration: 0 } : { duration: 2.1, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
           className="absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-white/30 bg-[radial-gradient(circle,_rgba(255,246,218,0.96)_0%,_rgba(255,178,84,0.92)_50%,_rgba(255,120,56,0.9)_100%)] shadow-[0_0_24px_rgba(255,169,88,0.85)]"
           style={{ left: `calc(${marker}% - 10px)` }}
-          animate={{
-            scale: [1, 1.06, 1],
-            boxShadow: [
-              '0 0 16px rgba(255,169,88,0.45)',
-              '0 0 26px rgba(255,169,88,0.72)',
-              '0 0 16px rgba(255,169,88,0.45)',
-            ],
-          }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          animate={shouldReduceMotion
+            ? {
+                scale: 1,
+                boxShadow: '0 0 16px rgba(255,169,88,0.45)',
+              }
+            : {
+                scale: [1, 1.04, 1],
+                boxShadow: [
+                  '0 0 16px rgba(255,169,88,0.45)',
+                  '0 0 22px rgba(255,169,88,0.62)',
+                  '0 0 16px rgba(255,169,88,0.45)',
+                ],
+              }}
+          transition={shouldReduceMotion ? { duration: 0 } : { duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
         />
       </div>
       <div className={cn(
@@ -761,7 +751,6 @@ function MyBattleCard({
   range,
   mode,
   pressure,
-  rewardState,
   isMobile = false,
 }: {
   viewer: BattleEntry;
@@ -770,9 +759,9 @@ function MyBattleCard({
   range: RankRange;
   mode: BattleMode;
   pressure: PressureLevel;
-  rewardState: RewardState;
   isMobile?: boolean;
 }) {
+  const shouldReduceMotion = useReducedMotion();
   const diffAbove = Math.max(0, (top?.value ?? viewer.value) - viewer.value);
   const diffBelow = below ? Math.max(0, viewer.value - below.value) : 0;
   const statusLabel =
@@ -797,10 +786,9 @@ function MyBattleCard({
       <motion.section
         layout
         className={cn(MOBILE_BATTLE_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-4 text-[#132A63]')}
-        whileHover={{ y: -2 }}
-        transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+        whileHover={shouldReduceMotion ? undefined : { y: -2 }}
+        transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 220, damping: 24 }}
       >
-        <DefenseShieldEffect active={mode === 'defense' || mode === 'danger'} pressure={pressure} />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),transparent_36%,transparent_72%,rgba(255,156,56,0.08))]" />
         <div className="pointer-events-none absolute inset-[1px] rounded-[1.72rem] border border-white/60" />
 
@@ -844,7 +832,6 @@ function MyBattleCard({
               rightLabel={viewer.rank === 1 ? '바로 아래 기준' : '1위 기준'}
               leftValue={viewer.value}
               rightValue={viewer.rank === 1 ? (below?.value ?? viewer.value - 10) : (top?.value ?? viewer.value + 10)}
-              mode={mode}
               isMobile
             />
           </div>
@@ -875,52 +862,42 @@ function MyBattleCard({
         'student-utility-card relative overflow-hidden rounded-[34px] border border-[#E7D1B9] bg-[radial-gradient(circle_at_top_right,rgba(255,187,108,0.24),transparent_28%),linear-gradient(180deg,#FFF9F1_0%,#FFF4E8_48%,#FFE7C8_100%)] text-[#132A63] shadow-[0_24px_60px_rgba(20,41,95,0.12)]',
         isMobile ? 'p-5' : 'p-6 md:p-7'
       )}
-      whileHover={{ y: -4 }}
-      transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+      whileHover={shouldReduceMotion ? undefined : { y: -4 }}
+      transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 220, damping: 24 }}
     >
-      <DefenseShieldEffect active={mode === 'defense' || mode === 'danger'} pressure={pressure} />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.82),transparent_32%,transparent_66%,rgba(255,140,40,0.08))]" />
       <div className="pointer-events-none absolute inset-[1px] rounded-[33px] border border-white/55" />
       <div className="relative">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="rounded-[28px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF8EE_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#BA6815]">
-                  <Zap className="h-4 w-4" />
-                  {statusLabel}
-                </div>
-                <div className="mt-4 text-[11px] font-black tracking-[0.22em] text-[#7A86A2]">{getBattleTrackLabel(range)}</div>
-                <div className="mt-3 flex flex-wrap items-end gap-4">
-                  <div className="text-6xl font-black leading-none tracking-[-0.06em] text-[#132A63]">#{viewer.rank}</div>
-                  <div className="pb-2">
-                <div className="text-sm font-bold text-[#6E7893]">현재 공부시간 {formatStudyCompact(viewer.value)}</div>
-                    <div className="student-aggro-body mt-2 max-w-xl text-lg leading-8 text-[#C86A10]">{helperCopy}</div>
-                  </div>
-                </div>
+        <div className="rounded-[28px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF8EE_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#F2C78F] bg-white/88 px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#BA6815]">
+                <Zap className="h-4 w-4" />
+                {statusLabel}
               </div>
-
-              <div className="rounded-full border border-[#F0D8B7] bg-[#FFF6EA] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">
-                현재 순위 요약
-              </div>
+              <div className="mt-4 text-[11px] font-black tracking-[0.22em] text-[#7A86A2]">{getBattleTrackLabel(range)}</div>
+            </div>
+            <div className="rounded-full border border-[#F0D8B7] bg-[#FFF6EA] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#7A86A2]">
+              현재 순위
             </div>
           </div>
 
-          <div className="grid gap-3">
-            <motion.div
-              className="rounded-[26px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF6EA_100%)] px-5 py-4 shadow-[0_18px_40px_rgba(20,41,95,0.08)]"
-              animate={{ boxShadow: ['0 0 0 rgba(255,154,56,0.08)', '0 0 24px rgba(255,154,56,0.18)', '0 0 0 rgba(255,154,56,0.08)'] }}
-              transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              <div className="text-[11px] font-black tracking-[0.24em] text-[#7A86A2]">현재 공부시간</div>
-              <div className="mt-2 text-[2rem] font-black tracking-[-0.05em] text-[#132A63]">{formatStudyClock(viewer.value)}</div>
-              <div className="mt-2 text-sm font-semibold text-[#64779C]">현재 범위 누적 기준</div>
-            </motion.div>
-
-            <div className="rounded-[26px] border border-[#F0D8B7] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF6EA_100%)] px-5 py-4 shadow-[0_18px_40px_rgba(20,41,95,0.08)]">
-              <div className="text-[11px] font-black tracking-[0.24em] text-[#7A86A2]">90분 기준</div>
-              <div className="mt-2 text-[2rem] font-black tracking-[-0.05em] text-[#132A63]">+{rewardState.minutesToReward}분</div>
-              <div className="mt-2 text-sm font-semibold text-[#64779C]">다음 누적 기준까지 남은 시간</div>
+          <div className="mt-4 grid gap-5 md:grid-cols-[180px_minmax(0,1fr)] md:items-end">
+            <div>
+              <div className="text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">내 현재 순위</div>
+              <div className="mt-3 text-6xl font-black leading-none tracking-[-0.06em] text-[#132A63]">#{viewer.rank}</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-black tracking-[0.2em] text-[#7A86A2]">현재 공부시간</div>
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <div className="text-[2.5rem] font-black leading-none tracking-[-0.06em] text-[#132A63]">{formatStudyClock(viewer.value)}</div>
+                <div className="rounded-full border border-[#FFD3AA] bg-[#FFF2E4] px-3 py-1.5 text-[11px] font-black text-[#C86A10]">
+                  {viewer.rank === 1 ? `바로 아래와 ${formatGapLabel(diffBelow)}` : `1위와 ${formatGapLabel(diffAbove)}`}
+                </div>
+              </div>
+              <div className="student-aggro-body mt-3 max-w-2xl text-[15px] leading-7 text-[#C86A10]">
+                {helperCopy}
+              </div>
             </div>
           </div>
         </div>
@@ -937,7 +914,6 @@ function MyBattleCard({
             rightLabel={viewer.rank === 1 ? '바로 아래 기준' : '1위 기준'}
             leftValue={viewer.value}
             rightValue={viewer.rank === 1 ? (below?.value ?? viewer.value - 10) : (top?.value ?? viewer.value + 10)}
-            mode={mode}
           />
         </div>
       </div>
@@ -1220,6 +1196,7 @@ function StandingsSidebar({
   viewer: BattleEntry;
   isMobile?: boolean;
 }) {
+  const shouldReduceMotion = useReducedMotion();
   const toneMap: Record<number, LogTone> = {
     1: 'gold',
     2: 'orange',
@@ -1244,10 +1221,10 @@ function StandingsSidebar({
             상위권 인사이트
           </div>
           <h3 className={cn('font-black tracking-[-0.04em] text-[#132A63]', isMobile ? 'text-xl' : 'text-2xl')}>
-            현재 상위 3명
+            상위권 인사이트
           </h3>
           <p className={cn('student-aggro-body mt-2 leading-6 text-[#64779C]', isMobile ? 'text-[13px]' : 'text-sm')}>
-            현재 누적 공부시간 기준으로 상위권 흐름과 내 위치를 빠르게 확인할 수 있습니다.
+            현재 누적 공부시간 기준으로 상위권 흐름과 내 위치를 빠르게 읽을 수 있습니다.
           </p>
         </div>
 
@@ -1260,8 +1237,8 @@ function StandingsSidebar({
               'relative overflow-hidden px-4 py-4',
               topLeader.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
             )}
-            whileHover={{ y: -2, scale: 1.01 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            whileHover={shouldReduceMotion ? undefined : { y: -2, scale: 1.01 }}
+            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
           >
             <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', TONE_CLASS_MAP.gold.line)} />
             <div className="flex items-start justify-between gap-3">
@@ -1310,8 +1287,8 @@ function StandingsSidebar({
                     !isMobile && 'flex items-center justify-between gap-3 px-4 py-4',
                     entry.isViewer && 'border-[#FFBE77] bg-[linear-gradient(180deg,#FFF7EA_0%,#FFE7C3_100%)]'
                   )}
-                  whileHover={{ y: -2, scale: 1.01 }}
-                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  whileHover={shouldReduceMotion ? undefined : { y: -2, scale: 1.01 }}
+                  transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
                 >
                   <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r', toneClass.line)} />
                   {isMobile ? (
@@ -1386,6 +1363,7 @@ function StandingsSidebar({
 }
 
 function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEntry[] }) {
+  const shouldReduceMotion = useReducedMotion();
   return (
     <section className="rounded-[30px] border border-[#E6D2BE] bg-[linear-gradient(180deg,#FFF9F0_0%,#FFF0DB_100%)] p-5 text-[#132A63] shadow-[0_20px_54px_rgba(20,41,95,0.1)] md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -1427,10 +1405,10 @@ function LiveActivityLog({ logs, leaders }: { logs: LiveLog[]; leaders: BattleEn
               <motion.div
                 key={log.id}
                 layout
-                initial={{ opacity: 0, x: -24, scale: 0.97 }}
+                initial={shouldReduceMotion ? false : { opacity: 0, x: -24, scale: 0.97 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 18, scale: 0.96 }}
-                transition={{ duration: 0.28, ease: 'easeOut' }}
+                exit={shouldReduceMotion ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: 18, scale: 0.96 }}
+                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.28, ease: 'easeOut' }}
                 className="relative overflow-hidden rounded-[22px] border border-[#E8D5C1] bg-white p-4 shadow-[0_14px_28px_rgba(20,41,95,0.08)]"
               >
                 <div className={cn('pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r opacity-60', toneClass.line)} />
@@ -1855,7 +1833,6 @@ export default function RankingBattlePage() {
   const diffBelow = viewer && below ? Math.max(0, viewer.value - below.value) : 0;
   const mode = viewer ? getBattleMode(viewer.rank, diffAbove, diffBelow) : 'chase';
   const pressure = viewer ? getPressureLevel(viewer.rank, diffAbove, diffBelow) : 'stable';
-  const rewardState = buildRewardState(viewer?.value ?? 0);
   const isDailyWaiting = range === 'daily' && !dailyRankWindow.isLive;
   const recommendations = useMemo(
     () => (viewer ? buildMainRecommendations({ viewer, top, below, logs }) : []),
@@ -1991,7 +1968,7 @@ export default function RankingBattlePage() {
           onRangeChange={handleRangeChange}
           activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]}
           isLive
-          statusLabel="실시간 집계"
+          statusLabel="실시간 반영"
           isMobile={isMobile}
         />
 
@@ -2003,7 +1980,7 @@ export default function RankingBattlePage() {
 
         {isMobile ? (
           <div className="space-y-4">
-            <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} rewardState={rewardState} isMobile />
+            <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} isMobile />
             <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
             <LiveActivityLog logs={logs} leaders={liveLeaders} />
             <RecommendationPanel
@@ -2016,7 +1993,7 @@ export default function RankingBattlePage() {
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
             <div className="space-y-5">
-              <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} rewardState={rewardState} />
+              <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} />
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
                 <LiveActivityLog logs={logs} leaders={liveLeaders} />
                 <RecommendationPanel
