@@ -276,14 +276,14 @@ export function StudentOperationsGraphBoard({
               </CardDescription>
             </div>
 
-            <div className={cn('grid gap-2.5', isMobile ? 'grid-cols-2' : 'grid-cols-2 xl:grid-cols-4')}>
+            <div className={cn('grid gap-2.5 xl:flex-none', isMobile ? 'grid-cols-2' : 'grid-cols-2 2xl:grid-cols-4')}>
               {headerMetrics.map((metric) => (
                 <div
                   key={metric.key}
-                  className="rounded-[1rem] border border-white/12 bg-white/10 px-3.5 py-3 backdrop-blur-sm transition-colors duration-300 hover:bg-white/14 motion-reduce:transition-none"
+                  className="flex min-h-[5.5rem] min-w-0 flex-col justify-between rounded-[1rem] border border-white/12 bg-white/10 px-3.5 py-3 backdrop-blur-sm transition-colors duration-300 hover:bg-white/14 motion-reduce:transition-none"
                 >
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/58">{metric.label}</p>
-                  <p className="mt-1 text-base font-black tracking-tight text-white">{metric.value}</p>
+                  <p className="break-keep text-[10px] font-black leading-4 tracking-[0.14em] text-white/58">{metric.label}</p>
+                  <p className="mt-2 break-keep text-[1.05rem] font-black leading-tight tracking-tight text-white sm:text-[1.15rem]">{metric.value}</p>
                 </div>
               ))}
             </div>
