@@ -1403,10 +1403,9 @@ function SubjectStudyChartDialog({
 }
 
 function formatMinutes(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (minutes <= 0) return '0m';
-  if (h <= 0) return `${m}m`;
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const h = Math.floor(safeMinutes / 60);
+  const m = safeMinutes % 60;
   return `${h}h ${m}m`;
 }
 
@@ -1423,29 +1422,12 @@ const PARENT_CALENDAR_THRESHOLDS = {
   steady: 540,
 } as const;
 
-const PARENT_CALENDAR_LEGEND = [
-  { label: '기록 없음', swatch: 'from-white via-[#F5F8F6] to-[#E7EEE9] ring-[#D7E1DA]' },
-  { label: '몰입 준비', swatch: 'from-[#F8FDF9] via-[#E4F7E8] to-[#CDEED5] ring-[#9BD5A9]' },
-  { label: '짧은 몰입', swatch: 'from-[#EFFBF2] via-[#C4EECE] to-[#83D69A] ring-[#58B871]' },
-  { label: '집중 흐름', swatch: 'from-[#DFF7E5] via-[#7AD494] to-[#2FAE61] ring-[#1F8E4B]' },
-  { label: '깊은 몰입', swatch: 'from-[#BDE9C9] via-[#31B864] to-[#177845] ring-[#115C34]' },
-] as const;
-
 function getParentCalendarFlowLevel(minutes: number): ParentCalendarFlowLevel {
   if (minutes <= 0) return 'none';
   if (minutes < PARENT_CALENDAR_THRESHOLDS.warmup) return 'warmup';
   if (minutes < PARENT_CALENDAR_THRESHOLDS.short) return 'short';
   if (minutes < PARENT_CALENDAR_THRESHOLDS.steady) return 'steady';
   return 'deep';
-}
-
-function getParentCalendarFlowLabel(minutes: number) {
-  const level = getParentCalendarFlowLevel(minutes);
-  if (level === 'none') return '기록 없음';
-  if (level === 'warmup') return '몰입 준비';
-  if (level === 'short') return '짧은 몰입';
-  if (level === 'steady') return '집중 흐름';
-  return '깊은 몰입';
 }
 
 function formatWon(value: number) {
@@ -2809,25 +2791,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return 'bg-[linear-gradient(180deg,rgba(168,230,187,0.998)_0%,rgba(24,128,69,0.998)_100%)] ring-1 ring-inset ring-[#0F6B37]/95 shadow-[inset_0_1px_0_rgba(232,250,238,0.38),0_24px_42px_-26px_rgba(12,98,49,0.3)]';
   };
 
-  const getCalendarAccentClass = (minutes: number) => {
-    const level = getParentCalendarFlowLevel(minutes);
-    if (level === 'none') return 'from-[#D7E1DA] via-[#E6EFE9] to-[#D7E1DA]';
-    if (level === 'warmup') return 'from-[#CDEED5] via-[#A7DAB5] to-[#7CC991]';
-    if (level === 'short') return 'from-[#B7E7C4] via-[#73CB8E] to-[#41B467]';
-    if (level === 'steady') return 'from-[#8DDAA5] via-[#35B868] to-[#188848]';
-    return 'from-[#63CB84] via-[#1D9854] to-[#0F6B37]';
-  };
-
-  const getParentCalendarFlowChipClass = (minutes: number, isCurrentMonth: boolean) => {
-    if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300';
-    const level = getParentCalendarFlowLevel(minutes);
-    if (level === 'none') return 'border-[#D7E1DA] bg-[#F6FAF7] text-[#7A8F80]';
-    if (level === 'warmup') return 'border-[#AADCB7] bg-[#EDF9F0] text-[#4A8F61]';
-    if (level === 'short') return 'border-[#6FC78A] bg-[#DDF5E4] text-[#217348]';
-    if (level === 'steady') return 'border-[#2CA55B] bg-[#C8EDD4] text-[#166A3C]';
-    return 'border-[#0F6B37] bg-[#1C8C4D] text-white';
-  };
-
   const getParentCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
     const level = getParentCalendarFlowLevel(minutes);
@@ -3934,14 +3897,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <CardContent className="relative p-0">
                   <div className={cn("flex flex-wrap items-center justify-between gap-2 border-b border-[#d8e7dc]", isMobile ? "px-3 py-3" : "px-5 py-4")}>
                     <span className="font-aggro-display text-[10px] uppercase tracking-[0.22em] text-[#2d6d47]">월간 흐름 요약</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {PARENT_CALENDAR_LEGEND.map((item) => (
-                        <span key={item.label} className="inline-flex items-center gap-1.5 rounded-full border border-[#d7e8dc] bg-white/96 px-2.5 py-1 text-[8px] font-aggro-display text-[#2a6a44] shadow-[0_12px_24px_-22px_rgba(23,120,69,0.1)] sm:text-[9px]">
-                          <span className={cn("h-2.5 w-2.5 rounded-full bg-gradient-to-br ring-1", item.swatch)} />
-                          {item.label}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                   <div className={cn("grid grid-cols-7 border-b border-primary/10", isMobile ? "gap-1 px-1.5 py-1.5" : "gap-2 px-5 py-3.5")}>
                     {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
@@ -3971,10 +3926,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const flowLevel = getParentCalendarFlowLevel(minutes);
                       const hasDeepFocus = isCurrentMonth && flowLevel === 'deep';
                       const hasStatusCluster = isCurrentMonth && (hasPlans || hasDeepFocus);
-                      const flowLabel = getParentCalendarFlowLabel(minutes);
-                      const capsuleLabel = isTodayCalendar && isCurrentMonth ? '오늘 공부' : flowLabel;
                       const exactTimeLabel = isCurrentMonth ? formatMinutes(minutes) : '--';
-                      const isLongTimeLabel = exactTimeLabel.length >= 5;
 
                       return (
                         <button
@@ -3992,11 +3944,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         >
                           {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-[#9cd6b0]" />}
                           <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
-                          {isCurrentMonth && (
-                            <div className={cn("pointer-events-none absolute", isMobile ? "inset-x-1.5 bottom-7" : "inset-x-3 bottom-[4.1rem]")}>
-                              <div className={cn("h-[4px] rounded-full bg-gradient-to-r opacity-100", getCalendarAccentClass(minutes))} />
-                            </div>
-                          )}
 
                           <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isMobile ? "mb-auto" : "mb-3")}>
                             <span
@@ -4028,8 +3975,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             {isCurrentMonth ? (
                               <div
                                 className={cn(
-                                  "inline-flex w-full max-w-full flex-col items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
-                                  isMobile ? "min-w-[3rem] px-1.5 py-1.5" : "min-h-[3.25rem] px-3 py-2",
+                                  "inline-flex w-full max-w-full items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
+                                  isMobile ? "min-w-[3rem] px-1.5 py-2" : "min-h-[3.25rem] px-3 py-3",
                                   getParentCalendarTimeCapsuleClass(minutes, isCurrentMonth)
                                 )}
                               >
@@ -4037,26 +3984,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                   className={cn(
                                     "font-aggro-display dashboard-number block whitespace-nowrap tabular-nums leading-none",
                                     isMobile
-                                      ? isLongTimeLabel
-                                        ? "text-[0.64rem] tracking-[-0.04em]"
-                                        : "text-[0.72rem] tracking-[-0.06em]"
-                                      : isLongTimeLabel
-                                        ? "text-[0.86rem] tracking-[-0.04em]"
-                                        : "text-[1rem] tracking-[-0.05em]"
+                                      ? "text-[0.64rem] tracking-[-0.04em]"
+                                      : "text-[0.86rem] tracking-[-0.04em]"
                                   )}
                                 >
                                   {exactTimeLabel}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "font-aggro-display mt-1 max-w-full truncate tracking-tight",
-                                    isMobile ? "text-[7px]" : "text-[10px]",
-                                    getParentCalendarFlowChipClass(minutes, isCurrentMonth).includes('text-')
-                                      ? getParentCalendarFlowChipClass(minutes, isCurrentMonth).split(' ').find((token) => token.startsWith('text-')) || 'text-slate-500'
-                                      : 'text-slate-500'
-                                  )}
-                                >
-                                  {capsuleLabel}
                                 </span>
                               </div>
                             ) : (
