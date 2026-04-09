@@ -738,8 +738,6 @@ function ParentDashboardTabRail({
 }) {
   const currentTabMeta =
     PARENT_DASHBOARD_TAB_META[tab as keyof typeof PARENT_DASHBOARD_TAB_META] ?? PARENT_DASHBOARD_TAB_META.home;
-  const CurrentTabIcon = currentTabMeta.icon;
-
   return (
     <section
       className={cn(
@@ -764,21 +762,6 @@ function ParentDashboardTabRail({
               <Badge variant="outline" className="h-7 rounded-full border border-[#ffb870]/28 bg-[#FF7A16]/14 px-3 text-[10px] font-black text-white shadow-[0_12px_24px_-22px_rgba(255,122,22,0.45)] backdrop-blur-sm">
                 현재 탭 {currentTabMeta.label}
               </Badge>
-            </div>
-
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.2rem] border border-white/12 bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
-                <CurrentTabIcon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">{activeStudentLabel}</p>
-                <h2 className="mt-2 break-keep text-[1.34rem] font-black leading-[1.15] tracking-[-0.04em] text-white sm:text-[1.68rem]">
-                  {currentTabMeta.label}
-                </h2>
-                <p className="mt-2 max-w-2xl break-keep text-[12.5px] font-bold leading-[1.7] text-white sm:text-[13px]">
-                  {currentTabMeta.description}
-                </p>
-              </div>
             </div>
 
             {linkedStudents.length > 1 && (
