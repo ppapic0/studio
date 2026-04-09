@@ -110,6 +110,7 @@ import {
   getDailyRankWindowState,
 } from '@/lib/student-ranking-policy';
 import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
+import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
@@ -955,6 +956,15 @@ function coerceStudyBoxRewards(dayStatus: Record<string, any>) {
     })
     .filter((entry): entry is StudyBoxReward => Boolean(entry))
     .sort((a, b) => a.milestone - b.milestone);
+}
+
+function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxReward) {
+  const next = new Map<number, StudyBoxReward>();
+  entries.forEach((entry) => {
+    next.set(entry.milestone, entry);
+  });
+  next.set(reward.milestone, reward);
+  return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
 
 function coerceOpenedStudyBoxes(dayStatus: Record<string, any>) {
@@ -2672,17 +2682,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => (activeVaultDateKey === yesterdayKey ? carryoverRewardByHour : rewardByHour),
     [activeVaultDateKey, carryoverRewardByHour, rewardByHour, yesterdayKey]
   );
-  const activeVaultDayStatus = useMemo(
-    () => (activeVaultDateKey === yesterdayKey ? yesterdayPointStatus : todayPointStatus),
-    [activeVaultDateKey, todayPointStatus, yesterdayKey, yesterdayPointStatus]
-  );
   const activeVaultClaimedBoxes = useMemo(
     () => (activeVaultDateKey === yesterdayKey ? persistedCarryoverClaimedBoxes : homeClaimedBoxes),
     [activeVaultDateKey, homeClaimedBoxes, persistedCarryoverClaimedBoxes, yesterdayKey]
-  );
-  const activeVaultRewardEntries = useMemo(
-    () => (activeVaultDateKey === yesterdayKey ? persistedCarryoverRewardEntries : homeRewardEntries),
-    [activeVaultDateKey, homeRewardEntries, persistedCarryoverRewardEntries, yesterdayKey]
   );
   const activeVaultOpenedCount = useMemo(
     () => (activeVaultDateKey === yesterdayKey ? carryoverOpenedBoxes.length : homeOpenedBoxes.length),
@@ -2960,7 +2962,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleRevealHomeBox = useCallback(async () => {
     const isRevealableBox = selectedHomeBox?.state === 'ready' || selectedHomeBox?.state === 'opened';
-    if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !progressRef || !activeVaultDateKey) return;
+    if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !activeVaultDateKey || !activeMembership?.id) return;
+    const targetHour = selectedHomeBox.hour;
+    const targetDateKey = activeVaultDateKey;
 
     setIsClaimingHomeBox(true);
     setHomeBoxStage('shake');
@@ -2970,34 +2974,43 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
     const revealId = setTimeout(async () => {
       try {
-        const reward = activeRewardByHour.get(selectedHomeBox.hour)?.awardedPoints ?? selectedHomeBox.reward ?? 0;
-        const sourceOpenedBoxes = activeVaultDateKey === todayKey ? homeOpenedBoxes : carryoverOpenedBoxes;
-        const nextOpenedBoxes = Array.from(new Set([...sourceOpenedBoxes, selectedHomeBox.hour])).sort((a, b) => a - b);
+        const result = await openStudyRewardBoxSecure({
+          centerId: activeMembership.id,
+          dateKey: targetDateKey,
+          hour: targetHour,
+        });
+        const sourceOpenedBoxes = targetDateKey === todayKey ? homeOpenedBoxes : carryoverOpenedBoxes;
+        const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
+          ? result.openedStudyBoxes
+          : Array.from(new Set([...sourceOpenedBoxes, targetHour])).sort((a, b) => a - b);
+        const nextClaimedBoxes = Array.isArray(result.claimedStudyBoxes)
+          ? result.claimedStudyBoxes
+          : Array.from(new Set([...activeVaultClaimedBoxes, targetHour])).sort((a, b) => a - b);
+        const nextRewardEntry = result.reward;
+        const reward =
+          nextRewardEntry?.awardedPoints
+          ?? activeRewardByHour.get(targetHour)?.awardedPoints
+          ?? selectedHomeBox.reward
+          ?? 0;
 
-        if (activeVaultDateKey === todayKey) {
+        if (targetDateKey === todayKey) {
           setHomeOpenedBoxes(nextOpenedBoxes);
+          setHomeClaimedBoxes(nextClaimedBoxes);
+          if (nextRewardEntry) {
+            setHomeRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
+          }
         } else {
           setCarryoverOpenedBoxes(nextOpenedBoxes);
         }
-
-        await setDoc(progressRef, {
-          dailyPointStatus: {
-            [activeVaultDateKey]: {
-              ...activeVaultDayStatus,
-              claimedStudyBoxes: activeVaultClaimedBoxes,
-              studyBoxRewards: activeVaultRewardEntries,
-              openedStudyBoxes: nextOpenedBoxes,
-            },
-          },
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
 
         setRevealedHomeReward(reward);
         setHomeBoxStage('revealed');
       } catch (error) {
         logHandledClientIssue('[student-track] home reward open failed', error);
-        if (activeVaultDateKey === todayKey) {
+        if (targetDateKey === todayKey) {
           setHomeOpenedBoxes(persistedOpenedBoxes);
+          setHomeClaimedBoxes(persistedClaimedBoxes);
+          setHomeRewardEntries(persistedRewardEntries);
         } else {
           setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
         }
@@ -3014,16 +3027,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
     homeBoxTimeoutsRef.current.push(revealId);
   }, [
+    activeMembership?.id,
     activeRewardByHour,
     activeVaultClaimedBoxes,
     activeVaultDateKey,
-    activeVaultDayStatus,
-    activeVaultRewardEntries,
     carryoverOpenedBoxes,
     isClaimingHomeBox,
+    persistedClaimedBoxes,
     persistedCarryoverOpenedBoxes,
     persistedOpenedBoxes,
-    progressRef,
+    persistedRewardEntries,
     homeOpenedBoxes,
     selectedHomeBox,
     toast,

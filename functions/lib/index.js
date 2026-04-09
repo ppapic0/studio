@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateStudyPlan = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.generateStudyPlan = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
@@ -79,6 +79,113 @@ const DEFAULT_SMS_TEMPLATES = {
     study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
     late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
 };
+const STUDY_BOX_REWARD_RANGE_BY_RARITY = {
+    common: [10, 20],
+    rare: [20, 30],
+    epic: [30, 40],
+};
+const EARLY_STUDY_BOX_RARITY_WEIGHTS = [
+    { rarity: "common", weight: 80 },
+    { rarity: "rare", weight: 17 },
+    { rarity: "epic", weight: 3 },
+];
+const LATE_STUDY_BOX_RARITY_WEIGHTS = [
+    { rarity: "common", weight: 60 },
+    { rarity: "rare", weight: 30 },
+    { rarity: "epic", weight: 10 },
+];
+function isPlainObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function normalizeStudyBoxHoursFromUnknown(value) {
+    if (!Array.isArray(value))
+        return [];
+    return Array.from(new Set(value
+        .map((entry) => Number(entry))
+        .filter((entry) => Number.isFinite(entry) && entry >= 1 && entry <= 8)
+        .map((entry) => Math.round(entry)))).sort((a, b) => a - b);
+}
+function normalizeStoredStudyBoxReward(value) {
+    var _a, _b, _c, _d, _e;
+    if (!isPlainObject(value))
+        return null;
+    const milestone = Math.round((_a = parseFiniteNumber(value.milestone)) !== null && _a !== void 0 ? _a : Number.NaN);
+    const rarity = asTrimmedString(value.rarity);
+    const minReward = Math.round((_b = parseFiniteNumber(value.minReward)) !== null && _b !== void 0 ? _b : Number.NaN);
+    const maxReward = Math.round((_c = parseFiniteNumber(value.maxReward)) !== null && _c !== void 0 ? _c : Number.NaN);
+    const awardedPoints = Math.round((_d = parseFiniteNumber(value.awardedPoints)) !== null && _d !== void 0 ? _d : Number.NaN);
+    const multiplier = Math.max(1, Math.round((_e = parseFiniteNumber(value.multiplier)) !== null && _e !== void 0 ? _e : 1));
+    if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8)
+        return null;
+    if (rarity !== "common" && rarity !== "rare" && rarity !== "epic")
+        return null;
+    if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints))
+        return null;
+    return {
+        milestone,
+        rarity,
+        minReward,
+        maxReward,
+        awardedPoints,
+        multiplier,
+    };
+}
+function upsertStudyBoxRewardEntries(existing, reward) {
+    const entries = Array.isArray(existing)
+        ? existing
+            .map((entry) => normalizeStoredStudyBoxReward(entry))
+            .filter((entry) => Boolean(entry))
+        : [];
+    const next = new Map();
+    entries.forEach((entry) => {
+        next.set(entry.milestone, entry);
+    });
+    next.set(reward.milestone, reward);
+    return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
+}
+function getStudyBoxRarityWeights(milestone) {
+    return milestone >= 5 ? LATE_STUDY_BOX_RARITY_WEIGHTS : EARLY_STUDY_BOX_RARITY_WEIGHTS;
+}
+function hashSeedToUInt32(input) {
+    let hash = 2166136261;
+    for (let index = 0; index < input.length; index += 1) {
+        hash ^= input.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+}
+function seededUnitInterval(seed) {
+    return hashSeedToUInt32(seed) / 0xffffffff;
+}
+function rollDeterministicStudyBoxRarity(milestone, seed) {
+    var _a, _b;
+    const weights = getStudyBoxRarityWeights(milestone);
+    const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+    const rolled = seededUnitInterval(`${seed}:rarity`) * totalWeight;
+    let cursor = 0;
+    for (const entry of weights) {
+        cursor += entry.weight;
+        if (rolled < cursor)
+            return entry.rarity;
+    }
+    return (_b = (_a = weights.at(-1)) === null || _a === void 0 ? void 0 : _a.rarity) !== null && _b !== void 0 ? _b : "common";
+}
+function buildDeterministicStudyBoxReward(params) {
+    const { centerId, studentId, dateKey, milestone } = params;
+    const seed = `${centerId}:${studentId}:${dateKey}:${milestone}`;
+    const rarity = rollDeterministicStudyBoxRarity(milestone, seed);
+    const [minReward, maxReward] = STUDY_BOX_REWARD_RANGE_BY_RARITY[rarity];
+    const rewardSpan = maxReward - minReward + 1;
+    const awardedPoints = minReward + Math.floor(seededUnitInterval(`${seed}:points`) * rewardSpan);
+    return {
+        milestone,
+        rarity,
+        minReward,
+        maxReward,
+        awardedPoints,
+        multiplier: 1,
+    };
+}
 function normalizePhoneNumber(raw) {
     if (typeof raw !== "string" && typeof raw !== "number")
         return "";
@@ -4547,6 +4654,108 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
         requestId: requestRef.id,
         penaltyLogId: penaltyLogRef.id,
         penaltyPointsDelta,
+    };
+});
+exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (data, context) => {
+    var _a, _b, _c, _d;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const authUid = context.auth.uid;
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const dateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey);
+    const hour = Math.round((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.hour)) !== null && _b !== void 0 ? _b : Number.NaN);
+    if (!centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+            userMessage: "센터 정보를 다시 확인해 주세요.",
+        });
+    }
+    if (!isValidDateKey(dateKey)) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+            userMessage: "상자 날짜 정보가 올바르지 않습니다.",
+        });
+    }
+    if (!Number.isFinite(hour) || hour < 1 || hour > 8) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid hour.", {
+            userMessage: "열 상자 정보를 다시 확인해 주세요.",
+        });
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+    if (membership.role !== "student" || !isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Only active students can open study boxes.", {
+            userMessage: "학생 본인만 보상 상자를 열 수 있습니다.",
+        });
+    }
+    const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${dateKey}`);
+    const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
+    const [studentMemberSnap, studentProfileSnap, studyDaySnap] = await Promise.all([
+        db.doc(`centers/${centerId}/members/${authUid}`).get(),
+        db.doc(`centers/${centerId}/students/${authUid}`).get(),
+        studyDayRef.get(),
+    ]);
+    if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+        throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+            userMessage: "학생 정보를 찾지 못했습니다.",
+        });
+    }
+    const dayMinutes = Math.max(0, Math.floor((_d = parseFiniteNumber((_c = studyDaySnap.data()) === null || _c === void 0 ? void 0 : _c.totalMinutes)) !== null && _d !== void 0 ? _d : 0));
+    const earnedHours = Math.min(8, Math.floor(dayMinutes / 60));
+    if (earnedHours < hour) {
+        throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
+            userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
+        });
+    }
+    const reward = buildDeterministicStudyBoxReward({
+        centerId,
+        studentId: authUid,
+        dateKey,
+        milestone: hour,
+    });
+    const result = await db.runTransaction(async (transaction) => {
+        var _a, _b;
+        const progressSnap = await transaction.get(progressRef);
+        const progressData = progressSnap.exists ? progressSnap.data() : {};
+        const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+            ? progressData.dailyPointStatus
+            : {};
+        const currentDayStatus = isPlainObject(dailyPointStatus[dateKey])
+            ? dailyPointStatus[dateKey]
+            : {};
+        const openedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.openedStudyBoxes);
+        const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.claimedStudyBoxes);
+        const nextOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...openedStudyBoxes, hour]);
+        const nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...claimedStudyBoxes, hour]);
+        const nextRewardEntries = upsertStudyBoxRewardEntries(currentDayStatus.studyBoxRewards, reward);
+        const alreadyOpened = openedStudyBoxes.includes(hour);
+        const currentPointsBalance = Math.max(0, Math.floor((_a = parseFiniteNumber(progressData.pointsBalance)) !== null && _a !== void 0 ? _a : 0));
+        const currentTotalPointsEarned = Math.max(0, Math.floor((_b = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _b !== void 0 ? _b : 0));
+        const awardedDelta = alreadyOpened ? 0 : reward.awardedPoints;
+        transaction.set(progressRef, {
+            pointsBalance: admin.firestore.FieldValue.increment(awardedDelta),
+            totalPointsEarned: admin.firestore.FieldValue.increment(awardedDelta),
+            dailyPointStatus: {
+                [dateKey]: Object.assign(Object.assign({}, currentDayStatus), { claimedStudyBoxes: nextClaimedStudyBoxes, studyBoxRewards: nextRewardEntries, openedStudyBoxes: nextOpenedStudyBoxes, updatedAt: admin.firestore.FieldValue.serverTimestamp() }),
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return {
+            alreadyOpened,
+            claimedStudyBoxes: nextClaimedStudyBoxes,
+            openedStudyBoxes: nextOpenedStudyBoxes,
+            pointsBalance: currentPointsBalance + awardedDelta,
+            totalPointsEarned: currentTotalPointsEarned + awardedDelta,
+        };
+    });
+    return {
+        ok: true,
+        opened: !result.alreadyOpened,
+        alreadyOpened: result.alreadyOpened,
+        reward,
+        claimedStudyBoxes: result.claimedStudyBoxes,
+        openedStudyBoxes: result.openedStudyBoxes,
+        pointsBalance: result.pointsBalance,
+        totalPointsEarned: result.totalPointsEarned,
     };
 });
 exports.refreshClassroomSignals = functions

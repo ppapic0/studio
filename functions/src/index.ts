@@ -165,6 +165,142 @@ const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | 
   late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
 };
 
+type StudyBoxRarity = "common" | "rare" | "epic";
+type SecureStudyBoxReward = {
+  milestone: number;
+  rarity: StudyBoxRarity;
+  minReward: number;
+  maxReward: number;
+  awardedPoints: number;
+  multiplier: number;
+};
+
+const STUDY_BOX_REWARD_RANGE_BY_RARITY: Record<StudyBoxRarity, readonly [number, number]> = {
+  common: [10, 20],
+  rare: [20, 30],
+  epic: [30, 40],
+};
+const EARLY_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: number }> = [
+  { rarity: "common", weight: 80 },
+  { rarity: "rare", weight: 17 },
+  { rarity: "epic", weight: 3 },
+];
+const LATE_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: number }> = [
+  { rarity: "common", weight: 60 },
+  { rarity: "rare", weight: 30 },
+  { rarity: "epic", weight: 10 },
+];
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeStudyBoxHoursFromUnknown(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((entry) => Number(entry))
+        .filter((entry) => Number.isFinite(entry) && entry >= 1 && entry <= 8)
+        .map((entry) => Math.round(entry))
+    )
+  ).sort((a, b) => a - b);
+}
+
+function normalizeStoredStudyBoxReward(value: unknown): SecureStudyBoxReward | null {
+  if (!isPlainObject(value)) return null;
+
+  const milestone = Math.round(parseFiniteNumber(value.milestone) ?? Number.NaN);
+  const rarity = asTrimmedString(value.rarity) as StudyBoxRarity;
+  const minReward = Math.round(parseFiniteNumber(value.minReward) ?? Number.NaN);
+  const maxReward = Math.round(parseFiniteNumber(value.maxReward) ?? Number.NaN);
+  const awardedPoints = Math.round(parseFiniteNumber(value.awardedPoints) ?? Number.NaN);
+  const multiplier = Math.max(1, Math.round(parseFiniteNumber(value.multiplier) ?? 1));
+
+  if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
+  if (rarity !== "common" && rarity !== "rare" && rarity !== "epic") return null;
+  if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
+
+  return {
+    milestone,
+    rarity,
+    minReward,
+    maxReward,
+    awardedPoints,
+    multiplier,
+  };
+}
+
+function upsertStudyBoxRewardEntries(existing: unknown, reward: SecureStudyBoxReward): SecureStudyBoxReward[] {
+  const entries = Array.isArray(existing)
+    ? existing
+        .map((entry) => normalizeStoredStudyBoxReward(entry))
+        .filter((entry): entry is SecureStudyBoxReward => Boolean(entry))
+    : [];
+
+  const next = new Map<number, SecureStudyBoxReward>();
+  entries.forEach((entry) => {
+    next.set(entry.milestone, entry);
+  });
+  next.set(reward.milestone, reward);
+
+  return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
+}
+
+function getStudyBoxRarityWeights(milestone: number) {
+  return milestone >= 5 ? LATE_STUDY_BOX_RARITY_WEIGHTS : EARLY_STUDY_BOX_RARITY_WEIGHTS;
+}
+
+function hashSeedToUInt32(input: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededUnitInterval(seed: string): number {
+  return hashSeedToUInt32(seed) / 0xffffffff;
+}
+
+function rollDeterministicStudyBoxRarity(milestone: number, seed: string): StudyBoxRarity {
+  const weights = getStudyBoxRarityWeights(milestone);
+  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+  const rolled = seededUnitInterval(`${seed}:rarity`) * totalWeight;
+  let cursor = 0;
+
+  for (const entry of weights) {
+    cursor += entry.weight;
+    if (rolled < cursor) return entry.rarity;
+  }
+
+  return weights.at(-1)?.rarity ?? "common";
+}
+
+function buildDeterministicStudyBoxReward(params: {
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  milestone: number;
+}): SecureStudyBoxReward {
+  const { centerId, studentId, dateKey, milestone } = params;
+  const seed = `${centerId}:${studentId}:${dateKey}:${milestone}`;
+  const rarity = rollDeterministicStudyBoxRarity(milestone, seed);
+  const [minReward, maxReward] = STUDY_BOX_REWARD_RANGE_BY_RARITY[rarity];
+  const rewardSpan = maxReward - minReward + 1;
+  const awardedPoints = minReward + Math.floor(seededUnitInterval(`${seed}:points`) * rewardSpan);
+
+  return {
+    milestone,
+    rarity,
+    minReward,
+    maxReward,
+    awardedPoints,
+    multiplier: 1,
+  };
+}
+
 function normalizePhoneNumber(raw: unknown): string {
   if (typeof raw !== "string" && typeof raw !== "number") return "";
   const digits = String(raw).replace(/\D/g, "");
@@ -5598,6 +5734,131 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
     requestId: requestRef.id,
     penaltyLogId: penaltyLogRef.id,
     penaltyPointsDelta,
+  };
+});
+
+export const openStudyRewardBoxSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const authUid = context.auth.uid;
+
+  const centerId = asTrimmedString(data?.centerId);
+  const dateKey = asTrimmedString(data?.dateKey);
+  const hour = Math.round(parseFiniteNumber(data?.hour) ?? Number.NaN);
+
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+      userMessage: "센터 정보를 다시 확인해 주세요.",
+    });
+  }
+  if (!isValidDateKey(dateKey)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+      userMessage: "상자 날짜 정보가 올바르지 않습니다.",
+    });
+  }
+  if (!Number.isFinite(hour) || hour < 1 || hour > 8) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid hour.", {
+      userMessage: "열 상자 정보를 다시 확인해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (membership.role !== "student" || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only active students can open study boxes.", {
+      userMessage: "학생 본인만 보상 상자를 열 수 있습니다.",
+    });
+  }
+
+  const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${dateKey}`);
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
+
+  const [studentMemberSnap, studentProfileSnap, studyDaySnap] = await Promise.all([
+    db.doc(`centers/${centerId}/members/${authUid}`).get(),
+    db.doc(`centers/${centerId}/students/${authUid}`).get(),
+    studyDayRef.get(),
+  ]);
+
+  if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+      userMessage: "학생 정보를 찾지 못했습니다.",
+    });
+  }
+
+  const dayMinutes = Math.max(0, Math.floor(parseFiniteNumber(studyDaySnap.data()?.totalMinutes) ?? 0));
+  const earnedHours = Math.min(8, Math.floor(dayMinutes / 60));
+  if (earnedHours < hour) {
+    throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
+      userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
+    });
+  }
+
+  const reward = buildDeterministicStudyBoxReward({
+    centerId,
+    studentId: authUid,
+    dateKey,
+    milestone: hour,
+  });
+
+  const result = await db.runTransaction(async (transaction) => {
+    const progressSnap = await transaction.get(progressRef);
+    const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+    const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+      ? (progressData.dailyPointStatus as Record<string, unknown>)
+      : {};
+    const currentDayStatus = isPlainObject(dailyPointStatus[dateKey])
+      ? (dailyPointStatus[dateKey] as Record<string, unknown>)
+      : {};
+
+    const openedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.openedStudyBoxes);
+    const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.claimedStudyBoxes);
+    const nextOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...openedStudyBoxes, hour]);
+    const nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...claimedStudyBoxes, hour]);
+    const nextRewardEntries = upsertStudyBoxRewardEntries(currentDayStatus.studyBoxRewards, reward);
+    const alreadyOpened = openedStudyBoxes.includes(hour);
+    const currentPointsBalance = Math.max(0, Math.floor(parseFiniteNumber(progressData.pointsBalance) ?? 0));
+    const currentTotalPointsEarned = Math.max(0, Math.floor(parseFiniteNumber(progressData.totalPointsEarned) ?? 0));
+    const awardedDelta = alreadyOpened ? 0 : reward.awardedPoints;
+
+    transaction.set(
+      progressRef,
+      {
+        pointsBalance: admin.firestore.FieldValue.increment(awardedDelta),
+        totalPointsEarned: admin.firestore.FieldValue.increment(awardedDelta),
+        dailyPointStatus: {
+          [dateKey]: {
+            ...currentDayStatus,
+            claimedStudyBoxes: nextClaimedStudyBoxes,
+            studyBoxRewards: nextRewardEntries,
+            openedStudyBoxes: nextOpenedStudyBoxes,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      alreadyOpened,
+      claimedStudyBoxes: nextClaimedStudyBoxes,
+      openedStudyBoxes: nextOpenedStudyBoxes,
+      pointsBalance: currentPointsBalance + awardedDelta,
+      totalPointsEarned: currentTotalPointsEarned + awardedDelta,
+    };
+  });
+
+  return {
+    ok: true,
+    opened: !result.alreadyOpened,
+    alreadyOpened: result.alreadyOpened,
+    reward,
+    claimedStudyBoxes: result.claimedStudyBoxes,
+    openedStudyBoxes: result.openedStudyBoxes,
+    pointsBalance: result.pointsBalance,
+    totalPointsEarned: result.totalPointsEarned,
   };
 });
 

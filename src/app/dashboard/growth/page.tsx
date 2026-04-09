@@ -36,6 +36,7 @@ import {
   rollStudyBoxReward,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
+import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { GrowthProgress, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -192,6 +193,15 @@ function coerceStudyBoxRewards(dayStatus: Record<string, any>): StudyBoxReward[]
     })
     .filter((entry): entry is StudyBoxReward => Boolean(entry))
     .sort((a, b) => a.milestone - b.milestone);
+}
+
+function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxReward) {
+  const next = new Map<number, StudyBoxReward>();
+  entries.forEach((entry) => {
+    next.set(entry.milestone, entry);
+  });
+  next.set(reward.milestone, reward);
+  return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
 
 function buildRewardBoxes({
@@ -693,7 +703,8 @@ export default function GrowthPage() {
   };
 
   const handleRevealBox = async () => {
-    if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !progressRef) return;
+    if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !activeMembership?.id) return;
+    const targetHour = selectedBox.hour;
 
     setIsClaimingBox(true);
     setBoxStage('shake');
@@ -705,25 +716,32 @@ export default function GrowthPage() {
 
     const revealTimeout = setTimeout(async () => {
       try {
-        const reward = rewardByHour.get(selectedBox.hour)?.awardedPoints ?? selectedBox.reward ?? 0;
-        const nextOpenedBoxes = Array.from(new Set([...openedBoxes, selectedBox.hour])).sort((a, b) => a - b);
+        const result = await openStudyRewardBoxSecure({
+          centerId: activeMembership.id,
+          dateKey: todayKey,
+          hour: targetHour,
+        });
+        const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
+          ? result.openedStudyBoxes
+          : Array.from(new Set([...openedBoxes, targetHour])).sort((a, b) => a - b);
+        const nextClaimedBoxes = Array.isArray(result.claimedStudyBoxes)
+          ? result.claimedStudyBoxes
+          : Array.from(new Set([...claimedBoxes, targetHour])).sort((a, b) => a - b);
+        const nextRewardEntry = result.reward;
+        const reward =
+          nextRewardEntry?.awardedPoints
+          ?? rewardByHour.get(targetHour)?.awardedPoints
+          ?? selectedBox.reward
+          ?? 0;
 
         setOpenedBoxes(nextOpenedBoxes);
-        await setDoc(
-          progressRef,
-          {
-            dailyPointStatus: {
-              [todayKey]: {
-                ...todayStatus,
-                claimedStudyBoxes: claimedBoxes,
-                studyBoxRewards: rewardEntries,
-                openedStudyBoxes: nextOpenedBoxes,
-              },
-            },
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
+        setClaimedBoxes(nextClaimedBoxes);
+        if (nextRewardEntry) {
+          setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
+        }
+        if (typeof result.pointsBalance === 'number') {
+          setPointBalance(Math.max(0, result.pointsBalance));
+        }
 
         setRevealedReward(reward);
         setBoxStage('revealed');
@@ -736,6 +754,8 @@ export default function GrowthPage() {
       } catch (error) {
         console.error('[point-track] reward box open failed', error);
         setOpenedBoxes(persistedOpenedBoxes);
+        setClaimedBoxes(persistedClaimedBoxes);
+        setRewardEntries(persistedRewardEntries);
         setBoxStage('idle');
       } finally {
         setIsClaimingBox(false);
