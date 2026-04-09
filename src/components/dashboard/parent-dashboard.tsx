@@ -3886,7 +3886,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       <ChevronLeft className="h-5 w-5" />
                     </Button>
                     <div className="flex min-w-[136px] items-center justify-center rounded-[1rem] border border-[#d8eadf] bg-white px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-24px_rgba(23,120,69,0.12)]">
-                      <span className="font-aggro-display text-sm tracking-tight text-[#154c34]">
+                      <span className="text-sm font-semibold tracking-tight text-[#154c34]">
                         {calendarBaseDate ? format(calendarBaseDate, 'yyyy년 M월') : '--'}
                       </span>
                     </div>
@@ -3917,7 +3917,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           className="inline-flex items-center gap-2 rounded-full border border-[#d7e7dc] bg-white/96 px-3 py-1.5 shadow-[0_14px_24px_-22px_rgba(23,120,69,0.12)]"
                         >
                           <span className={cn("h-2.5 w-2.5 rounded-full ring-1", item.swatch)} />
-                          <span className="font-aggro-display text-[10px] tracking-[0.02em] text-[#24513c]">
+                          <span className="text-[10px] font-semibold tracking-[0.02em] text-[#24513c]">
                             {item.label}
                           </span>
                         </div>
@@ -3930,7 +3930,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         key={day}
                         className={cn(
                           isMobile ? "py-1.5 text-[8px]" : "rounded-[1rem] border py-2.5 text-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]",
-                          "font-aggro-display border-[#d8e7dc] bg-[linear-gradient(180deg,#ffffff_0%,#f3faf5_100%)] text-center uppercase tracking-[0.18em]",
+                          "border-[#d8e7dc] bg-[linear-gradient(180deg,#ffffff_0%,#f3faf5_100%)] text-center font-semibold uppercase tracking-[0.18em]",
                           i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-[#5976a7]"
                         )}
                       >
@@ -3977,7 +3977,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isMobile ? "mb-auto" : "mb-3")}>
                               <span
                                 className={cn(
-                                  "font-aggro-display inline-flex items-center justify-center rounded-full border tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                                  "inline-flex items-center justify-center rounded-full border font-semibold tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
                                   isMobile ? "min-w-[1.45rem] px-1.5 py-0.5 text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
                                   idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
                                   isTodayCalendar && "border-[#9cd6b0] text-[#178244]"
@@ -4011,7 +4011,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               >
                                 <span
                                   className={cn(
-                                    "font-aggro-display dashboard-number block whitespace-nowrap tabular-nums leading-none",
+                                    "dashboard-number block whitespace-nowrap tabular-nums leading-none",
                                     isAppMode
                                       ? isVeryLongTimeLabel
                                         ? "text-[0.68rem] tracking-[-0.08em]"
@@ -5014,6 +5014,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       aiMeta={selectedChildReport.aiMeta}
                       dateKey={selectedChildReport.dateKey}
                       studentName={selectedChildReport.studentName}
+                      displayHeadingsOnly
                     />
                   ) : (
                     <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">

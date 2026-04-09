@@ -225,8 +225,10 @@ function SummaryHeroMetrics({
 
 function ReportInsightBoard({
   aiMeta,
+  displayHeadingsOnly = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
+  displayHeadingsOnly?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -246,7 +248,7 @@ function ReportInsightBoard({
         </div>
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">오늘 해석</p>
-          <p className="mt-1 text-sm font-black tracking-tight text-slate-900">리포트가 읽어낸 핵심 흐름</p>
+          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>리포트가 읽어낸 핵심 흐름</p>
         </div>
       </div>
 
@@ -283,9 +285,11 @@ function ReportInsightBoard({
 function ReportActionBoard({
   aiMeta,
   studentName,
+  displayHeadingsOnly = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
   studentName?: string;
+  displayHeadingsOnly?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -300,7 +304,7 @@ function ReportActionBoard({
         </div>
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">다음 액션</p>
-          <p className="mt-1 text-sm font-black tracking-tight text-slate-900">교실 코칭과 가정 대화를 한 번에</p>
+          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>교실 코칭과 가정 대화를 한 번에</p>
         </div>
       </div>
 
@@ -344,8 +348,10 @@ function ReportActionBoard({
 
 function MiniTrendChart({
   aiMeta,
+  displayHeadingsOnly = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
+  displayHeadingsOnly?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -360,7 +366,7 @@ function MiniTrendChart({
       <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">학습시간 그래프</p>
-          <p className="mt-1 text-sm font-black tracking-tight text-slate-900">최근 7일 + 오늘</p>
+          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>최근 7일 + 오늘</p>
         </div>
         <Badge className="shrink-0 border-none bg-blue-50 text-blue-700 font-black">
           {formatStudyTime(aiMeta.totalStudyMinutes)}
@@ -449,8 +455,10 @@ function buildRadarPoint(value: number, angle: number, radius: number, center: n
 
 function SignalRadarCard({
   aiMeta,
+  displayHeadingsOnly = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
+  displayHeadingsOnly?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -472,7 +480,7 @@ function SignalRadarCard({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">핵심 상태 그래프</p>
-          <p className="mt-1 text-sm font-black tracking-tight text-slate-900">학습 · 완료 · 성장 · 루틴</p>
+          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>학습 · 완료 · 성장 · 루틴</p>
         </div>
         <Badge className="border-none bg-indigo-50 text-indigo-700 font-black">
           {aiMeta.pedagogyLens || '학습 해석'}
@@ -523,8 +531,10 @@ function SignalRadarCard({
 
 function KpiGraphGrid({
   aiMeta,
+  displayHeadingsOnly = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
+  displayHeadingsOnly?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -538,7 +548,7 @@ function KpiGraphGrid({
   return (
     <div className="grid gap-4 md:grid-cols-3">
       <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">상태 요약</p>
+        <p className={cn('text-[10px] font-black uppercase tracking-[0.2em] text-slate-400', displayHeadingsOnly && 'font-aggro-display')}>상태 요약</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {aiMeta.pedagogyLens && (
             <Badge className="border-none bg-sky-50 text-sky-700 font-black">
@@ -558,7 +568,7 @@ function KpiGraphGrid({
 
       <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">학습시간 비교</p>
+          <p className={cn('text-[10px] font-black uppercase tracking-[0.2em] text-slate-400', displayHeadingsOnly && 'font-aggro-display')}>학습시간 비교</p>
           <span className="text-xs font-black text-slate-600">{formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg)}</span>
         </div>
         <div className="mt-4 space-y-3">
@@ -585,7 +595,7 @@ function KpiGraphGrid({
 
       <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">완료율 · 성장률</p>
+          <p className={cn('text-[10px] font-black uppercase tracking-[0.2em] text-slate-400', displayHeadingsOnly && 'font-aggro-display')}>완료율 · 성장률</p>
           <span className={cn('text-xs font-black', growthPositive ? 'text-emerald-600' : 'text-rose-600')}>
             {formatSignedPercent(aiMeta.metrics?.growthRate)}
           </span>
@@ -615,8 +625,10 @@ function KpiGraphGrid({
 
 function StrengthImprovementGrid({
   aiMeta,
+  displayHeadingsOnly = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
+  displayHeadingsOnly?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -632,7 +644,7 @@ function StrengthImprovementGrid({
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600/70">오늘 잘한 점</p>
-            <p className="mt-1 text-sm font-black tracking-tight text-slate-900">유지할 강점</p>
+            <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>유지할 강점</p>
           </div>
         </div>
         <div className="mt-4 grid gap-3">
@@ -658,7 +670,7 @@ function StrengthImprovementGrid({
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600/70">코칭 포인트</p>
-            <p className="mt-1 text-sm font-black tracking-tight text-slate-900">먼저 보완할 점</p>
+            <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>먼저 보완할 점</p>
           </div>
         </div>
         <div className="mt-4 grid gap-3">
@@ -688,11 +700,13 @@ export function VisualReportViewer({
   aiMeta,
   dateKey,
   studentName,
+  displayHeadingsOnly = false,
 }: {
   content: string;
   aiMeta?: DailyReport['aiMeta'] | null;
   dateKey?: string;
   studentName?: string;
+  displayHeadingsOnly?: boolean;
 }) {
   const sections = useMemo(() => {
     if (!content) return [];
@@ -731,7 +745,7 @@ export function VisualReportViewer({
                 <Badge className="border-none bg-white/10 text-white/85 font-black">{aiMeta.variationStyle}</Badge>
               )}
             </div>
-            <p className="mt-4 text-xl font-black tracking-tight leading-snug break-keep sm:text-2xl">{overallSummary.headline}</p>
+            <p className={cn('mt-4 text-xl font-black tracking-tight leading-snug break-keep sm:text-2xl', displayHeadingsOnly && 'font-aggro-display')}>{overallSummary.headline}</p>
             <p className="mt-2 text-sm font-bold leading-relaxed text-white/80">{overallSummary.subline}</p>
             <SummaryHeroMetrics aiMeta={aiMeta || null} />
           </CardContent>
@@ -741,15 +755,15 @@ export function VisualReportViewer({
       {aiMeta && (
         <>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-            <ReportInsightBoard aiMeta={aiMeta || null} />
-            <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} />
+            <ReportInsightBoard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+            <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} />
           </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-            <MiniTrendChart aiMeta={aiMeta || null} />
-            <SignalRadarCard aiMeta={aiMeta || null} />
+            <MiniTrendChart aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+            <SignalRadarCard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
           </div>
-          <KpiGraphGrid aiMeta={aiMeta || null} />
-          <StrengthImprovementGrid aiMeta={aiMeta || null} />
+          <KpiGraphGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+          <StrengthImprovementGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
         </>
       )}
 
@@ -763,7 +777,7 @@ export function VisualReportViewer({
             <CardHeader className="border-b border-white/20 p-5 pb-2">
               <div className="flex items-center gap-2">
                 {getSectionIcon(title)}
-                <span className="text-sm font-black tracking-tight">{title.replace(/^[^\s]+\s/, '')}</span>
+                <span className={cn('text-sm font-black tracking-tight', displayHeadingsOnly && 'font-aggro-display')}>{title.replace(/^[^\s]+\s/, '')}</span>
               </div>
             </CardHeader>
             <CardContent className="p-5">

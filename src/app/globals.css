@@ -525,7 +525,7 @@
 
   .parent-app-shell,
   .parent-font-dialog {
-    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+    font-family: "Pretendard Variable", "Pretendard", system-ui, sans-serif;
   }
 
   .parent-app-shell :where(
@@ -535,31 +535,10 @@
       h4,
       h5,
       h6,
-      p,
-      span,
-      a,
-      button,
-      label,
-      small,
-      strong,
-      em,
-      li,
-      dt,
-      dd,
-      th,
-      td,
-      input,
-      textarea,
-      select,
-      option,
       [data-slot="card-title"],
-      [data-slot="card-description"],
-      [data-slot="badge"],
-      [role="tab"],
-      .dashboard-number,
-      .tabular-nums,
-      .stat-number,
-      .recharts-text
+      [data-slot="dialog-title"],
+      .font-aggro-display,
+      .parent-display-title
     ),
   .parent-font-dialog :where(
       h1,
@@ -568,38 +547,17 @@
       h4,
       h5,
       h6,
-      p,
-      span,
-      a,
-      button,
-      label,
-      small,
-      strong,
-      em,
-      li,
-      dt,
-      dd,
-      th,
-      td,
-      input,
-      textarea,
-      select,
-      option,
       [data-slot="card-title"],
-      [data-slot="card-description"],
-      [data-slot="badge"],
-      [role="tab"],
-      .dashboard-number,
-      .tabular-nums,
-      .stat-number,
-      .recharts-text
+      [data-slot="dialog-title"],
+      .font-aggro-display,
+      .parent-display-title
     ) {
     font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
   }
 
   .parent-app-shell svg text,
   .parent-font-dialog svg text {
-    font-family: "TrackDisplay", "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+    font-family: "Pretendard Variable", "Pretendard", system-ui, sans-serif;
   }
 
 button,
