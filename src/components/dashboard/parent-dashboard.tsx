@@ -4855,21 +4855,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                             <div className="rounded-[1.3rem] border border-[#ffe1c3] bg-white/92 px-4 py-3 shadow-[0_14px_26px_-22px_rgba(255,122,22,0.1)]">
                               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">결제 방식</p>
-                              <p className="mt-2 text-sm font-black text-[#14295F]">앱 내 비대면 결제</p>
+                              <p className="mt-2 text-sm font-black text-[#14295F]">앱 내 결제 추후 오픈</p>
                             </div>
                           </div>
 
                           {isActionable ? (
                             <div className="space-y-2">
-                              <Link
-                                href={`/payment/checkout/${invoice.id}`}
-                                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-[1.25rem] bg-[linear-gradient(180deg,#ff963b_0%,#FF7A16_100%)] text-[15px] font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.34)] transition-transform duration-200 active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:brightness-[1.03]"
-                              >
+                              <div className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-[1.25rem] border border-[#ffd4ad] bg-[linear-gradient(180deg,#fff4e7_0%,#ffe7ce_100%)] text-[15px] font-black text-[#b86a1c] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_18px_30px_-22px_rgba(255,122,22,0.16)]">
                                 <CreditCard className="h-4 w-4" />
-                                결제하기
-                              </Link>
+                                추후 오픈
+                              </div>
                               <p className="text-center text-[11px] font-bold text-slate-500">
-                                안전 결제 링크로 바로 이동해 비대면으로 결제할 수 있어요.
+                                앱 내 결제 기능은 추후 오픈 예정입니다. 현재는 청구 내용만 먼저 확인할 수 있어요.
                               </p>
                             </div>
                           ) : (
@@ -4931,13 +4928,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 </div>
 
                                 {isActionable ? (
-                                  <Link
-                                    href={`/payment/checkout/${invoice.id}`}
-                                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[1rem] bg-[linear-gradient(180deg,#ff963b_0%,#FF7A16_100%)] text-[14px] font-black text-white shadow-[0_16px_26px_-20px_rgba(255,122,22,0.28)] transition-all hover:brightness-[1.03]"
-                                  >
+                                  <div className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[1rem] border border-[#ffd8b3] bg-[linear-gradient(180deg,#fff5ea_0%,#ffe9d4_100%)] text-[14px] font-black text-[#b86a1c] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_16px_26px_-22px_rgba(255,122,22,0.14)]">
                                     <CreditCard className="h-4 w-4" />
-                                    결제하기
-                                  </Link>
+                                    추후 오픈
+                                  </div>
                                 ) : (
                                   <div className="rounded-[1rem] border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-center text-[12px] font-black text-emerald-700">
                                     결제 완료
@@ -4958,7 +4952,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <p className="mt-4 text-base font-black text-[#14295F]">현재 발행된 청구서가 없습니다.</p>
                   <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
-                    새 청구서가 발행되면 이 화면에서 바로 확인하고 결제할 수 있어요.
+                    새 청구서가 발행되면 이 화면에서 바로 확인할 수 있어요. 결제 기능은 추후 오픈 예정입니다.
                   </p>
                 </Card>
               )}
