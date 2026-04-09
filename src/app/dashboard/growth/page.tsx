@@ -1017,19 +1017,21 @@ export default function GrowthPage() {
             <div className="px-5 pb-5 pt-4">
               <div
                 className={cn(
-                  'point-track-modal-stage',
+                  'point-track-modal-stage text-center',
                   selectedBox?.rarity === 'rare' && 'point-track-modal-stage--rare',
                   selectedBox?.rarity === 'epic' && 'point-track-modal-stage--epic',
                 )}
               >
-                <RewardHeroChest
-                  state={selectedBox?.state === 'ready' ? 'ready' : 'charging'}
-                  stage={boxStage}
-                  intense={selectedBox?.state === 'ready'}
-                  rarity={selectedBox?.rarity ?? null}
-                  label={selectedBox ? `${selectedBox.hour}시간 상자` : '상자'}
-                  onClick={selectedBox?.state === 'ready' ? handleRevealBox : undefined}
-                />
+                <div className="flex justify-center">
+                  <RewardHeroChest
+                    state={selectedBox?.state === 'ready' ? 'ready' : 'charging'}
+                    stage={boxStage}
+                    intense={selectedBox?.state === 'ready'}
+                    rarity={selectedBox?.rarity ?? null}
+                    label={selectedBox ? `${selectedBox.hour}시간 상자` : '상자'}
+                    onClick={selectedBox?.state === 'ready' ? handleRevealBox : undefined}
+                  />
+                </div>
 
                 <div className="point-track-modal-particles" aria-hidden="true">
                   {Array.from({ length: 7 }, (_, index) => (
