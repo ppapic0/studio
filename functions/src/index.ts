@@ -1,7 +1,7 @@
+import { defineSecret } from "firebase-functions/params";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
 
 import { generateStructuredStudyPlan } from "./geminiClient";
 import {
@@ -6069,6 +6069,7 @@ export const stopStudentStudySessionSecure = functions.region(region).https.onCa
           studentId: authUid,
           centerId,
           dateKey: sessionDateKey,
+          totalMinutes: totalMinutesAfterSession,
           firstSessionStartAt: nextFirstSessionAt,
           lastSessionEndAt: nextLastSessionAt,
           ...(normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {}),

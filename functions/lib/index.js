@@ -34,10 +34,10 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateStudyPlan = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
-const params_1 = require("firebase-functions/params");
 const geminiClient_1 = require("./geminiClient");
 const openclawSnapshot_1 = require("./openclawSnapshot");
 const plannerSchema_1 = require("./plannerSchema");
@@ -4930,7 +4930,7 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
                 currentDayStatus.bonus6h = true;
                 bonus6hAchieved = true;
             }
-            transaction.set(dayRef, Object.assign(Object.assign({ studentId: authUid, centerId, dateKey: sessionDateKey, firstSessionStartAt: nextFirstSessionAt, lastSessionEndAt: nextLastSessionAt }, (normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {})), { updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
+            transaction.set(dayRef, Object.assign(Object.assign({ studentId: authUid, centerId, dateKey: sessionDateKey, totalMinutes: totalMinutesAfterSession, firstSessionStartAt: nextFirstSessionAt, lastSessionEndAt: nextLastSessionAt }, (normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {})), { updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
             transaction.set(sessionRef, {
                 centerId,
                 studentId: authUid,
