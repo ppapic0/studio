@@ -1119,21 +1119,28 @@ export default function StudyHistoryPage() {
                     onClick={() => setSelectedDateForPlan(day)}
                     aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}${isCurrentMonth ? ' 학습' : ''}`}
                     className={cn(
-                      'group relative overflow-hidden rounded-[1.45rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
+                      'group relative overflow-hidden text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
                       'aspect-square',
-                      isMobile ? 'min-h-0 p-1.5' : 'p-3.5',
+                      isMobile ? 'min-h-0 rounded-[0.95rem] p-1' : 'rounded-[1.45rem] p-3.5',
                       studentCellClass,
                       isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0',
                       isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-[#7FCB97]/55 shadow-[0_22px_36px_-24px_rgba(26,115,64,0.18)]'
                     )}
                   >
-                    {isTodayCalendar ? <div className="pointer-events-none absolute inset-[1px] rounded-[1.35rem] border border-white/88" /> : null}
+                    {isTodayCalendar ? (
+                      <div
+                        className={cn(
+                          'pointer-events-none absolute inset-[1px] border border-white/88',
+                          isMobile ? 'rounded-[0.8rem]' : 'rounded-[1.35rem]'
+                        )}
+                      />
+                    ) : null}
                     <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/92" />
                     {isCurrentMonth && minutes > 0 ? (
                       <div className="pointer-events-none absolute inset-x-4 top-0 h-12 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.52),rgba(255,255,255,0)_72%)] opacity-90" />
                     ) : null}
 
-                    <div className={cn('relative z-10 flex h-full flex-col', isMobile ? 'justify-center' : 'justify-between')}>
+                    <div className={cn('relative z-10 h-full', isMobile ? 'grid place-items-center' : 'flex flex-col justify-between')}>
                       {!isMobile ? (
                         <div className="flex items-start justify-between">
                           <span
@@ -1154,7 +1161,7 @@ export default function StudyHistoryPage() {
                         </div>
                       ) : null}
 
-                      <div className={cn('flex flex-1 items-center justify-center', isMobile ? 'px-0.5' : 'px-1 pb-2 pt-4')}>
+                      <div className={cn('flex items-center justify-center', isMobile ? 'h-full w-full px-0.5' : 'flex-1 px-1 pb-2 pt-4')}>
                         {shouldRenderTime ? (
                           <span
                             className={cn(
@@ -1193,8 +1200,8 @@ export default function StudyHistoryPage() {
                   onClick={() => setSelectedDateForPlan(day)}
                   aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}${isCurrentMonth ? ' 학습' : ''}`}
                   className={cn(
-                    'group relative overflow-hidden rounded-[1.35rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35',
-                    isMobile ? 'aspect-square min-h-0 p-1.5' : 'aspect-square min-h-0 p-3.5',
+                    'group relative overflow-hidden text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35',
+                    isMobile ? 'aspect-square min-h-0 rounded-[0.95rem] p-1' : 'aspect-square min-h-0 rounded-[1.35rem] p-3.5',
                     !isCurrentMonth
                       ? 'bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75'
                       : getHeatmapColor(minutes),
@@ -1202,7 +1209,14 @@ export default function StudyHistoryPage() {
                     isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-inset ring-[#1f9d57]/45 shadow-[0_20px_40px_-22px_rgba(34,197,94,0.24)]'
                   )}
                 >
-                  {isTodayCalendar && <div className="pointer-events-none absolute -inset-0.5 rounded-[1.35rem] border border-primary/20" />}
+                  {isTodayCalendar && (
+                    <div
+                      className={cn(
+                        'pointer-events-none absolute -inset-0.5 border border-primary/20',
+                        isMobile ? 'rounded-[0.95rem]' : 'rounded-[1.35rem]'
+                      )}
+                    />
+                  )}
                   <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
                   {isCurrentMonth && minutes > 0 && (
                     <div className="pointer-events-none absolute inset-x-4 top-0 h-14 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.55),rgba(255,255,255,0)_72%)] opacity-80" />

@@ -4085,30 +4085,30 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             onClick={() => setSelectedCalendarDate(day)}
                             aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}${isCurrentMonth ? ' 학습' : ''}`}
                             className={cn(
-                              'group relative overflow-hidden rounded-[1.45rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
-                              'aspect-square min-h-0 p-1.5',
+                              'group relative overflow-hidden rounded-[0.95rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
+                              'aspect-square min-h-0 p-1',
                               appCalendarCellClass,
                               isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0',
                               isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-[#7FCB97]/55 shadow-[0_22px_36px_-24px_rgba(26,115,64,0.18)]'
                             )}
                           >
-                            {isTodayCalendar ? <div className="pointer-events-none absolute inset-[1px] rounded-[1.35rem] border border-white/88" /> : null}
+                            {isTodayCalendar ? <div className="pointer-events-none absolute inset-[1px] rounded-[0.8rem] border border-white/88" /> : null}
                             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/92" />
                             {isCurrentMonth && minutes > 0 ? (
                               <div className="pointer-events-none absolute inset-x-4 top-0 h-12 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.52),rgba(255,255,255,0)_72%)] opacity-90" />
                             ) : null}
 
-                            <div className="relative z-10 flex h-full flex-col justify-center">
-                              <div className="flex flex-1 items-center justify-center px-0.5">
+                            <div className="relative z-10 grid h-full place-items-center">
+                              <div className="flex h-full w-full items-center justify-center px-0.5">
                                 {shouldRenderTime ? (
                                   <span
                                     className={cn(
                                       'dashboard-number block max-w-full whitespace-nowrap font-black leading-none tabular-nums text-center',
                                       isVeryLongTimeLabel
-                                        ? 'text-[0.5rem] tracking-[-0.11em]'
+                                        ? 'text-[0.52rem] tracking-[-0.11em]'
                                         : isLongTimeLabel
-                                          ? 'text-[0.56rem] tracking-[-0.1em]'
-                                          : 'text-[0.66rem] tracking-[-0.08em]',
+                                          ? 'text-[0.6rem] tracking-[-0.1em]'
+                                          : 'text-[0.72rem] tracking-[-0.08em]',
                                       appCalendarValueTone
                                     )}
                                   >
