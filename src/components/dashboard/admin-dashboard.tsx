@@ -74,13 +74,15 @@ import {
   Megaphone,
   LayoutGrid,
   ClipboardCheck,
+  Link2,
+  Wifi,
 } from 'lucide-react';
 import { useFirestore, useCollection, useFunctions, useDoc, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
+import { AttendanceCurrent, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
@@ -299,6 +301,42 @@ const normalizeParentCommunicationRecord = (item: any) => {
     parentName,
     parentPhone,
   };
+};
+
+const formatDashboardTrackTime = (value: unknown): string => {
+  const date = toTimestampDateSafe(value);
+  if (!date) return '시간 미상';
+  return format(date, 'M/d HH:mm');
+};
+
+const getCommunicationActivityDate = (item: any): Date | null => {
+  return (
+    toTimestampDateSafe(item?.latestMessageAt)
+    || toTimestampDateSafe(item?.updatedAt)
+    || toTimestampDateSafe(item?.repliedAt)
+    || toTimestampDateSafe(item?.createdAt)
+  );
+};
+
+const getCommunicationPreview = (item: any): string => {
+  const candidates = [
+    item?.latestMessagePreview,
+    item?.replyBody,
+    item?.body,
+    item?.title,
+  ];
+  const matched = candidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+  return typeof matched === 'string' ? matched.trim() : '';
+};
+
+const getCommunicationKindLabel = (item: any): string => {
+  if (item?.supportKind === 'wifi_unblock') return '와이파이';
+  if (item?.supportKind === 'student_question') return '학생 질문';
+  if (item?.supportKind === 'student_suggestion') return '학생 건의';
+  if (item?.type === 'consultation') return '상담 문의';
+  if (item?.type === 'request') return '요청';
+  if (item?.type === 'suggestion') return '건의';
+  return '연락';
 };
 
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
@@ -679,6 +717,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () => (parentCommunications || []).map((item) => normalizeParentCommunicationRecord(item)),
     [parentCommunications]
   );
+
+  const counselingReservationsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'counselingReservations'),
+      orderBy('createdAt', 'desc'),
+      limit(120),
+    );
+  }, [firestore, centerId]);
+  const { data: counselingReservations } = useCollection<CounselingReservation>(counselingReservationsQuery, { enabled: isActive });
 
   const {
     rows: adminHeatmapRows,
@@ -1532,6 +1580,90 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       focusBottom10,
     };
   }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, normalizedParentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs]);
+
+  const counselingTrackOverview = useMemo(() => {
+    const scopedCommunications = normalizedParentCommunications
+      .filter((item: any) => item.studentId && targetMemberIds.has(item.studentId))
+      .map((item: any) => {
+        const activityDate = getCommunicationActivityDate(item);
+        const studentName = studentNameById.get(item.studentId)
+          || (typeof item?.studentName === 'string' && item.studentName.trim())
+          || toSafeStudentName(undefined, item.studentId);
+        return {
+          ...item,
+          studentName,
+          preview: getCommunicationPreview(item),
+          activityDate,
+          activityMs: activityDate?.getTime() ?? 0,
+          activityLabel: formatDashboardTrackTime(activityDate),
+          roleLabel: item.senderRole === 'student' ? '학생 1:1' : '학부모 1:1',
+          href: item.senderRole === 'student' ? '/dashboard/appointments/inquiries' : '/dashboard/appointments/parent-requests',
+        };
+      })
+      .sort((a, b) => b.activityMs - a.activityMs);
+
+    const wifiRequests = scopedCommunications.filter((item: any) => {
+      const status = typeof item?.status === 'string' ? item.status : 'requested';
+      return item.supportKind === 'wifi_unblock' && status !== 'done';
+    });
+
+    const recentContacts = scopedCommunications
+      .filter((item: any) => item.preview.length > 0 || (typeof item?.title === 'string' && item.title.trim().length > 0))
+      .slice(0, 5);
+
+    const consultationThreads = scopedCommunications
+      .filter((item: any) => {
+        const status = typeof item?.status === 'string' ? item.status : 'requested';
+        return item.type === 'consultation' && status !== 'done';
+      })
+      .map((item: any) => ({
+        id: `communication-${item.id}`,
+        studentName: item.studentName,
+        title: (typeof item?.title === 'string' && item.title.trim()) || '상담 문의',
+        preview: item.preview || '상담 문의가 접수되었습니다.',
+        timeLabel: item.activityLabel,
+        timeMs: item.activityMs,
+        href: '/dashboard/appointments/parent-requests',
+        badge: item.senderRole === 'student' ? '학생 문의' : '학부모 문의',
+        tone: 'orange' as const,
+      }));
+
+    const reservationThreads = (counselingReservations || [])
+      .filter((item) => item.studentId && targetMemberIds.has(item.studentId))
+      .filter((item) => item.status !== 'done' && item.status !== 'canceled')
+      .map((item) => {
+        const createdDate = toTimestampDateSafe(item.createdAt);
+        const studentName = studentNameById.get(item.studentId)
+          || (typeof item.studentName === 'string' && item.studentName.trim())
+          || toSafeStudentName(undefined, item.studentId);
+        return {
+          id: `reservation-${item.id}`,
+          studentName,
+          title: `${studentName} 상담 예약`,
+          preview: (typeof item.studentNote === 'string' && item.studentNote.trim())
+            || `${item.teacherName || '담당 선생님'} 상담이 대기 중입니다.`,
+          timeLabel: formatDashboardTrackTime(createdDate),
+          timeMs: createdDate?.getTime() ?? 0,
+          href: '/dashboard/appointments/reservations',
+          badge: item.status === 'confirmed' ? '예약 확정' : '예약 요청',
+          tone: 'navy' as const,
+        };
+      });
+
+    const consultationInbox = [...consultationThreads, ...reservationThreads]
+      .sort((a, b) => b.timeMs - a.timeMs)
+      .slice(0, 4);
+
+    return {
+      wifiCount: wifiRequests.length,
+      studentContactCount: scopedCommunications.filter((item: any) => item.senderRole === 'student').length,
+      parentContactCount: scopedCommunications.filter((item: any) => item.senderRole !== 'student').length,
+      consultationCount: consultationInbox.length,
+      wifiRequests: wifiRequests.slice(0, 3),
+      recentContacts,
+      consultationInbox,
+    };
+  }, [normalizedParentCommunications, counselingReservations, studentNameById, targetMemberIds]);
 
   const recentAnnouncementsPreview = announcementFeed.slice(0, 3);
   const topFocusPreview = metrics.focusTop10.slice(0, 4);
@@ -3034,6 +3166,216 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             </Card>
           </motion.div>
         </div>
+
+        <motion.div {...getStudioMotionProps(0.26, 16)}>
+          <Card className={cn('admin-card-lift overflow-hidden', studioWhiteCardClassName)}>
+            <CardHeader className="border-b border-[#E4ECFF] pb-5">
+              <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="rounded-full border border-[#DCE7FF] bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">학생 상담트랙</Badge>
+                    <Badge className="rounded-full border border-[#FFD7BA] bg-[#FFF4EA] px-2.5 py-1 text-[10px] font-black text-[#C95A08]">바로 확인</Badge>
+                  </div>
+                  <CardTitle className="mt-3 text-[1.5rem] font-black tracking-tight text-[#14295F]">
+                    와이파이 요청, 1:1 연락, 상담문의를 한 번에 봅니다.
+                  </CardTitle>
+                  <CardDescription className="mt-2 max-w-[42rem] text-sm font-bold leading-6 text-[#5c6e97]">
+                    학생·학부모와 오간 최근 연락과 예약 대기 흐름을 여기서 먼저 확인하고 바로 상담트랙으로 들어갑니다.
+                  </CardDescription>
+                </div>
+                <Link
+                  href="/dashboard/appointments"
+                  className="inline-flex h-11 items-center justify-center rounded-[1.1rem] border border-[#DCE7FF] bg-white px-4 text-sm font-black text-[#14295F] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/30 hover:text-[#C95A08]"
+                >
+                  상담트랙 열기
+                </Link>
+              </div>
+
+              <div className={cn('mt-5 grid gap-2.5', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+                <div className="rounded-[1.35rem] border border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F1_0%,#FFFFFF_100%)] px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C95A08]">와이파이 요청</p>
+                  <p className="admin-kpi-number mt-2 text-[1.5rem] text-[#14295F]">{counselingTrackOverview.wifiCount}</p>
+                </div>
+                <div className="rounded-[1.35rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#F7FAFF_0%,#FFFFFF_100%)] px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554D7]">학생 1:1</p>
+                  <p className="admin-kpi-number mt-2 text-[1.5rem] text-[#14295F]">{counselingTrackOverview.studentContactCount}</p>
+                </div>
+                <div className="rounded-[1.35rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#F6FBFF_0%,#FFFFFF_100%)] px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1D6F84]">학부모 1:1</p>
+                  <p className="admin-kpi-number mt-2 text-[1.5rem] text-[#14295F]">{counselingTrackOverview.parentContactCount}</p>
+                </div>
+                <div className="rounded-[1.35rem] border border-[#D7DEFF] bg-[linear-gradient(180deg,#F4F6FF_0%,#FFFFFF_100%)] px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#4B57C0]">상담 문의</p>
+                  <p className="admin-kpi-number mt-2 text-[1.5rem] text-[#14295F]">{counselingTrackOverview.consultationCount}</p>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-5">
+              <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'xl:grid-cols-3')}>
+                <section className={cn(studioSoftPanelClassName, 'flex h-full flex-col gap-3')}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Wifi className="h-4 w-4 text-[#FF7A16]" />
+                        <p className={studioSectionEyebrowClassName}>와이파이 방화벽 해제 요청</p>
+                      </div>
+                      <p className="mt-1.5 text-sm font-black text-[#14295F]">열린 요청부터 바로 확인</p>
+                    </div>
+                    <Link href="/dashboard/appointments/inquiries" className="inline-flex items-center gap-1 text-[11px] font-black text-[#C95A08] hover:text-[#FF7A16]">
+                      전체 보기
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+
+                  {counselingTrackOverview.wifiRequests.length === 0 ? (
+                    <div className="flex h-full min-h-[148px] items-center justify-center rounded-[1.35rem] border border-dashed border-[#FFD7BA] bg-white/80 px-4 text-center text-xs font-bold leading-5 text-[#5c6e97]">
+                      현재 열린 방화벽 해제 요청이 없습니다.
+                    </div>
+                  ) : (
+                    <div className="grid gap-2.5">
+                      {counselingTrackOverview.wifiRequests.map((item: any) => (
+                        <Link
+                          key={`wifi-${item.id}`}
+                          href="/dashboard/appointments/inquiries"
+                          className="admin-card-lift block rounded-[1.3rem] border border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F1_0%,#FFFFFF_100%)] px-4 py-3 hover:border-[#FF7A16]/40"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">{item.studentName}</Badge>
+                                <span className="text-[11px] font-black text-[#C95A08]">{item.activityLabel}</span>
+                              </div>
+                              <p className="mt-2 flex items-center gap-1.5 truncate text-sm font-black text-[#14295F]">
+                                <Link2 className="h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+                                {item.requestedUrl || '요청 URL 미입력'}
+                              </p>
+                              <p className="mt-1 text-[12px] font-bold leading-5 text-[#5c6e97] line-clamp-2">
+                                {item.preview || '방화벽 해제 사유가 접수되었습니다.'}
+                              </p>
+                            </div>
+                            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#5c6e97]" />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className={cn(studioSoftPanelClassName, 'flex h-full flex-col gap-3')}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-[#2554D7]" />
+                        <p className={studioSectionEyebrowClassName}>학생·학부모 최근 1:1 연락</p>
+                      </div>
+                      <p className="mt-1.5 text-sm font-black text-[#14295F]">가장 최근 대화 흐름</p>
+                    </div>
+                    <Link href="/dashboard/appointments" className="inline-flex items-center gap-1 text-[11px] font-black text-[#2554D7] hover:text-[#14295F]">
+                      전체 보기
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+
+                  {counselingTrackOverview.recentContacts.length === 0 ? (
+                    <div className="flex h-full min-h-[148px] items-center justify-center rounded-[1.35rem] border border-dashed border-[#DCE7FF] bg-white/80 px-4 text-center text-xs font-bold leading-5 text-[#5c6e97]">
+                      최근 1:1 연락이 아직 없습니다.
+                    </div>
+                  ) : (
+                    <div className="grid gap-2.5">
+                      {counselingTrackOverview.recentContacts.map((item: any) => (
+                        <Link
+                          key={`contact-${item.id}`}
+                          href={item.href}
+                          className="admin-card-lift block rounded-[1.3rem] border border-[#DCE7FF] bg-white px-4 py-3 hover:border-[#2554D7]/30"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={cn(
+                                  'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                                  item.senderRole === 'student' ? 'bg-[#EEF4FF] text-[#2554D7]' : 'bg-[#EAFBFF] text-[#1D6F84]'
+                                )}>
+                                  {item.roleLabel}
+                                </Badge>
+                                <Badge className="h-6 rounded-full border-none bg-[#F7FAFF] px-2.5 text-[10px] font-black text-[#14295F]">
+                                  {getCommunicationKindLabel(item)}
+                                </Badge>
+                                <span className="text-[11px] font-black text-[#5c6e97]">{item.activityLabel}</span>
+                              </div>
+                              <p className="mt-2 text-sm font-black text-[#14295F]">
+                                {item.studentName}
+                                {item.parentName ? <span className="text-[#5c6e97]"> · {item.parentName}</span> : null}
+                              </p>
+                              <p className="mt-1 text-[12px] font-bold leading-5 text-[#5c6e97] line-clamp-2">
+                                {item.preview || '최근 연락 내용이 업데이트되었습니다.'}
+                              </p>
+                            </div>
+                            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#5c6e97]" />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className={cn(studioSoftPanelClassName, 'flex h-full flex-col gap-3')}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <HeartHandshake className="h-4 w-4 text-[#4B57C0]" />
+                        <p className={studioSectionEyebrowClassName}>상담 문의 / 예약 대기</p>
+                      </div>
+                      <p className="mt-1.5 text-sm font-black text-[#14295F]">바로 처리할 문의와 예약</p>
+                    </div>
+                    <Link href="/dashboard/appointments" className="inline-flex items-center gap-1 text-[11px] font-black text-[#4B57C0] hover:text-[#14295F]">
+                      전체 보기
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+
+                  {counselingTrackOverview.consultationInbox.length === 0 ? (
+                    <div className="flex h-full min-h-[148px] items-center justify-center rounded-[1.35rem] border border-dashed border-[#D7DEFF] bg-white/80 px-4 text-center text-xs font-bold leading-5 text-[#5c6e97]">
+                      처리 대기 중인 상담 문의나 예약이 없습니다.
+                    </div>
+                  ) : (
+                    <div className="grid gap-2.5">
+                      {counselingTrackOverview.consultationInbox.map((item) => (
+                        <Link
+                          key={item.id}
+                          href={item.href}
+                          className={cn(
+                            'admin-card-lift block rounded-[1.3rem] border px-4 py-3',
+                            item.tone === 'navy'
+                              ? 'border-[#D7DEFF] bg-[linear-gradient(180deg,#F4F6FF_0%,#FFFFFF_100%)] hover:border-[#4B57C0]/35'
+                              : 'border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F1_0%,#FFFFFF_100%)] hover:border-[#FF7A16]/35'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={cn(
+                                  'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                                  item.tone === 'navy' ? 'bg-[#EEF1FF] text-[#4B57C0]' : 'bg-[#FFF1E6] text-[#C95A08]'
+                                )}>
+                                  {item.badge}
+                                </Badge>
+                                <span className="text-[11px] font-black text-[#5c6e97]">{item.timeLabel}</span>
+                              </div>
+                              <p className="mt-2 text-sm font-black text-[#14295F]">{item.title}</p>
+                              <p className="mt-1 text-[12px] font-bold leading-5 text-[#5c6e97] line-clamp-2">{item.preview}</p>
+                            </div>
+                            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#5c6e97]" />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* ═══ D. Center Health Axes — 운영 5축 ═══ */}
         <motion.div {...getStudioMotionProps(0.28, 16)}>
