@@ -265,6 +265,35 @@ function HomeGrowthTrack({
   const laneGradientId = `${gradientId}-lane`;
   const runnerLeft = `${(runnerPoint.x / 240) * 100}%`;
   const runnerTop = `${(runnerPoint.y / 96) * 100}%`;
+  const character = isStudying ? (
+    <g className="student-home-track-char student-home-track-char--run" transform="translate(9 6)">
+      <ellipse className="student-home-track-char__shadow" cx="24" cy="52" rx="15" ry="4.2" />
+      <path className="student-home-track-char__streak" d="M-6 32H8" />
+      <path className="student-home-track-char__streak student-home-track-char__streak--alt" d="M-2 25H10" />
+      <circle className="student-home-track-char__head" cx="20" cy="10" r="7.4" />
+      <path className="student-home-track-char__ear" d="M24 9L29 11" />
+      <path className="student-home-track-char__torso" d="M17 19L27 30L23 40" />
+      <path className="student-home-track-char__arm student-home-track-char__arm--front" d="M25 28L39 24L46 30" />
+      <path className="student-home-track-char__arm student-home-track-char__arm--back" d="M19 24L7 31" />
+      <path className="student-home-track-char__leg student-home-track-char__leg--front" d="M23 40L37 50L47 47" />
+      <path className="student-home-track-char__leg student-home-track-char__leg--back" d="M22 40L13 54L6 50" />
+      <path className="student-home-track-char__shoe student-home-track-char__shoe--front" d="M45 46L52 46" />
+      <path className="student-home-track-char__shoe student-home-track-char__shoe--back" d="M6 49L12 52" />
+    </g>
+  ) : (
+    <g className="student-home-track-char student-home-track-char--idle" transform="translate(10 8)">
+      <ellipse className="student-home-track-char__shadow" cx="22" cy="52" rx="14" ry="4.2" />
+      <circle className="student-home-track-char__head" cx="22" cy="10" r="7.2" />
+      <path className="student-home-track-char__ear" d="M26 9L30 11" />
+      <path className="student-home-track-char__torso" d="M22 19L22 33L22 42" />
+      <path className="student-home-track-char__arm student-home-track-char__arm--front" d="M22 25L31 30" />
+      <path className="student-home-track-char__arm student-home-track-char__arm--back" d="M22 25L13 30" />
+      <path className="student-home-track-char__leg student-home-track-char__leg--front" d="M22 42L30 55" />
+      <path className="student-home-track-char__leg student-home-track-char__leg--back" d="M22 42L14 55" />
+      <path className="student-home-track-char__shoe student-home-track-char__shoe--front" d="M30 55L36 56" />
+      <path className="student-home-track-char__shoe student-home-track-char__shoe--back" d="M14 55L8 56" />
+    </g>
+  );
 
   return (
     <div
@@ -332,70 +361,7 @@ function HomeGrowthTrack({
         aria-hidden="true"
       >
         <svg viewBox="0 0 64 64" className="student-home-track-progress__runner-svg" fill="none">
-          {isStudying ? (
-            <g className="track-pace-vehicle track-pace-vehicle--run" transform="translate(10 2)">
-              <ellipse className="track-pace-runner-shadow" cx="23" cy="59" rx="15.5" ry="4.4" fill="rgba(255,236,211,0.18)" />
-              <path className="track-pace-runner-streak" d="M-8 38H8" stroke="rgba(255,255,255,0.22)" strokeWidth="3" strokeLinecap="round" />
-              <path className="track-pace-runner-streak" d="M-2 31H11" stroke="rgba(255,255,255,0.14)" strokeWidth="2.2" strokeLinecap="round" />
-              <circle className="track-pace-runner-head" cx="18" cy="10" r="6.9" fill="#FFE0BC" />
-              <path
-                className="track-pace-runner-torso"
-                d="M15 19L26 30L21 41"
-                stroke="#FFF9F3"
-                strokeWidth="5.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path d="M23 27L31 22" stroke="#FFF4E8" strokeWidth="4.6" strokeLinecap="round" />
-              <path
-                className="track-pace-runner-arm-front"
-                d="M25 29L38 23L45 29"
-                stroke="#FFE2C0"
-                strokeWidth="4.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                className="track-pace-runner-arm-back"
-                d="M20 25L8 31"
-                stroke="#FFD9AF"
-                strokeWidth="4.7"
-                strokeLinecap="round"
-              />
-              <path
-                className="track-pace-runner-leg-front"
-                d="M21 41L35 50L45 47"
-                stroke="#FFBF77"
-                strokeWidth="5.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                className="track-pace-runner-leg-back"
-                d="M21 41L13 54L5 50"
-                stroke="#FFCF8C"
-                strokeWidth="5.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </g>
-          ) : (
-            <g className="track-pace-vehicle track-pace-vehicle--idle" transform="translate(11 6)">
-              <ellipse className="track-pace-idle-shadow" cx="21" cy="56" rx="14" ry="4.2" fill="rgba(255,236,211,0.16)" />
-              <circle cx="21" cy="10" r="6.8" fill="#FFE0BC" />
-              <path
-                d="M21 19L21 33L21 43"
-                stroke="#FFF9F3"
-                strokeWidth="5.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path d="M21 25L30 29" stroke="#FFE4C7" strokeWidth="4.4" strokeLinecap="round" />
-              <path d="M21 25L12 29" stroke="#FFDAB0" strokeWidth="4.4" strokeLinecap="round" />
-              <path d="M21 43L28 55" stroke="#FFBF77" strokeWidth="5.1" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M21 43L14 55" stroke="#FFCF8C" strokeWidth="5.1" strokeLinecap="round" strokeLinejoin="round" />
-            </g>
-          )}
+          {character}
         </svg>
       </div>
 
