@@ -16,25 +16,39 @@ export default async function DashboardLayout({
 }) {
   const headerStore = await headers();
   const pathname = headerStore.get('x-track-pathname') || '/dashboard';
-  const session = await getVerifiedServerSession();
-  if (!session) {
-    redirect('/login');
-  }
-
-  let memberships = [] as Awaited<ReturnType<typeof getServerDashboardMemberships>>;
-  let skipServerPathGuard = false;
+  let session = null as Awaited<ReturnType<typeof getVerifiedServerSession>>;
+  let skipServerAuthGuard = false;
 
   try {
-    memberships = await getServerDashboardMemberships(session.uid);
+    session = await getVerifiedServerSession();
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production' && isMissingAdminCredentialsError(error)) {
-      skipServerPathGuard = true;
+    if (isMissingAdminCredentialsError(error)) {
+      skipServerAuthGuard = true;
     } else {
       throw error;
     }
   }
 
-  if (!skipServerPathGuard && !canAccessDashboardPath(pathname, memberships)) {
+  if (!session && !skipServerAuthGuard) {
+    redirect('/login');
+  }
+
+  let memberships = [] as Awaited<ReturnType<typeof getServerDashboardMemberships>>;
+  let skipServerPathGuard = skipServerAuthGuard;
+
+  if (session) {
+    try {
+      memberships = await getServerDashboardMemberships(session.uid);
+    } catch (error) {
+      if (isMissingAdminCredentialsError(error)) {
+        skipServerPathGuard = true;
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  if (session && !skipServerPathGuard && !canAccessDashboardPath(pathname, memberships)) {
     redirect('/dashboard');
   }
 

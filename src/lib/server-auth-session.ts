@@ -3,7 +3,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 
 import { AUTH_SESSION_COOKIE_NAME } from '@/lib/auth-session-shared';
-import { adminAuth } from '@/lib/firebase-admin';
+import { adminAuth, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 
 type VerifiedSessionClaims = Awaited<ReturnType<typeof adminAuth.verifyIdToken>>;
 
@@ -15,10 +15,18 @@ export async function getVerifiedServerSession(): Promise<VerifiedSessionClaims 
 
   try {
     return await adminAuth.verifySessionCookie(sessionCookie);
-  } catch {
+  } catch (sessionCookieError) {
+    if (isMissingAdminCredentialsError(sessionCookieError)) {
+      throw sessionCookieError;
+    }
+
     try {
       return await adminAuth.verifyIdToken(sessionCookie);
-    } catch {
+    } catch (idTokenError) {
+      if (isMissingAdminCredentialsError(idTokenError)) {
+        throw idTokenError;
+      }
+
       return null;
     }
   }
