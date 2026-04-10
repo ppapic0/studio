@@ -5830,11 +5830,12 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
   const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${dateKey}`);
   const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
 
-  const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap] = await Promise.all([
+  const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap, progressSnap] = await Promise.all([
     db.doc(`centers/${centerId}/members/${authUid}`).get(),
     db.doc(`centers/${centerId}/students/${authUid}`).get(),
     studyDayRef.get(),
     db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(1).get(),
+    progressRef.get(),
   ]);
 
   if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
@@ -5867,7 +5868,18 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
 
   const effectiveDayMinutes = Math.max(persistedDayMinutes, persistedDayMinutes + liveSessionMinutes);
   const earnedHours = Math.min(8, Math.floor(effectiveDayMinutes / 60));
-  if (earnedHours < hour) {
+  const preExistingProgress = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+  const preExistingDailyPointStatus = isPlainObject(preExistingProgress.dailyPointStatus)
+    ? (preExistingProgress.dailyPointStatus as Record<string, unknown>)
+    : {};
+  const preExistingDayStatus = isPlainObject(preExistingDailyPointStatus[dateKey])
+    ? (preExistingDailyPointStatus[dateKey] as Record<string, unknown>)
+    : {};
+  const preExistingClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(preExistingDayStatus.claimedStudyBoxes);
+  const preExistingOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown(preExistingDayStatus.openedStudyBoxes);
+  const hasUnlockedBoxRecord = preExistingClaimedStudyBoxes.includes(hour) || preExistingOpenedStudyBoxes.includes(hour);
+
+  if (!hasUnlockedBoxRecord && earnedHours < hour) {
     throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
       userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
     });
