@@ -5041,24 +5041,24 @@ select {
 }
 
 .point-track-hero-box--shake .point-track-hero-box__body {
-  animation: point-track-box-shake 0.24s ease-in-out both;
+  animation: point-track-box-shake 0.42s ease-in-out both;
 }
 
 .point-track-hero-box--shake .point-track-hero-box__shadow {
-  animation: point-track-box-shadow-shake 0.24s ease-in-out both;
+  animation: point-track-box-shadow-shake 0.42s ease-in-out both;
 }
 
 .point-track-hero-box--burst .point-track-hero-box__glow {
-  animation: point-track-box-burst 0.38s ease-out both;
+  animation: point-track-box-burst 0.62s ease-out both;
 }
 
 .point-track-hero-box--burst .point-track-hero-box__lid {
-  animation: point-track-box-lid-open 0.4s ease-out forwards;
+  animation: point-track-box-lid-open 0.65s ease-out forwards;
   transform-origin: center top;
 }
 
 .point-track-hero-box--revealed .point-track-hero-box__glow {
-  animation: point-track-box-revealed 0.32s ease-out forwards;
+  animation: point-track-box-revealed 0.5s ease-out forwards;
 }
 
 .point-track-progress-track {
@@ -5284,7 +5284,7 @@ select {
   font-weight: 900;
   color: #ffd089;
   box-shadow: 0 10px 20px -16px rgba(255, 166, 64, 0.6);
-  animation: point-track-floating-gain-rise 1.05s ease-out both;
+  animation: point-track-floating-gain-rise 1.45s ease-out both;
 }
 
 .point-track-modal-shell {
@@ -5392,7 +5392,7 @@ select {
 }
 
 .point-track-modal-particle--visible {
-  animation: point-track-particle-burst 0.46s ease-out both;
+  animation: point-track-particle-burst 0.78s ease-out both;
 }
 
 .point-track-modal-particle:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg) translateY(-3.3rem); }
@@ -5404,7 +5404,7 @@ select {
 .point-track-modal-particle:nth-child(7) { transform: translate(-50%, -50%) rotate(315deg) translateY(-3.35rem); }
 
 .point-track-reward-burst {
-  animation: point-track-reward-pop 0.28s ease-out both;
+  animation: point-track-reward-pop 0.42s ease-out both;
 }
 
 @keyframes point-track-box-float {

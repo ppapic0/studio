@@ -718,7 +718,7 @@ export default function GrowthPage() {
 
     const shakeTimeout = setTimeout(() => {
       setBoxStage('burst');
-    }, 220);
+    }, 380);
     timeoutsRef.current.push(shakeTimeout);
 
     const revealTimeout = setTimeout(async () => {
@@ -765,7 +765,7 @@ export default function GrowthPage() {
       } finally {
         setIsClaimingBox(false);
       }
-    }, 540);
+    }, 760);
 
     timeoutsRef.current.push(revealTimeout);
   };
