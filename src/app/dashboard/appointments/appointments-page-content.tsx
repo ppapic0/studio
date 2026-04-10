@@ -113,6 +113,16 @@ type CenterAnnouncementRecord = {
 };
 
 type StudentInquiryType = 'question' | 'suggestion' | 'firewall';
+type SupportThreadTimelineEntry = {
+  id: string;
+  senderRole: SupportThreadMessage['senderRole'];
+  senderName: string;
+  body: string;
+  createdAt?: Timestamp;
+  supportKind?: SupportThreadKind | null;
+  requestedUrl?: string | null;
+  isInitialRequest?: boolean;
+};
 
 const STUDENT_SUPPORT_KIND_LABEL: Record<SupportThreadKind, string> = {
   student_question: '학생 질문',
@@ -135,6 +145,11 @@ function normalizeRequestedUrl(value: string) {
     throw new Error('invalid-url');
   }
   return parsed.toString();
+}
+
+function isStudentChatEnabledThread(item: Pick<ParentCommunicationRecord, 'senderRole' | 'supportKind'>) {
+  return item.senderRole === 'student'
+    && (item.supportKind === 'wifi_unblock' || item.supportKind === 'student_suggestion');
 }
 
 const isPublishedAnnouncement = (item: CenterAnnouncementRecord) => {
@@ -187,6 +202,7 @@ export function AppointmentsPageContent({
   const [firewallUrl, setFirewallUrl] = useState('');
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [threadDrafts, setThreadDrafts] = useState<Record<string, string>>({});
+  const [selectedSupportThread, setSelectedSupportThread] = useState<ParentCommunicationRecord | null>(null);
   const [announcementAudience, setAnnouncementAudience] = useState<'student' | 'parent' | 'all'>('all');
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementBody, setAnnouncementBody] = useState('');
@@ -689,7 +705,9 @@ export function AppointmentsPageContent({
           : inquiryType === 'question'
             ? '학생 질문'
             : '학생 건의사항';
-      await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
+      const supportKind = getStudentSupportKind(inquiryType);
+      const inquiryContent = inquiryBody.trim();
+      const communicationRef = await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
         studentId: user.uid,
         senderRole: 'student',
         senderUid: user.uid,
@@ -702,13 +720,49 @@ export function AppointmentsPageContent({
               ? 'question'
               : 'suggestion',
         title: inquiryTitle.trim() || defaultTitle,
-        body: inquiryBody.trim(),
-        supportKind: getStudentSupportKind(inquiryType),
+        body: inquiryContent,
+        supportKind,
         requestedUrl: normalizedUrl,
         status: 'requested',
+        latestMessageAt: serverTimestamp(),
+        latestMessagePreview: inquiryContent.length > 90 ? `${inquiryContent.slice(0, 90)}…` : inquiryContent,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      if (inquiryType === 'firewall' || inquiryType === 'suggestion') {
+        await addDoc(collection(firestore, 'centers', centerId, 'supportMessages'), {
+          centerId,
+          communicationId: communicationRef.id,
+          studentId: user.uid,
+          parentUid: null,
+          senderRole: 'student',
+          senderUid: user.uid,
+          senderName: user.displayName || '학생',
+          body: inquiryContent,
+          supportKind,
+          requestedUrl: normalizedUrl,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        setSelectedSupportThread({
+          id: communicationRef.id,
+          studentId: user.uid,
+          senderRole: 'student',
+          senderUid: user.uid,
+          senderName: user.displayName || '학생',
+          type: communicationType,
+          requestCategory: inquiryType === 'firewall' ? 'request' : 'suggestion',
+          title: inquiryTitle.trim() || defaultTitle,
+          body: inquiryContent,
+          supportKind,
+          requestedUrl: normalizedUrl,
+          status: 'requested',
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          latestMessageAt: Timestamp.now(),
+          latestMessagePreview: inquiryContent.length > 90 ? `${inquiryContent.slice(0, 90)}…` : inquiryContent,
+        });
+      }
       toast({ title: inquiryType === 'firewall' ? '와이파이 해제 요청이 등록되었습니다.' : '문의가 등록되었습니다.' });
       setInquiryTitle('');
       setInquiryBody('');
@@ -774,6 +828,50 @@ export function AppointmentsPageContent({
     supportMessagesByCommunicationId.get(communicationId) || [];
 
   const getThreadDraftValue = (communicationId: string) => threadDrafts[communicationId] ?? '';
+
+  const getSupportThreadTimeline = (item: ParentCommunicationRecord): SupportThreadTimelineEntry[] => {
+    const threadMessages = getSupportThreadMessages(item.id);
+    const initialBody = item.body?.trim();
+    const shouldIncludeInitialRequest = item.senderRole === 'student'
+      && Boolean(initialBody)
+      && !threadMessages.some((message) => message.senderRole === 'student' && message.body.trim() === initialBody);
+
+    const initialEntry: SupportThreadTimelineEntry[] = shouldIncludeInitialRequest
+      ? [{
+          id: `${item.id}-initial`,
+          senderRole: 'student',
+          senderName: item.senderName || '학생',
+          body: initialBody || '',
+          createdAt: item.createdAt || item.updatedAt,
+          supportKind: item.supportKind || null,
+          requestedUrl: item.requestedUrl || null,
+          isInitialRequest: true,
+        }]
+      : [];
+
+    return [
+      ...initialEntry,
+      ...threadMessages.map((message) => ({
+        id: message.id,
+        senderRole: message.senderRole,
+        senderName: message.senderName,
+        body: message.body,
+        createdAt: message.createdAt,
+        supportKind: message.supportKind || null,
+        requestedUrl: message.requestedUrl || null,
+      })),
+    ];
+  };
+
+  const liveSelectedSupportThread = useMemo(() => {
+    if (!selectedSupportThread) return null;
+    return parentCommunications.find((item) => item.id === selectedSupportThread.id) || selectedSupportThread;
+  }, [parentCommunications, selectedSupportThread]);
+
+  const liveSelectedSupportThreadTimeline = useMemo(() => {
+    if (!liveSelectedSupportThread) return [];
+    return getSupportThreadTimeline(liveSelectedSupportThread);
+  }, [liveSelectedSupportThread, supportMessagesByCommunicationId]);
 
   const handleSendSupportMessage = async (item: ParentCommunicationRecord) => {
     if (!firestore || !centerId || !user) return;
@@ -934,7 +1032,7 @@ export function AppointmentsPageContent({
     return item.parentName || item.parentUid || item.senderName || '학부모';
   };
 
-  const getSupportSenderLabel = (message: SupportThreadMessage) => {
+  const getSupportSenderLabel = (message: Pick<SupportThreadTimelineEntry, 'senderRole' | 'senderName'>) => {
     if (message.senderRole === 'student') return message.senderName || '학생';
     if (message.senderRole === 'centerAdmin') return message.senderName || '센터관리자';
     if (message.senderRole === 'teacher') return message.senderName || '선생님';
@@ -1136,22 +1234,42 @@ export function AppointmentsPageContent({
   };
 
   const renderSupportThread = (item: ParentCommunicationRecord, surface: 'student' | 'staff') => {
-    const threadMessages = getSupportThreadMessages(item.id);
+    const threadMessages = getSupportThreadTimeline(item);
     const draftValue = getThreadDraftValue(item.id);
 
     return (
       <div className="space-y-3">
         <div className="space-y-2">
-          <p className={cn(
-            'text-[10px] font-black uppercase tracking-[0.22em]',
-            surface === 'staff'
-              ? 'text-[#5c6e97]'
-              : isStudentTrackTheme
-                ? 'text-[var(--text-on-dark-muted)]'
-                : 'text-sky-700'
-          )}>
-            1:1 톡
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className={cn(
+              'text-[10px] font-black uppercase tracking-[0.22em]',
+              surface === 'staff'
+                ? 'text-[#5c6e97]'
+                : isStudentTrackTheme
+                  ? 'text-[var(--text-on-dark-muted)]'
+                  : 'text-sky-700'
+            )}>
+              1:1 톡
+            </p>
+            {item.senderRole === 'student' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectedSupportThread(item)}
+                className={cn(
+                  'h-8 rounded-full px-3 text-[11px] font-black',
+                  surface === 'staff'
+                    ? 'border-[#dbe5ff] bg-white text-[#14295F] hover:bg-[#f5f8ff]'
+                    : isStudentTrackTheme
+                      ? 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] hover:bg-white/[0.14]'
+                      : 'border-sky-200 bg-white text-sky-800 hover:bg-sky-50'
+                )}
+              >
+                톡방 열기
+              </Button>
+            )}
+          </div>
           {threadMessages.length === 0 ? (
             <div className={cn(
               surface === 'staff'
@@ -1210,6 +1328,18 @@ export function AppointmentsPageContent({
                         {messageTime ? format(messageTime, 'MM.dd HH:mm') : ''}
                       </p>
                     </div>
+                    {message.isInitialRequest && (
+                      <p className={cn(
+                        'mt-1 text-[10px] font-black',
+                        surface === 'staff'
+                          ? 'text-[#7f93ba]'
+                          : isStudentTrackTheme
+                            ? 'text-[var(--accent-orange-soft)]'
+                            : 'text-orange-700'
+                      )}>
+                        첫 요청 메시지
+                      </p>
+                    )}
                     <p className={cn(
                       'mt-2 whitespace-pre-wrap text-sm font-bold leading-relaxed',
                       surface === 'staff'
@@ -2057,6 +2187,19 @@ export function AppointmentsPageContent({
                           </div>
                           <h3 className={cn("font-black break-keep", isMobile ? "text-sm" : "text-base", studentTitleTextClass)}>{item.title || '질문/건의'}</h3>
                           <p className={cn("text-[10px] font-bold", studentMetaTextClass)}>{createdAtLabel}</p>
+                          {isStudentChatEnabledThread(item) && (
+                            <div className="flex justify-end">
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => setSelectedSupportThread(item)}
+                                className={cn("rounded-full px-4 font-black h-9 gap-1.5", counselingCtaClass)}
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                1:1 톡방 열기
+                              </Button>
+                            </div>
+                          )}
                           {renderRequestedUrlPanel(item, 'student')}
                           <div className={cn(studentGhostPanelClass, "p-4")}>
                             <p className={cn("whitespace-pre-wrap text-sm font-bold leading-relaxed", studentBodyTextClass)}>{item.body?.trim() || '내용이 없습니다.'}</p>
@@ -2166,6 +2309,17 @@ export function AppointmentsPageContent({
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
+                              {isStudentThread && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setSelectedSupportThread(item)}
+                                  className="rounded-xl border-[#dbe5ff] bg-white font-black text-[#14295F] h-9 hover:bg-[#f5f8ff]"
+                                >
+                                  1:1 톡 열기
+                                </Button>
+                              )}
                               {item.status !== 'in_progress' && item.status !== 'done' && (
                                 <Button size="sm" variant="outline" disabled={isSubmitting} onClick={() => handleParentCommunicationStatus(item.id, item.type === 'consultation' ? 'in_progress' : 'in_review')} className="rounded-xl border-[#dbe5ff] bg-white font-black text-[#14295F] h-9 hover:bg-[#f5f8ff]">
                                   {item.type === 'consultation' ? '처리 시작' : '검토 시작'}
@@ -2274,6 +2428,134 @@ export function AppointmentsPageContent({
               {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 완료 및 일지 저장'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(liveSelectedSupportThread)} onOpenChange={(open) => { if (!open) setSelectedSupportThread(null); }}>
+        <DialogContent className={cn("overflow-hidden border-none p-0 shadow-2xl", isMobile ? "w-[min(96vw,29rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-3xl rounded-[2.25rem]")}>
+          {liveSelectedSupportThread && (
+            <>
+              <div className={cn(
+                "relative overflow-hidden",
+                isStudentTrackTheme
+                  ? "bg-[linear-gradient(135deg,#14295F_0%,#1C3D8B_58%,#2C5BD8_100%)] text-white"
+                  : "bg-[linear-gradient(135deg,#14295F_0%,#274BA6_58%,#3F73FF_100%)] text-white",
+                isMobile ? "p-5" : "p-7"
+              )}>
+                <DialogHeader>
+                  <DialogTitle className={cn("font-black tracking-tight", isMobile ? "text-xl" : "text-2xl")}>
+                    {liveSelectedSupportThread.title || '1:1 톡'}
+                  </DialogTitle>
+                  <DialogDescription className="text-white/75 font-bold">
+                    {isStudentTrackTheme
+                      ? '선생님 또는 센터관리자와 카카오톡처럼 이어지는 1:1 상담 톡방이에요.'
+                      : '학생과 실시간으로 이어지는 1:1 상담 톡방입니다.'}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {getCommunicationTypeBadge(liveSelectedSupportThread)}
+                  {getParentStatusBadge(liveSelectedSupportThread.status)}
+                  <Badge variant="dark" className="border-white/12 bg-white/10 text-white shadow-none">
+                    1:1 톡 진행 중
+                  </Badge>
+                </div>
+                {liveSelectedSupportThread.supportKind === 'wifi_unblock' && liveSelectedSupportThread.requestedUrl && (
+                  <div className="mt-4 rounded-[1.35rem] border border-white/12 bg-white/[0.08] p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">요청 URL</p>
+                    <a
+                      href={liveSelectedSupportThread.requestedUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 flex items-center gap-2 break-all text-sm font-black text-white underline decoration-white/40 underline-offset-4"
+                    >
+                      <Link2 className="h-3.5 w-3.5 shrink-0 text-[#ffcf9f]" />
+                      {liveSelectedSupportThread.requestedUrl}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]">
+                <div className={cn("overflow-y-auto", isMobile ? "max-h-[46svh] p-4" : "max-h-[30rem] p-6")}>
+                  <div className="space-y-3">
+                    {liveSelectedSupportThreadTimeline.map((message) => {
+                      const isStudentSender = message.senderRole === 'student';
+                      const alignRight = isStudentTrackTheme ? isStudentSender : !isStudentSender;
+                      const messageTime = message.createdAt?.toDate?.();
+
+                      return (
+                        <div key={message.id} className={cn('flex', alignRight ? 'justify-end' : 'justify-start')}>
+                          <div
+                            className={cn(
+                              'max-w-[85%] rounded-[1.5rem] px-4 py-3 shadow-sm',
+                              alignRight
+                                ? 'bg-[linear-gradient(180deg,#FFB24C_0%,#FF8A1F_100%)] text-white'
+                                : 'border border-[#dbe5ff] bg-white text-[#14295F]'
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <p className={cn(
+                                'text-[10px] font-black uppercase tracking-[0.18em]',
+                                alignRight ? 'text-white/75' : 'text-[#7f93ba]'
+                              )}>
+                                {getSupportSenderLabel(message)}
+                              </p>
+                              {message.isInitialRequest && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'h-5 rounded-full px-2 text-[9px] font-black',
+                                    alignRight
+                                      ? 'border-white/20 bg-white/10 text-white'
+                                      : 'border-[#ffd9b6] bg-[#fff3e7] text-[#FF7A16]'
+                                  )}
+                                >
+                                  첫 요청
+                                </Badge>
+                              )}
+                            </div>
+                            <p className={cn(
+                              'mt-2 whitespace-pre-wrap text-sm font-bold leading-relaxed',
+                              alignRight ? 'text-white' : 'text-[#14295F]'
+                            )}>
+                              {message.body}
+                            </p>
+                            <p className={cn(
+                              'mt-2 text-[10px] font-semibold',
+                              alignRight ? 'text-white/70' : 'text-[#8ca0c7]'
+                            )}>
+                              {messageTime ? format(messageTime, 'MM.dd HH:mm') : ''}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className={cn("border-t border-[#dbe5ff] bg-white", isMobile ? "p-4" : "p-5")}>
+                  <div className="space-y-3">
+                    <Textarea
+                      value={getThreadDraftValue(liveSelectedSupportThread.id)}
+                      onChange={(e) => setThreadDrafts((prev) => ({ ...prev, [liveSelectedSupportThread.id]: e.target.value }))}
+                      placeholder={isStudentTrackTheme ? '선생님 또는 센터관리자에게 보낼 메시지를 입력해 주세요.' : '학생에게 보낼 메시지를 입력해 주세요.'}
+                      className="min-h-[92px] resize-none rounded-[1.25rem] border-[#dbe5ff] bg-[#f8fbff] font-bold text-[#14295F] placeholder:text-[#8ca0c7]"
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => handleSendSupportMessage(liveSelectedSupportThread)}
+                        disabled={isSubmitting || !getThreadDraftValue(liveSelectedSupportThread.id).trim()}
+                        className={cn("rounded-full px-5 font-black h-11 gap-2", counselingCtaClass)}
+                      >
+                        <Send className="h-4 w-4" />
+                        메시지 보내기
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
