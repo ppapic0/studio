@@ -190,6 +190,7 @@ const LATE_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: num
   { rarity: "rare", weight: 30 },
   { rarity: "epic", weight: 10 },
 ];
+const DAILY_POINT_EARN_CAP = 1000;
 const ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES = ["studying", "away", "break"] as const;
 const ACTIVE_STUDY_ATTENDANCE_STATUSES = new Set<string>(ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES);
 
@@ -233,12 +234,16 @@ function normalizeStoredStudyBoxReward(value: unknown): SecureStudyBoxReward | n
   };
 }
 
-function upsertStudyBoxRewardEntries(existing: unknown, reward: SecureStudyBoxReward): SecureStudyBoxReward[] {
-  const entries = Array.isArray(existing)
+function normalizeStudyBoxRewardEntries(existing: unknown): SecureStudyBoxReward[] {
+  return Array.isArray(existing)
     ? existing
         .map((entry) => normalizeStoredStudyBoxReward(entry))
         .filter((entry): entry is SecureStudyBoxReward => Boolean(entry))
     : [];
+}
+
+function upsertStudyBoxRewardEntries(existing: unknown, reward: SecureStudyBoxReward): SecureStudyBoxReward[] {
+  const entries = normalizeStudyBoxRewardEntries(existing);
 
   const next = new Map<number, SecureStudyBoxReward>();
   entries.forEach((entry) => {
@@ -247,6 +252,36 @@ function upsertStudyBoxRewardEntries(existing: unknown, reward: SecureStudyBoxRe
   next.set(reward.milestone, reward);
 
   return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
+}
+
+function getLegacyDailyPointAwardTotal(dayStatus: Record<string, unknown>): number {
+  const studyBoxPoints = normalizeStudyBoxRewardEntries(dayStatus.studyBoxRewards).reduce(
+    (total, entry) => total + Math.max(0, Math.floor(entry.awardedPoints)),
+    0
+  );
+  const rankRewardPoints = ["dailyRankRewardAmount", "weeklyRankRewardAmount", "monthlyRankRewardAmount"].reduce(
+    (total, key) => total + Math.max(0, Math.floor(parseFiniteNumber(dayStatus[key]) ?? 0)),
+    0
+  );
+  return studyBoxPoints + rankRewardPoints;
+}
+
+function getDailyAwardedPointTotal(dayStatus: Record<string, unknown>): number {
+  const dailyPointAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.dailyPointAmount) ?? 0));
+  return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
+}
+
+function clampDailyPointAward(dayStatus: Record<string, unknown>, requestedPoints: number) {
+  const normalizedRequestedPoints = Math.max(0, Math.floor(requestedPoints));
+  const currentAwardedTotal = getDailyAwardedPointTotal(dayStatus);
+  const remainingPoints = Math.max(0, DAILY_POINT_EARN_CAP - currentAwardedTotal);
+  const awardedPoints = Math.min(normalizedRequestedPoints, remainingPoints);
+
+  return {
+    currentAwardedTotal,
+    remainingPoints,
+    awardedPoints,
+  };
 }
 
 function getStudyBoxRarityWeights(milestone: number) {
@@ -5904,13 +5939,24 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
 
     const openedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.openedStudyBoxes);
     const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.claimedStudyBoxes);
+    const storedRewardEntries = normalizeStudyBoxRewardEntries(currentDayStatus.studyBoxRewards);
+    const storedReward = storedRewardEntries.find((entry) => entry.milestone === hour) ?? null;
+    const alreadyOpened = openedStudyBoxes.includes(hour);
+    const awardClamp = alreadyOpened
+      ? { currentAwardedTotal: getDailyAwardedPointTotal(currentDayStatus), remainingPoints: 0, awardedPoints: 0 }
+      : clampDailyPointAward(currentDayStatus, reward.awardedPoints);
+    const awardedDelta = alreadyOpened ? 0 : awardClamp.awardedPoints;
+    const creditedReward = alreadyOpened
+      ? (storedReward ?? reward)
+      : {
+          ...reward,
+          awardedPoints: awardedDelta,
+        };
     const nextOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...openedStudyBoxes, hour]);
     const nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...claimedStudyBoxes, hour]);
-    const nextRewardEntries = upsertStudyBoxRewardEntries(currentDayStatus.studyBoxRewards, reward);
-    const alreadyOpened = openedStudyBoxes.includes(hour);
+    const nextRewardEntries = upsertStudyBoxRewardEntries(storedRewardEntries, creditedReward);
     const currentPointsBalance = Math.max(0, Math.floor(parseFiniteNumber(progressData.pointsBalance) ?? 0));
     const currentTotalPointsEarned = Math.max(0, Math.floor(parseFiniteNumber(progressData.totalPointsEarned) ?? 0));
-    const awardedDelta = alreadyOpened ? 0 : reward.awardedPoints;
 
     transaction.set(
       progressRef,
@@ -5923,6 +5969,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
             claimedStudyBoxes: nextClaimedStudyBoxes,
             studyBoxRewards: nextRewardEntries,
             openedStudyBoxes: nextOpenedStudyBoxes,
+            dailyPointAmount: admin.firestore.FieldValue.increment(awardedDelta),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           },
         },
@@ -5935,6 +5982,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
       alreadyOpened,
       claimedStudyBoxes: nextClaimedStudyBoxes,
       openedStudyBoxes: nextOpenedStudyBoxes,
+      reward: creditedReward,
       pointsBalance: currentPointsBalance + awardedDelta,
       totalPointsEarned: currentTotalPointsEarned + awardedDelta,
     };
@@ -5944,7 +5992,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     ok: true,
     opened: !result.alreadyOpened,
     alreadyOpened: result.alreadyOpened,
-    reward,
+    reward: result.reward,
     claimedStudyBoxes: result.claimedStudyBoxes,
     openedStudyBoxes: result.openedStudyBoxes,
     pointsBalance: result.pointsBalance,

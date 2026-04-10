@@ -49,6 +49,7 @@ const STUDENT_RANK_REWARD_TIERS: Record<StudentRankingRange, StudentRankRewardTi
     { rank: 3, points: 2500 },
   ],
 };
+const DAILY_POINT_EARN_CAP = 1000;
 
 function toKstDate(baseDate: Date = new Date()) {
   const formatted = baseDate.toLocaleString("en-US", { timeZone: "Asia/Seoul" });
@@ -106,6 +107,55 @@ function normalizeMembershipStatus(value: unknown) {
   if (normalized === "onhold" || normalized === "pending") return "onHold";
   if (normalized === "inactive" || normalized === "withdrawn") return "withdrawn";
   return "active";
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function getLegacyDailyPointAwardTotal(dayStatus: Record<string, unknown>): number {
+  const studyBoxPoints = Array.isArray(dayStatus.studyBoxRewards)
+    ? dayStatus.studyBoxRewards.reduce((total, entry) => {
+        if (!isPlainObject(entry)) return total;
+        return total + Math.max(0, Math.floor(parseFiniteNumber(entry.awardedPoints) ?? 0));
+      }, 0)
+    : 0;
+  const rankRewardPoints = ["dailyRankRewardAmount", "weeklyRankRewardAmount", "monthlyRankRewardAmount"].reduce(
+    (total, key) => total + Math.max(0, Math.floor(parseFiniteNumber(dayStatus[key]) ?? 0)),
+    0
+  );
+  return studyBoxPoints + rankRewardPoints;
+}
+
+function getDailyAwardedPointTotal(dayStatus: Record<string, unknown>): number {
+  const dailyPointAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.dailyPointAmount) ?? 0));
+  return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
+}
+
+function clampDailyPointAward(dayStatus: Record<string, unknown>, requestedPoints: number) {
+  const normalizedRequestedPoints = Math.max(0, Math.floor(requestedPoints));
+  const currentAwardedTotal = getDailyAwardedPointTotal(dayStatus);
+  const remainingPoints = Math.max(0, DAILY_POINT_EARN_CAP - currentAwardedTotal);
+  const awardedPoints = Math.min(normalizedRequestedPoints, remainingPoints);
+
+  return {
+    awardedPoints,
+    currentAwardedTotal,
+    remainingPoints,
+  };
 }
 
 function isSyntheticStudentId(studentId: unknown): boolean {
@@ -551,39 +601,58 @@ async function applyAwardEntries(
   awardDateKey: string,
   awards: RankedStudentEntry[]
 ) {
-  if (awards.length === 0) return;
+  if (awards.length === 0) return [] as RankedStudentEntry[];
 
-  const batch = db.batch();
+  const appliedAwards: RankedStudentEntry[] = [];
 
   for (const award of awards) {
     const progressRef = db.doc(`centers/${centerId}/growthProgress/${award.studentId}`);
-    const pointStatusPayload: Record<string, unknown> = {
-      dailyPointAmount: admin.firestore.FieldValue.increment(award.points),
-    };
+    const appliedAward = await db.runTransaction(async (transaction) => {
+      const progressSnap = await transaction.get(progressRef);
+      const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+      const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+        ? (progressData.dailyPointStatus as Record<string, unknown>)
+        : {};
+      const currentDayStatus = isPlainObject(dailyPointStatus[awardDateKey])
+        ? (dailyPointStatus[awardDateKey] as Record<string, unknown>)
+        : {};
+      const awardedPoints = clampDailyPointAward(currentDayStatus, award.points).awardedPoints;
+      const pointStatusPayload: Record<string, unknown> = {
+        ...currentDayStatus,
+        dailyPointAmount: admin.firestore.FieldValue.increment(awardedPoints),
+      };
 
-    if (range === "daily") {
-      pointStatusPayload.dailyRankRewardAmount = award.points;
-      pointStatusPayload.dailyRankRewardRank = award.rank;
-      pointStatusPayload.dailyTopRewardAmount = award.points;
-    } else if (range === "weekly") {
-      pointStatusPayload.weeklyRankRewardAmount = award.points;
-      pointStatusPayload.weeklyRankRewardRank = award.rank;
-    } else {
-      pointStatusPayload.monthlyRankRewardAmount = award.points;
-      pointStatusPayload.monthlyRankRewardRank = award.rank;
-    }
+      if (range === "daily") {
+        pointStatusPayload.dailyRankRewardAmount = awardedPoints;
+        pointStatusPayload.dailyRankRewardRank = award.rank;
+        pointStatusPayload.dailyTopRewardAmount = awardedPoints;
+      } else if (range === "weekly") {
+        pointStatusPayload.weeklyRankRewardAmount = awardedPoints;
+        pointStatusPayload.weeklyRankRewardRank = award.rank;
+      } else {
+        pointStatusPayload.monthlyRankRewardAmount = awardedPoints;
+        pointStatusPayload.monthlyRankRewardRank = award.rank;
+      }
 
-    batch.set(progressRef, {
-      pointsBalance: admin.firestore.FieldValue.increment(award.points),
-      totalPointsEarned: admin.firestore.FieldValue.increment(award.points),
-      dailyPointStatus: {
-        [awardDateKey]: pointStatusPayload,
-      },
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+      transaction.set(progressRef, {
+        pointsBalance: admin.firestore.FieldValue.increment(awardedPoints),
+        totalPointsEarned: admin.firestore.FieldValue.increment(awardedPoints),
+        dailyPointStatus: {
+          [awardDateKey]: pointStatusPayload,
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return {
+        ...award,
+        points: awardedPoints,
+      };
+    });
+
+    appliedAwards.push(appliedAward);
   }
 
-  await batch.commit();
+  return appliedAwards;
 }
 
 function getDailySettlementCandidates(nowKst: Date, lookbackDays = 7) {
@@ -683,11 +752,11 @@ export const scheduledRankingRewardSettlement = functions
 
         try {
           const awards = await buildDailyAwardEntries(db, centerId, candidate.competitionDate, await getContext());
-          await applyAwardEntries(db, centerId, "daily", awardDateKey, awards);
+          const appliedAwards = await applyAwardEntries(db, centerId, "daily", awardDateKey, awards);
           await completeSettlement(settlementRef, {
             awardDateKey,
-            awardCount: awards.length,
-            awards: awards.map((award) => ({
+            awardCount: appliedAwards.length,
+            awards: appliedAwards.map((award) => ({
               studentId: award.studentId,
               rank: award.rank,
               points: award.points,
@@ -721,11 +790,11 @@ export const scheduledRankingRewardSettlement = functions
               weeklyCandidate.endDate,
               await getContext()
             );
-            await applyAwardEntries(db, centerId, "weekly", awardDateKey, awards);
+            const appliedAwards = await applyAwardEntries(db, centerId, "weekly", awardDateKey, awards);
             await completeSettlement(settlementRef, {
               awardDateKey,
-              awardCount: awards.length,
-              awards: awards.map((award) => ({
+              awardCount: appliedAwards.length,
+              awards: appliedAwards.map((award) => ({
                 studentId: award.studentId,
                 rank: award.rank,
                 points: award.points,
@@ -753,11 +822,11 @@ export const scheduledRankingRewardSettlement = functions
         if (claimed) {
           try {
             const awards = await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.monthKey, await getContext());
-            await applyAwardEntries(db, centerId, "monthly", awardDateKey, awards);
+            const appliedAwards = await applyAwardEntries(db, centerId, "monthly", awardDateKey, awards);
             await completeSettlement(settlementRef, {
               awardDateKey,
-              awardCount: awards.length,
-              awards: awards.map((award) => ({
+              awardCount: appliedAwards.length,
+              awards: appliedAwards.map((award) => ({
                 studentId: award.studentId,
                 rank: award.rank,
                 points: award.points,
