@@ -375,6 +375,7 @@ export function AttendanceScheduleSheet({
     activeTab === 'today'
       ? validateScheduleDraft(todayDraft, todayDraft.awaySlots || [])
       : validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []);
+  const todaySaveButtonLabel = todayDraft.isAbsent ? '미등원 일정 저장하기' : '일정 저장하기';
 
   const handleCloseRequest = () => {
     if (isSubmitting) return;
@@ -469,13 +470,13 @@ export function AttendanceScheduleSheet({
       <DialogContent
         motionPreset="dashboard-premium"
         className={cn(
-          'overflow-hidden border border-[#E0E8F6] bg-[linear-gradient(180deg,#FFF8EE_0%,#FFFFFF_38%,#F8FBFF_100%)] p-0 shadow-[0_28px_70px_-38px_rgba(12,29,74,0.36)]',
+          'flex flex-col overflow-hidden border border-[#E0E8F6] bg-[linear-gradient(180deg,#FFF8EE_0%,#FFFFFF_38%,#F8FBFF_100%)] p-0 shadow-[0_28px_70px_-38px_rgba(12,29,74,0.36)]',
           isMobile
             ? 'w-[min(94vw,34rem)] max-h-[90dvh] rounded-[2rem]'
             : 'w-[min(92vw,54rem)] max-w-[54rem] max-h-[88dvh] rounded-[2rem]'
         )}
       >
-        <div className="bg-[radial-gradient(circle_at_top_right,rgba(255,163,61,0.22),transparent_24%),linear-gradient(180deg,#FFFFFF_0%,#FFF6EA_100%)] p-6 text-[#17326B] border-b border-[#E4ECF9]">
+        <div className="shrink-0 border-b border-[#E4ECF9] bg-[radial-gradient(circle_at_top_right,rgba(255,163,61,0.22),transparent_24%),linear-gradient(180deg,#FFFFFF_0%,#FFF6EA_100%)] p-6 text-[#17326B]">
           <DialogHeader className="text-left">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl border border-[#FFD1A1] bg-[#FFF1DE] p-2.5 text-[#FF8A1F]">
@@ -493,7 +494,7 @@ export function AttendanceScheduleSheet({
           </DialogHeader>
         </div>
 
-        <div className={cn('overflow-y-auto bg-[linear-gradient(180deg,#FFF8EE_0%,#FFFFFF_32%,#F7FAFF_100%)]', isMobile ? 'max-h-[calc(90dvh-9rem)] p-4' : 'max-h-[calc(88dvh-9rem)] p-5')}>
+        <div className={cn('min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#FFF8EE_0%,#FFFFFF_32%,#F7FAFF_100%)]', isMobile ? 'p-4' : 'p-5')}>
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'today' | 'weekday')} className="space-y-4">
           <TabsList className="grid w-full grid-cols-2 rounded-2xl border border-[#DCE6F7] bg-white p-1 shadow-[0_12px_28px_-24px_rgba(15,33,73,0.22)]">
               <TabsTrigger value="weekday" className="rounded-xl text-[11px] font-black text-[#5F739F] data-[state=active]:bg-[#FF9626] data-[state=active]:text-white">주간 기본 일정</TabsTrigger>
@@ -905,7 +906,7 @@ export function AttendanceScheduleSheet({
           </Tabs>
         </div>
 
-        <div className={cn('border-t border-[#E4ECF9] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] p-4', isMobile ? 'space-y-2' : 'space-y-3')}>
+        <div className={cn('shrink-0 border-t border-[#E4ECF9] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF7EC_100%)] p-4', isMobile ? 'space-y-2' : 'space-y-3')}>
           {saveError ? (
             <div className="rounded-[1rem] border border-rose-200 bg-rose-50 px-4 py-3 text-left">
               <div className="flex items-start gap-2">
@@ -951,7 +952,7 @@ export function AttendanceScheduleSheet({
                 )}
               >
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                이 날짜 예외 저장
+                {todaySaveButtonLabel}
               </Button>
             </>
           ) : (
