@@ -2800,13 +2800,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleRevealHomeBox = useCallback(async () => {
     const isRevealableBox = selectedHomeBox?.state === 'ready' || selectedHomeBox?.state === 'opened';
-    if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !activeVaultDateKey || !activeMembership?.id) return;
+    if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !activeVaultDateKey || !activeMembership?.id || !user?.uid) return;
     const targetHour = selectedHomeBox.hour;
     const targetDateKey = activeVaultDateKey;
     const rewardOpenPromise = openStudyRewardBoxSecure({
       centerId: activeMembership.id,
+      studentId: user.uid,
       dateKey: targetDateKey,
       hour: targetHour,
+      reward: activeRewardByHour.get(targetHour) || rollStudyBoxReward(targetHour),
+      dayStatus: targetDateKey === yesterdayKey ? yesterdayPointStatus : todayPointStatus,
+      currentTotalPointsEarned: Number(progress?.totalPointsEarned || 0),
     })
       .then((result) => ({ ok: true as const, result }))
       .catch((error) => ({ ok: false as const, error }));

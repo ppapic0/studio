@@ -191,14 +191,29 @@ service cloud.firestore {
     }
 
     function isAllowedSelfGrowthProgressUpdate(centerId, studentId) {
-      return isSelfCenterMember(centerId, studentId)
+      return (
+        isSelfCenterMember(centerId, studentId)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'pointsBalance',
           'totalPointsEarned',
           'penaltyPoints',
           'seasonLp',
           'stats',
-        ]);
+        ])
+      ) || (
+        isSelfCenterMember(centerId, studentId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'pointsBalance',
+          'totalPointsEarned',
+          'dailyPointStatus',
+          'updatedAt',
+        ])
+        && request.resource.data.pointsBalance >= resource.data.pointsBalance
+        && request.resource.data.totalPointsEarned >= resource.data.totalPointsEarned
+        && request.resource.data.pointsBalance - resource.data.pointsBalance
+          == request.resource.data.totalPointsEarned - resource.data.totalPointsEarned
+        && request.resource.data.pointsBalance - resource.data.pointsBalance <= 40
+      );
     }
 
     function isAllowedSelfStudySessionCreate(centerId, studentId, dateKey, sessionId) {
