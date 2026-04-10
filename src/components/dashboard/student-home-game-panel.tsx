@@ -16,6 +16,12 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import {
+  RewardHeroBox,
+  type RewardBoxRarity as BoxRarity,
+  type RewardBoxStage as BoxStage,
+  type RewardBoxState as BoxState,
+} from "@/components/dashboard/reward-box-visuals";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,9 +29,6 @@ import type { GrowthProgress } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type RankRange = "daily" | "weekly" | "monthly";
-type BoxState = "locked" | "charging" | "ready" | "opened";
-type BoxRarity = "common" | "rare" | "epic";
-type BoxStage = "idle" | "shake" | "burst" | "revealed";
 
 const HOME_RANK_CARD_BASE =
   "student-utility-card relative w-full overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(89,133,223,0.34),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,188,102,0.14),transparent_40%),linear-gradient(180deg,rgba(7,17,35,0.98)_0%,rgba(12,28,58,0.98)_52%,rgba(20,41,95,0.98)_100%)] text-left shadow-[0_30px_56px_-30px_rgba(0,0,0,0.72)]";
@@ -143,51 +146,6 @@ function getRankEntryStatusLabel(entry: StudentHomeRankPreviewEntry) {
   if (entry.isLive || previewSeconds > baseSeconds) return "공부중";
   if (previewSeconds > 0) return "휴식중";
   return "대기중";
-}
-
-function RewardHeroChest({
-  state,
-  stage,
-  intense,
-  rarity,
-  label,
-  onClick,
-}: {
-  state: "ready" | "charging";
-  stage?: BoxStage;
-  intense?: boolean;
-  rarity?: BoxRarity | null;
-  label: string;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
-      className={cn(
-        "point-track-hero-box",
-        state === "ready" ? "point-track-hero-box--ready" : "point-track-hero-box--charging",
-        intense && "point-track-hero-box--intense",
-        rarity === "rare" && "point-track-hero-box--rare",
-        rarity === "epic" && "point-track-hero-box--epic",
-        stage === "shake" && "point-track-hero-box--shake",
-        stage === "burst" && "point-track-hero-box--burst",
-        stage === "revealed" && "point-track-hero-box--revealed",
-      )}
-    >
-      <div className="point-track-hero-box__glow" />
-      <div className="point-track-hero-box__shadow" />
-      <div className="point-track-hero-box__body">
-        <div className="point-track-hero-box__lid" />
-        <div className="point-track-hero-box__lock" />
-        <div className="point-track-hero-box__shine" />
-        <div className="point-track-hero-box__spark point-track-hero-box__spark--left" />
-        <div className="point-track-hero-box__spark point-track-hero-box__spark--right" />
-      </div>
-      <span className="sr-only">{label}</span>
-    </button>
-  );
 }
 
 function QuestRow({
@@ -331,7 +289,7 @@ function RewardModal({
                 />
               ))}
             </div>
-            <RewardHeroChest
+            <RewardHeroBox
               state="ready"
               intense={boxStage === "shake" || boxStage === "burst" || boxStage === "revealed"}
               stage={boxStage}
@@ -533,6 +491,7 @@ export function StudentHomeGamePanel({
   totalAvailableBoxes,
   boxStatusLabel,
   boxSubLabel,
+  boxPreviewRarity,
   onOpenMainBox,
   nextBoxCounter,
   nextBoxCaption,
@@ -580,6 +539,7 @@ export function StudentHomeGamePanel({
   totalAvailableBoxes: number;
   boxStatusLabel: string;
   boxSubLabel: string;
+  boxPreviewRarity?: BoxRarity | null;
   onOpenMainBox: (hour?: number) => void;
   nextBoxCounter: string;
   nextBoxCaption: string;
@@ -771,14 +731,15 @@ export function StudentHomeGamePanel({
                 </div>
               </div>
 
-              <div className="mt-3 flex justify-center">
-                <RewardHeroChest
-                  state={totalAvailableBoxes > 0 ? "ready" : "charging"}
-                  intense={totalAvailableBoxes > 0 || isNearNextBox}
-                  label={boxStatusLabel}
-                  onClick={onOpenMainBox}
-                />
-              </div>
+                <div className="mt-3 flex justify-center">
+                  <RewardHeroBox
+                    state={totalAvailableBoxes > 0 ? "ready" : "charging"}
+                    intense={totalAvailableBoxes > 0 || isNearNextBox}
+                    rarity={boxPreviewRarity ?? "common"}
+                    label={boxStatusLabel}
+                    onClick={onOpenMainBox}
+                  />
+                </div>
 
               <div className="mt-2 text-center">
                 <div className="text-sm font-black text-white">{totalAvailableBoxes > 0 ? "지금 열기" : nextBoxCounter}</div>

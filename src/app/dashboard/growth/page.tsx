@@ -16,13 +16,19 @@ import {
 import {
   Flame,
   Gift,
-  Lock,
   Sparkles,
-  Star,
   Timer,
   Wallet,
 } from 'lucide-react';
 
+import {
+  RewardHeroBox,
+  RewardVaultSlot,
+  type RewardBoxStage as BoxStage,
+  type RewardBoxRarity as BoxRarity,
+  type RewardBoxState as BoxState,
+  type RewardVaultBox as RewardBox,
+} from '@/components/dashboard/reward-box-visuals';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAppContext } from '@/contexts/app-context';
@@ -40,27 +46,9 @@ import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { GrowthProgress, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-type BoxState = 'locked' | 'charging' | 'ready' | 'opened';
-type BoxRarity = 'common' | 'rare' | 'epic';
-type BoxStage = 'idle' | 'shake' | 'burst' | 'revealed';
-
-type RewardBox = {
-  id: string;
-  hour: number;
-  state: BoxState;
-  rarity: BoxRarity;
-  reward?: number;
-};
-
 type FloatingGain = {
   key: number;
   amount: number;
-};
-
-const RARITY_LABELS: Record<BoxRarity, string> = {
-  common: '커먼',
-  rare: '레어',
-  epic: '에픽',
 };
 
 const STUDY_BOX_CLAIM_CACHE_PREFIX = 'point-track:claimed-boxes';
@@ -240,51 +228,6 @@ function buildRewardBoxes({
   });
 }
 
-function RewardHeroChest({
-  state,
-  stage,
-  label,
-  intense = false,
-  rarity,
-  onClick,
-}: {
-  state: 'ready' | 'charging';
-  stage?: BoxStage;
-  label: string;
-  intense?: boolean;
-  rarity?: BoxRarity | null;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
-      className={cn(
-        'point-track-hero-box',
-        state === 'ready' ? 'point-track-hero-box--ready' : 'point-track-hero-box--charging',
-        intense && 'point-track-hero-box--intense',
-        rarity === 'rare' && 'point-track-hero-box--rare',
-        rarity === 'epic' && 'point-track-hero-box--epic',
-        stage === 'shake' && 'point-track-hero-box--shake',
-        stage === 'burst' && 'point-track-hero-box--burst',
-        stage === 'revealed' && 'point-track-hero-box--revealed'
-      )}
-    >
-      <div className="point-track-hero-box__glow" />
-      <div className="point-track-hero-box__shadow" />
-      <div className="point-track-hero-box__body">
-        <div className="point-track-hero-box__lid" />
-        <div className="point-track-hero-box__lock" />
-        <div className="point-track-hero-box__shine" />
-        <div className="point-track-hero-box__spark point-track-hero-box__spark--left" />
-        <div className="point-track-hero-box__spark point-track-hero-box__spark--right" />
-      </div>
-      <span className="sr-only">{label}</span>
-    </button>
-  );
-}
-
 function HeroMetricChip({
   icon: Icon,
   label,
@@ -326,91 +269,6 @@ function HeroMetricChip({
         </div>
       </div>
     </div>
-  );
-}
-
-function InventorySlot({
-  box,
-  onSelect,
-  chargingLabel,
-  chargingPercent,
-  isFresh,
-}: {
-  box: RewardBox;
-  onSelect: (hour: number) => void;
-  chargingLabel?: string;
-  chargingPercent?: number;
-  isFresh?: boolean;
-}) {
-  const isRolledBox = box.state === 'ready' || box.state === 'opened';
-  const rarityClass =
-    isRolledBox && box.rarity === 'epic'
-      ? 'point-track-slot--epic'
-      : isRolledBox && box.rarity === 'rare'
-        ? 'point-track-slot--rare'
-        : 'point-track-slot--common';
-
-  return (
-    <button
-      type="button"
-      disabled={box.state !== 'ready'}
-      onClick={() => onSelect(box.hour)}
-      className={cn(
-        'point-track-slot',
-        rarityClass,
-        box.state === 'ready' && 'point-track-slot--ready',
-        box.state === 'charging' && 'point-track-slot--charging',
-        box.state === 'opened' && 'point-track-slot--opened',
-        box.state === 'locked' && 'point-track-slot--locked',
-        isFresh && 'point-track-slot--fresh'
-      )}
-    >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span
-          className={cn(
-            'rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]',
-            isRolledBox && box.rarity === 'epic'
-              ? 'border-violet-300/30 bg-violet-300/18 text-violet-100'
-              : isRolledBox && box.rarity === 'rare'
-                ? 'border-orange-300/30 bg-orange-300/18 text-orange-100'
-                : 'border-sky-200/24 bg-sky-200/14 text-sky-100'
-          )}
-        >
-          {isRolledBox ? RARITY_LABELS[box.rarity] : '랜덤'}
-        </span>
-        {box.state === 'ready' ? (
-          <Star className="h-3.5 w-3.5 text-orange-100" />
-        ) : box.state === 'locked' ? (
-          <Lock className="h-3.5 w-3.5 text-[var(--text-on-dark-soft)]" />
-        ) : null}
-      </div>
-      <div className="point-track-slot__box">
-        <div className="point-track-slot__lid" />
-        <div className="point-track-slot__lock" />
-      </div>
-      <div className="mt-3">
-        <div className="text-[11px] font-black tracking-tight text-white">{box.hour}시간 상자</div>
-        {box.state === 'charging' ? (
-          <>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-              <div className="point-track-slot__meter-fill" style={{ width: `${Math.max(4, Math.min(100, chargingPercent || 0))}%` }} />
-            </div>
-          <div className="mt-1 text-[10px] font-black text-[var(--text-on-dark-soft)]">{chargingLabel}</div>
-          </>
-        ) : (
-          <div className="mt-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-on-dark-soft)]">
-            <span>
-              {box.state === 'opened'
-                ? '확인완료'
-                : box.state === 'ready'
-                  ? 'READY'
-                  : 'LOCK'}
-            </span>
-            <span>{box.state === 'opened' ? '완료' : box.state === 'ready' ? '열기' : '잠김'}</span>
-          </div>
-        )}
-      </div>
-    </button>
   );
 }
 
@@ -567,6 +425,11 @@ export default function GrowthPage() {
 
   const readyBoxes = boxes.filter((box) => box.state === 'ready');
   const totalAvailableBoxes = readyBoxes.length;
+  const heroBoxRarity =
+    readyBoxes[0]?.rarity ??
+    boxes.find((box) => box.state === 'charging')?.rarity ??
+    boxes[0]?.rarity ??
+    'common';
   const todayOpenedCount = openedBoxes.length;
 
   const heroMode = totalAvailableBoxes > 0 ? 'ready' : isTimerActive ? 'studying' : 'idle';
@@ -848,10 +711,11 @@ export default function GrowthPage() {
           </div>
 
           <div className="relative mt-5 flex flex-col items-center gap-4">
-            <RewardHeroChest
+            <RewardHeroBox
               state={totalAvailableBoxes > 0 ? 'ready' : 'charging'}
               stage={boxStage}
               intense={totalAvailableBoxes > 0 || isNearNextBox || Boolean(arrivalEvent)}
+              rarity={heroBoxRarity}
               label={totalAvailableBoxes > 0 ? '지금 열기' : `${nextBoxSecondsLeft}초 남음`}
               onClick={totalAvailableBoxes > 0 ? () => openVault() : undefined}
             />
@@ -958,7 +822,7 @@ export default function GrowthPage() {
           </div>
           <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
             {boxes.map((box) => (
-              <InventorySlot
+              <RewardVaultSlot
                 key={box.id}
                 box={box}
                 onSelect={openVault}
@@ -1020,7 +884,7 @@ export default function GrowthPage() {
                 )}
               >
                 <div className="flex justify-center">
-                  <RewardHeroChest
+                  <RewardHeroBox
                     state={selectedBox?.state === 'ready' ? 'ready' : 'charging'}
                     stage={boxStage}
                     intense={selectedBox?.state === 'ready'}

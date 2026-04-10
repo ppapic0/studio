@@ -2537,6 +2537,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   );
   const visibleReadyBoxCount = carryoverReadyBoxes.length > 0 ? carryoverReadyBoxes.length : readyBoxes.length;
   const hasCarryoverReadyBoxes = carryoverReadyBoxes.length > 0;
+  const homeBoxPreviewRarity =
+    carryoverReadyBoxes[0]?.rarity ??
+    readyBoxes[0]?.rarity ??
+    homeRewardBoxes.find((box) => box.state === 'charging')?.rarity ??
+    homeRewardBoxes[0]?.rarity ??
+    'common';
 
   useEffect(() => {
     if (!todayKey || carryoverReadyBoxes.length === 0) {
@@ -2922,6 +2928,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         totalAvailableBoxes={visibleReadyBoxCount}
         boxStatusLabel={visibleReadyBoxCount > 0 ? 'BOX READY' : isNearNextBox ? 'ALMOST' : 'CHARGING'}
         boxSubLabel={hasCarryoverReadyBoxes ? `어제 상자 ${visibleReadyBoxCount}개가 남아 있어요` : visibleReadyBoxCount > 0 ? `상자 ${visibleReadyBoxCount}개가 도착했어요` : `${formatTimer(nextBoxSecondsLeft)} 뒤 상자 도착`}
+        boxPreviewRarity={homeBoxPreviewRarity}
         onOpenMainBox={openVault}
         nextBoxCounter={visibleReadyBoxCount > 0 ? `${visibleReadyBoxCount}개 대기` : formatTimer(nextBoxSecondsLeft)}
         nextBoxCaption={hasCarryoverReadyBoxes ? '어제 남아 있던 상자부터 열어보세요' : visibleReadyBoxCount > 0 ? '터치해서 보상을 확인하세요' : `${Math.floor(currentCycleSeconds / 60)} / 60분 누적`}
