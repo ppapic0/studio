@@ -145,6 +145,19 @@ service cloud.firestore {
         && isLinkedParent(centerId, request.resource.data.studentId);
     }
 
+    function parentCommunicationPath(centerId, communicationId) {
+      return /databases/$(database)/documents/centers/$(centerId)/parentCommunications/$(communicationId);
+    }
+
+    function isStudentOwnedCommunication(centerId, communicationId, studentId) {
+      return communicationId is string
+        && communicationId != ''
+        && exists(parentCommunicationPath(centerId, communicationId))
+        && get(parentCommunicationPath(centerId, communicationId)).data.senderRole == 'student'
+        && get(parentCommunicationPath(centerId, communicationId)).data.senderUid == studentId
+        && get(parentCommunicationPath(centerId, communicationId)).data.studentId == studentId;
+    }
+
     function isAllowedSelfStudyLogDayCreate(centerId, studentId, dateKey) {
       return isSelfCenterMember(centerId, studentId)
         && request.resource.data.studentId == request.auth.uid
@@ -510,7 +523,36 @@ service cloud.firestore {
               && request.resource.data.senderRole == 'student'
               && request.resource.data.senderUid == request.auth.uid
               && request.resource.data.type in ['request', 'suggestion']);
-        allow update: if isTeacherOrAdmin(centerId);
+        allow update: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId)
+              && resource.data.senderRole == 'student'
+              && resource.data.senderUid == request.auth.uid
+              && resource.data.studentId == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt', 'latestMessageAt', 'latestMessagePreview', 'status'])
+              && request.resource.data.status == 'requested');
+        allow delete: if isCenterAdmin(centerId);
+      }
+
+      match /supportMessages/{messageId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || (isParent(centerId) && resource.data.parentUid == request.auth.uid);
+        allow create: if (isTeacherOrAdmin(centerId)
+            && request.resource.data.centerId == centerId
+            && request.resource.data.communicationId is string
+            && request.resource.data.communicationId != ''
+            && request.resource.data.studentId != null
+            && exists(parentCommunicationPath(centerId, request.resource.data.communicationId))
+            && get(parentCommunicationPath(centerId, request.resource.data.communicationId)).data.studentId == request.resource.data.studentId
+            && request.resource.data.senderUid == request.auth.uid
+            && request.resource.data.senderRole in ['teacher', 'centerAdmin'])
+          || (isStudent(centerId)
+              && request.resource.data.centerId == centerId
+              && request.resource.data.studentId == request.auth.uid
+              && isStudentOwnedCommunication(centerId, request.resource.data.communicationId, request.auth.uid)
+              && request.resource.data.senderUid == request.auth.uid
+              && request.resource.data.senderRole == 'student');
+        allow update: if false;
         allow delete: if isCenterAdmin(centerId);
       }
 

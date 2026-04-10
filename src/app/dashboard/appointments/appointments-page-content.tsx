@@ -57,13 +57,17 @@ import {
   Megaphone,
   GraduationCap,
   Filter,
-  ClipboardCheck
+  ClipboardCheck,
+  Send,
+  Link2,
+  ShieldCheck,
+  Wifi
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc, orderBy, limit, FieldValue } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile } from '@/lib/types';
+import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile, SupportThreadMessage, SupportThreadKind } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -91,6 +95,10 @@ type ParentCommunicationRecord = {
   repliedAt?: Timestamp;
   repliedByName?: string;
   repliedByUid?: string;
+  supportKind?: SupportThreadKind | null;
+  requestedUrl?: string | null;
+  latestMessageAt?: Timestamp;
+  latestMessagePreview?: string;
 };
 
 type CenterAnnouncementRecord = {
@@ -103,6 +111,31 @@ type CenterAnnouncementRecord = {
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };
+
+type StudentInquiryType = 'question' | 'suggestion' | 'firewall';
+
+const STUDENT_SUPPORT_KIND_LABEL: Record<SupportThreadKind, string> = {
+  student_question: '학생 질문',
+  student_suggestion: '학생 건의',
+  wifi_unblock: '와이파이 해제 요청',
+};
+
+function getStudentSupportKind(inquiryType: StudentInquiryType): SupportThreadKind {
+  if (inquiryType === 'suggestion') return 'student_suggestion';
+  if (inquiryType === 'firewall') return 'wifi_unblock';
+  return 'student_question';
+}
+
+function normalizeRequestedUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const parsed = new URL(withProtocol);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('invalid-url');
+  }
+  return parsed.toString();
+}
 
 const isPublishedAnnouncement = (item: CenterAnnouncementRecord) => {
   const normalizedStatus = item?.status?.trim?.().toLowerCase();
@@ -148,10 +181,12 @@ export function AppointmentsPageContent({
   const [selectedSeason, setSelectedSeason] = useState<string>('all');
   const [parentTypeFilter, setParentTypeFilter] = useState<'all' | 'consultation' | 'request' | 'suggestion'>('all');
   const [parentStatusFilter, setParentStatusFilter] = useState<'all' | 'requested' | 'in_progress' | 'in_review' | 'done'>('all');
-  const [inquiryType, setInquiryType] = useState<'question' | 'suggestion'>('question');
+  const [inquiryType, setInquiryType] = useState<StudentInquiryType>('question');
   const [inquiryTitle, setInquiryTitle] = useState('');
   const [inquiryBody, setInquiryBody] = useState('');
+  const [firewallUrl, setFirewallUrl] = useState('');
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [threadDrafts, setThreadDrafts] = useState<Record<string, string>>({});
   const [announcementAudience, setAnnouncementAudience] = useState<'student' | 'parent' | 'all'>('all');
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementBody, setAnnouncementBody] = useState('');
@@ -284,6 +319,19 @@ export function AppointmentsPageContent({
     enabled: canAccessCommunications && !!centerId && !!studentUid && shouldLoadCommunications,
   });
 
+  const supportMessagesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentUid || !canAccessCommunications || !shouldLoadCommunications) return null;
+    const baseRef = collection(firestore, 'centers', centerId, 'supportMessages');
+
+    if (isStaff) return query(baseRef);
+    if (isStudent) return query(baseRef, where('studentId', '==', studentUid));
+
+    return null;
+  }, [firestore, centerId, studentUid, canAccessCommunications, isStaff, isStudent, shouldLoadCommunications]);
+  const { data: rawSupportMessages } = useCollection<SupportThreadMessage>(supportMessagesQuery, {
+    enabled: canAccessCommunications && !!centerId && !!studentUid && shouldLoadCommunications,
+  });
+
   const reservations = useMemo(() => {
     if (!rawReservations) return [];
     return [...rawReservations].sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0));
@@ -305,6 +353,26 @@ export function AppointmentsPageContent({
       return bMs - aMs;
     });
   }, [rawParentCommunications]);
+
+  const supportMessages = useMemo(() => {
+    if (!rawSupportMessages) return [];
+    return [...rawSupportMessages].sort((a, b) => {
+      const aMs = a.createdAt?.toMillis?.() || 0;
+      const bMs = b.createdAt?.toMillis?.() || 0;
+      return aMs - bMs;
+    });
+  }, [rawSupportMessages]);
+
+  const supportMessagesByCommunicationId = useMemo(() => {
+    const map = new Map<string, SupportThreadMessage[]>();
+    supportMessages.forEach((message) => {
+      if (!message.communicationId) return;
+      const current = map.get(message.communicationId) || [];
+      current.push(message);
+      map.set(message.communicationId, current);
+    });
+    return map;
+  }, [supportMessages]);
 
   const filteredParentCommunications = useMemo(() => {
     return parentCommunications.filter((item) => {
@@ -597,25 +665,54 @@ export function AppointmentsPageContent({
       return;
     }
 
+    let normalizedUrl: string | null = null;
+    if (inquiryType === 'firewall') {
+      try {
+        normalizedUrl = normalizeRequestedUrl(firewallUrl);
+      } catch {
+        toast({ variant: 'destructive', title: '해제 요청 URL을 정확히 입력해 주세요.' });
+        return;
+      }
+      if (!normalizedUrl) {
+        toast({ variant: 'destructive', title: '해제 요청 URL을 입력해 주세요.' });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const communicationType: ParentCommunicationRecord['type'] =
-        inquiryType === 'question' ? 'request' : 'suggestion';
+        inquiryType === 'suggestion' ? 'suggestion' : 'request';
+      const defaultTitle =
+        inquiryType === 'firewall'
+          ? '와이파이 방화벽 해제 요청'
+          : inquiryType === 'question'
+            ? '학생 질문'
+            : '학생 건의사항';
       await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
         studentId: user.uid,
         senderRole: 'student',
         senderUid: user.uid,
         senderName: user.displayName || '학생',
         type: communicationType,
-        title: inquiryTitle.trim() || (inquiryType === 'question' ? '학생 질문' : '학생 건의사항'),
+        requestCategory:
+          inquiryType === 'firewall'
+            ? 'request'
+            : inquiryType === 'question'
+              ? 'question'
+              : 'suggestion',
+        title: inquiryTitle.trim() || defaultTitle,
         body: inquiryBody.trim(),
+        supportKind: getStudentSupportKind(inquiryType),
+        requestedUrl: normalizedUrl,
         status: 'requested',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      toast({ title: '문의가 등록되었습니다.' });
+      toast({ title: inquiryType === 'firewall' ? '와이파이 해제 요청이 등록되었습니다.' : '문의가 등록되었습니다.' });
       setInquiryTitle('');
       setInquiryBody('');
+      setFirewallUrl('');
       setInquiryType('question');
     } catch (e: any) {
       toast({ variant: 'destructive', title: '문의 등록에 실패했습니다.', description: e?.message });
@@ -673,6 +770,83 @@ export function AppointmentsPageContent({
     }
   };
 
+  const getSupportThreadMessages = (communicationId: string) =>
+    supportMessagesByCommunicationId.get(communicationId) || [];
+
+  const getThreadDraftValue = (communicationId: string) => threadDrafts[communicationId] ?? '';
+
+  const handleSendSupportMessage = async (item: ParentCommunicationRecord) => {
+    if (!firestore || !centerId || !user) return;
+    const messageBody = getThreadDraftValue(item.id).trim();
+    if (!messageBody) {
+      toast({ variant: 'destructive', title: '메시지 내용을 입력해 주세요.' });
+      return;
+    }
+
+    const senderRole: SupportThreadMessage['senderRole'] = isStudent
+      ? 'student'
+      : isAdmin
+        ? 'centerAdmin'
+        : 'teacher';
+    const senderName =
+      user.displayName ||
+      (senderRole === 'centerAdmin' ? '센터관리자' : senderRole === 'teacher' ? '선생님' : '학생');
+    const latestPreview = messageBody.length > 90 ? `${messageBody.slice(0, 90)}…` : messageBody;
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(firestore, 'centers', centerId, 'supportMessages'), {
+        centerId,
+        communicationId: item.id,
+        studentId: item.studentId,
+        parentUid: item.parentUid || null,
+        senderRole,
+        senderUid: user.uid,
+        senderName,
+        body: messageBody,
+        supportKind: item.supportKind || null,
+        requestedUrl: item.requestedUrl || null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      const communicationUpdate: Record<string, string | FieldValue | null> = {
+        updatedAt: serverTimestamp(),
+        latestMessageAt: serverTimestamp(),
+        latestMessagePreview: latestPreview,
+      };
+
+      if (isStudent) {
+        communicationUpdate.status = 'requested';
+      } else {
+        communicationUpdate.replyBody = messageBody;
+        communicationUpdate.repliedAt = serverTimestamp();
+        communicationUpdate.repliedByUid = user.uid;
+        communicationUpdate.repliedByName = senderName;
+        communicationUpdate.handledByUid = user.uid;
+        communicationUpdate.handledByName = senderName;
+        communicationUpdate.status =
+          item.status === 'done'
+            ? 'done'
+            : item.type === 'consultation'
+              ? 'in_progress'
+              : 'in_review';
+      }
+
+      await updateDoc(doc(firestore, 'centers', centerId, 'parentCommunications', item.id), communicationUpdate);
+      setThreadDrafts((prev) => ({ ...prev, [item.id]: '' }));
+      toast({ title: isStudent ? '메시지를 보냈습니다.' : '답변을 보냈습니다.' });
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: isStudent ? '메시지 전송에 실패했습니다.' : '답변 전송에 실패했습니다.',
+        description: e?.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handlePublishAnnouncement = async () => {
     if (!firestore || !centerId || !user || !isStaff) return;
     if (!announcementTitle.trim() || !announcementBody.trim()) {
@@ -706,6 +880,39 @@ export function AppointmentsPageContent({
   };
 
   const getCommunicationTypeBadge = (item: ParentCommunicationRecord) => {
+    if (item.supportKind === 'wifi_unblock') {
+      return isStaff ? (
+        <Badge variant="outline" className="h-6 rounded-full border-[#ffe1c5] bg-[#fff1e4] px-2.5 text-[10px] font-black text-[#14295F]">
+          와이파이 해제 요청
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="border-none bg-orange-100 text-orange-700 font-black text-[10px]">
+          와이파이 해제 요청
+        </Badge>
+      );
+    }
+    if (item.supportKind === 'student_question') {
+      return isStaff ? (
+        <Badge variant="outline" className="h-6 rounded-full border-[#d6e4ff] bg-[#edf4ff] px-2.5 text-[10px] font-black text-[#14295F]">
+          학생 질문
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="border-none bg-sky-100 text-sky-700 font-black text-[10px]">
+          학생 질문
+        </Badge>
+      );
+    }
+    if (item.supportKind === 'student_suggestion') {
+      return isStaff ? (
+        <Badge variant="outline" className="h-6 rounded-full border-[#eadcff] bg-[#f7f0ff] px-2.5 text-[10px] font-black text-[#14295F]">
+          학생 건의
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="border-none bg-violet-100 text-violet-700 font-black text-[10px]">
+          학생 건의
+        </Badge>
+      );
+    }
     if (isStaff) {
       if (item.type === 'consultation') return <Badge variant="outline" className="h-6 rounded-full border-[#d6e4ff] bg-[#edf4ff] px-2.5 text-[10px] font-black text-[#14295F]">상담요청</Badge>;
       if (item.type === 'request' && item.senderRole === 'student') return <Badge variant="outline" className="h-6 rounded-full border-[#d6e4ff] bg-[#edf4ff] px-2.5 text-[10px] font-black text-[#14295F]">학생 질문</Badge>;
@@ -725,6 +932,13 @@ export function AppointmentsPageContent({
   const getCommunicationOwnerLabel = (item: ParentCommunicationRecord) => {
     if (item.senderRole === 'student') return item.senderName || '학생';
     return item.parentName || item.parentUid || item.senderName || '학부모';
+  };
+
+  const getSupportSenderLabel = (message: SupportThreadMessage) => {
+    if (message.senderRole === 'student') return message.senderName || '학생';
+    if (message.senderRole === 'centerAdmin') return message.senderName || '센터관리자';
+    if (message.senderRole === 'teacher') return message.senderName || '선생님';
+    return message.senderName || '학부모';
   };
 
   const getReplyDraftValue = (item: ParentCommunicationRecord) => replyDrafts[item.id] ?? item.replyBody ?? '';
@@ -861,6 +1075,196 @@ export function AppointmentsPageContent({
   const staffInsetPanelClass = 'rounded-[1.4rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#f9fbff_0%,#eef4ff_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]';
   const staffInputClass = 'rounded-xl border-[#dbe5ff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] font-bold text-[#14295F] placeholder:text-[#8ca0c7]';
 
+  const renderRequestedUrlPanel = (item: ParentCommunicationRecord, surface: 'student' | 'staff') => {
+    if (item.supportKind !== 'wifi_unblock' || !item.requestedUrl) return null;
+
+    if (surface === 'staff') {
+      return (
+        <div className="rounded-2xl border border-[#ffe1c5] bg-[linear-gradient(135deg,#fff8ef_0%,#fff1e4_100%)] p-4">
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-white p-2 shadow-sm">
+              <ShieldCheck className="h-4 w-4 text-[#FF7A16]" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c26a1c]">와이파이 방화벽 해제 요청</p>
+              <p className="mt-1 text-xs font-bold text-[#14295F]">학생이 학습용 사이트 허용을 요청했습니다.</p>
+            </div>
+          </div>
+          <div className="mt-3 rounded-xl border border-[#ffd9b6] bg-white/80 p-3">
+            <p className="text-[10px] font-black text-[#c26a1c]">요청 URL</p>
+            <a
+              href={item.requestedUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 flex items-center gap-2 break-all text-sm font-black text-[#14295F] underline decoration-[#ffb170] underline-offset-4"
+            >
+              <Link2 className="h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+              {item.requestedUrl}
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn(
+        isStudentTrackTheme
+          ? 'surface-card surface-card--ghost on-dark border-[#ffb170]/20'
+          : 'rounded-2xl border border-orange-200 bg-orange-50/80',
+        'p-4'
+      )}>
+        <div className="flex items-center gap-2">
+          <Wifi className={cn('h-4 w-4', isStudentTrackTheme ? 'text-[#ffb170]' : 'text-orange-600')} />
+          <p className={cn('text-[10px] font-black uppercase tracking-[0.22em]', isStudentTrackTheme ? 'text-[#ffcf9f]' : 'text-orange-700')}>
+            와이파이 방화벽 해제 요청
+          </p>
+        </div>
+        <a
+          href={item.requestedUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={cn(
+            'mt-2 flex items-center gap-2 break-all text-sm font-black underline underline-offset-4',
+            isStudentTrackTheme ? 'text-[var(--text-on-dark)] decoration-[#ffb170]/70' : 'text-orange-900 decoration-orange-300'
+          )}
+        >
+          <Link2 className={cn('h-3.5 w-3.5 shrink-0', isStudentTrackTheme ? 'text-[#ffb170]' : 'text-orange-600')} />
+          {item.requestedUrl}
+        </a>
+      </div>
+    );
+  };
+
+  const renderSupportThread = (item: ParentCommunicationRecord, surface: 'student' | 'staff') => {
+    const threadMessages = getSupportThreadMessages(item.id);
+    const draftValue = getThreadDraftValue(item.id);
+
+    return (
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <p className={cn(
+            'text-[10px] font-black uppercase tracking-[0.22em]',
+            surface === 'staff'
+              ? 'text-[#5c6e97]'
+              : isStudentTrackTheme
+                ? 'text-[var(--text-on-dark-muted)]'
+                : 'text-sky-700'
+          )}>
+            1:1 톡
+          </p>
+          {threadMessages.length === 0 ? (
+            <div className={cn(
+              surface === 'staff'
+                ? 'rounded-2xl border border-dashed border-[#dbe5ff] bg-[#f8fbff] p-4 text-[#5c6e97]'
+                : isStudentTrackTheme
+                  ? 'surface-card surface-card--ghost on-dark rounded-[1.2rem] border-white/10 p-4 text-[var(--text-on-dark-muted)]'
+                  : 'rounded-2xl border border-dashed border-sky-200 bg-sky-50/60 p-4 text-sky-700',
+              'text-sm font-bold'
+            )}>
+              아직 추가 대화가 없습니다. 아래에서 바로 메시지를 이어갈 수 있어요.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {threadMessages.map((message) => {
+                const isStudentSender = message.senderRole === 'student';
+                const messageTime = message.createdAt?.toDate?.();
+                return (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      'rounded-2xl border p-4',
+                      surface === 'staff'
+                        ? isStudentSender
+                          ? 'border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f4f8ff_100%)]'
+                          : 'border-[#ffe1c5] bg-[linear-gradient(135deg,#fff8ef_0%,#fff1e4_100%)]'
+                        : isStudentTrackTheme
+                          ? isStudentSender
+                            ? 'surface-card surface-card--ghost on-dark border-white/10'
+                            : 'surface-card surface-card--ghost on-dark border-emerald-300/18'
+                          : isStudentSender
+                            ? 'border-sky-200 bg-sky-50/80'
+                            : 'border-emerald-200 bg-emerald-50/80'
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className={cn(
+                        'text-[10px] font-black uppercase tracking-[0.2em]',
+                        surface === 'staff'
+                          ? 'text-[#5c6e97]'
+                          : isStudentTrackTheme
+                            ? 'text-[var(--text-on-dark-muted)]'
+                            : isStudentSender
+                              ? 'text-sky-700'
+                              : 'text-emerald-700'
+                      )}>
+                        {getSupportSenderLabel(message)}
+                      </p>
+                      <p className={cn(
+                        'text-[10px] font-bold',
+                        surface === 'staff'
+                          ? 'text-[#7f93ba]'
+                          : isStudentTrackTheme
+                            ? 'text-[var(--text-on-dark-muted)]'
+                            : 'text-muted-foreground'
+                      )}>
+                        {messageTime ? format(messageTime, 'MM.dd HH:mm') : ''}
+                      </p>
+                    </div>
+                    <p className={cn(
+                      'mt-2 whitespace-pre-wrap text-sm font-bold leading-relaxed',
+                      surface === 'staff'
+                        ? 'text-[#14295F]'
+                        : isStudentTrackTheme
+                          ? isStudentSender
+                            ? 'text-[var(--text-on-dark)]'
+                            : 'text-emerald-100'
+                          : isStudentSender
+                            ? 'text-sky-900'
+                            : 'text-emerald-900'
+                    )}>
+                      {message.body}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Textarea
+            value={draftValue}
+            onChange={(e) => setThreadDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+            placeholder={surface === 'staff' ? '학생에게 보낼 답변을 입력해 주세요.' : '선생님 또는 센터관리자에게 추가 메시지를 남겨 주세요.'}
+            className={cn(
+              'min-h-[92px] resize-none',
+              surface === 'staff'
+                ? staffInputClass
+                : isStudentTrackTheme
+                  ? 'rounded-xl border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]'
+                  : 'rounded-xl border-2'
+            )}
+          />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              disabled={isSubmitting || !draftValue.trim()}
+              onClick={() => handleSendSupportMessage(item)}
+              className={cn(
+                'rounded-xl font-black h-9 gap-1.5',
+                surface === 'staff'
+                  ? 'bg-[#14295F] text-white hover:bg-[#10224e]'
+                  : counselingCtaClass
+              )}
+            >
+              <Send className="h-3.5 w-3.5" />
+              {surface === 'staff' ? '메시지 보내기' : '톡 보내기'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       className={cn(
@@ -881,7 +1285,7 @@ export function AppointmentsPageContent({
                     상담 예약 · 피드백 센터
                   </p>
                   <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
-                    예약 신청부터 상담 결과 확인, 질문과 건의까지 한 흐름으로 이어지는 학생용 상담 라운지예요.
+                    예약 신청부터 상담 결과 확인, 질문과 건의, 와이파이 해제 요청까지 한 흐름으로 이어지는 학생용 상담 라운지예요.
                   </p>
                 </div>
                 <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] border-white/10 px-3.5 py-3 shadow-none">
@@ -1561,9 +1965,9 @@ export function AppointmentsPageContent({
                 <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
                   <div className="space-y-2">
                     <CardTitle className={studentSectionTitleClass}>
-                      <MessageSquare className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : isStaff ? "text-[#14295F]" : "opacity-60 text-sky-700")} /> 질문/건의함
+                      <MessageSquare className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : isStaff ? "text-[#14295F]" : "opacity-60 text-sky-700")} /> 질문/건의/요청함
                     </CardTitle>
-                    <CardDescription className={studentSectionDescriptionClass}>궁금한 점이나 건의사항을 남기면 선생님 또는 센터관리자가 확인 후 답변합니다.</CardDescription>
+                    <CardDescription className={studentSectionDescriptionClass}>궁금한 점, 건의사항, 와이파이 방화벽 해제 요청까지 남기면 선생님 또는 센터관리자가 확인 후 답변합니다.</CardDescription>
                   </div>
                   {isStaff && (
                     <Badge variant="outline" className="h-7 rounded-full border-[#dbe5ff] bg-white px-3 text-[10px] font-black text-[#14295F]">
@@ -1576,32 +1980,53 @@ export function AppointmentsPageContent({
                 {isStudent && (
                 <div className={cn("space-y-4 border-b", isMobile ? "p-5" : "p-6 sm:p-8", isStudentTrackTheme ? "border-white/10 bg-white/[0.03]" : "bg-sky-50/20")}>
                   <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[150px_1fr]")}>
-                    <Select value={inquiryType} onValueChange={(value: 'question' | 'suggestion') => setInquiryType(value)}>
+                    <Select value={inquiryType} onValueChange={(value) => setInquiryType(value as StudentInquiryType)}>
                       <SelectTrigger className={cn("h-11 rounded-xl border-2 font-bold text-xs", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)]")}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="question">질문</SelectItem>
                         <SelectItem value="suggestion">건의사항</SelectItem>
+                        <SelectItem value="firewall">와이파이 방화벽 해제 요청</SelectItem>
                       </SelectContent>
                     </Select>
                     <Input
                       value={inquiryTitle}
                       onChange={(e) => setInquiryTitle(e.target.value)}
-                      placeholder={inquiryType === 'question' ? '질문 제목 (선택)' : '건의 제목 (선택)'}
+                      placeholder={
+                        inquiryType === 'firewall'
+                          ? '요청 제목 (선택)'
+                          : inquiryType === 'question'
+                            ? '질문 제목 (선택)'
+                            : '건의 제목 (선택)'
+                      }
                       className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]")}
                     />
                   </div>
+                  {inquiryType === 'firewall' && (
+                    <Input
+                      value={firewallUrl}
+                      onChange={(e) => setFirewallUrl(e.target.value)}
+                      placeholder="예: classroom.google.com 또는 https://classroom.google.com"
+                      className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]")}
+                    />
+                  )}
                   <Textarea
                     value={inquiryBody}
                     onChange={(e) => setInquiryBody(e.target.value)}
-                    placeholder={inquiryType === 'question' ? '질문 내용을 입력해 주세요.' : '건의사항 내용을 입력해 주세요.'}
+                    placeholder={
+                      inquiryType === 'firewall'
+                        ? '해당 URL이 왜 필요한지, 어떤 수업/과제에 필요한지 이유를 적어 주세요.'
+                        : inquiryType === 'question'
+                          ? '질문 내용을 입력해 주세요.'
+                          : '건의사항 내용을 입력해 주세요.'
+                    }
                     className={cn("rounded-xl min-h-[120px] resize-none text-sm font-bold border-2", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]")}
                   />
                   <div className="flex justify-end">
                     <Button
                       onClick={handleSubmitInquiry}
-                      disabled={isSubmitting || !inquiryBody.trim()}
+                      disabled={isSubmitting || !inquiryBody.trim() || (inquiryType === 'firewall' && !firewallUrl.trim())}
                       className={cn("rounded-xl font-black h-11 px-6", counselingCtaClass)}
                     >
                       {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : '등록하기'}
@@ -1614,7 +2039,7 @@ export function AppointmentsPageContent({
                 ) : studentInquiries.length === 0 ? (
                   <div className={cn("py-24", studentEmptyStateClass)}>
                     <MessageSquare className={cn("h-16 w-16", isStudentTrackTheme ? "opacity-30" : "opacity-10")} />
-                    등록된 질문/건의가 없습니다.
+                    등록된 질문/건의/요청이 없습니다.
                   </div>
                 ) : (
                   <div className={cn(isStudentTrackTheme ? "space-y-3 p-4" : "divide-y divide-muted/10")}>
@@ -1623,6 +2048,7 @@ export function AppointmentsPageContent({
                       const createdAtLabel = createdAtDate ? format(createdAtDate, 'yyyy.MM.dd HH:mm') : '-';
                       const repliedAtDate = item.repliedAt?.toDate?.();
                       const repliedAtLabel = repliedAtDate ? format(repliedAtDate, 'yyyy.MM.dd HH:mm') : '';
+                      const threadMessages = getSupportThreadMessages(item.id);
                       return (
                         <div key={item.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : isStaff ? "space-y-3 rounded-[1.5rem] border border-[#d9ecff] bg-[linear-gradient(135deg,#ffffff_0%,#f4faff_54%,#eef5ff_100%)] mx-4 my-4 shadow-[0_20px_42px_-34px_rgba(37,84,215,0.18)]" : "space-y-3 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-8")}>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -1631,15 +2057,17 @@ export function AppointmentsPageContent({
                           </div>
                           <h3 className={cn("font-black break-keep", isMobile ? "text-sm" : "text-base", studentTitleTextClass)}>{item.title || '질문/건의'}</h3>
                           <p className={cn("text-[10px] font-bold", studentMetaTextClass)}>{createdAtLabel}</p>
+                          {renderRequestedUrlPanel(item, 'student')}
                           <div className={cn(studentGhostPanelClass, "p-4")}>
                             <p className={cn("whitespace-pre-wrap text-sm font-bold leading-relaxed", studentBodyTextClass)}>{item.body?.trim() || '내용이 없습니다.'}</p>
                           </div>
-                          {item.replyBody && (
+                          {item.replyBody && threadMessages.length === 0 && (
                             <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-emerald-300/18" : isStaff ? "rounded-2xl border border-[#d8efe2] bg-[linear-gradient(135deg,#f1fbf5_0%,#ffffff_100%)]" : "rounded-2xl border border-emerald-200 bg-emerald-50/70", "p-4")}>
                               <p className={cn("text-[10px] font-black mb-1", isStudentTrackTheme ? "text-emerald-300" : isStaff ? "text-[#5c6e97]" : "text-emerald-700")}>답변 {item.repliedByName ? `· ${item.repliedByName}` : ''} {repliedAtLabel ? `· ${repliedAtLabel}` : ''}</p>
                               <p className={cn("whitespace-pre-wrap text-sm font-bold leading-relaxed", isStudentTrackTheme ? "text-emerald-100" : isStaff ? "text-[#14295F]" : "text-emerald-900")}>{item.replyBody}</p>
                             </div>
                           )}
+                          {renderSupportThread(item, 'student')}
                         </div>
                       );
                     })}
@@ -1673,9 +2101,9 @@ export function AppointmentsPageContent({
                 <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-stretch" : "flex-row")}>
                   <div className="space-y-2">
                     <CardTitle className={cn("font-black text-[#14295F] flex items-center gap-3 break-keep", isMobile ? "text-lg" : "text-xl")}>
-                      <ClipboardCheck className="h-6 w-6" /> 학부모 요청 워크보드
+                      <ClipboardCheck className="h-6 w-6" /> 상담트랙 워크보드
                     </CardTitle>
-                    <CardDescription className="text-sm font-semibold leading-6 text-[#5c6e97]">학생·학부모 요청을 확인하고 상태 변경 또는 답변을 남길 수 있습니다.</CardDescription>
+                    <CardDescription className="text-sm font-semibold leading-6 text-[#5c6e97]">학생 질문, 와이파이 해제 요청, 학부모 요청을 확인하고 상태 변경 또는 답변을 남길 수 있습니다.</CardDescription>
                   </div>
                   <div className={cn("flex items-center gap-2", isMobile ? "w-full flex-col" : "w-auto")}>
                     <Select value={parentTypeFilter} onValueChange={(value: any) => setParentTypeFilter(value)}>
@@ -1720,6 +2148,8 @@ export function AppointmentsPageContent({
                       const studentName = studentNameById.get(item.studentId) || item.studentId;
                       const channelLabel =
                         item.channel === 'visit' ? '방문' : item.channel === 'phone' ? '전화' : item.channel === 'online' ? '온라인' : null;
+                      const threadMessages = getSupportThreadMessages(item.id);
+                      const isStudentThread = item.senderRole === 'student';
                       return (
                         <div key={item.id} className={cn("flex flex-col gap-4 rounded-[1.5rem] border border-[#e7dcff] bg-[linear-gradient(135deg,#fffaf3_0%,#f8f5ff_45%,#eef5ff_100%)] shadow-[0_20px_42px_-34px_rgba(20,41,95,0.2)]", isMobile ? "p-5" : "p-6 sm:p-8")}>
                           <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1751,21 +2181,26 @@ export function AppointmentsPageContent({
                           <div className="rounded-2xl border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f4f8ff_100%)] p-4">
                             <p className="whitespace-pre-wrap text-sm font-bold text-[#14295F] leading-relaxed">{item.body?.trim() || '요청 내용이 비어 있습니다.'}</p>
                           </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black text-[#5c6e97] uppercase tracking-wider">답변</p>
-                            <Textarea
-                              value={getReplyDraftValue(item)}
-                              onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                              placeholder="학생/학부모에게 전달할 답변을 입력해 주세요."
-                              className={cn("min-h-[92px] resize-none", staffInputClass)}
-                            />
-                            <div className="flex justify-end">
-                              <Button size="sm" disabled={isSubmitting || !getReplyDraftValue(item).trim()} onClick={() => handleSaveCommunicationReply(item)} className="rounded-xl font-black h-9 bg-[#14295F] text-white hover:bg-[#10224e]">
-                                답변 저장
-                              </Button>
+                          {renderRequestedUrlPanel(item, 'staff')}
+                          {isStudentThread ? (
+                            renderSupportThread(item, 'staff')
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-black text-[#5c6e97] uppercase tracking-wider">답변</p>
+                              <Textarea
+                                value={getReplyDraftValue(item)}
+                                onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                placeholder="학생/학부모에게 전달할 답변을 입력해 주세요."
+                                className={cn("min-h-[92px] resize-none", staffInputClass)}
+                              />
+                              <div className="flex justify-end">
+                                <Button size="sm" disabled={isSubmitting || !getReplyDraftValue(item).trim()} onClick={() => handleSaveCommunicationReply(item)} className="rounded-xl font-black h-9 bg-[#14295F] text-white hover:bg-[#10224e]">
+                                  답변 저장
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                          {item.replyBody && (
+                          )}
+                          {item.replyBody && threadMessages.length === 0 && (
                             <div className="rounded-2xl border border-[#d8efe2] bg-[linear-gradient(135deg,#f2fbf6_0%,#ffffff_100%)] p-4">
                               <p className="text-[10px] font-black text-[#5c6e97] mb-1">
                                 최근 답변{item.repliedByName ? ` · ${item.repliedByName}` : ''}

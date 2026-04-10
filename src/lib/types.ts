@@ -932,6 +932,25 @@ export interface CounselingLog {
   createdAt: Timestamp;
 }
 
+export type SupportThreadKind = 'student_question' | 'student_suggestion' | 'wifi_unblock';
+export type SupportThreadSenderRole = 'student' | 'teacher' | 'centerAdmin' | 'parent';
+
+export interface SupportThreadMessage {
+  id: string;
+  centerId: string;
+  communicationId: string;
+  studentId: string;
+  parentUid?: string | null;
+  senderRole: SupportThreadSenderRole;
+  senderUid: string;
+  senderName: string;
+  body: string;
+  supportKind?: SupportThreadKind | null;
+  requestedUrl?: string | null;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface DailyStudentStat {
     centerId: string;
     studentId: string;
