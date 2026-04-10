@@ -91,6 +91,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
 import { CenterAdminHeatmapCharts } from '@/components/dashboard/center-admin-heatmap-charts';
+import { AppointmentsPageContent } from '@/app/dashboard/appointments/appointments-page-content';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
@@ -363,6 +364,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isImmediateInterventionSheetOpen, setIsImmediateInterventionSheetOpen] = useState(false);
   const [isAttendancePriorityDialogOpen, setIsAttendancePriorityDialogOpen] = useState(false);
   const [isControlAlertsDialogOpen, setIsControlAlertsDialogOpen] = useState(false);
+  const [isCounselTrackDialogOpen, setIsCounselTrackDialogOpen] = useState(false);
+  const [counselTrackDialogTab, setCounselTrackDialogTab] = useState<'reservations' | 'logs' | 'inquiries' | 'parent'>('reservations');
   const [selectedHomeAxisId, setSelectedHomeAxisId] = useState<string | null>(null);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const hasInitializedRoomViewRef = useRef(false);
@@ -1597,7 +1600,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           activityMs: activityDate?.getTime() ?? 0,
           activityLabel: formatDashboardTrackTime(activityDate),
           roleLabel: item.senderRole === 'student' ? '학생 1:1' : '학부모 1:1',
-          href: item.senderRole === 'student' ? '/dashboard/appointments/inquiries' : '/dashboard/appointments/parent-requests',
+          targetTab: item.senderRole === 'student' ? 'inquiries' as const : 'parent' as const,
         };
       })
       .sort((a, b) => b.activityMs - a.activityMs);
@@ -1623,7 +1626,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         preview: item.preview || '상담 문의가 접수되었습니다.',
         timeLabel: item.activityLabel,
         timeMs: item.activityMs,
-        href: '/dashboard/appointments/parent-requests',
+        targetTab: 'parent' as const,
         badge: item.senderRole === 'student' ? '학생 문의' : '학부모 문의',
         tone: 'orange' as const,
       }));
@@ -1644,7 +1647,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             || `${item.teacherName || '담당 선생님'} 상담이 대기 중입니다.`,
           timeLabel: formatDashboardTrackTime(createdDate),
           timeMs: createdDate?.getTime() ?? 0,
-          href: '/dashboard/appointments/reservations',
+          targetTab: 'reservations' as const,
           badge: item.status === 'confirmed' ? '예약 확정' : '예약 요청',
           tone: 'navy' as const,
         };
@@ -2752,6 +2755,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setIsImmediateInterventionSheetOpen(false);
     setSelectedFocusStudentId(studentId);
   };
+  const openCounselTrackDialog = (tab: 'reservations' | 'logs' | 'inquiries' | 'parent' = 'reservations') => {
+    setCounselTrackDialogTab(tab);
+    setIsCounselTrackDialogOpen(true);
+  };
   function renderHomeHeroSection() {
     // ── KPI cards for the summary bar ──
     const kpiCards = [
@@ -3180,15 +3187,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     와이파이 요청, 1:1 연락, 상담문의를 한 번에 봅니다.
                   </CardTitle>
                   <CardDescription className="mt-2 max-w-[42rem] text-sm font-bold leading-6 text-[#5c6e97]">
-                    학생·학부모와 오간 최근 연락과 예약 대기 흐름을 여기서 먼저 확인하고 바로 상담트랙으로 들어갑니다.
+                    학생·학부모와 오간 최근 연락과 예약 대기 흐름을 여기서 먼저 보고, 팝업 안에서 바로 처리합니다.
                   </CardDescription>
                 </div>
-                <Link
-                  href="/dashboard/appointments"
+                <button
+                  type="button"
+                  onClick={() => openCounselTrackDialog('reservations')}
                   className="inline-flex h-11 items-center justify-center rounded-[1.1rem] border border-[#DCE7FF] bg-white px-4 text-sm font-black text-[#14295F] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/30 hover:text-[#C95A08]"
                 >
                   상담트랙 열기
-                </Link>
+                </button>
               </div>
 
               <div className={cn('mt-5 grid gap-2.5', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
@@ -3222,10 +3230,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                       <p className="mt-1.5 text-sm font-black text-[#14295F]">열린 요청부터 바로 확인</p>
                     </div>
-                    <Link href="/dashboard/appointments/inquiries" className="inline-flex items-center gap-1 text-[11px] font-black text-[#C95A08] hover:text-[#FF7A16]">
+                    <button type="button" onClick={() => openCounselTrackDialog('inquiries')} className="inline-flex items-center gap-1 text-[11px] font-black text-[#C95A08] hover:text-[#FF7A16]">
                       전체 보기
                       <ChevronRight className="h-3.5 w-3.5" />
-                    </Link>
+                    </button>
                   </div>
 
                   {counselingTrackOverview.wifiRequests.length === 0 ? (
@@ -3235,9 +3243,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   ) : (
                     <div className="grid gap-2.5">
                       {counselingTrackOverview.wifiRequests.map((item: any) => (
-                        <Link
+                        <button
                           key={`wifi-${item.id}`}
-                          href="/dashboard/appointments/inquiries"
+                          type="button"
+                          onClick={() => openCounselTrackDialog('inquiries')}
                           className="admin-card-lift block rounded-[1.3rem] border border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF8F1_0%,#FFFFFF_100%)] px-4 py-3 hover:border-[#FF7A16]/40"
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -3256,7 +3265,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                             <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#5c6e97]" />
                           </div>
-                        </Link>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -3271,10 +3280,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                       <p className="mt-1.5 text-sm font-black text-[#14295F]">가장 최근 대화 흐름</p>
                     </div>
-                    <Link href="/dashboard/appointments" className="inline-flex items-center gap-1 text-[11px] font-black text-[#2554D7] hover:text-[#14295F]">
+                    <button type="button" onClick={() => openCounselTrackDialog('parent')} className="inline-flex items-center gap-1 text-[11px] font-black text-[#2554D7] hover:text-[#14295F]">
                       전체 보기
                       <ChevronRight className="h-3.5 w-3.5" />
-                    </Link>
+                    </button>
                   </div>
 
                   {counselingTrackOverview.recentContacts.length === 0 ? (
@@ -3284,9 +3293,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   ) : (
                     <div className="grid gap-2.5">
                       {counselingTrackOverview.recentContacts.map((item: any) => (
-                        <Link
+                        <button
                           key={`contact-${item.id}`}
-                          href={item.href}
+                          type="button"
+                          onClick={() => openCounselTrackDialog(item.targetTab)}
                           className="admin-card-lift block rounded-[1.3rem] border border-[#DCE7FF] bg-white px-4 py-3 hover:border-[#2554D7]/30"
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -3313,7 +3323,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                             <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#5c6e97]" />
                           </div>
-                        </Link>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -3328,10 +3338,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                       <p className="mt-1.5 text-sm font-black text-[#14295F]">바로 처리할 문의와 예약</p>
                     </div>
-                    <Link href="/dashboard/appointments" className="inline-flex items-center gap-1 text-[11px] font-black text-[#4B57C0] hover:text-[#14295F]">
+                    <button type="button" onClick={() => openCounselTrackDialog('reservations')} className="inline-flex items-center gap-1 text-[11px] font-black text-[#4B57C0] hover:text-[#14295F]">
                       전체 보기
                       <ChevronRight className="h-3.5 w-3.5" />
-                    </Link>
+                    </button>
                   </div>
 
                   {counselingTrackOverview.consultationInbox.length === 0 ? (
@@ -3341,9 +3351,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   ) : (
                     <div className="grid gap-2.5">
                       {counselingTrackOverview.consultationInbox.map((item) => (
-                        <Link
+                        <button
                           key={item.id}
-                          href={item.href}
+                          type="button"
+                          onClick={() => openCounselTrackDialog(item.targetTab)}
                           className={cn(
                             'admin-card-lift block rounded-[1.3rem] border px-4 py-3',
                             item.tone === 'navy'
@@ -3367,7 +3378,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                             <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#5c6e97]" />
                           </div>
-                        </Link>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -4111,6 +4122,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </Button>
             </DialogClose>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isCounselTrackDialogOpen} onOpenChange={setIsCounselTrackDialogOpen}>
+        <DialogContent
+          motionPreset="dashboard-premium"
+          className={cn(
+            studioDialogContentClassName,
+            'max-h-[94vh] flex flex-col gap-0 overflow-hidden bg-[linear-gradient(180deg,#F7FAFF_0%,#EFF4FF_100%)] p-0 sm:max-w-[1180px]'
+          )}
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4">
+            <AppointmentsPageContent forceTab={counselTrackDialogTab} />
+          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={isAnnouncementDialogOpen} onOpenChange={setIsAnnouncementDialogOpen}>
