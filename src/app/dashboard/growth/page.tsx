@@ -705,22 +705,27 @@ export default function GrowthPage() {
   const handleRevealBox = async () => {
     if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !activeMembership?.id) return;
     const targetHour = selectedBox.hour;
+    const rewardOpenPromise = openStudyRewardBoxSecure({
+      centerId: activeMembership.id,
+      dateKey: todayKey,
+      hour: targetHour,
+    })
+      .then((result) => ({ ok: true as const, result }))
+      .catch((error) => ({ ok: false as const, error }));
 
     setIsClaimingBox(true);
     setBoxStage('shake');
 
     const shakeTimeout = setTimeout(() => {
       setBoxStage('burst');
-    }, 380);
+    }, 220);
     timeoutsRef.current.push(shakeTimeout);
 
     const revealTimeout = setTimeout(async () => {
       try {
-        const result = await openStudyRewardBoxSecure({
-          centerId: activeMembership.id,
-          dateKey: todayKey,
-          hour: targetHour,
-        });
+        const rewardResult = await rewardOpenPromise;
+        if (!rewardResult.ok) throw rewardResult.error;
+        const result = rewardResult.result;
         const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
           ? result.openedStudyBoxes
           : Array.from(new Set([...openedBoxes, targetHour])).sort((a, b) => a - b);
@@ -760,7 +765,7 @@ export default function GrowthPage() {
       } finally {
         setIsClaimingBox(false);
       }
-    }, 980);
+    }, 540);
 
     timeoutsRef.current.push(revealTimeout);
   };

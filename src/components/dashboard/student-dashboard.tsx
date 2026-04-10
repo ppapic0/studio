@@ -2803,20 +2803,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !activeVaultDateKey || !activeMembership?.id) return;
     const targetHour = selectedHomeBox.hour;
     const targetDateKey = activeVaultDateKey;
+    const rewardOpenPromise = openStudyRewardBoxSecure({
+      centerId: activeMembership.id,
+      dateKey: targetDateKey,
+      hour: targetHour,
+    })
+      .then((result) => ({ ok: true as const, result }))
+      .catch((error) => ({ ok: false as const, error }));
 
     setIsClaimingHomeBox(true);
     setHomeBoxStage('shake');
 
-    const burstId = setTimeout(() => setHomeBoxStage('burst'), 360);
+    const burstId = setTimeout(() => setHomeBoxStage('burst'), 220);
     homeBoxTimeoutsRef.current.push(burstId);
 
     const revealId = setTimeout(async () => {
       try {
-        const result = await openStudyRewardBoxSecure({
-          centerId: activeMembership.id,
-          dateKey: targetDateKey,
-          hour: targetHour,
-        });
+        const rewardResult = await rewardOpenPromise;
+        if (!rewardResult.ok) throw rewardResult.error;
+        const result = rewardResult.result;
         const sourceOpenedBoxes = targetDateKey === todayKey ? homeOpenedBoxes : carryoverOpenedBoxes;
         const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
           ? result.openedStudyBoxes
@@ -2861,7 +2866,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       } finally {
         setIsClaimingHomeBox(false);
       }
-    }, 960);
+    }, 520);
 
     homeBoxTimeoutsRef.current.push(revealId);
   }, [
