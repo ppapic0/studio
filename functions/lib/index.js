@@ -4704,7 +4704,7 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
     };
 });
 exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -4736,18 +4736,36 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
     }
     const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${dateKey}`);
     const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
-    const [studentMemberSnap, studentProfileSnap, studyDaySnap] = await Promise.all([
+    const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap] = await Promise.all([
         db.doc(`centers/${centerId}/members/${authUid}`).get(),
         db.doc(`centers/${centerId}/students/${authUid}`).get(),
         studyDayRef.get(),
+        db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(1).get(),
     ]);
     if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
         throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
             userMessage: "학생 정보를 찾지 못했습니다.",
         });
     }
-    const dayMinutes = Math.max(0, Math.floor((_d = parseFiniteNumber((_c = studyDaySnap.data()) === null || _c === void 0 ? void 0 : _c.totalMinutes)) !== null && _d !== void 0 ? _d : 0));
-    const earnedHours = Math.min(8, Math.floor(dayMinutes / 60));
+    const persistedDayMinutes = Math.max(0, Math.floor((_d = parseFiniteNumber((_c = studyDaySnap.data()) === null || _c === void 0 ? void 0 : _c.totalMinutes)) !== null && _d !== void 0 ? _d : 0));
+    const todayKstKey = toDateKey(toKstDate());
+    let liveSessionMinutes = 0;
+    if (dateKey === todayKstKey && !attendanceSnap.empty) {
+        const attendanceData = (_e = attendanceSnap.docs[0]) === null || _e === void 0 ? void 0 : _e.data();
+        const attendanceStatus = asTrimmedString(attendanceData === null || attendanceData === void 0 ? void 0 : attendanceData.status);
+        const liveStartedAtMs = toMillisSafe(attendanceData === null || attendanceData === void 0 ? void 0 : attendanceData.lastCheckInAt);
+        const dayStartMs = Date.parse(`${dateKey}T00:00:00+09:00`);
+        const nowMs = Date.now();
+        if (ACTIVE_STUDY_ATTENDANCE_STATUSES.has(attendanceStatus) &&
+            liveStartedAtMs > 0 &&
+            Number.isFinite(dayStartMs) &&
+            nowMs > liveStartedAtMs) {
+            const effectiveStartMs = Math.max(liveStartedAtMs, dayStartMs);
+            liveSessionMinutes = Math.max(0, Math.floor((nowMs - effectiveStartMs) / 60000));
+        }
+    }
+    const effectiveDayMinutes = Math.max(persistedDayMinutes, persistedDayMinutes + liveSessionMinutes);
+    const earnedHours = Math.min(8, Math.floor(effectiveDayMinutes / 60));
     if (earnedHours < hour) {
         throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
             userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",

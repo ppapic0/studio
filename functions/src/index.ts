@@ -5830,10 +5830,11 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
   const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${dateKey}`);
   const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
 
-  const [studentMemberSnap, studentProfileSnap, studyDaySnap] = await Promise.all([
+  const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap] = await Promise.all([
     db.doc(`centers/${centerId}/members/${authUid}`).get(),
     db.doc(`centers/${centerId}/students/${authUid}`).get(),
     studyDayRef.get(),
+    db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(1).get(),
   ]);
 
   if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
@@ -5842,8 +5843,30 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     });
   }
 
-  const dayMinutes = Math.max(0, Math.floor(parseFiniteNumber(studyDaySnap.data()?.totalMinutes) ?? 0));
-  const earnedHours = Math.min(8, Math.floor(dayMinutes / 60));
+  const persistedDayMinutes = Math.max(0, Math.floor(parseFiniteNumber(studyDaySnap.data()?.totalMinutes) ?? 0));
+  const todayKstKey = toDateKey(toKstDate());
+  let liveSessionMinutes = 0;
+
+  if (dateKey === todayKstKey && !attendanceSnap.empty) {
+    const attendanceData = attendanceSnap.docs[0]?.data() as Record<string, unknown> | undefined;
+    const attendanceStatus = asTrimmedString(attendanceData?.status);
+    const liveStartedAtMs = toMillisSafe(attendanceData?.lastCheckInAt);
+    const dayStartMs = Date.parse(`${dateKey}T00:00:00+09:00`);
+    const nowMs = Date.now();
+
+    if (
+      ACTIVE_STUDY_ATTENDANCE_STATUSES.has(attendanceStatus) &&
+      liveStartedAtMs > 0 &&
+      Number.isFinite(dayStartMs) &&
+      nowMs > liveStartedAtMs
+    ) {
+      const effectiveStartMs = Math.max(liveStartedAtMs, dayStartMs);
+      liveSessionMinutes = Math.max(0, Math.floor((nowMs - effectiveStartMs) / 60000));
+    }
+  }
+
+  const effectiveDayMinutes = Math.max(persistedDayMinutes, persistedDayMinutes + liveSessionMinutes);
+  const earnedHours = Math.min(8, Math.floor(effectiveDayMinutes / 60));
   if (earnedHours < hour) {
     throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
       userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
