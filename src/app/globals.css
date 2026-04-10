@@ -1084,6 +1084,113 @@ select {
     animation: track-pace-contrail 1.8s ease-in-out infinite;
   }
 
+  .track-pace-vehicle--idle {
+    transform-origin: 21px 36px;
+    animation: track-pace-idle-breathe 2.4s ease-in-out infinite;
+  }
+
+  .track-pace-idle-shadow {
+    transform-origin: center;
+    animation: track-pace-idle-shadow 2.4s ease-in-out infinite;
+  }
+
+  .student-home-track-progress {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(255,255,255,0.08);
+    background:
+      radial-gradient(circle at 82% 18%, rgba(255,210,108,0.14), transparent 18%),
+      radial-gradient(circle at 12% 88%, rgba(147,227,255,0.14), transparent 22%),
+      linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 16px 32px -28px rgba(20,41,95,0.42);
+  }
+
+  .student-home-track-progress__surface {
+    position: absolute;
+    inset: 0.55rem;
+    border-radius: 0.95rem;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    pointer-events: none;
+  }
+
+  .student-home-track-progress__svg {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+  }
+
+  .student-home-track-progress__runner {
+    position: absolute;
+    z-index: 2;
+    width: 3.45rem;
+    height: 3.45rem;
+    transform: translate(-50%, -62%);
+    transition:
+      left 560ms cubic-bezier(0.22, 1, 0.36, 1),
+      top 560ms cubic-bezier(0.22, 1, 0.36, 1),
+      filter 220ms ease;
+    filter: drop-shadow(0 10px 14px rgba(20,41,95,0.22));
+    will-change: left, top;
+  }
+
+  .student-home-track-progress__runner-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .student-home-track-progress--live .student-home-track-progress__runner {
+    filter:
+      drop-shadow(0 8px 12px rgba(255, 122, 22, 0.18))
+      drop-shadow(0 0 14px rgba(255, 210, 108, 0.16));
+  }
+
+  .student-home-track-progress--idle .student-home-track-progress__runner {
+    filter: drop-shadow(0 8px 12px rgba(20,41,95,0.16));
+  }
+
+  .student-home-track-progress--complete .student-home-track-progress__surface {
+    border-color: rgba(255,210,108,0.22);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 0 26px rgba(255,210,108,0.08);
+  }
+
+  .student-home-track-progress__legend {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0 0.35rem 0.1rem;
+    font-size: 0.6rem;
+    font-weight: 900;
+    letter-spacing: 0.22em;
+    color: rgba(255,255,255,0.58);
+    text-transform: uppercase;
+  }
+
+  .student-home-track-progress__legend span:nth-child(2) {
+    color: rgba(255,255,255,0.84);
+  }
+
+  .student-home-track-progress--complete .student-home-track-progress__legend span:last-child {
+    color: #FFD26C;
+  }
+
+  @media (max-width: 430px) {
+    .student-home-track-progress__runner {
+      width: 3rem;
+      height: 3rem;
+    }
+
+    .student-home-track-progress__legend {
+      font-size: 0.56rem;
+      letter-spacing: 0.18em;
+    }
+  }
+
   @keyframes analysis-sheen {
     0% {
       transform: translateX(-130%);
@@ -2999,6 +3106,28 @@ select {
   }
 }
 
+@keyframes track-pace-idle-breathe {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -1px, 0) rotate(0.6deg);
+  }
+}
+
+@keyframes track-pace-idle-shadow {
+  0%,
+  100% {
+    transform: scaleX(1) scaleY(1);
+    opacity: 0.24;
+  }
+  50% {
+    transform: scaleX(0.94) scaleY(0.96);
+    opacity: 0.18;
+  }
+}
+
 @keyframes track-pace-run-body {
   0%,
   100% {
@@ -4744,6 +4873,8 @@ select {
   .track-pace-wheel,
   .track-pace-streak,
   .track-pace-contrail,
+  .track-pace-idle-shadow,
+  .student-home-track-progress__runner,
   .point-box,
   .point-box-shadow,
   .point-box-hint,
