@@ -765,7 +765,7 @@ export default function GrowthPage() {
       } finally {
         setIsClaimingBox(false);
       }
-    }, 760);
+    }, 520);
 
     timeoutsRef.current.push(revealTimeout);
   };

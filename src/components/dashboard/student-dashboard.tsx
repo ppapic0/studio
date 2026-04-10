@@ -2866,7 +2866,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       } finally {
         setIsClaimingHomeBox(false);
       }
-    }, 740);
+    }, 520);
 
     homeBoxTimeoutsRef.current.push(revealId);
   }, [
