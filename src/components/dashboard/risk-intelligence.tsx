@@ -23,6 +23,7 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { useCollection, useFirestore } from '@/firebase';
@@ -80,6 +81,66 @@ const EXPOSURE_META: Record<RevenueExposureLevel, { label: string; className: st
   high: { label: '매출 위험 큼', className: 'bg-orange-100 text-orange-700' },
   medium: { label: '매출 위험 보통', className: 'bg-amber-100 text-amber-700' },
   low: { label: '매출 위험 낮음', className: 'bg-emerald-100 text-emerald-700' },
+};
+
+const DIMENSION_SURFACE_META: Record<
+  RiskDimensionKey,
+  {
+    icon: LucideIcon;
+    shell: string;
+    iconWrap: string;
+    iconColor: string;
+    scorePanel: string;
+    scoreText: string;
+    scoreSubtle: string;
+    meter: string;
+    reasonPanel: string;
+  }
+> = {
+  dropout: {
+    icon: AlertTriangle,
+    shell: 'border-rose-200/80 bg-[linear-gradient(180deg,#fff7f7_0%,#ffffff_44%,#fff6f6_100%)] shadow-[0_24px_48px_-38px_rgba(225,29,72,0.38)]',
+    iconWrap: 'bg-rose-500/12 ring-1 ring-rose-200/70',
+    iconColor: 'text-rose-600',
+    scorePanel: 'bg-[linear-gradient(180deg,#fff1f3_0%,#ffe4e8_100%)] ring-1 ring-rose-200/70',
+    scoreText: 'text-rose-700',
+    scoreSubtle: 'text-rose-500',
+    meter: 'bg-[linear-gradient(90deg,#fb7185_0%,#f43f5e_100%)]',
+    reasonPanel: 'border-rose-100 bg-white/80',
+  },
+  focus: {
+    icon: BrainCircuit,
+    shell: 'border-violet-200/80 bg-[linear-gradient(180deg,#fbf8ff_0%,#ffffff_44%,#f9f5ff_100%)] shadow-[0_24px_48px_-38px_rgba(124,58,237,0.34)]',
+    iconWrap: 'bg-violet-500/12 ring-1 ring-violet-200/70',
+    iconColor: 'text-violet-600',
+    scorePanel: 'bg-[linear-gradient(180deg,#f5f0ff_0%,#ede4ff_100%)] ring-1 ring-violet-200/70',
+    scoreText: 'text-violet-700',
+    scoreSubtle: 'text-violet-500',
+    meter: 'bg-[linear-gradient(90deg,#a78bfa_0%,#7c3aed_100%)]',
+    reasonPanel: 'border-violet-100 bg-white/80',
+  },
+  pattern: {
+    icon: Activity,
+    shell: 'border-amber-200/80 bg-[linear-gradient(180deg,#fffaf2_0%,#ffffff_44%,#fff8ef_100%)] shadow-[0_24px_48px_-38px_rgba(245,158,11,0.34)]',
+    iconWrap: 'bg-amber-500/12 ring-1 ring-amber-200/70',
+    iconColor: 'text-amber-600',
+    scorePanel: 'bg-[linear-gradient(180deg,#fff4dd_0%,#ffebbf_100%)] ring-1 ring-amber-200/70',
+    scoreText: 'text-amber-700',
+    scoreSubtle: 'text-amber-600',
+    meter: 'bg-[linear-gradient(90deg,#fbbf24_0%,#f59e0b_100%)]',
+    reasonPanel: 'border-amber-100 bg-white/80',
+  },
+  stagnation: {
+    icon: TrendingDown,
+    shell: 'border-sky-200/80 bg-[linear-gradient(180deg,#f5fbff_0%,#ffffff_44%,#f2f8ff_100%)] shadow-[0_24px_48px_-38px_rgba(14,165,233,0.32)]',
+    iconWrap: 'bg-sky-500/12 ring-1 ring-sky-200/70',
+    iconColor: 'text-sky-600',
+    scorePanel: 'bg-[linear-gradient(180deg,#eaf6ff_0%,#d7eeff_100%)] ring-1 ring-sky-200/70',
+    scoreText: 'text-sky-700',
+    scoreSubtle: 'text-sky-500',
+    meter: 'bg-[linear-gradient(90deg,#38bdf8_0%,#0ea5e9_100%)]',
+    reasonPanel: 'border-sky-100 bg-white/80',
+  },
 };
 
 function average(values: number[]): number {
@@ -174,7 +235,7 @@ function StudentDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden rounded-[2rem] p-0">
+      <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden rounded-[2rem] p-0">
         <div className={cn('p-8 text-white', LEVEL_SCORE_CLASS[student.overallLevel].split(' ')[0])}>
           <DialogHeader>
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -213,31 +274,91 @@ function StudentDetailDialog({
               ))}
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2">
+            <section className="space-y-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">dimension breakdown</p>
+                  <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900">차원별 리스크 해석</h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">각 차원 점수, 가중치, 주요 원인과 바로 적용할 행동을 한 카드 안에서 확인합니다.</p>
+                </div>
+                <Badge className="w-fit border-none bg-slate-900 text-white">
+                  상위 3개 원인 중심
+                </Badge>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
               {(Object.keys(student.explanations) as RiskDimensionKey[]).map((dimension) => {
                 const explanation = student.explanations[dimension];
+                const surfaceMeta = DIMENSION_SURFACE_META[dimension];
+                const Icon = surfaceMeta.icon;
+                const strongestFactor = explanation.factors[0];
                 return (
-                  <Card key={dimension} className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
-                    <CardContent className="space-y-4 p-5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className={cn('text-sm font-black', DIMENSION_COLORS[dimension])}>{explanation.label}</p>
-                          <p className="text-xs font-bold text-slate-500">{explanation.summary}</p>
+                  <Card key={dimension} className={cn('overflow-hidden rounded-[2rem] border shadow-none', surfaceMeta.shell)}>
+                    <CardContent className="space-y-5 p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl', surfaceMeta.iconWrap)}>
+                              <Icon className={cn('h-5 w-5', surfaceMeta.iconColor)} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={cn('border-none text-white', DIMENSION_BG[dimension])}>{explanation.label}</Badge>
+                                <Badge variant="outline" className="border-slate-200 bg-white/80 text-[11px] font-black text-slate-600">
+                                  {explanation.level}
+                                </Badge>
+                              </div>
+                              <p className="mt-2 text-sm font-black leading-snug text-slate-900">{explanation.summary}</p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-black text-slate-900">{explanation.score}</p>
-                          <p className="text-[11px] font-bold text-slate-500">가중치 {Math.round(explanation.overallWeight * 100)}%</p>
+                        <div className={cn('shrink-0 rounded-[1.4rem] px-4 py-3 text-right', surfaceMeta.scorePanel)}>
+                          <p className={cn('text-4xl font-black leading-none tracking-tight', surfaceMeta.scoreText)}>{explanation.score}</p>
+                          <p className={cn('mt-1 text-[11px] font-black', surfaceMeta.scoreSubtle)}>가중치 {Math.round(explanation.overallWeight * 100)}%</p>
                         </div>
                       </div>
-                      <div className="space-y-2">
+
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-white/80 bg-white/85 px-4 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">전체 기여도</p>
+                          <p className="mt-2 text-lg font-black text-slate-900">{explanation.overallContribution.toFixed(1)}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/80 bg-white/85 px-4 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">주요 요인</p>
+                          <p className="mt-2 text-sm font-black text-slate-900">{strongestFactor?.label || '-'}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/80 bg-white/85 px-4 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">상태</p>
+                          <p className={cn('mt-2 text-sm font-black', DIMENSION_COLORS[dimension])}>{explanation.level}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
                         {explanation.factors.slice(0, 3).map((factor) => (
-                          <div key={factor.key} className="rounded-xl bg-slate-50 px-3 py-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-xs font-black text-slate-800">{factor.label}</span>
-                              <span className="text-xs font-bold text-slate-500">{factor.displayValue}</span>
+                          <div key={factor.key} className={cn('rounded-[1.35rem] border px-4 py-4', surfaceMeta.reasonPanel)}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-sm font-black text-slate-900">{factor.label}</span>
+                                  <Badge variant="outline" className="border-slate-200 bg-white/80 text-[10px] font-black text-slate-500">
+                                    {factor.displayValue}
+                                  </Badge>
+                                </div>
+                                <p className="mt-2 text-[12px] font-semibold leading-5 text-slate-600">{factor.reason}</p>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <p className="text-lg font-black text-slate-900">{factor.normalizedScore}</p>
+                                <p className="text-[10px] font-bold text-slate-400">리스크</p>
+                              </div>
                             </div>
-                            <Progress value={factor.normalizedScore} className="mt-2 h-2" />
-                            <p className="mt-1 text-[11px] font-semibold text-slate-500">{factor.recommendedAction}</p>
+                            <Progress
+                              value={factor.normalizedScore}
+                              className="mt-3 h-2.5 bg-slate-200/70"
+                              indicatorClassName={surfaceMeta.meter}
+                            />
+                            <div className="mt-3 rounded-xl bg-white/90 px-3 py-2">
+                              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">바로 할 행동</p>
+                              <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-600">{factor.recommendedAction}</p>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -245,6 +366,7 @@ function StudentDetailDialog({
                   </Card>
                 );
               })}
+              </div>
             </section>
 
             <section className="grid gap-4 md:grid-cols-3">
