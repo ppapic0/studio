@@ -216,10 +216,10 @@ export default async function ClassPage() {
               </div>
 
               {/* highlights */}
-              <div className="space-y-2.5 border-t border-white/8 pt-5">
-                {['원장 직강', '직접 제작 해설 자료', '학생별 맞춤 보완'].map((item) => (
-                  <div key={item} className="flex items-center gap-2.5">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[#FF9848]" />
+                <div className="space-y-2.5 border-t border-white/8 pt-5">
+                {['직접 제작 해설 자료', '학생별 맞춤 보완'].map((item) => (
+                    <div key={item} className="flex items-center gap-2.5">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-[#FF9848]" />
                     <span className="text-[13.5px] font-semibold text-white/90">{item}</span>
                   </div>
                 ))}

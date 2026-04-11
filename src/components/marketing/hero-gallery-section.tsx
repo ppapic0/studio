@@ -16,7 +16,7 @@ const heroGalleryCards = [
   {
     eyebrow: 'CLASS 01',
     title: '국어 수업 장면',
-    summary: '원장 직강 수업의 실제 분위기와 설명 밀도가 보이는 장면을 담습니다.',
+    summary: '수업의 실제 분위기와 설명 밀도가 보이는 장면을 담습니다.',
     tone: 'class',
     badge: '수업 장면 예정',
   },

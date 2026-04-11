@@ -27,7 +27,7 @@ const differentiationCards = [
   },
   {
     icon: Target,
-    title: '원장 직강 풀이 체계',
+    title: '핵심 풀이 체계',
     description:
       '상위권 학생이 실제 시험장에서 바로 적용할 수 있는 문제풀이 기준과 판단 루틴을 체계적으로 전달합니다.',
   },
@@ -128,7 +128,7 @@ export function TrackKoreanMethodSection() {
           <div className="grid gap-7 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div className="space-y-5">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-[11px] font-black tracking-[0.14em] text-white/95 uppercase">
-                수능 국어 전문 · 원장 직강
+                수능 국어 전문 · 실전 수업
               </span>
               <h2 className="font-aggro-display break-keep text-[clamp(1.9rem,4.8vw,3.2rem)] font-black leading-[1.12]">
                 읽는 힘을 넘어서,
@@ -397,7 +397,7 @@ export function TrackKoreanMethodSection() {
             결국 읽는 방식과 생각하는 방식입니다
           </h3>
           <p className="mt-4 max-w-[760px] break-keep text-[14px] font-semibold leading-[1.8] text-white/86 sm:text-[14.5px]">
-            원장 직강, 직접 제작 자료, 사고력 중심 수업으로 수능 국어와 내신 국어를 더 밀도 있게 준비하세요.
+            직접 제작 자료와 사고력 중심 수업으로 수능 국어와 내신 국어를 더 밀도 있게 준비하세요.
             상담을 통해 현재 상태에 맞는 학습 루틴과 수업 방향을 함께 설계해드립니다.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
