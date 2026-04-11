@@ -1186,7 +1186,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [homeBoxStage, setHomeBoxStage] = useState<'idle' | 'shake' | 'burst' | 'revealed'>('idle');
   const [revealedHomeReward, setRevealedHomeReward] = useState<number | null>(null);
   const [isClaimingHomeBox, setIsClaimingHomeBox] = useState(false);
-  const [carryoverOpenedBoxes, setCarryoverOpenedBoxes] = useState<number[]>([]);
+  const [carryoverOpenedSnapshot, setCarryoverOpenedSnapshot] = useState<{
+    dateKey: string;
+    hours: number[];
+  }>({
+    dateKey: '',
+    hours: [],
+  });
   const [questGain, setQuestGain] = useState<{ id: string; key: number; amount: number } | null>(null);
   const [pendingQuestIds, setPendingQuestIds] = useState<string[]>([]);
   const pendingQuestIdsRef = useRef<Set<string>>(new Set());
@@ -2488,11 +2494,24 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     setHomeOpenedBoxes(persistedOpenedBoxes);
   }, [persistedOpenedBoxes]);
 
+  const resolvedCarryoverOpenedBoxes = useMemo(() => {
+    if (carryoverOpenedSnapshot.dateKey === yesterdayKey) {
+      return carryoverOpenedSnapshot.hours;
+    }
+    return normalizeStudyBoxHours([...persistedCarryoverOpenedBoxes, ...cachedCarryoverOpenedBoxes]);
+  }, [
+    cachedCarryoverOpenedBoxes,
+    carryoverOpenedSnapshot,
+    persistedCarryoverOpenedBoxes,
+    yesterdayKey,
+  ]);
+
   useEffect(() => {
-    setCarryoverOpenedBoxes(
-      normalizeStudyBoxHours([...persistedCarryoverOpenedBoxes, ...cachedCarryoverOpenedBoxes])
-    );
-  }, [persistedCarryoverOpenedBoxes, cachedCarryoverOpenedBoxes]);
+    setCarryoverOpenedSnapshot({
+      dateKey: yesterdayKey,
+      hours: normalizeStudyBoxHours([...persistedCarryoverOpenedBoxes, ...cachedCarryoverOpenedBoxes]),
+    });
+  }, [cachedCarryoverOpenedBoxes, persistedCarryoverOpenedBoxes, yesterdayKey]);
 
   useEffect(() => {
     return () => {
@@ -2535,11 +2554,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       persistedCarryoverClaimedBoxes.map((hour) => ({
         id: `carryover-box-${yesterdayKey}-${hour}`,
         hour,
-        state: carryoverOpenedBoxes.includes(hour) ? ('opened' as const) : ('ready' as const),
+        state: resolvedCarryoverOpenedBoxes.includes(hour) ? ('opened' as const) : ('ready' as const),
         rarity: carryoverRewardByHour.get(hour)?.rarity || getStudyBoxFallbackRarity(hour),
         reward: carryoverRewardByHour.get(hour)?.awardedPoints,
       })),
-    [carryoverOpenedBoxes, carryoverRewardByHour, persistedCarryoverClaimedBoxes, yesterdayKey]
+    [carryoverRewardByHour, persistedCarryoverClaimedBoxes, resolvedCarryoverOpenedBoxes, yesterdayKey]
   );
   const carryoverReadyBoxes = useMemo(
     () => carryoverRewardBoxes.filter((box) => box.state === 'ready'),
@@ -2564,8 +2583,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     [activeVaultDateKey, homeClaimedBoxes, persistedCarryoverClaimedBoxes, yesterdayKey]
   );
   const activeVaultOpenedCount = useMemo(
-    () => (activeVaultDateKey === yesterdayKey ? carryoverOpenedBoxes.length : homeOpenedBoxes.length),
-    [activeVaultDateKey, carryoverOpenedBoxes, homeOpenedBoxes, yesterdayKey]
+    () => (activeVaultDateKey === yesterdayKey ? resolvedCarryoverOpenedBoxes.length : homeOpenedBoxes.length),
+    [activeVaultDateKey, homeOpenedBoxes, resolvedCarryoverOpenedBoxes, yesterdayKey]
   );
   const activeVaultContextLabel = activeVaultDateKey === yesterdayKey
     ? '어제 남아 있던 상자예요.'
@@ -2871,7 +2890,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const rewardResult = await rewardOpenPromise;
         if (!rewardResult.ok) throw rewardResult.error;
         const result = rewardResult.result;
-        const sourceOpenedBoxes = targetDateKey === todayKey ? homeOpenedBoxes : carryoverOpenedBoxes;
+        const sourceOpenedBoxes = targetDateKey === todayKey ? homeOpenedBoxes : resolvedCarryoverOpenedBoxes;
         const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
           ? result.openedStudyBoxes
           : Array.from(new Set([...sourceOpenedBoxes, targetHour])).sort((a, b) => a - b);
@@ -2892,7 +2911,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             setHomeRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
           }
         } else {
-          setCarryoverOpenedBoxes(nextOpenedBoxes);
+          setCarryoverOpenedSnapshot({
+            dateKey: yesterdayKey,
+            hours: nextOpenedBoxes,
+          });
           writeCarryoverOpenedCache(yesterdayKey, nextOpenedBoxes);
         }
 
@@ -2905,7 +2927,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           setHomeClaimedBoxes(persistedClaimedBoxes);
           setHomeRewardEntries(persistedRewardEntries);
         } else {
-          setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
+          setCarryoverOpenedSnapshot({
+            dateKey: yesterdayKey,
+            hours: normalizeStudyBoxHours([...persistedCarryoverOpenedBoxes, ...cachedCarryoverOpenedBoxes]),
+          });
         }
         setHomeBoxStage('idle');
         toast({
@@ -2924,13 +2949,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     activeRewardByHour,
     activeVaultClaimedBoxes,
     activeVaultDateKey,
-    carryoverOpenedBoxes,
+    cachedCarryoverOpenedBoxes,
     isClaimingHomeBox,
     persistedClaimedBoxes,
     persistedCarryoverOpenedBoxes,
     persistedOpenedBoxes,
     persistedRewardEntries,
     homeOpenedBoxes,
+    resolvedCarryoverOpenedBoxes,
     selectedHomeBox,
     toast,
     todayKey,
