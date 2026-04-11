@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Check,
   ChevronRight,
@@ -216,195 +216,6 @@ function QuestRow({
         <div className="mt-1 text-sm font-black text-[var(--accent-orange-soft)]">{quest.done ? "완료" : "진행"}</div>
       </div>
     </button>
-  );
-}
-
-const HOME_GROWTH_TRACK_POINTS = [
-  { progress: 0, x: 18, y: 72 },
-  { progress: 18, x: 58, y: 71 },
-  { progress: 40, x: 100, y: 59 },
-  { progress: 62, x: 144, y: 36 },
-  { progress: 82, x: 192, y: 43 },
-  { progress: 100, x: 224, y: 48 },
-] as const;
-
-function interpolateHomeGrowthTrack(progress: number) {
-  const clamped = Math.max(0, Math.min(100, progress));
-
-  for (let index = 0; index < HOME_GROWTH_TRACK_POINTS.length - 1; index += 1) {
-    const start = HOME_GROWTH_TRACK_POINTS[index];
-    const end = HOME_GROWTH_TRACK_POINTS[index + 1];
-
-    if (clamped >= start.progress && clamped <= end.progress) {
-      const range = end.progress - start.progress || 1;
-      const t = (clamped - start.progress) / range;
-      return {
-        x: start.x + (end.x - start.x) * t,
-        y: start.y + (end.y - start.y) * t,
-      };
-    }
-  }
-
-  const fallback = HOME_GROWTH_TRACK_POINTS[HOME_GROWTH_TRACK_POINTS.length - 1];
-  return { x: fallback.x, y: fallback.y };
-}
-
-function HomeGrowthTrack({
-  isMobile,
-  growthPercent,
-  sessionTimerLabel,
-}: {
-  isMobile: boolean;
-  growthPercent: number;
-  sessionTimerLabel: string | null;
-}) {
-  const isStudying = Boolean(sessionTimerLabel);
-  const clampedProgress = Math.max(0, Math.min(100, growthPercent));
-  const runnerPoint = interpolateHomeGrowthTrack(clampedProgress);
-  const gradientId = useId().replace(/:/g, "");
-  const laneGradientId = `${gradientId}-lane`;
-  const runnerLeft = `${(runnerPoint.x / 240) * 100}%`;
-  const runnerTop = `${(runnerPoint.y / 96) * 100}%`;
-
-  return (
-    <div
-      className={cn(
-        "student-home-track-progress",
-        isStudying ? "student-home-track-progress--live" : "student-home-track-progress--idle",
-        clampedProgress >= 100 && "student-home-track-progress--complete",
-      )}
-    >
-      <div className="student-home-track-progress__surface" />
-      <svg
-        viewBox="0 0 240 96"
-        className={cn("student-home-track-progress__svg", isMobile ? "h-[92px]" : "h-[104px]")}
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <defs>
-          <linearGradient id={laneGradientId} x1="18" y1="72" x2="224" y2="48" gradientUnits="userSpaceOnUse">
-            <stop stopColor="rgba(255,255,255,0.26)" />
-            <stop offset="0.48" stopColor="rgba(255,255,255,0.82)" />
-            <stop offset="1" stopColor="rgba(255,210,108,0.96)" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M18 72C48 72 72 70 98 58C124 46 144 28 170 32C194 36 210 48 224 48"
-          stroke="rgba(255,255,255,0.12)"
-          strokeWidth="14"
-          strokeLinecap="round"
-        />
-        <path
-          d="M18 72C48 72 72 70 98 58C124 46 144 28 170 32C194 36 210 48 224 48"
-          stroke="rgba(255,255,255,0.3)"
-          strokeWidth="2.8"
-          strokeLinecap="round"
-          className="track-pace-lane"
-        />
-        <path
-          d="M18 72C48 72 72 70 98 58C124 46 144 28 170 32C194 36 210 48 224 48"
-          stroke={`url(#${laneGradientId})`}
-          strokeWidth="3.6"
-          strokeLinecap="round"
-          className={cn(isStudying && "track-pace-dash")}
-        />
-        <circle cx="18" cy="72" r="5.5" fill="#F8FBFF" opacity="0.84" />
-        <circle cx="84" cy="63" r="3.5" fill="#F8FBFF" opacity="0.32" />
-        <circle cx="152" cy="31" r="3.5" fill="#F8FBFF" opacity="0.32" />
-        <circle cx="224" cy="48" r="5.8" fill="#FFD26C" />
-        <circle
-          cx="224"
-          cy="48"
-          r="12"
-          fill="#FFD26C"
-          opacity={clampedProgress >= 100 ? "0.28" : "0.18"}
-          className={cn(clampedProgress >= 100 && "track-pace-node-glow")}
-        />
-      </svg>
-
-      <div
-        className={cn(
-          "student-home-track-progress__runner",
-          isStudying ? "student-home-track-progress__runner--live" : "student-home-track-progress__runner--idle",
-        )}
-        style={{ left: runnerLeft, top: runnerTop }}
-        aria-hidden="true"
-      >
-        <svg viewBox="0 0 64 64" className="student-home-track-progress__runner-svg" fill="none">
-          {isStudying ? (
-            <g className="track-pace-vehicle track-pace-vehicle--run" transform="translate(10 2)">
-              <ellipse className="track-pace-runner-shadow" cx="23" cy="59" rx="15.5" ry="4.4" fill="rgba(255,236,211,0.18)" />
-              <path className="track-pace-runner-streak" d="M-8 38H8" stroke="rgba(255,255,255,0.22)" strokeWidth="3" strokeLinecap="round" />
-              <path className="track-pace-runner-streak" d="M-2 31H11" stroke="rgba(255,255,255,0.14)" strokeWidth="2.2" strokeLinecap="round" />
-              <circle className="track-pace-runner-head" cx="18" cy="10" r="6.9" fill="#FFE0BC" />
-              <path
-                className="track-pace-runner-torso"
-                d="M15 19L26 30L21 41"
-                stroke="#FFF9F3"
-                strokeWidth="5.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path d="M23 27L31 22" stroke="#FFF4E8" strokeWidth="4.6" strokeLinecap="round" />
-              <path
-                className="track-pace-runner-arm-front"
-                d="M25 29L38 23L45 29"
-                stroke="#FFE2C0"
-                strokeWidth="4.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                className="track-pace-runner-arm-back"
-                d="M20 25L8 31"
-                stroke="#FFD9AF"
-                strokeWidth="4.7"
-                strokeLinecap="round"
-              />
-              <path
-                className="track-pace-runner-leg-front"
-                d="M21 41L35 50L45 47"
-                stroke="#FFBF77"
-                strokeWidth="5.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                className="track-pace-runner-leg-back"
-                d="M21 41L13 54L5 50"
-                stroke="#FFCF8C"
-                strokeWidth="5.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </g>
-          ) : (
-            <g className="track-pace-vehicle track-pace-vehicle--idle" transform="translate(11 6)">
-              <ellipse className="track-pace-idle-shadow" cx="21" cy="56" rx="14" ry="4.2" fill="rgba(255,236,211,0.16)" />
-              <circle cx="21" cy="10" r="6.8" fill="#FFE0BC" />
-              <path
-                d="M21 19L21 33L21 43"
-                stroke="#FFF9F3"
-                strokeWidth="5.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path d="M21 25L30 29" stroke="#FFE4C7" strokeWidth="4.4" strokeLinecap="round" />
-              <path d="M21 25L12 29" stroke="#FFDAB0" strokeWidth="4.4" strokeLinecap="round" />
-              <path d="M21 43L28 55" stroke="#FFBF77" strokeWidth="5.1" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M21 43L14 55" stroke="#FFCF8C" strokeWidth="5.1" strokeLinecap="round" strokeLinejoin="round" />
-            </g>
-          )}
-        </svg>
-      </div>
-
-      <div className="student-home-track-progress__legend" aria-hidden="true">
-        <span>START</span>
-        <span>{isStudying ? "RUN" : "IDLE"}</span>
-        <span>GOAL</span>
-      </div>
-    </div>
   );
 }
 
@@ -880,11 +691,16 @@ export function StudentHomeGamePanel({
                   </span>
                   <span className="text-[11px] font-black text-white">{growthLabel}</span>
                 </div>
-                <HomeGrowthTrack
-                  isMobile={isMobile}
-                  growthPercent={growthPercent}
-                  sessionTimerLabel={sessionTimerLabel}
-                />
+                <div className={cn("point-track-progress-track", growthPercent >= 100 && "point-track-progress-track--charged")}>
+                  <div className="point-track-progress-fill" style={{ width: `${Math.max(6, Math.min(100, growthPercent))}%` }} />
+                  <div className="point-track-progress-node point-track-progress-node--one" />
+                  <div className="point-track-progress-node point-track-progress-node--two" />
+                  <div className="point-track-progress-node point-track-progress-node--three" />
+                  <div
+                    className="point-track-progress-orb"
+                    style={{ left: `calc(${Math.max(6, Math.min(100, growthPercent))}% - 0.65rem)` }}
+                  />
+                </div>
               </div>
 
               <Button
