@@ -169,11 +169,6 @@ export default async function ClassPage() {
                 <br />
                 쌓입니다
               </h1>
-              <p className="max-w-[440px] break-keep text-[15.5px] font-semibold leading-[1.82] text-white/85">
-                원장 직강으로 진행합니다.
-                직접 만든 해설 자료와 수업 자료를 바탕으로
-                읽는 방식, 선지 판단 기준, 적용 흐름까지 함께 잡아갑니다.
-              </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -293,10 +288,9 @@ export default async function ClassPage() {
       <ScrollReveal>
         <section className="py-20 sm:py-28 bg-white">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-20">
+            <div className="grid gap-12 lg:gap-20">
               {/* Left */}
               <div>
-                <span className="eyebrow-badge">원장 직강</span>
                 <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
                   원장이 직접 수업합니다
                 </h2>
@@ -317,21 +311,6 @@ export default async function ClassPage() {
                     </span>
                   ))}
                 </div>
-              </div>
-
-              {/* Right — highlights */}
-              <div className="space-y-3">
-                {marketingContent.director.highlights.map((highlight) => (
-                  <div
-                    key={highlight}
-                    className="flex items-start gap-4 rounded-2xl border border-[rgba(20,41,95,0.18)] bg-[#14295F] px-5 py-4"
-                  >
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#FF7A16]" />
-                    <p className="break-keep text-[14.5px] font-semibold leading-[1.72] text-white">
-                      {highlight}
-                    </p>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
