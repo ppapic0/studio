@@ -2274,7 +2274,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       });
     };
 
-    const mappedDailyEntries = dailyRankWindow.isLive ? buildRankPreviewEntries(validDailyRankEntries, true) : [];
+    const mappedDailyEntries = buildRankPreviewEntries(validDailyRankEntries, dailyRankWindow.isLive);
     const hasDailySelfEntry = Boolean(user?.uid && mappedDailyEntries.some((entry) => entry.studentId === user.uid));
     const shouldAddDailySelfFallback = Boolean(
       dailyRankWindow.isLive &&
@@ -2411,12 +2411,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     weeklyStudyRankMinutes,
     dailyRankWindow,
   ]);
-  const preferredHomeRankRange = useMemo<RankRange>(() => {
-    if (dailyRankWindow.isLive) return 'daily';
-    if (validWeeklyRankEntries.length > 0) return 'weekly';
-    if (validRankEntries.length > 0) return 'monthly';
-    return 'weekly';
-  }, [dailyRankWindow.isLive, validRankEntries.length, validWeeklyRankEntries.length]);
+    const preferredHomeRankRange = useMemo<RankRange>(() => {
+      if (validDailyRankEntries.length > 0 || dailyRankWindow.isLive) return 'daily';
+      if (validWeeklyRankEntries.length > 0) return 'weekly';
+      if (validRankEntries.length > 0) return 'monthly';
+      return 'weekly';
+    }, [dailyRankWindow.isLive, validDailyRankEntries.length, validRankEntries.length, validWeeklyRankEntries.length]);
   const selectedHomeRank = homeRankMap[selectedRankRange];
   const handleSelectHomeRankRange = useCallback((nextRange: RankRange) => {
     hasManualHomeRankRangeRef.current = true;
