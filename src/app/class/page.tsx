@@ -159,8 +159,6 @@ export default async function ClassPage() {
         <div className="relative mx-auto grid w-full max-w-7xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_0.82fr] lg:items-center lg:gap-16 lg:px-8 lg:py-24">
           {/* Left */}
           <div className="space-y-8">
-            <span className="eyebrow-badge-light">원장 직강 · 수능 국어</span>
-
             <div className="space-y-6">
               <h1 className="font-aggro-display break-keep text-[clamp(2.6rem,5.2vw,4.2rem)] font-black leading-[1.06] text-white">
                 국어는 감이 아니라,
