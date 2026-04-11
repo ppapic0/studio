@@ -395,15 +395,24 @@ export function MarketingConsultingCRM({
 
     const waitingOrderById = new Map<string, number>();
     const waitingEntries = sortedEntries.filter((entry) => (entry.status || 'waiting') === 'waiting');
-    waitingEntries
-      .sort((a, b) => {
-        const dateGap = getWaitlistSortDate(a) - getWaitlistSortDate(b);
-        if (dateGap !== 0) return dateGap;
-        return toDateMs(a.createdAt) - toDateMs(b.createdAt);
-      })
-      .forEach((entry, index) => {
-        waitingOrderById.set(entry.id, index + 1);
-      });
+    const waitingByService = new Map<ServiceType, WaitlistEntry[]>();
+    waitingEntries.forEach((entry) => {
+      const serviceType = entry.serviceType || 'study_center';
+      const current = waitingByService.get(serviceType) || [];
+      current.push(entry);
+      waitingByService.set(serviceType, current);
+    });
+    waitingByService.forEach((entries) => {
+      entries
+        .sort((a, b) => {
+          const dateGap = getWaitlistSortDate(a) - getWaitlistSortDate(b);
+          if (dateGap !== 0) return dateGap;
+          return toDateMs(a.createdAt) - toDateMs(b.createdAt);
+        })
+        .forEach((entry, index) => {
+          waitingOrderById.set(entry.id, index + 1);
+        });
+    });
 
     return sortedEntries.map((entry) => ({
       ...entry,
