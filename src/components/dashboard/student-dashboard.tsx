@@ -959,6 +959,17 @@ function coerceStudyBoxRewards(dayStatus: Record<string, any>) {
     .sort((a, b) => a.milestone - b.milestone);
 }
 
+function normalizeStudyBoxHours(values: unknown) {
+  if (!Array.isArray(values)) return [] as number[];
+  return Array.from(
+    new Set(
+      values
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
+    )
+  ).sort((a, b) => a - b);
+}
+
 function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxReward) {
   const next = new Map<number, StudyBoxReward>();
   entries.forEach((entry) => {
@@ -970,10 +981,7 @@ function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxRe
 
 function coerceOpenedStudyBoxes(dayStatus: Record<string, any>) {
   const raw = Array.isArray(dayStatus.openedStudyBoxes) ? dayStatus.openedStudyBoxes : [];
-  return raw
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
-    .sort((a, b) => a - b);
+  return normalizeStudyBoxHours(raw);
 }
 
 function buildRewardBoxes({
@@ -1184,9 +1192,34 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const pendingQuestIdsRef = useRef<Set<string>>(new Set());
   const carryoverAutoOpenSignatureRef = useRef<string | null>(null);
 
+  const getCarryoverOpenedStorageKey = useCallback((dateKey: string) => {
+    return `student-dashboard:carryover-opened:${user?.uid ?? 'anonymous'}:${dateKey}`;
+  }, [user?.uid]);
+
   const getCarryoverAutoOpenStorageKey = useCallback((dateKey: string) => {
     return `student-dashboard:carryover-auto-open:${user?.uid ?? 'anonymous'}:${dateKey}`;
   }, [user?.uid]);
+
+  const readCarryoverOpenedCache = useCallback((dateKey: string) => {
+    if (!dateKey || typeof window === 'undefined') return [] as number[];
+    try {
+      const raw = window.localStorage.getItem(getCarryoverOpenedStorageKey(dateKey));
+      if (!raw) return [] as number[];
+      const parsed = JSON.parse(raw);
+      return normalizeStudyBoxHours(parsed);
+    } catch {
+      return [] as number[];
+    }
+  }, [getCarryoverOpenedStorageKey]);
+
+  const writeCarryoverOpenedCache = useCallback((dateKey: string, values: number[]) => {
+    if (!dateKey || typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(getCarryoverOpenedStorageKey(dateKey), JSON.stringify(normalizeStudyBoxHours(values)));
+    } catch {
+      // Ignore storage access errors and keep runtime state only.
+    }
+  }, [getCarryoverOpenedStorageKey]);
 
   const hasHandledCarryoverAutoOpen = useCallback((dateKey: string) => {
     if (typeof window === 'undefined') return false;
@@ -2423,6 +2456,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const persistedCarryoverClaimedBoxes = useMemo(() => getClaimedStudyBoxes(yesterdayPointStatus), [yesterdayPointStatus]);
   const persistedCarryoverRewardEntries = useMemo(() => coerceStudyBoxRewards(yesterdayPointStatus), [yesterdayPointStatus]);
   const persistedCarryoverOpenedBoxes = useMemo(() => coerceOpenedStudyBoxes(yesterdayPointStatus), [yesterdayPointStatus]);
+  const cachedCarryoverOpenedBoxes = useMemo(
+    () => readCarryoverOpenedCache(yesterdayKey),
+    [readCarryoverOpenedCache, yesterdayKey]
+  );
   const syncedClaimedBoxes = useMemo(
     () => Array.from(new Set([...persistedClaimedBoxes, ...homeClaimedBoxes])).sort((a, b) => a - b),
     [persistedClaimedBoxes, homeClaimedBoxes]
@@ -2452,8 +2489,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [persistedOpenedBoxes]);
 
   useEffect(() => {
-    setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
-  }, [persistedCarryoverOpenedBoxes]);
+    setCarryoverOpenedBoxes(
+      normalizeStudyBoxHours([...persistedCarryoverOpenedBoxes, ...cachedCarryoverOpenedBoxes])
+    );
+  }, [persistedCarryoverOpenedBoxes, cachedCarryoverOpenedBoxes]);
 
   useEffect(() => {
     return () => {
@@ -2854,6 +2893,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         } else {
           setCarryoverOpenedBoxes(nextOpenedBoxes);
+          writeCarryoverOpenedCache(yesterdayKey, nextOpenedBoxes);
         }
 
         setRevealedHomeReward(reward);
@@ -2894,6 +2934,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     selectedHomeBox,
     toast,
     todayKey,
+    todayPointStatus,
+    yesterdayKey,
+    yesterdayPointStatus,
+    progress?.totalPointsEarned,
+    writeCarryoverOpenedCache,
   ]);
 
   const handleNextHomeBox = useCallback(() => {
