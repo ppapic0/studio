@@ -288,28 +288,7 @@ export default async function ClassPage() {
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-12 lg:gap-20">
               {/* Left */}
-              <div>
-                <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.8rem,3.6vw,2.5rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
-                  원장이 직접 수업합니다
-                </h2>
-                <p className="mt-5 break-keep text-[15.5px] font-semibold leading-[1.9] text-[#334e6a]">
-                  수업의 방향, 자료의 밀도, 학생 피드백의 흐름까지
-                  모두 원장이 직접 설계하고 진행합니다.
-                  겉으로만 많은 설명이 아니라, 실제 성적 변화로 이어질 수 있도록
-                  수업의 기준을 분명하게 세웁니다.
-                </p>
-
-                <div className="mt-8 flex flex-wrap gap-2">
-                  {['직강', '직접 제작 자료', '학생별 보완'].map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border border-[#14295F]/14 bg-[#14295F]/5 px-4 py-1.5 text-[12.5px] font-black text-[#14295F]"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <div />
             </div>
           </div>
         </section>
