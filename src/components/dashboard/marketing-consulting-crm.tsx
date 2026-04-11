@@ -257,6 +257,12 @@ function formatDateTimeLabel(value: any): string {
   return format(new Date(ms), 'yyyy.MM.dd HH:mm');
 }
 
+function getWaitlistSortDate(entry: Pick<WaitlistEntry, 'waitlistDate' | 'createdAt'>) {
+  const waitlistMs = toDateMs(entry.waitlistDate);
+  if (waitlistMs) return waitlistMs;
+  return toDateMs(entry.createdAt);
+}
+
 function getNextWaitlistQueueNumber(entries: WaitlistEntry[]) {
   const maxAssigned = entries.reduce((best, entry) => {
     if (typeof entry.queueNumber !== 'number' || !Number.isFinite(entry.queueNumber)) return best;
@@ -374,6 +380,12 @@ export function MarketingConsultingCRM({
       const statusGap = statusOrder[a.status || 'waiting'] - statusOrder[b.status || 'waiting'];
       if (statusGap !== 0) return statusGap;
 
+      const isWaiting = (a.status || 'waiting') === 'waiting' && (b.status || 'waiting') === 'waiting';
+      if (isWaiting) {
+        const dateGap = getWaitlistSortDate(a) - getWaitlistSortDate(b);
+        if (dateGap !== 0) return dateGap;
+      }
+
       const aQueue = getStoredWaitlistQueueNumber(a) ?? Number.MAX_SAFE_INTEGER;
       const bQueue = getStoredWaitlistQueueNumber(b) ?? Number.MAX_SAFE_INTEGER;
       if (aQueue !== bQueue) return aQueue - bQueue;
@@ -382,13 +394,16 @@ export function MarketingConsultingCRM({
     });
 
     const waitingOrderById = new Map<string, number>();
-    let waitingOrder = 1;
-
-    sortedEntries.forEach((entry) => {
-      if ((entry.status || 'waiting') !== 'waiting') return;
-      waitingOrderById.set(entry.id, waitingOrder);
-      waitingOrder += 1;
-    });
+    const waitingEntries = sortedEntries.filter((entry) => (entry.status || 'waiting') === 'waiting');
+    waitingEntries
+      .sort((a, b) => {
+        const dateGap = getWaitlistSortDate(a) - getWaitlistSortDate(b);
+        if (dateGap !== 0) return dateGap;
+        return toDateMs(a.createdAt) - toDateMs(b.createdAt);
+      })
+      .forEach((entry, index) => {
+        waitingOrderById.set(entry.id, index + 1);
+      });
 
     return sortedEntries.map((entry) => ({
       ...entry,
