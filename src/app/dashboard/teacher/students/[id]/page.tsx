@@ -35,7 +35,7 @@ import {
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
 import { canManageSettings, canManageStaff, canReadFinance } from '@/lib/dashboard-access';
-import { StudentOperationsGraphBoard, type StudentOperationsTimelinePoint } from '@/components/dashboard/student-operations-graph-board';
+import { type StudentOperationsTimelinePoint } from '@/components/dashboard/student-operations-graph-board';
 import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
 import { motion, useReducedMotion } from 'framer-motion';
 
@@ -3048,12 +3048,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </CardContent>
               </Card>
 
-              <StudentOperationsGraphBoard
-                timeline={operationsTimeline}
-                isAdmin={canViewFinance}
-                isMobile={isMobile}
-                className={cn(isAnalysisPresentation ? 'analysis-chart-stage analysis-full-ops-card' : 'min-w-0')}
-              />
             </section>
           ) : null}
 
