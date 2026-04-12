@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import {
@@ -23,6 +23,7 @@ import {
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
 import {
+  getDailyRankWindowOverlapMinutes,
   getDailyRankWindowState,
 } from '@/lib/student-ranking-policy';
 import { cn } from '@/lib/utils';
@@ -65,7 +66,7 @@ type BattleRecommendation = {
   cta: string;
 };
 
-const LIVE_TICK_MS = 4200;
+const SNAPSHOT_REFRESH_MS = 30000;
 const HERO_ROTATE_MS = 3600;
 
 const RANGE_META: Record<
@@ -199,31 +200,6 @@ function assignRanks(entries: BattleEntry[]) {
     }));
 }
 
-function buildFallbackEntries(range: RankRange, viewerId: string) {
-  const baseMap: Record<RankRange, BattleEntry[]> = {
-    daily: [
-      { id: 'fallback-top', studentId: 'rival-top', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 288, rank: 1 },
-      { id: 'fallback-viewer', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 252, rank: 2, isViewer: true },
-      { id: 'fallback-rival', studentId: 'rival-under', displayNameSnapshot: '이*은', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 234, rank: 3 },
-      { id: 'fallback-4', studentId: 'rival-4', displayNameSnapshot: '박*준', classNameSnapshot: null, schoolNameSnapshot: '대성고등학교', value: 214, rank: 4 },
-    ],
-    weekly: [
-      { id: 'fallback-top-w', studentId: 'rival-top-w', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 1740, rank: 1 },
-      { id: 'fallback-viewer-w', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 1620, rank: 2, isViewer: true },
-      { id: 'fallback-rival-w', studentId: 'rival-under-w', displayNameSnapshot: '이*은', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 1512, rank: 3 },
-      { id: 'fallback-4-w', studentId: 'rival-4-w', displayNameSnapshot: '정*현', classNameSnapshot: null, schoolNameSnapshot: '중동고등학교', value: 1420, rank: 4 },
-    ],
-    monthly: [
-      { id: 'fallback-top-m', studentId: 'rival-top-m', displayNameSnapshot: '성*민', classNameSnapshot: null, schoolNameSnapshot: '구성고등학교', value: 7360, rank: 1 },
-      { id: 'fallback-viewer-m', studentId: viewerId, displayNameSnapshot: '나', classNameSnapshot: null, schoolNameSnapshot: '현재 사용자', value: 6840, rank: 2, isViewer: true },
-      { id: 'fallback-rival-m', studentId: 'rival-under-m', displayNameSnapshot: '이*은', classNameSnapshot: null, schoolNameSnapshot: '경희대학교', value: 6410, rank: 3 },
-      { id: 'fallback-4-m', studentId: 'rival-4-m', displayNameSnapshot: '박*준', classNameSnapshot: null, schoolNameSnapshot: '대성고등학교', value: 6180, rank: 4 },
-    ],
-  };
-
-  return assignRanks(baseMap[range]);
-}
-
 function ensureViewerEntry(entries: StudentRankEntry[], viewerId: string) {
   const hasViewer = entries.some((entry) => entry.studentId === viewerId);
   if (hasViewer) {
@@ -236,12 +212,52 @@ function ensureViewerEntry(entries: StudentRankEntry[], viewerId: string) {
     displayNameSnapshot: '나',
     classNameSnapshot: null,
     schoolNameSnapshot: '현재 사용자',
-    value: entries.length > 0 ? Math.max(120, entries[Math.min(1, entries.length - 1)].value - 24) : 252,
+    value: 0,
     rank: 0,
     isViewer: true,
+    liveStatus: null,
+    liveStartedAtMs: null,
   };
 
   return assignRanks([...entries.map((entry) => ({ ...entry, isViewer: entry.studentId === viewerId })), fallbackViewer]);
+}
+
+function getLiveAdjustedValue({
+  entry,
+  range,
+  nowMs,
+  viewerId,
+  selfLiveStartedAtMs,
+}: {
+  entry: BattleEntry;
+  range: RankRange;
+  nowMs: number;
+  viewerId: string;
+  selfLiveStartedAtMs: number;
+}) {
+  const serverLiveStartedAtMs = Number(entry.liveStartedAtMs || 0);
+  const hasServerLive = Boolean(entry.liveStatus && serverLiveStartedAtMs > 0);
+  const hasSelfLive = entry.studentId === viewerId && selfLiveStartedAtMs > 0;
+
+  if (!hasServerLive && !hasSelfLive) {
+    return Math.max(0, Number(entry.value || 0));
+  }
+
+  const effectiveStartedAtMs =
+    serverLiveStartedAtMs > 0 && selfLiveStartedAtMs > 0 && entry.studentId === viewerId
+      ? Math.min(serverLiveStartedAtMs, selfLiveStartedAtMs)
+      : Math.max(serverLiveStartedAtMs, hasSelfLive ? selfLiveStartedAtMs : 0);
+
+  if (effectiveStartedAtMs <= 0 || effectiveStartedAtMs >= nowMs) {
+    return Math.max(0, Number(entry.value || 0));
+  }
+
+  const liveMinutes =
+    range === 'daily'
+      ? getDailyRankWindowOverlapMinutes(effectiveStartedAtMs, nowMs, getDailyRankWindowState(new Date(nowMs)))
+      : Math.max(1, Math.ceil((nowMs - effectiveStartedAtMs) / 60000));
+
+  return Math.max(0, Number(entry.value || 0)) + liveMinutes;
 }
 
 function getBattleMode(rank: number, diffAbove: number, diffBelow: number): BattleMode {
@@ -299,37 +315,47 @@ function buildHeroMessages(params: {
 }
 
 function buildInitialLogs(entries: BattleEntry[], viewerId: string) {
+  if (!entries.length) return [];
+
   const top = entries[0];
   const viewer = entries.find((entry) => entry.studentId === viewerId) ?? entries[1] ?? entries[0];
   const rival = entries.find((entry) => entry.rank === viewer.rank + 1) ?? entries[2] ?? viewer;
   const diffAbove = Math.max(0, (top?.value ?? viewer.value) - viewer.value);
-
-  return [
+  const diffBelow = rival && rival.studentId !== viewer.studentId ? Math.max(0, viewer.value - rival.value) : 0;
+  const logs: LiveLog[] = [
     {
-      id: 'seed-1',
-      tone: 'orange' as const,
-      badge: '상위권',
-      title: `${top?.displayNameSnapshot ?? '성*민'} 님이 25분 추가 기록`,
-      detail: '현재 1위 기준치가 조금 더 올라갔습니다.',
-      target: 'top' as const,
+      id: 'seed-top',
+      tone: 'gold',
+      badge: '현재 1위',
+      title: `${top?.displayNameSnapshot ?? '학생'} 님이 선두입니다`,
+      detail: `현재 기준 ${formatStudyClock(top?.value ?? 0)} 누적으로 가장 앞서 있습니다.`,
+      target: 'top',
     },
     {
-      id: 'seed-2',
-      tone: 'red' as const,
-      badge: '간격 변화',
-      title: `${rival.displayNameSnapshot} 님이 바로 아래에서 올라오고 있어요`,
-      detail: `${Math.max(12, diffAbove)}분 차이 안에서 순위 변화가 다시 커지고 있습니다.`,
-      target: 'rival' as const,
-    },
-    {
-      id: 'seed-3',
-      tone: 'gold' as const,
-      badge: '상승 구간',
-      title: `지금 ${Math.max(12, Math.min(diffAbove + 1, 24))}분 더 쌓으면 선두권에 가까워집니다`,
-      detail: '이번 블록의 집중 시간이 순위 변화를 만들 수 있어요.',
-      target: 'viewer' as const,
+      id: 'seed-viewer',
+      tone: viewer.rank === 1 ? 'blue' : 'orange',
+      badge: '내 위치',
+      title: viewer.rank === 1 ? '현재 내가 선두를 유지하고 있어요' : `현재 ${viewer.rank}위에서 추격 중입니다`,
+      detail:
+        viewer.rank === 1
+          ? `바로 아래와 ${formatGapLabel(diffBelow)} 차이입니다.`
+          : `1위와 ${formatGapLabel(diffAbove)} 차이입니다.`,
+      target: 'viewer',
     },
   ];
+
+  if (rival && rival.studentId !== viewer.studentId) {
+    logs.push({
+      id: 'seed-rival',
+      tone: 'red',
+      badge: '근접 순위',
+      title: `${rival.displayNameSnapshot} 님이 바로 아래 순위에 있습니다`,
+      detail: `현재 간격은 ${formatGapLabel(diffBelow)}입니다.`,
+      target: 'rival',
+    });
+  }
+
+  return logs;
 }
 
 function buildMainRecommendations(params: {
@@ -1414,6 +1440,47 @@ function DailyWaitingCard({
   );
 }
 
+function EmptyRankingState({
+  range,
+}: {
+  range: RankRange;
+}) {
+  const title =
+    range === 'daily'
+      ? '오늘 반영된 공부 기록이 아직 없어요'
+      : range === 'weekly'
+        ? '이번 주 누적 기록이 아직 없어요'
+        : '이번 달 누적 기록이 아직 없어요';
+  const description =
+    range === 'daily'
+      ? '첫 공부 기록이 들어오면 실제 학생 기준으로 일간 랭킹이 바로 열립니다.'
+      : range === 'weekly'
+        ? '주간 누적이 쌓이면 실제 학생 흐름으로 랭킹이 자동 갱신됩니다.'
+        : '월간 누적이 쌓이면 실제 학생 기준으로 상위권이 바로 보입니다.';
+
+  return (
+    <section className={cn(RANKING_SECTION_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-white md:p-6')}>
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,rgba(255,255,255,0.08),transparent_36%,transparent_74%,rgba(255,165,78,0.08))]" />
+      <div className="relative space-y-4">
+        <div className={RANKING_KICKER_CLASS}>
+          <Clock3 className="h-4 w-4" />
+          집계 준비 중
+        </div>
+        <div>
+          <h2 className="font-aggro-display text-[2rem] font-black leading-[0.95] tracking-[-0.05em] text-white md:text-[2.4rem]">
+            실제 기록이 들어오면
+            <br />
+            여기서 바로 보입니다
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-[#B7C7E8] md:text-base">
+            {title}. {description}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RecommendationChip({
   recommendation,
   onApply,
@@ -1511,154 +1578,11 @@ function RecommendationPanel({
   );
 }
 
-function simulateBattleTick(entries: BattleEntry[], viewerId: string): {
-  entries: BattleEntry[];
-  log: LiveLog;
-  floatingEvent: FloatingEvent;
-} {
-  const current = assignRanks(entries);
-  const viewer = current.find((entry) => entry.studentId === viewerId) ?? current[1] ?? current[0];
-  const top = current[0] ?? viewer;
-  const below = current.find((entry) => entry.rank === viewer.rank + 1) ?? current[current.length - 1];
-
-  const actorPool: Array<{ id: string; weight: number }> = [];
-  current.slice(0, 5).forEach((entry) => {
-    const weight =
-      entry.studentId === viewerId
-        ? 0.42
-        : entry.rank === 1
-          ? 0.24
-          : entry.studentId === below?.studentId
-            ? 0.2
-            : 0.14;
-    actorPool.push({ id: entry.studentId, weight });
-  });
-
-  const totalWeight = actorPool.reduce((sum, item) => sum + item.weight, 0);
-  let cursor = Math.random() * totalWeight;
-  let actorId = actorPool[0]?.id ?? viewerId;
-  for (const item of actorPool) {
-    cursor -= item.weight;
-    if (cursor <= 0) {
-      actorId = item.id;
-      break;
-    }
-  }
-
-  const bonus =
-    actorId === viewerId && top.value - viewer.value <= 36
-      ? 6
-      : actorId === below?.studentId && viewer.value - below.value <= 16
-        ? 5
-        : 0;
-  const delta = 8 + Math.floor(Math.random() * 18) + bonus;
-
-  const updated = current.map((entry) =>
-    entry.studentId === actorId
-      ? {
-          ...entry,
-          value: entry.value + delta,
-        }
-      : entry
-  );
-
-  const next = assignRanks(updated);
-  const nextViewer = next.find((entry) => entry.studentId === viewerId) ?? viewer;
-  const nextTop = next[0] ?? nextViewer;
-  const nextBelow = next.find((entry) => entry.rank === nextViewer.rank + 1) ?? below;
-  const actor = next.find((entry) => entry.studentId === actorId) ?? nextViewer;
-
-  if (viewer.rank > nextViewer.rank) {
-    return {
-      entries: next,
-      log: {
-        id: `log-${Date.now()}`,
-        tone: 'gold',
-        badge: '순위 상승',
-        title: `나: 방금 ${nextViewer.rank}위로 올라왔어요`,
-        detail: '순위가 실제로 올라갔습니다. 지금 흐름을 유지해보세요.',
-        target: 'viewer',
-      },
-      floatingEvent: {
-        id: `float-${Date.now()}`,
-        tone: 'gold',
-        label: '상승',
-        target: 'viewer',
-      },
-    };
-  }
-
-  if (actorId === viewerId) {
-    const diffAbove = Math.max(0, nextTop.value - nextViewer.value);
-    return {
-      entries: next,
-      log: {
-        id: `log-${Date.now()}`,
-        tone: 'orange',
-        badge: '집중 증가',
-        title: `나: ${delta}분 추가 기록`,
-        detail:
-          diffAbove > 0
-            ? `지금 ${Math.max(10, Math.min(diffAbove + 1, 20))}분 더 쌓으면 상위권과 간격이 더 줄어듭니다.`
-            : '현재 선두 흐름을 안정적으로 유지하고 있어요.',
-        target: 'viewer',
-      },
-      floatingEvent: {
-        id: `float-${Date.now()}`,
-        tone: 'orange',
-        label: `+${delta}m`,
-        target: 'viewer',
-      },
-    };
-  }
-
-  if (actorId === nextTop.studentId) {
-    return {
-      entries: next,
-      log: {
-        id: `log-${Date.now()}`,
-        tone: 'blue',
-        badge: '상위권 유지',
-        title: `${actor.displayNameSnapshot} 님이 ${delta}분 추가 기록`,
-        detail: '상위권 기준치가 다시 조금 올라갔습니다.',
-        target: 'top',
-      },
-      floatingEvent: {
-        id: `float-${Date.now()}`,
-        tone: 'blue',
-        label: `+${delta}m`,
-        target: 'top',
-      },
-    };
-  }
-
-  return {
-    entries: next,
-    log: {
-      id: `log-${Date.now()}`,
-      tone: 'red',
-      badge: '간격 축소',
-      title: `${actor.displayNameSnapshot} 님이 ${delta}분 추가 기록`,
-      detail:
-        nextBelow && nextBelow.studentId === actor.studentId
-          ? `지금 ${Math.max(8, Math.min(nextViewer.value - nextBelow.value, 18))}분 차이까지 간격이 줄었습니다.`
-          : '바로 아래 구간에서도 변화가 커지고 있어요.',
-      target: 'rival',
-    },
-    floatingEvent: {
-      id: `float-${Date.now()}`,
-      tone: 'red',
-      label: '근접',
-      target: 'rival',
-    },
-  };
-}
-
 export default function RankingBattlePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useUser();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, viewMode, isTimerActive, startTime } = useAppContext();
   const isMobile = viewMode === 'mobile';
 
   const range = (searchParams.get('range') as RankRange) || 'daily';
@@ -1668,17 +1592,11 @@ export default function RankingBattlePage() {
   const [snapshot, setSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [battleEntries, setBattleEntries] = useState<BattleEntry[]>([]);
   const [logs, setLogs] = useState<LiveLog[]>([]);
   const [floatingEvents, setFloatingEvents] = useState<FloatingEvent[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [clockNowMs, setClockNowMs] = useState(() => Date.now());
-
-  const entriesRef = useRef<BattleEntry[]>([]);
-
-  useEffect(() => {
-    entriesRef.current = battleEntries;
-  }, [battleEntries]);
+  const selfLiveStartedAtMs = isTimerActive && startTime ? startTime : 0;
 
   useEffect(() => {
     setClockNowMs(Date.now());
@@ -1696,6 +1614,7 @@ export default function RankingBattlePage() {
 
   useEffect(() => {
     let cancelled = false;
+    let intervalId: number | null = null;
 
     if (!user || !centerId) {
       setSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
@@ -1704,59 +1623,76 @@ export default function RankingBattlePage() {
       return;
     }
 
-    setLoading(true);
-    setFetchError(null);
+    const loadSnapshot = async (isInitialLoad: boolean) => {
+      if (isInitialLoad) setLoading(true);
 
-    fetchStudentRankingSnapshot({ centerId, user })
-      .then((result) => {
-        if (!cancelled) setSnapshot(result);
-      })
-      .catch(() => {
+      try {
+        const result = await fetchStudentRankingSnapshot({ centerId, user });
         if (cancelled) return;
-        setSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
-        setFetchError('지금은 실시간 데이터를 불러오지 못해 샘플 랭킹으로 보여드리고 있어요.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        setSnapshot(result);
+        setFetchError(null);
+      } catch {
+        if (cancelled) return;
+        if (isInitialLoad) {
+          setSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
+        }
+        setFetchError('실시간 랭킹 데이터를 잠시 불러오지 못하고 있어요. 잠시 후 자동으로 다시 불러옵니다.');
+      } finally {
+        if (!cancelled && isInitialLoad) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSnapshot(true);
+    intervalId = window.setInterval(() => {
+      void loadSnapshot(false);
+    }, SNAPSHOT_REFRESH_MS);
 
     return () => {
       cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
     };
   }, [centerId, user]);
 
-  const baseEntries = useMemo(() => {
-    const currentRangeEntries = snapshot[range] ?? [];
-    if (!currentRangeEntries.length) return buildFallbackEntries(range, viewerId);
+  const currentRangeEntries = snapshot[range] ?? [];
 
-    return ensureViewerEntry(currentRangeEntries, viewerId)
-      .slice(0, 50)
-      .map((entry) => ({
+  const baseEntries = useMemo(() => {
+    return ensureViewerEntry(currentRangeEntries.slice(0, 50), viewerId).map((entry) => ({
+      ...entry,
+      isViewer: entry.studentId === viewerId,
+    }));
+  }, [currentRangeEntries, viewerId]);
+
+  const battleEntries = useMemo(() => {
+    return assignRanks(
+      baseEntries.map((entry) => ({
         ...entry,
-        isViewer: entry.studentId === viewerId,
-      }));
-  }, [range, snapshot, viewerId]);
+        value: getLiveAdjustedValue({
+          entry,
+          range,
+          nowMs: clockNowMs,
+          viewerId,
+          selfLiveStartedAtMs,
+        }),
+      }))
+    );
+  }, [baseEntries, clockNowMs, range, selfLiveStartedAtMs, viewerId]);
+
+  const shouldShowEmptyState = !loading && currentRangeEntries.length === 0 && selfLiveStartedAtMs <= 0;
 
   useEffect(() => {
-    setBattleEntries(baseEntries);
-    setLogs(buildInitialLogs(baseEntries, viewerId));
+    if (shouldShowEmptyState) {
+      setLogs([]);
+      setFloatingEvents([]);
+      setHeroIndex(0);
+      return;
+    }
+
+    setLogs(buildInitialLogs(battleEntries, viewerId));
     setFloatingEvents([]);
     setHeroIndex(0);
-  }, [baseEntries, viewerId]);
-
-  useEffect(() => {
-    if (!battleEntries.length || (range === 'daily' && !dailyRankWindow.isLive)) return;
-
-    const intervalId = window.setInterval(() => {
-      const outcome = simulateBattleTick(entriesRef.current, viewerId);
-      entriesRef.current = outcome.entries;
-      setBattleEntries(outcome.entries);
-      setLogs((prev) => [outcome.log, ...prev].slice(0, 7));
-      setFloatingEvents((prev) => [...prev, outcome.floatingEvent].slice(-4));
-    }, LIVE_TICK_MS);
-
-    return () => window.clearInterval(intervalId);
-  }, [battleEntries.length, dailyRankWindow.isLive, viewerId, range]);
+  }, [battleEntries, shouldShowEmptyState, viewerId]);
 
   useEffect(() => {
     if (!floatingEvents.length) return;
@@ -1767,7 +1703,7 @@ export default function RankingBattlePage() {
   }, [floatingEvents]);
 
   const viewer = useMemo(
-    () => battleEntries.find((entry) => entry.studentId === viewerId) ?? battleEntries[1] ?? battleEntries[0] ?? null,
+    () => battleEntries.find((entry) => entry.studentId === viewerId) ?? battleEntries[0] ?? null,
     [battleEntries, viewerId]
   );
   const top = battleEntries[0] ?? null;
@@ -1848,7 +1784,7 @@ export default function RankingBattlePage() {
     router.push('/dashboard/plan/diagnosis');
   }
 
-  if (loading && !viewer && !isDailyWaiting) {
+  if (loading && currentRangeEntries.length === 0 && selfLiveStartedAtMs <= 0 && !isDailyWaiting) {
     return (
       <main className={cn('student-font-shell min-h-screen px-4 py-8', RANKING_PAGE_SHELL_CLASS)}>
         <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,19,39,0.88)_0%,rgba(13,30,63,0.94)_100%)] shadow-[0_32px_72px_-36px_rgba(0,0,0,0.88)]">
@@ -1891,6 +1827,39 @@ export default function RankingBattlePage() {
                 windowLabel={dailyRankWindow.windowLabel}
                 nextOpensAtLabel={dailyRankWindow.nextOpensAtLabel}
               />
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (shouldShowEmptyState) {
+    return (
+      <main className={cn(
+        'student-font-shell',
+        RANKING_PAGE_SHELL_CLASS,
+        isMobile ? 'min-h-0 px-0 py-0' : 'min-h-screen px-4 py-6 md:px-6 md:py-8'
+      )}>
+        <div className={cn('mx-auto', isMobile ? 'max-w-none space-y-4' : 'max-w-7xl space-y-5')}>
+          <HeroBattleHeader
+            range={range}
+            onRangeChange={handleRangeChange}
+            activeMessage="실제 공부 기록이 들어오면 랭킹이 바로 반영됩니다."
+            isLive={range !== 'daily' || dailyRankWindow.isLive}
+            statusLabel="실시간 조회"
+            isMobile={isMobile}
+          />
+
+          {fetchError ? (
+            <div className="rounded-[24px] border border-[#F5C97B]/20 bg-[rgba(255,198,112,0.08)] px-4 py-3 text-sm font-semibold text-[#FFD89A]">
+              {fetchError}
+            </div>
+          ) : null}
+
+          <div className={cn(isMobile ? 'space-y-4' : 'grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]')}>
+            <div className="space-y-5">
+              <EmptyRankingState range={range} />
             </div>
           </div>
         </div>
