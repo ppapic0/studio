@@ -50,8 +50,6 @@ export const CLASS_TUITION_NOTICE = {
   academyName: '트랙 국어학원',
   subject: '국어',
   registrationNumber: '등록 완료 후 업데이트 예정',
-  registrationStatusLabel: '등록 준비 중 안내',
-  registrationStatusDescription: '현재 등록번호는 등록 완료 후 반영 예정입니다.',
   contact: '010-5879-5888',
   sessionSummary: '월 4회 / 주 1회 / 회당 3시간 / 총 12시간',
   extraFees: '별도 비용 없음',

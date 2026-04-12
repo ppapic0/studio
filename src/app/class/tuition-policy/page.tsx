@@ -33,15 +33,12 @@ export default function ClassTuitionPolicyPage() {
           <p className="text-xs font-black tracking-[0.28em] text-[#FFB273]">TUITION & REFUND POLICY</p>
           <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] sm:text-4xl">교습비 및 환불 안내</h1>
           <p className="mt-3 max-w-3xl break-keep text-sm font-semibold leading-7 text-white/78">
-            트랙 국어학원의 교습비와 환불 기준을 등록 준비 중 안내 형태로 먼저 공개합니다.
-            현재 등록번호는 등록 완료 후 반영 예정이며, 환불은 학교교과교습학원 기준에 따라 적용됩니다.
+            트랙 국어학원의 교습비와 환불 기준을 안내합니다.
+            환불은 학교교과교습학원 기준에 따라 적용됩니다.
           </p>
           <div className="mt-5 flex flex-wrap gap-3 text-xs font-black text-white/72">
             <span className="rounded-full border border-white/12 bg-white/10 px-3 py-1.5">
               시행일 {CLASS_TUITION_POLICY_EFFECTIVE_DATE_LABEL}
-            </span>
-            <span className="rounded-full border border-[#FF7A16]/35 bg-[#FF7A16]/12 px-3 py-1.5 text-[#FFD0A5]">
-              {CLASS_TUITION_NOTICE.registrationStatusDescription}
             </span>
           </div>
         </section>
@@ -112,9 +109,6 @@ export default function ClassTuitionPolicyPage() {
         </PolicySection>
 
         <PolicySection title="3. 추가 안내">
-          <p>
-            본 페이지는 등록 준비 중 안내를 위한 공개 문서이며, 현재 등록번호는 등록 완료 후 즉시 업데이트할 예정입니다.
-          </p>
           <p>
             학원명은 <span className="font-black text-[#14295F]">{CLASS_TUITION_NOTICE.academyName}</span>,
             교습과목은 <span className="font-black text-[#14295F]">{CLASS_TUITION_NOTICE.subject}</span> 기준으로 안내합니다.

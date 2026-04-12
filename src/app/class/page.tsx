@@ -500,8 +500,7 @@ export default async function ClassPage() {
                 교습비 및 환불 안내
               </h2>
               <p className="mx-auto mt-5 max-w-[720px] break-keep text-[15px] font-semibold leading-[1.88] text-[#445f7e]">
-                교습비와 환불 기준을 등록 준비 중 안내 형태로 먼저 공개합니다.
-                현재 등록번호는 등록 완료 후 반영 예정이며,
+                트랙 국어학원의 교습비와 환불 기준을 안내합니다.
                 상세 기준은 아래 정책 페이지에서 함께 확인하실 수 있습니다.
               </p>
             </div>
@@ -516,15 +515,9 @@ export default async function ClassPage() {
             >
               <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
                 <div>
-                  <span className="inline-flex rounded-full border border-[#FF7A16]/30 bg-[#FF7A16]/14 px-3 py-1 text-[11px] font-black tracking-[0.16em] text-[#FFD0A5]">
-                    {CLASS_TUITION_NOTICE.registrationStatusLabel}
-                  </span>
-                  <h3 className="mt-3 break-keep text-[1.5rem] font-black text-white sm:text-[1.7rem]">
+                  <h3 className="break-keep text-[1.5rem] font-black text-white sm:text-[1.7rem]">
                     {CLASS_TUITION_NOTICE.academyName}
                   </h3>
-                  <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.8] text-white/70">
-                    {CLASS_TUITION_NOTICE.registrationStatusDescription}
-                  </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
                   <p className="text-[10.5px] font-black tracking-[0.18em] text-[#FFB273]">문의처</p>
