@@ -163,6 +163,37 @@ function toKoreanSubjectLabel(raw: string): string {
   return source;
 }
 
+function getPenaltyLogSourceMeta(log: Pick<PenaltyLog, 'source' | 'requestType'>) {
+  if (log.source === 'routine_missing') {
+    return {
+      label: '루틴 미작성',
+      className: 'border-amber-200 bg-amber-50 text-amber-700',
+    };
+  }
+  if (log.source === 'attendance_request') {
+    return {
+      label: log.requestType === 'absence' ? '결석 처리' : '지각 처리',
+      className: 'border-rose-200 bg-rose-50 text-rose-700',
+    };
+  }
+  if (log.source === 'manual') {
+    return {
+      label: '센터 수동 부여',
+      className: 'border-slate-200 bg-slate-50 text-slate-700',
+    };
+  }
+  if (log.source === 'reset') {
+    return {
+      label: '센터 조정',
+      className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    };
+  }
+  return {
+    label: '생활 기록',
+    className: 'border-slate-200 bg-slate-50 text-slate-700',
+  };
+}
+
 type ParentCommunicationRecord = {
   id: string;
   studentId: string;
@@ -1584,6 +1615,12 @@ function toDateSafe(value: TimestampLike): Date | null {
   return null;
 }
 
+function formatPenaltyLogDateTime(value: TimestampLike) {
+  const date = toDateSafe(value);
+  if (!date || Number.isNaN(date.getTime())) return '-';
+  return format(date, 'yyyy.MM.dd HH:mm', { locale: ko });
+}
+
 function toRelativeLabel(value: TimestampLike, nowMs = 0) {
   const date = toDateSafe(value);
   if (!date) return '최근';
@@ -2737,6 +2774,24 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         dateLabel: formatDateLabel(request.date, (request as any).createdAt),
       }));
   }, [attendance요청]);
+
+  const recentPenaltyTimeline = useMemo(() => {
+    return [...(penaltyLogs || [])]
+      .filter((log) => Number(log.pointsDelta || 0) > 0)
+      .sort((a, b) => {
+        const aMs = toDateSafe((a as any).createdAt)?.getTime() || 0;
+        const bMs = toDateSafe((b as any).createdAt)?.getTime() || 0;
+        return bMs - aMs;
+      })
+      .slice(0, 8)
+      .map((log) => ({
+        id: log.id,
+        reason: log.reason || getPenaltyLogSourceMeta(log).label,
+        points: Math.max(0, Number(log.pointsDelta || 0)),
+        dateTimeLabel: formatPenaltyLogDateTime((log as any).createdAt),
+        sourceMeta: getPenaltyLogSourceMeta(log),
+      }));
+  }, [penaltyLogs]);
 
   const penaltyRecovery = useMemo(() => {
     const basePoints = Math.max(0, Math.round(Number(growth?.penaltyPoints || 0)));
@@ -5162,6 +5217,45 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">현재 조치 단계</p>
               <Badge variant="outline" className={cn('mt-2 h-7 rounded-full border px-3 text-xs font-black', penaltyMeta.badge)}>{penaltyMeta.label}</Badge>
+            </div>
+
+            <div className="rounded-2xl border border-[#dbe6ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-widest text-[#3156a6]">최근 벌점 반영 이력</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">언제, 어떤 사유로 벌점이 반영됐는지 확인할 수 있어요.</p>
+                </div>
+                <Badge variant="outline" className="h-7 rounded-full border border-[#cfe0ff] bg-white px-3 text-[10px] font-black text-[#3156a6]">
+                  최근 {recentPenaltyTimeline.length}건
+                </Badge>
+              </div>
+
+              {recentPenaltyTimeline.length > 0 ? (
+                <div className="mt-4 space-y-2.5">
+                  {recentPenaltyTimeline.map((item) => (
+                    <div key={item.id} className="rounded-[1.1rem] border border-white/90 bg-white/90 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black text-slate-400">{item.dateTimeLabel}</p>
+                          <p className="mt-1 break-keep text-sm font-black leading-5 text-[#14295F]">{item.reason}</p>
+                        </div>
+                        <Badge variant="outline" className="h-7 shrink-0 rounded-full border border-rose-200 bg-rose-50 px-3 text-[11px] font-black text-rose-700">
+                          +{item.points}점
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge variant="outline" className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black', item.sourceMeta.className)}>
+                          {item.sourceMeta.label}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-[1.1rem] border border-dashed border-[#cfe0ff] bg-white/80 px-4 py-5 text-center text-sm font-bold text-slate-500">
+                  최근 반영된 벌점 기록이 아직 없습니다.
+                </div>
+              )}
             </div>
           </div>
 
