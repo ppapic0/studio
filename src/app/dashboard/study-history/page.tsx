@@ -1354,25 +1354,28 @@ export default function StudyHistoryPage() {
                     'aspect-square',
                     isMobile ? 'min-h-0 rounded-[0.95rem] p-1' : 'rounded-[1.45rem] p-3.5',
                     studentCellClass,
+                    isTodayCalendar && isCurrentMonth && 'border-[#FF7A16] ring-2 ring-inset ring-[#FF7A16] shadow-[0_18px_30px_-22px_rgba(255,122,22,0.32)]',
                     isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0'
                   )}
                 >
                     <div className="relative z-10 h-full">
-                      <span
-                        className={cn(
-                          'dashboard-number absolute left-1.5 top-1.5 inline-flex items-center justify-center rounded-[0.8rem] border font-black tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
-                          isMobile ? 'h-6 w-6 text-[0.62rem]' : 'h-8 w-8 text-xs',
-                          idx % 7 === 5 && isCurrentMonth
-                            ? 'border-blue-100 bg-blue-50 text-blue-700'
-                            : idx % 7 === 6 && isCurrentMonth
-                              ? 'border-rose-100 bg-rose-50 text-rose-700'
-                              : 'border-slate-200 bg-white text-slate-700',
-                          !isCurrentMonth && 'border-[#E2E8F0] bg-white/80 text-[#B6C0D0]',
-                          isTodayCalendar && isCurrentMonth && 'border-[#FFB068] bg-[#FFF3E6] text-[#D86A11]'
-                        )}
-                      >
-                        {format(day, 'd')}
-                      </span>
+                      {!isMobile ? (
+                        <span
+                          className={cn(
+                            'dashboard-number absolute left-1.5 top-1.5 inline-flex items-center justify-center rounded-[0.8rem] border font-black tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
+                            'h-8 w-8 text-xs',
+                            idx % 7 === 5 && isCurrentMonth
+                              ? 'border-blue-100 bg-blue-50 text-blue-700'
+                              : idx % 7 === 6 && isCurrentMonth
+                                ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                : 'border-slate-200 bg-white text-slate-700',
+                            !isCurrentMonth && 'border-[#E2E8F0] bg-white/80 text-[#B6C0D0]',
+                            isTodayCalendar && isCurrentMonth && 'border-[#FFB068] bg-[#FFF3E6] text-[#D86A11]'
+                          )}
+                        >
+                          {format(day, 'd')}
+                        </span>
+                      ) : null}
 
                       <div className={cn('grid h-full place-items-center', isMobile ? 'w-full px-0.5' : 'px-1')}>
                         {shouldRenderTime ? (
