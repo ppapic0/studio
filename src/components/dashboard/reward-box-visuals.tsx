@@ -31,20 +31,20 @@ function RewardBoxFigure({
   rarity: RewardBoxRarity;
   state?: RewardBoxState;
 }) {
-  const isLocked = state === 'locked';
+  const isMystery = state === 'locked' || (variant === 'slot' && state === 'charging');
 
   return (
     <div
       className={cn(
         'point-track-box-figure',
         variant === 'hero' ? 'point-track-box-figure--hero' : 'point-track-box-figure--slot',
-        isLocked ? 'point-track-box-figure--mystery' : `point-track-box-figure--${rarity}`,
-        isLocked && 'point-track-box-figure--locked'
+        isMystery ? 'point-track-box-figure--mystery' : `point-track-box-figure--${rarity}`,
+        isMystery && 'point-track-box-figure--locked'
       )}
     >
       <div className="point-track-box-figure__glow" />
       {variant === 'hero' ? <div className="point-track-box-figure__shadow" /> : null}
-      {isLocked ? (
+      {isMystery ? (
         <div className="point-track-box-figure__mystery">
           <span className="point-track-box-figure__mystery-mark">?</span>
         </div>
@@ -118,6 +118,8 @@ export function RewardVaultSlot({
   isFresh?: boolean;
   rarityLabels?: Record<RewardBoxRarity, string>;
 }) {
+  const isMysterySlot = box.state === 'locked' || box.state === 'charging';
+
   return (
     <button
       type="button"
@@ -125,7 +127,7 @@ export function RewardVaultSlot({
       onClick={() => onSelect(box.hour)}
       className={cn(
         'point-track-slot',
-        box.state === 'locked' ? 'point-track-slot--mystery' : `point-track-slot--${box.rarity}`,
+        isMysterySlot ? 'point-track-slot--mystery' : `point-track-slot--${box.rarity}`,
         box.state === 'ready' && 'point-track-slot--ready',
         box.state === 'charging' && 'point-track-slot--charging',
         box.state === 'opened' && 'point-track-slot--opened',
@@ -137,7 +139,7 @@ export function RewardVaultSlot({
         <span
           className={cn(
             'rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]',
-            box.state === 'locked'
+            isMysterySlot
               ? 'border-white/18 bg-white/8 text-white/85'
               : box.rarity === 'epic'
                 ? 'border-violet-300/30 bg-violet-300/18 text-violet-100'
@@ -146,7 +148,7 @@ export function RewardVaultSlot({
                   : 'border-sky-200/24 bg-sky-200/14 text-sky-100'
           )}
         >
-          {box.state === 'locked' ? '?' : rarityLabels[box.rarity]}
+          {isMysterySlot ? '?' : rarityLabels[box.rarity]}
         </span>
         {box.state === 'ready' ? (
           <Star
