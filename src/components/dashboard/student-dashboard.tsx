@@ -1808,7 +1808,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         let wroteSomething = false;
 
         if (isFirstCheckInToday) {
-          checkInProgressUpdate.stats = { consistency: increment(0.5) };
+          // Students can mark today's check-in status directly, but stat bonuses stay server-managed.
           batch.set(progressRef, checkInProgressUpdate, { merge: true });
           wroteSomething = true;
         }
@@ -1866,21 +1866,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         if (startCommitError) {
           logHandledClientIssue('[student-track] start commit failed', startCommitError);
+          toast({
+            variant: 'destructive',
+            title: '트랙 시작 실패',
+            description: '학생 데이터 저장 권한을 확인해 주세요.',
+          });
+          return;
         }
 
-        if (!startCommitError) {
-          void syncAutoAttendanceRecord({
-            firestore,
-            centerId,
-            studentId: user.uid,
-            studentName: user.displayName || '학생',
-            targetDate: new Date(nowTs),
-            checkInAt: new Date(nowTs),
-            confirmedByUserId: user.uid,
-          }).catch((syncError: any) => {
-            logHandledClientIssue('[student-track] auto attendance sync skipped', syncError);
-          });
-        }
+        void syncAutoAttendanceRecord({
+          firestore,
+          centerId,
+          studentId: user.uid,
+          studentName: user.displayName || '학생',
+          targetDate: new Date(nowTs),
+          checkInAt: new Date(nowTs),
+          confirmedByUserId: user.uid,
+        }).catch((syncError: any) => {
+          logHandledClientIssue('[student-track] auto attendance sync skipped', syncError);
+        });
 
         void sendKakaoNotification(firestore, centerId, {
           studentId: user.uid,
@@ -1892,13 +1896,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         setStartTime(nowTs);
         setIsTimerActive(true);
-        if (startCommitError) {
-          toast({
-            variant: 'destructive',
-            title: '트랙 시작 실패',
-            description: '학생 데이터 저장 권한을 확인해 주세요.',
-          });
-        } else if (!seatDoc && !fallbackSeatRef) {
+        if (!seatDoc && !fallbackSeatRef) {
           toast({
             variant: 'destructive',
             title: '트랙 시작됨 (좌석 연동 대기)',
