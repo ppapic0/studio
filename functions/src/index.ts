@@ -204,7 +204,16 @@ function normalizeStudyBoxHoursFromUnknown(value: unknown): number[] {
   return Array.from(
     new Set(
       value
-        .map((entry) => Number(entry))
+        .map((entry) => {
+          if (typeof entry === "number") return entry;
+          if (typeof entry === "string") {
+            const trimmed = entry.trim().toLowerCase();
+            if (!trimmed) return Number.NaN;
+            const legacyMatch = trimmed.match(/^(\d+)\s*(?:h|시간)$/);
+            return Number(legacyMatch?.[1] ?? trimmed);
+          }
+          return Number.NaN;
+        })
         .filter((entry) => Number.isFinite(entry) && entry >= 1 && entry <= 8)
         .map((entry) => Math.round(entry))
     )

@@ -105,7 +105,19 @@ function normalizeStudyBoxHoursFromUnknown(value) {
     if (!Array.isArray(value))
         return [];
     return Array.from(new Set(value
-        .map((entry) => Number(entry))
+        .map((entry) => {
+        var _a;
+        if (typeof entry === "number")
+            return entry;
+        if (typeof entry === "string") {
+            const trimmed = entry.trim().toLowerCase();
+            if (!trimmed)
+                return Number.NaN;
+            const legacyMatch = trimmed.match(/^(\d+)\s*(?:h|시간)$/);
+            return Number((_a = legacyMatch === null || legacyMatch === void 0 ? void 0 : legacyMatch[1]) !== null && _a !== void 0 ? _a : trimmed);
+        }
+        return Number.NaN;
+    })
         .filter((entry) => Number.isFinite(entry) && entry >= 1 && entry <= 8)
         .map((entry) => Math.round(entry)))).sort((a, b) => a - b);
 }

@@ -39,6 +39,7 @@ import {
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
   getStudyBoxFallbackRarity,
+  normalizeStudyBoxHourValues,
   rollStudyBoxReward,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
@@ -55,14 +56,8 @@ const STUDY_BOX_CLAIM_CACHE_PREFIX = 'point-track:claimed-boxes';
 const STUDY_BOX_ARRIVAL_TOAST_PREFIX = 'point-track:arrival-toast';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
 
-function normalizeStudyBoxHours(values: number[]) {
-  return Array.from(
-    new Set(
-      values
-        .map((value) => Number(value))
-        .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
-    )
-  ).sort((a, b) => a - b);
+function normalizeStudyBoxHours(values: unknown) {
+  return normalizeStudyBoxHourValues(values);
 }
 
 function readStudyBoxHoursCache(storageKey: string | null) {
@@ -343,11 +338,7 @@ export default function GrowthPage() {
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayStatus), [todayStatus]);
   const persistedRewardEntries = useMemo(() => coerceStudyBoxRewards(todayStatus), [todayStatus]);
   const persistedOpenedBoxes = useMemo(() => {
-    const raw = Array.isArray(todayStatus.openedStudyBoxes) ? todayStatus.openedStudyBoxes : [];
-    return raw
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
-      .sort((a, b) => a - b);
+    return normalizeStudyBoxHourValues(todayStatus.openedStudyBoxes);
   }, [todayStatus]);
 
   const stats = useMemo(() => {
@@ -600,12 +591,12 @@ export default function GrowthPage() {
         const rewardResult = await rewardOpenPromise;
         if (!rewardResult.ok) throw rewardResult.error;
         const result = rewardResult.result;
-        const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
-          ? result.openedStudyBoxes
-          : Array.from(new Set([...openedBoxes, targetHour])).sort((a, b) => a - b);
-        const nextClaimedBoxes = Array.isArray(result.claimedStudyBoxes)
-          ? result.claimedStudyBoxes
-          : Array.from(new Set([...claimedBoxes, targetHour])).sort((a, b) => a - b);
+        if (!Array.isArray(result.openedStudyBoxes) || !Array.isArray(result.claimedStudyBoxes)) {
+          throw new Error('Missing canonical study box state.');
+        }
+
+        const nextOpenedBoxes = result.openedStudyBoxes;
+        const nextClaimedBoxes = result.claimedStudyBoxes;
         const nextRewardEntry = result.reward;
         const reward =
           nextRewardEntry?.awardedPoints

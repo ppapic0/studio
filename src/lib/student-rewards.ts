@@ -46,6 +46,43 @@ export type StudyBoxReward = {
   multiplier: number;
 };
 
+function coerceStudyBoxHourValue(value: unknown): number | null {
+  let parsedValue: number | null = null;
+
+  if (typeof value === 'number') {
+    parsedValue = value;
+  } else if (typeof value === 'string') {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) return null;
+
+    const legacyMatch = trimmed.match(/^(\d+)\s*(?:h|시간)$/);
+    if (legacyMatch) {
+      parsedValue = Number(legacyMatch[1]);
+    } else {
+      parsedValue = Number(trimmed);
+    }
+  }
+
+  if (parsedValue === null || !Number.isFinite(parsedValue)) return null;
+
+  const rounded = Math.round(parsedValue);
+  if (rounded < 1 || rounded > 8) return null;
+
+  return rounded;
+}
+
+export function normalizeStudyBoxHourValues(values: unknown): number[] {
+  if (!Array.isArray(values)) return [];
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => coerceStudyBoxHourValue(value))
+        .filter((value): value is number => value !== null)
+    )
+  ).sort((a, b) => a - b);
+}
+
 export function getStudyBoxRarityWeights(milestone: number) {
   return milestone >= 5 ? LATE_STUDY_BOX_RARITY_WEIGHTS : EARLY_STUDY_BOX_RARITY_WEIGHTS;
 }
@@ -68,12 +105,7 @@ export function rollStudyBoxRarity(milestone: number): StudyBoxRarity {
 }
 
 export function getClaimedStudyBoxes(dayStatus?: Record<string, any>): number[] {
-  const raw = dayStatus?.claimedStudyBoxes;
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 8)
-    .sort((a, b) => a - b);
+  return normalizeStudyBoxHourValues(dayStatus?.claimedStudyBoxes);
 }
 
 export function getAvailableStudyBoxMilestones(totalMinutes: number, claimedStudyBoxes?: number[]) {
