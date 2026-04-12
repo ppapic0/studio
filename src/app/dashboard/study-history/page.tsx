@@ -708,15 +708,15 @@ export default function StudyHistoryPage() {
     const level = getStudyHistoryFlowLevel(minutes);
     if (isMobileView) {
       if (level === 'none') {
-        return 'border border-[#D8E5DE] bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(248,251,249,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_14px_26px_-24px_rgba(61,96,72,0.08)]';
+        return 'border border-[#D8E5DE] bg-[#F7FBF8] shadow-[0_12px_24px_-24px_rgba(61,96,72,0.08)]';
       }
       if (level === 'light') {
-        return 'border border-[#BCE1C8] bg-[linear-gradient(180deg,rgba(250,255,251,0.998)_0%,rgba(232,248,237,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.97),0_16px_30px_-24px_rgba(45,124,74,0.12)]';
+        return 'border border-[#BCE1C8] bg-[#E9F7ED] shadow-[0_14px_26px_-24px_rgba(45,124,74,0.12)]';
       }
       if (level === 'medium') {
-        return 'border border-[#67BE82] bg-[linear-gradient(180deg,rgba(242,253,245,0.998)_0%,rgba(190,233,203,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_17px_30px_-24px_rgba(31,125,69,0.16)]';
+        return 'border border-[#67BE82] bg-[#BFE4CB] shadow-[0_14px_26px_-24px_rgba(31,125,69,0.16)]';
       }
-      return 'border border-[#0F6B37] bg-[linear-gradient(180deg,rgba(212,242,221,0.998)_0%,rgba(32,139,77,0.998)_100%)] shadow-[inset_0_1px_0_rgba(235,250,240,0.52),0_20px_34px_-22px_rgba(18,102,54,0.22)]';
+      return 'border border-[#0F6B37] bg-[#2D8B54] shadow-[0_16px_28px_-22px_rgba(18,102,54,0.22)]';
     }
     if (level === 'none') {
       return 'border border-[#D8E5DE] bg-[linear-gradient(180deg,rgba(255,255,255,0.998)_0%,rgba(248,251,249,0.996)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_15px_28px_-24px_rgba(61,96,72,0.08)]';
@@ -1349,16 +1349,14 @@ export default function StudyHistoryPage() {
                     type="button"
                     onClick={() => setSelectedDateForPlan(day)}
                     aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}${isCurrentMonth ? ' 학습' : ''}`}
-                    className={cn(
-                      'group relative overflow-hidden text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
-                      'aspect-square',
-                      isMobile ? 'min-h-0 rounded-[0.95rem] p-1' : 'rounded-[1.45rem] p-3.5',
-                      studentCellClass,
-                      isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0'
-                    )}
-                  >
-                    <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/92" />
-
+                  className={cn(
+                    'group relative overflow-hidden text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
+                    'aspect-square',
+                    isMobile ? 'min-h-0 rounded-[0.95rem] p-1' : 'rounded-[1.45rem] p-3.5',
+                    studentCellClass,
+                    isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0'
+                  )}
+                >
                     <div className="relative z-10 h-full">
                       <span
                         className={cn(
