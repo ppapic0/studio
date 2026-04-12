@@ -27,6 +27,7 @@ type PlanItemCardProps = {
     actualAmount: number;
     unitLabel: string;
     onCommitActual: (value: number) => void;
+    onRequestCompletion?: () => void;
   } | null;
 };
 
@@ -228,7 +229,13 @@ export function PlanItemCard({
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={() => commitAmount(volumeMeta.targetAmount)}
+                      onClick={() => {
+                        if (volumeMeta.onRequestCompletion) {
+                          volumeMeta.onRequestCompletion();
+                          return;
+                        }
+                        commitAmount(volumeMeta.targetAmount);
+                      }}
                       className="h-7 rounded-full px-3 text-[10px] font-black"
                     >
                       완료

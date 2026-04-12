@@ -142,15 +142,54 @@ function resolveAmountUnitLabel(task: Pick<StudyPlanItem, 'amountUnit' | 'amount
   return task.amountUnit || '문제';
 }
 
-function buildStudyTaskMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetMinutes' | 'targetAmount' | 'actualAmount' | 'amountUnit' | 'amountUnitLabel'>) {
+function getRecordedCompletionPercent(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetMinutes' | 'targetAmount' | 'actualAmount' | 'completionPercent' | 'done'>) {
+  const explicitPercent = Number(task.completionPercent);
+  if (Number.isFinite(explicitPercent) && explicitPercent >= 0) {
+    return clampPercent(Math.round(explicitPercent));
+  }
+
+  if (resolveStudyPlanMode(task) === 'volume') {
+    const targetAmount = Math.max(0, task.targetAmount || 0);
+    const actualAmount = Math.max(0, task.actualAmount || 0);
+    if (targetAmount > 0) {
+      return clampPercent(Math.round((actualAmount / targetAmount) * 100));
+    }
+  }
+
+  return task.done ? 100 : 0;
+}
+
+function buildCompletionRecordMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetMinutes' | 'targetAmount' | 'actualAmount' | 'completionPercent' | 'actualDurationMinutes' | 'done'>) {
+  const completionPercent = getRecordedCompletionPercent(task);
+  const actualDurationMinutes = Math.max(0, Number(task.actualDurationMinutes || 0));
+  const summaryParts: string[] = [];
+
+  if (completionPercent > 0) {
+    summaryParts.push(`완수 ${completionPercent}%`);
+  }
+  if (actualDurationMinutes > 0) {
+    summaryParts.push(`${actualDurationMinutes}분 소요`);
+  }
+
+  return summaryParts.join(' · ');
+}
+
+function buildStudyTaskMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetMinutes' | 'targetAmount' | 'actualAmount' | 'amountUnit' | 'amountUnitLabel' | 'completionPercent' | 'actualDurationMinutes' | 'done'>) {
+  const completionMeta = buildCompletionRecordMeta(task);
   if (resolveStudyPlanMode(task) === 'volume') {
     const unitLabel = resolveAmountUnitLabel(task);
     const targetAmount = Math.max(0, task.targetAmount || 0);
     const actualAmount = Math.max(0, task.actualAmount || 0);
-    const progressRate = targetAmount > 0 ? Math.round((actualAmount / targetAmount) * 100) : 0;
-    return `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel} · ${progressRate}%`;
+    const baseMeta = `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel}`;
+    return completionMeta ? `${baseMeta} · ${completionMeta}` : baseMeta;
   }
-  return task.targetMinutes ? `${task.targetMinutes}분 목표` : '시간 자유';
+  const baseMeta = task.targetMinutes ? `${task.targetMinutes}분 목표` : '시간 자유';
+  return completionMeta ? `${baseMeta} · ${completionMeta}` : baseMeta;
+}
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
 }
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
@@ -401,8 +440,41 @@ export default function StudyHistoryPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
   const [linkedStudents, setLinkedStudents] = useState<LinkedStudentOption[]>([]);
+  const [completionReviewItem, setCompletionReviewItem] = useState<WithId<StudyPlanItem> | null>(null);
+  const [completionMarkedDone, setCompletionMarkedDone] = useState(true);
+  const [completionPercentDraft, setCompletionPercentDraft] = useState('100');
+  const [completionActualDurationDraft, setCompletionActualDurationDraft] = useState('');
+  const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
+  const [isCompletionSubmitting, setIsCompletionSubmitting] = useState(false);
 
   useEffect(() => { setCurrentDate(new Date()); }, []);
+
+  useEffect(() => {
+    if (!completionReviewItem) return;
+    const recordedPercent = getRecordedCompletionPercent(completionReviewItem);
+    const nextMarkedDone = completionReviewItem.done || recordedPercent >= 100;
+    const nextPercent = nextMarkedDone
+      ? 100
+      : Math.max(1, Math.min(99, recordedPercent > 0 ? recordedPercent : 80));
+    const targetDuration = Math.max(
+      0,
+      Number(
+        completionReviewItem.actualDurationMinutes
+        ?? completionReviewItem.targetMinutes
+        ?? 0
+      )
+    );
+
+    setCompletionMarkedDone(nextMarkedDone);
+    setCompletionPercentDraft(String(nextPercent));
+    setCompletionActualDurationDraft(targetDuration > 0 ? String(targetDuration) : '');
+  }, [completionReviewItem]);
+
+  useEffect(() => {
+    if (selectedDateForPlan) return;
+    setIsCompletionDialogOpen(false);
+    setCompletionReviewItem(null);
+  }, [selectedDateForPlan]);
 
   useEffect(() => {
     if (!isParent) return;
@@ -822,20 +894,175 @@ export default function StudyHistoryPage() {
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid || !progressRef) return;
-    if (resolveStudyPlanMode(item) === 'volume') return;
+    try {
+      const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+      const nextState = !item.done;
+      const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id);
+
+      if (resolveStudyPlanMode(item) === 'volume') {
+        if (!nextState) {
+          await updateDoc(itemRef, {
+            actualAmount: 0,
+            done: false,
+            completedAt: null,
+            completionPercent: null,
+            actualDurationMinutes: null,
+            completedWithinPlannedTime: null,
+            completionOvertimeMinutes: null,
+            updatedAt: serverTimestamp(),
+          });
+          return;
+        }
+      }
+
+      if (!nextState) {
+        await updateDoc(itemRef, {
+          done: false,
+          completedAt: null,
+          completionPercent: null,
+          actualDurationMinutes: null,
+          completedWithinPlannedTime: null,
+          completionOvertimeMinutes: null,
+          updatedAt: serverTimestamp(),
+        });
+        return;
+      }
+
+      setCompletionReviewItem(item);
+      setIsCompletionDialogOpen(true);
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '계획 상태 변경 실패',
+        description: typeof e?.message === 'string' ? e.message : '계획 상태를 저장하지 못했습니다.',
+      });
+    }
+  };
+
+  const handleCommitStudyActualAmount = async (item: WithId<StudyPlanItem>, nextActualAmount: number) => {
+    if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
+    const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
+    const safeActualAmount = Math.max(0, Math.round(nextActualAmount));
+    const targetAmount = Math.max(0, item.targetAmount || 0);
+    const completionPercent = targetAmount > 0
+      ? clampPercent(Math.round((safeActualAmount / targetAmount) * 100))
+      : null;
+    const shouldResetCompletedState = Boolean(item.done && targetAmount > 0 && safeActualAmount < targetAmount);
+    await updateDoc(
+      doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id),
+      {
+        actualAmount: safeActualAmount,
+        completionPercent,
+        ...(shouldResetCompletedState
+          ? {
+              done: false,
+              completedAt: null,
+            }
+          : {}),
+        updatedAt: serverTimestamp(),
+      }
+    );
+    toast({
+      title: '실제 분량을 기록했어요',
+      description: completionPercent !== null
+        ? `현재 완수율 ${completionPercent}%로 반영됐어요.`
+        : '실제 분량이 저장됐어요.',
+    });
+  };
+
+  const handleConfirmTaskCompletion = async () => {
+    if (
+      !completionReviewItem ||
+      !firestore ||
+      !user ||
+      !activeMembership ||
+      !selectedDateForPlan ||
+      !targetUid ||
+      !progressRef
+    ) {
+      return;
+    }
+
+    const actualDurationMinutes = Math.max(0, Math.round(Number(completionActualDurationDraft) || 0));
+    if (actualDurationMinutes <= 0) {
+      toast({
+        variant: 'destructive',
+        title: '걸린 시간을 적어주세요',
+        description: '실제로 얼마나 걸렸는지 분 단위로 적어주시면 돼요.',
+      });
+      return;
+    }
+
+    const completionPercent = completionMarkedDone
+      ? 100
+      : clampPercent(Math.round(Number(completionPercentDraft) || 0));
+
+    if (!completionMarkedDone && completionPercent <= 0) {
+      toast({
+        variant: 'destructive',
+        title: '완수율을 적어주세요',
+        description: '아직 남았다면 몇 퍼센트까지 했는지 1% 이상으로 입력해 주세요.',
+      });
+      return;
+    }
+
+    if (!completionMarkedDone && completionPercent >= 100) {
+      toast({
+        variant: 'destructive',
+        title: '부분 완료라면 99% 이하로 적어주세요',
+        description: '전부 끝냈다면 "전부 완료했어요"를 선택하면 됩니다.',
+      });
+      return;
+    }
+
+    setIsCompletionSubmitting(true);
     try {
       const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
       const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-      const nextState = !item.done;
+      const itemRef = doc(
+        firestore,
+        'centers',
+        activeMembership.id,
+        'plans',
+        targetUid,
+        'weeks',
+        weekKey,
+        'items',
+        completionReviewItem.id
+      );
 
-      await updateDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id), { done: nextState, updatedAt: serverTimestamp() });
+      const targetMinutes = Math.max(0, Number(completionReviewItem.targetMinutes || 0));
+      const overtimeMinutes = targetMinutes > 0
+        ? Math.max(0, actualDurationMinutes - targetMinutes)
+        : 0;
+      const completedWithinPlannedTime = targetMinutes > 0
+        ? actualDurationMinutes <= targetMinutes
+        : null;
+      const isVolumeTask = resolveStudyPlanMode(completionReviewItem) === 'volume';
+      const targetAmount = Math.max(0, Number(completionReviewItem.targetAmount || 0));
+      const nextActualAmount = isVolumeTask && targetAmount > 0
+        ? completionMarkedDone
+          ? targetAmount
+          : Math.max(0, Math.min(targetAmount, Math.round((targetAmount * completionPercent) / 100)))
+        : Math.max(0, Number(completionReviewItem.actualAmount || 0));
 
-      if (nextState) {
+      await updateDoc(itemRef, {
+        ...(isVolumeTask ? { actualAmount: nextActualAmount } : {}),
+        done: completionMarkedDone,
+        completedAt: completionMarkedDone ? serverTimestamp() : null,
+        completionPercent,
+        actualDurationMinutes,
+        completedWithinPlannedTime,
+        completionOvertimeMinutes: completedWithinPlannedTime === null ? null : overtimeMinutes,
+        updatedAt: serverTimestamp(),
+      });
+
+      if (completionMarkedDone) {
         const batch = writeBatch(firestore);
         const achievementCount = progress?.dailyPointStatus?.[dateKey]?.achievementCount || 0;
         const existingDayStatus = (progress?.dailyPointStatus?.[dateKey] || {}) as Record<string, any>;
         const remainingStudyTasks = dailyPlans
-          .filter((plan) => (plan.category === 'study' || !plan.category) && plan.id !== item.id && !plan.done);
+          .filter((plan) => (plan.category === 'study' || !plan.category) && plan.id !== completionReviewItem.id && !plan.done);
         const shouldAwardPlanPoints = remainingStudyTasks.length === 0 && !existingDayStatus.plan;
         const progressUpdate: Record<string, any> = {
           dailyPointStatus: {
@@ -860,28 +1087,23 @@ export default function StudyHistoryPage() {
           });
         }
       }
+
+      toast({
+        title: completionMarkedDone ? '완료 결과를 저장했어요' : '진행 상황을 저장했어요',
+        description: `완수 ${completionPercent}% · ${actualDurationMinutes}분 기록됐어요.`,
+      });
+
+      setIsCompletionDialogOpen(false);
+      setCompletionReviewItem(null);
     } catch (e: any) {
       toast({
         variant: 'destructive',
-        title: '계획 상태 변경 실패',
-        description: typeof e?.message === 'string' ? e.message : '계획 상태를 저장하지 못했습니다.',
+        title: '완료 기록 저장 실패',
+        description: typeof e?.message === 'string' ? e.message : '완료 기록을 저장하지 못했습니다.',
       });
+    } finally {
+      setIsCompletionSubmitting(false);
     }
-  };
-
-  const handleCommitStudyActualAmount = async (item: WithId<StudyPlanItem>, nextActualAmount: number) => {
-    if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
-    const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-    const safeActualAmount = Math.max(0, Math.round(nextActualAmount));
-    const targetAmount = Math.max(0, item.targetAmount || 0);
-    await updateDoc(
-      doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id),
-      {
-        actualAmount: safeActualAmount,
-        done: targetAmount > 0 && safeActualAmount >= targetAmount,
-        updatedAt: serverTimestamp(),
-      }
-    );
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
@@ -1546,6 +1768,7 @@ export default function StudyHistoryPage() {
                                     actualAmount: Math.max(0, task.actualAmount || 0),
                                     unitLabel,
                                     onCommitActual: (value) => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, value),
+                                    onRequestCompletion: () => handleToggleTask(task as WithId<StudyPlanItem>),
                                   } : null}
                                   compact
                                 />
@@ -1767,6 +1990,171 @@ export default function StudyHistoryPage() {
           <div className="p-8 bg-white border-t shrink-0 flex justify-center">
             <Button variant="ghost" className="w-full h-12 rounded-2xl font-black text-muted-foreground/60 hover:bg-muted/50 transition-all" onClick={() => setSelectedDateForPlan(null)}>분석 창 닫기</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isCompletionDialogOpen}
+        onOpenChange={(open) => {
+          setIsCompletionDialogOpen(open);
+          if (!open && !isCompletionSubmitting) {
+            setCompletionReviewItem(null);
+          }
+        }}
+      >
+        <DialogContent className="w-[min(92vw,28rem)] rounded-[1.8rem] border border-[#E5ECF7] bg-white p-0 shadow-[0_24px_60px_-30px_rgba(20,41,95,0.32)]">
+          <div className="rounded-t-[1.8rem] bg-[linear-gradient(180deg,#17326B_0%,#21448D_100%)] px-6 py-5 text-white">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-xl font-black tracking-tight text-white">
+                완료 체크 전에 한 번만 확인할게요
+              </DialogTitle>
+              <DialogDescription className="mt-1 break-keep text-[12px] font-semibold leading-5 text-white/72">
+                실제 완료 여부와 완수율, 걸린 시간을 함께 적어두면 다음 계획 점검이 더 정확해져요.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-4 px-6 py-5">
+            {completionReviewItem ? (
+              <div className="rounded-[1.2rem] border border-[#E6EDF8] bg-[#F8FBFF] px-4 py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border-none bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary shadow-none">
+                    {completionReviewItem.category === 'personal'
+                      ? '기타 일정'
+                      : SUBJECTS.find((item) => item.id === (completionReviewItem.subject || 'etc'))?.label || '기타'}
+                  </Badge>
+                  {completionReviewItem.category !== 'personal' ? (
+                    <span className="text-[10px] font-black text-[#8AA0C7]">
+                      {buildStudyTaskMeta(completionReviewItem)}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-2 break-keep text-base font-black text-[#17326B]">
+                  {completionReviewItem.title}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setCompletionMarkedDone(true);
+                  setCompletionPercentDraft('100');
+                }}
+                className={cn(
+                  'rounded-[1.15rem] border px-4 py-4 text-left transition-all',
+                  completionMarkedDone
+                    ? 'border-[#FFB347] bg-[#FFF4E8] shadow-[0_12px_28px_-20px_rgba(216,106,17,0.35)]'
+                    : 'border-[#E6EDF8] bg-white'
+                )}
+              >
+                <p className="text-sm font-black text-[#17326B]">전부 완료했어요</p>
+                <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                  계획한 분량이나 내용을 끝까지 마무리했다면 100%로 저장돼요.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCompletionMarkedDone(false);
+                  setCompletionPercentDraft((previous) => {
+                    const current = Math.round(Number(previous) || 0);
+                    if (current > 0 && current < 100) return String(current);
+                    return '80';
+                  });
+                }}
+                className={cn(
+                  'rounded-[1.15rem] border px-4 py-4 text-left transition-all',
+                  !completionMarkedDone
+                    ? 'border-[#FFB347] bg-[#FFF4E8] shadow-[0_12px_28px_-20px_rgba(216,106,17,0.35)]'
+                    : 'border-[#E6EDF8] bg-white'
+                )}
+              >
+                <p className="text-sm font-black text-[#17326B]">아직 남았어요</p>
+                <p className="mt-1 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                  어디까지 했는지 퍼센트로 남기면 다음 이어서 하기가 더 쉬워져요.
+                </p>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
+              <div className="rounded-[1.15rem] border border-[#E6EDF8] bg-white px-4 py-4">
+                <Label htmlFor="completion-percent" className="text-[12px] font-black text-[#17326B]">
+                  실제 완수율
+                </Label>
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    id="completion-percent"
+                    type="number"
+                    min={completionMarkedDone ? 100 : 1}
+                    max={completionMarkedDone ? 100 : 99}
+                    inputMode="numeric"
+                    value={completionPercentDraft}
+                    onChange={(event) => setCompletionPercentDraft(event.target.value)}
+                    disabled={completionMarkedDone}
+                    className="h-12 rounded-[1rem] border-[#DCE6F5] bg-[#FCFDFF] text-base font-black text-[#17326B] disabled:opacity-70"
+                  />
+                  <span className="text-sm font-black text-[#17326B]">%</span>
+                </div>
+              </div>
+              <div className="rounded-[1.15rem] border border-[#FFE2C5] bg-[#FFF8F1] px-4 py-4">
+                <Label htmlFor="completion-duration" className="text-[12px] font-black text-[#17326B]">
+                  걸린 시간
+                </Label>
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    id="completion-duration"
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={completionActualDurationDraft}
+                    onChange={(event) => setCompletionActualDurationDraft(event.target.value)}
+                    className="h-12 rounded-[1rem] border-[#FFD7B5] bg-white text-base font-black text-[#17326B]"
+                  />
+                  <span className="text-sm font-black text-[#D86A11]">분</span>
+                </div>
+              </div>
+            </div>
+
+            {completionReviewItem?.targetMinutes ? (
+              <div className="rounded-[1.15rem] border border-[#E6EDF8] bg-[#F8FBFF] px-4 py-3">
+                <p className="text-[11px] font-semibold leading-5 text-[#5A6F95]">
+                  계획 시간은 {completionReviewItem.targetMinutes}분이에요. 실제 시간을 적으면 제시간 완료 여부는 자동으로 계산돼요.
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="flex-col gap-2 border-t border-[#EEF3FB] bg-[#FCFDFF] px-6 py-4 sm:flex-col">
+            <Button
+              type="button"
+              onClick={() => void handleConfirmTaskCompletion()}
+              disabled={isCompletionSubmitting}
+              className="h-12 w-full rounded-[1rem] bg-[linear-gradient(90deg,#14295F_0%,#21448D_100%)] font-black text-white"
+            >
+              {isCompletionSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  저장 중
+                </>
+              ) : (
+                '완료 기록 저장'
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsCompletionDialogOpen(false);
+                setCompletionReviewItem(null);
+              }}
+              disabled={isCompletionSubmitting}
+              className="h-11 w-full rounded-[1rem] border-[#DCE6F5] bg-white font-black text-[#17326B]"
+            >
+              다시 보기
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

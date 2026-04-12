@@ -296,6 +296,7 @@ export function StudyPlanSheet({
                                   actualAmount: Math.max(0, task.actualAmount || 0),
                                   unitLabel,
                                   onCommitActual: (value) => onCommitActual(task, value),
+                                  onRequestCompletion: () => onToggleTask(task),
                                 }
                               : null
                           }
