@@ -1973,6 +1973,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, centerId, studentId, tab, calendarRangeStartKey, calendarRangeEndKey, recentAnalyticsStartKey, todayKey]);
   const { data: allLogs, isLoading: logsLoading } = useCollection<StudyLogDay>(allLogsQuery, { enabled: shouldLoadStudyAnalytics });
+  const recent7LogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId || !todayKey || !today) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days'),
+      where('dateKey', '>=', format(subDays(today, 6), 'yyyy-MM-dd')),
+      where('dateKey', '<=', todayKey),
+      orderBy('dateKey', 'desc')
+    );
+  }, [firestore, centerId, studentId, today, todayKey]);
+  const { data: recent7Logs } = useCollection<StudyLogDay>(recent7LogsQuery, {
+    enabled: shouldLoadStudyAnalytics && tab === 'studyDetail',
+  });
 
   const plansQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !studentId || !todayKey || !weekKey) return null;
@@ -2413,6 +2425,24 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     }
     return map;
   }, [logMinutesByDateKey, todayKey, totalMinutes]);
+  const monthTotalMinutes = useMemo(() => {
+    if (!calendarBaseDate) return 0;
+    return (allLogs || [])
+      .filter((log) => isSameMonth(parse(log.dateKey, 'yyyy-MM-dd', new Date()), calendarBaseDate))
+      .reduce((sum, log) => sum + Math.max(0, Math.round(Number(log.totalMinutes || 0))), 0);
+  }, [allLogs, calendarBaseDate]);
+  const todayTotalMinutes = totalMinutes;
+  const recent7DaysTotalMinutes = useMemo(() => {
+    const minutesByDateKey = new Map<string, number>();
+    (recent7Logs || []).forEach((log) => {
+      minutesByDateKey.set(log.dateKey, Math.max(0, Math.round(Number(log.totalMinutes || 0))));
+    });
+    if (todayKey) {
+      minutesByDateKey.set(todayKey, totalMinutes);
+    }
+
+    return Array.from(minutesByDateKey.values()).reduce((sum, value) => sum + value, 0);
+  }, [recent7Logs, todayKey, totalMinutes]);
 
   const dailyStudyTrend = useMemo(() => {
     if (!today) return [] as { date: string; minutes: number }[];
@@ -3956,6 +3986,53 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </TabsContent>
 
             <TabsContent value="studyDetail" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
+              {isAppMode ? (
+                <div className="w-full">
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      {
+                        label: '이번 달 총 공부시간',
+                        mobileLabel: '이번 달',
+                        value: toClockLabel(monthTotalMinutes),
+                        note: '이번 달 누적 기준',
+                        mobileNote: '누적',
+                      },
+                      {
+                        label: '오늘 공부시간',
+                        mobileLabel: '오늘',
+                        value: toClockLabel(todayTotalMinutes),
+                        note: '오늘 하루 기준',
+                        mobileNote: '하루 기준',
+                      },
+                      {
+                        label: '최근 7일 누적',
+                        mobileLabel: '7일 누적',
+                        value: toClockLabel(recent7DaysTotalMinutes),
+                        note: '직전 7일 공부 누적',
+                        mobileNote: '직전 7일',
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="min-w-0 overflow-hidden rounded-[1.55rem] border border-[#2D4E92] bg-[linear-gradient(180deg,#102756_0%,#17326B_56%,#1D3D80_100%)] px-4 py-[1.05rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_20px_38px_-28px_rgba(9,18,46,0.52)]"
+                      >
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white">
+                          {item.mobileLabel}
+                        </p>
+                        <div className="mt-3.5 flex items-end gap-2">
+                          <span className="dashboard-number min-w-0 text-[1.28rem] font-black leading-none tracking-[-0.06em] text-white">
+                            {item.value}
+                          </span>
+                        </div>
+                        <p className="mt-2.5 break-keep text-[10px] font-semibold leading-[1.2rem] text-white">
+                          {item.mobileNote}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {!isAppMode ? (
                 <section
                   className={cn(
@@ -4084,7 +4161,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         key={day}
                         className={cn(
                           isAppMode
-                            ? 'py-1.5 text-[8px] rounded-2xl border border-white/80 bg-white/90 text-center font-black uppercase tracking-widest shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]'
+                            ? 'py-1.5 text-[8px]'
                             : isMobile
                               ? "py-1.5 text-[8px]"
                               : "rounded-[1rem] border py-2.5 text-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]",
@@ -4093,13 +4170,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               ? 'text-blue-600'
                               : i === 6
                                 ? 'text-rose-600'
-                                : 'text-primary/60'
+                                : 'text-[#9B6C3D]'
                             : i === 5
                               ? "text-blue-600"
                               : i === 6
                                 ? "text-rose-600"
                                 : "text-[#5976a7]",
-                          !isAppMode && "border-[#d8e7dc] bg-[linear-gradient(180deg,#ffffff_0%,#f3faf5_100%)] text-center font-semibold uppercase tracking-[0.18em]"
+                          isAppMode
+                            ? "border-[#EFDCC3] bg-[linear-gradient(180deg,#FFFDF8_0%,#FFF6EA_100%)] text-center font-black uppercase tracking-[0.18em]"
+                            : "border-[#d8e7dc] bg-[linear-gradient(180deg,#ffffff_0%,#f3faf5_100%)] text-center font-semibold uppercase tracking-[0.18em]"
                         )}
                       >
                         {day}
@@ -4143,27 +4222,37 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               'group relative overflow-hidden rounded-[0.95rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/28',
                               'aspect-square min-h-0 p-1',
                               appCalendarCellClass,
-                              isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0',
-                              isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-[#7FCB97]/55 shadow-[0_22px_36px_-24px_rgba(26,115,64,0.18)]'
+                              isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0'
                             )}
                           >
-                            {isTodayCalendar ? <div className="pointer-events-none absolute inset-[1px] rounded-[0.8rem] border border-white/88" /> : null}
                             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/92" />
-                            {isCurrentMonth && minutes > 0 ? (
-                              <div className="pointer-events-none absolute inset-x-4 top-0 h-12 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.52),rgba(255,255,255,0)_72%)] opacity-90" />
-                            ) : null}
 
-                            <div className="relative z-10 grid h-full place-items-center">
-                              <div className="flex h-full w-full items-center justify-center px-0.5">
+                            <div className="relative z-10 h-full">
+                              <span
+                                className={cn(
+                                  'dashboard-number absolute left-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-[0.8rem] border text-[0.62rem] font-black tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
+                                  idx % 7 === 5 && isCurrentMonth
+                                    ? 'border-blue-100 bg-blue-50 text-blue-700'
+                                    : idx % 7 === 6 && isCurrentMonth
+                                      ? 'border-rose-100 bg-rose-50 text-rose-700'
+                                      : 'border-slate-200 bg-white text-slate-700',
+                                  !isCurrentMonth && 'border-[#E2E8F0] bg-white/80 text-[#B6C0D0]',
+                                  isTodayCalendar && isCurrentMonth && 'border-[#FFB068] bg-[#FFF3E6] text-[#D86A11]'
+                                )}
+                              >
+                                {format(day, 'd')}
+                              </span>
+
+                              <div className="grid h-full w-full place-items-center px-0.5">
                                 {shouldRenderTime ? (
                                   <span
                                     className={cn(
                                       'dashboard-number block max-w-full whitespace-nowrap font-black leading-none tabular-nums text-center',
                                       isVeryLongTimeLabel
-                                        ? 'text-[0.52rem] tracking-[-0.11em]'
+                                        ? 'text-[0.5rem] tracking-[-0.11em]'
                                         : isLongTimeLabel
-                                          ? 'text-[0.6rem] tracking-[-0.1em]'
-                                          : 'text-[0.72rem] tracking-[-0.08em]',
+                                          ? 'text-[0.56rem] tracking-[-0.1em]'
+                                          : 'text-[0.66rem] tracking-[-0.08em]',
                                       appCalendarValueTone
                                     )}
                                   >
@@ -4266,9 +4355,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
 
               {!selectedCalendarDate && (
-                <div className="mx-1 flex items-center justify-center gap-2 rounded-[1.4rem] border border-dashed border-[#dbe6fb] bg-[#f7fbff] px-4 py-2.5 shadow-[0_16px_28px_-26px_rgba(20,41,95,0.12)]">
-                  <Info className="h-3.5 w-3.5 shrink-0 text-[#6d86b4]" />
-                  <p className="text-center text-[11px] font-bold leading-relaxed text-[#5874a4]">날짜를 누르면 그날의 핵심 기록만 볼 수 있어요.</p>
+                <div className={cn(
+                  "mx-1 flex items-center justify-center gap-2 px-4 py-2.5",
+                  isAppMode
+                    ? "rounded-2xl border border-dashed border-muted-foreground/10 bg-muted/20"
+                    : "rounded-[1.4rem] border border-dashed border-[#dbe6fb] bg-[#f7fbff] shadow-[0_16px_28px_-26px_rgba(20,41,95,0.12)]"
+                )}>
+                  <Info className={cn("h-3.5 w-3.5 shrink-0", isAppMode ? "text-primary/30" : "text-[#6d86b4]")} />
+                  <p className={cn("text-center text-[11px] font-bold leading-relaxed", isAppMode ? "text-muted-foreground/50" : "text-[#5874a4]")}>
+                    날짜를 누르면 그날의 핵심 기록만 볼 수 있어요.
+                  </p>
                 </div>
               )}
             </TabsContent>
