@@ -129,6 +129,29 @@ function addRankMinutes(target: Map<string, number>, studentId: string, minutes:
   target.set(studentId, (target.get(studentId) || 0) + minutes);
 }
 
+function buildStudentDateRankKey(studentId: string, dateKey: string) {
+  return `${studentId}\u001f${dateKey}`;
+}
+
+function mergeRankMinutesByDate(target: Map<string, number>, studentId: string, dateKey: string, minutes: number) {
+  if (!studentId || !dateKey || minutes <= 0) return;
+  const key = buildStudentDateRankKey(studentId, dateKey);
+  target.set(key, Math.max(target.get(key) || 0, minutes));
+}
+
+function foldRankMinutesByDate(source: Map<string, number>) {
+  const totals = new Map<string, number>();
+
+  source.forEach((minutes, compositeKey) => {
+    const separatorIndex = compositeKey.indexOf('\u001f');
+    const studentId = separatorIndex >= 0 ? compositeKey.slice(0, separatorIndex) : compositeKey;
+    if (!studentId || minutes <= 0) return;
+    addRankMinutes(totals, studentId, minutes);
+  });
+
+  return totals;
+}
+
 function normalizeMembershipStatus(value: unknown) {
   if (typeof value !== 'string') return 'active';
   const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -249,18 +272,30 @@ export async function GET(request: NextRequest) {
       .orderBy('value', 'desc')
       .limit(400)
       .get();
+    const dailyStudyDayLogsPromise = adminDb
+      .collectionGroup('days')
+      .where('centerId', '==', centerId)
+      .where('dateKey', 'in', dailyDateKeys)
+      .get();
     const attendanceSnapPromise = adminDb
       .collection(`centers/${centerId}/attendanceCurrent`)
+      .get();
+    const weeklyStudyDayLogsPromise = adminDb
+      .collectionGroup('days')
+      .where('centerId', '==', centerId)
+      .where('dateKey', 'in', weekDateKeys)
       .get();
     const weeklySnapPromises = weekDateKeys.map((dateKey) =>
       adminDb.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()
     );
 
-    const [membersSnap, studentsSnap, monthlySnap, attendanceSnap, ...dailyAndWeeklySnaps] = await Promise.all([
+    const [membersSnap, studentsSnap, monthlySnap, dailyStudyDayLogsSnap, attendanceSnap, weeklyStudyDayLogsSnap, ...dailyAndWeeklySnaps] = await Promise.all([
       membersSnapPromise,
       studentsSnapPromise,
       monthlySnapPromise,
+      dailyStudyDayLogsPromise,
       attendanceSnapPromise,
+      weeklyStudyDayLogsPromise,
       ...dailySnapPromises,
       ...weeklySnapPromises,
     ]);
@@ -371,28 +406,53 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const weeklyTotals = new Map<string, number>();
-    const dailyTotals = new Map<string, number>();
+    const dailyMinutesByStudentDate = new Map<string, number>();
+    const weeklyMinutesByStudentDate = new Map<string, number>();
 
-    dailySnaps.forEach((snapshot) => {
+    dailySnaps.forEach((snapshot, index) => {
+      const fallbackDateKey = dailyDateKeys[index] || '';
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
         const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
+        const dateKey = typeof data.dateKey === 'string' && data.dateKey.trim() ? data.dateKey.trim() : fallbackDateKey;
         const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
-        if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
-        addRankMinutes(dailyTotals, studentId, value);
+        if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+        mergeRankMinutesByDate(dailyMinutesByStudentDate, studentId, dateKey, value);
       });
     });
 
-    weeklySnaps.forEach((snapshot) => {
+    dailyStudyDayLogsSnap.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      const studentId = typeof data.studentId === 'string' ? data.studentId : '';
+      const dateKey = typeof data.dateKey === 'string' ? data.dateKey.trim() : '';
+      const value = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
+      if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+      mergeRankMinutesByDate(dailyMinutesByStudentDate, studentId, dateKey, value);
+    });
+
+    weeklySnaps.forEach((snapshot, index) => {
+      const fallbackDateKey = weekDateKeys[index] || '';
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
         const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
+        const dateKey = typeof data.dateKey === 'string' && data.dateKey.trim() ? data.dateKey.trim() : fallbackDateKey;
         const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
-        if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
-        addRankMinutes(weeklyTotals, studentId, value);
+        if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+        mergeRankMinutesByDate(weeklyMinutesByStudentDate, studentId, dateKey, value);
       });
     });
+
+    weeklyStudyDayLogsSnap.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      const studentId = typeof data.studentId === 'string' ? data.studentId : '';
+      const dateKey = typeof data.dateKey === 'string' ? data.dateKey.trim() : '';
+      const value = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
+      if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+      mergeRankMinutesByDate(weeklyMinutesByStudentDate, studentId, dateKey, value);
+    });
+
+    const dailyTotals = foldRankMinutesByDate(dailyMinutesByStudentDate);
+    const weeklyTotals = foldRankMinutesByDate(weeklyMinutesByStudentDate);
 
     const nowMs = Date.now();
     const weekDateKeySet = new Set(weekDateKeys);
