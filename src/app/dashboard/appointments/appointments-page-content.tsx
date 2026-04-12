@@ -2008,7 +2008,17 @@ export function AppointmentsPageContent({
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className={cn("rounded-lg font-black uppercase text-[9px] px-2 py-0.5", isStaff ? "border-[#dbe5ff] bg-[#f6f9ff] text-[#14295F]" : "border-primary/20 text-primary")}>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "rounded-lg font-black uppercase text-[9px] px-2 py-0.5",
+                                isStudentTrackTheme
+                                  ? "border-white/14 bg-white/10 text-white shadow-none"
+                                  : isStaff
+                                    ? "border-[#dbe5ff] bg-[#f6f9ff] text-[#14295F]"
+                                    : "border-primary/20 text-primary"
+                              )}
+                            >
                               {log.type === 'academic' ? '학업' : log.type === 'life' ? '생활' : '진로'}
                             </Badge>
                             <span className={cn("text-[10px] font-bold flex items-center gap-1.5", isStaff ? "text-[#5c6e97]" : "text-muted-foreground")}>
