@@ -2865,13 +2865,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !activeVaultDateKey || !activeMembership?.id || !user?.uid) return;
     const targetHour = selectedHomeBox.hour;
     const targetDateKey = activeVaultDateKey;
+    const currentDayStatus = targetDateKey === yesterdayKey
+      ? {
+          ...yesterdayPointStatus,
+          claimedStudyBoxes: persistedCarryoverClaimedBoxes,
+          openedStudyBoxes: resolvedCarryoverOpenedBoxes,
+          studyBoxRewards: persistedCarryoverRewardEntries,
+        }
+      : {
+          ...todayPointStatus,
+          claimedStudyBoxes: syncedClaimedBoxes,
+          openedStudyBoxes: syncedOpenedBoxes,
+          studyBoxRewards: syncedRewardEntries,
+        };
     const rewardOpenPromise = openStudyRewardBoxSecure({
       centerId: activeMembership.id,
       studentId: user.uid,
       dateKey: targetDateKey,
       hour: targetHour,
       reward: activeRewardByHour.get(targetHour) || rollStudyBoxReward(targetHour),
-      dayStatus: targetDateKey === yesterdayKey ? yesterdayPointStatus : todayPointStatus,
+      dayStatus: currentDayStatus,
       currentTotalPointsEarned: Number(progress?.totalPointsEarned || 0),
     })
       .then((result) => ({ ok: true as const, result }))
@@ -2950,12 +2963,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     cachedCarryoverOpenedBoxes,
     isClaimingHomeBox,
     persistedClaimedBoxes,
+    persistedCarryoverClaimedBoxes,
+    persistedCarryoverRewardEntries,
     persistedCarryoverOpenedBoxes,
     persistedOpenedBoxes,
     persistedRewardEntries,
     homeOpenedBoxes,
     resolvedCarryoverOpenedBoxes,
     selectedHomeBox,
+    syncedClaimedBoxes,
+    syncedOpenedBoxes,
+    syncedRewardEntries,
     toast,
     todayKey,
     todayPointStatus,

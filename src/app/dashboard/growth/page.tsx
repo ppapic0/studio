@@ -568,13 +568,19 @@ export default function GrowthPage() {
   const handleRevealBox = async () => {
     if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !activeMembership?.id || !user?.uid) return;
     const targetHour = selectedBox.hour;
+    const currentDayStatus = {
+      ...todayStatus,
+      claimedStudyBoxes: claimedBoxes,
+      openedStudyBoxes: openedBoxes,
+      studyBoxRewards: rewardEntries,
+    };
     const rewardOpenPromise = openStudyRewardBoxSecure({
       centerId: activeMembership.id,
       studentId: user.uid,
       dateKey: todayKey,
       hour: targetHour,
       reward: rewardByHour.get(targetHour) || rollStudyBoxReward(targetHour),
-      dayStatus: todayStatus,
+      dayStatus: currentDayStatus,
       currentPointsBalance: pointBalance,
       currentTotalPointsEarned: Number(progress?.totalPointsEarned || 0),
     })
