@@ -4761,7 +4761,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         onChange={(e) => setParentInquiryTitle(e.target.value)}
                         placeholder={
                           parentInquiryType === 'question'
-                            ? '예: 아이 숙제 진행 방식이 궁금합니다'
+                            ? '예: 학생 의무 등원 시간 조정이 가능한가요?'
                             : parentInquiryType === 'request'
                               ? '예: 상담 일정 조정 요청'
                               : '예: 앱 알림 방식 개선 건의'
