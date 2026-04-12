@@ -31,45 +31,36 @@ function RewardBoxFigure({
   rarity: RewardBoxRarity;
   state?: RewardBoxState;
 }) {
+  const isLocked = state === 'locked';
+
   return (
     <div
       className={cn(
         'point-track-box-figure',
         variant === 'hero' ? 'point-track-box-figure--hero' : 'point-track-box-figure--slot',
-        `point-track-box-figure--${rarity}`,
-        state === 'locked' && 'point-track-box-figure--locked'
+        isLocked ? 'point-track-box-figure--mystery' : `point-track-box-figure--${rarity}`,
+        isLocked && 'point-track-box-figure--locked'
       )}
     >
       <div className="point-track-box-figure__glow" />
       {variant === 'hero' ? <div className="point-track-box-figure__shadow" /> : null}
-      <div className="point-track-box-figure__shell">
-        <div className="point-track-box-figure__lid" />
-        <div className="point-track-box-figure__band" />
-        <div className="point-track-box-figure__trim point-track-box-figure__trim--left" />
-        <div className="point-track-box-figure__trim point-track-box-figure__trim--right" />
-        <div className="point-track-box-figure__crest" />
-        <div className="point-track-box-figure__lock" />
-        <div className="point-track-box-figure__shine" />
-        <div className="point-track-box-figure__spark point-track-box-figure__spark--left" />
-        <div className="point-track-box-figure__spark point-track-box-figure__spark--right" />
-        {state === 'locked' ? (
-          <div className="absolute inset-0 z-[3] flex items-center justify-center">
-            <span
-              className={cn(
-                'inline-flex items-center justify-center rounded-full border font-black leading-none shadow-[0_10px_22px_-14px_rgba(8,15,36,0.8)]',
-                variant === 'hero' ? 'h-10 w-10 text-[1.4rem]' : 'h-9 w-9 text-[1.35rem]',
-                rarity === 'epic'
-                  ? 'border-violet-100/60 bg-violet-100/26 text-white'
-                  : rarity === 'rare'
-                    ? 'border-orange-100/60 bg-orange-100/28 text-white'
-                    : 'border-white/60 bg-white/28 text-white'
-              )}
-            >
-              ?
-            </span>
-          </div>
-        ) : null}
-      </div>
+      {isLocked ? (
+        <div className="point-track-box-figure__mystery">
+          <span className="point-track-box-figure__mystery-mark">?</span>
+        </div>
+      ) : (
+        <div className="point-track-box-figure__shell">
+          <div className="point-track-box-figure__lid" />
+          <div className="point-track-box-figure__band" />
+          <div className="point-track-box-figure__trim point-track-box-figure__trim--left" />
+          <div className="point-track-box-figure__trim point-track-box-figure__trim--right" />
+          <div className="point-track-box-figure__crest" />
+          <div className="point-track-box-figure__lock" />
+          <div className="point-track-box-figure__shine" />
+          <div className="point-track-box-figure__spark point-track-box-figure__spark--left" />
+          <div className="point-track-box-figure__spark point-track-box-figure__spark--right" />
+        </div>
+      )}
     </div>
   );
 }
@@ -134,7 +125,7 @@ export function RewardVaultSlot({
       onClick={() => onSelect(box.hour)}
       className={cn(
         'point-track-slot',
-        `point-track-slot--${box.rarity}`,
+        box.state === 'locked' ? 'point-track-slot--mystery' : `point-track-slot--${box.rarity}`,
         box.state === 'ready' && 'point-track-slot--ready',
         box.state === 'charging' && 'point-track-slot--charging',
         box.state === 'opened' && 'point-track-slot--opened',
@@ -146,14 +137,16 @@ export function RewardVaultSlot({
         <span
           className={cn(
             'rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em]',
-            box.rarity === 'epic'
-              ? 'border-violet-300/30 bg-violet-300/18 text-violet-100'
-              : box.rarity === 'rare'
-                ? 'border-orange-300/30 bg-orange-300/18 text-orange-100'
-                : 'border-sky-200/24 bg-sky-200/14 text-sky-100'
+            box.state === 'locked'
+              ? 'border-white/18 bg-white/8 text-white/85'
+              : box.rarity === 'epic'
+                ? 'border-violet-300/30 bg-violet-300/18 text-violet-100'
+                : box.rarity === 'rare'
+                  ? 'border-orange-300/30 bg-orange-300/18 text-orange-100'
+                  : 'border-sky-200/24 bg-sky-200/14 text-sky-100'
           )}
         >
-          {rarityLabels[box.rarity]}
+          {box.state === 'locked' ? '?' : rarityLabels[box.rarity]}
         </span>
         {box.state === 'ready' ? (
           <Star
