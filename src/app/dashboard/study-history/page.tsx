@@ -690,7 +690,13 @@ export default function StudyHistoryPage() {
   };
 
   const formatMobileCalendarMinutesLabel = (minutes: number) => {
-    return formatHourMinuteCompact(minutes);
+    const safeMinutes = toSafeStudyMinutes(minutes);
+    const hours = Math.floor(safeMinutes / 60);
+    const mins = safeMinutes % 60;
+    if (safeMinutes <= 0) return '0m';
+    if (hours === 0) return `${mins}m`;
+    if (mins === 0) return `${hours}h`;
+    return `${hours}h${mins}m`;
   };
 
   const getHeatmapColor = (minutes: number) => {
@@ -1329,7 +1335,11 @@ export default function StudyHistoryPage() {
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isTodayCalendar = isSameDay(day, new Date());
               const isFutureCalendar = isCurrentMonth && isAfter(startOfDay(day), startOfDay(new Date()));
-              const exactTimeLabel = isCurrentMonth ? formatCalendarMinutesLabel(minutes) : '';
+              const exactTimeLabel = isCurrentMonth
+                ? isMobile
+                  ? formatMobileCalendarMinutesLabel(minutes)
+                  : formatCalendarMinutesLabel(minutes)
+                : '';
               const shouldRenderTime = isCurrentMonth && !isFutureCalendar;
               const isLongTimeLabel = exactTimeLabel.length >= 6;
               const isVeryLongTimeLabel = exactTimeLabel.length >= 7;
@@ -1381,7 +1391,7 @@ export default function StudyHistoryPage() {
                         {shouldRenderTime ? (
                           <span
                             className={cn(
-                              'dashboard-number block max-w-full whitespace-nowrap font-black leading-none tabular-nums text-center',
+                              'dashboard-number inline-flex w-full min-w-0 items-center justify-center whitespace-nowrap font-black leading-[1.05] tabular-nums text-center',
                               isMobile
                                 ? isVeryLongTimeLabel
                                   ? 'text-[0.5rem] tracking-[-0.11em]'
@@ -1446,7 +1456,7 @@ export default function StudyHistoryPage() {
                     {shouldRenderTime ? (
                       <span
                         className={cn(
-                          'dashboard-number block max-w-full whitespace-nowrap tabular-nums leading-none text-center',
+                          'dashboard-number inline-flex w-full min-w-0 items-center justify-center whitespace-nowrap tabular-nums leading-[1.05] text-center',
                           isMobile
                             ? isVeryLongTimeLabel
                               ? 'text-[0.5rem] tracking-[-0.1em]'

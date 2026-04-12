@@ -4197,7 +4197,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const isTodayCalendar = today ? isSameDay(day, today) : false;
                       const isFutureCalendar = isCurrentMonth && !!todayKey && dateKey > todayKey;
                       const exactTimeLabel = isCurrentMonth
-                        ? formatCalendarMinutes(minutes)
+                        ? formatCalendarMinutes(minutes, isAppMode)
                         : '';
                       const shouldRenderTime = isCurrentMonth && !isFutureCalendar;
                       const isLongTimeLabel = exactTimeLabel.length >= (isAppMode ? 6 : 6);
@@ -4231,7 +4231,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 {shouldRenderTime ? (
                                   <span
                                     className={cn(
-                                      'dashboard-number block max-w-full whitespace-nowrap font-black leading-none tabular-nums text-center',
+                                      'dashboard-number inline-flex w-full min-w-0 items-center justify-center whitespace-nowrap font-black leading-[1.05] tabular-nums text-center',
                                       isVeryLongTimeLabel
                                         ? 'text-[0.5rem] tracking-[-0.11em]'
                                         : isLongTimeLabel
