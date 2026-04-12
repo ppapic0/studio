@@ -1394,15 +1394,15 @@ export default function StudyHistoryPage() {
                               'dashboard-number inline-flex w-full min-w-0 items-center justify-center whitespace-nowrap font-black leading-[1.05] tabular-nums text-center',
                               isMobile
                                 ? isVeryLongTimeLabel
-                                  ? 'text-[0.5rem] tracking-[-0.11em]'
+                                  ? 'text-[0.46rem] tracking-[-0.11em]'
                                   : isLongTimeLabel
-                                    ? 'text-[0.56rem] tracking-[-0.1em]'
-                                    : 'text-[0.66rem] tracking-[-0.08em]'
+                                    ? 'text-[0.52rem] tracking-[-0.1em]'
+                                    : 'text-[0.62rem] tracking-[-0.08em]'
                                 : isVeryLongTimeLabel
-                                  ? 'text-[0.92rem] tracking-[-0.05em]'
+                                  ? 'text-[0.86rem] tracking-[-0.05em]'
                                   : isLongTimeLabel
-                                    ? 'text-[1rem] tracking-[-0.045em]'
-                                    : 'text-[1.12rem] tracking-[-0.05em]',
+                                    ? 'text-[0.94rem] tracking-[-0.045em]'
+                                    : 'text-[1.04rem] tracking-[-0.05em]',
                               studentValueTone
                             )}
                           >
@@ -1459,15 +1459,15 @@ export default function StudyHistoryPage() {
                           'dashboard-number inline-flex w-full min-w-0 items-center justify-center whitespace-nowrap tabular-nums leading-[1.05] text-center',
                           isMobile
                             ? isVeryLongTimeLabel
-                              ? 'text-[0.5rem] tracking-[-0.1em]'
+                              ? 'text-[0.46rem] tracking-[-0.1em]'
                               : isLongTimeLabel
-                                ? 'text-[0.58rem] tracking-[-0.08em]'
-                                : 'text-[0.68rem] tracking-[-0.06em]'
+                                ? 'text-[0.54rem] tracking-[-0.08em]'
+                                : 'text-[0.62rem] tracking-[-0.06em]'
                             : isVeryLongTimeLabel
-                              ? 'text-[0.86rem] tracking-[-0.04em]'
+                              ? 'text-[0.8rem] tracking-[-0.04em]'
                               : isLongTimeLabel
-                                ? 'text-[0.96rem] tracking-[-0.04em]'
-                                : 'text-[1.06rem] tracking-[-0.05em]',
+                                ? 'text-[0.9rem] tracking-[-0.04em]'
+                                : 'text-[1rem] tracking-[-0.05em]',
                           parentValueTone
                         )}
                       >
