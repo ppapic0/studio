@@ -135,6 +135,24 @@ function toClockLabel(totalMinutes: number) {
   return `${hours}:${minutes}`;
 }
 
+function toDurationClockLabel(totalMinutes: number) {
+  const safe = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(safe / 60).toString().padStart(2, '0');
+  const minutes = (safe % 60).toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function normalizeLinkedStudentIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        .map((entry) => entry.trim())
+    )
+  );
+}
+
 function calculateRhythmScore(minutes: number[]): number {
   if (!minutes.length) return 0;
   const safeMinutes = minutes.map((value) => Math.max(0, Math.round(value)));
@@ -1726,20 +1744,25 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const centerId = active센터Membership?.id;
   const calendarBaseDate = currentCalendarDate ?? today;
-  const linkedStudentIds = useMemo(
-    () =>
-      (active센터Membership?.linkedStudentIds || []).filter(
-        (value): value is string => typeof value === 'string' && value.trim().length > 0
-      ),
-    [active센터Membership?.linkedStudentIds]
-  );
+  const parentMemberRef = useMemoFirebase(() => {
+    if (!firestore || !centerId || !user?.uid) return null;
+    return doc(firestore, 'centers', centerId, 'members', user.uid);
+  }, [firestore, centerId, user?.uid]);
+  const { data: parentMember } = useDoc<Record<string, unknown>>(parentMemberRef, {
+    enabled: isActive && !!centerId && !!user?.uid,
+  });
+  const linkedStudentIds = useMemo(() => {
+    const membershipIds = normalizeLinkedStudentIds(active센터Membership?.linkedStudentIds);
+    const memberDocIds = normalizeLinkedStudentIds(parentMember?.linkedStudentIds);
+    return Array.from(new Set([...membershipIds, ...memberDocIds]));
+  }, [active센터Membership?.linkedStudentIds, parentMember?.linkedStudentIds]);
   const linkedStudentIdsKey = linkedStudentIds.join(',');
   const requestedStudentId = searchParams.get('parentStudentId');
   const studentId = useMemo(() => {
-    if (linkedStudentIds.length === 0) return undefined;
-    if (requestedStudentId && linkedStudentIds.includes(requestedStudentId)) {
+    if (requestedStudentId && (linkedStudentIds.length === 0 || linkedStudentIds.includes(requestedStudentId))) {
       return requestedStudentId;
     }
+    if (linkedStudentIds.length === 0) return undefined;
     return linkedStudentIds[0];
   }, [linkedStudentIds, requestedStudentId]);
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
@@ -1778,7 +1801,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         params.set('parentStudentId', studentId);
         shouldReplace = true;
       }
-    } else if (requestedStudentId) {
+    } else if (requestedStudentId && linkedStudentIds.length > 0) {
       params.delete('parentStudentId');
       shouldReplace = true;
     }
@@ -3158,9 +3181,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const selectedDateCheckInAt = useMemo(() => {
     if (!selectedDateKey) return null;
     if (selectedDateKey === todayKey && todayCheckInAt) return todayCheckInAt;
-    return toDateSafe(
-      (selectedDateAttendanceRecord?.checkInAt as TimestampLike) || (selectedDateAttendanceRecord?.updatedAt as TimestampLike)
-    );
+    return toDateSafe(selectedDateAttendanceRecord?.checkInAt as TimestampLike);
   }, [selectedDateAttendanceRecord, selectedDateKey, todayCheckInAt, todayKey]);
 
   const selectedDateCheckOutAt = useMemo(() => {
@@ -3993,21 +4014,21 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       {
                         label: '이번 달 총 공부시간',
                         mobileLabel: '이번 달',
-                        value: toClockLabel(monthTotalMinutes),
+                        value: toDurationClockLabel(monthTotalMinutes),
                         note: '이번 달 누적 기준',
                         mobileNote: '누적',
                       },
                       {
                         label: '오늘 공부시간',
                         mobileLabel: '오늘',
-                        value: toClockLabel(todayTotalMinutes),
+                        value: toDurationClockLabel(todayTotalMinutes),
                         note: '오늘 하루 기준',
                         mobileNote: '하루 기준',
                       },
                       {
                         label: '최근 7일 누적',
                         mobileLabel: '7일 누적',
-                        value: toClockLabel(recent7DaysTotalMinutes),
+                        value: toDurationClockLabel(recent7DaysTotalMinutes),
                         note: '직전 7일 공부 누적',
                         mobileNote: '직전 7일',
                       },

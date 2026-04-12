@@ -119,6 +119,17 @@ type LinkedStudentOption = {
   name: string;
 };
 
+function normalizeLinkedStudentIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        .map((entry) => entry.trim())
+    )
+  );
+}
+
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 
@@ -406,21 +417,26 @@ export default function StudyHistoryPage() {
   
   const isMobile = viewMode === 'mobile';
   const isParent = activeMembership?.role === 'parent';
-  const linkedStudentIds = useMemo(
-    () =>
-      (activeMembership?.linkedStudentIds || []).filter(
-        (value): value is string => typeof value === 'string' && value.trim().length > 0
-      ),
-    [activeMembership?.linkedStudentIds]
-  );
+  const parentMemberRef = useMemoFirebase(() => {
+    if (!isParent || !firestore || !activeMembership?.id || !user?.uid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'members', user.uid);
+  }, [isParent, firestore, activeMembership?.id, user?.uid]);
+  const { data: parentMember } = useDoc<Record<string, unknown>>(parentMemberRef, {
+    enabled: isParent && !!firestore && !!activeMembership?.id && !!user?.uid,
+  });
+  const linkedStudentIds = useMemo(() => {
+    const membershipIds = normalizeLinkedStudentIds(activeMembership?.linkedStudentIds);
+    const memberDocIds = normalizeLinkedStudentIds(parentMember?.linkedStudentIds);
+    return Array.from(new Set([...membershipIds, ...memberDocIds]));
+  }, [activeMembership?.linkedStudentIds, parentMember?.linkedStudentIds]);
   const linkedStudentIdsKey = linkedStudentIds.join(',');
   const requestedParentStudentId = searchParams.get('parentStudentId');
   const targetUid = useMemo(() => {
     if (!isParent) return user?.uid;
-    if (linkedStudentIds.length === 0) return undefined;
-    if (requestedParentStudentId && linkedStudentIds.includes(requestedParentStudentId)) {
+    if (requestedParentStudentId && (linkedStudentIds.length === 0 || linkedStudentIds.includes(requestedParentStudentId))) {
       return requestedParentStudentId;
     }
+    if (linkedStudentIds.length === 0) return undefined;
     return linkedStudentIds[0];
   }, [isParent, user?.uid, linkedStudentIds, requestedParentStudentId]);
 
@@ -487,7 +503,7 @@ export default function StudyHistoryPage() {
         params.set('parentStudentId', targetUid);
         shouldReplace = true;
       }
-    } else if (requestedParentStudentId) {
+    } else if (requestedParentStudentId && linkedStudentIds.length > 0) {
       params.delete('parentStudentId');
       shouldReplace = true;
     }
@@ -592,7 +608,7 @@ export default function StudyHistoryPage() {
   const completedQuickPlanCount = completedStudyCount + completedPersonalCount;
   const quickPlanCompletionRate = totalQuickPlanCount > 0 ? Math.round((completedQuickPlanCount / totalQuickPlanCount) * 100) : 0;
   const selectedDateCheckInAt = useMemo(
-    () => toDateSafe((selectedDateAttendanceRecord?.checkInAt as unknown) || (selectedDateAttendanceRecord?.updatedAt as unknown)),
+    () => toDateSafe(selectedDateAttendanceRecord?.checkInAt as unknown),
     [selectedDateAttendanceRecord]
   );
   const selectedDateCheckOutAt = useMemo(
