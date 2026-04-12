@@ -152,6 +152,15 @@ function foldRankMinutesByDate(source: Map<string, number>) {
   return totals;
 }
 
+function chunkItems<T>(items: T[], size: number) {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
 function normalizeMembershipStatus(value: unknown) {
   if (typeof value !== 'string') return 'active';
   const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -272,30 +281,18 @@ export async function GET(request: NextRequest) {
       .orderBy('value', 'desc')
       .limit(400)
       .get();
-    const dailyStudyDayLogsPromise = adminDb
-      .collectionGroup('days')
-      .where('centerId', '==', centerId)
-      .where('dateKey', 'in', dailyDateKeys)
-      .get();
     const attendanceSnapPromise = adminDb
       .collection(`centers/${centerId}/attendanceCurrent`)
-      .get();
-    const weeklyStudyDayLogsPromise = adminDb
-      .collectionGroup('days')
-      .where('centerId', '==', centerId)
-      .where('dateKey', 'in', weekDateKeys)
       .get();
     const weeklySnapPromises = weekDateKeys.map((dateKey) =>
       adminDb.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()
     );
 
-    const [membersSnap, studentsSnap, monthlySnap, dailyStudyDayLogsSnap, attendanceSnap, weeklyStudyDayLogsSnap, ...dailyAndWeeklySnaps] = await Promise.all([
+    const [membersSnap, studentsSnap, monthlySnap, attendanceSnap, ...dailyAndWeeklySnaps] = await Promise.all([
       membersSnapPromise,
       studentsSnapPromise,
       monthlySnapPromise,
-      dailyStudyDayLogsPromise,
       attendanceSnapPromise,
-      weeklyStudyDayLogsPromise,
       ...dailySnapPromises,
       ...weeklySnapPromises,
     ]);
@@ -382,11 +379,39 @@ export async function GET(request: NextRequest) {
       if (!studentProfiles.has(studentId)) return activeStudentIds.size === 0;
       return !knownStudentMemberIds.has(studentId);
     };
+    const includedStudentIds = Array.from(
+      new Set([
+        ...studentProfiles.keys(),
+        ...activeStudentIds,
+        ...knownStudentMemberIds,
+      ])
+    ).filter((studentId) => shouldInclude(studentId) && !isSyntheticStudentId(studentId));
     const getProfile = (studentId: string) => memberProfiles.get(studentId) || studentProfiles.get(studentId) || {
       displayNameSnapshot: '학생',
       classNameSnapshot: null,
       schoolNameSnapshot: null,
     };
+
+    const fetchStudyLogDayDocs = async (dateKeys: string[]) => {
+      if (includedStudentIds.length === 0 || dateKeys.length === 0) return [];
+
+      const refs = includedStudentIds.flatMap((studentId) =>
+        dateKeys.map((dateKey) => adminDb.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`))
+      );
+
+      const snapshots: FirebaseFirestore.DocumentSnapshot[] = [];
+      for (const chunk of chunkItems(refs, 350)) {
+        if (chunk.length === 0) continue;
+        const chunkSnapshots = await adminDb.getAll(...chunk);
+        snapshots.push(...chunkSnapshots);
+      }
+      return snapshots;
+    };
+
+    const [dailyStudyDayDocs, weeklyStudyDayDocs] = await Promise.all([
+      fetchStudyLogDayDocs(dailyDateKeys),
+      fetchStudyLogDayDocs(weekDateKeys),
+    ]);
 
     const seatIdToStudentId = new Map<string, string | null>();
     const roomSeatToStudentId = new Map<string, string | null>();
@@ -421,7 +446,8 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    dailyStudyDayLogsSnap.forEach((docSnap) => {
+    dailyStudyDayDocs.forEach((docSnap) => {
+      if (!docSnap.exists) return;
       const data = docSnap.data() as Record<string, unknown>;
       const studentId = typeof data.studentId === 'string' ? data.studentId : '';
       const dateKey = typeof data.dateKey === 'string' ? data.dateKey.trim() : '';
@@ -442,7 +468,8 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    weeklyStudyDayLogsSnap.forEach((docSnap) => {
+    weeklyStudyDayDocs.forEach((docSnap) => {
+      if (!docSnap.exists) return;
       const data = docSnap.data() as Record<string, unknown>;
       const studentId = typeof data.studentId === 'string' ? data.studentId : '';
       const dateKey = typeof data.dateKey === 'string' ? data.dateKey.trim() : '';
