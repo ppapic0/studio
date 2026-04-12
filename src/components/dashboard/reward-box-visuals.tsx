@@ -31,7 +31,7 @@ function RewardBoxFigure({
   rarity: RewardBoxRarity;
   state?: RewardBoxState;
 }) {
-  const isMystery = state === 'locked' || (variant === 'slot' && state === 'charging');
+  const isMystery = state === 'locked' || state === 'charging';
 
   return (
     <div
@@ -97,7 +97,7 @@ export function RewardHeroBox({
         stage === 'revealed' && 'point-track-hero-box--revealed'
       )}
     >
-      <RewardBoxFigure variant="hero" rarity={resolvedRarity} />
+      <RewardBoxFigure variant="hero" rarity={resolvedRarity} state={state} />
       <span className="sr-only">{label}</span>
     </button>
   );
