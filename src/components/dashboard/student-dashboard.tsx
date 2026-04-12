@@ -97,11 +97,13 @@ import {
   formatStudyMinutesShort,
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
+  getOpenedStudyBoxes,
   getStudyBoxFallbackRarity,
   normalizeStudyBoxHourValues,
   rollStudyBoxReward,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
+import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
 import {
   EMPTY_STUDENT_RANKING_SNAPSHOT,
   fetchStudentRankingSnapshot,
@@ -1075,8 +1077,7 @@ function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxRe
 }
 
 function coerceOpenedStudyBoxes(dayStatus: Record<string, any>) {
-  const raw = Array.isArray(dayStatus.openedStudyBoxes) ? dayStatus.openedStudyBoxes : [];
-  return normalizeStudyBoxHours(raw);
+  return getOpenedStudyBoxes(dayStatus);
 }
 
 function buildRewardBoxes({
@@ -1307,34 +1308,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const pendingQuestIdsRef = useRef<Set<string>>(new Set());
   const carryoverAutoOpenSignatureRef = useRef<string | null>(null);
 
-  const getCarryoverOpenedStorageKey = useCallback((dateKey: string) => {
-    return `student-dashboard:carryover-opened:${user?.uid ?? 'anonymous'}:${dateKey}`;
-  }, [user?.uid]);
-
   const getCarryoverAutoOpenStorageKey = useCallback((dateKey: string) => {
     return `student-dashboard:carryover-auto-open:${user?.uid ?? 'anonymous'}:${dateKey}`;
   }, [user?.uid]);
 
   const readCarryoverOpenedCache = useCallback((dateKey: string) => {
-    if (!dateKey || typeof window === 'undefined') return [] as number[];
-    try {
-      const raw = window.localStorage.getItem(getCarryoverOpenedStorageKey(dateKey));
-      if (!raw) return [] as number[];
-      const parsed = JSON.parse(raw);
-      return normalizeStudyBoxHours(parsed);
-    } catch {
-      return [] as number[];
-    }
-  }, [getCarryoverOpenedStorageKey]);
+    return readStudyBoxOpenedCache(user?.uid, dateKey);
+  }, [user?.uid]);
 
   const writeCarryoverOpenedCache = useCallback((dateKey: string, values: number[]) => {
-    if (!dateKey || typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(getCarryoverOpenedStorageKey(dateKey), JSON.stringify(normalizeStudyBoxHours(values)));
-    } catch {
-      // Ignore storage access errors and keep runtime state only.
-    }
-  }, [getCarryoverOpenedStorageKey]);
+    writeStudyBoxOpenedCache(user?.uid, dateKey, values);
+  }, [user?.uid]);
 
   const hasHandledCarryoverAutoOpen = useCallback((dateKey: string) => {
     if (typeof window === 'undefined') return false;
@@ -2743,8 +2727,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [persistedRewardEntries]);
 
   useEffect(() => {
-    setHomeOpenedBoxes(persistedOpenedBoxes);
-  }, [persistedOpenedBoxes]);
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(user?.uid, todayKey);
+    const nextOpenedBoxes = normalizeStudyBoxHours([...persistedOpenedBoxes, ...cachedOpenedBoxes]);
+
+    setHomeOpenedBoxes(nextOpenedBoxes);
+    writeStudyBoxOpenedCache(user?.uid, todayKey, nextOpenedBoxes);
+  }, [persistedOpenedBoxes, todayKey, user?.uid]);
 
   const resolvedCarryoverOpenedBoxes = useMemo(() => {
     const snapshotHours = carryoverOpenedSnapshot.dateKey === yesterdayKey
@@ -3187,6 +3175,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         if (targetDateKey === todayKey) {
           setHomeOpenedBoxes(nextOpenedBoxes);
           setHomeClaimedBoxes(nextClaimedBoxes);
+          writeStudyBoxOpenedCache(user.uid, todayKey, nextOpenedBoxes);
           if (nextRewardEntry) {
             setHomeRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
           }

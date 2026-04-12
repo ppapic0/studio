@@ -46,6 +46,88 @@ export type StudyBoxReward = {
   multiplier: number;
 };
 
+function normalizeStoredStudyBoxReward(value: unknown): StudyBoxReward | null {
+  const milestone = Number((value as StudyBoxReward | null | undefined)?.milestone);
+  const minReward = Number((value as StudyBoxReward | null | undefined)?.minReward);
+  const maxReward = Number((value as StudyBoxReward | null | undefined)?.maxReward);
+  const awardedPoints = Number((value as StudyBoxReward | null | undefined)?.awardedPoints);
+  const multiplier = Number((value as StudyBoxReward | null | undefined)?.multiplier ?? 1);
+  const rarity = (value as StudyBoxReward | null | undefined)?.rarity;
+
+  if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
+  if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
+  if (rarity !== 'common' && rarity !== 'rare' && rarity !== 'epic') return null;
+
+  return {
+    milestone,
+    rarity,
+    minReward,
+    maxReward,
+    awardedPoints: Math.max(0, Math.floor(awardedPoints)),
+    multiplier: Number.isFinite(multiplier) ? multiplier : 1,
+  };
+}
+
+function normalizeStoredStudyBoxRewardEntries(values: unknown): StudyBoxReward[] {
+  if (!Array.isArray(values)) return [];
+
+  return values
+    .map((value) => normalizeStoredStudyBoxReward(value))
+    .filter((value): value is StudyBoxReward => value !== null)
+    .sort((a, b) => a.milestone - b.milestone);
+}
+
+function getRankRewardPoints(dayStatus?: Record<string, any>): number {
+  return ['dailyRankRewardAmount', 'weeklyRankRewardAmount', 'monthlyRankRewardAmount'].reduce((total, key) => {
+    const points = Number(dayStatus?.[key] ?? 0);
+    if (!Number.isFinite(points)) return total;
+    return total + Math.max(0, Math.floor(points));
+  }, 0);
+}
+
+function inferOpenedStudyBoxHours(dayStatus?: Record<string, any>): number[] {
+  const claimedStudyBoxes = getClaimedStudyBoxes(dayStatus);
+  const explicitOpenedStudyBoxes = normalizeStudyBoxHourValues(dayStatus?.openedStudyBoxes);
+
+  if (claimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
+
+  const rewardByHour = new Map<number, number>();
+  normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).forEach((entry) => {
+    rewardByHour.set(entry.milestone, Math.max(0, Math.floor(entry.awardedPoints)));
+  });
+
+  if (explicitOpenedStudyBoxes.some((hour) => !rewardByHour.has(hour))) {
+    return explicitOpenedStudyBoxes;
+  }
+
+  const persistedDailyPointAmount = Number(dayStatus?.dailyPointAmount ?? 0);
+  const studyBoxAwardedPoints = Math.max(
+    0,
+    Math.floor(Number.isFinite(persistedDailyPointAmount) ? persistedDailyPointAmount : 0) - getRankRewardPoints(dayStatus)
+  );
+  const explicitOpenedStudyBoxPoints = explicitOpenedStudyBoxes.reduce(
+    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
+    0
+  );
+  const remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
+  const missingClaimedStudyBoxes = claimedStudyBoxes.filter(
+    (hour) => !explicitOpenedStudyBoxes.includes(hour) && rewardByHour.has(hour)
+  );
+
+  if (missingClaimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
+
+  const missingClaimedRewardTotal = missingClaimedStudyBoxes.reduce(
+    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
+    0
+  );
+
+  if (missingClaimedRewardTotal > 0 && remainingAwardedStudyBoxPoints < missingClaimedRewardTotal) {
+    return explicitOpenedStudyBoxes;
+  }
+
+  return normalizeStudyBoxHourValues([...explicitOpenedStudyBoxes, ...missingClaimedStudyBoxes]);
+}
+
 function coerceStudyBoxHourValue(value: unknown): number | null {
   let parsedValue: number | null = null;
 
@@ -106,6 +188,10 @@ export function rollStudyBoxRarity(milestone: number): StudyBoxRarity {
 
 export function getClaimedStudyBoxes(dayStatus?: Record<string, any>): number[] {
   return normalizeStudyBoxHourValues(dayStatus?.claimedStudyBoxes);
+}
+
+export function getOpenedStudyBoxes(dayStatus?: Record<string, any>): number[] {
+  return inferOpenedStudyBoxHours(dayStatus);
 }
 
 export function getAvailableStudyBoxMilestones(totalMinutes: number, claimedStudyBoxes?: number[]) {

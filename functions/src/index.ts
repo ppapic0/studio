@@ -281,6 +281,54 @@ function getDailyAwardedPointTotal(dayStatus: Record<string, unknown>): number {
   return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
 }
 
+function getRankRewardAwardTotal(dayStatus: Record<string, unknown>): number {
+  return ["dailyRankRewardAmount", "weeklyRankRewardAmount", "monthlyRankRewardAmount"].reduce(
+    (total, key) => total + Math.max(0, Math.floor(parseFiniteNumber(dayStatus[key]) ?? 0)),
+    0
+  );
+}
+
+function resolveOpenedStudyBoxHoursFromDayStatus(dayStatus: Record<string, unknown>): number[] {
+  const explicitOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.openedStudyBoxes);
+  const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.claimedStudyBoxes);
+
+  if (claimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
+
+  const rewardEntries = normalizeStudyBoxRewardEntries(dayStatus.studyBoxRewards);
+  const rewardByHour = new Map<number, number>();
+  rewardEntries.forEach((entry) => {
+    rewardByHour.set(entry.milestone, Math.max(0, Math.floor(entry.awardedPoints)));
+  });
+
+  if (explicitOpenedStudyBoxes.some((hour) => !rewardByHour.has(hour))) {
+    return explicitOpenedStudyBoxes;
+  }
+
+  const persistedDailyPointAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.dailyPointAmount) ?? 0));
+  const studyBoxAwardedPoints = Math.max(0, persistedDailyPointAmount - getRankRewardAwardTotal(dayStatus));
+  const explicitOpenedStudyBoxPoints = explicitOpenedStudyBoxes.reduce(
+    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
+    0
+  );
+  const remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
+  const missingClaimedStudyBoxes = claimedStudyBoxes.filter(
+    (hour) => !explicitOpenedStudyBoxes.includes(hour) && rewardByHour.has(hour)
+  );
+
+  if (missingClaimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
+
+  const missingClaimedRewardTotal = missingClaimedStudyBoxes.reduce(
+    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
+    0
+  );
+
+  if (missingClaimedRewardTotal > 0 && remainingAwardedStudyBoxPoints < missingClaimedRewardTotal) {
+    return explicitOpenedStudyBoxes;
+  }
+
+  return normalizeStudyBoxHoursFromUnknown([...explicitOpenedStudyBoxes, ...missingClaimedStudyBoxes]);
+}
+
 function clampDailyPointAward(dayStatus: Record<string, unknown>, requestedPoints: number) {
   const normalizedRequestedPoints = Math.max(0, Math.floor(requestedPoints));
   const currentAwardedTotal = getDailyAwardedPointTotal(dayStatus);
@@ -6493,7 +6541,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     ? (preExistingDailyPointStatus[dateKey] as Record<string, unknown>)
     : {};
   const preExistingClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(preExistingDayStatus.claimedStudyBoxes);
-  const preExistingOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown(preExistingDayStatus.openedStudyBoxes);
+  const preExistingOpenedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(preExistingDayStatus);
   const hasUnlockedBoxRecord = preExistingClaimedStudyBoxes.includes(hour) || preExistingOpenedStudyBoxes.includes(hour);
 
   if (!hasUnlockedBoxRecord && earnedHours < hour) {
@@ -6519,7 +6567,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
       ? (dailyPointStatus[dateKey] as Record<string, unknown>)
       : {};
 
-    const openedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.openedStudyBoxes);
+    const openedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(currentDayStatus);
     const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.claimedStudyBoxes);
     const storedRewardEntries = normalizeStudyBoxRewardEntries(currentDayStatus.studyBoxRewards);
     const storedReward = storedRewardEntries.find((entry) => entry.milestone === hour) ?? null;

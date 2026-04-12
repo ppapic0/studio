@@ -38,11 +38,13 @@ import { useToast } from '@/hooks/use-toast';
 import {
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
+  getOpenedStudyBoxes,
   getStudyBoxFallbackRarity,
   normalizeStudyBoxHourValues,
   rollStudyBoxReward,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
+import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { GrowthProgress, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -337,9 +339,7 @@ export default function GrowthPage() {
 
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayStatus), [todayStatus]);
   const persistedRewardEntries = useMemo(() => coerceStudyBoxRewards(todayStatus), [todayStatus]);
-  const persistedOpenedBoxes = useMemo(() => {
-    return normalizeStudyBoxHourValues(todayStatus.openedStudyBoxes);
-  }, [todayStatus]);
+  const persistedOpenedBoxes = useMemo(() => getOpenedStudyBoxes(todayStatus), [todayStatus]);
 
   const stats = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
@@ -365,8 +365,12 @@ export default function GrowthPage() {
   }, [persistedRewardEntries]);
 
   useEffect(() => {
-    setOpenedBoxes(persistedOpenedBoxes);
-  }, [persistedOpenedBoxes]);
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(user?.uid, todayKey);
+    const nextOpenedBoxes = normalizeStudyBoxHours([...persistedOpenedBoxes, ...cachedOpenedBoxes]);
+
+    setOpenedBoxes(nextOpenedBoxes);
+    writeStudyBoxOpenedCache(user?.uid, todayKey, nextOpenedBoxes);
+  }, [persistedOpenedBoxes, todayKey, user?.uid]);
 
   useEffect(() => {
     setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
@@ -606,6 +610,7 @@ export default function GrowthPage() {
 
         setOpenedBoxes(nextOpenedBoxes);
         setClaimedBoxes(nextClaimedBoxes);
+        writeStudyBoxOpenedCache(user.uid, todayKey, nextOpenedBoxes);
         if (nextRewardEntry) {
           setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
         }
