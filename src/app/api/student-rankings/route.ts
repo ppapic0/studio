@@ -140,6 +140,20 @@ function normalizeMembershipStatus(value: unknown) {
   return 'active';
 }
 
+function normalizeRole(value: unknown) {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+function shouldTreatMemberAsStudent(role: unknown, hasStudentProfile: boolean) {
+  const normalizedRole = normalizeRole(role);
+  if (['teacher', 'centeradmin', 'admin', 'parent', 'staff', 'manager', 'owner'].includes(normalizedRole)) {
+    return false;
+  }
+  if (hasStudentProfile) return true;
+  return normalizedRole === 'student' || normalizedRole === 'learner';
+}
+
 function isSyntheticStudentId(studentId: unknown): boolean {
   if (typeof studentId !== 'string') return true;
   const normalized = studentId.trim().toLowerCase();
@@ -223,7 +237,6 @@ export async function GET(request: NextRequest) {
 
     const membersSnapPromise = adminDb
       .collection(`centers/${centerId}/members`)
-      .where('role', '==', 'student')
       .get();
     const studentsSnapPromise = adminDb
       .collection(`centers/${centerId}/students`)
@@ -306,6 +319,8 @@ export async function GET(request: NextRequest) {
       if (isSyntheticStudentId(studentId)) return;
 
       const data = docSnap.data() as Record<string, unknown>;
+      const hasStudentProfile = studentProfiles.has(studentId);
+      if (!shouldTreatMemberAsStudent(data.role, hasStudentProfile)) return;
       if (normalizeMembershipStatus(data.status) !== 'active') return;
 
       activeStudentIds.add(studentId);
