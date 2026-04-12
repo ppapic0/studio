@@ -209,6 +209,12 @@ function formatAttendanceTimeLabel(value: Date | null, fallback = '미기록') {
   return value ? format(value, 'HH:mm') : fallback;
 }
 
+function toSafeStudyMinutes(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.round(parsed));
+}
+
 function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMobile, disabled }: any) {
   const [titlePart, timePart] = item.title.split(': ');
   
@@ -594,13 +600,14 @@ export default function StudyHistoryPage() {
   }, [currentDate]);
 
   const formatMinutes = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    const safeMinutes = toSafeStudyMinutes(minutes);
+    const hours = Math.floor(safeMinutes / 60);
+    const mins = safeMinutes % 60;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
   const formatHourMinuteCompact = (minutes: number) => {
-    const safeMinutes = Math.max(0, minutes);
+    const safeMinutes = toSafeStudyMinutes(minutes);
     const hours = Math.floor(safeMinutes / 60);
     const mins = safeMinutes % 60;
     return `${hours}h ${mins}m`;
@@ -669,12 +676,14 @@ export default function StudyHistoryPage() {
 
   const monthTotalMinutes = useMemo(() => {
     if (!logs || !currentDate) return 0;
-    return logs.filter(log => isSameMonth(new Date(log.dateKey), currentDate)).reduce((acc, log) => acc + log.totalMinutes, 0);
+    return logs
+      .filter((log) => isSameMonth(new Date(log.dateKey), currentDate))
+      .reduce((acc, log) => acc + toSafeStudyMinutes(log.totalMinutes), 0);
   }, [logs, currentDate]);
 
   const todayTotalMinutes = useMemo(() => {
     if (!logs) return 0;
-    return logs.find((log) => log.dateKey === todayStr)?.totalMinutes || 0;
+    return toSafeStudyMinutes(logs.find((log) => log.dateKey === todayStr)?.totalMinutes);
   }, [logs, todayStr]);
 
   const recent7DaysTotalMinutes = useMemo(() => {
@@ -682,7 +691,7 @@ export default function StudyHistoryPage() {
     const windowStartKey = format(subDays(new Date(), 6), 'yyyy-MM-dd');
     return logs
       .filter((log) => log.dateKey >= windowStartKey && log.dateKey <= todayStr)
-      .reduce((acc, log) => acc + log.totalMinutes, 0);
+      .reduce((acc, log) => acc + toSafeStudyMinutes(log.totalMinutes), 0);
   }, [logs, todayStr]);
 
   const todayOpenedBoxCount = useMemo(() => {
@@ -1094,7 +1103,7 @@ export default function StudyHistoryPage() {
               </div>
             ) : calendarData.days.map((day, idx) => {
               const dateKey = format(day, 'yyyy-MM-dd');
-              const minutes = logs?.find(l => l.dateKey === dateKey)?.totalMinutes || 0;
+              const minutes = toSafeStudyMinutes(logs?.find((l) => l.dateKey === dateKey)?.totalMinutes);
               const isCurrentMonth = calendarData.monthStart ? isSameMonth(day, calendarData.monthStart) : false;
               const isTodayCalendar = isSameDay(day, new Date());
               const isFutureCalendar = isCurrentMonth && isAfter(startOfDay(day), startOfDay(new Date()));
