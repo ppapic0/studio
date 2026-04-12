@@ -116,6 +116,8 @@ import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
+const STUDY_BOX_CLAIM_CACHE_PREFIX = 'student-dashboard:claimed-boxes';
+const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
 
 function isSyntheticStudentId(studentId: unknown): boolean {
   if (typeof studentId !== 'string') return true;
@@ -963,6 +965,35 @@ function normalizeStudyBoxHours(values: unknown) {
   ).sort((a, b) => a - b);
 }
 
+function readStudyBoxHoursCache(storageKey: string | null) {
+  if (typeof window === 'undefined' || !storageKey) return [] as number[];
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [] as number[];
+    const parsed = JSON.parse(raw);
+    return normalizeStudyBoxHours(parsed);
+  } catch {
+    return [] as number[];
+  }
+}
+
+function writeStudyBoxHoursCache(storageKey: string | null, values: number[]) {
+  if (typeof window === 'undefined' || !storageKey) return;
+
+  try {
+    const normalized = normalizeStudyBoxHours(values);
+    if (normalized.length === 0) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+
+    window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+  } catch {
+    // Ignore storage access issues and keep runtime state only.
+  }
+}
+
 function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxReward) {
   const next = new Map<number, StudyBoxReward>();
   entries.forEach((entry) => {
@@ -1188,6 +1219,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   });
   const [questGain, setQuestGain] = useState<{ id: string; key: number; amount: number } | null>(null);
   const [pendingQuestIds, setPendingQuestIds] = useState<string[]>([]);
+  const [hydratedStudyBoxClaimCacheKey, setHydratedStudyBoxClaimCacheKey] = useState<string | null>(null);
   const pendingQuestIdsRef = useRef<Set<string>>(new Set());
   const carryoverAutoOpenSignatureRef = useRef<string | null>(null);
 
@@ -2461,6 +2493,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const persistedCarryoverClaimedBoxes = useMemo(() => getClaimedStudyBoxes(yesterdayPointStatus), [yesterdayPointStatus]);
   const persistedCarryoverRewardEntries = useMemo(() => coerceStudyBoxRewards(yesterdayPointStatus), [yesterdayPointStatus]);
   const persistedCarryoverOpenedBoxes = useMemo(() => coerceOpenedStudyBoxes(yesterdayPointStatus), [yesterdayPointStatus]);
+  const studyBoxClaimCacheKey = useMemo(() => {
+    if (!activeMembership?.id || !user?.uid) return null;
+    return `${STUDY_BOX_CLAIM_CACHE_PREFIX}:${activeMembership.id}:${user.uid}:${todayKey}`;
+  }, [activeMembership?.id, todayKey, user?.uid]);
   const cachedCarryoverOpenedBoxes = useMemo(
     () => readCarryoverOpenedCache(yesterdayKey),
     [readCarryoverOpenedCache, yesterdayKey]
@@ -2482,8 +2518,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   );
 
   useEffect(() => {
-    setHomeClaimedBoxes(persistedClaimedBoxes);
-  }, [persistedClaimedBoxes]);
+    const cachedClaimedBoxes = readStudyBoxHoursCache(studyBoxClaimCacheKey);
+    const nextClaimedBoxes = normalizeStudyBoxHours([...persistedClaimedBoxes, ...cachedClaimedBoxes]);
+
+    setHomeClaimedBoxes(nextClaimedBoxes);
+    writeStudyBoxHoursCache(studyBoxClaimCacheKey, nextClaimedBoxes);
+    setHydratedStudyBoxClaimCacheKey(studyBoxClaimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY);
+  }, [persistedClaimedBoxes, studyBoxClaimCacheKey]);
 
   useEffect(() => {
     setHomeRewardEntries(persistedRewardEntries);
@@ -2645,6 +2686,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     if (!isActive || !isTimerActive || !progressRef || !todayKey || !activeMembership?.id || !user?.uid) return;
+    if ((studyBoxClaimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY) !== hydratedStudyBoxClaimCacheKey) return;
 
     const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, syncedClaimedBoxes);
     if (availableMilestones.length === 0) return;
@@ -2681,6 +2723,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       },
       updatedAt: serverTimestamp(),
     }, { merge: true }).then(() => {
+      writeStudyBoxHoursCache(studyBoxClaimCacheKey, nextClaimedBoxes);
+
       if (shouldShowStudyBoxArrivalToast(membershipId, userId, todayKey, availableMilestones)) {
         toast({
           title: availableMilestones.length > 1 ? `상자 ${availableMilestones.length}개 도착!` : '상자 도착!',
@@ -2704,6 +2748,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     persistedClaimedBoxes,
     persistedRewardEntries,
     progressRef,
+    studyBoxClaimCacheKey,
+    hydratedStudyBoxClaimCacheKey,
     todayKey,
     todayPointStatus,
     toast,
