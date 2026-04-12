@@ -17,6 +17,10 @@ import { MarketingHeader } from '@/components/marketing/marketing-header';
 import { ScrollReveal } from '@/components/marketing/scroll-reveal';
 import { StaggerChildren } from '@/components/marketing/stagger-children';
 import { adminDb } from '@/lib/firebase-admin';
+import {
+  CLASS_TUITION_NOTICE,
+  CLASS_TUITION_POLICY_ROUTE,
+} from '@/lib/legal-documents';
 import { marketingContent } from '@/lib/marketing-content';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
 
@@ -118,7 +122,7 @@ const studentFits = [
 ];
 
 const contactItems = [
-  { label: 'CONTACT', value: marketingContent.consult.contactLine },
+  { label: 'CONTACT', value: `상담 문의: ${CLASS_TUITION_NOTICE.contact}` },
   { label: 'LOCATION', value: marketingContent.consult.locationLine },
   { label: 'HOURS', value: marketingContent.consult.hoursLine },
 ];
@@ -139,6 +143,10 @@ export default async function ClassPage() {
     .split(/<br\s*\/?>/i)
     .map((item) => item.trim())
     .filter(Boolean);
+  const classFooter = {
+    ...marketingContent.footer,
+    phone: `상담 문의: ${CLASS_TUITION_NOTICE.contact}`,
+  };
   return (
     <main className="min-h-screen bg-white pb-24 text-slate-900 sm:pb-0">
       <MarketingHeader brand={marketingContent.brand} nav={marketingContent.nav} />
@@ -481,6 +489,151 @@ export default async function ClassPage() {
       </ScrollReveal>
 
       {/* ══════════════════════════════════════════
+          8. TUITION POLICY
+      ══════════════════════════════════════════ */}
+      <ScrollReveal>
+        <section className="py-20 sm:py-28 bg-white">
+          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-3xl text-center">
+              <span className="eyebrow-badge">교습비 안내</span>
+              <h2 className="font-aggro-display mt-5 break-keep text-[clamp(1.8rem,3.7vw,2.6rem)] font-black leading-[1.08] tracking-[-0.03em] text-[#14295F]">
+                교습비 및 환불 안내
+              </h2>
+              <p className="mx-auto mt-5 max-w-[720px] break-keep text-[15px] font-semibold leading-[1.88] text-[#445f7e]">
+                교습비와 환불 기준을 등록 준비 중 안내 형태로 먼저 공개합니다.
+                현재 등록번호는 등록 완료 후 반영 예정이며,
+                상세 기준은 아래 정책 페이지에서 함께 확인하실 수 있습니다.
+              </p>
+            </div>
+
+            <div
+              className="mt-10 overflow-hidden rounded-[2rem] border px-6 py-7 text-white sm:px-8 sm:py-9"
+              style={{
+                borderColor: 'rgba(20,41,95,0.12)',
+                background: 'linear-gradient(155deg, #0a1330 0%, #14295f 58%, #0d1e4a 100%)',
+                boxShadow: '0 28px 70px -34px rgba(20,41,95,0.65)',
+              }}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
+                <div>
+                  <span className="inline-flex rounded-full border border-[#FF7A16]/30 bg-[#FF7A16]/14 px-3 py-1 text-[11px] font-black tracking-[0.16em] text-[#FFD0A5]">
+                    {CLASS_TUITION_NOTICE.registrationStatusLabel}
+                  </span>
+                  <h3 className="mt-3 break-keep text-[1.5rem] font-black text-white sm:text-[1.7rem]">
+                    {CLASS_TUITION_NOTICE.academyName}
+                  </h3>
+                  <p className="mt-2 break-keep text-[14px] font-semibold leading-[1.8] text-white/70">
+                    {CLASS_TUITION_NOTICE.registrationStatusDescription}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+                  <p className="text-[10.5px] font-black tracking-[0.18em] text-[#FFB273]">문의처</p>
+                  <p className="mt-2 text-[1.15rem] font-black tracking-[-0.03em] text-white">
+                    {CLASS_TUITION_NOTICE.contact}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: '학원명', value: CLASS_TUITION_NOTICE.academyName },
+                  { label: '교습과목', value: CLASS_TUITION_NOTICE.subject },
+                  { label: '등록번호', value: CLASS_TUITION_NOTICE.registrationNumber },
+                  { label: '수강 기준', value: CLASS_TUITION_NOTICE.sessionSummary },
+                ].map((item) => (
+                  <article
+                    key={item.label}
+                    className="rounded-[1.35rem] border border-white/10 bg-white/5 px-5 py-4"
+                  >
+                    <p className="text-[10px] font-black tracking-[0.16em] text-[#FFB273]">{item.label}</p>
+                    <p className="mt-2 break-keep text-[1rem] font-black leading-[1.45] text-white">
+                      {item.value}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-6 lg:grid-cols-[0.98fr_1.02fr]">
+              <article className="rounded-[1.8rem] border border-[#14295F]/10 bg-[#f7f9ff] p-6 shadow-[0_24px_56px_-36px_rgba(20,41,95,0.35)] sm:p-7">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-[#FF7A16]" />
+                  <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">교습비</p>
+                </div>
+                <h3 className="mt-3 text-[1.35rem] font-black text-[#14295F]">대상별 교습비 기준</h3>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  {CLASS_TUITION_NOTICE.tuitionRows.map((row) => (
+                    <div
+                      key={row.target}
+                      className="rounded-[1.4rem] border border-[#14295F]/10 bg-white px-5 py-5"
+                    >
+                      <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">{row.target}</p>
+                      <p className="mt-3 text-[2rem] font-black leading-none text-[#14295F]">{row.amount}</p>
+                      <p className="mt-3 break-keep text-[13px] font-semibold leading-[1.7] text-[#4b6784]">
+                        {row.detail}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-4">
+                    <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">수강 단위</p>
+                    <p className="mt-2 break-keep text-[14px] font-black leading-[1.6] text-[#14295F]">
+                      {CLASS_TUITION_NOTICE.sessionSummary}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[#14295F]/10 bg-white px-4 py-4">
+                    <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">별도 비용</p>
+                    <p className="mt-2 break-keep text-[14px] font-black leading-[1.6] text-[#14295F]">
+                      {CLASS_TUITION_NOTICE.extraFees}
+                    </p>
+                  </div>
+                </div>
+              </article>
+
+              <article className="rounded-[1.8rem] border border-[#14295F]/10 bg-white p-6 shadow-[0_24px_56px_-36px_rgba(20,41,95,0.35)] sm:p-7">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-[#FF7A16]" />
+                  <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">환불 기준</p>
+                </div>
+                <h3 className="mt-3 text-[1.35rem] font-black text-[#14295F]">학교교과교습학원 기준 환불 안내</h3>
+                <div className="mt-6 grid gap-3">
+                  {CLASS_TUITION_NOTICE.refundRules.map((rule) => (
+                    <div
+                      key={rule.stage}
+                      className="rounded-[1.3rem] border border-[#14295F]/10 bg-[#f8fbff] px-4 py-4"
+                    >
+                      <p className="text-[12px] font-black tracking-[0.04em] text-[#14295F]">{rule.stage}</p>
+                      <p className="mt-1.5 break-keep text-[14px] font-semibold leading-[1.75] text-[#445f7e]">
+                        {rule.refund}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 rounded-2xl border border-[#FF7A16]/18 bg-[#fff7f1] px-4 py-4">
+                  <p className="break-keep text-[13.5px] font-bold leading-[1.8] text-[#8b4a14]">
+                    {CLASS_TUITION_NOTICE.refundBasis}
+                  </p>
+                </div>
+              </article>
+            </div>
+
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <a
+                href={CLASS_TUITION_POLICY_ROUTE}
+                className="premium-cta premium-cta-primary h-12 px-7 text-[14px]"
+              >
+                상세 교습비 및 환불 기준 보기
+              </a>
+              <a href="#class-consult" className="premium-cta premium-cta-ghost h-12 px-7 text-[14px]">
+                수업 상담 바로가기
+              </a>
+            </div>
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ══════════════════════════════════════════
           9. CONSULT CTA
       ══════════════════════════════════════════ */}
       <section
@@ -595,7 +748,7 @@ export default async function ClassPage() {
       {/* ══════════════════════════════════════════
           10. FOOTER
       ══════════════════════════════════════════ */}
-      <MarketingFooter brand={marketingContent.brand} footer={marketingContent.footer} />
+      <MarketingFooter brand={marketingContent.brand} footer={classFooter} />
 
       {/* Floating CTA */}
       <AcademyFloatingCTA />

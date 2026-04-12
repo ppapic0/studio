@@ -1,8 +1,11 @@
 export const TERMS_ROUTE = '/terms';
 export const PRIVACY_ROUTE = '/privacy';
+export const CLASS_TUITION_POLICY_ROUTE = '/class/tuition-policy';
 
 export const LEGAL_EFFECTIVE_DATE = '2026-04-07';
 export const LEGAL_EFFECTIVE_DATE_LABEL = '2026년 4월 7일';
+export const CLASS_TUITION_POLICY_EFFECTIVE_DATE = '2026-04-12';
+export const CLASS_TUITION_POLICY_EFFECTIVE_DATE_LABEL = '2026년 4월 12일';
 
 export const TERMS_VERSION = LEGAL_EFFECTIVE_DATE;
 export const PRIVACY_VERSION = LEGAL_EFFECTIVE_DATE;
@@ -42,6 +45,48 @@ export const MARKETING_ANALYTICS_FIELDS = [
 export const CONSULT_RETENTION_LABEL = '3년';
 export const MARKETING_ANALYTICS_RETENTION_LABEL = '1년';
 export const MEMBER_RETENTION_LABEL = '회원 탈퇴 시까지 및 관련 법령 보관기간';
+
+export const CLASS_TUITION_NOTICE = {
+  academyName: '트랙 국어학원',
+  subject: '국어',
+  registrationNumber: '등록 완료 후 업데이트 예정',
+  registrationStatusLabel: '등록 준비 중 안내',
+  registrationStatusDescription: '현재 등록번호는 등록 완료 후 반영 예정입니다.',
+  contact: '010-5879-5888',
+  sessionSummary: '월 4회 / 주 1회 / 회당 3시간 / 총 12시간',
+  extraFees: '별도 비용 없음',
+  tuitionRows: [
+    {
+      target: '고1·고2',
+      amount: '375,000원',
+      detail: '월 4회 기준 국어 수업',
+    },
+    {
+      target: '고3·N수생',
+      amount: '400,000원',
+      detail: '월 4회 기준 국어 수업',
+    },
+  ],
+  refundRules: [
+    {
+      stage: '교습 시작 전',
+      refund: '이미 납부한 교습비 전액 반환',
+    },
+    {
+      stage: '총 교습시간의 1/3 경과 전',
+      refund: '이미 납부한 교습비의 2/3 반환',
+    },
+    {
+      stage: '총 교습시간의 1/2 경과 전',
+      refund: '이미 납부한 교습비의 1/2 반환',
+    },
+    {
+      stage: '총 교습시간의 1/2 경과 후',
+      refund: '반환 없음',
+    },
+  ],
+  refundBasis: '환불은 학교교과교습학원 교습비 반환기준에 따라 적용됩니다.',
+} as const;
 
 export type ConsentSource = 'signup' | 'consult' | 'dashboard';
 
