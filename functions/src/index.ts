@@ -7046,6 +7046,18 @@ export const ensureCurrentUserMemberships = functions
   });
 
 export { scheduledRankingRewardSettlement } from "./rankingRewardSettlement";
+export {
+  approveGiftishowOrderSecure,
+  cancelGiftishowOrderSecure,
+  createGiftishowOrderRequestSecure,
+  getGiftishowBizmoneySecure,
+  reconcilePendingGiftishowOrders,
+  rejectGiftishowOrderSecure,
+  resendGiftishowOrderSecure,
+  saveGiftishowSettingsSecure,
+  scheduledGiftishowCatalogSync,
+  syncGiftishowCatalogSecure,
+} from "./giftishow";
 
 function buildFallbackStudyPlan(profile: Record<string, any>) {
   const weakSubject = Array.isArray(profile.weakSubjects) && profile.weakSubjects.length > 0

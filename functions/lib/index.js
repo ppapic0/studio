@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateStudyPlan = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -5752,6 +5752,17 @@ exports.ensureCurrentUserMemberships = functions
 });
 var rankingRewardSettlement_1 = require("./rankingRewardSettlement");
 Object.defineProperty(exports, "scheduledRankingRewardSettlement", { enumerable: true, get: function () { return rankingRewardSettlement_1.scheduledRankingRewardSettlement; } });
+var giftishow_1 = require("./giftishow");
+Object.defineProperty(exports, "approveGiftishowOrderSecure", { enumerable: true, get: function () { return giftishow_1.approveGiftishowOrderSecure; } });
+Object.defineProperty(exports, "cancelGiftishowOrderSecure", { enumerable: true, get: function () { return giftishow_1.cancelGiftishowOrderSecure; } });
+Object.defineProperty(exports, "createGiftishowOrderRequestSecure", { enumerable: true, get: function () { return giftishow_1.createGiftishowOrderRequestSecure; } });
+Object.defineProperty(exports, "getGiftishowBizmoneySecure", { enumerable: true, get: function () { return giftishow_1.getGiftishowBizmoneySecure; } });
+Object.defineProperty(exports, "reconcilePendingGiftishowOrders", { enumerable: true, get: function () { return giftishow_1.reconcilePendingGiftishowOrders; } });
+Object.defineProperty(exports, "rejectGiftishowOrderSecure", { enumerable: true, get: function () { return giftishow_1.rejectGiftishowOrderSecure; } });
+Object.defineProperty(exports, "resendGiftishowOrderSecure", { enumerable: true, get: function () { return giftishow_1.resendGiftishowOrderSecure; } });
+Object.defineProperty(exports, "saveGiftishowSettingsSecure", { enumerable: true, get: function () { return giftishow_1.saveGiftishowSettingsSecure; } });
+Object.defineProperty(exports, "scheduledGiftishowCatalogSync", { enumerable: true, get: function () { return giftishow_1.scheduledGiftishowCatalogSync; } });
+Object.defineProperty(exports, "syncGiftishowCatalogSecure", { enumerable: true, get: function () { return giftishow_1.syncGiftishowCatalogSecure; } });
 function buildFallbackStudyPlan(profile) {
     const weakSubject = Array.isArray(profile.weakSubjects) && profile.weakSubjects.length > 0
         ? profile.weakSubjects[0]

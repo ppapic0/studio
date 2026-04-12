@@ -1050,6 +1050,121 @@ export interface NotificationSettings {
   updatedBy?: string;
 }
 
+export type GiftishowDeliveryMode = 'mms';
+export type GiftishowSyncStatus = 'idle' | 'syncing' | 'success' | 'error';
+export type GiftishowOrderStatus =
+  | 'requested'
+  | 'approved'
+  | 'sending'
+  | 'pending_provider'
+  | 'sent'
+  | 'failed'
+  | 'rejected'
+  | 'cancelled';
+export type GiftishowPointEventType = 'deduct' | 'refund';
+
+export interface GiftishowSettings {
+  enabled?: boolean;
+  deliveryMode?: GiftishowDeliveryMode;
+  bannerId?: string;
+  templateId?: string;
+  authCodeConfigured?: boolean;
+  authTokenConfigured?: boolean;
+  userIdConfigured?: boolean;
+  callbackNoConfigured?: boolean;
+  lastCatalogSyncedAt?: Timestamp | null;
+  lastBizmoneyBalance?: number | null;
+  lastSyncStatus?: GiftishowSyncStatus;
+  lastErrorMessage?: string | null;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+export interface GiftishowProduct {
+  goodsCode: string;
+  goodsName: string;
+  brandCode?: string | null;
+  brandName?: string | null;
+  content?: string | null;
+  contentAddDesc?: string | null;
+  goodsTypeNm?: string | null;
+  goodsTypeDtlNm?: string | null;
+  affiliate?: string | null;
+  goodsImgS?: string | null;
+  goodsImgB?: string | null;
+  mmsGoodsImg?: string | null;
+  brandIconImg?: string | null;
+  salePrice: number;
+  discountPrice: number;
+  realPrice?: number | null;
+  validPrdTypeCd?: string | null;
+  validPrdDay?: string | null;
+  limitDay?: number | null;
+  goodsStateCd?: string | null;
+  mmsReserveFlag?: string | null;
+  mmsBarcdCreateYn?: string | null;
+  pointCost: number;
+  isAvailable: boolean;
+  lastSyncedAt?: Timestamp | null;
+  updatedAt?: Timestamp;
+}
+
+export interface GiftishowOrderPointEvent {
+  type: GiftishowPointEventType;
+  points: number;
+  reason: string;
+  byUid?: string | null;
+  createdAt?: Timestamp | null;
+}
+
+export interface GiftishowOrder {
+  centerId: string;
+  studentId: string;
+  studentName: string;
+  recipientPhoneMasked: string;
+  goodsCode: string;
+  goodsName: string;
+  brandCode?: string | null;
+  brandName?: string | null;
+  salePrice: number;
+  discountPrice: number;
+  pointCost: number;
+  status: GiftishowOrderStatus;
+  providerMode?: 'mock' | 'live';
+  trId?: string | null;
+  orderNo?: string | null;
+  pinNo?: string | null;
+  couponImgUrl?: string | null;
+  sendStatusCode?: string | null;
+  sendStatusName?: string | null;
+  pinStatusCode?: string | null;
+  pinStatusName?: string | null;
+  validPrdEndDt?: string | null;
+  sendResultCode?: string | null;
+  sendResultMessage?: string | null;
+  lastErrorCode?: string | null;
+  lastErrorMessage?: string | null;
+  rejectionReason?: string | null;
+  cancelledReason?: string | null;
+  needsManualReview?: boolean;
+  reconcileAttemptCount?: number;
+  resendCount?: number;
+  pointEvents?: GiftishowOrderPointEvent[];
+  requestedAt?: Timestamp | null;
+  requestedBy?: string | null;
+  approvedAt?: Timestamp | null;
+  approvedBy?: string | null;
+  sentAt?: Timestamp | null;
+  failedAt?: Timestamp | null;
+  rejectedAt?: Timestamp | null;
+  rejectedBy?: string | null;
+  cancelledAt?: Timestamp | null;
+  cancelledBy?: string | null;
+  lastReconciledAt?: Timestamp | null;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface ParentActivityEvent {
   id: string;
   centerId: string;

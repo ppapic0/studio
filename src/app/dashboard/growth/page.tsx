@@ -6,17 +6,17 @@ import { format, subDays } from 'date-fns';
 import {
   collection,
   doc,
-  increment,
   limit,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
+  where,
 } from 'firebase/firestore';
 import {
   Flame,
   Gift,
-  Sparkles,
+  Loader2,
   Timer,
   Wallet,
 } from 'lucide-react';
@@ -25,16 +25,26 @@ import {
   RewardHeroBox,
   RewardVaultSlot,
   type RewardBoxStage as BoxStage,
-  type RewardBoxRarity as BoxRarity,
   type RewardBoxState as BoxState,
   type RewardVaultBox as RewardBox,
 } from '@/components/dashboard/reward-box-visuals';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
+import { createGiftishowOrderRequestSecure } from '@/lib/giftishow-actions';
+import {
+  formatGiftishowTimestamp,
+  getGiftishowOrderStatusLabel,
+  getGiftishowOrderStatusTone,
+  isGiftishowProductAvailable,
+  sortGiftishowOrdersByRecent,
+  sortGiftishowProducts,
+} from '@/lib/giftishow';
 import {
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
@@ -46,7 +56,7 @@ import {
 } from '@/lib/student-rewards';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
-import { GrowthProgress, StudyLogDay } from '@/lib/types';
+import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type FloatingGain = {
@@ -57,6 +67,46 @@ type FloatingGain = {
 const STUDY_BOX_CLAIM_CACHE_PREFIX = 'point-track:claimed-boxes';
 const STUDY_BOX_ARRIVAL_TOAST_PREFIX = 'point-track:arrival-toast';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
+
+function normalizePhone(raw: string) {
+  return raw.replace(/\D/g, '');
+}
+
+function extractPhoneNumber(source: unknown): string {
+  if (!source || typeof source !== 'object') return '';
+  const candidate = (source as { phoneNumber?: unknown }).phoneNumber;
+  return typeof candidate === 'string' ? candidate : '';
+}
+
+function isValidKoreanMobilePhone(raw: string): boolean {
+  return /^01\d{8,9}$/.test(raw);
+}
+
+function formatGiftishowPoints(value?: number | null) {
+  return `${Math.max(0, Number(value || 0)).toLocaleString()}P`;
+}
+
+function getGiftishowProductImage(product?: GiftishowProduct | null) {
+  return product?.goodsImgB || product?.goodsImgS || product?.mmsGoodsImg || product?.brandIconImg || '';
+}
+
+function getGiftishowRequestDisabledReason({
+  settings,
+  product,
+  pointBalance,
+  hasStudentPhone,
+}: {
+  settings?: GiftishowSettings | null;
+  product?: GiftishowProduct | null;
+  pointBalance: number;
+  hasStudentPhone: boolean;
+}) {
+  if (settings?.enabled !== true) return '센터에서 보상샵을 준비 중이에요.';
+  if (!hasStudentPhone) return '학생 휴대폰 번호를 등록해 주세요.';
+  if (!isGiftishowProductAvailable(product, settings)) return '현재 교환할 수 없는 상품이에요.';
+  if (Math.max(0, Number(pointBalance || 0)) < Math.max(0, Number(product?.pointCost || 0))) return '포인트가 부족해요.';
+  return null;
+}
 
 function normalizeStudyBoxHours(values: unknown) {
   return normalizeStudyBoxHourValues(values);
@@ -291,6 +341,7 @@ export default function GrowthPage() {
   const [rewardEntries, setRewardEntries] = useState<StudyBoxReward[]>([]);
   const [openedBoxes, setOpenedBoxes] = useState<number[]>([]);
   const [pointBalance, setPointBalance] = useState(0);
+  const [requestingGoodsCode, setRequestingGoodsCode] = useState<string | null>(null);
   const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const liveClaimKeyRef = useRef<string | null>(null);
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
@@ -300,6 +351,48 @@ export default function GrowthPage() {
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user?.uid]);
+  const { data: userProfile } = useDoc<{ phoneNumber?: string }>(userProfileRef, { enabled: Boolean(user) });
+
+  const studentProfileRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: studentProfile } = useDoc<{ phoneNumber?: string }>(studentProfileRef, {
+    enabled: Boolean(activeMembership && user),
+  });
+
+  const giftishowSettingsRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'settings', 'giftishow');
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: giftishowSettings } = useDoc<GiftishowSettings>(giftishowSettingsRef, {
+    enabled: Boolean(activeMembership && user),
+  });
+
+  const giftishowProductsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(collection(firestore, 'centers', activeMembership.id, 'giftishowProducts'), limit(80));
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: giftishowProductsRaw } = useCollection<GiftishowProduct>(giftishowProductsQuery, {
+    enabled: Boolean(activeMembership && user),
+  });
+
+  const giftishowOrdersQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'giftishowOrders'),
+      where('studentId', '==', user.uid),
+      limit(50)
+    );
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: giftishowOrdersRaw } = useCollection<GiftishowOrder>(giftishowOrdersQuery, {
+    enabled: Boolean(activeMembership && user),
+  });
 
   const seasonStudyLogsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
@@ -375,6 +468,27 @@ export default function GrowthPage() {
   useEffect(() => {
     setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
   }, [progress?.pointsBalance]);
+
+  const resolvedStudentPhone = useMemo(() => {
+    return normalizePhone(
+      extractPhoneNumber(studentProfile) || userProfile?.phoneNumber || activeMembership?.phoneNumber || ''
+    );
+  }, [activeMembership?.phoneNumber, studentProfile, userProfile?.phoneNumber]);
+
+  const hasStudentPhone = useMemo(() => isValidKoreanMobilePhone(resolvedStudentPhone), [resolvedStudentPhone]);
+
+  const giftishowProducts = useMemo(
+    () => sortGiftishowProducts(giftishowProductsRaw || []),
+    [giftishowProductsRaw]
+  );
+  const giftishowOrders = useMemo(
+    () => sortGiftishowOrdersByRecent(giftishowOrdersRaw || []),
+    [giftishowOrdersRaw]
+  );
+  const availableGiftishowProducts = useMemo(
+    () => giftishowProducts.filter((product) => isGiftishowProductAvailable(product, giftishowSettings)),
+    [giftishowProducts, giftishowSettings]
+  );
 
   useEffect(() => {
     if (!isTimerActive || !startTime) return;
@@ -659,6 +773,45 @@ export default function GrowthPage() {
     router.push('/dashboard');
   };
 
+  const handleGiftishowRequest = async (product: GiftishowProduct) => {
+    if (!activeMembership?.id || !product.goodsCode) return;
+
+    const disabledReason = getGiftishowRequestDisabledReason({
+      settings: giftishowSettings,
+      product,
+      pointBalance,
+      hasStudentPhone,
+    });
+    if (disabledReason) {
+      toast({
+        variant: 'destructive',
+        title: '교환 요청 불가',
+        description: disabledReason,
+      });
+      return;
+    }
+
+    setRequestingGoodsCode(product.goodsCode);
+    try {
+      await createGiftishowOrderRequestSecure({
+        centerId: activeMembership.id,
+        goodsCode: product.goodsCode,
+      });
+      toast({
+        title: '교환 요청을 보냈어요.',
+        description: '센터 관리자 승인 후 MMS 쿠폰이 발송됩니다.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '교환 요청 실패',
+        description: getSafeErrorMessage(error, '교환 요청 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setRequestingGoodsCode(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[70vh] items-center justify-center">
@@ -847,18 +1000,170 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <div className="rounded-[1.8rem] border border-[#FFE1B7]/50 bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] px-4 py-4 shadow-[0_20px_48px_-34px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4">
+        <section className="rounded-[1.8rem] border border-[#FFE1B7]/50 bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] px-4 py-4 shadow-[0_20px_48px_-34px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+          <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4D679F]">REWARD SHOP</p>
-              <p className="font-aggro-display mt-2 text-base font-black tracking-tight text-[#14295F]">기프티콘샵 추후 오픈</p>
-              <p className="mt-1 text-sm font-bold leading-5 text-[#24457f]">추후 기프티콘샵이 연동되면 이곳에서 보상 교환이 가능해져요.</p>
+              <div className="mt-2 flex items-center gap-2">
+                <Gift className="h-4 w-4 text-[#FF7A16]" />
+                <p className="font-aggro-display text-base font-black tracking-tight text-[#14295F]">Giftishow 보상샵</p>
+              </div>
+              <p className="mt-2 text-sm font-bold leading-5 text-[#24457f]">
+                관리자 승인 후 학생 번호로 MMS 쿠폰이 발송돼요. 상품 포인트는 기프티쇼 판매가와 1:1이에요.
+              </p>
             </div>
-            <div className="inline-flex h-12 min-w-[3rem] items-center justify-center rounded-full border border-[#FFBE77] bg-white/92 px-3 text-[11px] font-black tracking-[0.18em] text-[#C86A10] shadow-[0_12px_24px_-18px_rgba(255,138,31,0.35)]">
-              SOON
+            <div className="flex flex-col items-end gap-2">
+              <Badge className={cn('border-none font-black', giftishowSettings?.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
+                {giftishowSettings?.enabled ? 'OPEN' : 'PREP'}
+              </Badge>
+              <p className="text-[11px] font-bold text-[#6E7FA7]">
+                {formatGiftishowTimestamp(giftishowSettings?.lastCatalogSyncedAt)}
+              </p>
             </div>
           </div>
-        </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <div className="rounded-[1.3rem] border border-white/70 bg-white/85 px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">내 포인트</p>
+              <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{formatGiftishowPoints(pointBalance)}</p>
+            </div>
+            <div className="rounded-[1.3rem] border border-white/70 bg-white/85 px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 가능</p>
+              <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{availableGiftishowProducts.length}개</p>
+            </div>
+          </div>
+
+          {!hasStudentPhone ? (
+            <div className="mt-4 rounded-[1.3rem] border border-rose-100 bg-rose-50 px-3 py-3 text-xs font-bold leading-5 text-rose-700">
+              학생 휴대폰 번호가 아직 등록되지 않았어요. 프로필 설정에서 번호를 저장하면 보상샵 요청 버튼이 활성화돼요.
+            </div>
+          ) : null}
+
+          <div className="mt-4 space-y-3">
+            {giftishowProducts.length === 0 ? (
+              <div className="rounded-[1.4rem] border border-dashed border-[#FFD39E] bg-white/70 px-4 py-8 text-center text-sm font-bold text-[#7B5A2A]">
+                아직 동기화된 상품이 없어요. 센터에서 카탈로그를 연결하면 이곳에 상품이 보여요.
+              </div>
+            ) : (
+              giftishowProducts.slice(0, 6).map((product) => {
+                const disabledReason = getGiftishowRequestDisabledReason({
+                  settings: giftishowSettings,
+                  product,
+                  pointBalance,
+                  hasStudentPhone,
+                });
+                const productImage = getGiftishowProductImage(product);
+                const isRequesting = requestingGoodsCode === product.goodsCode;
+
+                return (
+                  <div
+                    key={product.id || product.goodsCode}
+                    className="overflow-hidden rounded-[1.45rem] border border-white/70 bg-white/92 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)]"
+                  >
+                    <div className="flex gap-3 p-3">
+                      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[1.1rem] bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)]">
+                        {productImage ? (
+                          <img src={productImage} alt={product.goodsName} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-[10px] font-black tracking-[0.2em] text-[#7D8FB3]">GIFT</div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={cn('border-none font-black', isGiftishowProductAvailable(product, giftishowSettings) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
+                            {product.goodsStateCd || 'UNKNOWN'}
+                          </Badge>
+                          <p className="truncate text-[11px] font-bold text-[#6E7FA7]">
+                            {product.brandName || product.affiliate || '브랜드'}
+                          </p>
+                        </div>
+
+                        <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{product.goodsName}</p>
+
+                        <div className="mt-3 flex items-end justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
+                            <p className="mt-1 text-lg font-black tracking-tight text-[#FF7A16]">
+                              {formatGiftishowPoints(product.pointCost)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={disabledReason ? 'outline' : 'secondary'}
+                            className="rounded-full font-black"
+                            disabled={Boolean(disabledReason) || isRequesting}
+                            onClick={() => void handleGiftishowRequest(product)}
+                          >
+                            {isRequesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                            요청하기
+                          </Button>
+                        </div>
+
+                        {disabledReason ? (
+                          <p className="mt-2 text-[11px] font-bold leading-5 text-[#915A1E]">{disabledReason}</p>
+                        ) : (
+                          <p className="mt-2 text-[11px] font-bold leading-5 text-[#4D679F]">
+                            승인되면 {resolvedStudentPhone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')} 번호로 발송돼요.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        <section className="surface-card surface-card--light rounded-[1.8rem] px-4 py-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)]">MY REWARDS</p>
+              <h2 className="mt-1 text-lg font-black tracking-tight text-[var(--text-primary)]">내 요청 히스토리</h2>
+            </div>
+            <Badge className="border-none bg-slate-100 text-slate-700 font-black">{giftishowOrders.length}건</Badge>
+          </div>
+
+          {giftishowOrders.length === 0 ? (
+            <div className="rounded-[1.4rem] border border-dashed border-slate-200 px-4 py-10 text-center text-sm font-bold text-muted-foreground">
+              아직 보상샵 요청 내역이 없어요. 포인트가 모이면 첫 상품을 요청해 보세요.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {giftishowOrders.slice(0, 6).map((order) => (
+                <div key={order.id || `${order.goodsCode}-${order.createdAt?.seconds || 0}`} className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-black text-slate-900">{order.goodsName}</p>
+                        <Badge className={cn('border-none font-black', getGiftishowOrderStatusTone(order.status))}>
+                          {getGiftishowOrderStatusLabel(order.status)}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs font-bold text-slate-500">
+                        {order.brandName || '브랜드'} · {order.recipientPhoneMasked || '번호 미등록'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-[#14295F]">{formatGiftishowPoints(order.pointCost)}</p>
+                      <p className="mt-1 text-[11px] font-bold text-slate-500">
+                        {formatGiftishowTimestamp(order.updatedAt || order.createdAt || order.requestedAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {order.lastErrorMessage || order.rejectionReason || order.cancelledReason ? (
+                    <div className="mt-3 rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold leading-5 text-slate-600">
+                      {order.lastErrorMessage || order.rejectionReason || order.cancelledReason}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
       <Dialog open={isVaultOpen} onOpenChange={handleVaultChange}>

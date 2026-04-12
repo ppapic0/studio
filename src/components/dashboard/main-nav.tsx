@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   DollarSign,
   FileText,
+  Gift,
   GraduationCap,
   History,
   LayoutDashboard,
@@ -43,6 +44,7 @@ const adminNavItems = [
   { href: '/dashboard/revenue', label: '비즈니스 분석', icon: DollarSign },
   { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   { href: '/dashboard/settings/notifications', label: '문자 알림', icon: Bell },
+  { href: '/dashboard/settings/giftishow', label: '기프티쇼', icon: Gift },
   { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
 ] as const satisfies readonly NavItem[];
 
@@ -71,6 +73,7 @@ const adminNavGroups: NavGroup[] = [
       { href: '/dashboard/revenue', label: '비즈니스 분석', icon: DollarSign },
       { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
       { href: '/dashboard/settings/notifications', label: '문자 알림', icon: Bell },
+      { href: '/dashboard/settings/giftishow', label: '기프티쇼', icon: Gift },
       { href: '/dashboard/settings/invites', label: '초대 코드', icon: Settings },
     ],
   },
