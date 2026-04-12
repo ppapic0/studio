@@ -25,9 +25,11 @@ const DEFAULT_RARITY_LABELS: Record<RewardBoxRarity, string> = {
 function RewardBoxFigure({
   variant,
   rarity,
+  state,
 }: {
   variant: 'hero' | 'slot';
   rarity: RewardBoxRarity;
+  state?: RewardBoxState;
 }) {
   return (
     <div
@@ -49,6 +51,22 @@ function RewardBoxFigure({
         <div className="point-track-box-figure__shine" />
         <div className="point-track-box-figure__spark point-track-box-figure__spark--left" />
         <div className="point-track-box-figure__spark point-track-box-figure__spark--right" />
+        {state === 'locked' ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span
+              className={cn(
+                'mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full border text-[1.2rem] font-black leading-none',
+                rarity === 'epic'
+                  ? 'border-violet-200/30 bg-violet-200/14 text-violet-50'
+                  : rarity === 'rare'
+                    ? 'border-orange-200/30 bg-orange-200/14 text-orange-50'
+                    : 'border-white/24 bg-white/12 text-white'
+              )}
+            >
+              ?
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -151,7 +169,7 @@ export function RewardVaultSlot({
         ) : null}
       </div>
 
-      <RewardBoxFigure variant="slot" rarity={box.rarity} />
+      <RewardBoxFigure variant="slot" rarity={box.rarity} state={box.state} />
 
       <div className="mt-3">
         <div className="text-[11px] font-black tracking-tight text-white">{box.hour}시간 상자</div>
