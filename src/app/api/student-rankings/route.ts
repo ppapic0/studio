@@ -257,8 +257,9 @@ export async function GET(request: NextRequest) {
       return noStoreJson({ error: 'forbidden' }, { status: 403 });
     }
 
-    const nowKst = toKstDate();
-    const dailyRankWindow = getDailyRankWindowState(nowKst);
+    const now = new Date();
+    const nowKst = toKstDate(now);
+    const dailyRankWindow = getDailyRankWindowState(now);
     const dailyDateKeys = dailyRankWindow.coveredDateKeys;
     const dailyDateKeySet = new Set(dailyDateKeys);
     const monthKey = format(nowKst, 'yyyy-MM');
