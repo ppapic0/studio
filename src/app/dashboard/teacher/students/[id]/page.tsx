@@ -3011,37 +3011,37 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 "rounded-[1.5rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] shadow-lg",
                 isAnalysisPresentation && "analysis-premium-card analysis-full-section-card surface-card surface-card--secondary on-dark border-none shadow-none"
               )}>
-                <CardHeader className="pb-3">
+                <CardHeader className={cn(isMobile ? 'pb-3' : 'pb-2')}>
                   <CardTitle className={cn("font-aggro-display flex items-center gap-2 text-base font-black tracking-tight", isAnalysisPresentation ? 'text-[var(--text-on-dark)]' : detailPrimaryTextClass)}>
                     <ClipboardList className={cn("h-4 w-4", isAnalysisPresentation ? "text-[var(--accent-orange)]" : "text-[#2554d4]")} />
                     관리 증빙 요약
                   </CardTitle>
-                  <CardDescription className={cn("font-bold text-[11px]", isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : detailSecondaryTextClass)}>
+                  <CardDescription className={cn("font-bold", isMobile ? 'text-[11px]' : 'text-[10px] leading-4', isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : detailSecondaryTextClass)}>
                     보호자 상담 시 바로 보여줄 수 있도록, 최근 30일 관리 흐름을 한 문장과 핵심 수치로 먼저 정리했습니다.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 pt-0">
+                <CardContent className={cn('pt-0', isMobile ? 'space-y-4' : 'space-y-3')}>
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-                    <div className={cn("rounded-xl border p-4", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
+                    <div className={cn("rounded-xl border", isMobile ? 'p-4' : 'px-3.5 py-3', isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
                       <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isAnalysisPresentation ? "text-[var(--text-on-dark-muted)]" : "text-[#2554d4]")}>학습 관리</p>
-                      <p className={cn("mt-2 text-lg font-black", detailPrimaryTextClass)}>{minutesToLabel(todayStudyMinutes)}</p>
-                      <p className={cn("mt-1 text-xs font-bold", detailSecondaryTextClass)}>최근 7일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}%</p>
+                      <p className={cn(isMobile ? 'mt-2 text-lg' : 'mt-1.5 text-[1.05rem]', "font-black", detailPrimaryTextClass)}>{minutesToLabel(todayStudyMinutes)}</p>
+                      <p className={cn(isMobile ? 'mt-1 text-xs' : 'mt-1 text-[11px] leading-4', "font-bold", detailSecondaryTextClass)}>최근 7일 평균 {minutesToLabel(avgStudyMinutes)} · 완료율 {avgCompletionRate}%</p>
                     </div>
-                    <div className={cn("rounded-xl border p-4", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
+                    <div className={cn("rounded-xl border", isMobile ? 'p-4' : 'px-3.5 py-3', isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
                       <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isAnalysisPresentation ? "text-[var(--text-on-dark-muted)]" : "text-[#2554d4]")}>출결 관리</p>
-                      <p className={cn("mt-2 text-lg font-black", detailPrimaryTextClass)}>{attendanceRate30d}%</p>
-                      <p className={cn("mt-1 text-xs font-bold", detailSecondaryTextClass)}>
+                      <p className={cn(isMobile ? 'mt-2 text-lg' : 'mt-1.5 text-[1.05rem]', "font-black", detailPrimaryTextClass)}>{attendanceRate30d}%</p>
+                      <p className={cn(isMobile ? 'mt-1 text-xs' : 'mt-1 text-[11px] leading-4', "font-bold", detailSecondaryTextClass)}>
                         최근 30일 출석률 · 벌점 {Math.max(0, Math.round(Number(progress?.penaltyPoints || 0)))}점 · 외출 {awayTimeData.filter((item) => item.awayMinutes > 0).length}회
                       </p>
                     </div>
-                    <div className={cn("rounded-xl border p-4", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
+                    <div className={cn("rounded-xl border", isMobile ? 'p-4' : 'px-3.5 py-3', isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-white/90")}>
                       <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", isAnalysisPresentation ? "text-[var(--text-on-dark-muted)]" : "text-[#2554d4]")}>소통 관리</p>
-                      <p className={cn("mt-2 text-lg font-black", detailPrimaryTextClass)}>{counselingCount30d + reportSentCount30d + smsAcceptedCount30d}회</p>
-                      <p className={cn("mt-1 text-xs font-bold", detailSecondaryTextClass)}>상담 {counselingCount30d} · 리포트 {reportSentCount30d} · 문자 {smsAcceptedCount30d}</p>
+                      <p className={cn(isMobile ? 'mt-2 text-lg' : 'mt-1.5 text-[1.05rem]', "font-black", detailPrimaryTextClass)}>{counselingCount30d + reportSentCount30d + smsAcceptedCount30d}회</p>
+                      <p className={cn(isMobile ? 'mt-1 text-xs' : 'mt-1 text-[11px] leading-4', "font-bold", detailSecondaryTextClass)}>상담 {counselingCount30d} · 리포트 {reportSentCount30d} · 문자 {smsAcceptedCount30d}</p>
                     </div>
                   </div>
-                  <div className={cn("rounded-xl border px-4 py-3", isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-[#eef4ff]")}>
-                    <p className={cn("text-sm font-black leading-6", detailPrimaryTextClass)}>
+                  <div className={cn("rounded-xl border", isMobile ? 'px-4 py-3' : 'px-3.5 py-2.5', isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : "border-[#dbe7ff] bg-[#eef4ff]")}>
+                    <p className={cn(isMobile ? 'text-sm leading-6' : 'text-[12px] leading-5', "font-black", detailPrimaryTextClass)}>
                       최근 30일 동안 학습, 출결, 상담/문자/리포트 기록을 함께 관리하고 있으며, 보호자 반응은 앱 방문 {parentVisitCount30d}회 · 리포트 열람 {reportReadCount30d}회로 추적 중입니다.
                     </p>
                   </div>
