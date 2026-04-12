@@ -21,6 +21,7 @@ import {
 import { useCollection, useDoc, useFirestore, useFunctions, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
+import { shouldExcludeFromSmsQueries } from '@/lib/counseling-demo';
 import { canManageSettings } from '@/lib/dashboard-access';
 import type { NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -770,7 +771,13 @@ export default function NotificationSettingsPage() {
   const recipientRows = useMemo<StudentRecipientRow[]>(() => {
     return (studentsRaw || [])
       .filter((student) => {
+        if (shouldExcludeFromSmsQueries(student, student.id)) {
+          return false;
+        }
         const membership = membersById.get(student.id);
+        if (shouldExcludeFromSmsQueries(membership, student.id)) {
+          return false;
+        }
         if (membership?.role === 'student' && membership?.status && membership.status !== 'active') {
           return false;
         }
@@ -779,14 +786,17 @@ export default function NotificationSettingsPage() {
       .map((student) => {
         const studentName = student.name || '학생';
         const className = student.className || student.grade || '-';
-        const parentRows: RecipientPreferenceRow[] = (student.parentUids || []).map((parentUid) => {
+        const parentRows: RecipientPreferenceRow[] = (student.parentUids || []).reduce<RecipientPreferenceRow[]>((rows, parentUid) => {
           const member = membersById.get(parentUid);
+          if (shouldExcludeFromSmsQueries(member, parentUid)) {
+            return rows;
+          }
           const pref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, parentUid));
           const phoneNumber = resolveFirstValidPhoneNumber(
             pref?.phoneNumber,
             member?.phoneNumber
           );
-          return {
+          rows.push({
             studentId: student.id,
             studentName,
             className,
@@ -796,8 +806,9 @@ export default function NotificationSettingsPage() {
             enabled: pref?.enabled !== false,
             eventToggles: mergeEventToggles(pref?.eventToggles),
             isPhoneMissing: !phoneNumber,
-          } satisfies RecipientPreferenceRow;
-        });
+          } satisfies RecipientPreferenceRow);
+          return rows;
+        }, []);
         const parentRowsWithPhone = parentRows.filter((row) => !row.isPhoneMissing);
         const fallbackPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, STUDENT_SMS_FALLBACK_UID));
         const studentMember = membersById.get(student.id);

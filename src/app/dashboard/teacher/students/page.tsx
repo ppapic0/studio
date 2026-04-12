@@ -115,6 +115,28 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
   return fallback;
 }
 
+type CounselingDemoAccount = {
+  uid: string;
+  email: string;
+  password: string;
+  displayName: string;
+  parentLinkCode?: string;
+};
+
+type CounselingDemoSeedResult = {
+  ok: boolean;
+  centerId: string;
+  student: CounselingDemoAccount;
+  parent: CounselingDemoAccount;
+  seeded: {
+    studyDays: number;
+    monthlyStudyMinutes: number;
+    reportCount: number;
+    counselingLogCount: number;
+    penaltyLogCount: number;
+  };
+};
+
 export default function StudentListPage() {
   const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { user: currentUser } = useUser();
@@ -150,6 +172,9 @@ export default function StudentListPage() {
     schoolName: '',
     grade: '1학년',
   });
+  const [isCounselingDemoDialogOpen, setIsCounselingDemoDialogOpen] = useState(false);
+  const [isCounselingDemoCreating, setIsCounselingDemoCreating] = useState(false);
+  const [counselingDemoResult, setCounselingDemoResult] = useState<CounselingDemoSeedResult | null>(null);
 
   const centerId = activeMembership?.id;
   const isTeacherOrAdmin = isTeacherOrAdminRole(activeMembership?.role);
@@ -341,6 +366,32 @@ export default function StudentListPage() {
       toast({ variant: "destructive", title: "등록 실패", description: e.message });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateCounselingDemo = async () => {
+    if (!centerId || !functions) return;
+
+    setIsCounselingDemoCreating(true);
+    try {
+      const createCounselingDemoFn = httpsCallable<{ centerId: string }, CounselingDemoSeedResult>(
+        functions,
+        'createCounselingDemoBundle'
+      );
+      const result = await createCounselingDemoFn({ centerId });
+      setCounselingDemoResult(result.data);
+      toast({
+        title: '상담 데모 계정 준비 완료',
+        description: '학생/학부모 계정과 상담용 샘플 데이터가 함께 생성되었습니다.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '상담 데모 생성 실패',
+        description: resolveCallableErrorMessage(error, '상담 데모 계정을 만드는 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setIsCounselingDemoCreating(false);
     }
   };
 
@@ -746,12 +797,23 @@ export default function StudentListPage() {
                     </p>
                   </div>
                   {canManageStudentAccounts ? (
-                    <DialogTrigger asChild>
-                      <Button className={cn("rounded-[1.2rem] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]", isMobile ? "h-12 w-full" : "h-12 w-full")}>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        학생 계정 바로 생성
+                    <div className="grid gap-2">
+                      <DialogTrigger asChild>
+                        <Button className={cn("rounded-[1.2rem] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]", isMobile ? "h-12 w-full" : "h-12 w-full")}>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          학생 계정 바로 생성
+                        </Button>
+                      </DialogTrigger>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCounselingDemoDialogOpen(true)}
+                        className={cn("rounded-[1.2rem] border-white/18 bg-white/10 font-black text-white hover:bg-white/16 hover:text-white", isMobile ? "h-12 w-full" : "h-12 w-full")}
+                      >
+                        <GraduationCap className="mr-2 h-4 w-4" />
+                        상담 데모 계정 만들기
                       </Button>
-                    </DialogTrigger>
+                    </div>
                   ) : (
                     <div className="rounded-[1.2rem] border border-white/12 bg-white/8 px-4 py-3">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">권한 안내</p>
@@ -840,6 +902,118 @@ export default function StudentListPage() {
           </DialogContent>
         </Dialog>
       </header>
+
+      <Dialog open={isCounselingDemoDialogOpen} onOpenChange={setIsCounselingDemoDialogOpen}>
+        <DialogContent motionPreset="dashboard-premium" className={cn("rounded-[2.5rem] border-none p-0 shadow-2xl overflow-hidden", isMobile ? "fixed left-1/2 top-1/2 h-[84vh] w-[92vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]" : "sm:max-w-2xl")}>
+          <div className="bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] px-7 py-6 text-white">
+            <DialogHeader>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                  상담 데모
+                </Badge>
+                <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                  경쟁 트랙 제외
+                </Badge>
+                <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                  문자 발송 제외
+                </Badge>
+              </div>
+              <DialogTitle className="text-3xl font-black tracking-tight">상담용 학생/학부모 계정 생성</DialogTitle>
+              <DialogDescription className="font-semibold text-white/80">
+                설명용으로 보기 좋은 학습 기록, 상담 로그, 리포트, 벌점 이력을 담은 데모 계정을 한 번에 만듭니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="max-h-[56vh] space-y-4 overflow-y-auto bg-white px-6 py-5 custom-scrollbar">
+            <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-[#f8fbff] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">생성 내용</p>
+              <div className={cn("mt-3 grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+                <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-white px-4 py-3">
+                  <p className="text-xs font-black text-[#14295F]">학생/학부모 1세트</p>
+                  <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">로그인 가능한 계정을 바로 돌려드립니다.</p>
+                </div>
+                <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-white px-4 py-3">
+                  <p className="text-xs font-black text-[#14295F]">정제된 샘플 데이터</p>
+                  <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">학습 기록, 리포트, 상담, 벌점 예시가 같이 들어갑니다.</p>
+                </div>
+                <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-white px-4 py-3">
+                  <p className="text-xs font-black text-[#14295F]">운영 제외 설정</p>
+                  <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">경쟁 트랙과 문자 수신 대상 계산에서 자동으로 빠집니다.</p>
+                </div>
+              </div>
+            </div>
+
+            {counselingDemoResult ? (
+              <>
+                <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-2")}>
+                  <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">학생 계정</p>
+                    <p className="mt-2 text-lg font-black text-[#14295F]">{counselingDemoResult.student.displayName}</p>
+                    <div className="mt-3 space-y-2 text-sm font-semibold text-[#5c6e97]">
+                      <p><span className="font-black text-[#14295F]">이메일</span> {counselingDemoResult.student.email}</p>
+                      <p><span className="font-black text-[#14295F]">비밀번호</span> {counselingDemoResult.student.password}</p>
+                      <p><span className="font-black text-[#14295F]">학부모 연동코드</span> {counselingDemoResult.student.parentLinkCode || '-'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">학부모 계정</p>
+                    <p className="mt-2 text-lg font-black text-[#14295F]">{counselingDemoResult.parent.displayName}</p>
+                    <div className="mt-3 space-y-2 text-sm font-semibold text-[#5c6e97]">
+                      <p><span className="font-black text-[#14295F]">이메일</span> {counselingDemoResult.parent.email}</p>
+                      <p><span className="font-black text-[#14295F]">비밀번호</span> {counselingDemoResult.parent.password}</p>
+                      <p><span className="font-black text-[#14295F]">연결 학생</span> {counselingDemoResult.student.displayName}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-[#f8fbff] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">시드된 설명 데이터</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge className="h-7 rounded-full border border-[#dbe7ff] bg-white px-3 text-[11px] font-black text-[#14295F]">
+                      학습일 {counselingDemoResult.seeded.studyDays}일
+                    </Badge>
+                    <Badge className="h-7 rounded-full border border-[#dbe7ff] bg-white px-3 text-[11px] font-black text-[#14295F]">
+                      이번달 {counselingDemoResult.seeded.monthlyStudyMinutes}분
+                    </Badge>
+                    <Badge className="h-7 rounded-full border border-[#dbe7ff] bg-white px-3 text-[11px] font-black text-[#14295F]">
+                      리포트 {counselingDemoResult.seeded.reportCount}건
+                    </Badge>
+                    <Badge className="h-7 rounded-full border border-[#dbe7ff] bg-white px-3 text-[11px] font-black text-[#14295F]">
+                      상담 로그 {counselingDemoResult.seeded.counselingLogCount}건
+                    </Badge>
+                    <Badge className="h-7 rounded-full border border-[#dbe7ff] bg-white px-3 text-[11px] font-black text-[#14295F]">
+                      벌점 이력 {counselingDemoResult.seeded.penaltyLogCount}건
+                    </Badge>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <DialogFooter className="border-t border-[#D7E4FF] bg-[#F8FBFF] px-6 py-5">
+            <div className={cn("grid w-full gap-2", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCounselingDemoDialogOpen(false)}
+                className="h-12 rounded-2xl border-2 border-[#D7E4FF] bg-white font-black text-[#14295F] hover:bg-[#F1F6FF]"
+              >
+                닫기
+              </Button>
+              <Button
+                type="button"
+                onClick={handleCreateCounselingDemo}
+                disabled={isCounselingDemoCreating}
+                className="h-12 rounded-2xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]"
+              >
+                {isCounselingDemoCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GraduationCap className="mr-2 h-4 w-4" />}
+                {counselingDemoResult ? '비밀번호 다시 발급하며 갱신' : '상담 데모 계정 생성'}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <section className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'md:grid-cols-3 xl:grid-cols-6')}>
         {[

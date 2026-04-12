@@ -18,6 +18,11 @@ export interface UserLegalConsents {
   marketingEmail?: LegalConsentSnapshot;
 }
 
+export interface OperationalExclusions {
+  rankings?: boolean;
+  sms?: boolean;
+}
+
 export interface User {
   id: string;
   displayName: string;
@@ -25,6 +30,8 @@ export interface User {
   profileImageUrl?: string;
   schoolName?: string; 
   phoneNumber?: string;
+  isCounselingDemo?: boolean;
+  operationalExclusions?: OperationalExclusions;
   legalConsents?: UserLegalConsents;
   targetDailyMinutes?: number;
   targetDailyMinutesSource?: 'default' | 'routine' | 'manual';
@@ -56,6 +63,8 @@ export interface CenterMembership {
   displayName?: string;
   className?: string;
   phoneNumber?: string;
+  isCounselingDemo?: boolean;
+  operationalExclusions?: OperationalExclusions;
   linkedStudentIds?: string[];
   // Legacy read compatibility only. New writes go to billingProfiles.
   monthlyFee?: number;
@@ -134,6 +143,8 @@ export interface StudentProfile {
   seatZone?: string;
   targetDailyMinutes: number;
   targetDailyMinutesSource?: 'default' | 'routine' | 'manual';
+  isCounselingDemo?: boolean;
+  operationalExclusions?: OperationalExclusions;
   parentUids: string[];
   createdAt: Timestamp;
   parentLinkCode?: string;

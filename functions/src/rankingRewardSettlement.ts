@@ -166,8 +166,29 @@ function isSyntheticStudentId(studentId: unknown): boolean {
     normalized.startsWith("test-")
     || normalized.startsWith("seed-")
     || normalized.startsWith("mock-")
+    || normalized.startsWith("counseling-demo-")
+    || normalized.startsWith("demo-counseling-")
     || normalized.includes("dummy")
   );
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function shouldExcludeFromCompetitionRecord(value: unknown, studentId?: unknown): boolean {
+  if (isSyntheticStudentId(studentId)) return true;
+  const record = asRecord(value);
+  if (!record) return false;
+  if (record.isCounselingDemo === true) return true;
+
+  const accountKind = typeof record.accountKind === "string" ? record.accountKind.trim().toLowerCase() : "";
+  if (accountKind === "counseling-demo" || accountKind === "counseling_demo") {
+    return true;
+  }
+
+  const exclusions = asRecord(record.operationalExclusions);
+  return exclusions?.rankings === true || exclusions?.competition === true;
 }
 
 function isWeekendCompetitionDate(targetDate: Date) {
@@ -312,11 +333,16 @@ async function loadCenterStudentContext(
   ]);
 
   const studentProfiles = new Map<string, StudentProfileSnapshot>();
+  const excludedStudentIds = new Set<string>();
   studentsSnap.forEach((docSnap) => {
     const studentId = docSnap.id;
     if (isSyntheticStudentId(studentId)) return;
 
     const data = docSnap.data() as Record<string, unknown>;
+    if (shouldExcludeFromCompetitionRecord(data, studentId)) {
+      excludedStudentIds.add(studentId);
+      return;
+    }
     studentProfiles.set(studentId, {
       displayNameSnapshot: typeof data.name === "string" && data.name.trim()
         ? data.name.trim()
@@ -340,6 +366,10 @@ async function loadCenterStudentContext(
     if (isSyntheticStudentId(studentId)) return;
 
     const data = docSnap.data() as Record<string, unknown>;
+    if (shouldExcludeFromCompetitionRecord(data, studentId)) {
+      excludedStudentIds.add(studentId);
+      return;
+    }
     if (normalizeMembershipStatus(data.status) !== "active") return;
 
     activeStudentIds.add(studentId);
@@ -360,7 +390,8 @@ async function loadCenterStudentContext(
   });
 
   return {
-    shouldInclude: (studentId: string) => activeStudentIds.size === 0 || activeStudentIds.has(studentId),
+    shouldInclude: (studentId: string) =>
+      !excludedStudentIds.has(studentId) && (activeStudentIds.size === 0 || activeStudentIds.has(studentId)),
     getProfile: (studentId: string) =>
       memberProfiles.get(studentId)
       || studentProfiles.get(studentId)

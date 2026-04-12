@@ -2,6 +2,7 @@ import { defineSecret } from "firebase-functions/params";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { randomInt } from "crypto";
 
 import { generateStructuredStudyPlan } from "./geminiClient";
 import {
@@ -376,6 +377,40 @@ function resolveFirstValidPhoneNumber(...values: unknown[]): string {
     if (normalized) return normalized;
   }
   return "";
+}
+
+function isCounselingDemoId(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return false;
+
+  return (
+    normalized.startsWith("counseling-demo-")
+    || normalized.startsWith("demo-counseling-")
+  );
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function isCounselingDemoRecord(value: unknown): boolean {
+  const record = asRecord(value);
+  if (!record) return false;
+  if (record.isCounselingDemo === true) return true;
+
+  const accountKind = typeof record.accountKind === "string" ? record.accountKind.trim().toLowerCase() : "";
+  return accountKind === "counseling-demo" || accountKind === "counseling_demo";
+}
+
+function shouldExcludeFromSmsQueries(value: unknown, id?: unknown): boolean {
+  if (isCounselingDemoId(id)) return true;
+  const record = asRecord(value);
+  if (!record) return false;
+  if (isCounselingDemoRecord(record)) return true;
+
+  const exclusions = asRecord(record.operationalExclusions);
+  return exclusions?.sms === true || exclusions?.messages === true;
 }
 
 function toKstDate(baseDate: Date = new Date()): Date {
@@ -1390,6 +1425,7 @@ async function collectParentRecipients(
 ): Promise<SmsRecipient[]> {
   const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
   if (!studentSnap.exists) return [];
+  if (shouldExcludeFromSmsQueries(studentSnap.data(), studentId)) return [];
 
   const parentUidsRaw = studentSnap.data()?.parentUids;
   const parentUids = Array.isArray(parentUidsRaw)
@@ -1408,6 +1444,9 @@ async function collectParentRecipients(
 
     const userData = userSnap.exists ? userSnap.data() : null;
     const memberData = memberSnap.exists ? memberSnap.data() : null;
+    if (shouldExcludeFromSmsQueries(userData, parentUid) || shouldExcludeFromSmsQueries(memberData, parentUid)) {
+      continue;
+    }
     const phoneNumber = normalizePhoneNumber(userData?.phoneNumber || memberData?.phoneNumber);
     if (!phoneNumber || usedPhones.has(phoneNumber)) continue;
 
@@ -3410,6 +3449,153 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     });
   }
 });
+
+function buildCounselingDemoUid(centerId: string, role: "student" | "parent") {
+  const token = centerId
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24) || "center";
+  return `counseling-demo-${role}-${token}`;
+}
+
+function buildCounselingDemoEmail(centerId: string, role: "student" | "parent") {
+  const token = centerId
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 18) || "center";
+  return `counseling.${role}.${token}@track-demo.local`;
+}
+
+function buildCounselingDemoPassword(role: "student" | "parent") {
+  const roleToken = role === "student" ? "Student" : "Parent";
+  return `Track${roleToken}${randomInt(1000, 10000)}!`;
+}
+
+function buildCounselingDemoStudySeeds(referenceDate: Date) {
+  const presets = [
+    { daysAgo: 11, minutes: 195, completionRate: 68 },
+    { daysAgo: 10, minutes: 228, completionRate: 74 },
+    { daysAgo: 9, minutes: 256, completionRate: 81 },
+    { daysAgo: 8, minutes: 242, completionRate: 79 },
+    { daysAgo: 7, minutes: 278, completionRate: 84 },
+    { daysAgo: 6, minutes: 305, completionRate: 86 },
+    { daysAgo: 5, minutes: 264, completionRate: 82 },
+    { daysAgo: 4, minutes: 318, completionRate: 88 },
+    { daysAgo: 3, minutes: 296, completionRate: 85 },
+    { daysAgo: 2, minutes: 332, completionRate: 91 },
+    { daysAgo: 1, minutes: 287, completionRate: 83 },
+    { daysAgo: 0, minutes: 245, completionRate: 78 },
+  ];
+
+  return presets.map((preset, index) => {
+    const dayDate = new Date(referenceDate.getTime());
+    dayDate.setDate(dayDate.getDate() - preset.daysAgo);
+    dayDate.setHours(0, 0, 0, 0);
+
+    const firstSessionStartAt = new Date(dayDate.getTime());
+    firstSessionStartAt.setHours(17, index % 2 === 0 ? 20 : 40, 0, 0);
+
+    const lastSessionEndAt = new Date(firstSessionStartAt.getTime() + preset.minutes * 60 * 1000);
+    const previousMinutes = index > 0 ? presets[index - 1].minutes : preset.minutes;
+
+    return {
+      ...preset,
+      date: dayDate,
+      dateKey: toDateKey(dayDate),
+      firstSessionStartAt,
+      lastSessionEndAt,
+      growthRate: preset.minutes - previousMinutes,
+    };
+  });
+}
+
+function getAuthErrorCode(error: any): string {
+  return String(error?.code || error?.errorInfo?.code || "").trim().toLowerCase();
+}
+
+async function upsertCounselingDemoAuthUser(params: {
+  auth: admin.auth.Auth;
+  uid: string;
+  email: string;
+  password: string;
+  displayName: string;
+}) {
+  const { auth, uid, email, password, displayName } = params;
+
+  try {
+    await auth.getUser(uid);
+    await auth.updateUser(uid, { email, password, displayName });
+    return;
+  } catch (error: any) {
+    if (!getAuthErrorCode(error).includes("user-not-found")) {
+      throw error;
+    }
+  }
+
+  try {
+    const existingByEmail = await auth.getUserByEmail(email);
+    if (existingByEmail.uid !== uid) {
+      throw new functions.https.HttpsError("already-exists", "Counseling demo email is already bound to another account.", {
+        userMessage: "상담 데모용 이메일이 이미 다른 계정에 연결되어 있습니다. 기존 데모 계정을 정리한 뒤 다시 시도해 주세요.",
+      });
+    }
+
+    await auth.updateUser(uid, { email, password, displayName });
+    return;
+  } catch (error: any) {
+    const authCode = getAuthErrorCode(error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    if (!authCode.includes("user-not-found")) {
+      throw error;
+    }
+  }
+
+  await auth.createUser({
+    uid,
+    email,
+    password,
+    displayName,
+  });
+}
+
+async function resolveCounselingDemoParentLinkCode(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  studentId: string,
+  preferredCode?: unknown
+) {
+  const normalizedPreferredCode = normalizeParentLinkCodeValue(preferredCode);
+  if (normalizedPreferredCode) {
+    const hasConflict = await hasParentLinkCodeConflict(db, normalizedPreferredCode, {
+      exceptCenterId: centerId,
+      exceptStudentId: studentId,
+    });
+    if (!hasConflict) {
+      return normalizedPreferredCode;
+    }
+  }
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const candidate = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const hasConflict = await hasParentLinkCodeConflict(db, candidate, {
+      exceptCenterId: centerId,
+      exceptStudentId: studentId,
+    });
+    if (!hasConflict) {
+      return candidate;
+    }
+  }
+
+  throw new functions.https.HttpsError("resource-exhausted", "Unable to allocate a parent link code for counseling demo.", {
+    userMessage: "상담 데모 부모 연동 코드를 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  });
+}
+
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
@@ -3450,6 +3636,393 @@ export const registerStudent = functions.region(region).https.onCall(async (data
     }
     throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
       userMessage: toSafeUserMessage(e, "학생 계정 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
+    });
+  }
+});
+
+export const createCounselingDemoBundle = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+  const auth = admin.auth();
+  const centerId = String(data?.centerId || "").trim();
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+  }
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "센터 정보가 필요합니다.");
+  }
+
+  const callerUid = context.auth.uid;
+  const callerMemberRef = db.doc(`centers/${centerId}/members/${callerUid}`);
+  const callerMemberSnap = await callerMemberRef.get();
+  if (!callerMemberSnap.exists || !isAdminRole(callerMemberSnap.data()?.role)) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 상담 데모 계정을 만들 수 있습니다.");
+  }
+
+  const callerMemberData = callerMemberSnap.data() as Record<string, unknown> | undefined;
+  const teacherName =
+    asTrimmedString(callerMemberData?.displayName)
+    || asTrimmedString(context.auth.token.name)
+    || "센터 관리자";
+
+  const studentUid = buildCounselingDemoUid(centerId, "student");
+  const parentUid = buildCounselingDemoUid(centerId, "parent");
+  const studentEmail = buildCounselingDemoEmail(centerId, "student");
+  const parentEmail = buildCounselingDemoEmail(centerId, "parent");
+  const studentPassword = buildCounselingDemoPassword("student");
+  const parentPassword = buildCounselingDemoPassword("parent");
+  const studentDisplayName = "상담용 서윤";
+  const parentDisplayName = "상담용 서윤 학부모";
+  const schoolName = "한결고등학교";
+  const grade = "고2";
+  const targetDailyMinutes = 360;
+  const nowKst = toKstDate();
+  const nowTs = admin.firestore.Timestamp.fromDate(nowKst);
+  const sampleDays = buildCounselingDemoStudySeeds(nowKst);
+  const latestStudyDay = sampleDays[sampleDays.length - 1];
+
+  const studentRef = db.doc(`centers/${centerId}/students/${studentUid}`);
+  const existingStudentSnap = await studentRef.get();
+  const parentLinkCode = await resolveCounselingDemoParentLinkCode(
+    db,
+    centerId,
+    studentUid,
+    existingStudentSnap.data()?.parentLinkCode
+  );
+
+  try {
+    await upsertCounselingDemoAuthUser({
+      auth,
+      uid: studentUid,
+      email: studentEmail,
+      password: studentPassword,
+      displayName: studentDisplayName,
+    });
+    await upsertCounselingDemoAuthUser({
+      auth,
+      uid: parentUid,
+      email: parentEmail,
+      password: parentPassword,
+      displayName: parentDisplayName,
+    });
+
+    const exclusions = {
+      rankings: true,
+      sms: true,
+    };
+
+    const batch = db.batch();
+    batch.set(db.doc(`users/${studentUid}`), {
+      id: studentUid,
+      email: studentEmail,
+      displayName: studentDisplayName,
+      schoolName,
+      targetDailyMinutes,
+      isCounselingDemo: true,
+      accountKind: "counseling-demo",
+      operationalExclusions: exclusions,
+      createdAt: nowTs,
+      updatedAt: nowTs,
+    }, { merge: true });
+    batch.set(db.doc(`users/${parentUid}`), {
+      id: parentUid,
+      email: parentEmail,
+      displayName: parentDisplayName,
+      isCounselingDemo: true,
+      accountKind: "counseling-demo",
+      operationalExclusions: exclusions,
+      createdAt: nowTs,
+      updatedAt: nowTs,
+    }, { merge: true });
+
+    batch.set(db.doc(`centers/${centerId}/members/${studentUid}`), {
+      id: studentUid,
+      centerId,
+      role: "student",
+      status: "active",
+      joinedAt: nowTs,
+      displayName: studentDisplayName,
+      className: "상담 데모",
+      isCounselingDemo: true,
+      accountKind: "counseling-demo",
+      operationalExclusions: exclusions,
+      updatedAt: nowTs,
+    }, { merge: true });
+    batch.set(db.doc(`userCenters/${studentUid}/centers/${centerId}`), {
+      id: centerId,
+      centerId,
+      role: "student",
+      status: "active",
+      joinedAt: nowTs,
+      displayName: studentDisplayName,
+      className: "상담 데모",
+      isCounselingDemo: true,
+      accountKind: "counseling-demo",
+      operationalExclusions: exclusions,
+      updatedAt: nowTs,
+    }, { merge: true });
+
+    batch.set(db.doc(`centers/${centerId}/members/${parentUid}`), {
+      id: parentUid,
+      centerId,
+      role: "parent",
+      status: "active",
+      joinedAt: nowTs,
+      displayName: parentDisplayName,
+      linkedStudentIds: [studentUid],
+      isCounselingDemo: true,
+      accountKind: "counseling-demo",
+      operationalExclusions: exclusions,
+      updatedAt: nowTs,
+    }, { merge: true });
+    batch.set(db.doc(`userCenters/${parentUid}/centers/${centerId}`), {
+      id: centerId,
+      centerId,
+      role: "parent",
+      status: "active",
+      joinedAt: nowTs,
+      displayName: parentDisplayName,
+      linkedStudentIds: [studentUid],
+      isCounselingDemo: true,
+      accountKind: "counseling-demo",
+      operationalExclusions: exclusions,
+      updatedAt: nowTs,
+    }, { merge: true });
+
+    batch.set(studentRef, {
+      id: studentUid,
+      name: studentDisplayName,
+      schoolName,
+      grade,
+      className: "상담 데모",
+      seatNo: 0,
+      targetDailyMinutes,
+      parentUids: [parentUid],
+      parentLinkCode,
+      isCounselingDemo: true,
+      accountKind: "counseling-demo",
+      operationalExclusions: exclusions,
+      createdAt: nowTs,
+      updatedAt: nowTs,
+    }, { merge: true });
+
+    batch.set(db.doc(`centers/${centerId}/growthProgress/${studentUid}`), {
+      seasonLp: 1840,
+      pointsBalance: 1840,
+      totalPointsEarned: 2480,
+      penaltyPoints: 2,
+      stats: {
+        focus: 78,
+        consistency: 84,
+        achievement: 73,
+        resilience: 80,
+      },
+      dailyPointStatus: {
+        [latestStudyDay.dateKey]: {
+          dailyPointAmount: 120,
+          openedStudyBoxes: ["3h"],
+          claimedStudyBoxes: ["3h"],
+        },
+      },
+      lastResetAt: nowTs,
+      updatedAt: nowTs,
+    }, { merge: true });
+
+    batch.set(db.doc(`centers/${centerId}/billingProfiles/${studentUid}`), {
+      id: studentUid,
+      studentId: studentUid,
+      centerId,
+      monthlyFee: 390000,
+      createdAt: nowTs,
+      updatedAt: nowTs,
+    }, { merge: true });
+
+    batch.set(
+      getParentLinkLookupRef(db, parentLinkCode),
+      buildParentLinkLookupPayload({
+        code: parentLinkCode,
+        centerId,
+        studentId: studentUid,
+        studentName: studentDisplayName,
+        timestamp: nowTs,
+      }),
+      { merge: true }
+    );
+
+    sampleDays.forEach((day, index) => {
+      batch.set(db.doc(`centers/${centerId}/studyLogs/${studentUid}/days/${day.dateKey}`), {
+        studentId: studentUid,
+        centerId,
+        dateKey: day.dateKey,
+        totalMinutes: day.minutes,
+        awayMinutes: 0,
+        firstSessionStartAt: admin.firestore.Timestamp.fromDate(day.firstSessionStartAt),
+        lastSessionEndAt: admin.firestore.Timestamp.fromDate(day.lastSessionEndAt),
+        updatedAt: nowTs,
+        createdAt: nowTs,
+      }, { merge: true });
+
+      batch.set(db.doc(`centers/${centerId}/dailyStudentStats/${day.dateKey}/students/${studentUid}`), {
+        centerId,
+        studentId: studentUid,
+        dateKey: day.dateKey,
+        todayPlanCompletionRate: day.completionRate,
+        totalStudyMinutes: day.minutes,
+        studyTimeGrowthRate: day.growthRate,
+        createdAt: nowTs,
+        updatedAt: nowTs,
+      }, { merge: true });
+
+      if (index >= sampleDays.length - 3) {
+        batch.set(db.doc(`centers/${centerId}/dailyReports/${day.dateKey}_${studentUid}`), {
+          id: `${day.dateKey}_${studentUid}`,
+          studentId: studentUid,
+          teacherId: callerUid,
+          dateKey: day.dateKey,
+          studentName: studentDisplayName,
+          content:
+            index === sampleDays.length - 1
+              ? "오늘은 루틴 재정비를 중심으로 학습 흐름을 다시 안정시켰습니다. 국어 독해는 속도를 회복했고 수학은 오답 정리 비중을 높여 정확도를 끌어올렸습니다."
+              : index === sampleDays.length - 2
+                ? "전날보다 집중 시간이 늘었고, 문제 풀이 뒤 오답 분류가 깔끔하게 이어졌습니다. 설명식 복습이 특히 안정적으로 진행됐습니다."
+                : "한 주 흐름을 정리하며 과목 전환 타이밍이 좋아졌습니다. 목표량은 조금 남았지만 스스로 보완 과제를 적어 둔 점이 좋았습니다.",
+          teacherNote: "상담 시 데일리 리포트 예시로 바로 설명할 수 있는 샘플입니다.",
+          status: "sent",
+          nextAction: "다음 상담에서는 수학 오답 재개념화 루틴을 20분 단위로 쪼개서 점검합니다.",
+          priority: index === sampleDays.length - 1 ? "high" : "normal",
+          aiMeta: {
+            teacherOneLiner: "계획 유지력은 안정적이고, 과목 전환 시 자기조절이 눈에 띄게 좋아지고 있습니다.",
+            strengths: ["오답 정리 루틴 유지", "집중 회복 속도 향상"],
+            improvements: ["수학 개념 회독 속도 보강", "막판 30분 정리 루틴 고정"],
+            totalStudyMinutes: day.minutes,
+            completionRate: day.completionRate,
+            history7Days: sampleDays.slice(Math.max(0, index - 6), index + 1).map((item) => ({
+              date: item.dateKey,
+              minutes: item.minutes,
+            })),
+            metrics: {
+              growthRate: day.growthRate,
+              deltaMinutesFromAvg: day.minutes - Math.round(sampleDays.reduce((sum, item) => sum + item.minutes, 0) / sampleDays.length),
+              avg7StudyMinutes: Math.round(sampleDays.slice(Math.max(0, index - 6), index + 1).reduce((sum, item) => sum + item.minutes, 0) / Math.min(index + 1, 7)),
+              isNewRecord: day.minutes >= Math.max(...sampleDays.map((item) => item.minutes)),
+              alertLow: day.minutes < 180,
+              streakBadge: day.completionRate >= 80,
+              trendSummary: day.growthRate >= 0 ? "전일 대비 학습 흐름이 유지 또는 상승했습니다." : "전일 대비 학습량이 내려가 다시 리듬을 붙여야 합니다.",
+            },
+          },
+          createdAt: nowTs,
+          updatedAt: nowTs,
+        }, { merge: true });
+      }
+    });
+
+    const counselingLogDates = [
+      { id: "counseling-demo-log-1", daysAgo: 6, type: "academic" as const, content: "수학 오답 노트를 단순 정답 암기형에서 개념 재서술형으로 바꾸기로 합의했습니다.", improvement: "오답 1문항마다 핵심 개념 한 줄 요약을 직접 작성합니다." },
+      { id: "counseling-demo-log-2", daysAgo: 2, type: "life" as const, content: "주중 피로 누적 때문에 마지막 블록 집중력이 떨어지는 패턴을 확인했습니다.", improvement: "저녁 블록 시작 전 10분 회복 루틴과 과목 전환 체크리스트를 도입합니다." },
+    ];
+
+    counselingLogDates.forEach((item) => {
+      const createdAt = new Date(nowKst.getTime());
+      createdAt.setDate(createdAt.getDate() - item.daysAgo);
+      createdAt.setHours(19, 10, 0, 0);
+
+      batch.set(db.doc(`centers/${centerId}/counselingLogs/${item.id}`), {
+        id: item.id,
+        studentId: studentUid,
+        studentName: studentDisplayName,
+        teacherId: callerUid,
+        teacherName,
+        type: item.type,
+        content: item.content,
+        improvement: item.improvement,
+        studentQuestion: "이번 흐름을 유지하려면 어떤 루틴부터 고정하면 좋을까요?",
+        createdAt: admin.firestore.Timestamp.fromDate(createdAt),
+      }, { merge: true });
+    });
+
+    const reservationDate = new Date(nowKst.getTime());
+    reservationDate.setDate(reservationDate.getDate() + 2);
+    reservationDate.setHours(19, 30, 0, 0);
+    batch.set(db.doc(`centers/${centerId}/counselingReservations/counseling-demo-reservation`), {
+      id: "counseling-demo-reservation",
+      studentId: studentUid,
+      studentName: studentDisplayName,
+      teacherId: callerUid,
+      teacherName,
+      scheduledAt: admin.firestore.Timestamp.fromDate(reservationDate),
+      status: "confirmed",
+      studentNote: "중간고사 전 과목별 우선순위 재조정 상담",
+      teacherNote: "학부모 설명용 샘플 예약",
+      createdAt: nowTs,
+      updatedAt: nowTs,
+    }, { merge: true });
+
+    const penaltySeed = [
+      { id: "counseling-demo-penalty-1", daysAgo: 9, pointsDelta: 1, reason: "지각 출석", source: "attendance_request" as const, requestType: "late" as const },
+      { id: "counseling-demo-penalty-2", daysAgo: 3, pointsDelta: 1, reason: "루틴 미작성", source: "routine_missing" as const },
+    ];
+    penaltySeed.forEach((item) => {
+      const createdAt = new Date(nowKst.getTime());
+      createdAt.setDate(createdAt.getDate() - item.daysAgo);
+      createdAt.setHours(18, 5, 0, 0);
+
+      batch.set(db.doc(`centers/${centerId}/penaltyLogs/${item.id}`), {
+        id: item.id,
+        centerId,
+        studentId: studentUid,
+        studentName: studentDisplayName,
+        pointsDelta: item.pointsDelta,
+        reason: item.reason,
+        source: item.source,
+        requestType: item.requestType || null,
+        createdByUserId: callerUid,
+        createdByName: teacherName,
+        createdAt: admin.firestore.Timestamp.fromDate(createdAt),
+      }, { merge: true });
+    });
+
+    await batch.commit();
+
+    const monthlyStudyMinutes = sampleDays
+      .filter((day) => day.date.getMonth() === nowKst.getMonth() && day.date.getFullYear() === nowKst.getFullYear())
+      .reduce((sum, day) => sum + day.minutes, 0);
+
+    return {
+      ok: true,
+      centerId,
+      student: {
+        uid: studentUid,
+        email: studentEmail,
+        password: studentPassword,
+        displayName: studentDisplayName,
+        parentLinkCode,
+      },
+      parent: {
+        uid: parentUid,
+        email: parentEmail,
+        password: parentPassword,
+        displayName: parentDisplayName,
+      },
+      seeded: {
+        studyDays: sampleDays.length,
+        monthlyStudyMinutes,
+        reportCount: 3,
+        counselingLogCount: counselingLogDates.length,
+        penaltyLogCount: penaltySeed.length,
+      },
+    };
+  } catch (error: any) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    console.error("[createCounselingDemoBundle] failed", {
+      centerId,
+      callerUid,
+      message: error?.message || error,
+      stack: error?.stack || null,
+    });
+    throw new functions.https.HttpsError("internal", "Operation failed due to internal error.", {
+      userMessage: toSafeUserMessage(error, "상담 데모 계정을 만드는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     });
   }
 });

@@ -160,7 +160,27 @@ function isSyntheticStudentId(studentId) {
     return (normalized.startsWith("test-")
         || normalized.startsWith("seed-")
         || normalized.startsWith("mock-")
+        || normalized.startsWith("counseling-demo-")
+        || normalized.startsWith("demo-counseling-")
         || normalized.includes("dummy"));
+}
+function asRecord(value) {
+    return value && typeof value === "object" ? value : null;
+}
+function shouldExcludeFromCompetitionRecord(value, studentId) {
+    if (isSyntheticStudentId(studentId))
+        return true;
+    const record = asRecord(value);
+    if (!record)
+        return false;
+    if (record.isCounselingDemo === true)
+        return true;
+    const accountKind = typeof record.accountKind === "string" ? record.accountKind.trim().toLowerCase() : "";
+    if (accountKind === "counseling-demo" || accountKind === "counseling_demo") {
+        return true;
+    }
+    const exclusions = asRecord(record.operationalExclusions);
+    return (exclusions === null || exclusions === void 0 ? void 0 : exclusions.rankings) === true || (exclusions === null || exclusions === void 0 ? void 0 : exclusions.competition) === true;
 }
 function isWeekendCompetitionDate(targetDate) {
     const day = targetDate.getDay();
@@ -270,11 +290,16 @@ async function loadCenterStudentContext(db, centerId) {
         db.collection(`centers/${centerId}/students`).get(),
     ]);
     const studentProfiles = new Map();
+    const excludedStudentIds = new Set();
     studentsSnap.forEach((docSnap) => {
         const studentId = docSnap.id;
         if (isSyntheticStudentId(studentId))
             return;
         const data = docSnap.data();
+        if (shouldExcludeFromCompetitionRecord(data, studentId)) {
+            excludedStudentIds.add(studentId);
+            return;
+        }
         studentProfiles.set(studentId, {
             displayNameSnapshot: typeof data.name === "string" && data.name.trim()
                 ? data.name.trim()
@@ -296,6 +321,10 @@ async function loadCenterStudentContext(db, centerId) {
         if (isSyntheticStudentId(studentId))
             return;
         const data = docSnap.data();
+        if (shouldExcludeFromCompetitionRecord(data, studentId)) {
+            excludedStudentIds.add(studentId);
+            return;
+        }
         if (normalizeMembershipStatus(data.status) !== "active")
             return;
         activeStudentIds.add(studentId);
@@ -315,7 +344,7 @@ async function loadCenterStudentContext(db, centerId) {
         });
     });
     return {
-        shouldInclude: (studentId) => activeStudentIds.size === 0 || activeStudentIds.has(studentId),
+        shouldInclude: (studentId) => !excludedStudentIds.has(studentId) && (activeStudentIds.size === 0 || activeStudentIds.has(studentId)),
         getProfile: (studentId) => memberProfiles.get(studentId)
             || studentProfiles.get(studentId)
             || {

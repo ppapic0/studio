@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eachDayOfInterval, format, startOfMonth, startOfWeek } from 'date-fns';
 
 import { noStoreJson } from '@/lib/api-security';
+import { shouldExcludeFromCompetitionTrack } from '@/lib/counseling-demo';
 import { adminAuth, adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import { getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
@@ -194,6 +195,8 @@ function isSyntheticStudentId(studentId: unknown): boolean {
     normalized.startsWith('test-')
     || normalized.startsWith('seed-')
     || normalized.startsWith('mock-')
+    || normalized.startsWith('counseling-demo-')
+    || normalized.startsWith('demo-counseling-')
     || normalized.includes('dummy')
   );
 }
@@ -317,6 +320,10 @@ export async function GET(request: NextRequest) {
       if (isSyntheticStudentId(studentId)) return;
 
       const data = docSnap.data() as Record<string, unknown>;
+      if (shouldExcludeFromCompetitionTrack(data, studentId)) {
+        excludedStudentIds.add(studentId);
+        return;
+      }
       const seatIdentity = resolveSeatIdentity({
         seatId: typeof data.seatId === 'string' ? data.seatId : undefined,
         seatNo: Number.isFinite(Number(data.seatNo)) ? Number(data.seatNo) : undefined,
@@ -349,12 +356,17 @@ export async function GET(request: NextRequest) {
     }>();
     const knownStudentMemberIds = new Set<string>();
     const activeStudentIds = new Set<string>();
+    const excludedStudentIds = new Set<string>();
 
     membersSnap.forEach((docSnap) => {
       const studentId = docSnap.id;
       if (isSyntheticStudentId(studentId)) return;
 
       const data = docSnap.data() as Record<string, unknown>;
+      if (shouldExcludeFromCompetitionTrack(data, studentId)) {
+        excludedStudentIds.add(studentId);
+        return;
+      }
       const hasStudentProfile = studentProfiles.has(studentId);
       if (!shouldTreatMemberAsStudent(data.role, hasStudentProfile)) return;
       knownStudentMemberIds.add(studentId);
@@ -378,6 +390,7 @@ export async function GET(request: NextRequest) {
     });
 
     const shouldInclude = (studentId: string) => {
+      if (excludedStudentIds.has(studentId)) return false;
       if (activeStudentIds.has(studentId)) return true;
       if (!studentProfiles.has(studentId)) return activeStudentIds.size === 0;
       return !knownStudentMemberIds.has(studentId);
