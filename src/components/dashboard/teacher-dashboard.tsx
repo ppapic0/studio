@@ -1851,6 +1851,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
 
       const updateData: any = {
+        studentId,
         seatNo: selectedSeat.seatNo,
         roomId: selectedSeat.roomId,
         roomSeatNo: selectedSeat.roomSeatNo,

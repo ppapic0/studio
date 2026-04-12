@@ -8,6 +8,8 @@ export type StudentRankEntry = {
   schoolNameSnapshot?: string | null;
   value: number;
   rank: number;
+  liveStatus?: 'studying' | 'away' | 'break' | null;
+  liveStartedAtMs?: number | null;
 };
 
 export type StudentRankingSnapshot = Record<StudentRankRange, StudentRankEntry[]>;

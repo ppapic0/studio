@@ -3,9 +3,11 @@ import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
 
 import { noStoreJson } from '@/lib/api-security';
 import { adminAuth, adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
+import { resolveSeatIdentity } from '@/lib/seat-layout';
 import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
+type ActiveLiveRankStatus = 'studying' | 'away' | 'break';
 
 type RankEntry = {
   id: string;
@@ -15,6 +17,13 @@ type RankEntry = {
   schoolNameSnapshot: string | null;
   value: number;
   rank: number;
+  liveStatus?: ActiveLiveRankStatus | null;
+  liveStartedAtMs?: number | null;
+};
+
+type RankEntrySeed = Omit<RankEntry, 'rank'> & {
+  liveStatus: ActiveLiveRankStatus | null;
+  liveStartedAtMs: number | null;
 };
 
 type StudentRankingSnapshot = Record<RankRange, RankEntry[]>;
@@ -27,13 +36,18 @@ const EMPTY_SNAPSHOT: StudentRankingSnapshot = {
 
 export const dynamic = 'force-dynamic';
 
-const ACTIVE_LIVE_RANK_STATUSES = new Set(['studying', 'away', 'break']);
+const ACTIVE_LIVE_RANK_STATUSES = new Set<ActiveLiveRankStatus>(['studying', 'away', 'break']);
 
 function getAttendanceStatusRank(value: unknown) {
   if (value === 'studying') return 0;
   if (value === 'away' || value === 'break') return 1;
   if (value === 'absent') return 3;
   return 2;
+}
+
+function getActiveLiveRankStatus(value: unknown): ActiveLiveRankStatus | null {
+  if (value === 'studying' || value === 'away' || value === 'break') return value;
+  return null;
 }
 
 function toTimestampMillis(value: unknown) {
@@ -74,13 +88,40 @@ function pickPreferredAttendanceRecord(records: Record<string, unknown>[]) {
 }
 
 function getLiveAttendanceMinutes(attendance: Record<string, unknown>, nowMs: number) {
-  const status = typeof attendance.status === 'string' ? attendance.status : '';
-  if (!ACTIVE_LIVE_RANK_STATUSES.has(status)) return 0;
+  const status = getActiveLiveRankStatus(attendance.status);
+  if (!status) return 0;
 
   const startedAtMs = toTimestampMillis(attendance.lastCheckInAt);
   if (startedAtMs <= 0) return 0;
 
   return Math.max(1, Math.ceil((nowMs - startedAtMs) / 60000));
+}
+
+function registerLookup(map: Map<string, string | null>, key: string, studentId: string) {
+  const normalizedKey = key.trim();
+  if (!normalizedKey) return;
+
+  const existing = map.get(normalizedKey);
+  if (typeof existing === 'undefined') {
+    map.set(normalizedKey, studentId);
+    return;
+  }
+  if (existing !== studentId) {
+    map.set(normalizedKey, null);
+  }
+}
+
+function registerNumberLookup(map: Map<number, string | null>, key: number, studentId: string) {
+  if (!Number.isFinite(key) || key <= 0) return;
+
+  const existing = map.get(key);
+  if (typeof existing === 'undefined') {
+    map.set(key, studentId);
+    return;
+  }
+  if (existing !== studentId) {
+    map.set(key, null);
+  }
 }
 
 function addRankMinutes(target: Map<string, number>, studentId: string, minutes: number) {
@@ -216,6 +257,10 @@ export async function GET(request: NextRequest) {
       displayNameSnapshot: string;
       classNameSnapshot: string | null;
       schoolNameSnapshot: string | null;
+      seatId: string | null;
+      seatNo: number;
+      roomId: string | null;
+      roomSeatNo: number;
     }>();
 
     studentsSnap.forEach((docSnap) => {
@@ -223,6 +268,12 @@ export async function GET(request: NextRequest) {
       if (isSyntheticStudentId(studentId)) return;
 
       const data = docSnap.data() as Record<string, unknown>;
+      const seatIdentity = resolveSeatIdentity({
+        seatId: typeof data.seatId === 'string' ? data.seatId : undefined,
+        seatNo: Number.isFinite(Number(data.seatNo)) ? Number(data.seatNo) : undefined,
+        roomId: typeof data.roomId === 'string' ? data.roomId : undefined,
+        roomSeatNo: Number.isFinite(Number(data.roomSeatNo)) ? Number(data.roomSeatNo) : undefined,
+      });
       studentProfiles.set(studentId, {
         displayNameSnapshot: typeof data.name === 'string' && data.name.trim()
           ? data.name.trim()
@@ -235,6 +286,10 @@ export async function GET(request: NextRequest) {
         schoolNameSnapshot: typeof data.schoolName === 'string' && data.schoolName.trim()
           ? data.schoolName.trim()
           : null,
+        seatId: seatIdentity.seatId || null,
+        seatNo: seatIdentity.seatNo,
+        roomId: seatIdentity.roomId || null,
+        roomSeatNo: seatIdentity.roomSeatNo,
       });
     });
 
@@ -276,6 +331,24 @@ export async function GET(request: NextRequest) {
       schoolNameSnapshot: null,
     };
 
+    const seatIdToStudentId = new Map<string, string | null>();
+    const roomSeatToStudentId = new Map<string, string | null>();
+    const globalSeatNoToStudentId = new Map<number, string | null>();
+
+    studentProfiles.forEach((profile, studentId) => {
+      if (!shouldInclude(studentId)) return;
+
+      if (profile.seatId) {
+        registerLookup(seatIdToStudentId, profile.seatId, studentId);
+      }
+      if (profile.roomId && profile.roomSeatNo > 0) {
+        registerLookup(roomSeatToStudentId, `${profile.roomId}:${profile.roomSeatNo}`, studentId);
+      }
+      if (profile.seatNo > 0) {
+        registerNumberLookup(globalSeatNoToStudentId, profile.seatNo, studentId);
+      }
+    });
+
     const weeklyTotals = new Map<string, number>();
     const dailyTotals = new Map<string, number>();
 
@@ -302,14 +375,32 @@ export async function GET(request: NextRequest) {
     const nowMs = Date.now();
     const weekDateKeySet = new Set(weekDateKeys);
     const attendanceBuckets = new Map<string, Record<string, unknown>[]>();
+    const liveAttendanceMeta = new Map<string, { liveStatus: ActiveLiveRankStatus; liveStartedAtMs: number }>();
 
     attendanceSnap.forEach((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
-      const studentId = typeof data.studentId === 'string' ? data.studentId : '';
+      const directStudentId = typeof data.studentId === 'string' ? data.studentId.trim() : '';
+      const seatIdentity = resolveSeatIdentity({
+        id: docSnap.id,
+        seatNo: Number.isFinite(Number(data.seatNo)) ? Number(data.seatNo) : undefined,
+        roomId: typeof data.roomId === 'string' ? data.roomId : undefined,
+        roomSeatNo: Number.isFinite(Number(data.roomSeatNo)) ? Number(data.roomSeatNo) : undefined,
+      });
+      const seatIdStudentId = seatIdentity.seatId ? seatIdToStudentId.get(seatIdentity.seatId) : undefined;
+      const roomSeatStudentId = seatIdentity.roomId && seatIdentity.roomSeatNo > 0
+        ? roomSeatToStudentId.get(`${seatIdentity.roomId}:${seatIdentity.roomSeatNo}`)
+        : undefined;
+      const globalSeatStudentId = seatIdentity.seatNo > 0
+        ? globalSeatNoToStudentId.get(seatIdentity.seatNo)
+        : undefined;
+      const studentId = directStudentId
+        || (typeof seatIdStudentId === 'string' ? seatIdStudentId : '')
+        || (typeof roomSeatStudentId === 'string' ? roomSeatStudentId : '')
+        || (typeof globalSeatStudentId === 'string' ? globalSeatStudentId : '');
       if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId)) return;
 
       const current = attendanceBuckets.get(studentId) || [];
-      current.push(data);
+      current.push({ ...data, studentId });
       attendanceBuckets.set(studentId, current);
     });
 
@@ -321,8 +412,14 @@ export async function GET(request: NextRequest) {
       if (liveMinutes <= 0) return;
 
       const liveStartedAtMs = toTimestampMillis(selectedRecord.lastCheckInAt);
+      const liveStatus = getActiveLiveRankStatus(selectedRecord.status);
       const liveDateKey = toKstDateKeyFromTimestamp(selectedRecord.lastCheckInAt);
-      if (!liveDateKey) return;
+      if (!liveDateKey || !liveStatus || liveStartedAtMs <= 0) return;
+
+      liveAttendanceMeta.set(studentId, {
+        liveStatus,
+        liveStartedAtMs,
+      });
 
       const dailyLiveMinutes = getDailyRankWindowOverlapMinutes(liveStartedAtMs, nowMs, dailyRankWindow);
       if (dailyLiveMinutes > 0) {
@@ -344,6 +441,8 @@ export async function GET(request: NextRequest) {
           classNameSnapshot: profile.classNameSnapshot,
           schoolNameSnapshot: profile.schoolNameSnapshot,
           value,
+          liveStatus: liveAttendanceMeta.get(studentId)?.liveStatus ?? null,
+          liveStartedAtMs: liveAttendanceMeta.get(studentId)?.liveStartedAtMs ?? null,
         };
       })
     );
@@ -358,6 +457,8 @@ export async function GET(request: NextRequest) {
           classNameSnapshot: profile.classNameSnapshot,
           schoolNameSnapshot: profile.schoolNameSnapshot,
           value,
+          liveStatus: liveAttendanceMeta.get(studentId)?.liveStatus ?? null,
+          liveStartedAtMs: liveAttendanceMeta.get(studentId)?.liveStartedAtMs ?? null,
         };
       })
     );
@@ -383,9 +484,11 @@ export async function GET(request: NextRequest) {
               ? data.schoolNameSnapshot.trim()
               : profile.schoolNameSnapshot,
             value,
-          };
+            liveStatus: liveAttendanceMeta.get(studentId)?.liveStatus ?? null,
+            liveStartedAtMs: liveAttendanceMeta.get(studentId)?.liveStartedAtMs ?? null,
+          } satisfies RankEntrySeed;
         })
-        .filter((entry): entry is Omit<RankEntry, 'rank'> => Boolean(entry))
+        .filter((entry): entry is RankEntrySeed => entry !== null)
     );
 
     return noStoreJson({

@@ -2220,10 +2220,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const studentId = typeof entry.studentId === 'string' ? entry.studentId : null;
         const baseMinutes = Math.max(0, Number(entry.value || 0));
         const isSelfLive = Boolean(allowLiveTrack && studentId && studentId === user?.uid && isTimerActive);
+        const serverLiveStartedAtMs = allowLiveTrack
+          && studentId
+          && studentId !== user?.uid
+          && ['studying', 'away', 'break'].includes(String(entry.liveStatus || ''))
+          ? Math.max(0, Number(entry.liveStartedAtMs || 0))
+          : 0;
+        const serverLiveSeconds = serverLiveStartedAtMs > 0
+          ? Math.max(0, Math.floor((rankPreviewNowMs - serverLiveStartedAtMs) / 1000))
+          : 0;
         const liveSeconds = isSelfLive
           ? localSeconds
           : allowLiveTrack
-            ? getLiveAttendanceSeconds(studentId ? attendanceCurrentByStudent.get(studentId) : null, rankPreviewNowMs)
+            ? Math.max(
+                getLiveAttendanceSeconds(studentId ? attendanceCurrentByStudent.get(studentId) : null, rankPreviewNowMs),
+                serverLiveSeconds
+              )
             : 0;
 
         return {

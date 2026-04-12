@@ -188,6 +188,7 @@ export default function KioskPage() {
       }
 
       const updateData: any = {
+        studentId: student.id,
         seatNo: seat.seatNo,
         roomId: seat.roomId,
         roomSeatNo: seat.roomSeatNo,
