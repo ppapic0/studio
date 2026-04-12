@@ -56,7 +56,7 @@ const INITIAL_FORM: FormState = {
   marketingConsentOptional: false,
 };
 
-const GRADE_OPTIONS = ["중3", "고1", "고2", "고3", "N수생"];
+const GRADE_OPTIONS = ["고1", "고2", "고3", "N수생"];
 
 function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
