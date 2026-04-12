@@ -5703,6 +5703,16 @@ select {
   opacity: 0.3;
 }
 
+.point-track-box-figure--locked .point-track-box-figure__lock,
+.point-track-box-figure--locked .point-track-box-figure__shine,
+.point-track-box-figure--locked .point-track-box-figure__spark {
+  opacity: 0;
+}
+
+.point-track-box-figure--locked .point-track-box-figure__crest {
+  opacity: 0.42;
+}
+
 .point-track-box-figure--common .point-track-box-figure__shell {
   border-radius: 2rem 2rem 1.7rem 1.7rem;
 }

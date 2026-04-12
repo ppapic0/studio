@@ -36,7 +36,8 @@ function RewardBoxFigure({
       className={cn(
         'point-track-box-figure',
         variant === 'hero' ? 'point-track-box-figure--hero' : 'point-track-box-figure--slot',
-        `point-track-box-figure--${rarity}`
+        `point-track-box-figure--${rarity}`,
+        state === 'locked' && 'point-track-box-figure--locked'
       )}
     >
       <div className="point-track-box-figure__glow" />
@@ -52,15 +53,16 @@ function RewardBoxFigure({
         <div className="point-track-box-figure__spark point-track-box-figure__spark--left" />
         <div className="point-track-box-figure__spark point-track-box-figure__spark--right" />
         {state === 'locked' ? (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 z-[3] flex items-center justify-center">
             <span
               className={cn(
-                'mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full border text-[1.2rem] font-black leading-none',
+                'inline-flex items-center justify-center rounded-full border font-black leading-none shadow-[0_10px_22px_-14px_rgba(8,15,36,0.8)]',
+                variant === 'hero' ? 'h-10 w-10 text-[1.4rem]' : 'h-9 w-9 text-[1.35rem]',
                 rarity === 'epic'
-                  ? 'border-violet-200/30 bg-violet-200/14 text-violet-50'
+                  ? 'border-violet-100/60 bg-violet-100/26 text-white'
                   : rarity === 'rare'
-                    ? 'border-orange-200/30 bg-orange-200/14 text-orange-50'
-                    : 'border-white/24 bg-white/12 text-white'
+                    ? 'border-orange-100/60 bg-orange-100/28 text-white'
+                    : 'border-white/60 bg-white/28 text-white'
               )}
             >
               ?
