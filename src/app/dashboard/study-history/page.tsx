@@ -1354,22 +1354,10 @@ export default function StudyHistoryPage() {
                       'aspect-square',
                       isMobile ? 'min-h-0 rounded-[0.95rem] p-1' : 'rounded-[1.45rem] p-3.5',
                       studentCellClass,
-                      isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0',
-                      isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-[#7FCB97]/55 shadow-[0_22px_36px_-24px_rgba(26,115,64,0.18)]'
+                      isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0'
                     )}
                   >
-                    {isTodayCalendar ? (
-                      <div
-                        className={cn(
-                          'pointer-events-none absolute inset-[1px] border border-white/88',
-                          isMobile ? 'rounded-[0.8rem]' : 'rounded-[1.35rem]'
-                        )}
-                      />
-                    ) : null}
                     <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/92" />
-                    {isCurrentMonth && minutes > 0 ? (
-                      <div className="pointer-events-none absolute inset-x-4 top-0 h-12 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.52),rgba(255,255,255,0)_72%)] opacity-90" />
-                    ) : null}
 
                     <div className="relative z-10 h-full">
                       <span
@@ -1382,7 +1370,7 @@ export default function StudyHistoryPage() {
                               ? 'border-rose-100 bg-rose-50 text-rose-700'
                               : 'border-slate-200 bg-white text-slate-700',
                           !isCurrentMonth && 'border-[#E2E8F0] bg-white/80 text-[#B6C0D0]',
-                          isTodayCalendar && 'border-[#9CD6B0] text-[#178244]'
+                          isTodayCalendar && isCurrentMonth && 'border-[#FFB068] bg-[#FFF3E6] text-[#D86A11]'
                         )}
                       >
                         {format(day, 'd')}
@@ -1432,22 +1420,10 @@ export default function StudyHistoryPage() {
                     !isCurrentMonth
                       ? 'bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75'
                       : getHeatmapColor(minutes),
-                    isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.22)] active:translate-y-0',
-                    isTodayCalendar && 'z-10 -translate-y-[1px] ring-2 ring-inset ring-[#1f9d57]/45 shadow-[0_20px_40px_-22px_rgba(34,197,94,0.24)]'
+                    isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.22)] active:translate-y-0'
                   )}
                 >
-                  {isTodayCalendar && (
-                    <div
-                      className={cn(
-                        'pointer-events-none absolute -inset-0.5 border border-primary/20',
-                        isMobile ? 'rounded-[0.95rem]' : 'rounded-[1.35rem]'
-                      )}
-                    />
-                  )}
                   <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
-                  {isCurrentMonth && minutes > 0 && (
-                    <div className="pointer-events-none absolute inset-x-4 top-0 h-14 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.55),rgba(255,255,255,0)_72%)] opacity-80" />
-                  )}
 
                   {!isMobile ? (
                     <div className="relative z-10 mb-3 flex items-start justify-between gap-1.5">
@@ -1456,7 +1432,7 @@ export default function StudyHistoryPage() {
                           'inline-flex items-center justify-center rounded-full border font-black tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
                           'min-w-[2rem] px-2 py-1 text-xs',
                           idx % 7 === 5 && isCurrentMonth ? 'border-blue-100 bg-blue-50 text-blue-700' : idx % 7 === 6 && isCurrentMonth ? 'border-rose-100 bg-rose-50 text-rose-700' : 'border-slate-200 bg-white text-slate-700',
-                          isTodayCalendar && 'border-primary/20 text-primary'
+                          isTodayCalendar && isCurrentMonth && 'border-[#FFB068] bg-[#FFF3E6] text-[#D86A11]'
                         )}
                       >
                         {format(day, 'd')}
