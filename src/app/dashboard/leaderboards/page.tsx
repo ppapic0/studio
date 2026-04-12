@@ -156,8 +156,10 @@ function formatStudyClock(minutes: number) {
 }
 
 function formatStudyCompact(minutes: number) {
-  if (minutes <= 0) return '0.0h';
-  return `${(minutes / 60).toFixed(1)}h`;
+  const safe = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  return `${hours}시간 ${mins}분`;
 }
 
 function formatGapLabel(minutes: number) {
