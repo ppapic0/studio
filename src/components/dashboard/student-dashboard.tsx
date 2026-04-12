@@ -42,7 +42,8 @@ import {
   UserMinus,
   Plus,
   Trash2,
-  Gift
+  Gift,
+  Wifi
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -72,7 +73,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, type User as UserType } from '@/lib/types';
+import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, type User as UserType, type SupportThreadKind } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
@@ -118,6 +119,26 @@ import { logHandledClientIssue } from '@/lib/handled-client-log';
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
 const STUDY_BOX_CLAIM_CACHE_PREFIX = 'student-dashboard:claimed-boxes';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
+
+type StudentWifiRequestRecord = {
+  id: string;
+  studentId?: string;
+  senderRole?: 'student' | 'parent';
+  senderUid?: string;
+  senderName?: string;
+  type?: 'consultation' | 'request' | 'suggestion';
+  requestCategory?: 'question' | 'request' | 'suggestion';
+  title?: string;
+  body?: string;
+  supportKind?: SupportThreadKind | null;
+  requestedUrl?: string | null;
+  status?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  latestMessageAt?: Timestamp;
+  latestMessagePreview?: string;
+  replyBody?: string;
+};
 
 function isSyntheticStudentId(studentId: unknown): boolean {
   if (typeof studentId !== 'string') return true;
@@ -334,6 +355,62 @@ function shouldShowStudyBoxArrivalToast(centerId: string, userId: string, dateKe
     return true;
   } catch {
     return true;
+  }
+}
+
+function normalizeRequestedUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const parsed = new URL(withProtocol);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('invalid-url');
+  }
+  return parsed.toString();
+}
+
+function getWifiRequestStatusMeta(status?: string) {
+  switch (status) {
+    case 'done':
+      return {
+        label: '처리 완료',
+        badgeClass: 'bg-emerald-500 text-white',
+        captionClass: 'text-[#4A9C6C]',
+      };
+    case 'in_progress':
+      return {
+        label: '처리 중',
+        badgeClass: 'bg-[#17326B] text-white',
+        captionClass: 'text-[#6781AE]',
+      };
+    case 'in_review':
+      return {
+        label: '검토 중',
+        badgeClass: 'bg-[#FFB24C] text-white',
+        captionClass: 'text-[#B6761E]',
+      };
+    default:
+      return {
+        label: '접수됨',
+        badgeClass: 'bg-[#FF7A16] text-white',
+        captionClass: 'text-[#B56B24]',
+      };
+  }
+}
+
+function formatWifiRequestTimestamp(value?: Timestamp | null) {
+  const date = value?.toDate?.();
+  if (!date) return '방금 요청';
+  return format(date, 'M/d HH:mm');
+}
+
+function getRequestedHostLabel(value?: string | null) {
+  if (!value) return '';
+  try {
+    return new URL(value).hostname.replace(/^www\./i, '');
+  } catch {
+    return value.replace(/^https?:\/\//i, '').split('/')[0] || value;
   }
 }
 
@@ -1182,6 +1259,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [requestDate, setRequestDate] = useState('');
   const [requestReason, setRequestReason] = useState('');
   const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+  const [isWifiRequestDialogOpen, setIsWifiRequestDialogOpen] = useState(false);
+  const [wifiRequestTitle, setWifiRequestTitle] = useState('');
+  const [wifiRequestUrl, setWifiRequestUrl] = useState('');
+  const [wifiRequestReason, setWifiRequestReason] = useState('');
+  const [isWifiRequestSubmitting, setIsWifiRequestSubmitting] = useState(false);
   const [selectedTeacherReport, setSelectedTeacherReport] = useState<DailyReport | null>(null);
   const [isTeacherReportDialogOpen, setIsTeacherReportDialogOpen] = useState(false);
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
@@ -1451,6 +1533,30 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!teacherReportsRaw) return [];
     return [...teacherReportsRaw].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
   }, [teacherReportsRaw]);
+
+  const wifiRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'parentCommunications'),
+      where('studentId', '==', user.uid),
+      limit(20)
+    );
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: wifiRequestsRaw } = useCollection<StudentWifiRequestRecord>(wifiRequestsQuery, { enabled: isActive });
+
+  const wifiRequests = useMemo(() => {
+    if (!wifiRequestsRaw) return [] as StudentWifiRequestRecord[];
+    return [...wifiRequestsRaw]
+      .filter((item) => item.senderRole === 'student' && item.supportKind === 'wifi_unblock')
+      .sort((a, b) => {
+        const bTime = toTimestampMillis(b.latestMessageAt) || toTimestampMillis(b.updatedAt) || toTimestampMillis(b.createdAt);
+        const aTime = toTimestampMillis(a.latestMessageAt) || toTimestampMillis(a.updatedAt) || toTimestampMillis(a.createdAt);
+        return bTime - aTime;
+      });
+  }, [wifiRequestsRaw]);
+
+  const latestWifiRequest = wifiRequests[0] || null;
+  const latestWifiRequestStatusMeta = getWifiRequestStatusMeta(latestWifiRequest?.status);
 
   const attendanceCurrentQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user?.uid) return null;
@@ -2042,6 +2148,93 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleRequestSubmitInternal = async () => {
     await handleRequestSubmit();
+  };
+
+  const handleWifiRequestSubmit = async () => {
+    if (!firestore || !activeMembership?.id || !user) return;
+
+    const trimmedReason = wifiRequestReason.trim();
+    if (!trimmedReason) {
+      toast({
+        variant: 'destructive',
+        title: '요청 사유를 입력해 주세요.',
+      });
+      return;
+    }
+
+    let normalizedUrl: string | null = null;
+    try {
+      normalizedUrl = normalizeRequestedUrl(wifiRequestUrl);
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: '해제 요청 URL을 정확히 입력해 주세요.',
+      });
+      return;
+    }
+
+    if (!normalizedUrl) {
+      toast({
+        variant: 'destructive',
+        title: '해제 요청 URL을 입력해 주세요.',
+      });
+      return;
+    }
+
+    setIsWifiRequestSubmitting(true);
+    try {
+      const defaultTitle = '와이파이 방화벽 해제 요청';
+      const trimmedTitle = wifiRequestTitle.trim();
+      const requestRef = await addDoc(collection(firestore, 'centers', activeMembership.id, 'parentCommunications'), {
+        studentId: user.uid,
+        senderRole: 'student',
+        senderUid: user.uid,
+        senderName: user.displayName || activeMembership.displayName || '학생',
+        type: 'request',
+        requestCategory: 'request',
+        title: trimmedTitle || defaultTitle,
+        body: trimmedReason,
+        supportKind: 'wifi_unblock' as SupportThreadKind,
+        requestedUrl: normalizedUrl,
+        status: 'requested',
+        latestMessageAt: serverTimestamp(),
+        latestMessagePreview: trimmedReason.length > 90 ? `${trimmedReason.slice(0, 90)}…` : trimmedReason,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await addDoc(collection(firestore, 'centers', activeMembership.id, 'supportMessages'), {
+        centerId: activeMembership.id,
+        communicationId: requestRef.id,
+        studentId: user.uid,
+        parentUid: null,
+        senderRole: 'student',
+        senderUid: user.uid,
+        senderName: user.displayName || activeMembership.displayName || '학생',
+        body: trimmedReason,
+        supportKind: 'wifi_unblock' as SupportThreadKind,
+        requestedUrl: normalizedUrl,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({
+        title: '와이파이 해제 요청이 등록되었습니다.',
+        description: '상담트랙과 동일한 요청으로 전달되며 확인 후 처리됩니다.',
+      });
+      setWifiRequestTitle('');
+      setWifiRequestUrl('');
+      setWifiRequestReason('');
+      setIsWifiRequestDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '요청 등록 실패',
+        description: getSafeErrorMessage(error, '와이파이 해제 요청을 저장하지 못했습니다.'),
+      });
+    } finally {
+      setIsWifiRequestSubmitting(false);
+    }
   };
 
   const handleOpenTeacherReport = async (report: DailyReport) => {
@@ -3541,6 +3734,157 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className={cn("border-t shrink-0 bg-white", isMobile ? "p-4" : "p-6")}>
+                <DialogClose asChild>
+                  <Button variant="ghost" className="w-full h-12 rounded-xl font-black">닫기</Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isWifiRequestDialogOpen} onOpenChange={setIsWifiRequestDialogOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="group text-left h-full w-full touch-manipulation"
+              >
+                <Card
+                  className={cn(
+                    "student-cta student-cta-card student-utility-card h-full border border-[#D9E1F2] bg-[linear-gradient(180deg,#F7F9FD_0%,#EDF3FB_100%)] shadow-[0_20px_42px_-30px_rgba(10,28,72,0.28)] transition-all duration-200 flex flex-row items-center gap-4 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-30px_rgba(10,28,72,0.34)]",
+                    isMobile ? "rounded-2xl p-4" : "rounded-[2rem] p-6",
+                    latestWifiRequest && latestWifiRequest.status !== 'done' && "ring-1 ring-[#FF7A16]/20 border-[#FFD4A9]"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "rounded-2xl border border-[#FFD9B7] bg-[linear-gradient(180deg,#FFF5E8_0%,#FFE7C9_100%)] flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]",
+                      isMobile ? "h-12 w-12" : "h-16 w-16"
+                    )}
+                  >
+                    <Wifi className={cn("text-[#FF8F1F]", isMobile ? "h-6 w-6" : "h-8 w-8")} />
+                  </div>
+                  <div className="student-copy-stack grid min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={cn("font-black tracking-tighter text-[#17326B] break-keep", isMobile ? "text-sm" : "text-xl")}>와이파이 해제 요청</span>
+                      {latestWifiRequest ? (
+                        <Badge className={cn("border-none font-black h-5 px-2 shrink-0", latestWifiRequestStatusMeta.badgeClass)}>
+                          {latestWifiRequestStatusMeta.label}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <span className={cn("font-bold uppercase tracking-widest truncate", isMobile ? "text-[8px]" : "text-[10px]", latestWifiRequest ? latestWifiRequestStatusMeta.captionClass : "text-[#6781AE]")}>
+                      {latestWifiRequest
+                        ? `${getRequestedHostLabel(latestWifiRequest.requestedUrl) || '최근 요청'} · ${formatWifiRequestTimestamp(latestWifiRequest.latestMessageAt || latestWifiRequest.updatedAt || latestWifiRequest.createdAt)}`
+                        : '상담트랙 빠른 요청'}
+                    </span>
+                  </div>
+                  <ChevronRight className="ml-auto h-5 w-5 text-[#8AA0C7]" />
+                </Card>
+              </button>
+            </DialogTrigger>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
+              <div className="bg-[linear-gradient(180deg,#FF9A2F_0%,#FF7A16_100%)] p-8 text-white relative shrink-0">
+                <Wifi className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black tracking-tight">와이파이 방화벽 해제 요청</DialogTitle>
+                  <DialogDescription className="text-white/78 font-bold">
+                    상담트랙과 동일한 요청으로 전달돼요. 필요한 사이트 주소와 사용 이유를 적어 주세요.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
+                <div className={cn("p-8 space-y-6", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4" : "")}>
+                  <div className="grid gap-4 rounded-[2rem] border border-[#E7EDF8] bg-white p-6 shadow-[0_18px_42px_-34px_rgba(10,28,72,0.18)]">
+                    <div className="space-y-1.5">
+                      <Label className="ml-1 text-[10px] font-black uppercase text-muted-foreground">요청 제목 (선택)</Label>
+                      <Input
+                        value={wifiRequestTitle}
+                        onChange={(event) => setWifiRequestTitle(event.target.value)}
+                        placeholder="예: classroom.google.com 해제 요청"
+                        className="h-12 rounded-xl border-2 font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="ml-1 text-[10px] font-black uppercase text-muted-foreground">사이트 주소</Label>
+                      <Input
+                        value={wifiRequestUrl}
+                        onChange={(event) => setWifiRequestUrl(event.target.value)}
+                        placeholder="예: classroom.google.com 또는 https://classroom.google.com"
+                        className="h-12 rounded-xl border-2 font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-3 ml-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">사용 이유</Label>
+                        <span className={cn("text-[9px] font-bold", wifiRequestReason.trim().length === 0 ? "text-rose-500" : "text-emerald-600")}>
+                          {wifiRequestReason.trim().length > 0 ? '작성됨' : '필수'}
+                        </span>
+                      </div>
+                      <Textarea
+                        value={wifiRequestReason}
+                        onChange={(event) => setWifiRequestReason(event.target.value)}
+                        placeholder="어떤 수업, 과제, 학습 목적 때문에 이 사이트 해제가 필요한지 적어 주세요."
+                        className="min-h-[120px] resize-none rounded-2xl border-2 font-bold text-sm"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleWifiRequestSubmit}
+                      disabled={isWifiRequestSubmitting || !wifiRequestUrl.trim() || !wifiRequestReason.trim()}
+                      className="h-14 rounded-2xl bg-[#FF7A16] font-black text-white hover:bg-[#E86C10]"
+                    >
+                      {isWifiRequestSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : '해제 요청 보내기'}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-[#17326B]" />
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6781AE]">최근 와이파이 요청</h4>
+                    </div>
+                    {wifiRequests.length === 0 ? (
+                      <div className="rounded-[1.6rem] border-2 border-dashed border-[#D9E1F2] bg-white px-4 py-10 text-center text-[11px] font-semibold text-[#7A8EAE]">
+                        아직 등록한 방화벽 해제 요청이 없어요.
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        {wifiRequests.slice(0, 4).map((item) => {
+                          const statusMeta = getWifiRequestStatusMeta(item.status);
+                          const timestampLabel = formatWifiRequestTimestamp(item.latestMessageAt || item.updatedAt || item.createdAt);
+                          const hostLabel = getRequestedHostLabel(item.requestedUrl) || '요청 사이트';
+                          return (
+                            <div
+                              key={item.id}
+                              className="rounded-[1.35rem] border border-[#D9E1F2] bg-white px-4 py-4 shadow-[0_18px_36px_-30px_rgba(10,28,72,0.16)]"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="rounded-full bg-[#EFF4FF] px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#17326B]">
+                                      {hostLabel}
+                                    </span>
+                                    <span className="text-[10px] font-black text-[#8AA0C7]">{timestampLabel}</span>
+                                  </div>
+                                  <p className="mt-2 break-keep text-sm font-black text-[#17326B]">
+                                    {item.title?.trim() || '와이파이 방화벽 해제 요청'}
+                                  </p>
+                                  <p className="mt-1 line-clamp-2 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
+                                    {item.latestMessagePreview || item.body || '요청 사유가 등록되었습니다.'}
+                                  </p>
+                                </div>
+                                <Badge className={cn("border-none font-black shrink-0", statusMeta.badgeClass)}>
+                                  {statusMeta.label}
+                                </Badge>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
