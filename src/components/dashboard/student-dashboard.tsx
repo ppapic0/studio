@@ -306,13 +306,6 @@ function pickPreferredAttendanceCurrentRecord(entries: AttendanceCurrent[]): Att
   })[0] ?? null;
 }
 
-function getLiveAttendanceSeconds(attendance: AttendanceCurrent | null | undefined, nowMs: number) {
-  if (!attendance?.status || !ACTIVE_ATTENDANCE_STATUSES.includes(attendance.status)) return 0;
-  const startedAtMs = toTimestampMillis(attendance.lastCheckInAt);
-  if (startedAtMs <= 0) return 0;
-  return Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
-}
-
 function pickPreferredSeatDoc<T extends { data: () => AttendanceCurrent | undefined }>(docs: T[]): T | null {
   if (!docs.length) return null;
 
@@ -2232,10 +2225,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const liveSeconds = isSelfLive
           ? localSeconds
           : allowLiveTrack
-            ? Math.max(
-                getLiveAttendanceSeconds(studentId ? attendanceCurrentByStudent.get(studentId) : null, rankPreviewNowMs),
-                serverLiveSeconds
-              )
+            ? serverLiveSeconds
             : 0;
 
         return {
@@ -2403,7 +2393,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       liveBadge?: string | null;
     }>;
   }, [
-    attendanceCurrentByStudent,
     activeMembership?.displayName,
     dailyStudyRank,
     dailyStudyRankDisplaySeconds,

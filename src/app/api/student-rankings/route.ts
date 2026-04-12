@@ -4,7 +4,7 @@ import { eachDayOfInterval, format, startOfWeek } from 'date-fns';
 import { noStoreJson } from '@/lib/api-security';
 import { adminAuth, adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
-import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
+import { getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
 type ActiveLiveRankStatus = 'studying' | 'away' | 'break';
@@ -214,6 +214,7 @@ export async function GET(request: NextRequest) {
     const nowKst = toKstDate();
     const dailyRankWindow = getDailyRankWindowState(nowKst);
     const dailyDateKeys = dailyRankWindow.coveredDateKeys;
+    const dailyDateKeySet = new Set(dailyDateKeys);
     const monthKey = format(nowKst, 'yyyy-MM');
     const weekDateKeys = eachDayOfInterval({
       start: startOfWeek(nowKst, { weekStartsOn: 1 }),
@@ -414,25 +415,16 @@ export async function GET(request: NextRequest) {
       const liveStartedAtMs = toTimestampMillis(selectedRecord.lastCheckInAt);
       const liveStatus = getActiveLiveRankStatus(selectedRecord.status);
       const liveDateKey = toKstDateKeyFromTimestamp(selectedRecord.lastCheckInAt);
-      if (!liveDateKey || !liveStatus || liveStartedAtMs <= 0) return;
+      if (!liveDateKey || !liveStatus || liveStartedAtMs <= 0 || !dailyDateKeySet.has(liveDateKey)) return;
 
       liveAttendanceMeta.set(studentId, {
         liveStatus,
         liveStartedAtMs,
       });
-
-      const dailyLiveMinutes = getDailyRankWindowOverlapMinutes(liveStartedAtMs, nowMs, dailyRankWindow);
-      if (dailyLiveMinutes > 0) {
-        addRankMinutes(dailyTotals, studentId, dailyLiveMinutes);
-      }
-
-      if (weekDateKeySet.has(liveDateKey)) {
-        addRankMinutes(weeklyTotals, studentId, liveMinutes);
-      }
     });
 
     const dailyEntries = applyCompetitionRanks(
-      Array.from(dailyTotals.entries()).map(([studentId, value]) => {
+      Array.from(new Set([...dailyTotals.keys(), ...liveAttendanceMeta.keys()])).map((studentId) => {
         const profile = getProfile(studentId);
         return {
           id: studentId,
@@ -440,7 +432,7 @@ export async function GET(request: NextRequest) {
           displayNameSnapshot: profile.displayNameSnapshot,
           classNameSnapshot: profile.classNameSnapshot,
           schoolNameSnapshot: profile.schoolNameSnapshot,
-          value,
+          value: dailyTotals.get(studentId) || 0,
           liveStatus: liveAttendanceMeta.get(studentId)?.liveStatus ?? null,
           liveStartedAtMs: liveAttendanceMeta.get(studentId)?.liveStartedAtMs ?? null,
         };
@@ -448,7 +440,7 @@ export async function GET(request: NextRequest) {
     );
 
     const weeklyEntries = applyCompetitionRanks(
-      Array.from(weeklyTotals.entries()).map(([studentId, value]) => {
+      Array.from(new Set([...weeklyTotals.keys(), ...liveAttendanceMeta.keys()])).map((studentId) => {
         const profile = getProfile(studentId);
         return {
           id: `weekly-${studentId}`,
@@ -456,7 +448,7 @@ export async function GET(request: NextRequest) {
           displayNameSnapshot: profile.displayNameSnapshot,
           classNameSnapshot: profile.classNameSnapshot,
           schoolNameSnapshot: profile.schoolNameSnapshot,
-          value,
+          value: weeklyTotals.get(studentId) || 0,
           liveStatus: liveAttendanceMeta.get(studentId)?.liveStatus ?? null,
           liveStartedAtMs: liveAttendanceMeta.get(studentId)?.liveStartedAtMs ?? null,
         };
