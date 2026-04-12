@@ -312,6 +312,7 @@ export async function GET(request: NextRequest) {
       classNameSnapshot: string | null;
       schoolNameSnapshot: string | null;
     }>();
+    const knownStudentMemberIds = new Set<string>();
     const activeStudentIds = new Set<string>();
 
     membersSnap.forEach((docSnap) => {
@@ -321,6 +322,7 @@ export async function GET(request: NextRequest) {
       const data = docSnap.data() as Record<string, unknown>;
       const hasStudentProfile = studentProfiles.has(studentId);
       if (!shouldTreatMemberAsStudent(data.role, hasStudentProfile)) return;
+      knownStudentMemberIds.add(studentId);
       if (normalizeMembershipStatus(data.status) !== 'active') return;
 
       activeStudentIds.add(studentId);
@@ -340,7 +342,11 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    const shouldInclude = (studentId: string) => activeStudentIds.size === 0 || activeStudentIds.has(studentId);
+    const shouldInclude = (studentId: string) => {
+      if (activeStudentIds.has(studentId)) return true;
+      if (!studentProfiles.has(studentId)) return activeStudentIds.size === 0;
+      return !knownStudentMemberIds.has(studentId);
+    };
     const getProfile = (studentId: string) => memberProfiles.get(studentId) || studentProfiles.get(studentId) || {
       displayNameSnapshot: '학생',
       classNameSnapshot: null,
