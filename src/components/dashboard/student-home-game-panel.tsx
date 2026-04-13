@@ -624,9 +624,6 @@ export function StudentHomeGamePanel({
                 </Badge>
                 <span className="text-[11px] font-black text-white">{dateLabel}</span>
               </div>
-              <h2 className={cn("font-aggro-display break-keep font-black tracking-tight text-white", isMobile ? "text-[1.9rem] leading-9" : "text-[2.6rem] leading-[1.05]")}>
-                오늘도 성장한 하루
-              </h2>
               {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
             </div>
 
