@@ -354,6 +354,53 @@ const formatPointBoostMultiplier = (value: number): string => {
 
 const formatPointsInPt = (value: number): string => `${value.toLocaleString()}pt`;
 
+type PointHistoryWindow = 'today' | '7d' | '30d';
+
+type PointHistoryRow = {
+  studentId: string;
+  studentName: string;
+  className: string;
+  totalPoints: number;
+  studyBoxPoints: number;
+  rankPoints: number;
+  otherPoints: number;
+};
+
+type PointHistorySummary = {
+  totalPoints: number;
+  studyBoxPoints: number;
+  rankPoints: number;
+  otherPoints: number;
+  earners: number;
+};
+
+const POINT_HISTORY_WINDOW_ORDER: PointHistoryWindow[] = ['today', '7d', '30d'];
+
+const EMPTY_POINT_HISTORY_SUMMARY: PointHistorySummary = {
+  totalPoints: 0,
+  studyBoxPoints: 0,
+  rankPoints: 0,
+  otherPoints: 0,
+  earners: 0,
+};
+
+const buildRecentDateKeys = (referenceDate: Date | null, dayCount: number): string[] => {
+  if (!referenceDate || dayCount <= 0) return [];
+  return Array.from({ length: dayCount }, (_, index) => format(subDays(referenceDate, index), 'yyyy-MM-dd'));
+};
+
+const summarizePointHistoryRows = (rows: PointHistoryRow[]): PointHistorySummary =>
+  rows.reduce(
+    (acc, row) => ({
+      totalPoints: acc.totalPoints + row.totalPoints,
+      studyBoxPoints: acc.studyBoxPoints + row.studyBoxPoints,
+      rankPoints: acc.rankPoints + row.rankPoints,
+      otherPoints: acc.otherPoints + row.otherPoints,
+      earners: acc.earners + (row.totalPoints > 0 ? 1 : 0),
+    }),
+    EMPTY_POINT_HISTORY_SUMMARY
+  );
+
 const parseKstDayRange = (dateKey: string): { startAtMs: number; endAtMs: number } | null => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
   const startAtMs = Date.parse(`${dateKey}T00:00:00+09:00`);
@@ -440,6 +487,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isNoticeSubmitting, setIsNoticeSubmitting] = useState(false);
   const [isAnnouncementDialogOpen, setIsAnnouncementDialogOpen] = useState(false);
   const [isTodayPointsDialogOpen, setIsTodayPointsDialogOpen] = useState(false);
+  const [selectedPointHistoryWindow, setSelectedPointHistoryWindow] = useState<PointHistoryWindow>('today');
   const [isPointBoostDialogOpen, setIsPointBoostDialogOpen] = useState(false);
   const [pointBoostModeDraft, setPointBoostModeDraft] = useState<'day' | 'window'>('day');
   const [pointBoostDateDraft, setPointBoostDateDraft] = useState('');
@@ -903,46 +951,88 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [filteredStudentMembers]
   );
 
-  const todayPointRows = useMemo(
-    () =>
-      filteredStudentMembers
+  const pointHistoryDateKeys = useMemo(
+    () => ({
+      today: todayKey ? [todayKey] : [],
+      '7d': buildRecentDateKeys(today, 7),
+      '30d': buildRecentDateKeys(today, 30),
+    }),
+    [today, todayKey]
+  );
+
+  const pointHistoryByWindow = useMemo(() => {
+    const buildRows = (dateKeys: string[]): PointHistoryRow[] => {
+      if (dateKeys.length === 0) return [];
+
+      return filteredStudentMembers
         .map((member) => {
           const progress = progressById.get(member.id);
-          const dayStatus = (((progress?.dailyPointStatus || {}) as Record<string, any>)[todayKey] || {}) as Record<string, any>;
-          const breakdown = getDailyPointBreakdown(dayStatus);
+          const dailyPointStatus = (progress?.dailyPointStatus || {}) as Record<string, any>;
+          const totals = dateKeys.reduce(
+            (acc, dateKey) => {
+              const breakdown = getDailyPointBreakdown((dailyPointStatus[dateKey] || {}) as Record<string, any>);
+              return {
+                totalPoints: acc.totalPoints + breakdown.totalPoints,
+                studyBoxPoints: acc.studyBoxPoints + breakdown.studyBoxPoints,
+                rankPoints: acc.rankPoints + breakdown.rankPoints,
+                otherPoints: acc.otherPoints + breakdown.otherPoints,
+              };
+            },
+            { totalPoints: 0, studyBoxPoints: 0, rankPoints: 0, otherPoints: 0 }
+          );
 
           return {
             studentId: member.id,
             studentName: toSafeStudentName(member.displayName, member.id),
             className: member.className || '-',
-            totalPoints: breakdown.totalPoints,
-            studyBoxPoints: breakdown.studyBoxPoints,
-            rankPoints: breakdown.rankPoints,
-            otherPoints: breakdown.otherPoints,
+            totalPoints: totals.totalPoints,
+            studyBoxPoints: totals.studyBoxPoints,
+            rankPoints: totals.rankPoints,
+            otherPoints: totals.otherPoints,
           };
         })
         .sort((left, right) => {
           if (right.totalPoints !== left.totalPoints) return right.totalPoints - left.totalPoints;
           if (right.studyBoxPoints !== left.studyBoxPoints) return right.studyBoxPoints - left.studyBoxPoints;
           return left.studentName.localeCompare(right.studentName, 'ko');
-        }),
-    [filteredStudentMembers, progressById, todayKey]
-  );
+        });
+    };
 
-  const todayPointsSummary = useMemo(
-    () =>
-      todayPointRows.reduce(
-        (acc, row) => ({
-          totalPoints: acc.totalPoints + row.totalPoints,
-          studyBoxPoints: acc.studyBoxPoints + row.studyBoxPoints,
-          rankPoints: acc.rankPoints + row.rankPoints,
-          otherPoints: acc.otherPoints + row.otherPoints,
-          earners: acc.earners + (row.totalPoints > 0 ? 1 : 0),
-        }),
-        { totalPoints: 0, studyBoxPoints: 0, rankPoints: 0, otherPoints: 0, earners: 0 }
-      ),
-    [todayPointRows]
-  );
+    const todayRows = buildRows(pointHistoryDateKeys.today);
+    const sevenDayRows = buildRows(pointHistoryDateKeys['7d']);
+    const thirtyDayRows = buildRows(pointHistoryDateKeys['30d']);
+
+    return {
+      today: {
+        key: 'today' as const,
+        tabLabel: '오늘',
+        headlineLabel: '오늘',
+        leaderboardLabel: '오늘',
+        rows: todayRows,
+        summary: summarizePointHistoryRows(todayRows),
+      },
+      '7d': {
+        key: '7d' as const,
+        tabLabel: '최근 7일',
+        headlineLabel: '최근 7일',
+        leaderboardLabel: '7일',
+        rows: sevenDayRows,
+        summary: summarizePointHistoryRows(sevenDayRows),
+      },
+      '30d': {
+        key: '30d' as const,
+        tabLabel: '최근 30일',
+        headlineLabel: '최근 30일',
+        leaderboardLabel: '30일',
+        rows: thirtyDayRows,
+        summary: summarizePointHistoryRows(thirtyDayRows),
+      },
+    };
+  }, [filteredStudentMembers, pointHistoryDateKeys, progressById]);
+
+  const todayPointRows = pointHistoryByWindow.today.rows;
+  const todayPointsSummary = pointHistoryByWindow.today.summary;
+  const selectedPointHistoryData = pointHistoryByWindow[selectedPointHistoryWindow];
 
   const pointBoostOverview = useMemo(() => {
     const active: Array<PointBoostEvent & { startAtMs: number; endAtMs: number; cancelledAtMs: number; label: string; multiplierLabel: string }> = [];
@@ -2949,6 +3039,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setCounselTrackDialogTab(tab);
     setIsCounselTrackDialogOpen(true);
   };
+  const openPointHistoryDialog = (window: PointHistoryWindow = 'today') => {
+    setSelectedPointHistoryWindow(window);
+    setIsTodayPointsDialogOpen(true);
+  };
   const handleCreatePointBoost = async () => {
     if (!centerId) return;
 
@@ -3091,7 +3185,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         deltaLabel: pointBoostOverview.activeEvent
           ? `${pointBoostOverview.activeEvent.multiplierLabel} 부스트 진행중`
           : `지급 학생 ${todayPointsSummary.earners}명`,
-        onClick: () => setIsTodayPointsDialogOpen(true),
+        onClick: () => openPointHistoryDialog('today'),
       },
       {
         key: 'lead-pipeline',
@@ -3867,35 +3961,60 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {renderHomeInsightsSection()}
 
           <Dialog open={isTodayPointsDialogOpen} onOpenChange={setIsTodayPointsDialogOpen}>
-            <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-2xl')}>
+            <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-3xl')}>
               <div className={studioDialogHeaderClassName}>
                 <DialogHeader className="text-left">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">오늘 지급 포인트</Badge>
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">포인트 지급 현황</Badge>
                     <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
                       {selectedClass === 'all' ? '센터 전체' : selectedClass}
                     </Badge>
                     <Badge className="border-none bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white">
-                      지급 학생 {todayPointsSummary.earners}명
+                      지급 학생 {selectedPointHistoryData.summary.earners}명
                     </Badge>
                   </div>
                   <DialogTitle className="text-2xl font-black tracking-tight">
-                    오늘 총 {formatPointsInPt(todayPointsSummary.totalPoints)} 지급
+                    {selectedPointHistoryData.headlineLabel} 총 {formatPointsInPt(selectedPointHistoryData.summary.totalPoints)} 지급
                   </DialogTitle>
                   <DialogDescription className="text-sm font-medium text-white/76">
-                    상자 {formatPointsInPt(todayPointsSummary.studyBoxPoints)} · 랭킹 {formatPointsInPt(todayPointsSummary.rankPoints)}
-                    {todayPointsSummary.otherPoints > 0 ? ` · 기타 ${formatPointsInPt(todayPointsSummary.otherPoints)}` : ''}
+                    상자 {formatPointsInPt(selectedPointHistoryData.summary.studyBoxPoints)} · 랭킹 {formatPointsInPt(selectedPointHistoryData.summary.rankPoints)}
+                    {selectedPointHistoryData.summary.otherPoints > 0 ? ` · 기타 ${formatPointsInPt(selectedPointHistoryData.summary.otherPoints)}` : ''}
                   </DialogDescription>
                 </DialogHeader>
               </div>
               <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
-                {todayPointRows.length === 0 ? (
+                <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                  {POINT_HISTORY_WINDOW_ORDER.map((windowKey) => {
+                    const dataset = pointHistoryByWindow[windowKey];
+                    const isSelected = selectedPointHistoryWindow === windowKey;
+
+                    return (
+                      <button
+                        key={windowKey}
+                        type="button"
+                        onClick={() => setSelectedPointHistoryWindow(windowKey)}
+                        className={cn(
+                          'rounded-[1.35rem] border px-4 py-4 text-left shadow-[0_18px_32px_-28px_rgba(20,41,95,0.16)] transition-colors',
+                          isSelected ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white hover:bg-[#F7FAFF]'
+                        )}
+                      >
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">{dataset.tabLabel}</p>
+                        <p className="admin-kpi-number mt-2 text-[1.45rem] text-[#14295F]">{formatPointsInPt(dataset.summary.totalPoints)}</p>
+                        <p className="mt-2 text-xs font-bold text-[#5c6e97]">지급 학생 {dataset.summary.earners}명</p>
+                        <p className="mt-1 text-[11px] font-semibold text-[#7A88A8]">
+                          상자 {formatPointsInPt(dataset.summary.studyBoxPoints)} · 랭킹 {formatPointsInPt(dataset.summary.rankPoints)}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedPointHistoryData.rows.length === 0 ? (
                   <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-10 text-center text-sm font-bold text-[#5c6e97]">
-                    오늘 포인트 집계 대상 학생이 없습니다.
+                    {selectedPointHistoryData.headlineLabel} 포인트 집계 대상 학생이 없습니다.
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {todayPointRows.map((row, index) => (
+                    {selectedPointHistoryData.rows.map((row, index) => (
                       <div
                         key={row.studentId}
                         className={cn(
@@ -3911,7 +4030,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                   'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
                                   index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]'
                                 )}>
-                                  {index === 0 ? '오늘 1위' : `${index + 1}위`}
+                                  {index === 0 ? `${selectedPointHistoryData.leaderboardLabel} 1위` : `${index + 1}위`}
                                 </Badge>
                               ) : null}
                               <p className="truncate text-base font-black tracking-tight text-[#14295F]">{row.studentName}</p>
