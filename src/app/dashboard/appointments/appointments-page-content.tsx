@@ -1409,13 +1409,9 @@ export function AppointmentsPageContent({
             <div className="flex flex-col gap-5">
               <div className={cn("flex justify-between gap-4", isMobile ? "flex-col" : "items-start")}>
                 <div className="min-w-0">
-                  <Badge variant="dark" className="px-3 py-1 text-[10px] shadow-none">COUNSEL TRACK</Badge>
-                  <h1 className={cn("font-aggro-display mt-3 font-black tracking-tighter leading-none text-[var(--text-on-dark)]", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
+                  <h1 className={cn("font-aggro-display font-black tracking-tighter leading-none text-[var(--text-on-dark)]", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
                   <p className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-orange-soft)]">
                     상담 예약 · 피드백 센터
-                  </p>
-                  <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
-                    예약 신청부터 상담 결과 확인, 질문과 건의, 와이파이 해제 요청까지 한 흐름으로 이어지는 학생용 상담 라운지예요.
                   </p>
                 </div>
                 <div className="surface-card surface-card--ghost on-dark rounded-[1.2rem] border-white/10 px-3.5 py-3 shadow-none">
@@ -1782,7 +1778,6 @@ export function AppointmentsPageContent({
             <CardTitle className={studentSectionTitleClass}>
               <Megaphone className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : "opacity-70 text-amber-700")} /> 공지사항
             </CardTitle>
-            <CardDescription className={studentSectionDescriptionClass}>학생 대상 공지를 상담트랙에서 바로 확인할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {announcementsLoading ? (
