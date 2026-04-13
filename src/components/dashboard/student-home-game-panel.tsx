@@ -720,9 +720,6 @@ export function StudentHomeGamePanel({
                   </div>
                   <div className="surface-caption mt-1 text-sm font-semibold">{boxSubLabel}</div>
                 </div>
-                <div className="surface-chip surface-chip--light px-2.5 py-1 text-[10px] uppercase tracking-[0.2em]">
-                  {boxStatusLabel}
-                </div>
               </div>
 
                 <div className="mt-3 flex justify-center">
