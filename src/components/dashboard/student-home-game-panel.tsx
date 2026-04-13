@@ -658,13 +658,12 @@ export function StudentHomeGamePanel({
             <div className="surface-card surface-card--primary on-dark rounded-[1.5rem] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="surface-kicker text-[10px] text-white">growth</div>
                   {sessionTimerLabel ? (
-                    <div className="mt-2">
+                    <div>
                       <div className="text-[1.1rem] font-black tracking-tight text-white">집중 중</div>
                     </div>
                   ) : (
-                    <div className={cn("mt-2 font-black tracking-tight text-white", isMobile ? "text-[2.4rem]" : "text-[3rem]")}>
+                    <div className={cn("font-black tracking-tight text-white", isMobile ? "text-[2.4rem]" : "text-[3rem]")}>
                       {totalMinutesLabel}
                     </div>
                   )}
@@ -768,8 +767,7 @@ export function StudentHomeGamePanel({
         <div className="surface-card surface-card--primary on-dark rounded-[1.65rem] p-4 text-white">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="surface-kicker text-[10px]">quest board</div>
-              <h3 className="mt-1 text-[1.35rem] font-black tracking-tight">오늘의 퀘스트</h3>
+              <h3 className="text-[1.35rem] font-black tracking-tight">오늘의 퀘스트</h3>
             </div>
             <Button
               type="button"
@@ -838,7 +836,6 @@ export function StudentHomeGamePanel({
             </div>
               <div className="mt-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="surface-kicker text-[10px]">growth log</div>
                   <div className="text-[11px] font-black text-[var(--accent-orange-soft)]">최고 {bestDayLabel}</div>
                 </div>
                 <div className="mt-4 grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
@@ -913,10 +910,6 @@ export function StudentHomeGamePanel({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className={cn(HOME_RANK_CARD_BADGE, "px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_14px_28px_-22px_rgba(0,0,0,0.42)]")}>
-                        <Swords className="h-3.5 w-3.5 text-[#FFCB78]" />
-                        Ranking Track
-                      </div>
                       {rankLiveBadge ? (
                         <div className={cn(HOME_RANK_CARD_LIVE_BADGE, "px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_22px_-18px_rgba(255,122,22,0.22)]")}>
                           <span className="h-2 w-2 rounded-full bg-[#FF7A16] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
@@ -1057,10 +1050,6 @@ export function StudentHomeGamePanel({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className={cn(HOME_RANK_CARD_BADGE, "px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]")}>
-                        <Swords className="h-3.5 w-3.5 text-[#FFCB78]" />
-                        Ranking Track
-                      </div>
                       {rankLiveBadge ? (
                         <div className={cn(HOME_RANK_CARD_LIVE_BADGE, "px-2.5 py-1 text-[10px] font-black shadow-[0_10px_24px_-18px_rgba(255,122,22,0.22)]")}>
                           <span className="h-2 w-2 rounded-full bg-[#FF7A16] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
