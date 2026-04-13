@@ -4871,20 +4871,15 @@ select {
   position: relative;
   overflow: hidden;
   border-radius: 2rem;
-  border: 1px solid var(--accent-orange-border);
   padding: 1.25rem;
-  background:
-    radial-gradient(circle at 82% 14%, var(--student-panel-glow-strong), transparent 18%),
-    radial-gradient(circle at 28% 100%, rgba(255,255,255,0.04), transparent 26%),
-    linear-gradient(135deg, var(--student-night-panel) 0%, var(--student-night-panel-soft) 58%, var(--student-night-bg-soft) 100%);
-  box-shadow:
-    0 28px 64px -38px rgba(0, 0, 0, 0.76),
-    inset 0 1px 0 rgba(255,255,255,0.08);
-  backdrop-filter: blur(20px);
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .point-track-hero-stage::before {
-  content: "";
+  content: none;
   position: absolute;
   left: 50%;
   bottom: -2rem;
@@ -4898,11 +4893,7 @@ select {
 }
 
 .point-track-hero-stage--arrival {
-  box-shadow:
-    0 0 0 1px var(--accent-orange-surface) inset,
-    0 28px 64px -38px rgba(0, 0, 0, 0.76),
-    0 0 0 1px var(--accent-orange-border),
-    0 0 40px var(--accent-orange-shadow-soft);
+  box-shadow: none;
 }
 
 .point-track-arrival-banner {

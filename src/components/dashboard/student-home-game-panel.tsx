@@ -636,14 +636,14 @@ export function StudentHomeGamePanel({
               onClick={onOpenFocusEditor}
               title={homeHeaderLabel}
               className={cn(
-                "group inline-flex max-w-full items-center gap-2 rounded-full text-left transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/28",
+                "group inline-flex max-w-full items-center gap-2 rounded-full text-left transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]",
                 isMobile ? "pr-1" : "pr-1.5"
               )}
             >
-              <span className={cn("truncate font-black text-white", isMobile ? "text-[11px]" : "text-[12px]")}>
+              <span className={cn("truncate font-black text-[var(--text-primary)]", isMobile ? "text-[11px]" : "text-[12px]")}>
                 {homeHeaderLabel}
               </span>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/72 transition-transform duration-200 group-hover:translate-x-0.5" />
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] transition-transform duration-200 group-hover:translate-x-0.5" />
               <span className="sr-only">{homeHeaderLabel}</span>
             </button>
             {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
