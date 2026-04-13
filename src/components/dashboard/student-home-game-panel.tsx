@@ -619,9 +619,6 @@ export function StudentHomeGamePanel({
           <div className={cn("flex items-start justify-between gap-3", isMobile ? "flex-col" : "items-center")}>
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="dark" className="px-3 py-1 text-[10px] uppercase tracking-[0.22em]">
-                  Home Lobby
-                </Badge>
                 <span className="text-[11px] font-black text-white">{dateLabel}</span>
               </div>
               {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
