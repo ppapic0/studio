@@ -4123,10 +4123,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     {isAppMode ? (
                       <div className={cn(isMobile ? 'space-y-3' : 'flex items-end justify-between gap-6')}>
                         <div className="space-y-2">
-                          <div className="inline-flex items-center gap-2 rounded-full border border-[#E5EBF5] bg-[#F7FAFF] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#6D80A5]">
-                            <CalendarDays className="h-3.5 w-3.5" />
-                            STUDY CALENDAR
-                          </div>
                           <div>
                             <h3 className={cn('font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1.3rem]' : 'text-[1.62rem]')}>학습 캘린더</h3>
                             <p className={cn('mt-1 font-semibold text-[#71819C]', isMobile ? 'text-[12px] leading-5' : 'text-sm leading-6')}>
