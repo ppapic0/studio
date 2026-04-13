@@ -1524,13 +1524,9 @@ function getParentCalendarCellClass(minutes: number, isCurrentMonth: boolean, is
   return 'border border-[#0F6B37] bg-[linear-gradient(180deg,rgba(214,243,222,0.998)_0%,rgba(32,139,77,0.998)_100%)] shadow-[inset_0_1px_0_rgba(235,250,240,0.56),0_20px_34px_-22px_rgba(18,102,54,0.24)]';
 }
 
-function getParentCalendarValueTone(minutes: number, isCurrentMonth: boolean, isMobileView: boolean) {
+function getParentCalendarValueTone(minutes: number, isCurrentMonth: boolean) {
   if (!isCurrentMonth) return 'text-[#C6CFDD]';
-  const level = getParentCalendarFlowLevel(minutes);
-  if (level === 'none') return isMobileView ? 'text-[#6F8475]' : 'text-[#738779]';
-  if (level === 'light') return 'text-[#2F6F48]';
-  if (level === 'medium') return 'text-[#175336]';
-  return 'text-white';
+  return minutes >= PARENT_CALENDAR_THRESHOLDS.medium ? 'text-white' : 'text-black';
 }
 
 function getParentLegendChipClass(level: ParentCalendarFlowLevel) {
@@ -2996,10 +2992,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const getParentCalendarTimeCapsuleClass = (minutes: number, isCurrentMonth: boolean) => {
     if (!isCurrentMonth) return 'border-slate-200/80 bg-white/70 text-slate-300 shadow-none';
     const level = getParentCalendarFlowLevel(minutes);
-    if (level === 'none') return 'border-[#D7E1DA] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(246,249,247,0.99))] text-[#7A8F80] shadow-[0_10px_18px_-18px_rgba(82,112,91,0.08)]';
-    if (level === 'light') return 'border-[#B6DFC2] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(233,248,237,0.99))] text-[#3C7F56] shadow-[0_12px_20px_-18px_rgba(52,138,87,0.12)]';
-    if (level === 'medium') return 'border-[#63BF7F] bg-[linear-gradient(180deg,rgba(247,255,249,0.98),rgba(205,241,215,0.995))] text-[#1D6E44] shadow-[0_12px_20px_-18px_rgba(38,143,78,0.16)]';
-    return 'border-[#0F6B37] bg-[linear-gradient(180deg,rgba(58,158,96,0.98),rgba(15,107,55,0.998))] text-white shadow-[0_14px_24px_-18px_rgba(12,98,49,0.28)]';
+    if (level === 'none') return 'border-[#D7E1DA] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(246,249,247,0.99))] shadow-[0_10px_18px_-18px_rgba(82,112,91,0.08)]';
+    if (level === 'light') return 'border-[#B6DFC2] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(233,248,237,0.99))] shadow-[0_12px_20px_-18px_rgba(52,138,87,0.12)]';
+    if (level === 'medium') return 'border-[#63BF7F] bg-[linear-gradient(180deg,rgba(247,255,249,0.98),rgba(205,241,215,0.995))] shadow-[0_12px_20px_-18px_rgba(38,143,78,0.16)]';
+    return 'border-[#0F6B37] bg-[linear-gradient(180deg,rgba(58,158,96,0.98),rgba(15,107,55,0.998))] shadow-[0_14px_24px_-18px_rgba(12,98,49,0.28)]';
   };
 
   const announcementNotifications = useMemo<ParentNotificationItem[]>(() => {
@@ -4231,7 +4227,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
                       if (isAppMode) {
                         const appCalendarCellClass = getParentCalendarCellClass(minutes, isCurrentMonth, true);
-                        const appCalendarValueTone = getParentCalendarValueTone(minutes, isCurrentMonth, true);
+                        const appCalendarValueTone = getParentCalendarValueTone(minutes, isCurrentMonth);
 
                         return (
                           <button
@@ -4326,6 +4322,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 <span
                                   className={cn(
                                     "dashboard-number block whitespace-nowrap tabular-nums leading-none",
+                                    getParentCalendarValueTone(minutes, isCurrentMonth),
                                     isAppMode
                                       ? isVeryLongTimeLabel
                                         ? "text-[0.68rem] tracking-[-0.08em]"
