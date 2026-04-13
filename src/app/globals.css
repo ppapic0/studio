@@ -1532,6 +1532,21 @@ select {
       linear-gradient(180deg, rgba(17, 37, 84, 0.95) 0%, rgba(11, 23, 54, 0.95) 100%);
   }
 
+  .analysis-growth-signal-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(160, 192, 255, 0.16);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 20px 38px -32px rgba(0, 0, 0, 0.42);
+  }
+
+  .analysis-growth-hero-badge {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 14px 24px -22px rgba(0, 0, 0, 0.26);
+  }
+
   .analysis-growth-kicker {
     display: inline-flex;
     align-items: center;
@@ -1617,6 +1632,20 @@ select {
     opacity: 0.88;
   }
 
+  .analysis-growth-detail-trigger {
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .analysis-growth-detail-trigger[data-state="open"] {
+    color: inherit;
+  }
+
+  .analysis-growth-detail-trigger > svg {
+    margin-top: 0.55rem;
+    color: rgba(255, 244, 228, 0.82);
+  }
+
   .analysis-growth-state-chip {
     display: inline-flex;
     align-items: center;
@@ -1664,7 +1693,8 @@ select {
   .analysis-kpi-card,
   .analysis-health-card,
   .analysis-growth-summary-card,
-  .analysis-growth-module-shell {
+  .analysis-growth-module-shell,
+  .analysis-growth-signal-card {
     word-break: keep-all;
   }
 
@@ -1674,6 +1704,7 @@ select {
     .analysis-growth-action-panel,
     .analysis-growth-summary-card,
     .analysis-growth-module-shell,
+    .analysis-growth-signal-card,
     .analysis-growth-light-card,
     .analysis-growth-highlight-card,
     .analysis-kpi-card,

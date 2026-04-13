@@ -9,7 +9,6 @@ import {
   Activity,
   BarChart3,
   Clock3,
-  Flame,
   Lock,
   Loader2,
   ShieldCheck,
@@ -32,15 +31,17 @@ import { useAppContext } from '@/contexts/app-context';
 import { useUser, useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { cn } from '@/lib/utils';
-import { buildWeeklyStudyInsight } from '@/lib/learning-insights';
+import { buildStudentGrowthSummary, buildWeeklyStudyInsight } from '@/lib/learning-insights';
 import { StudyLogDay } from '@/lib/types';
 import { StudentTrackSubnav } from '@/components/dashboard/student-track-subnav';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StudentDetailPage from '../teacher/students/[id]/page';
 import { StudentDetailPresentationProvider } from '@/components/dashboard/student-detail-presentation-mode';
 
 type ToneKey = 'blue' | 'emerald' | 'amber' | 'rose';
 type AnalysisTab = 'growth' | 'full';
+type GrowthSummaryTone = 'good' | 'steady' | 'recovery';
 
 const TONE_STYLES: Record<ToneKey, { chip: string; text: string; bar: string; ring: string; soft: string }> = {
   blue: {
@@ -70,6 +71,27 @@ const TONE_STYLES: Record<ToneKey, { chip: string; text: string; bar: string; ri
     bar: 'from-[#dc4b74] via-[#f1668f] to-[#f8a3b8]',
     ring: '#dc4b74',
     soft: 'from-[#fff7f8] to-[#fff2f5]',
+  },
+};
+
+const SUMMARY_TONE_STYLES: Record<
+  GrowthSummaryTone,
+  { badge: string; accent: string; glow: string }
+> = {
+  good: {
+    badge: 'border-[#78e3b9]/30 bg-[#0f8f65]/18 text-[#a6f3d5]',
+    accent: 'text-[#a6f3d5]',
+    glow: 'from-[#173b72] via-[#133864] to-[#0f5f48]',
+  },
+  steady: {
+    badge: 'border-[#8db4ff]/28 bg-[#2856b8]/18 text-[#d9e7ff]',
+    accent: 'text-[#d9e7ff]',
+    glow: 'from-[#18305f] via-[#173d7b] to-[#1c4e86]',
+  },
+  recovery: {
+    badge: 'border-[#ffc8d5]/28 bg-[#9b3154]/18 text-[#ffd9e2]',
+    accent: 'text-[#ffd9e2]',
+    glow: 'from-[#3e264f] via-[#572b5f] to-[#7b304f]',
   },
 };
 
@@ -159,55 +181,35 @@ function AnalysisTooltip({
   );
 }
 
-function AnalysisKpiCard({
+function GrowthSummaryCard({
   title,
-  value,
-  meta,
-  progress,
-  icon: Icon,
+  detail,
+  metricLabel,
+  metricValue,
   tone,
-  delta,
 }: {
   title: string;
-  value: string;
-  meta: string;
-  progress: number;
-  icon: LucideIcon;
-  tone: ToneKey;
-  delta?: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  tone: GrowthSummaryTone;
 }) {
-  const toneStyles = TONE_STYLES[tone];
-  const progressValue = clampPercent(progress);
+  const toneStyles = SUMMARY_TONE_STYLES[tone];
 
   return (
-    <div className={cn('analysis-kpi-card rounded-[1.5rem] p-4 bg-gradient-to-br', toneStyles.soft)}>
-      <div className="relative z-10 flex items-start justify-between gap-3">
+    <div className={cn('analysis-growth-signal-card rounded-[1.5rem] p-4 bg-gradient-to-br', toneStyles.glow)}>
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6478a5]">{title}</p>
-          <p className="font-aggro-display mt-3 break-keep text-[clamp(1.08rem,1.55vw,1.72rem)] font-black tracking-[-0.03em] text-[#14295F]">
-            {value}
-          </p>
-          <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">{meta}</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[rgba(240,247,255,0.72)]">{title}</p>
+          <p className="mt-3 text-sm font-semibold leading-6 text-white">{detail}</p>
         </div>
-        <div className={cn('rounded-[1rem] border px-3 py-2 shadow-[0_16px_26px_-22px_rgba(20,41,95,0.32)]', toneStyles.chip)}>
-          <Icon className="h-4 w-4" />
+        <div className={cn('rounded-full border px-3 py-1.5 text-[10px] font-black tracking-[0.14em]', toneStyles.badge)}>
+          {metricLabel}
         </div>
       </div>
-      <div className="relative z-10 mt-4 space-y-2">
-        <div className="analysis-kpi-track">
-          <span className={cn('bg-gradient-to-r', toneStyles.bar)} style={{ width: `${progressValue}%` }} />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8090b4]">기준 대비</span>
-          {delta ? (
-            <span className={cn('font-aggro-display text-[10px] font-black', delta.startsWith('-') ? 'text-rose-500' : toneStyles.text)}>
-              {delta}
-            </span>
-          ) : (
-            <span className="font-aggro-display text-[10px] font-black text-[#5c6e97]">{progressValue}%</span>
-          )}
-        </div>
-      </div>
+      <p className={cn('font-aggro-display mt-4 break-keep text-[1.18rem] font-black tracking-[-0.04em]', toneStyles.accent)}>
+        {metricValue}
+      </p>
     </div>
   );
 }
@@ -277,38 +279,6 @@ function SessionMetricCard({
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function QuestStatBar({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent: 'orange' | 'blue' | 'emerald';
-}) {
-  const gradient =
-    accent === 'blue'
-      ? 'from-[#69CBFF] via-[#4E8CFF] to-[#28478F]'
-      : accent === 'emerald'
-        ? 'from-[#8EF0C9] via-[#39C084] to-[#1A7B61]'
-        : 'from-[#FFD36D] via-[#FFB347] to-[#FF7A00]';
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[12px] font-semibold text-[var(--text-on-dark-soft)]">{label}</span>
-        <span className="font-aggro-display text-[11px] font-black text-white">{clampPercent(value)}%</span>
-      </div>
-      <div className="analysis-growth-rail-track">
-        <div
-          className={cn('h-2 rounded-full bg-gradient-to-r', gradient)}
-          style={{ width: `${clampPercent(value)}%`, transition: 'width 700ms ease-out' }}
-        />
-      </div>
     </div>
   );
 }
@@ -471,58 +441,60 @@ function MiniGrowthBars({
   );
 }
 
-function GraphDungeonCard({
+function GrowthDetailAccordionItem({
+  value,
   title,
   eyebrow,
   insight,
   unlocked,
-  preview,
   previewHint,
   children,
   className,
 }: {
+  value: string;
   title: string;
   eyebrow: string;
   insight: string;
   unlocked: boolean;
-  preview: ReactNode;
   previewHint: string;
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <section
+    <AccordionItem
+      value={value}
       className={cn(
-        'analysis-growth-module-shell rounded-[1.9rem] p-4',
+        'analysis-growth-module-shell rounded-[1.9rem] border-b-0 px-4 py-2',
         !unlocked && 'analysis-growth-module-shell--pending',
         className
       )}
     >
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="analysis-growth-kicker">{eyebrow}</span>
-              <span className={cn(
+      <AccordionTrigger className="analysis-growth-detail-trigger min-w-0 py-3 text-left hover:no-underline">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="analysis-growth-kicker">{eyebrow}</span>
+            <span
+              className={cn(
                 'analysis-growth-state-chip',
                 unlocked ? 'analysis-growth-state-chip--ready' : 'analysis-growth-state-chip--pending'
-              )}>
-                {unlocked ? '데이터 충분' : <><Lock className="h-3 w-3" /> 기록 대기</>}
-              </span>
-            </div>
-            <h3 className="font-aggro-display mt-3 break-keep text-[1.2rem] font-black tracking-[-0.03em] text-white">{title}</h3>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">{insight}</p>
+              )}
+            >
+              {unlocked ? '데이터 충분' : <><Lock className="h-3 w-3" /> 기록 대기</>}
+            </span>
           </div>
+          <h3 className="font-aggro-display mt-3 break-keep text-[1.1rem] font-black tracking-[-0.03em] text-white">
+            {title}
+          </h3>
+          <p className="mt-1 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">{insight}</p>
+          <p className="mt-2 text-[11px] font-semibold text-[var(--text-on-dark-muted)]">
+            {previewHint} · 보고 싶을 때만 펼쳐보세요
+          </p>
         </div>
-      </div>
-
-      <div className="analysis-growth-canvas mt-4 rounded-[1.45rem] px-4 py-4">
-        {preview}
-        <p className="mt-3 text-right text-[11px] font-semibold text-[var(--text-on-dark-muted)]">{previewHint}</p>
-      </div>
-
-      <div className="mt-4 border-t border-white/10 pt-4">{children}</div>
-    </section>
+      </AccordionTrigger>
+      <AccordionContent className="pb-3 pt-1">
+        <div className="border-t border-white/10 pt-4">{children}</div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -674,45 +646,6 @@ export default function AnalysisTrackPage() {
     };
   }, [firestore, user?.uid, activeMembership?.id]);
 
-  const kpiCards = useMemo(
-    () => [
-      {
-        title: '주간 학습',
-        value: minutesToLabel(kpi.thisWeekMin),
-        meta: '최근 7일 누적 공부시간',
-        progress: kpi.thisWeekMin > 0 ? (kpi.thisWeekMin / (14 * 60)) * 100 : 0,
-        icon: TrendingUp,
-        tone: kpi.weekDiffPct >= 0 ? ('blue' as const) : ('rose' as const),
-        delta: `${signedPercent(kpi.weekDiffPct)} 지난 주 대비`,
-      },
-      {
-        title: '루틴 안정도',
-        value: `${kpi.consistencyScore}점`,
-        meta: `14일 중 ${kpi.studyDays}일 기록`,
-        progress: kpi.consistencyScore,
-        icon: Activity,
-        tone: 'emerald' as const,
-      },
-      {
-        title: '연속 기록',
-        value: `${kpi.maxStreak}일`,
-        meta: '루틴 유지 최고 기록',
-        progress: (kpi.maxStreak / 7) * 100,
-        icon: Flame,
-        tone: 'blue' as const,
-      },
-      {
-        title: '일 평균',
-        value: minutesToLabel(kpi.avgMin14),
-        meta: '최근 14일 평균 몰입',
-        progress: (kpi.avgMin14 / 180) * 100,
-        icon: Clock3,
-        tone: 'amber' as const,
-      },
-    ],
-    [kpi]
-  );
-
   const sessionCards = useMemo(
     () => [
       {
@@ -758,9 +691,6 @@ export default function AnalysisTrackPage() {
     [chartData]
   );
 
-  const focusHp = clampPercent((kpi.avgMin14 / 240) * 100);
-  const consistencyHp = clampPercent(kpi.consistencyScore);
-  const completionHp = clampPercent(sessionMetrics.completionRate);
   const todayMinutes = chartData[13]?.totalMinutes || 0;
   const heroGoalMinutes = 600;
   const heroProgress = clampPercent((todayMinutes / heroGoalMinutes) * 100);
@@ -768,26 +698,90 @@ export default function AnalysisTrackPage() {
     (best, item) => (item.totalMinutes > best.totalMinutes ? item : best),
     weeklyData[0] || { dateKey: format(new Date(), 'yyyy-MM-dd'), label: '오늘', shortLabel: '오늘', totalMinutes: 0, avgMinutes: 0 }
   );
+  const blankDayCount = useMemo(() => chartData.filter((item) => item.totalMinutes === 0).length, [chartData]);
   const hasBlankDays = useMemo(() => chartData.some((item) => item.totalMinutes === 0), [chartData]);
   const remainingGoalMinutes = Math.max(0, heroGoalMinutes - todayMinutes);
-  const statusSummary = useMemo(() => {
-    if (todayMinutes > 0) {
-      return `${displayName} 학생은 오늘 ${minutesToCompactLabel(todayMinutes)}을 기록했고, 이번 주 흐름은 ${kpi.weekDiffPct >= 0 ? '상승세를 유지하고 있어요.' : '잠시 숨 고르기 중이에요.'}`;
-    }
-    return `${displayName} 학생의 오늘 학습 기록은 아직 없지만, 최근 14일 흐름과 루틴 변화는 계속 집계 중이에요.`;
-  }, [displayName, kpi.weekDiffPct, todayMinutes]);
-  const weeklySummaryLines = useMemo(() => {
-    const blankDays = weeklyData.filter((item) => item.totalMinutes === 0).length;
-    return [
-      kpi.weekDiffPct >= 0
-        ? `최근 7일 누적 공부시간은 지난 주보다 ${Math.abs(kpi.weekDiffPct)}% 올라갔어요.`
-        : `최근 7일 누적 공부시간은 지난 주보다 ${Math.abs(kpi.weekDiffPct)}% 줄었어요.`,
-      `${shortDateLabel(bestDay.dateKey)}에 ${minutesToLabel(bestDay.totalMinutes)}으로 가장 길게 공부했어요.`,
-      blankDays > 0
-        ? `최근 7일 중 기록이 없는 날이 ${blankDays}일 있어서 흐름이 조금 끊겼어요.`
-        : '최근 7일은 매일 기록이 이어져서 흐름이 안정적이에요.',
-    ];
-  }, [bestDay.dateKey, bestDay.totalMinutes, kpi.weekDiffPct, weeklyData]);
+  const growthSummary = useMemo(
+    () =>
+      buildStudentGrowthSummary({
+        data: chartData,
+        weekDiffPct: kpi.weekDiffPct,
+        maxStreak: kpi.maxStreak,
+        completionRate: sessionMetrics.completionRate,
+        avgMinutes: kpi.avgMin14,
+        studyDays: kpi.studyDays,
+      }),
+    [chartData, kpi.avgMin14, kpi.maxStreak, kpi.studyDays, kpi.weekDiffPct, sessionMetrics.completionRate]
+  );
+  const summaryToneStyles = SUMMARY_TONE_STYLES[growthSummary.tone];
+  const summaryCards = useMemo(
+    () => [
+      {
+        title: growthSummary.strengthTitle,
+        detail: growthSummary.strengthDetail,
+        metricLabel:
+          sessionMetrics.completionRate >= 85
+            ? '완료율'
+            : kpi.maxStreak >= 4
+              ? '연속 기록'
+              : kpi.weekDiffPct >= 10
+                ? '주간 변화'
+                : '14일 평균',
+        metricValue:
+          sessionMetrics.completionRate >= 85
+            ? `${sessionMetrics.completionRate}%`
+            : kpi.maxStreak >= 4
+              ? `${kpi.maxStreak}일`
+              : kpi.weekDiffPct >= 10
+                ? signedPercent(kpi.weekDiffPct)
+                : minutesToCompactLabel(kpi.avgMin14),
+        tone: 'good' as const,
+      },
+      {
+        title: growthSummary.weaknessTitle,
+        detail: growthSummary.weaknessDetail,
+        metricLabel:
+          blankDayCount > 0
+            ? '공백일'
+            : kpi.weekDiffPct < 0
+              ? '주간 변화'
+              : sessionMetrics.completionRate < 70
+                ? '완료율'
+                : '14일 평균',
+        metricValue:
+          blankDayCount > 0
+            ? `${blankDayCount}일`
+            : kpi.weekDiffPct < 0
+              ? signedPercent(kpi.weekDiffPct)
+              : sessionMetrics.completionRate < 70
+                ? `${sessionMetrics.completionRate}%`
+                : minutesToCompactLabel(kpi.avgMin14),
+        tone: blankDayCount > 0 || kpi.weekDiffPct < 0 || sessionMetrics.completionRate < 70 ? ('recovery' as const) : ('steady' as const),
+      },
+      {
+        title: growthSummary.growthTitle,
+        detail: growthSummary.growthDetail,
+        metricLabel: '이번 주',
+        metricValue: minutesToCompactLabel(kpi.thisWeekMin),
+        tone: growthSummary.tone,
+      },
+    ],
+    [
+      blankDayCount,
+      growthSummary.growthDetail,
+      growthSummary.growthTitle,
+      growthSummary.strengthDetail,
+      growthSummary.strengthTitle,
+      growthSummary.tone,
+      growthSummary.weaknessDetail,
+      growthSummary.weaknessTitle,
+      kpi.avgMin14,
+      kpi.maxStreak,
+      kpi.thisWeekMin,
+      kpi.weekDiffPct,
+      sessionMetrics.completionRate,
+    ]
+  );
   const densityData = useMemo(
     () => [
       { label: '완료율', value: clampPercent(sessionMetrics.completionRate) },
@@ -833,10 +827,6 @@ export default function AnalysisTrackPage() {
     ],
     [insight.trend, kpi.studyDays, kpi.weekDiffPct, sessionMetrics]
   );
-  const visibleDungeonCards = useMemo(
-    () => (growthTabMatchesDesktop ? dungeonCards : dungeonCards.filter((card) => card.unlocked)),
-    [dungeonCards, growthTabMatchesDesktop]
-  );
 
   if (!user) {
     return (
@@ -880,7 +870,7 @@ export default function AnalysisTrackPage() {
 
         <TabsContent value="growth" className="mt-0 space-y-4">
           <section className={cn('analysis-growth-overview rounded-[2.25rem]', isMobile ? 'px-5 py-5' : 'px-6 py-6')}>
-            <div className={cn('grid gap-5', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]')}>
+            <div className={cn('grid gap-5', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]')}>
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="analysis-growth-kicker">성장 리포트</span>
@@ -888,172 +878,132 @@ export default function AnalysisTrackPage() {
                 </div>
 
                 <div className="max-w-2xl">
-                  <h1 className={cn('font-aggro-display break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.65rem] leading-[1.08]' : 'text-[clamp(1.65rem,2.6vw,2.48rem)] leading-[1.04]')}>이번 주 성장 요약</h1>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">{statusSummary}</p>
-                </div>
-
-                <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
-                  <div className="analysis-growth-highlight-card rounded-[1.35rem] px-4 py-4">
-                    <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6a7da6]">오늘 학습</p>
-                    <p className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-[#14295F]', isMobile ? 'text-[1.35rem] leading-[1.08]' : 'text-[clamp(1.35rem,2vw,2rem)] leading-[1.04]')}>{minutesToCompactLabel(todayMinutes)}</p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
-                      {todayMinutes > 0 ? `${minutesToCompactLabel(heroGoalMinutes)} 목표 중 ${heroProgress}% 진행` : `오늘 목표 ${minutesToCompactLabel(heroGoalMinutes)}`}
-                    </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn('analysis-growth-hero-badge rounded-full border px-3 py-1.5 text-[11px] font-black tracking-[0.14em]', summaryToneStyles.badge)}>
+                      {growthSummary.statusLabel}
+                    </span>
+                    <span className="analysis-growth-date">{displayName} 학생 기준</span>
                   </div>
-
-                  <div className="analysis-growth-highlight-card rounded-[1.35rem] px-4 py-4">
-                    <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6a7da6]">주간 변화</p>
-                    <p className={cn(
-                      'font-aggro-display mt-3 break-keep font-black tracking-[-0.04em]',
-                      isMobile ? 'text-[1.35rem] leading-[1.08]' : 'text-[clamp(1.35rem,2vw,2rem)] leading-[1.04]',
-                      kpi.weekDiffPct >= 0 ? 'text-[var(--accent-orange)]' : 'text-[#d14c75]'
-                    )}>
-                      {signedPercent(kpi.weekDiffPct)}
-                    </p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
-                      {kpi.weekDiffPct >= 0 ? '지난 주보다 공부시간이 늘었어요.' : '지난 주보다 공부시간이 줄었어요.'}
-                    </p>
-                  </div>
+                  <h1 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.65rem] leading-[1.08]' : 'text-[clamp(1.65rem,2.6vw,2.48rem)] leading-[1.04]')}>
+                    지금 흐름을 쉽게 읽어보세요
+                  </h1>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">{growthSummary.statusSummary}</p>
                 </div>
 
                 <div className={cn('analysis-growth-summary-card analysis-growth-summary-card--soft rounded-[1.55rem]', isMobile ? 'p-4' : 'p-5')}>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">현재 상태</p>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">지금 상태 한 줄</p>
                       <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-white', isMobile ? 'text-[1.02rem] leading-6' : 'text-lg leading-7')}>
-                        {heroProgress >= 100 ? '오늘 목표를 달성했어요' : `${remainingGoalMinutes}분 더 채우면 오늘 목표예요`}
+                        {growthSummary.coachNote}
                       </p>
                     </div>
-                    <p className={cn('font-aggro-display break-keep font-black tracking-[-0.03em] text-[#FFBE72]', isMobile ? 'text-[12px]' : 'text-sm')}>{minutesToCompactLabel(todayMinutes)} / {minutesToCompactLabel(heroGoalMinutes)}</p>
+                    <span className={cn('font-aggro-display text-sm font-black tracking-[-0.03em]', summaryToneStyles.accent)}>
+                      {kpi.weekDiffPct >= 0 ? `${signedPercent(kpi.weekDiffPct)} 상승` : `${signedPercent(kpi.weekDiffPct)} 조정`}
+                    </span>
                   </div>
-                  <div className="analysis-growth-rail-track mt-3">
-                    <div className="analysis-growth-progress-bar" style={{ width: `${heroProgress}%` }} />
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    <QuestStatBar label="집중 시간" value={focusHp} accent="orange" />
-                    <QuestStatBar label="루틴 안정도" value={consistencyHp} accent="blue" />
-                    <QuestStatBar label="계획 완수율" value={completionHp} accent="emerald" />
-                  </div>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
+                    {todayMinutes > 0
+                      ? `오늘은 ${minutesToCompactLabel(todayMinutes)}을 기록했고, 최근 14일 평균은 ${minutesToLabel(kpi.avgMin14)}이에요.`
+                      : `오늘 기록은 아직 없지만, 최근 14일 평균은 ${minutesToLabel(kpi.avgMin14)}으로 집계되고 있어요.`}
+                  </p>
+                </div>
+
+                <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+                  {summaryCards.map((card) => (
+                    <GrowthSummaryCard
+                      key={`${card.title}-${card.metricLabel}`}
+                      title={card.title}
+                      detail={card.detail}
+                      metricLabel={card.metricLabel}
+                      metricValue={card.metricValue}
+                      tone={card.tone}
+                    />
+                  ))}
                 </div>
               </div>
 
               <div className="analysis-growth-summary-card rounded-[1.85rem] p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="analysis-growth-kicker">이번 주 요약</p>
-                    <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>흐름을 빠르게 읽어보세요</h2>
+                    <p className="analysis-growth-kicker">오늘 목표 진행</p>
+                    <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>
+                      오늘 얼마나 채웠는지 먼저 보세요
+                    </h2>
                   </div>
-                  <div className="analysis-growth-light-card rounded-[1.15rem] px-4 py-3 text-right">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최고 집중일</p>
-                    <p className="font-aggro-display mt-1 text-lg font-black tracking-[-0.03em] text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
-                    <p className="mt-1 text-[12px] font-semibold text-[#5c6e97]">{minutesToLabel(bestDay.totalMinutes)}</p>
+                  <span className={cn('analysis-growth-hero-badge rounded-full border px-3 py-1.5 text-[11px] font-black tracking-[0.14em]', heroProgress >= 100 ? SUMMARY_TONE_STYLES.good.badge : SUMMARY_TONE_STYLES.steady.badge)}>
+                    {heroProgress >= 100 ? '목표 달성' : `${heroProgress}% 진행`}
+                  </span>
+                </div>
+
+                <div className="mt-5 analysis-growth-highlight-card rounded-[1.35rem] px-4 py-4">
+                  <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.16em] text-[#6a7da6]">오늘 학습</p>
+                  <p className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-[#14295F]', isMobile ? 'text-[1.35rem] leading-[1.08]' : 'text-[clamp(1.35rem,2vw,2rem)] leading-[1.04]')}>
+                    {minutesToCompactLabel(todayMinutes)}
+                  </p>
+                  <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                    {heroProgress >= 100 ? '오늘 목표를 이미 채웠어요.' : `${remainingGoalMinutes}분 더 채우면 오늘 목표예요.`}
+                  </p>
+                </div>
+
+                <div className="analysis-growth-rail-track mt-4">
+                  <div className="analysis-growth-progress-bar" style={{ width: `${heroProgress}%` }} />
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">연속 기록</p>
+                    <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">{kpi.maxStreak}일</p>
+                    <p className="mt-1 text-sm font-semibold text-[#5c6e97]">가장 길게 이어진 흐름</p>
+                  </div>
+                  <div className="analysis-growth-light-card rounded-[1.2rem] p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">완료율</p>
+                    <p className="font-aggro-display mt-2 text-lg font-black tracking-[-0.03em] text-[#14295F]">{sessionMetrics.completionRate}%</p>
+                    <p className="mt-1 text-sm font-semibold text-[#5c6e97]">시작한 세션 마무리 힘</p>
                   </div>
                 </div>
-                <div className="mt-5 space-y-3">
-                  {weeklySummaryLines.map((line) => (
-                    <div key={line} className="analysis-growth-light-card rounded-[1.2rem] px-4 py-3">
-                      <p className="text-sm font-semibold leading-6 text-[#17326B]">{line}</p>
-                    </div>
-                  ))}
+
+                <div className="mt-4 analysis-growth-light-card analysis-growth-light-card--accent rounded-[1.25rem] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">이번 주 최고 집중일</p>
+                  <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>
+                    {shortDateLabel(bestDay.dateKey)}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-[#37507F]">{minutesToLabel(bestDay.totalMinutes)}으로 가장 길게 공부했어요.</p>
                 </div>
               </div>
-            </div>
-
-            <div className={cn('mt-5 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
-              {kpiCards.map((item) => (
-                <AnalysisKpiCard
-                  key={item.title}
-                  title={item.title}
-                  value={item.value}
-                  meta={item.meta}
-                  progress={item.progress}
-                  icon={item.icon}
-                  tone={item.tone}
-                  delta={item.delta}
-                />
-              ))}
             </div>
           </section>
 
           <section className={cn('analysis-growth-map rounded-[2rem]', isMobile ? 'p-5' : 'p-6')}>
             <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'flex-row items-start justify-between')}>
               <div>
-                <span className="analysis-growth-kicker">주간 성장 흐름</span>
-                <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>지난 7일 집중 흐름</h2>
-                <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">주간 누적 공부시간이 어떻게 움직였는지 한 번에 볼 수 있어요.</p>
+                <span className="analysis-growth-kicker">자세히 보기</span>
+                <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>
+                  보고 싶을 때만 그래프를 펼쳐보세요
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">지금은 핵심만 먼저 보여주고, 아래에서 필요한 분석만 골라서 볼 수 있어요.</p>
               </div>
               <div className="analysis-growth-light-card rounded-[1.2rem] px-4 py-3 text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최고 집중일</p>
-                <p className="font-aggro-display mt-1 text-lg font-black tracking-[-0.03em] text-[#14295F]">{shortDateLabel(bestDay.dateKey)}</p>
-                <p className="mt-1 text-[12px] font-semibold text-[#5c6e97]">{minutesToLabel(bestDay.totalMinutes)}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">빠른 체크</p>
+                <p className="font-aggro-display mt-1 text-lg font-black tracking-[-0.03em] text-[#14295F]">
+                  {blankDayCount > 0 ? `${blankDayCount}일 공백` : '흐름 안정'}
+                </p>
+                <p className="mt-1 text-[12px] font-semibold text-[#5c6e97]">
+                  {blankDayCount > 0 ? '빈 날부터 줄이면 성장 그래프가 더 선명해져요.' : '최근 흐름이 매끄럽게 이어지고 있어요.'}
+                </p>
               </div>
             </div>
-            <div className={cn('analysis-growth-canvas mt-5 rounded-[1.55rem]', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
-              <MiniGrowthBars data={weeklyData.map((item) => ({ label: item.shortLabel, totalMinutes: item.totalMinutes }))} compact={isMobile} />
-            </div>
-          </section>
-
-          <section className="student-analysis-shell">
-            <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
-              {visibleDungeonCards.map((card) => (
-                <GraphDungeonCard
+            <div className="student-analysis-shell mt-5">
+              <Accordion type="multiple" className="flex flex-col gap-4">
+                {dungeonCards.map((card) => (
+                <GrowthDetailAccordionItem
                   key={card.id}
-                  className={cn(!isMobile && (card.id === 'focus' || card.id === 'slot') && 'col-span-2')}
+                  value={card.id}
                   title={card.title}
                   eyebrow={card.eyebrow}
                   insight={card.insight}
                   unlocked={card.unlocked}
                   previewHint={card.previewHint}
-                  preview={
-                    card.id === 'density' ? (
-                      <ResponsiveContainer width="100%" height={88}>
-                        <BarChart data={densityData} margin={{ top: 8, right: 10, left: 14, bottom: 2 }}>
-                          <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
-                          <YAxis
-                            width={38}
-                            tick={{ fontSize: 9, fontWeight: 800, fill: 'var(--chart-axis)' }}
-                            tickLine={{ stroke: 'var(--chart-grid)' }}
-                            axisLine={{ stroke: 'var(--chart-grid)' }}
-                            tickFormatter={(value) => `${Number(value)}%`}
-                            tickMargin={8}
-                          />
-                          <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(255,150,38,0.12)' }} />
-                          <Bar name="집중 밀도" dataKey="value" radius={[8, 8, 4, 4]} fill="var(--accent-orange)" activeBar={{ fill: 'var(--accent-orange-soft)' }} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={88}>
-                        <ComposedChart data={weeklyData} margin={{ top: 8, right: 10, left: 14, bottom: 2 }}>
-                          <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
-                          <YAxis
-                            width={38}
-                            tick={{ fontSize: 9, fontWeight: 800, fill: 'var(--chart-axis)' }}
-                            tickLine={{ stroke: 'var(--chart-grid)' }}
-                            axisLine={{ stroke: 'var(--chart-grid)' }}
-                            tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`}
-                            tickMargin={8}
-                          />
-                          <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(90,136,255,0.1)' }} />
-                          <Bar
-                            name={card.id === 'rhythm' ? '평균 공부시간' : '집중 시간'}
-                            dataKey={card.id === 'rhythm' ? 'avgMinutes' : 'totalMinutes'}
-                            radius={[8, 8, 4, 4]}
-                            fill={card.id === 'rhythm' ? '#18B67A' : '#2E6BFF'}
-                            activeBar={{ fill: card.id === 'rhythm' ? '#29C58D' : '#4B84FF' }}
-                          />
-                          <Line
-                            type="monotone"
-                            name={card.id === 'rhythm' ? '리듬선' : '평균 흐름'}
-                            dataKey="avgMinutes"
-                            stroke={card.id === 'rhythm' ? '#8EF0C9' : '#FFB347'}
-                            strokeWidth={2.2}
-                            dot={false}
-                            activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-                          />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    )
-                  }
                 >
                   {card.id === 'focus' ? (
                     <div className="space-y-4">
@@ -1102,20 +1052,39 @@ export default function AnalysisTrackPage() {
                       </div>
                     </div>
                   ) : card.id === 'density' ? (
-                    <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-                      {sessionCards.map((item) => (
-                        <SessionMetricCard
-                          key={item.label}
-                          label={item.label}
-                          value={item.value}
-                          meta={item.meta}
-                          progress={item.progress}
-                          tone={item.tone}
-                          icon={item.icon}
-                          variant={item.variant}
-                          ringDisplay={item.ringDisplay}
-                        />
-                      ))}
+                    <div className="space-y-4">
+                      <div className="analysis-growth-canvas rounded-[1.45rem] p-4">
+                        <ResponsiveContainer width="100%" height={88}>
+                          <BarChart data={densityData} margin={{ top: 8, right: 10, left: 14, bottom: 2 }}>
+                            <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
+                            <YAxis
+                              width={38}
+                              tick={{ fontSize: 9, fontWeight: 800, fill: 'var(--chart-axis)' }}
+                              tickLine={{ stroke: 'var(--chart-grid)' }}
+                              axisLine={{ stroke: 'var(--chart-grid)' }}
+                              tickFormatter={(value) => `${Number(value)}%`}
+                              tickMargin={8}
+                            />
+                            <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(255,150,38,0.12)' }} />
+                            <Bar name="집중 밀도" dataKey="value" radius={[8, 8, 4, 4]} fill="var(--accent-orange)" activeBar={{ fill: 'var(--accent-orange-soft)' }} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+                        {sessionCards.map((item) => (
+                          <SessionMetricCard
+                            key={item.label}
+                            label={item.label}
+                            value={item.value}
+                            meta={item.meta}
+                            progress={item.progress}
+                            tone={item.tone}
+                            icon={item.icon}
+                            variant={item.variant}
+                            ringDisplay={item.ringDisplay}
+                          />
+                        ))}
+                      </div>
                     </div>
                   ) : card.id === 'rhythm' ? (
                     <div className="space-y-4">
@@ -1169,8 +1138,9 @@ export default function AnalysisTrackPage() {
                       </div>
                     </div>
                   )}
-                </GraphDungeonCard>
+                </GrowthDetailAccordionItem>
               ))}
+              </Accordion>
             </div>
           </section>
 
