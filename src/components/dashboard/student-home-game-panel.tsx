@@ -168,7 +168,7 @@ function QuestRow({
         "relative flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left transition-all duration-200",
         disabled && "cursor-wait opacity-70",
         quest.done
-          ? "border border-emerald-300/32 bg-[linear-gradient(180deg,rgba(47,170,125,0.2),rgba(13,28,69,0.92))]"
+          ? "border border-emerald-300/32 bg-[linear-gradient(180deg,rgba(47,170,125,0.2),color-mix(in_srgb,var(--student-night-bg)_90%,#2faa7d_10%))]"
           : "surface-card surface-card--secondary on-dark hover:-translate-y-0.5 hover:border-[color:var(--accent-orange-border)]",
       )}
     >
@@ -314,10 +314,10 @@ function RewardModal({
                 <div className="mt-2 text-[2rem] font-black tracking-tight text-[var(--text-on-accent)]">
                   +{revealedReward.toLocaleString()}P
                 </div>
-                <div className="mt-2 text-sm font-semibold text-[rgba(14,28,56,0.76)]">
+                <div className="mt-2 text-sm font-semibold text-[color-mix(in_srgb,var(--text-on-light)_72%,white)]">
                   이번 상자 보상이에요.
                 </div>
-                <div className="mt-3 rounded-full border border-[rgba(14,28,56,0.12)] bg-[rgba(255,255,255,0.56)] px-3 py-2 text-[11px] font-black text-[rgba(14,28,56,0.72)]">
+                <div className="mt-3 rounded-full border border-[color:var(--border-subtle)] bg-[rgba(255,255,255,0.56)] px-3 py-2 text-[11px] font-black text-[color-mix(in_srgb,var(--text-on-light)_70%,white)]">
                   오늘 연 상자 {todayOpenedBoxCount}개
                 </div>
               </div>
@@ -406,19 +406,19 @@ function PointHistoryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("max-w-[26rem] overflow-hidden rounded-[2rem] border-[#DCE5F8] bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.18),transparent_26%),linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-0 text-[#17326B] shadow-[0_28px_60px_-30px_rgba(19,50,107,0.24)]", isMobile ? "w-[min(94vw,26rem)]" : "")}>
-        <div className={cn("border-b border-[#E4ECFA] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,250,255,0.96))]", isMobile ? "px-5 py-5" : "px-6 py-6")}>
+      <DialogContent className={cn("max-w-[26rem] overflow-hidden rounded-[2rem] border-[color:var(--border-subtle)] bg-[radial-gradient(circle_at_top_right,var(--accent-orange-surface-strong),transparent_26%),linear-gradient(180deg,#FFFFFF_0%,var(--bg-surface-2)_100%)] p-0 text-[var(--text-primary)] shadow-[0_28px_60px_-30px_rgba(19,50,107,0.24)]", isMobile ? "w-[min(94vw,26rem)]" : "")}>
+        <div className={cn("border-b border-[color:var(--border-subtle)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),var(--bg-surface-2))]", isMobile ? "px-5 py-5" : "px-6 py-6")}>
           <DialogHeader className="text-left">
-            <DialogTitle className="text-[1.35rem] font-black tracking-tight text-[#17326B]">일자별 활동 기록</DialogTitle>
+            <DialogTitle className="text-[1.35rem] font-black tracking-tight text-[var(--text-primary)]">일자별 활동 기록</DialogTitle>
           </DialogHeader>
-          <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">최근 30일 동안 출석, 계획, 상자, 랭킹 보상 기록을 한눈에 확인할 수 있어요.</p>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-[var(--text-secondary)]">최근 30일 동안 출석, 계획, 상자, 랭킹 보상 기록을 한눈에 확인할 수 있어요.</p>
         </div>
 
-        <div className={cn("max-h-[26rem] space-y-2 overflow-y-auto bg-[#F7FAFF] custom-scrollbar", isMobile ? "px-4 py-4" : "px-5 py-5")}>
+        <div className={cn("max-h-[26rem] space-y-2 overflow-y-auto bg-[var(--bg-surface-2)] custom-scrollbar", isMobile ? "px-4 py-4" : "px-5 py-5")}>
           {sortedDates.length === 0 ? (
-            <div className="rounded-[1.4rem] border border-dashed border-[#D8E4F8] bg-white/85 px-4 py-10 text-center">
-              <div className="text-sm font-black text-[#17326B]">아직 활동 기록이 없어요.</div>
-              <div className="mt-1 text-[11px] font-semibold text-[#6B7EA8]">공부를 시작하거나 계획을 체크하면 여기에 일자별 내역이 쌓입니다.</div>
+            <div className="rounded-[1.4rem] border border-dashed border-[color:var(--border-subtle)] bg-white/85 px-4 py-10 text-center">
+              <div className="text-sm font-black text-[var(--text-primary)]">아직 활동 기록이 없어요.</div>
+              <div className="mt-1 text-[11px] font-semibold text-[var(--text-secondary)]">공부를 시작하거나 계획을 체크하면 여기에 일자별 내역이 쌓입니다.</div>
             </div>
           ) : (
             sortedDates.map(([date, data]) => {
@@ -440,25 +440,25 @@ function PointHistoryModal({
               });
 
               return (
-                <div key={date} className="rounded-[1.3rem] border border-[#E1EAF8] bg-white/90 px-4 py-3 shadow-[0_18px_34px_-26px_rgba(19,50,107,0.18)]">
+                <div key={date} className="rounded-[1.3rem] border border-[color:var(--border-subtle)] bg-white/90 px-4 py-3 shadow-[0_18px_34px_-26px_rgba(19,50,107,0.18)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7EA8]">
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                         {formatPointHistoryDateLabel(date)}
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {data?.attendance ? <Badge variant="outline" className="border-none bg-[#4F8CFF] px-2 py-1 text-[9px] font-black text-white">출석</Badge> : null}
+                        {data?.attendance ? <Badge variant="outline" className="border-none bg-[var(--accent-blue)] px-2 py-1 text-[9px] font-black text-white">출석</Badge> : null}
                         {(data?.plan || data?.planTrackCompleted) ? <Badge variant="outline" className="border-none bg-[#11A868] px-2 py-1 text-[9px] font-black text-white">계획</Badge> : null}
-                        {data?.routine ? <Badge variant="outline" className="border-none bg-[#FF9B24] px-2 py-1 text-[9px] font-black text-white">루틴</Badge> : null}
-                        {studyBoxes > 0 ? <Badge variant="outline" className="border-none bg-[#14295F] px-2 py-1 text-[9px] font-black text-white">상자 {studyBoxes}</Badge> : null}
-                        {dailyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-violet-600 px-2 py-1 text-[9px] font-black text-white">일간 {dailyRankRewardRank || 1}위</Badge> : null}
-                        {weeklyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-fuchsia-600 px-2 py-1 text-[9px] font-black text-white">주간 {weeklyRankRewardRank}위</Badge> : null}
-                        {monthlyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-rose-600 px-2 py-1 text-[9px] font-black text-white">월간 {monthlyRankRewardRank}위</Badge> : null}
+                        {data?.routine ? <Badge variant="outline" className="border-none bg-[var(--accent-orange)] px-2 py-1 text-[9px] font-black text-white">루틴</Badge> : null}
+                        {studyBoxes > 0 ? <Badge variant="outline" className="border-none bg-[var(--bg-card-primary)] px-2 py-1 text-[9px] font-black text-white">상자 {studyBoxes}</Badge> : null}
+                        {dailyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-[var(--chart-5)] px-2 py-1 text-[9px] font-black text-white">일간 {dailyRankRewardRank || 1}위</Badge> : null}
+                        {weeklyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-[var(--chart-4)] px-2 py-1 text-[9px] font-black text-white">주간 {weeklyRankRewardRank}위</Badge> : null}
+                        {monthlyRankRewardAmount > 0 ? <Badge variant="outline" className="border-none bg-[var(--chart-1)] px-2 py-1 text-[9px] font-black text-white">월간 {monthlyRankRewardRank}위</Badge> : null}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="text-sm font-black tracking-tight text-[#17326B]">{summaryLabel}</div>
-                      <div className="mt-1 text-[10px] font-semibold text-[#6B7EA8]">대표 기록</div>
+                      <div className="text-sm font-black tracking-tight text-[var(--text-primary)]">{summaryLabel}</div>
+                      <div className="mt-1 text-[10px] font-semibold text-[var(--text-secondary)]">대표 기록</div>
                     </div>
                   </div>
                 </div>
@@ -467,8 +467,8 @@ function PointHistoryModal({
           )}
         </div>
 
-        <div className="border-t border-[#E4ECFA] bg-white px-4 py-4">
-          <Button type="button" variant="outline" className="h-11 w-full rounded-[1rem] border-[#D8E4F8] font-black text-[#17326B]" onClick={() => onOpenChange(false)}>
+        <div className="border-t border-[color:var(--border-subtle)] bg-white px-4 py-4">
+          <Button type="button" variant="outline" className="h-11 w-full rounded-[1rem] border-[color:var(--border-subtle)] font-black text-[var(--text-primary)]" onClick={() => onOpenChange(false)}>
             닫기
           </Button>
         </div>
@@ -857,7 +857,7 @@ export function StudentHomeGamePanel({
                                 <div
                                   className={cn(
                   "w-full rounded-full bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)] shadow-[0_10px_20px_-14px_var(--accent-orange-shadow-soft)]",
-                  item.date === bestDayLabel && "bg-[linear-gradient(180deg,#fff3d6_0%,var(--accent-orange-soft)_32%,var(--accent-orange)_100%)]",
+                  item.date === bestDayLabel && "bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent-orange-soft)_44%,white)_0%,var(--accent-orange-soft)_32%,var(--accent-orange)_100%)]",
                                   )}
                                   style={{ height: `${height * 100}%` }}
                                 />
@@ -892,14 +892,14 @@ export function StudentHomeGamePanel({
               }}
               className={cn(
                 HOME_RANK_CARD_BASE,
-                "rounded-[1.78rem] p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,217,157,0.32)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                "rounded-[1.78rem] p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
               )}
               style={{ animation: "leaderboard-card-breathe 5.8s ease-in-out infinite" }}
             >
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,transparent,rgba(255,196,112,0.92),rgba(121,162,255,0.78),transparent)]" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,transparent,var(--accent-orange-soft),var(--accent-blue),transparent)]" />
               <div className="pointer-events-none absolute -left-20 top-0 h-full w-16 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.44),transparent)] opacity-80 animate-[leaderboard-bar-shimmer_4.1s_linear_infinite]" />
-              <div className="pointer-events-none absolute right-2 top-2 h-20 w-20 rounded-full bg-[rgba(113,154,255,0.18)] blur-3xl animate-[hero-orb-drift_8s_ease-in-out_infinite]" />
-              <div className="pointer-events-none absolute left-4 top-28 h-16 w-16 rounded-full bg-[rgba(255,189,104,0.14)] blur-2xl animate-[hero-orb-drift_9.4s_ease-in-out_infinite]" style={{ animationDelay: "1.2s" }} />
+              <div className="pointer-events-none absolute right-2 top-2 h-20 w-20 rounded-full bg-[var(--glow-blue)] blur-3xl animate-[hero-orb-drift_8s_ease-in-out_infinite]" />
+              <div className="pointer-events-none absolute left-4 top-28 h-16 w-16 rounded-full bg-[var(--accent-orange-surface)] blur-2xl animate-[hero-orb-drift_9.4s_ease-in-out_infinite]" style={{ animationDelay: "1.2s" }} />
               <div className="pointer-events-none absolute inset-x-4 top-[5.4rem] h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)]" />
               <div className="relative">
                 <div className="flex items-start justify-between gap-3">
@@ -916,14 +916,14 @@ export function StudentHomeGamePanel({
                       <div className="font-aggro-display text-[1.32rem] font-black tracking-tight text-white">
                         {rankSummaryTitle}
                       </div>
-                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[#B7C7E8]">
+                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
                         {rankSummaryDescription}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[rgba(255,255,255,0.08)] shadow-[0_16px_30px_-22px_rgba(0,0,0,0.42)]">
-                    <ChevronRight className="h-4 w-4 text-[#D5E1F7]" />
+                    <ChevronRight className="h-4 w-4 text-[var(--text-on-dark-soft)]" />
                   </div>
                 </div>
 
@@ -940,8 +940,8 @@ export function StudentHomeGamePanel({
                         className={cn(
                           "rounded-[0.95rem] px-3 py-2 text-[10px] font-black transition-all",
                           selectedRankRange === range
-                            ? "bg-[linear-gradient(135deg,#FFE09D_0%,#FFBE67_42%,#FF9D42_100%)] text-[#332005] shadow-[0_14px_24px_-18px_rgba(255,170,79,0.5)]"
-                            : "text-[#B7C7E8] hover:bg-[rgba(255,255,255,0.08)] hover:text-white",
+                            ? "bg-[linear-gradient(135deg,var(--accent-orange-soft)_0%,var(--accent-orange)_42%,var(--accent-orange-strong)_100%)] text-[var(--text-on-light)] shadow-[0_14px_24px_-18px_var(--accent-orange-shadow-soft)]"
+                            : "text-[var(--text-on-dark-soft)] hover:bg-[rgba(255,255,255,0.08)] hover:text-white",
                         )}
                       >
                         {range === "daily" ? "일간" : range === "weekly" ? "주간" : "월간"}
@@ -958,7 +958,7 @@ export function StudentHomeGamePanel({
                         className={cn(
                           "rounded-[1.18rem] border px-3.5 py-3 shadow-[0_14px_26px_-22px_rgba(0,0,0,0.42)]",
                           entry.rank === 1
-                            ? "border-[#F5C97B]/28 bg-[linear-gradient(135deg,rgba(255,209,132,0.18)_0%,rgba(255,255,255,0.08)_24%,rgba(255,255,255,0.04)_100%)] text-white"
+                            ? "border-[color:var(--accent-orange-border)] bg-[linear-gradient(135deg,var(--accent-orange-surface-strong)_0%,rgba(255,255,255,0.08)_24%,rgba(255,255,255,0.04)_100%)] text-white"
                             : "border-white/10 bg-[rgba(255,255,255,0.06)] text-white"
                         )}
                       >
@@ -968,8 +968,8 @@ export function StudentHomeGamePanel({
                               className={cn(
                                 "inline-flex min-w-[3rem] items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-black",
                                 entry.rank === 1
-                                  ? "bg-[rgba(255,224,157,0.12)] text-[#FFE09E]"
-                                  : "bg-[rgba(255,255,255,0.08)] text-[#B7C7E8]"
+                                  ? "bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]"
+                                  : "bg-[rgba(255,255,255,0.08)] text-[var(--text-on-dark-soft)]"
                               )}
                             >
                               {entry.rank}등
@@ -985,11 +985,11 @@ export function StudentHomeGamePanel({
                                 "mt-0.5 text-[11px] font-bold",
                                 entry.rank === 1
                                   ? entry.isLive
-                                    ? "text-[#FFE09E]"
+                                    ? "text-[var(--accent-orange-soft)]"
                                     : "text-white/70"
                                   : entry.isLive
-                                    ? "text-[#FFC98F]"
-                                    : "text-[#8FA4CC]"
+                                    ? "text-[var(--accent-orange-soft)]"
+                                    : "text-[var(--text-on-dark-soft)]"
                               )}>
                                 {getRankEntryStatusLabel(entry)}
                               </div>
@@ -1001,8 +1001,8 @@ export function StudentHomeGamePanel({
                             className={cn(
                               "shrink-0 rounded-full border px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_20px_-18px_rgba(0,0,0,0.38)]",
                               entry.rank === 1
-                                ? "border-[#F5C97B]/24 bg-[rgba(255,224,157,0.08)] text-[#FFE09E]"
-                                : "border-white/10 bg-[rgba(255,255,255,0.06)] text-[#B7C7E8]"
+                                ? "border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]"
+                                : "border-white/10 bg-[rgba(255,255,255,0.06)] text-[var(--text-on-dark-soft)]"
                             )}
                           />
                         </div>
@@ -1011,7 +1011,7 @@ export function StudentHomeGamePanel({
                   ) : (
                     <div className="rounded-[1.2rem] border border-dashed border-white/14 bg-[rgba(255,255,255,0.05)] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                       <div className="text-sm font-black text-white">아직 표시할 랭킹이 없어요.</div>
-                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[#B7C7E8]">
+                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
                         공부를 시작하면 상위 3명이 여기 표시됩니다.
                       </div>
                     </div>
@@ -1032,14 +1032,14 @@ export function StudentHomeGamePanel({
               }}
               className={cn(
                 HOME_RANK_CARD_BASE,
-                "rounded-[1.65rem] p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,217,157,0.32)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                "rounded-[1.65rem] p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
               )}
               style={{ animation: "leaderboard-card-breathe 5s ease-in-out infinite" }}
             >
               <div className="pointer-events-none absolute inset-0">
                 <div className="absolute -left-24 top-0 h-full w-20 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.26),transparent)] opacity-70 animate-[leaderboard-bar-shimmer_4.8s_linear_infinite]" />
-                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-[rgba(113,154,255,0.18)] blur-2xl animate-[hero-orb-drift_8.8s_ease-in-out_infinite]" />
-                <div className="absolute -left-8 bottom-2 h-24 w-24 rounded-full bg-[rgba(255,189,104,0.12)] blur-2xl animate-[hero-orb-drift_10.2s_ease-in-out_infinite]" style={{ animationDelay: "1.4s" }} />
+                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-[var(--glow-blue)] blur-2xl animate-[hero-orb-drift_8.8s_ease-in-out_infinite]" />
+                <div className="absolute -left-8 bottom-2 h-24 w-24 rounded-full bg-[var(--accent-orange-surface)] blur-2xl animate-[hero-orb-drift_10.2s_ease-in-out_infinite]" style={{ animationDelay: "1.4s" }} />
               </div>
               <div className="relative">
                 <div className="flex items-start justify-between gap-3">
@@ -1056,13 +1056,13 @@ export function StudentHomeGamePanel({
                       <div className="font-aggro-display text-[1.32rem] font-black tracking-tight text-white">
                         {rankSummaryTitle}
                       </div>
-                      <div className="mt-1 text-[11px] font-semibold text-[#B7C7E8]">
+                      <div className="mt-1 text-[11px] font-semibold text-[var(--text-on-dark-soft)]">
                         {rankSummaryDescription}
                       </div>
                     </div>
                   </div>
                   <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[rgba(255,255,255,0.08)] shadow-[0_14px_28px_-20px_rgba(0,0,0,0.42)]">
-                    <ChevronRight className="h-4 w-4 text-[#D5E1F7]" />
+                    <ChevronRight className="h-4 w-4 text-[var(--text-on-dark-soft)]" />
                   </div>
                 </div>
                 <div className={cn(HOME_RANK_CARD_INSET, "relative mt-4 p-1.5")}>
@@ -1078,8 +1078,8 @@ export function StudentHomeGamePanel({
                         className={cn(
                           "rounded-full border px-3 py-1.5 text-[10px] font-black transition-all",
                           selectedRankRange === range
-                            ? "border-transparent bg-[linear-gradient(135deg,#FFE09D_0%,#FFBE67_42%,#FF9D42_100%)] text-[#332005] shadow-[0_16px_28px_-18px_rgba(255,170,79,0.58)]"
-                            : "border-white/10 bg-[rgba(255,255,255,0.04)] text-[#B7C7E8] hover:bg-[rgba(255,255,255,0.08)] hover:text-white",
+                            ? "border-transparent bg-[linear-gradient(135deg,var(--accent-orange-soft)_0%,var(--accent-orange)_42%,var(--accent-orange-strong)_100%)] text-[var(--text-on-light)] shadow-[0_16px_28px_-18px_var(--accent-orange-shadow-soft)]"
+                            : "border-white/10 bg-[rgba(255,255,255,0.04)] text-[var(--text-on-dark-soft)] hover:bg-[rgba(255,255,255,0.08)] hover:text-white",
                         )}
                       >
                         {getRankRangeLabel(range)}
@@ -1095,7 +1095,7 @@ export function StudentHomeGamePanel({
                         className={cn(
                           "rounded-[1.18rem] border px-3.5 py-3 shadow-[0_14px_26px_-22px_rgba(0,0,0,0.42)]",
                           entry.rank === 1
-                            ? "border-[#F5C97B]/28 bg-[linear-gradient(135deg,rgba(255,209,132,0.18)_0%,rgba(255,255,255,0.08)_24%,rgba(255,255,255,0.04)_100%)] text-white"
+                            ? "border-[color:var(--accent-orange-border)] bg-[linear-gradient(135deg,var(--accent-orange-surface-strong)_0%,rgba(255,255,255,0.08)_24%,rgba(255,255,255,0.04)_100%)] text-white"
                             : "border-white/10 bg-[rgba(255,255,255,0.06)] text-white"
                         )}
                       >
@@ -1105,8 +1105,8 @@ export function StudentHomeGamePanel({
                               className={cn(
                                 "inline-flex min-w-[3rem] items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-black",
                                 entry.rank === 1
-                                  ? "bg-[rgba(255,224,157,0.12)] text-[#FFE09E]"
-                                  : "bg-[rgba(255,255,255,0.08)] text-[#B7C7E8]"
+                                  ? "bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]"
+                                  : "bg-[rgba(255,255,255,0.08)] text-[var(--text-on-dark-soft)]"
                               )}
                             >
                               {entry.rank}등
@@ -1122,11 +1122,11 @@ export function StudentHomeGamePanel({
                                 "mt-0.5 text-[11px] font-bold",
                                 entry.rank === 1
                                   ? entry.isLive
-                                    ? "text-[#FFE09E]"
+                                    ? "text-[var(--accent-orange-soft)]"
                                     : "text-white/70"
                                   : entry.isLive
-                                    ? "text-[#FFC98F]"
-                                    : "text-[#8FA4CC]"
+                                    ? "text-[var(--accent-orange-soft)]"
+                                    : "text-[var(--text-on-dark-soft)]"
                               )}>
                                 {getRankEntryStatusLabel(entry)}
                               </div>
@@ -1137,8 +1137,8 @@ export function StudentHomeGamePanel({
                             className={cn(
                               "shrink-0 rounded-full border px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_24px_-20px_rgba(0,0,0,0.42)]",
                               entry.rank === 1
-                                ? "border-[#F5C97B]/24 bg-[rgba(255,224,157,0.08)] text-[#FFE09E]"
-                                : "border-white/10 bg-[rgba(255,255,255,0.06)] text-[#B7C7E8]"
+                                ? "border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]"
+                                : "border-white/10 bg-[rgba(255,255,255,0.06)] text-[var(--text-on-dark-soft)]"
                             )}
                           />
                         </div>
@@ -1147,7 +1147,7 @@ export function StudentHomeGamePanel({
                   ) : (
                     <div className="rounded-[1.2rem] border border-dashed border-white/14 bg-[rgba(255,255,255,0.05)] px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                       <div className="text-sm font-black text-white">아직 표시할 랭킹이 없어요.</div>
-                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[#B7C7E8]">
+                      <div className="mt-1 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
                         공부를 시작하면 상위 3명이 여기 표시됩니다.
                       </div>
                     </div>

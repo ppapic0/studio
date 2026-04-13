@@ -2507,17 +2507,21 @@ select {
 
 .student-night-main {
   background: transparent;
-  color: #17326b;
+  color: var(--text-primary);
 }
 
 .student-night-page {
   min-height: 100%;
-  color: #17326b;
+  color: var(--text-primary);
 }
 
 .student-night-panel {
   border: 1px solid var(--student-night-border);
-  background: linear-gradient(180deg, rgba(22, 40, 79, 0.96) 0%, rgba(12, 27, 63, 0.92) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--student-night-panel) 88%, white) 0%,
+    color-mix(in srgb, var(--student-night-bg) 92%, black) 100%
+  );
   color: var(--student-night-text);
   box-shadow:
     0 20px 48px -34px rgba(0, 0, 0, 0.62),
@@ -2529,7 +2533,11 @@ select {
   border: 1px solid var(--accent-orange-border);
   background:
     radial-gradient(circle at top, var(--student-panel-glow), transparent 48%),
-    linear-gradient(180deg, rgba(29, 53, 101, 0.96) 0%, rgba(18, 34, 70, 0.92) 100%);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--student-night-panel-soft) 90%, white) 0%,
+      color-mix(in srgb, var(--student-night-panel) 92%, black) 100%
+    );
   color: var(--student-night-text);
   box-shadow:
     0 22px 52px -36px rgba(0, 0, 0, 0.68),
@@ -4847,7 +4855,7 @@ select {
   min-height: 100%;
   background:
     radial-gradient(circle at top, var(--student-panel-glow), transparent 28%),
-    radial-gradient(circle at 50% 14%, rgba(64, 102, 194, 0.16), transparent 34%),
+    radial-gradient(circle at 50% 14%, var(--glow-blue), transparent 34%),
     linear-gradient(180deg, var(--student-night-bg-soft) 0%, var(--student-night-bg) 100%);
   color: rgba(255, 255, 255, 0.96);
   overflow-x: hidden;
