@@ -960,7 +960,7 @@ export default function GrowthPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Gift className="h-4 w-4 text-[#FF7A16]" />
+                  <Gift className="h-4 w-4 text-[var(--accent-orange)]" />
                 <p className="font-aggro-display text-base font-black tracking-tight text-[#14295F]">Giftishow 보상샵</p>
               </div>
               <p className="mt-2 text-sm font-bold leading-5 text-[#24457f]">
@@ -1039,7 +1039,7 @@ export default function GrowthPage() {
                         <div className="mt-3 flex items-end justify-between gap-3">
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
-                            <p className="mt-1 text-lg font-black tracking-tight text-[#FF7A16]">
+                <p className="mt-1 text-lg font-black tracking-tight text-[var(--accent-orange)]">
                               {formatGiftishowPoints(product.pointCost)}
                             </p>
                           </div>

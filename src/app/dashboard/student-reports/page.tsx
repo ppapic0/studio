@@ -158,7 +158,7 @@ export default function StudentReportsPage() {
                           variant="secondary"
                           className={cn(
                             'h-4 shrink-0 border-none px-1.5 text-[8px] font-black',
-                            report.viewedAt ? 'bg-white text-[#FF7A16]' : 'bg-[#FF7A16] text-white',
+                    report.viewedAt ? 'bg-white text-[var(--accent-orange)]' : 'bg-[var(--accent-orange)] text-white',
                           )}
                         >
                           {report.viewedAt ? '읽음' : '신규'}

@@ -58,11 +58,11 @@ const TONE_STYLES: Record<ToneKey, { chip: string; text: string; bar: string; ri
     soft: 'from-[#f7fdf9] to-[#eefaf4]',
   },
   amber: {
-    chip: 'border-[#ffe4c8] bg-[#fff4ea] text-[#d86a11]',
-    text: 'text-[#d86a11]',
-    bar: 'from-[#ff7a16] via-[#ff973c] to-[#ffc58b]',
-    ring: '#ff7a16',
-    soft: 'from-[#fffaf4] to-[#fff3e8]',
+    chip: 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange)]',
+    text: 'text-[var(--accent-orange)]',
+    bar: 'from-[var(--accent-orange)] via-[var(--accent-orange-soft)] to-[#fff1d7]',
+    ring: 'var(--accent-orange)',
+    soft: 'from-[#fffaf4] to-[var(--accent-orange-surface)]',
   },
   rose: {
     chip: 'border-[#ffdbe2] bg-[#fff2f5] text-[#dc4b74]',
@@ -130,7 +130,7 @@ function AnalysisTooltip({
       color:
         item.color ??
         (item.name?.includes('밀도')
-          ? '#FF7A16'
+          ? 'var(--accent-orange)'
           : item.name?.includes('리듬') || item.name?.includes('평균')
             ? '#FFB347'
             : '#2554D4'),
@@ -861,7 +861,7 @@ export default function AnalysisTrackPage() {
             : 'gap-1.5 border border-[#F0DDC9] bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF2E5_100%)] shadow-[0_16px_34px_-28px_rgba(191,115,31,0.18)]'
         )}>
           <TabsTrigger value="growth" className={cn(
-            'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626]',
+            'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[var(--accent-orange)]',
             growthTabMatchesDesktop
               ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white'
               : 'data-[state=active]:text-[#17326B] text-[#6B5676] hover:text-[#17326B]'
@@ -869,7 +869,7 @@ export default function AnalysisTrackPage() {
             <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> 성장 맵
           </TabsTrigger>
           <TabsTrigger value="full" className={cn(
-            'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[#FF9626]',
+            'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[var(--accent-orange)]',
             growthTabMatchesDesktop
               ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white'
               : 'data-[state=active]:text-[#17326B] text-[#6B5676] hover:text-[#17326B]'
@@ -906,7 +906,7 @@ export default function AnalysisTrackPage() {
                     <p className={cn(
                       'font-aggro-display mt-3 break-keep font-black tracking-[-0.04em]',
                       isMobile ? 'text-[1.35rem] leading-[1.08]' : 'text-[clamp(1.35rem,2vw,2rem)] leading-[1.04]',
-                      kpi.weekDiffPct >= 0 ? 'text-[#FF8A1F]' : 'text-[#d14c75]'
+                      kpi.weekDiffPct >= 0 ? 'text-[var(--accent-orange)]' : 'text-[#d14c75]'
                     )}>
                       {signedPercent(kpi.weekDiffPct)}
                     </p>
@@ -1018,7 +1018,7 @@ export default function AnalysisTrackPage() {
                             tickMargin={8}
                           />
                           <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(255,150,38,0.12)' }} />
-                          <Bar name="집중 밀도" dataKey="value" radius={[8, 8, 4, 4]} fill="#FF9626" activeBar={{ fill: '#FFAE4F' }} />
+                          <Bar name="집중 밀도" dataKey="value" radius={[8, 8, 4, 4]} fill="var(--accent-orange)" activeBar={{ fill: 'var(--accent-orange-soft)' }} />
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (

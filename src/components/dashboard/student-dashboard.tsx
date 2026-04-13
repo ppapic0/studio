@@ -73,7 +73,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, PointBoostEvent, type User as UserType, type SupportThreadKind } from '@/lib/types';
+import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, PointBoostEvent, type SupportedUniversityThemeKey, type User as UserType, type SupportThreadKind } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
@@ -118,6 +118,10 @@ import {
 import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { stopStudentStudySessionSecure } from '@/lib/study-session-actions';
+import {
+  UNIVERSITY_THEME_OPTIONS,
+  isSupportedUniversityThemeKey,
+} from '@/lib/university-theme';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
@@ -1277,6 +1281,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [examDrafts, setExamDrafts] = useState<ExamCountdownSetting[]>(DEFAULT_EXAM_COUNTDOWNS);
   const [goalPathTypeDraft, setGoalPathTypeDraft] = useState<'school' | 'job'>('school');
   const [goalPathLabelDraft, setGoalPathLabelDraft] = useState('');
+  const [universityThemeKeyDraft, setUniversityThemeKeyDraft] = useState<'default' | SupportedUniversityThemeKey>('default');
   const [examSaveError, setExamSaveError] = useState<{ title: string; description: string } | null>(null);
   const [isPointBoostPopupOpen, setIsPointBoostPopupOpen] = useState(false);
   const [pointBoostPopupEvent, setPointBoostPopupEvent] = useState<(
@@ -1454,6 +1459,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => userProfile?.goalPathLabel ?? studentProfile?.goalPathLabel ?? '',
     [userProfile?.goalPathLabel, studentProfile?.goalPathLabel]
   );
+  const resolvedUniversityThemeKey = useMemo(() => {
+    const candidate = userProfile?.universityThemeKey ?? studentProfile?.universityThemeKey ?? null;
+    return isSupportedUniversityThemeKey(candidate) ? candidate : null;
+  }, [studentProfile?.universityThemeKey, userProfile?.universityThemeKey]);
 
   useEffect(() => {
     setExamDrafts(normalizeExamCountdowns(resolvedExamCountdownSettings));
@@ -1461,7 +1470,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     setGoalPathTypeDraft(resolvedGoalPathType);
     setGoalPathLabelDraft(resolvedGoalPathLabel);
-  }, [resolvedGoalPathLabel, resolvedGoalPathType]);
+    setUniversityThemeKeyDraft(resolvedUniversityThemeKey ?? 'default');
+  }, [resolvedGoalPathLabel, resolvedGoalPathType, resolvedUniversityThemeKey]);
   useEffect(() => {
     if (!isExamDialogOpen) {
       setExamSaveError(null);
@@ -2362,6 +2372,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           examCountdowns: payload,
           goalPathType: goalPathTypeDraft,
           goalPathLabel: goalPathLabelDraft.trim(),
+          universityThemeKey: universityThemeKeyDraft === 'default' ? null : universityThemeKeyDraft,
           updatedAt: serverTimestamp(),
         },
         { merge: true },
@@ -2375,6 +2386,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               examCountdowns: payload,
               goalPathType: goalPathTypeDraft,
               goalPathLabel: goalPathLabelDraft.trim(),
+              universityThemeKey: universityThemeKeyDraft === 'default' ? null : universityThemeKeyDraft,
               updatedAt: serverTimestamp(),
             },
             { merge: true },
@@ -3491,6 +3503,27 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     className="h-10 rounded-xl border-primary/15 font-bold"
                   />
                 </div>
+              </div>
+              <div className="mt-3 space-y-1.5">
+                <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-[#17326B]">대학 컬러 테마</Label>
+                <Select
+                  value={universityThemeKeyDraft ?? 'default'}
+                  onValueChange={(value) => setUniversityThemeKeyDraft(value as 'default' | SupportedUniversityThemeKey)}
+                >
+                  <SelectTrigger className="h-10 rounded-xl border-primary/15 bg-white font-bold">
+                    <SelectValue placeholder="기본 테마" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIVERSITY_THEME_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] font-semibold leading-5 text-[#5F739F]">
+                  희망학교 문구와 별개로 학생 모드 전체 색상을 직접 고를 수 있어요.
+                </p>
               </div>
             </div>
 

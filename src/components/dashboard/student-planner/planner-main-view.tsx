@@ -125,14 +125,14 @@ function getChecklistBadge(task: any, subjectOptions: any[]) {
   if (task.category === 'personal') {
     return {
       label: task.tag || '메모',
-      className: 'border border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)]',
+      className: 'border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]',
     };
   }
 
   const subject = subjectOptions.find((item) => item.id === (task.subject || 'etc'));
   return {
     label: subject?.label || '기타',
-    className: 'border border-[#FFB347]/22 bg-[#FF9626]/14 text-[var(--accent-orange-soft)]',
+    className: 'border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]',
   };
 }
 
@@ -161,7 +161,7 @@ function ActionChipButton({
 }) {
   const toneClass =
     tone === 'orange'
-      ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)] hover:bg-[#FF9626]/24'
+      ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)] hover:bg-[var(--accent-orange-surface-strong)]'
       : tone === 'white'
         ? 'border-white/12 bg-white/[0.1] text-[var(--text-on-dark)] hover:bg-white/[0.14]'
         : 'border-white/12 bg-[#17326B] text-white hover:bg-[#22479B]';
@@ -802,17 +802,17 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     className={cn(
                       'rounded-[1rem] border px-2 py-2 text-center transition-all',
                       isSelected
-                        ? 'border-[#FFB347] bg-[#FFF2E3] shadow-[0_18px_28px_-24px_rgba(255,150,38,0.45)]'
+                        ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] shadow-[var(--accent-orange-shadow)]'
                         : 'border-[#DCE5F4] bg-white hover:border-[#AFC3E8] hover:bg-[#F7FAFF]'
                     )}
                   >
-                    <p className={cn('text-[10px] font-black', isSelected ? 'text-[#D96E12]' : isTodayCell ? 'text-[#17326B]' : 'text-[#6C7FA6]')}>
+                    <p className={cn('text-[10px] font-black', isSelected ? 'text-[var(--accent-orange)]' : isTodayCell ? 'text-[#17326B]' : 'text-[#6C7FA6]')}>
                       {format(day, 'EEE', { locale: ko })}
                     </p>
                     <p className={cn('mt-1 text-sm font-black', isSelected ? 'text-[#17326B]' : 'text-[#17326B]')}>
                       {format(day, 'd')}
                     </p>
-                    <p className={cn('mt-1 text-[9px] font-semibold', isSelected ? 'text-[#D96E12]' : isTodayCell ? 'text-[#17326B]' : 'text-[#8AA0CC]')}>
+                    <p className={cn('mt-1 text-[9px] font-semibold', isSelected ? 'text-[var(--accent-orange)]' : isTodayCell ? 'text-[#17326B]' : 'text-[#8AA0CC]')}>
                       {dayModeLabel}
                     </p>
                   </button>
@@ -823,12 +823,12 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         </header>
 
         <section className="surface-card surface-card--primary on-dark relative rounded-[2rem] px-5 py-5 text-white animate-[planner-fade-rise_0.22s_ease-out]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.22),transparent_34%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,var(--accent-orange-surface-strong),transparent_34%)]" />
           <div className="relative">
             {floatingPointBursts.map((burst: { id: number; label: string }, index: number) => (
               <div
                 key={burst.id}
-                className="absolute right-0 top-0 rounded-full border border-[rgba(255,138,31,0.16)] bg-[rgba(255,248,238,0.95)] px-3 py-1 text-xs font-black text-[var(--text-primary)] shadow-[0_18px_30px_-24px_rgba(6,12,34,0.4)] animate-[planner-point-burst_0.95s_ease-out_forwards]"
+                className="absolute right-0 top-0 rounded-full border border-[color:var(--accent-orange-border)] bg-[rgba(255,255,255,0.94)] px-3 py-1 text-xs font-black text-[var(--text-primary)] shadow-[0_18px_30px_-24px_rgba(6,12,34,0.4)] animate-[planner-point-burst_0.95s_ease-out_forwards]"
                 style={{ marginTop: `${index * 8}px` }}
               >
                 +{burst.label}P
@@ -870,7 +870,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
               <div className="relative overflow-hidden rounded-full">
                 <Progress
                   value={completionPercent}
-                  className="h-3 bg-white/10 [&>div]:bg-[linear-gradient(90deg,#FFD79F_0%,#FFB347_32%,#FF9626_72%,#2FAA7D_100%)]"
+                  className="h-3 bg-white/10 [&>div]:bg-[linear-gradient(90deg,var(--accent-orange-soft)_0%,var(--accent-orange)_72%,#2FAA7D_100%)]"
                 />
                 <div className="pointer-events-none absolute inset-y-0 w-20 animate-[planner-shimmer-slide_2.8s_linear_infinite] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.42)_55%,rgba(255,255,255,0)_100%)]" />
               </div>
@@ -903,7 +903,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                 <button type="button" onClick={handleCopyYesterdayPlan} className="rounded-full border border-white/12 bg-white/[0.1] px-3 py-2 text-[11px] font-black text-white transition hover:bg-white/[0.14]">
                   어제 복사
                 </button>
-                <button type="button" onClick={() => setIsTemplateSheetOpen(true)} className="rounded-full border border-[#FFB347]/28 bg-[#FF9626]/18 px-3 py-2 text-[11px] font-black text-[var(--accent-orange-soft)] transition hover:bg-[#FF9626]/24">
+                <button type="button" onClick={() => setIsTemplateSheetOpen(true)} className="rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] px-3 py-2 text-[11px] font-black text-[var(--accent-orange-soft)] transition hover:bg-[var(--accent-orange-surface-strong)]">
                   템플릿
                 </button>
               </div>
@@ -959,7 +959,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           isDone
                             ? 'border-emerald-400/18 bg-emerald-500/8'
                             : progressPercent > 0
-                              ? 'border-[#FFB347]/24 bg-[#FF9626]/10'
+                              ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)]'
                               : 'border-white/12 bg-white/[0.08]'
                         )}
                       >
@@ -1002,7 +1002,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                             <div className="relative overflow-hidden rounded-full">
                               <Progress
                                 value={progressPercent}
-                                className="h-2.5 bg-white/10 [&>div]:bg-[linear-gradient(90deg,#FFD79F_0%,#FFB347_40%,#FF9626_100%)]"
+                                className="h-2.5 bg-white/10 [&>div]:bg-[linear-gradient(90deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)]"
                               />
                               <div className="pointer-events-none absolute inset-y-0 w-14 animate-[planner-shimmer-slide_2.4s_linear_infinite] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.36)_52%,rgba(255,255,255,0)_100%)]" />
                             </div>
@@ -1048,7 +1048,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                                 <button
                                   type="button"
                                   onClick={() => handleToggleTask(task)}
-                                  className="rounded-full bg-[linear-gradient(135deg,#173A82_0%,#22479B_55%,#FF7A16_170%)] px-4 py-2 text-[11px] font-black text-white"
+                                  className="rounded-full bg-[linear-gradient(135deg,var(--student-night-panel)_0%,var(--student-night-panel-soft)_55%,var(--accent-orange)_170%)] px-4 py-2 text-[11px] font-black text-white"
                                 >
                                   완료
                                 </button>
@@ -1112,7 +1112,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           className={cn(
                             'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                             resolvedSubjectValue === subject.id
-                              ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)] shadow-[0_14px_26px_-20px_rgba(255,150,38,0.45)]'
+                              ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)] shadow-[var(--accent-orange-shadow)]'
                               : 'border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.12]'
                           )}
                         >
@@ -1125,7 +1125,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                         className={cn(
                           'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                           resolvedSubjectValue === 'etc'
-                            ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)] shadow-[0_14px_26px_-20px_rgba(255,150,38,0.45)]'
+                            ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)] shadow-[var(--accent-orange-shadow)]'
                             : 'border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.12]'
                         )}
                       >
@@ -1150,7 +1150,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           className={cn(
                             'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                             Number(newStudyMinutes || missionSuggestion?.targetMinutes || 0) === minute
-                              ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)] shadow-[0_14px_26px_-20px_rgba(255,150,38,0.45)]'
+                              ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)] shadow-[var(--accent-orange-shadow)]'
                               : 'border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.12]'
                           )}
                         >
@@ -1179,7 +1179,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           className={cn(
                             'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                             quickStudyType === type
-                              ? 'border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)] shadow-[0_14px_26px_-20px_rgba(255,150,38,0.45)]'
+                              ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)] shadow-[var(--accent-orange-shadow)]'
                               : 'border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.12]'
                           )}
                         >
@@ -1198,7 +1198,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
                     <div className={cn('rounded-[1.1rem] border border-white/12 bg-white/[0.08] px-4 py-3', isMobile ? 'space-y-3' : 'flex items-center justify-between gap-3')}>
                       <div>
-                        <p className="text-[10px] font-black tracking-[0.18em] text-[#FF9626]">AUTO SCHEDULE</p>
+                        <p className="text-[10px] font-black tracking-[0.18em] text-[var(--accent-orange)]">AUTO SCHEDULE</p>
                         <p className="mt-1 text-[12px] font-bold text-white">{resolvedWindowPreview ? `${resolvedWindowPreview.startTime} → ${resolvedWindowPreview.endTime}` : '시간은 자동으로 이어 붙어요'}</p>
                         <p className="mt-2 text-[11px] font-semibold text-[var(--text-on-dark-soft)]">그날만 필요한 미션은 위에 직접 적고 바로 퀘스트로 넣어도 돼요.</p>
                       </div>
@@ -1253,7 +1253,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {isAbsentMode ? (
-                        <Badge className="rounded-full border border-[#FFB347]/24 bg-[#FF9626]/16 px-3 py-1 text-[10px] font-black text-[var(--accent-orange-soft)] shadow-none">
+                        <Badge className="rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] px-3 py-1 text-[10px] font-black text-[var(--accent-orange-soft)] shadow-none">
                           {selectedAbsentSaveLabel}
                         </Badge>
                       ) : null}
@@ -1263,7 +1263,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                         </Badge>
                       ) : null}
                       {hasAwayPlan ? (
-                        <Badge className="rounded-full border border-[#FFB347]/24 bg-[#FF9626]/16 px-3 py-1 text-[10px] font-black text-[var(--accent-orange-soft)] shadow-none">
+                        <Badge className="rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] px-3 py-1 text-[10px] font-black text-[var(--accent-orange-soft)] shadow-none">
                           외출 {Math.max(1, editableAwayPlanCount)}건
                         </Badge>
                       ) : null}
@@ -1373,7 +1373,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
                   {!isPast ? (
                     <div className={cn('mt-4 gap-2', isMobile ? 'grid grid-cols-1' : 'flex flex-wrap')}>
-                      <Button type="button" onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className="h-11 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_60%,#FF7A16_170%)] px-4 font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.35)]">
+                      <Button type="button" onClick={() => handleSetAttendance('attend')} disabled={isSubmitting} className="h-11 rounded-2xl bg-[linear-gradient(135deg,var(--student-night-panel)_0%,var(--student-night-panel-soft)_60%,var(--accent-orange)_170%)] px-4 font-black text-white shadow-[var(--accent-orange-shadow)]">
                         <CalendarCheck2 className="mr-2 h-4 w-4" />
                         {selectedAttendanceSaveLabel}
                       </Button>
@@ -1492,7 +1492,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       className={cn(
                         'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                         awayReason === reason
-                          ? 'border-[#FFB347] bg-[#FFF2E3] text-[#D96E12] shadow-[0_12px_24px_-20px_rgba(255,150,38,0.4)]'
+                          ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange)] shadow-[var(--accent-orange-shadow)]'
                           : 'border-[#D7E1F2] bg-white text-[#17326B] hover:border-[#AFC3E8] hover:bg-[#F6F9FF]'
                       )}
                     >
@@ -1513,7 +1513,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                       className={cn(
                         'rounded-full border px-3 py-2 text-[11px] font-black transition-all',
                         outingDuration === duration
-                          ? 'border-[#FFB347] bg-[#FFF2E3] text-[#D96E12] shadow-[0_12px_24px_-20px_rgba(255,150,38,0.4)]'
+                          ? 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange)] shadow-[var(--accent-orange-shadow)]'
                           : 'border-[#D7E1F2] bg-white text-[#17326B] hover:border-[#AFC3E8] hover:bg-[#F6F9FF]'
                       )}
                     >
@@ -1701,7 +1701,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
 
             <div className="rounded-[1.15rem] border border-white/12 bg-white/[0.08] px-4 py-3">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">preview</div>
-              <div className="mt-2 inline-flex items-center rounded-full border border-[#FFB347]/28 bg-[#FF9626]/18 px-3 py-2 text-[11px] font-black text-[var(--accent-orange-soft)]">
+              <div className="mt-2 inline-flex items-center rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] px-3 py-2 text-[11px] font-black text-[var(--accent-orange-soft)]">
                 {presetEditorKind === 'minute'
                   ? `${sanitizeMinutePreset(presetEditorDraft || customMinutePreset)}분`
                   : sanitizePresetLabel(
@@ -1723,7 +1723,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
               <Button
                 type="button"
                 onClick={savePresetEditor}
-                className="h-11 flex-1 rounded-2xl bg-[linear-gradient(135deg,#173A82_0%,#22479B_58%,#FF7A16_170%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(23,58,130,0.45)]"
+                className="h-11 flex-1 rounded-2xl bg-[linear-gradient(135deg,var(--student-night-panel)_0%,var(--student-night-panel-soft)_58%,var(--accent-orange)_170%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(23,58,130,0.45)]"
               >
                 저장
               </Button>

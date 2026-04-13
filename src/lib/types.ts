@@ -3,6 +3,25 @@ import { Timestamp } from "firebase/firestore";
 
 export type WithId<T> = T & { id: string };
 
+export type SupportedUniversityThemeKey =
+  | 'seoul-national'
+  | 'yonsei'
+  | 'korea'
+  | 'sogang'
+  | 'sungkyunkwan'
+  | 'hanyang'
+  | 'chung-ang'
+  | 'kyung-hee'
+  | 'hufs'
+  | 'seoul-city'
+  | 'konkuk'
+  | 'dongguk'
+  | 'hongik'
+  | 'kookmin'
+  | 'soongsil'
+  | 'sejong'
+  | 'dankook';
+
 export interface LegalConsentSnapshot {
   agreed: boolean;
   version?: string;
@@ -42,6 +61,7 @@ export interface User {
   }>;
   goalPathType?: 'school' | 'job';
   goalPathLabel?: string;
+  universityThemeKey?: SupportedUniversityThemeKey | null;
   studyRoutineOnboarding?: RoutineOnboardingState;
   studyRoutineProfile?: UserStudyProfile;
   studyPlannerDiagnostic?: StudyPlannerDiagnosticRecord;
@@ -164,6 +184,7 @@ export interface StudentProfile {
   }>;
   goalPathType?: 'school' | 'job';
   goalPathLabel?: string;
+  universityThemeKey?: SupportedUniversityThemeKey | null;
   studyRoutineOnboarding?: RoutineOnboardingState;
   studyRoutineProfile?: UserStudyProfile;
   studyRoutineWorkspace?: RoutineWorkspaceState;

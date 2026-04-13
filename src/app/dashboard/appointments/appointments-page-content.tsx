@@ -1095,7 +1095,7 @@ export function AppointmentsPageContent({
 
   const isStudentTrackTheme = isStudent;
   const counselingCtaClass =
-    'border border-[rgba(255,215,180,0.32)] bg-[linear-gradient(180deg,#FFB24C_0%,#FF8A1F_100%)] text-[var(--text-on-accent)] shadow-[0_18px_34px_-24px_rgba(255,138,31,0.55)] hover:brightness-[1.04]';
+    'border border-[color:var(--accent-orange-border)] bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)] text-[var(--text-on-accent)] shadow-[var(--accent-orange-shadow)] hover:brightness-[1.04]';
   const studentSectionCardClass = cn(
     'w-full overflow-hidden border-none',
     isMobile ? 'rounded-[1.5rem]' : 'rounded-[2.5rem]',
@@ -1110,7 +1110,7 @@ export function AppointmentsPageContent({
     isStudentTrackTheme
       ? 'border-b border-white/10 bg-transparent'
       : isStaff
-        ? 'border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_54%,rgba(255,122,22,0.1)_100%)]'
+        ? 'border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_54%,var(--accent-orange-surface)_100%)]'
         : 'bg-muted/5 border-b'
   );
   const studentSectionTitleClass = cn(
@@ -1136,7 +1136,7 @@ export function AppointmentsPageContent({
     'rounded-full font-black gap-2 transition-all',
     isMobile ? 'min-h-[3.25rem] px-2' : '',
     isStudentTrackTheme
-      ? 'text-[#5D739B] hover:bg-white/60 hover:text-[#17326B] data-[state=active]:bg-[var(--accent-orange)] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_-16px_rgba(255,138,31,0.48)]'
+      ? 'text-[#5D739B] hover:bg-white/60 hover:text-[#17326B] data-[state=active]:bg-[var(--accent-orange)] data-[state=active]:text-white data-[state=active]:shadow-[var(--accent-orange-shadow)]'
       : isStaff
         ? 'text-[#5c6e97] hover:bg-white/70 hover:text-[#14295F] data-[state=active]:bg-white data-[state=active]:text-[#14295F] data-[state=active]:shadow-[0_18px_34px_-24px_rgba(20,41,95,0.42)]'
         : 'data-[state=active]:bg-white data-[state=active]:shadow-lg'
@@ -1181,14 +1181,14 @@ export function AppointmentsPageContent({
         <div className="rounded-2xl border border-[#ffe1c5] bg-[linear-gradient(135deg,#fff8ef_0%,#fff1e4_100%)] p-4">
           <div className="flex items-center gap-2">
             <div className="rounded-full bg-white p-2 shadow-sm">
-              <ShieldCheck className="h-4 w-4 text-[#FF7A16]" />
+                    <ShieldCheck className="h-4 w-4 text-[var(--accent-orange)]" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c26a1c]">와이파이 방화벽 해제 요청</p>
               <p className="mt-1 text-xs font-bold text-[#14295F]">학생이 학습용 사이트 허용을 요청했습니다.</p>
             </div>
           </div>
-          <div className="mt-3 rounded-xl border border-[#ffd9b6] bg-white/80 p-3">
+          <div className="mt-3 rounded-xl border border-[color:var(--accent-orange-border)] bg-white/80 p-3">
             <p className="text-[10px] font-black text-[#c26a1c]">요청 URL</p>
             <a
               href={item.requestedUrl}
@@ -1196,7 +1196,7 @@ export function AppointmentsPageContent({
               rel="noreferrer"
               className="mt-1 flex items-center gap-2 break-all text-sm font-black text-[#14295F] underline decoration-[#ffb170] underline-offset-4"
             >
-              <Link2 className="h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+                            <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--accent-orange)]" />
               {item.requestedUrl}
             </a>
           </div>
@@ -1427,7 +1427,7 @@ export function AppointmentsPageContent({
                   </Button>
                 </DialogTrigger>
                 <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "w-[min(94vw,25rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
-                  <div className={cn("text-white relative bg-[linear-gradient(180deg,#FFB24C_0%,#FF8A1F_100%)]", isMobile ? "p-6" : "p-10")}>
+          <div className={cn("text-white relative bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)]", isMobile ? "p-6" : "p-10")}>
                     <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
                     <DialogHeader>
                       <DialogTitle className={cn("font-black tracking-tighter text-left break-keep", isMobile ? "text-[1.7rem]" : "text-3xl")}>상담 신청</DialogTitle>
@@ -1558,7 +1558,7 @@ export function AppointmentsPageContent({
 
           <div className={cn('grid gap-5', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[1.35fr_0.65fr]')}>
             <Card className={staffPanelShellClass}>
-              <CardHeader className={cn('border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_52%,rgba(255,122,22,0.1)_100%)]', isMobile ? 'p-5' : 'p-6 sm:p-8')}>
+          <CardHeader className={cn('border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_52%,var(--accent-orange-surface)_100%)]', isMobile ? 'p-5' : 'p-6 sm:p-8')}>
                 <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
                   <div className="space-y-2">
                     <p className={staffLabelClass}>공지 운영</p>
@@ -1611,7 +1611,7 @@ export function AppointmentsPageContent({
                       />
                     </div>
                     <div className="flex justify-end">
-                      <Button onClick={handlePublishAnnouncement} disabled={isSubmitting} className="h-11 rounded-xl bg-[#FF7A16] px-5 font-black text-white hover:bg-[#e76c10]">
+              <Button onClick={handlePublishAnnouncement} disabled={isSubmitting} className="h-11 rounded-xl bg-[var(--accent-orange)] px-5 font-black text-white hover:bg-[var(--accent-orange-strong)]">
                         {isSubmitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Megaphone className="mr-1.5 h-4 w-4" />}
                         공지 발송
                       </Button>
@@ -1667,7 +1667,7 @@ export function AppointmentsPageContent({
               <div className={cn(staffPanelShellClass, 'p-5')}>
                 <p className={staffLabelClass}>즉시 확인</p>
                 <div className="mt-4 grid gap-3">
-                  <div className="rounded-[1.25rem] border border-[#ffe0c2] bg-[linear-gradient(135deg,#fff7ef_0%,#ffffff_100%)] px-4 py-4 shadow-[0_16px_32px_-28px_rgba(255,122,22,0.24)]">
+              <div className="rounded-[1.25rem] border border-[color:var(--accent-orange-border)] bg-[linear-gradient(135deg,#fff7ef_0%,#ffffff_100%)] px-4 py-4 shadow-[0_16px_32px_-28px_var(--accent-orange-shadow-soft)]">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">예약 승인 대기</p>
                     <p className="mt-2 text-2xl font-black text-[#14295F]">{staffPendingReservations}건</p>
                     <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">승인 또는 거절 처리가 필요한 예약입니다.</p>
@@ -1713,7 +1713,7 @@ export function AppointmentsPageContent({
                 </Button>
               </DialogTrigger>
               <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "w-[min(94vw,25rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
-                <div className={cn("text-white relative bg-[linear-gradient(180deg,#FFB24C_0%,#FF8A1F_100%)]", isMobile ? "p-6" : "p-10")}>
+          <div className={cn("text-white relative bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)]", isMobile ? "p-6" : "p-10")}>
                   <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
                   <DialogHeader>
                     <DialogTitle className={cn("font-black tracking-tighter text-left break-keep", isMobile ? "text-[1.7rem]" : "text-3xl")}>상담 신청</DialogTitle>
@@ -1899,7 +1899,7 @@ export function AppointmentsPageContent({
                       <div className="flex items-center gap-2">
                         {isStaff && res.status === 'requested' && (
                           <div className="flex gap-2 w-full sm:w-auto">
-                            <Button size="sm" onClick={() => handleUpdateStatus(res.id, 'confirmed')} className="rounded-xl font-black bg-[#FF7A16] hover:bg-[#e86c10] gap-1.5 h-10 px-4 text-white">
+                  <Button size="sm" onClick={() => handleUpdateStatus(res.id, 'confirmed')} className="rounded-xl font-black bg-[var(--accent-orange)] hover:bg-[var(--accent-orange-strong)] gap-1.5 h-10 px-4 text-white">
                               <Check className="h-4 w-4" /> 승인
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(res.id, 'canceled')} className="rounded-xl font-black border-[#dbe5ff] text-[#14295F] hover:bg-[#f5f8ff] h-10 px-4">
@@ -2245,7 +2245,7 @@ export function AppointmentsPageContent({
         {isStaff && (
           <TabsContent value="parent" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
             <Card className={staffPanelShellClass}>
-              <CardHeader className={cn("border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_52%,rgba(255,122,22,0.1)_100%)]", isMobile ? "p-6" : "p-6 sm:p-8")}>
+          <CardHeader className={cn("border-b border-[#dbe5ff] bg-[linear-gradient(135deg,rgba(20,41,95,0.08)_0%,rgba(79,124,255,0.08)_52%,var(--accent-orange-surface)_100%)]", isMobile ? "p-6" : "p-6 sm:p-8")}>
                 <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col items-stretch" : "flex-row")}>
                   <div className="space-y-2">
                     <CardTitle className={cn("font-black text-[#14295F] flex items-center gap-3 break-keep", isMobile ? "text-lg" : "text-xl")}>
@@ -2331,7 +2331,7 @@ export function AppointmentsPageContent({
                                 </Button>
                               )}
                               {item.status !== 'done' && (
-                                <Button size="sm" disabled={isSubmitting} onClick={() => handleParentCommunicationStatus(item.id, 'done')} className="rounded-xl font-black h-9 bg-[#FF7A16] text-white hover:bg-[#e86c10]">
+                  <Button size="sm" disabled={isSubmitting} onClick={() => handleParentCommunicationStatus(item.id, 'done')} className="rounded-xl font-black h-9 bg-[var(--accent-orange)] text-white hover:bg-[var(--accent-orange-strong)]">
                                   완료 처리
                                 </Button>
                               )}
@@ -2429,7 +2429,7 @@ export function AppointmentsPageContent({
             </div>
           </div>
           <DialogFooter className={cn("border-t border-[#dbe5ff] bg-[#f8fbff]", isMobile ? "p-5" : "p-8")}>
-            <Button onClick={handleSaveCounselLog} disabled={isSubmitting || !logContent.trim()} className="w-full h-14 rounded-2xl font-black bg-[#FF7A16] text-white shadow-xl hover:bg-[#e86c10]">
+              <Button onClick={handleSaveCounselLog} disabled={isSubmitting || !logContent.trim()} className="w-full h-14 rounded-2xl font-black bg-[var(--accent-orange)] text-white shadow-xl hover:bg-[var(--accent-orange-strong)]">
               {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 완료 및 일지 저장'}
             </Button>
           </DialogFooter>
@@ -2494,7 +2494,7 @@ export function AppointmentsPageContent({
                             className={cn(
                               'max-w-[85%] rounded-[1.5rem] px-4 py-3 shadow-sm',
                               alignRight
-                                ? 'bg-[linear-gradient(180deg,#FFB24C_0%,#FF8A1F_100%)] text-white'
+                                ? 'bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)] text-white'
                                 : 'border border-[#dbe5ff] bg-white text-[#14295F]'
                             )}
                           >
@@ -2512,7 +2512,7 @@ export function AppointmentsPageContent({
                                     'h-5 rounded-full px-2 text-[9px] font-black',
                                     alignRight
                                       ? 'border-white/20 bg-white/10 text-white'
-                                      : 'border-[#ffd9b6] bg-[#fff3e7] text-[#FF7A16]'
+                                      : 'border-[color:var(--accent-orange-border)] bg-[#fff3e7] text-[var(--accent-orange)]'
                                   )}
                                 >
                                   첫 요청

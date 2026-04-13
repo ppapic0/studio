@@ -31,13 +31,13 @@ import { cn } from "@/lib/utils";
 type RankRange = "daily" | "weekly" | "monthly";
 
 const HOME_RANK_CARD_BASE =
-  "student-utility-card relative w-full overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(89,133,223,0.34),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,188,102,0.14),transparent_40%),linear-gradient(180deg,rgba(7,17,35,0.98)_0%,rgba(12,28,58,0.98)_52%,rgba(20,41,95,0.98)_100%)] text-left shadow-[0_30px_56px_-30px_rgba(0,0,0,0.72)]";
+  "student-utility-card relative w-full overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_top_right,var(--student-panel-glow-strong),transparent_28%),radial-gradient(circle_at_bottom_left,var(--accent-orange-surface),transparent_40%),linear-gradient(180deg,var(--student-night-bg)_0%,var(--student-night-panel)_52%,var(--student-night-bg-soft)_100%)] text-left shadow-[0_30px_56px_-30px_rgba(0,0,0,0.72)]";
 const HOME_RANK_CARD_INSET =
   "rounded-[1.18rem] border border-white/10 bg-[rgba(255,255,255,0.06)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_16px_32px_-28px_rgba(0,0,0,0.62)]";
 const HOME_RANK_CARD_BADGE =
-  "inline-flex items-center gap-2 rounded-full border border-[#F5C97B]/30 bg-[rgba(255,198,112,0.08)] text-[#FFD99D]";
+  "inline-flex items-center gap-2 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]";
 const HOME_RANK_CARD_LIVE_BADGE =
-  "inline-flex items-center gap-1.5 rounded-full border border-[#FFB66E]/28 bg-[rgba(255,182,110,0.12)] text-[#FFCB95]";
+  "inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]";
 
 export type StudentHomeQuest = {
   id: string;
@@ -113,7 +113,7 @@ function RankPreviewTimeBadge({
       {entry.isLive ? (
         <span
           className={cn(
-            "rounded-full bg-[#FF7A16] shadow-[0_0_0_3px_rgba(255,122,22,0.12)] leaderboard-live-dot",
+            "rounded-full bg-[var(--accent-orange)] shadow-[0_0_0_3px_var(--accent-orange-surface)] leaderboard-live-dot",
             compact ? "h-1.5 w-1.5" : "h-2 w-2"
           )}
         />
@@ -169,13 +169,13 @@ function QuestRow({
         disabled && "cursor-wait opacity-70",
         quest.done
           ? "border border-emerald-300/32 bg-[linear-gradient(180deg,rgba(47,170,125,0.2),rgba(13,28,69,0.92))]"
-          : "surface-card surface-card--secondary on-dark hover:-translate-y-0.5 hover:border-[rgba(255,138,31,0.3)]",
+          : "surface-card surface-card--secondary on-dark hover:-translate-y-0.5 hover:border-[color:var(--accent-orange-border)]",
       )}
     >
       {gainKey ? (
         <span
           key={gainKey}
-          className="pointer-events-none absolute right-3 top-2 rounded-full border border-[rgba(255,138,31,0.26)] bg-[rgba(255,138,31,0.16)] px-2 py-1 text-[11px] font-black text-[var(--accent-orange-soft)]"
+          className="pointer-events-none absolute right-3 top-2 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] px-2 py-1 text-[11px] font-black text-[var(--accent-orange-soft)]"
           style={{ animation: "planner-fade-rise 900ms ease-out both" }}
         >
           완료!
@@ -786,7 +786,7 @@ export function StudentHomeGamePanel({
               ))
             ) : (
               <div className="surface-card surface-card--ghost on-dark rounded-[1.25rem] border-dashed px-4 py-6 text-center">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,138,31,0.2)] bg-[rgba(255,138,31,0.12)] text-[var(--accent-orange-soft)]">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]">
                   <Swords className="h-5 w-5" />
                 </div>
                 <div className="mt-3 text-base font-black text-white">아직 오늘 퀘스트가 없어요</div>
@@ -816,7 +816,7 @@ export function StudentHomeGamePanel({
               <button
                 type="button"
                 onClick={() => setIsPointHistoryOpen(true)}
-                className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3 text-left transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,122,22,0.28)]"
+          className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3 text-left transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]"
               >
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                   <History className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
@@ -856,8 +856,8 @@ export function StudentHomeGamePanel({
                               <div className="flex h-24 w-full items-end rounded-full bg-[rgba(5,16,43,0.44)] px-1.5 py-1.5 ring-1 ring-white/8">
                                 <div
                                   className={cn(
-                                    "w-full rounded-full bg-[linear-gradient(180deg,#FFB347_0%,#FF8A1F_100%)] shadow-[0_10px_20px_-14px_rgba(255,138,31,0.7)]",
-                                    item.date === bestDayLabel && "bg-[linear-gradient(180deg,#FFE6AB_0%,#FFB347_32%,#FF8A1F_100%)]",
+                  "w-full rounded-full bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)] shadow-[0_10px_20px_-14px_var(--accent-orange-shadow-soft)]",
+                  item.date === bestDayLabel && "bg-[linear-gradient(180deg,#fff3d6_0%,var(--accent-orange-soft)_32%,var(--accent-orange)_100%)]",
                                   )}
                                   style={{ height: `${height * 100}%` }}
                                 />
@@ -906,8 +906,8 @@ export function StudentHomeGamePanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {rankLiveBadge ? (
-                        <div className={cn(HOME_RANK_CARD_LIVE_BADGE, "px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_22px_-18px_rgba(255,122,22,0.22)]")}>
-                          <span className="h-2 w-2 rounded-full bg-[#FF7A16] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
+          <div className={cn(HOME_RANK_CARD_LIVE_BADGE, "px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_22px_-18px_var(--accent-orange-shadow-soft)]")}>
+            <span className="h-2 w-2 rounded-full bg-[var(--accent-orange)] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
                           {rankLiveBadge}
                         </div>
                       ) : null}
@@ -1046,8 +1046,8 @@ export function StudentHomeGamePanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {rankLiveBadge ? (
-                        <div className={cn(HOME_RANK_CARD_LIVE_BADGE, "px-2.5 py-1 text-[10px] font-black shadow-[0_10px_24px_-18px_rgba(255,122,22,0.22)]")}>
-                          <span className="h-2 w-2 rounded-full bg-[#FF7A16] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
+          <div className={cn(HOME_RANK_CARD_LIVE_BADGE, "px-2.5 py-1 text-[10px] font-black shadow-[0_10px_24px_-18px_var(--accent-orange-shadow-soft)]")}>
+            <span className="h-2 w-2 rounded-full bg-[var(--accent-orange)] animate-[leaderboard-live-dot-pulse_1.15s_ease-in-out_infinite]" />
                           {rankLiveBadge}
                         </div>
                       ) : null}

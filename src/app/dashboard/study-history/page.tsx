@@ -754,7 +754,7 @@ export default function StudyHistoryPage() {
 
   const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
     if (!isCurrentMonth) return 'text-[#C6CFDD]';
-    return '!text-[#FF7A16]';
+    return '!text-[var(--accent-orange)]';
   };
 
   const getStudentLegendChipClass = (level: StudyHistoryFlowLevel) => {
@@ -1372,7 +1372,7 @@ export default function StudyHistoryPage() {
                     'aspect-square',
                     isMobile ? 'min-h-0 rounded-[0.95rem] p-1' : 'rounded-[1.45rem] p-3.5',
                     studentCellClass,
-                    isTodayCalendar && isCurrentMonth && 'border-[#FF7A16] ring-2 ring-inset ring-[#FF7A16] shadow-[0_18px_30px_-22px_rgba(255,122,22,0.32)]',
+            isTodayCalendar && isCurrentMonth && 'border-[var(--accent-orange)] ring-2 ring-inset ring-[var(--accent-orange)] shadow-[0_18px_30px_-22px_var(--accent-orange-shadow-soft)]',
                     isCurrentMonth && 'hover:-translate-y-[1px] hover:shadow-[0_18px_30px_-22px_rgba(20,41,95,0.16)] active:translate-y-0'
                   )}
                 >
