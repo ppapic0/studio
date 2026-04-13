@@ -352,6 +352,8 @@ const formatPointBoostMultiplier = (value: number): string => {
   return `${label}배`;
 };
 
+const formatPointsInPt = (value: number): string => `${value.toLocaleString()}pt`;
+
 const parseKstDayRange = (dateKey: string): { startAtMs: number; endAtMs: number } | null => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
   const startAtMs = Date.parse(`${dateKey}T00:00:00+09:00`);
@@ -3082,7 +3084,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         key: 'today-points',
         label: '오늘 지급 포인트',
         value: todayPointsSummary.totalPoints.toLocaleString(),
-        unit: '점',
+        unit: 'pt',
         icon: Sparkles,
         tone: pointBoostOverview.activeEvent ? 'orange' as const : 'blue' as const,
         delta: null,
@@ -3878,11 +3880,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     </Badge>
                   </div>
                   <DialogTitle className="text-2xl font-black tracking-tight">
-                    오늘 총 {todayPointsSummary.totalPoints.toLocaleString()}점 지급
+                    오늘 총 {formatPointsInPt(todayPointsSummary.totalPoints)} 지급
                   </DialogTitle>
                   <DialogDescription className="text-sm font-medium text-white/76">
-                    상자 {todayPointsSummary.studyBoxPoints.toLocaleString()}점 · 랭킹 {todayPointsSummary.rankPoints.toLocaleString()}점
-                    {todayPointsSummary.otherPoints > 0 ? ` · 기타 ${todayPointsSummary.otherPoints.toLocaleString()}점` : ''}
+                    상자 {formatPointsInPt(todayPointsSummary.studyBoxPoints)} · 랭킹 {formatPointsInPt(todayPointsSummary.rankPoints)}
+                    {todayPointsSummary.otherPoints > 0 ? ` · 기타 ${formatPointsInPt(todayPointsSummary.otherPoints)}` : ''}
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -3919,21 +3921,21 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
                               <Badge className="h-6 rounded-full border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">
-                                상자 {row.studyBoxPoints.toLocaleString()}점
+                                상자 {formatPointsInPt(row.studyBoxPoints)}
                               </Badge>
                               <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
-                                랭킹 {row.rankPoints.toLocaleString()}점
+                                랭킹 {formatPointsInPt(row.rankPoints)}
                               </Badge>
                               {row.otherPoints > 0 ? (
                                 <Badge className="h-6 rounded-full border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
-                                  기타 {row.otherPoints.toLocaleString()}점
+                                  기타 {formatPointsInPt(row.otherPoints)}
                                 </Badge>
                               ) : null}
                             </div>
                           </div>
                           <div className="shrink-0 text-right">
                             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">총 지급</p>
-                            <p className="admin-kpi-number mt-2 text-[1.55rem] text-[#14295F]">{row.totalPoints.toLocaleString()}</p>
+                            <p className="admin-kpi-number mt-2 text-[1.55rem] text-[#14295F]">{formatPointsInPt(row.totalPoints)}</p>
                           </div>
                         </div>
                       </div>
