@@ -28,12 +28,12 @@ type RankedStudentEntry = StudentProfileSnapshot & {
 };
 
 type CenterStudentContext = {
+  includedStudentIds: string[];
   shouldInclude: (studentId: string) => boolean;
   getProfile: (studentId: string) => StudentProfileSnapshot;
 };
 
 const DAILY_RANK_START_HOUR = 17;
-const WEEKEND_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
 const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying", "away", "break"]);
 
@@ -191,19 +191,14 @@ function shouldExcludeFromCompetitionRecord(value: unknown, studentId?: unknown)
   return exclusions?.rankings === true || exclusions?.competition === true;
 }
 
-function isWeekendCompetitionDate(targetDate: Date) {
-  const day = targetDate.getDay();
-  return day === 0 || day === 6;
-}
-
-function getCompetitionStartHour(targetDate: Date) {
-  return isWeekendCompetitionDate(targetDate) ? WEEKEND_RANK_START_HOUR : DAILY_RANK_START_HOUR;
+function getCompetitionStartHour() {
+  return DAILY_RANK_START_HOUR;
 }
 
 function buildCompetitionWindow(targetDate: Date) {
   const competitionDate = startOfKstDay(targetDate);
   const startsAt = cloneDate(competitionDate);
-  startsAt.setHours(getCompetitionStartHour(competitionDate), 0, 0, 0);
+  startsAt.setHours(getCompetitionStartHour(), 0, 0, 0);
 
   const endsAt = cloneDate(competitionDate);
   endsAt.setDate(endsAt.getDate() + 1);
@@ -227,6 +222,15 @@ function getDateKeysCoveredByWindow(startsAt: Date, endsAt: Date) {
   }
 
   return keys;
+}
+
+function chunkItems<T>(items: T[], size: number) {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
 
 function getAttendanceStatusRank(value: unknown) {
@@ -303,6 +307,31 @@ function getLiveAttendanceOverlapMinutes(
   if (startedAtMs <= 0) return 0;
 
   return getDailyWindowOverlapMinutes(startedAtMs, referenceMs, dailyWindow);
+}
+
+function getSessionReferenceMillis(session: Record<string, unknown>) {
+  const startedAtMs = toTimestampMillis(session.startTime);
+  if (startedAtMs <= 0) {
+    return {
+      startedAtMs: 0,
+      referenceMs: 0,
+    };
+  }
+
+  const endedAtMs = toTimestampMillis(session.endTime);
+  if (endedAtMs > startedAtMs) {
+    return {
+      startedAtMs,
+      referenceMs: endedAtMs,
+    };
+  }
+
+  const rawDurationMinutes = Number(session.durationMinutes ?? 0);
+  const durationMinutes = Number.isFinite(rawDurationMinutes) ? Math.max(0, Math.round(rawDurationMinutes)) : 0;
+  return {
+    startedAtMs,
+    referenceMs: durationMinutes > 0 ? startedAtMs + durationMinutes * 60000 : 0,
+  };
 }
 
 function applyCompetitionRanks<T extends { value: number }>(entries: T[]): Array<T & { rank: number }> {
@@ -389,7 +418,15 @@ async function loadCenterStudentContext(
     });
   });
 
+  const includedStudentIds = Array.from(new Set([
+    ...studentProfiles.keys(),
+    ...activeStudentIds,
+  ])).filter((studentId) =>
+    !excludedStudentIds.has(studentId) && (activeStudentIds.size === 0 || activeStudentIds.has(studentId))
+  );
+
   return {
+    includedStudentIds,
     shouldInclude: (studentId: string) =>
       !excludedStudentIds.has(studentId) && (activeStudentIds.size === 0 || activeStudentIds.has(studentId)),
     getProfile: (studentId: string) =>
@@ -436,20 +473,53 @@ async function buildDailyAwardEntries(
 ) {
   const dailyWindow = buildCompetitionWindow(competitionDate);
   const dailyDateKeys = getDateKeysCoveredByWindow(dailyWindow.startsAt, dailyWindow.endsAt);
-  const dailySnapshots = await Promise.all(
-    dailyDateKeys.map((dateKey) => db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get())
+  const dayRefs = context.includedStudentIds.flatMap((studentId) =>
+    dailyDateKeys.map((dateKey) => db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`))
   );
+  const dailyDayDocs: FirebaseFirestore.DocumentSnapshot[] = [];
+  for (const chunk of chunkItems(dayRefs, 350)) {
+    if (chunk.length === 0) continue;
+    const chunkSnapshots = await db.getAll(...chunk);
+    dailyDayDocs.push(...chunkSnapshots);
+  }
+
+  const sessionRequests = dailyDayDocs.flatMap((docSnap) => {
+    if (!docSnap.exists) return [];
+
+    const data = docSnap.data() as Record<string, unknown>;
+    const studentId = typeof data.studentId === "string" && data.studentId.trim()
+      ? data.studentId.trim()
+      : docSnap.ref.parent.parent?.id ?? "";
+    const persistedMinutes = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
+
+    if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId)) return [];
+    if (persistedMinutes <= 0 && !data.firstSessionStartAt && !data.lastSessionEndAt) return [];
+
+    return [{
+      studentId,
+      snapshotRef: docSnap.ref.collection("sessions"),
+    }];
+  });
 
   const totals = new Map<string, number>();
-  dailySnapshots.forEach((snapshot) => {
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data() as Record<string, unknown>;
-      const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-      const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
-      if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
-      totals.set(studentId, (totals.get(studentId) || 0) + value);
+  for (const chunk of chunkItems(sessionRequests, 40)) {
+    if (chunk.length === 0) continue;
+    const chunkSnapshots = await Promise.all(chunk.map(({ snapshotRef }) => snapshotRef.get()));
+    chunkSnapshots.forEach((snapshot, index) => {
+      const fallbackStudentId = chunk[index]?.studentId ?? "";
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as Record<string, unknown>;
+        const studentId = typeof data.studentId === "string" && data.studentId.trim()
+          ? data.studentId.trim()
+          : fallbackStudentId;
+        const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
+        const value = getDailyWindowOverlapMinutes(startedAtMs, referenceMs, dailyWindow);
+
+        if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
+        totals.set(studentId, (totals.get(studentId) || 0) + value);
+      });
     });
-  });
+  }
 
   const attendanceBuckets = new Map<string, Record<string, unknown>[]>();
   const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();

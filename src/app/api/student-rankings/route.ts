@@ -5,7 +5,7 @@ import { noStoreJson } from '@/lib/api-security';
 import { shouldExcludeFromCompetitionTrack } from '@/lib/counseling-demo';
 import { adminAuth, adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
-import { getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
+import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
 type ActiveLiveRankStatus = 'studying' | 'away' | 'break';
@@ -162,6 +162,31 @@ function chunkItems<T>(items: T[], size: number) {
   return chunks;
 }
 
+function getSessionReferenceMillis(session: Record<string, unknown>) {
+  const startedAtMs = toTimestampMillis(session.startTime);
+  if (startedAtMs <= 0) {
+    return {
+      startedAtMs: 0,
+      referenceMs: 0,
+    };
+  }
+
+  const endedAtMs = toTimestampMillis(session.endTime);
+  if (endedAtMs > startedAtMs) {
+    return {
+      startedAtMs,
+      referenceMs: endedAtMs,
+    };
+  }
+
+  const rawDurationMinutes = Number(session.durationMinutes ?? 0);
+  const durationMinutes = Number.isFinite(rawDurationMinutes) ? Math.max(0, Math.round(rawDurationMinutes)) : 0;
+  return {
+    startedAtMs,
+    referenceMs: durationMinutes > 0 ? startedAtMs + durationMinutes * 60000 : 0,
+  };
+}
+
 function normalizeMembershipStatus(value: unknown) {
   if (typeof value !== 'string') return 'active';
   const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -280,9 +305,6 @@ export async function GET(request: NextRequest) {
     const studentsSnapPromise = adminDb
       .collection(`centers/${centerId}/students`)
       .get();
-    const dailySnapPromises = dailyDateKeys.map((dateKey) =>
-      adminDb.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()
-    );
     const attendanceSnapPromise = adminDb
       .collection(`centers/${centerId}/attendanceCurrent`)
       .get();
@@ -297,13 +319,11 @@ export async function GET(request: NextRequest) {
       membersSnapPromise,
       studentsSnapPromise,
       attendanceSnapPromise,
-      ...dailySnapPromises,
       ...weeklySnapPromises,
       ...monthlySnapPromises,
     ]);
-    const dailySnaps = dateStatSnaps.slice(0, dailySnapPromises.length);
-    const weeklySnaps = dateStatSnaps.slice(dailySnapPromises.length, dailySnapPromises.length + weeklySnapPromises.length);
-    const monthlySnaps = dateStatSnaps.slice(dailySnapPromises.length + weeklySnapPromises.length);
+    const weeklySnaps = dateStatSnaps.slice(0, weeklySnapPromises.length);
+    const monthlySnaps = dateStatSnaps.slice(weeklySnapPromises.length);
 
     const studentProfiles = new Map<string, {
       displayNameSnapshot: string;
@@ -424,11 +444,49 @@ export async function GET(request: NextRequest) {
       return snapshots;
     };
 
+    const fetchStudyLogSessionSnapshots = async (dayDocs: FirebaseFirestore.DocumentSnapshot[]) => {
+      const requests = dayDocs.flatMap((docSnap) => {
+        if (!docSnap.exists) return [];
+
+        const data = docSnap.data() as Record<string, unknown>;
+        const studentId = typeof data.studentId === 'string' && data.studentId.trim()
+          ? data.studentId.trim()
+          : docSnap.ref.parent.parent?.id ?? '';
+        const dateKey = typeof data.dateKey === 'string' && data.dateKey.trim()
+          ? data.dateKey.trim()
+          : docSnap.id;
+        const persistedMinutes = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
+
+        if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId)) return [];
+        if (persistedMinutes <= 0 && !data.firstSessionStartAt && !data.lastSessionEndAt) return [];
+
+        return [{
+          studentId,
+          snapshotRef: docSnap.ref.collection('sessions'),
+        }];
+      });
+
+      const snapshots: Array<{ studentId: string; snapshot: FirebaseFirestore.QuerySnapshot }> = [];
+      for (const chunk of chunkItems(requests, 40)) {
+        if (chunk.length === 0) continue;
+        const chunkSnapshots = await Promise.all(chunk.map(({ snapshotRef }) => snapshotRef.get()));
+        chunkSnapshots.forEach((snapshot, index) => {
+          snapshots.push({
+            studentId: chunk[index]?.studentId ?? '',
+            snapshot,
+          });
+        });
+      }
+
+      return snapshots;
+    };
+
     const [dailyStudyDayDocs, weeklyStudyDayDocs, monthlyStudyDayDocs] = await Promise.all([
       fetchStudyLogDayDocs(dailyDateKeys),
       fetchStudyLogDayDocs(weekDateKeys),
       fetchStudyLogDayDocs(monthDateKeys),
     ]);
+    const dailyStudySessionSnaps = await fetchStudyLogSessionSnapshots(dailyStudyDayDocs);
 
     const seatIdToStudentId = new Map<string, string | null>();
     const roomSeatToStudentId = new Map<string, string | null>();
@@ -448,30 +506,22 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const dailyMinutesByStudentDate = new Map<string, number>();
+    const dailyTotals = new Map<string, number>();
     const weeklyMinutesByStudentDate = new Map<string, number>();
     const monthlyMinutesByStudentDate = new Map<string, number>();
 
-    dailySnaps.forEach((snapshot, index) => {
-      const fallbackDateKey = dailyDateKeys[index] || '';
+    dailyStudySessionSnaps.forEach(({ studentId: fallbackStudentId, snapshot }) => {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
-        const studentId = typeof data.studentId === 'string' ? data.studentId : docSnap.id;
-        const dateKey = typeof data.dateKey === 'string' && data.dateKey.trim() ? data.dateKey.trim() : fallbackDateKey;
-        const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
-        if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
-        mergeRankMinutesByDate(dailyMinutesByStudentDate, studentId, dateKey, value);
-      });
-    });
+        const studentId = typeof data.studentId === 'string' && data.studentId.trim()
+          ? data.studentId.trim()
+          : fallbackStudentId;
+        const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
+        const value = getDailyRankWindowOverlapMinutes(startedAtMs, referenceMs, dailyRankWindow);
 
-    dailyStudyDayDocs.forEach((docSnap) => {
-      if (!docSnap.exists) return;
-      const data = docSnap.data() as Record<string, unknown>;
-      const studentId = typeof data.studentId === 'string' ? data.studentId : '';
-      const dateKey = typeof data.dateKey === 'string' ? data.dateKey.trim() : '';
-      const value = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
-      if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
-      mergeRankMinutesByDate(dailyMinutesByStudentDate, studentId, dateKey, value);
+        if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+        addRankMinutes(dailyTotals, studentId, value);
+      });
     });
 
     weeklySnaps.forEach((snapshot, index) => {
@@ -518,7 +568,6 @@ export async function GET(request: NextRequest) {
       mergeRankMinutesByDate(monthlyMinutesByStudentDate, studentId, dateKey, value);
     });
 
-    const dailyTotals = foldRankMinutesByDate(dailyMinutesByStudentDate);
     const weeklyTotals = foldRankMinutesByDate(weeklyMinutesByStudentDate);
     const monthlyTotals = foldRankMinutesByDate(monthlyMinutesByStudentDate);
 

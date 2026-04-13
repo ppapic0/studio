@@ -19,7 +19,6 @@ export type DailyRankWindowState = {
 };
 
 const DAILY_RANK_START_HOUR = 17;
-const WEEKEND_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
 
 export const STUDENT_RANK_REWARD_TIERS: Record<StudentRankingRange, StudentRankRewardTier[]> = {
@@ -48,13 +47,8 @@ export function toKstDateKey(baseDate: Date) {
   return `${baseDate.getFullYear()}-${padNumber(baseDate.getMonth() + 1)}-${padNumber(baseDate.getDate())}`;
 }
 
-function isWeekendCompetitionDate(targetDate: Date) {
-  const day = targetDate.getDay();
-  return day === 0 || day === 6;
-}
-
-function getCompetitionStartHour(targetDate: Date) {
-  return isWeekendCompetitionDate(targetDate) ? WEEKEND_RANK_START_HOUR : DAILY_RANK_START_HOUR;
+function getCompetitionStartHour() {
+  return DAILY_RANK_START_HOUR;
 }
 
 function buildCompetitionWindow(targetDate: Date) {
@@ -62,7 +56,7 @@ function buildCompetitionWindow(targetDate: Date) {
   competitionDate.setHours(0, 0, 0, 0);
 
   const startsAt = new Date(competitionDate);
-  startsAt.setHours(getCompetitionStartHour(competitionDate), 0, 0, 0);
+  startsAt.setHours(getCompetitionStartHour(), 0, 0, 0);
 
   const endsAt = new Date(competitionDate);
   endsAt.setDate(endsAt.getDate() + 1);
@@ -98,7 +92,7 @@ function getDateKeysCoveredByWindow(startsAt: Date, endsAt: Date) {
 }
 
 export function getDailyRankWindowLabel() {
-  return "평일 17:00~01:00 · 주말 08:00~01:00";
+  return "매일 17:00~01:00";
 }
 
 export function getStudentRankRewardTiers(range: StudentRankingRange) {
