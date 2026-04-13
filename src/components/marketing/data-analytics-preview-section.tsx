@@ -6,13 +6,34 @@ import { StaggerChildren } from './stagger-children';
 
 const analyticsFocusChips = ['공부시간', '목표 달성률', '성장률', '리듬', '시작·종료 시간', '중간 이탈시간'];
 
-const analyticsScreenshots = [
+type AnalyticsScreenshotRedaction = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  radius: string;
+};
+
+type AnalyticsScreenshot = {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  frameClassName: string;
+  redactions?: readonly AnalyticsScreenshotRedaction[];
+};
+
+const analyticsScreenshots: readonly AnalyticsScreenshot[] = [
   {
     src: '/marketing/app-evidence/experience-analytics-overview-capture.png',
     alt: '트랙 학습 분석 요약 화면 스크린샷',
     width: 836,
     height: 660,
     frameClassName: '',
+    redactions: [
+      { left: 3.8, top: 1.3, width: 31.2, height: 8.8, radius: '999px' },
+      { left: 3.8, top: 10.6, width: 29.8, height: 5.2, radius: '999px' },
+    ],
   },
   {
     src: '/marketing/app-evidence/experience-analytics-dashboard-capture.png',
@@ -26,7 +47,7 @@ const analyticsScreenshots = [
 function AnalyticsScreenshotCard({
   screen,
 }: {
-  screen: (typeof analyticsScreenshots)[number];
+  screen: AnalyticsScreenshot;
 }) {
   return (
     <article className="brand-panel-scan relative overflow-hidden rounded-[1.2rem] border border-[#14295F]/10 bg-white p-3 shadow-[0_14px_30px_rgba(20,41,95,0.08)] sm:rounded-[1.55rem] sm:p-5">
@@ -37,14 +58,30 @@ function AnalyticsScreenshotCard({
       />
       <div className={`relative ${screen.frameClassName}`}>
         <div className="overflow-hidden rounded-[1rem] border border-[#D8E5FF] bg-[linear-gradient(180deg,#FBFDFF_0%,#F3F7FF_100%)] p-2.5 shadow-[0_16px_32px_rgba(20,41,95,0.06)] sm:rounded-[1.2rem] sm:p-3.5">
-          <Image
-            src={screen.src}
-            alt={screen.alt}
-            width={screen.width}
-            height={screen.height}
-            sizes="(max-width: 640px) 92vw, (max-width: 1024px) 88vw, 1120px"
-            className="h-auto w-full rounded-[0.75rem] border border-[#EEF3FF] bg-white object-contain"
-          />
+          <div className="relative">
+            <Image
+              src={screen.src}
+              alt={screen.alt}
+              width={screen.width}
+              height={screen.height}
+              sizes="(max-width: 640px) 92vw, (max-width: 1024px) 88vw, 1120px"
+              className="h-auto w-full rounded-[0.75rem] border border-[#EEF3FF] bg-white object-contain"
+            />
+            {screen.redactions?.map((area, index) => (
+              <div
+                key={`${screen.src}-redaction-${index}`}
+                aria-hidden="true"
+                className="pointer-events-none absolute border border-white/10 bg-[linear-gradient(135deg,rgba(22,43,92,0.96)_0%,rgba(14,29,70,0.96)_100%)] shadow-[0_10px_26px_rgba(9,20,54,0.28)] backdrop-blur-[3px]"
+                style={{
+                  left: `${area.left}%`,
+                  top: `${area.top}%`,
+                  width: `${area.width}%`,
+                  height: `${area.height}%`,
+                  borderRadius: area.radius,
+                }}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </article>
