@@ -143,16 +143,24 @@ function getLegacyDailyPointAwardTotal(dayStatus: Record<string, unknown>): numb
         return total + Math.max(0, Math.floor(parseFiniteNumber(entry.awardedPoints) ?? 0));
       }, 0)
     : 0;
-  const rankRewardPoints = ["dailyRankRewardAmount", "weeklyRankRewardAmount", "monthlyRankRewardAmount"].reduce(
-    (total, key) => total + Math.max(0, Math.floor(parseFiniteNumber(dayStatus[key]) ?? 0)),
-    0
-  );
+  const rankRewardPoints = getRankRewardAwardTotal(dayStatus);
   return studyBoxPoints + rankRewardPoints;
 }
 
 function getDailyAwardedPointTotal(dayStatus: Record<string, unknown>): number {
   const dailyPointAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.dailyPointAmount) ?? 0));
   return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
+}
+
+function getRankRewardAwardTotal(dayStatus: Record<string, unknown>) {
+  const dailyRankRewardAmount = Math.max(
+    Math.floor(parseFiniteNumber(dayStatus.dailyRankRewardAmount) ?? 0),
+    Math.floor(parseFiniteNumber(dayStatus.dailyTopRewardAmount) ?? 0)
+  );
+  const weeklyRankRewardAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.weeklyRankRewardAmount) ?? 0));
+  const monthlyRankRewardAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.monthlyRankRewardAmount) ?? 0));
+
+  return Math.max(0, dailyRankRewardAmount) + weeklyRankRewardAmount + monthlyRankRewardAmount;
 }
 
 function clampDailyPointAward(dayStatus: Record<string, unknown>, requestedPoints: number) {

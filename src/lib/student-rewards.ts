@@ -86,12 +86,23 @@ export function normalizeStoredStudyBoxRewardEntries(values: unknown): StudyBoxR
     .sort((a, b) => a.milestone - b.milestone);
 }
 
+function getNormalizedRewardAmount(value: unknown): number {
+  const points = Number(value ?? 0);
+  if (!Number.isFinite(points)) return 0;
+  return Math.max(0, Math.floor(points));
+}
+
+function getDailyRankRewardPoints(dayStatus?: Record<string, any>): number {
+  return Math.max(
+    getNormalizedRewardAmount(dayStatus?.dailyRankRewardAmount),
+    getNormalizedRewardAmount(dayStatus?.dailyTopRewardAmount)
+  );
+}
+
 export function getRankRewardPoints(dayStatus?: Record<string, any>): number {
-  return ['dailyRankRewardAmount', 'weeklyRankRewardAmount', 'monthlyRankRewardAmount'].reduce((total, key) => {
-    const points = Number(dayStatus?.[key] ?? 0);
-    if (!Number.isFinite(points)) return total;
-    return total + Math.max(0, Math.floor(points));
-  }, 0);
+  return getDailyRankRewardPoints(dayStatus)
+    + getNormalizedRewardAmount(dayStatus?.weeklyRankRewardAmount)
+    + getNormalizedRewardAmount(dayStatus?.monthlyRankRewardAmount);
 }
 
 function inferOpenedStudyBoxHours(dayStatus?: Record<string, any>): number[] {
