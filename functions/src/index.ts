@@ -177,9 +177,9 @@ type SecureStudyBoxReward = {
 };
 
 const STUDY_BOX_REWARD_RANGE_BY_RARITY: Record<StudyBoxRarity, readonly [number, number]> = {
-  common: [10, 20],
-  rare: [20, 30],
-  epic: [30, 40],
+  common: [1, 10],
+  rare: [10, 20],
+  epic: [20, 30],
 };
 const EARLY_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: number }> = [
   { rarity: "common", weight: 80 },

@@ -81,9 +81,9 @@ const DEFAULT_SMS_TEMPLATES = {
     late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
 };
 const STUDY_BOX_REWARD_RANGE_BY_RARITY = {
-    common: [10, 20],
-    rare: [20, 30],
-    epic: [30, 40],
+    common: [1, 10],
+    rare: [10, 20],
+    epic: [20, 30],
 };
 const EARLY_STUDY_BOX_RARITY_WEIGHTS = [
     { rarity: "common", weight: 80 },
