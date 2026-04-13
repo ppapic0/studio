@@ -1181,7 +1181,7 @@ export function AppointmentsPageContent({
         <div className="rounded-2xl border border-[#ffe1c5] bg-[linear-gradient(135deg,#fff8ef_0%,#fff1e4_100%)] p-4">
           <div className="flex items-center gap-2">
             <div className="rounded-full bg-white p-2 shadow-sm">
-                    <ShieldCheck className="h-4 w-4 text-[var(--accent-orange)]" />
+                    <ShieldCheck className="h-4 w-4 text-[var(--text-accent-fixed)]" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c26a1c]">와이파이 방화벽 해제 요청</p>
@@ -1196,7 +1196,7 @@ export function AppointmentsPageContent({
               rel="noreferrer"
               className="mt-1 flex items-center gap-2 break-all text-sm font-black text-[#14295F] underline decoration-[#ffb170] underline-offset-4"
             >
-                            <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--accent-orange)]" />
+                            <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-accent-fixed)]" />
               {item.requestedUrl}
             </a>
           </div>
@@ -1334,7 +1334,7 @@ export function AppointmentsPageContent({
                         surface === 'staff'
                           ? 'text-[#7f93ba]'
                           : isStudentTrackTheme
-                            ? 'text-[var(--accent-orange-soft)]'
+                            ? 'text-[var(--text-accent-soft-fixed)]'
                             : 'text-orange-700'
                       )}>
                         첫 요청 메시지
@@ -1410,7 +1410,7 @@ export function AppointmentsPageContent({
               <div className={cn("flex justify-between gap-4", isMobile ? "flex-col" : "items-start")}>
                 <div className="min-w-0">
                   <h1 className={cn("font-aggro-display font-black tracking-tighter leading-none text-[var(--text-on-dark)]", isMobile ? "text-3xl" : "text-4xl")}>상담트랙</h1>
-                  <p className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-orange-soft)]">
+                  <p className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-accent-soft-fixed)]">
                     상담 예약 · 피드백 센터
                   </p>
                 </div>
@@ -1776,7 +1776,7 @@ export function AppointmentsPageContent({
         <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={cn(studentSectionCardClass, isMobile ? "mb-4" : "mb-6")}>
           <CardHeader className={studentSectionHeaderClass}>
             <CardTitle className={studentSectionTitleClass}>
-              <Megaphone className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : "opacity-70 text-amber-700")} /> 공지사항
+                    <Megaphone className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--text-accent-fixed)] opacity-100" : "opacity-70 text-amber-700")} /> 공지사항
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -1835,7 +1835,7 @@ export function AppointmentsPageContent({
               <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
                 <div className="space-y-2">
                   <CardTitle className={studentSectionTitleClass}>
-                    <History className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : isStaff ? "text-[#14295F]" : "opacity-40")} /> 예약 및 신청 내역
+                    <History className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--text-accent-fixed)] opacity-100" : isStaff ? "text-[#14295F]" : "opacity-40")} /> 예약 및 신청 내역
                   </CardTitle>
                   {isStaff && (
                     <CardDescription className="text-sm font-semibold leading-6 text-[#5c6e97]">
@@ -1956,7 +1956,7 @@ export function AppointmentsPageContent({
               <div className={cn("flex justify-between items-center gap-4", isMobile ? "flex-col" : "flex-row")}>
                 <div className="space-y-2">
                   <CardTitle className={studentSectionTitleClass}>
-                    <CheckCircle2 className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : isStaff ? "text-[#14295F]" : "opacity-60 text-emerald-700")} /> 피드백 및 결과 일지
+                      <CheckCircle2 className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--text-accent-fixed)] opacity-100" : isStaff ? "text-[#14295F]" : "opacity-60 text-emerald-700")} /> 피드백 및 결과 일지
                   </CardTitle>
                   {isStaff && (
                     <CardDescription className="text-sm font-semibold leading-6 text-[#5c6e97]">
@@ -1966,7 +1966,7 @@ export function AppointmentsPageContent({
                 </div>
                 
                 <div className={cn("flex items-center gap-2 p-1.5 rounded-2xl border", isMobile ? "w-full" : "w-auto", isStudentTrackTheme ? "border-white/10 bg-white/[0.06] shadow-none" : isStaff ? "border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#eef4ff_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]" : "bg-white/50 shadow-sm")}>
-                  <Filter className={cn("h-3.5 w-3.5 ml-2", isStudentTrackTheme ? "text-[var(--accent-orange-soft)]" : isStaff ? "text-[#14295F]" : "text-emerald-600")} />
+                  <Filter className={cn("h-3.5 w-3.5 ml-2", isStudentTrackTheme ? "text-[var(--text-accent-soft-fixed)]" : isStaff ? "text-[#14295F]" : "text-emerald-600")} />
                   <Select value={selectedSeason} onValueChange={setSelectedSeason}>
                     <SelectTrigger className={cn("h-9 w-full sm:w-[180px] border-none bg-transparent font-black text-xs shadow-none focus:ring-0", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : isStaff ? "text-[#14295F]" : "")}>
                       <SelectValue placeholder="시즌 선택" />
@@ -2100,7 +2100,7 @@ export function AppointmentsPageContent({
                 <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
                   <div className="space-y-2">
                     <CardTitle className={studentSectionTitleClass}>
-                      <MessageSquare className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--accent-orange)] opacity-100" : isStaff ? "text-[#14295F]" : "opacity-60 text-sky-700")} /> 질문/건의/요청함
+                      <MessageSquare className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--text-accent-fixed)] opacity-100" : isStaff ? "text-[#14295F]" : "opacity-60 text-sky-700")} /> 질문/건의/요청함
                     </CardTitle>
                     <CardDescription className={studentSectionDescriptionClass}>궁금한 점, 건의사항, 와이파이 방화벽 해제 요청까지 남기면 선생님 또는 센터관리자가 확인 후 답변합니다.</CardDescription>
                   </div>
@@ -2512,7 +2512,7 @@ export function AppointmentsPageContent({
                                     'h-5 rounded-full px-2 text-[9px] font-black',
                                     alignRight
                                       ? 'border-white/20 bg-white/10 text-white'
-                                      : 'border-[color:var(--accent-orange-border)] bg-[#fff3e7] text-[var(--accent-orange)]'
+                                : 'border-[color:var(--accent-orange-border)] bg-[#fff3e7] text-[var(--text-accent-fixed)]'
                                   )}
                                 >
                                   첫 요청

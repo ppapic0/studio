@@ -84,6 +84,9 @@
     --text-on-dark-muted: #b8c8e6;
     --text-on-light: #14295f;
     --text-on-accent: #fffaf5;
+    --text-accent-fixed: #ff8a1f;
+    --text-accent-soft-fixed: #ffd89f;
+    --text-accent-muted-fixed: #ffc98f;
     --border-subtle: rgba(20, 41, 95, 0.12);
     --border-strong: rgba(20, 41, 95, 0.24);
     --accent-orange: #ff8a1f;
@@ -170,6 +173,9 @@
     --text-on-dark-muted: #b8c8e6;
     --text-on-light: #f7fbff;
     --text-on-accent: #fffaf5;
+    --text-accent-fixed: #ff8a1f;
+    --text-accent-soft-fixed: #ffd89f;
+    --text-accent-muted-fixed: #ffc98f;
     --border-subtle: rgba(255, 255, 255, 0.12);
     --border-strong: rgba(255, 255, 255, 0.2);
     --chart-axis: rgba(240,247,255,0.84);

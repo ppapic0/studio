@@ -59,8 +59,8 @@ const TONE_STYLES: Record<ToneKey, { chip: string; text: string; bar: string; ri
     soft: 'from-[#f7fdf9] to-[#eefaf4]',
   },
   amber: {
-    chip: 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange)]',
-    text: 'text-[var(--accent-orange)]',
+    chip: 'border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--text-accent-fixed)]',
+    text: 'text-[var(--text-accent-fixed)]',
     bar: 'from-[var(--accent-orange)] via-[var(--accent-orange-soft)] to-[#fff1d7]',
     ring: 'var(--accent-orange)',
     soft: 'from-[#fffaf4] to-[var(--accent-orange-surface)]',

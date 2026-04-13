@@ -345,8 +345,13 @@ export function getUniversityThemeCssVars(themeKey?: SupportedUniversityThemeKey
   const accentSoft = theme.accentSoft ?? mixHex(accent, '#FFFFFF', 0.46);
   const lightSurface = mixHex('#FFFFFF', primary, 0.045);
   const secondarySurface = mixHex('#FFFFFF', primary, 0.075);
-  const secondaryText = mixHex(primary, '#FFFFFF', 0.28);
-  const mutedText = mixHex(primary, '#FFFFFF', 0.42);
+  const fixedTextPrimary = '#14295F';
+  const fixedTextSecondary = '#365377';
+  const fixedTextMuted = '#5F7698';
+  const fixedTextOnAccent = '#FFFAF5';
+  const fixedAccentText = '#FF8A1F';
+  const fixedAccentTextSoft = '#FFD89F';
+  const fixedAccentTextMuted = '#FFC98F';
   const cardSecondary = mixHex(primaryDeep, primary, 0.5);
   const panel = mixHex(primaryDeep, primary, 0.28);
   const panelSoft = mixHex(primaryDeep, accent, 0.16);
@@ -367,14 +372,17 @@ export function getUniversityThemeCssVars(themeKey?: SupportedUniversityThemeKey
     '--surface-secondary-gradient': `linear-gradient(180deg, ${mixHex(primary, '#FFFFFF', 0.12)} 0%, ${mixHex(primaryDeep, primary, 0.26)} 100%)`,
     '--surface-highlight-gradient': `linear-gradient(180deg, ${mixHex(accentSoft, '#FFFFFF', 0.16)} 0%, ${accent} 100%)`,
     '--surface-light-gradient': `linear-gradient(180deg, #FFFFFF 0%, ${lightSurface} 100%)`,
-    '--text-primary': primary,
-    '--text-secondary': secondaryText,
-    '--text-muted': mutedText,
+    '--text-primary': fixedTextPrimary,
+    '--text-secondary': fixedTextSecondary,
+    '--text-muted': fixedTextMuted,
     '--text-on-dark': '#F7FBFF',
     '--text-on-dark-soft': 'rgba(247, 251, 255, 0.84)',
     '--text-on-dark-muted': 'rgba(247, 251, 255, 0.62)',
-    '--text-on-light': primary,
-    '--text-on-accent': '#FFFAF5',
+    '--text-on-light': fixedTextPrimary,
+    '--text-on-accent': fixedTextOnAccent,
+    '--text-accent-fixed': fixedAccentText,
+    '--text-accent-soft-fixed': fixedAccentTextSoft,
+    '--text-accent-muted-fixed': fixedAccentTextMuted,
     '--border-subtle': rgba(primary, 0.12),
     '--border-strong': rgba(primary, 0.24),
     '--accent-orange': accent,

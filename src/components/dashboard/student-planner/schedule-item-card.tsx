@@ -205,7 +205,7 @@ export function ScheduleItemCard({
     )}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <div className={cn("flex shrink-0 items-center justify-center rounded-xl border border-[rgba(255,138,31,0.2)] bg-[rgba(255,138,31,0.14)] text-[var(--accent-orange-soft)]", isMobile ? "p-2" : "p-2.5")}>
+          <div className={cn("flex shrink-0 items-center justify-center rounded-xl border border-[rgba(255,138,31,0.2)] bg-[rgba(255,138,31,0.14)] text-[var(--text-accent-soft-fixed)]", isMobile ? "p-2" : "p-2.5")}>
             <Icon className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </div>
           <div className="min-w-0">
@@ -213,7 +213,7 @@ export function ScheduleItemCard({
               {titlePart}
             </Label>
             {isToday ? (
-              <p className="mt-0.5 text-[10px] font-bold text-[var(--accent-orange-soft)]">오늘 수정 시 벌점 규칙 적용</p>
+              <p className="mt-0.5 text-[10px] font-bold text-[var(--text-accent-soft-fixed)]">오늘 수정 시 벌점 규칙 적용</p>
             ) : null}
           </div>
         </div>

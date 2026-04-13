@@ -78,7 +78,7 @@ export function PlannerChecklistItem({
     statusTone === 'completed'
       ? 'border border-[#2FAA7D]/26 bg-[#2FAA7D]/14 text-[#8BE1BF]'
       : statusTone === 'active'
-        ? 'border border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--accent-orange-soft)]'
+        ? 'border border-[#FFB347]/28 bg-[#FF9626]/18 text-[var(--text-accent-soft-fixed)]'
         : 'border border-white/12 bg-white/[0.1] text-[var(--text-on-dark-soft)]';
 
   return (
@@ -128,12 +128,12 @@ export function PlannerChecklistItem({
               </Badge>
             ) : null}
             {rewardLabel ? (
-              <Badge className="rounded-full border border-[#FF9626]/24 bg-[#FF9626]/16 px-2.5 py-0.5 text-[9px] font-black text-[var(--accent-orange-soft)] shadow-none">
+              <Badge className="rounded-full border border-[#FF9626]/24 bg-[#FF9626]/16 px-2.5 py-0.5 text-[9px] font-black text-[var(--text-accent-soft-fixed)] shadow-none">
                 {rewardLabel}
               </Badge>
             ) : null}
             {task.priority ? (
-              <Badge className="rounded-full border border-[#FF7A16]/24 bg-[#FF9626]/16 px-2 py-0.5 text-[9px] font-black text-[var(--accent-orange-soft)] shadow-none">
+              <Badge className="rounded-full border border-[#FF7A16]/24 bg-[#FF9626]/16 px-2 py-0.5 text-[9px] font-black text-[var(--text-accent-soft-fixed)] shadow-none">
                 {task.priority === 'high' ? '중요' : task.priority === 'medium' ? '보통' : '가볍게'}
               </Badge>
             ) : null}
@@ -153,7 +153,7 @@ export function PlannerChecklistItem({
               {task.startTime && task.endTime ? `${task.startTime} - ${task.endTime}` : durationLabel}
             </span>
             {task.tag ? (
-              <span className="rounded-full bg-[#FF9626]/16 px-2.5 py-1 text-[var(--accent-orange-soft)]">{task.tag}</span>
+              <span className="rounded-full bg-[#FF9626]/16 px-2.5 py-1 text-[var(--text-accent-soft-fixed)]">{task.tag}</span>
             ) : null}
           </div>
 
@@ -216,7 +216,7 @@ export function PlannerChecklistItem({
                 </span>
                 <span className={cn(
                   'rounded-full px-2.5 py-1',
-                  task.done ? 'bg-emerald-500 text-white' : 'bg-[#FF9626]/18 text-[var(--accent-orange-soft)]'
+                  task.done ? 'bg-emerald-500 text-white' : 'bg-[#FF9626]/18 text-[var(--text-accent-soft-fixed)]'
                 )}>
                   실제 {Math.max(0, task.actualAmount || 0)}{task.amountUnit === '직접입력' ? task.amountUnitLabel || '단위' : task.amountUnit || '문제'}
                 </span>

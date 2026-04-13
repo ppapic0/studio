@@ -833,7 +833,7 @@ export default function GrowthPage() {
             />
 
             <div className="text-center">
-              <p className="font-aggro-display text-sm font-black text-[var(--accent-orange-soft)]">
+              <p className="font-aggro-display text-sm font-black text-[var(--text-accent-soft-fixed)]">
                 {totalAvailableBoxes > 0 ? '상자 도착' : heroMode === 'studying' ? '집중 중' : '다음 상자'}
               </p>
               <div className="font-aggro-display mt-1 text-[2rem] font-black tracking-tight text-white">{heroPrimaryLabel}</div>
@@ -852,7 +852,7 @@ export default function GrowthPage() {
                 </div>
                 <div className="surface-card surface-card--ghost on-dark rounded-[1.1rem] px-3 py-3 text-center">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-soft)]">도착</p>
-                  <p className="font-aggro-display mt-2 text-sm font-black text-[var(--accent-orange-soft)]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
+                  <p className="font-aggro-display mt-2 text-sm font-black text-[var(--text-accent-soft-fixed)]">{totalAvailableBoxes > 0 ? 'OPEN' : formatCountdown(nextBoxSecondsLeft)}</p>
                 </div>
               </div>
             ) : null}
@@ -876,7 +876,7 @@ export default function GrowthPage() {
         <section className="surface-card surface-card--secondary on-dark rounded-[1.7rem] px-4 py-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Timer className="h-4 w-4 text-[var(--accent-orange-soft)]" />
+              <Timer className="h-4 w-4 text-[var(--text-accent-soft-fixed)]" />
               <span className="text-sm font-black text-white">다음 상자</span>
             </div>
             <div className="flex items-center gap-2">
@@ -960,7 +960,7 @@ export default function GrowthPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                  <Gift className="h-4 w-4 text-[var(--accent-orange)]" />
+                  <Gift className="h-4 w-4 text-[var(--text-accent-fixed)]" />
                 <p className="font-aggro-display text-base font-black tracking-tight text-[#14295F]">Giftishow 보상샵</p>
               </div>
               <p className="mt-2 text-sm font-bold leading-5 text-[#24457f]">
@@ -1039,7 +1039,7 @@ export default function GrowthPage() {
                         <div className="mt-3 flex items-end justify-between gap-3">
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
-                <p className="mt-1 text-lg font-black tracking-tight text-[var(--accent-orange)]">
+                <p className="mt-1 text-lg font-black tracking-tight text-[var(--text-accent-fixed)]">
                               {formatGiftishowPoints(product.pointCost)}
                             </p>
                           </div>

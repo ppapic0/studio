@@ -754,7 +754,7 @@ export default function StudyHistoryPage() {
 
   const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
     if (!isCurrentMonth) return 'text-[#C6CFDD]';
-    return '!text-[var(--accent-orange)]';
+    return '!text-[var(--text-accent-fixed)]';
   };
 
   const getStudentLegendChipClass = (level: StudyHistoryFlowLevel) => {

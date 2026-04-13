@@ -35,9 +35,9 @@ const HOME_RANK_CARD_BASE =
 const HOME_RANK_CARD_INSET =
   "rounded-[1.18rem] border border-white/10 bg-[rgba(255,255,255,0.06)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_16px_32px_-28px_rgba(0,0,0,0.62)]";
 const HOME_RANK_CARD_BADGE =
-  "inline-flex items-center gap-2 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]";
+  "inline-flex items-center gap-2 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--text-accent-soft-fixed)]";
 const HOME_RANK_CARD_LIVE_BADGE =
-  "inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]";
+  "inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--text-accent-soft-fixed)]";
 
 export type StudentHomeQuest = {
   id: string;
@@ -175,7 +175,7 @@ function QuestRow({
       {gainKey ? (
         <span
           key={gainKey}
-          className="pointer-events-none absolute right-3 top-2 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] px-2 py-1 text-[11px] font-black text-[var(--accent-orange-soft)]"
+          className="pointer-events-none absolute right-3 top-2 rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] px-2 py-1 text-[11px] font-black text-[var(--text-accent-soft-fixed)]"
           style={{ animation: "planner-fade-rise 900ms ease-out both" }}
         >
           완료!
@@ -199,7 +199,7 @@ function QuestRow({
             </span>
           ) : null}
           {quest.timeLabel ? (
-            <span className="text-[11px] font-black text-[var(--accent-orange-soft)]">{quest.timeLabel}</span>
+            <span className="text-[11px] font-black text-[var(--text-accent-soft-fixed)]">{quest.timeLabel}</span>
           ) : null}
         </div>
         <div
@@ -213,7 +213,7 @@ function QuestRow({
       </div>
       <div className="shrink-0 text-right">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">status</div>
-        <div className="mt-1 text-sm font-black text-[var(--accent-orange-soft)]">{quest.done ? "완료" : "진행"}</div>
+        <div className="mt-1 text-sm font-black text-[var(--text-accent-soft-fixed)]">{quest.done ? "완료" : "진행"}</div>
       </div>
     </button>
   );
@@ -300,7 +300,7 @@ function RewardModal({
             />
             {revealedReward === null ? (
               <div className="mt-4">
-                <div className="text-sm font-black text-[var(--accent-orange-soft)]">
+                <div className="text-sm font-black text-[var(--text-accent-soft-fixed)]">
                   {modalBox ? `${modalBox.hour}시간 상자` : "보상 상자"}
                 </div>
                 {boxContextLabel ? (
@@ -687,7 +687,7 @@ export function StudentHomeGamePanel({
               <div className="surface-card surface-card--ghost on-dark mt-4 rounded-[1.25rem] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-white">
-                    <Flame className="h-3.5 w-3.5 text-[var(--accent-orange-soft)]" />
+                    <Flame className="h-3.5 w-3.5 text-[var(--text-accent-soft-fixed)]" />
                     성장 게이지
                   </span>
                   <span className="text-[11px] font-black text-white">{growthLabel}</span>
@@ -786,7 +786,7 @@ export function StudentHomeGamePanel({
               ))
             ) : (
               <div className="surface-card surface-card--ghost on-dark rounded-[1.25rem] border-dashed px-4 py-6 text-center">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--text-accent-soft-fixed)]">
                   <Swords className="h-5 w-5" />
                 </div>
                 <div className="mt-3 text-base font-black text-white">아직 오늘 퀘스트가 없어요</div>
@@ -819,19 +819,19 @@ export function StudentHomeGamePanel({
           className="surface-card surface-card--ivory rounded-[1.15rem] px-3 py-3 text-left transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]"
               >
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-                  <History className="h-3.5 w-3.5 text-[var(--accent-orange)]" />
+                  <History className="h-3.5 w-3.5 text-[var(--text-accent-fixed)]" />
                   활동 기록
                 </div>
                 <div className="font-aggro-display mt-2 text-xl font-black text-[var(--text-primary)]">{recentActivityDays}일</div>
                 <div className="mt-1 flex items-center justify-between gap-2">
-                  <div className="text-[11px] font-black text-[var(--accent-orange)]">오늘 연 상자 {todayOpenedBoxCount}개</div>
-                  <ChevronRight className="h-4 w-4 text-[var(--accent-orange)]" />
+                  <div className="text-[11px] font-black text-[var(--text-accent-fixed)]">오늘 연 상자 {todayOpenedBoxCount}개</div>
+                  <ChevronRight className="h-4 w-4 text-[var(--text-accent-fixed)]" />
                 </div>
               </button>
             </div>
               <div className="mt-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-black text-[var(--accent-orange-soft)]">최고 {bestDayLabel}</div>
+                  <div className="text-[11px] font-black text-[var(--text-accent-soft-fixed)]">최고 {bestDayLabel}</div>
                 </div>
                 <div className="mt-4 grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
                   <div className="flex h-24 flex-col justify-between pt-1">
@@ -968,7 +968,7 @@ export function StudentHomeGamePanel({
                               className={cn(
                                 "inline-flex min-w-[3rem] items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-black",
                                 entry.rank === 1
-                                  ? "bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]"
+                                  ? "bg-[var(--accent-orange-surface)] text-[var(--text-accent-soft-fixed)]"
                                   : "bg-[rgba(255,255,255,0.08)] text-[var(--text-on-dark-soft)]"
                               )}
                             >
@@ -985,10 +985,10 @@ export function StudentHomeGamePanel({
                                 "mt-0.5 text-[11px] font-bold",
                                 entry.rank === 1
                                   ? entry.isLive
-                                    ? "text-[var(--accent-orange-soft)]"
+                                    ? "text-[var(--text-accent-soft-fixed)]"
                                     : "text-white/70"
                                   : entry.isLive
-                                    ? "text-[var(--accent-orange-soft)]"
+                                    ? "text-[var(--text-accent-soft-fixed)]"
                                     : "text-[var(--text-on-dark-soft)]"
                               )}>
                                 {getRankEntryStatusLabel(entry)}
@@ -1001,7 +1001,7 @@ export function StudentHomeGamePanel({
                             className={cn(
                               "shrink-0 rounded-full border px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_20px_-18px_rgba(0,0,0,0.38)]",
                               entry.rank === 1
-                                ? "border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]"
+                                ? "border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--text-accent-soft-fixed)]"
                                 : "border-white/10 bg-[rgba(255,255,255,0.06)] text-[var(--text-on-dark-soft)]"
                             )}
                           />
@@ -1105,7 +1105,7 @@ export function StudentHomeGamePanel({
                               className={cn(
                                 "inline-flex min-w-[3rem] items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-black",
                                 entry.rank === 1
-                                  ? "bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]"
+                                  ? "bg-[var(--accent-orange-surface)] text-[var(--text-accent-soft-fixed)]"
                                   : "bg-[rgba(255,255,255,0.08)] text-[var(--text-on-dark-soft)]"
                               )}
                             >
@@ -1122,10 +1122,10 @@ export function StudentHomeGamePanel({
                                 "mt-0.5 text-[11px] font-bold",
                                 entry.rank === 1
                                   ? entry.isLive
-                                    ? "text-[var(--accent-orange-soft)]"
+                                    ? "text-[var(--text-accent-soft-fixed)]"
                                     : "text-white/70"
                                   : entry.isLive
-                                    ? "text-[var(--accent-orange-soft)]"
+                                    ? "text-[var(--text-accent-soft-fixed)]"
                                     : "text-[var(--text-on-dark-soft)]"
                               )}>
                                 {getRankEntryStatusLabel(entry)}
@@ -1137,7 +1137,7 @@ export function StudentHomeGamePanel({
                             className={cn(
                               "shrink-0 rounded-full border px-2.5 py-1.5 text-[10px] font-black shadow-[0_10px_24px_-20px_rgba(0,0,0,0.42)]",
                               entry.rank === 1
-                                ? "border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--accent-orange-soft)]"
+                                ? "border-[color:var(--accent-orange-border)] bg-[var(--accent-orange-surface)] text-[var(--text-accent-soft-fixed)]"
                                 : "border-white/10 bg-[rgba(255,255,255,0.06)] text-[var(--text-on-dark-soft)]"
                             )}
                           />
