@@ -278,6 +278,21 @@ function normalizePointBoostMultiplier(value) {
         return null;
     return Number(multiplier.toFixed(2));
 }
+function formatPointBoostMultiplierLabel(value) {
+    if (!Number.isFinite(value) || value <= 0)
+        return "1배";
+    return Number.isInteger(value) ? `${value.toFixed(0)}배` : `${value.toFixed(2).replace(/\.?0+$/, "")}배`;
+}
+function buildDefaultPointBoostMessage(multiplier) {
+    return `지금부터 상자 pt가 ${formatPointBoostMultiplierLabel(multiplier)}로 적용돼요. 집중한 만큼 더 크게 받아가세요!`;
+}
+function normalizePointBoostMessage(value, multiplier) {
+    if (typeof value !== "string") {
+        return buildDefaultPointBoostMessage(multiplier);
+    }
+    const trimmed = value.trim().slice(0, 160);
+    return trimmed || buildDefaultPointBoostMessage(multiplier);
+}
 function isPointBoostEventCancelled(value) {
     return toMillisSafe(value === null || value === void 0 ? void 0 : value.cancelledAt) > 0;
 }
@@ -5157,6 +5172,7 @@ exports.createPointBoostEventSecure = functions.region(region).https.onCall(asyn
             userMessage: "배율은 1보다 큰 숫자로 입력해 주세요.",
         });
     }
+    const message = normalizePointBoostMessage(data === null || data === void 0 ? void 0 : data.message, multiplier);
     if (endAtMs <= Date.now()) {
         throw new functions.https.HttpsError("failed-precondition", "Cannot create a boost event in the past.", {
             userMessage: "이미 지난 시간에는 부스트를 만들 수 없습니다.",
@@ -5187,6 +5203,7 @@ exports.createPointBoostEventSecure = functions.region(region).https.onCall(asyn
         startAt: admin.firestore.Timestamp.fromMillis(startAtMs),
         endAt: admin.firestore.Timestamp.fromMillis(endAtMs),
         multiplier,
+        message,
         createdBy: context.auth.uid,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });

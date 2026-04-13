@@ -352,6 +352,18 @@ const formatPointBoostMultiplier = (value: number): string => {
   return `${label}배`;
 };
 
+const buildDefaultPointBoostMessage = (multiplier: number): string =>
+  `지금부터 상자 pt가 ${formatPointBoostMultiplier(multiplier)}로 적용돼요. 집중한 만큼 더 크게 받아가세요!`;
+
+const resolvePointBoostMessage = (message: unknown, multiplier: number): string => {
+  if (typeof message !== 'string') {
+    return buildDefaultPointBoostMessage(multiplier);
+  }
+
+  const trimmed = message.trim();
+  return trimmed || buildDefaultPointBoostMessage(multiplier);
+};
+
 const formatPointsInPt = (value: number): string => `${value.toLocaleString()}pt`;
 
 type PointHistoryWindow = 'today' | '7d' | '30d';
@@ -494,6 +506,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [pointBoostStartDraft, setPointBoostStartDraft] = useState('');
   const [pointBoostEndDraft, setPointBoostEndDraft] = useState('');
   const [pointBoostMultiplierDraft, setPointBoostMultiplierDraft] = useState('2');
+  const [pointBoostMessageDraft, setPointBoostMessageDraft] = useState('');
   const [isCreatingPointBoost, setIsCreatingPointBoost] = useState(false);
   const [cancellingPointBoostId, setCancellingPointBoostId] = useState<string | null>(null);
   const [isOpenClawExporting, setIsOpenClawExporting] = useState(false);
@@ -1053,6 +1066,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         cancelledAtMs,
         label: formatPointBoostWindowLabel(event),
         multiplierLabel: formatPointBoostMultiplier(event.multiplier),
+        message: resolvePointBoostMessage(event.message, event.multiplier),
       };
 
       if (cancelledAtMs > 0 || endAtMs <= nowMs) {
@@ -3047,6 +3061,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (!centerId) return;
 
     const multiplier = Number(pointBoostMultiplierDraft);
+    const pointBoostMessage = pointBoostMessageDraft.trim();
     if (!Number.isFinite(multiplier) || multiplier <= 1) {
       toast({
         variant: 'destructive',
@@ -3084,7 +3099,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         startAtMs,
         endAtMs,
         multiplier,
+        message: pointBoostMessage || buildDefaultPointBoostMessage(multiplier),
       });
+      setPointBoostMessageDraft('');
       toast({
         title: '포인트 부스트 생성 완료',
         description: `${formatPointBoostMultiplier(multiplier)} 이벤트를 저장했어요.`,
@@ -4160,6 +4177,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     </div>
                   )}
+                  <div className="mt-3 space-y-2">
+                    <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">학생 팝업 메시지</Label>
+                    <Textarea
+                      value={pointBoostMessageDraft}
+                      onChange={(event) => setPointBoostMessageDraft(event.target.value.slice(0, 160))}
+                      className="min-h-[110px] rounded-2xl border-[#DCE7FF] font-semibold text-[#14295F] placeholder:text-[#7A88A8]"
+                      placeholder={buildDefaultPointBoostMessage(Number(pointBoostMultiplierDraft) || 2)}
+                    />
+                    <div className="flex items-center justify-between gap-3 text-[11px] font-semibold text-[#7A88A8]">
+                      <p>비워두면 기본 안내 문구가 자동으로 나갑니다.</p>
+                      <p>{pointBoostMessageDraft.trim().length}/160</p>
+                    </div>
+                  </div>
                   <div className="mt-4 flex justify-end">
                     <Button
                       type="button"
@@ -4198,6 +4228,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                 <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#C95A08]">{event.multiplierLabel}</Badge>
                               </div>
                               <p className="mt-3 text-sm font-black text-[#14295F]">{event.label}</p>
+                              <p className="mt-2 whitespace-pre-line text-[11px] font-semibold leading-5 text-[#5c6e97]">{event.message}</p>
                               <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">생성 {formatDashboardTrackTime(event.createdAt)}</p>
                             </div>
                             <Button
@@ -4240,6 +4271,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                 <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F]">{event.multiplierLabel}</Badge>
                               </div>
                               <p className="mt-3 text-sm font-black text-[#14295F]">{event.label}</p>
+                              <p className="mt-2 whitespace-pre-line text-[11px] font-semibold leading-5 text-[#5c6e97]">{event.message}</p>
                               <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">생성 {formatDashboardTrackTime(event.createdAt)}</p>
                             </div>
                             <Button
@@ -4287,6 +4319,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                 <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F]">{event.multiplierLabel}</Badge>
                               </div>
                               <p className="mt-3 text-sm font-black text-[#14295F]">{event.label}</p>
+                              <p className="mt-2 whitespace-pre-line text-[11px] font-semibold leading-5 text-[#5c6e97]">{event.message}</p>
                               <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">
                                 {event.cancelledAtMs > 0 ? `취소 ${formatDashboardTrackTime(event.cancelledAt)}` : `종료 ${formatDashboardTrackTime(event.endAt)}`}
                               </p>

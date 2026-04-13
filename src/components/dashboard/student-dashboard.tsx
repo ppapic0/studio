@@ -73,7 +73,7 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, type User as UserType, type SupportThreadKind } from '@/lib/types';
+import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, PointBoostEvent, type User as UserType, type SupportThreadKind } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
@@ -124,6 +124,7 @@ import { logHandledClientIssue } from '@/lib/handled-client-log';
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
 const STUDY_BOX_CLAIM_CACHE_PREFIX = 'student-dashboard:claimed-boxes';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
+const POINT_BOOST_POPUP_SESSION_PREFIX = 'student-point-boost-popup';
 
 type StudentWifiRequestRecord = {
   id: string;
@@ -263,6 +264,47 @@ function formatStudyDurationWithSeconds(totalSecs: number) {
 function toTimestampMillis(value?: Timestamp | null) {
   if (!value || typeof value.toMillis !== 'function') return 0;
   return value.toMillis();
+}
+
+function formatPointBoostMultiplierLabel(value: number) {
+  const safe = Number(value);
+  if (!Number.isFinite(safe) || safe <= 0) return '1배';
+  return Number.isInteger(safe) ? `${safe.toFixed(0)}배` : `${safe.toFixed(2).replace(/\.?0+$/, '')}배`;
+}
+
+function buildDefaultPointBoostMessage(multiplier: number) {
+  return `지금부터 상자 pt가 ${formatPointBoostMultiplierLabel(multiplier)}로 적용돼요. 집중한 만큼 더 크게 받아가세요!`;
+}
+
+function resolvePointBoostPopupMessage(message: unknown, multiplier: number) {
+  if (typeof message !== 'string') return buildDefaultPointBoostMessage(multiplier);
+  const trimmed = message.trim();
+  return trimmed || buildDefaultPointBoostMessage(multiplier);
+}
+
+function formatPointBoostWindowLabel(event: Pick<PointBoostEvent, 'mode' | 'startAt' | 'endAt'>) {
+  const startAt = event.startAt?.toDate?.();
+  const endAt = event.endAt?.toDate?.();
+  if (!startAt || !endAt) return '시간 미상';
+  if (event.mode === 'day') return `${format(startAt, 'M/d')} 하루 종일`;
+  const sameDay = format(startAt, 'yyyy-MM-dd') === format(endAt, 'yyyy-MM-dd');
+  if (sameDay) {
+    return `${format(startAt, 'M/d HH:mm')} - ${format(endAt, 'HH:mm')}`;
+  }
+  return `${format(startAt, 'M/d HH:mm')} - ${format(endAt, 'M/d HH:mm')}`;
+}
+
+function shouldShowPointBoostPopup(centerId: string, userId: string, eventId: string): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const storageKey = `${POINT_BOOST_POPUP_SESSION_PREFIX}:${centerId}:${userId}`;
+    const lastShownEventId = window.sessionStorage.getItem(storageKey);
+    if (lastShownEventId === eventId) return false;
+    window.sessionStorage.setItem(storageKey, eventId);
+    return true;
+  } catch {
+    return true;
+  }
 }
 
 function formatMinutesToKorean(minutes: number): string {
@@ -1213,6 +1255,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
   const [rankPreviewNowMs, setRankPreviewNowMs] = useState(0);
+  const [pointBoostNowMs, setPointBoostNowMs] = useState(0);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const actionLockAtRef = useRef<number | null>(null);
   const isMobile = viewMode === 'mobile';
@@ -1235,6 +1278,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [goalPathTypeDraft, setGoalPathTypeDraft] = useState<'school' | 'job'>('school');
   const [goalPathLabelDraft, setGoalPathLabelDraft] = useState('');
   const [examSaveError, setExamSaveError] = useState<{ title: string; description: string } | null>(null);
+  const [isPointBoostPopupOpen, setIsPointBoostPopupOpen] = useState(false);
+  const [pointBoostPopupEvent, setPointBoostPopupEvent] = useState<(
+    PointBoostEvent & {
+      startAtMs: number;
+      endAtMs: number;
+      multiplierLabel: string;
+      label: string;
+      message: string;
+    }
+  ) | null>(null);
   const [selectedRankRange, setSelectedRankRange] = useState<RankRange>('weekly');
   const [rankSnapshot, setRankSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [rankSnapshotLoading, setRankSnapshotLoading] = useState(false);
@@ -1322,6 +1375,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  useEffect(() => {
+    setPointBoostNowMs(Date.now());
+    const intervalId = window.setInterval(() => {
+      setPointBoostNowMs(Date.now());
+    }, 10000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const tomorrowKey = today ? format(addDays(today, 1), 'yyyy-MM-dd') : '';
@@ -1363,6 +1424,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isActive });
+  const pointBoostEventsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership?.id) return null;
+    return query(
+      collection(firestore, 'centers', activeMembership.id, 'pointBoostEvents'),
+      orderBy('startAt', 'desc'),
+      limit(20)
+    );
+  }, [activeMembership?.id, firestore]);
+  const { data: pointBoostEvents } = useCollection<PointBoostEvent>(pointBoostEventsQuery, { enabled: isActive });
   const resolvedTargetDailyMinutes = useMemo(
     () => resolveStudentTargetDailyMinutesOrFallback(studentProfile, userProfile, 240),
     [
@@ -1615,6 +1685,38 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       cancelled = true;
     };
   }, [activeMembership?.id, isActive, rankAttendanceRefreshKey, rankSnapshotRefreshBucket, user]);
+
+  const activePointBoostEvent = useMemo(() => {
+    const nowMs = pointBoostNowMs || Date.now();
+    return (
+      (pointBoostEvents || [])
+        .map((event) => {
+          const startAtMs = toTimestampMillis(event.startAt);
+          const endAtMs = toTimestampMillis(event.endAt);
+          const cancelledAtMs = toTimestampMillis(event.cancelledAt ?? null);
+          if (startAtMs <= 0 || endAtMs <= 0 || cancelledAtMs > 0) return null;
+          if (startAtMs > nowMs || nowMs >= endAtMs) return null;
+
+          return {
+            ...event,
+            startAtMs,
+            endAtMs,
+            multiplierLabel: formatPointBoostMultiplierLabel(event.multiplier),
+            label: formatPointBoostWindowLabel(event),
+            message: resolvePointBoostPopupMessage(event.message, event.multiplier),
+          };
+        })
+        .find((event) => event !== null) ?? null
+    );
+  }, [pointBoostEvents, pointBoostNowMs]);
+
+  useEffect(() => {
+    if (!isActive || !user?.uid || !activeMembership?.id || !activePointBoostEvent) return;
+    if (!shouldShowPointBoostPopup(activeMembership.id, user.uid, activePointBoostEvent.id)) return;
+
+    setPointBoostPopupEvent(activePointBoostEvent);
+    setIsPointBoostPopupOpen(true);
+  }, [activeMembership?.id, activePointBoostEvent, isActive, user?.uid]);
 
   useEffect(() => {
     if (!isActive || !user?.uid || isTeacherReportsLoading || teacherReports.length === 0) return;
@@ -3284,6 +3386,65 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         todayOpenedBoxCount={activeVaultOpenedCount}
         nextCountdownLabel={formatTimer(nextBoxSecondsLeft)}
       />
+
+      <Dialog open={isPointBoostPopupOpen} onOpenChange={setIsPointBoostPopupOpen}>
+        <DialogContent className={cn("overflow-hidden rounded-[2rem] border-0 p-0 shadow-[0_30px_80px_-40px_rgba(23,50,107,0.55)]", isMobile ? "w-[min(94vw,26rem)]" : "sm:max-w-md")}>
+          {pointBoostPopupEvent ? (
+            <>
+              <div className={cn("relative overflow-hidden bg-[linear-gradient(145deg,#17326B_0%,#2554D7_55%,#5B8CFF_100%)] text-white", isMobile ? "p-6" : "p-7")}>
+                <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/20 blur-3xl" />
+                <div className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-[#FFB24C]/35 blur-2xl" />
+                <div className="relative">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">라이브 부스트</Badge>
+                    <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#17326B]">{pointBoostPopupEvent.multiplierLabel}</Badge>
+                  </div>
+                  <DialogHeader className="mt-4 text-left">
+                    <DialogTitle className={cn("font-black tracking-tight text-white", isMobile ? "text-[1.55rem]" : "text-[1.8rem]")}>
+                      포인트 부스트 적용 중
+                    </DialogTitle>
+                    <DialogDescription className="text-sm font-semibold leading-6 text-white/82">
+                      지금 열리는 상자부터 {pointBoostPopupEvent.multiplierLabel}로 반영돼요.
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+              </div>
+              <div className={cn("bg-white", isMobile ? "p-4" : "p-5")}>
+                <div className="rounded-[1.5rem] border border-[#DCE5F5] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)] p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#17326B] text-white shadow-[0_18px_34px_-26px_rgba(23,50,107,0.7)]">
+                      <BellRing className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6781AE]">센터 메시지</p>
+                      <p className="mt-2 whitespace-pre-line break-keep text-[15px] font-black leading-7 text-[#17326B]">
+                        {pointBoostPopupEvent.message}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge className="h-8 rounded-full border-none bg-[#EEF4FF] px-3 text-[11px] font-black text-[#17326B]">
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    {pointBoostPopupEvent.label}
+                  </Badge>
+                  <Badge className="h-8 rounded-full border-none bg-[#FFF4E8] px-3 text-[11px] font-black text-[#C95A08]">
+                    <Trophy className="mr-1.5 h-3.5 w-3.5" />
+                    남은 시간 {formatMinutesToKorean(Math.max(0, Math.ceil((pointBoostPopupEvent.endAtMs - (pointBoostNowMs || Date.now())) / 60000)))}
+                  </Badge>
+                </div>
+              </div>
+              <DialogFooter className="border-t border-slate-100 bg-white px-4 py-4">
+                <DialogClose asChild>
+                  <Button type="button" className="h-11 w-full rounded-2xl bg-[#17326B] font-black text-white hover:bg-[#132754]">
+                    확인했어요
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
         <DialogContent className={cn("flex max-h-[85vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0", isMobile ? "" : "sm:w-full sm:max-w-lg")}>

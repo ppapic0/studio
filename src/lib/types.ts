@@ -808,6 +808,7 @@ export interface PointBoostEvent {
   startAt: Timestamp;
   endAt: Timestamp;
   multiplier: number;
+  message?: string | null;
   createdBy: string;
   createdAt?: Timestamp;
   cancelledAt?: Timestamp | null;

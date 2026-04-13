@@ -186,6 +186,7 @@ type PointBoostEventDoc = {
   startAt: admin.firestore.Timestamp;
   endAt: admin.firestore.Timestamp;
   multiplier: number;
+  message?: string | null;
   createdBy: string;
   createdAt?: admin.firestore.Timestamp;
   cancelledAt?: admin.firestore.Timestamp | null;
@@ -436,6 +437,24 @@ function normalizePointBoostMultiplier(value: unknown): number | null {
   if (multiplier === null || !Number.isFinite(multiplier)) return null;
   if (multiplier <= 1 || multiplier > 100) return null;
   return Number(multiplier.toFixed(2));
+}
+
+function formatPointBoostMultiplierLabel(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "1배";
+  return Number.isInteger(value) ? `${value.toFixed(0)}배` : `${value.toFixed(2).replace(/\.?0+$/, "")}배`;
+}
+
+function buildDefaultPointBoostMessage(multiplier: number): string {
+  return `지금부터 상자 pt가 ${formatPointBoostMultiplierLabel(multiplier)}로 적용돼요. 집중한 만큼 더 크게 받아가세요!`;
+}
+
+function normalizePointBoostMessage(value: unknown, multiplier: number): string {
+  if (typeof value !== "string") {
+    return buildDefaultPointBoostMessage(multiplier);
+  }
+
+  const trimmed = value.trim().slice(0, 160);
+  return trimmed || buildDefaultPointBoostMessage(multiplier);
 }
 
 function isPointBoostEventCancelled(value: unknown): boolean {
@@ -6332,6 +6351,7 @@ export const createPointBoostEventSecure = functions.region(region).https.onCall
       userMessage: "배율은 1보다 큰 숫자로 입력해 주세요.",
     });
   }
+  const message = normalizePointBoostMessage(data?.message, multiplier);
   if (endAtMs <= Date.now()) {
     throw new functions.https.HttpsError("failed-precondition", "Cannot create a boost event in the past.", {
       userMessage: "이미 지난 시간에는 부스트를 만들 수 없습니다.",
@@ -6365,6 +6385,7 @@ export const createPointBoostEventSecure = functions.region(region).https.onCall
     startAt: admin.firestore.Timestamp.fromMillis(startAtMs),
     endAt: admin.firestore.Timestamp.fromMillis(endAtMs),
     multiplier,
+    message,
     createdBy: context.auth.uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });

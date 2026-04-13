@@ -12,6 +12,7 @@ export type CreatePointBoostEventSecureInput = {
   startAtMs: number;
   endAtMs: number;
   multiplier: number;
+  message?: string;
 };
 
 export type CreatePointBoostEventSecureResult = {
