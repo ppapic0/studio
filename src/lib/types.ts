@@ -1181,9 +1181,14 @@ export interface StudentNotification {
   studentId: string;
   teacherId: string;
   teacherName: string;
-  type: 'one_line_feedback';
+  type: 'one_line_feedback' | 'ranking_reward';
   title?: string;
   message: string;
+  rankingRange?: 'daily' | 'weekly' | 'monthly';
+  rankingRank?: number;
+  rankingRewardPoints?: number;
+  rankingPeriodKey?: string;
+  awardDateKey?: string;
   readAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt?: Timestamp;

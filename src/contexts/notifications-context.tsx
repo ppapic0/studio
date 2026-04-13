@@ -26,10 +26,13 @@ export type ReportItem = {
 type NotificationsContextType = {
   reports: ReportItem[];
   feedbacks: StudentNotification[];
+  rankingRewards: StudentNotification[];
   latestReport: ReportItem | null;
   latestFeedback: StudentNotification | null;
+  latestRankingReward: StudentNotification | null;
   clearLatestReport: () => void;
   clearLatestFeedback: () => void;
+  clearLatestRankingReward: () => void;
 };
 
 function toMillis(value?: { toDate?: () => Date } | null): number {
@@ -43,10 +46,13 @@ function toMillis(value?: { toDate?: () => Date } | null): number {
 const NotificationsContext = createContext<NotificationsContextType>({
   reports: [],
   feedbacks: [],
+  rankingRewards: [],
   latestReport: null,
   latestFeedback: null,
+  latestRankingReward: null,
   clearLatestReport: () => {},
   clearLatestFeedback: () => {},
+  clearLatestRankingReward: () => {},
 });
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
@@ -56,11 +62,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [feedbacks, setFeedbacks] = useState<StudentNotification[]>([]);
+  const [rankingRewards, setRankingRewards] = useState<StudentNotification[]>([]);
   const [latestReport, setLatestReport] = useState<ReportItem | null>(null);
   const [latestFeedback, setLatestFeedback] = useState<StudentNotification | null>(null);
+  const [latestRankingReward, setLatestRankingReward] = useState<StudentNotification | null>(null);
 
   const reportsInitialLoad = useRef(true);
   const feedbacksInitialLoad = useRef(true);
+  const rankingRewardsInitialLoad = useRef(true);
 
   useEffect(() => {
     if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') {
@@ -150,15 +159,67 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => unsubscribe();
   }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
 
+  useEffect(() => {
+    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') {
+      setRankingRewards([]);
+      setLatestRankingReward(null);
+      rankingRewardsInitialLoad.current = true;
+      return;
+    }
+
+    const centerId = activeMembership.id;
+    const q = query(
+      collection(firestore, 'centers', centerId, 'studentNotifications'),
+      where('studentId', '==', user.uid),
+      where('type', '==', 'ranking_reward')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedRewards = snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() } as StudentNotification))
+        .sort((a, b) =>
+          Math.max(toMillis(b.updatedAt), toMillis(b.createdAt)) -
+          Math.max(toMillis(a.updatedAt), toMillis(a.createdAt))
+        )
+        .slice(0, 10);
+      setRankingRewards(fetchedRewards);
+
+      const latestUnreadReward = fetchedRewards.find((item) => !item.readAt) || null;
+
+      if (rankingRewardsInitialLoad.current) {
+        rankingRewardsInitialLoad.current = false;
+        if (latestUnreadReward) {
+          setLatestRankingReward(latestUnreadReward);
+        }
+        return;
+      }
+
+      const now = Date.now();
+      snapshot.docChanges().forEach((change) => {
+        if (change.type !== 'added' && change.type !== 'modified') return;
+        const data = { id: change.doc.id, ...change.doc.data() } as StudentNotification;
+        const ts = data.updatedAt?.toDate?.().getTime?.() ?? data.createdAt?.toDate?.().getTime?.() ?? 0;
+        if (!data.readAt && now - ts < 20000) {
+          setLatestRankingReward(data);
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
+
   return (
     <NotificationsContext.Provider
       value={{
         reports,
         feedbacks,
+        rankingRewards,
         latestReport,
         latestFeedback,
+        latestRankingReward,
         clearLatestReport: () => setLatestReport(null),
         clearLatestFeedback: () => setLatestFeedback(null),
+        clearLatestRankingReward: () => setLatestRankingReward(null),
       }}
     >
       {children}

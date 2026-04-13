@@ -8,6 +8,7 @@ import { BottomNav } from '@/components/dashboard/bottom-nav';
 import { FeedbackNotifier } from '@/components/dashboard/feedback-notifier';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { MainNav } from '@/components/dashboard/main-nav';
+import { RankingRewardNotifier } from '@/components/dashboard/ranking-reward-notifier';
 import { ReportNotifier } from '@/components/dashboard/report-notifier';
 import { useAppContext } from '@/contexts/app-context';
 import { NotificationsProvider } from '@/contexts/notifications-context';
@@ -175,6 +176,7 @@ export function DashboardShell({
           </main>
 
           <FeedbackNotifier />
+          <RankingRewardNotifier />
           <AppointmentNotifier />
           <ReportNotifier />
 

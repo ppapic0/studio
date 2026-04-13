@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { collection, doc, limit, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { AlertTriangle, Bell, ChevronRight, Clock, FileText, MessageSquareMore, Sparkles } from 'lucide-react';
+import { AlertTriangle, Bell, ChevronRight, Clock, Crown, FileText, Gift, MessageSquareMore, Sparkles } from 'lucide-react';
 
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -61,6 +61,15 @@ type NotificationFeedItem =
       timestamp: number;
       unread: boolean;
       payload: StudentNotification;
+    }
+  | {
+      id: string;
+      kind: 'reward';
+      title: string;
+      description: string;
+      timestamp: number;
+      unread: boolean;
+      payload: StudentNotification;
     };
 
 type AdminNotificationItem = {
@@ -82,15 +91,29 @@ function toMillis(value?: { toDate?: () => Date } | null) {
   }
 }
 
+const RANKING_RANGE_LABEL: Record<'daily' | 'weekly' | 'monthly', string> = {
+  daily: '일간',
+  weekly: '주간',
+  monthly: '월간',
+};
+
+function getRankingRangeLabel(range?: StudentNotification['rankingRange']) {
+  if (range === 'daily' || range === 'weekly' || range === 'monthly') {
+    return RANKING_RANGE_LABEL[range];
+  }
+  return '랭킹';
+}
+
 export function NotificationBell() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { activeMembership } = useAppContext();
-  const { reports, feedbacks } = useNotifications();
+  const { reports, feedbacks, rankingRewards } = useNotifications();
   const isStudentRole = activeMembership?.role === 'student';
   const isCenterAdminRole = isAdminRole(activeMembership?.role);
 
   const [selectedFeedback, setSelectedFeedback] = useState<StudentNotification | null>(null);
+  const [selectedReward, setSelectedReward] = useState<StudentNotification | null>(null);
   const [nowMs, setNowMs] = useState(0);
 
   useEffect(() => {
@@ -141,19 +164,19 @@ export function NotificationBell() {
   }, [firestore, activeMembership?.id, isStudentRole]);
   const { data: studentAnnouncementRows } = useCollection<any>(studentAnnouncementsQuery, { enabled: isStudentRole });
 
-  const markFeedbackAsRead = async (feedback: StudentNotification | null) => {
-    if (!firestore || !activeMembership || !feedback || feedback.readAt) return;
+  const markStudentNotificationAsRead = async (notification: StudentNotification | null) => {
+    if (!firestore || !activeMembership || !notification || notification.readAt) return;
 
     try {
       await updateDoc(
-        doc(firestore, 'centers', activeMembership.id, 'studentNotifications', feedback.id),
+        doc(firestore, 'centers', activeMembership.id, 'studentNotifications', notification.id),
         {
           readAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         }
       );
     } catch (error) {
-      logHandledClientIssue('[notification-bell] mark feedback read failed', error);
+      logHandledClientIssue('[notification-bell] mark student notification read failed', error);
     }
   };
 
@@ -200,6 +223,21 @@ export function NotificationBell() {
       payload: feedback,
     }));
 
+    const rewardItems: NotificationFeedItem[] = rankingRewards.map((reward) => {
+      const rangeLabel = getRankingRangeLabel(reward.rankingRange);
+      const rank = Math.max(0, Number(reward.rankingRank || 0));
+      const points = Math.max(0, Number(reward.rankingRewardPoints || 0));
+      return {
+        id: `reward-${reward.id}`,
+        kind: 'reward',
+        title: reward.title || `${rangeLabel} 랭킹 ${rank}위`,
+        description: points > 0 ? `${rangeLabel} ${rank}위 · +${points.toLocaleString()}P 지급` : reward.message,
+        timestamp: Math.max(toMillis(reward.updatedAt), toMillis(reward.createdAt)),
+        unread: !reward.readAt,
+        payload: reward,
+      };
+    });
+
     const announcementItems: NotificationFeedItem[] = (studentAnnouncementRows || [])
       .filter((item) => {
         const normalizedStatus = item?.status?.trim?.().toLowerCase?.();
@@ -224,8 +262,8 @@ export function NotificationBell() {
         };
       });
 
-    return [...feedbackItems, ...announcementItems, ...reportItems].sort((a, b) => b.timestamp - a.timestamp).slice(0, 6);
-  }, [feedbacks, nowMs, reports, studentAnnouncementRows]);
+    return [...rewardItems, ...feedbackItems, ...announcementItems, ...reportItems].sort((a, b) => b.timestamp - a.timestamp).slice(0, 6);
+  }, [feedbacks, nowMs, rankingRewards, reports, studentAnnouncementRows]);
 
   const adminFeedItems = useMemo<AdminNotificationItem[]>(() => {
     if (!isCenterAdminRole) return [];
@@ -392,7 +430,14 @@ export function NotificationBell() {
                     if (item.kind === 'feedback') {
                       event.preventDefault();
                       setSelectedFeedback(item.payload);
-                      void markFeedbackAsRead(item.payload);
+                      void markStudentNotificationAsRead(item.payload);
+                      return;
+                    }
+
+                    if (item.kind === 'reward') {
+                      event.preventDefault();
+                      setSelectedReward(item.payload);
+                      void markStudentNotificationAsRead(item.payload);
                       return;
                     }
 
@@ -400,10 +445,10 @@ export function NotificationBell() {
                       void markReportAsRead(item.reportId, !!item.viewedAt);
                     }
                   }}
-                  asChild={item.kind !== 'feedback'}
+                  asChild={item.kind === 'report' || item.kind === 'announcement'}
                   className="p-0"
                 >
-                  {item.kind !== 'feedback' ? (
+                  {item.kind === 'report' || item.kind === 'announcement' ? (
                     <Link href={item.link} className="flex items-center gap-4 p-3 rounded-2xl cursor-pointer hover:bg-primary/5 transition-all group">
                       <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center shrink-0 transition-all group-hover:bg-primary group-hover:text-white shadow-sm">
                         {item.kind === 'announcement' ? <AlertTriangle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
@@ -424,6 +469,26 @@ export function NotificationBell() {
                       </div>
                       <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
                     </Link>
+                  ) : item.kind === 'reward' ? (
+                    <button type="button" className="flex w-full items-center gap-4 p-3 rounded-2xl cursor-pointer hover:bg-primary/5 transition-all group text-left">
+                      <div className="h-10 w-10 rounded-xl bg-[#fff3e9] text-[#ff7a16] flex items-center justify-center shrink-0 transition-all group-hover:bg-[#ff7a16] group-hover:text-white shadow-sm">
+                        <Crown className="h-5 w-5" />
+                      </div>
+                      <div className="grid gap-1 flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-black tracking-tight whitespace-nowrap truncate">{item.title}</p>
+                          {item.unread && (
+                            <Badge className="border-none bg-amber-100 text-amber-700 font-black text-[8px] px-1.5 h-4">
+                              신규
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[11px] font-semibold text-muted-foreground line-clamp-2">
+                          {item.description}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
+                    </button>
                   ) : (
                     <button type="button" className="flex w-full items-center gap-4 p-3 rounded-2xl cursor-pointer hover:bg-primary/5 transition-all group text-left">
                       <div className="h-10 w-10 rounded-xl bg-[#fff3e9] text-[#ff7a16] flex items-center justify-center shrink-0 transition-all group-hover:bg-[#ff7a16] group-hover:text-white shadow-sm">
@@ -464,7 +529,7 @@ export function NotificationBell() {
           open={!!selectedFeedback}
           onOpenChange={(open) => {
             if (!open) {
-              void markFeedbackAsRead(selectedFeedback);
+              void markStudentNotificationAsRead(selectedFeedback);
               setSelectedFeedback(null);
             }
           }}
@@ -501,8 +566,69 @@ export function NotificationBell() {
               <Button
                 className="premium-cta premium-cta-secondary h-12 w-full rounded-2xl text-base"
                 onClick={() => {
-                  void markFeedbackAsRead(selectedFeedback);
+                  void markStudentNotificationAsRead(selectedFeedback);
                   setSelectedFeedback(null);
+                }}
+              >
+                확인했어요
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {!isCenterAdminRole && (
+        <Dialog
+          open={!!selectedReward}
+          onOpenChange={(open) => {
+            if (!open) {
+              void markStudentNotificationAsRead(selectedReward);
+              setSelectedReward(null);
+            }
+          }}
+        >
+          <DialogContent className="rounded-[2.25rem] border-none p-0 overflow-hidden shadow-2xl sm:max-w-lg">
+            <div className="bg-gradient-to-br from-[#14295F] via-[#17326f] to-[#0f214d] px-7 py-6 text-white">
+              <DialogHeader>
+                <div className="mb-3 flex items-center gap-2">
+                  <Badge className="border-none bg-white/15 text-white font-black text-[10px] tracking-[0.18em] uppercase whitespace-nowrap">
+                    랭킹 보상
+                  </Badge>
+                </div>
+                <DialogTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
+                  <div className="rounded-2xl bg-white/12 p-2">
+                    <Gift className="h-5 w-5" />
+                  </div>
+                  {selectedReward?.title || '랭킹 보상'}
+                </DialogTitle>
+                <DialogDescription className="text-white/75 font-semibold">
+                  {getRankingRangeLabel(selectedReward?.rankingRange)} 랭킹에서 얻은 포인트 보상입니다.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <div className="bg-[#fafafa] px-6 py-6">
+              <div className="app-depth-card rounded-[1.65rem] px-5 py-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary/55">
+                    {getRankingRangeLabel(selectedReward?.rankingRange)} 랭킹 {Math.max(0, Number(selectedReward?.rankingRank || 0))}위
+                  </p>
+                  <Badge className="border border-[#ffd9b7] bg-[#fff3e9] text-[#ff7a16] font-black">
+                    +{Math.max(0, Number(selectedReward?.rankingRewardPoints || 0)).toLocaleString()}P
+                  </Badge>
+                </div>
+                <p className="break-keep text-lg font-black leading-8 text-slate-900">
+                  {selectedReward?.message || ''}
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="border-t bg-white p-5">
+              <Button
+                className="premium-cta premium-cta-secondary h-12 w-full rounded-2xl text-base"
+                onClick={() => {
+                  void markStudentNotificationAsRead(selectedReward);
+                  setSelectedReward(null);
                 }}
               >
                 확인했어요

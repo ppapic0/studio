@@ -33,6 +33,11 @@ type CenterStudentContext = {
   getProfile: (studentId: string) => StudentProfileSnapshot;
 };
 
+type RankingNotificationTarget = {
+  periodKey: string;
+  awardDateKey: string;
+};
+
 const DAILY_RANK_START_HOUR = 17;
 const DAILY_RANK_END_HOUR = 1;
 const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying", "away", "break"]);
@@ -50,6 +55,11 @@ const STUDENT_RANK_REWARD_TIERS: Record<StudentRankingRange, StudentRankRewardTi
   ],
 };
 const DAILY_POINT_EARN_CAP = 1000;
+const RANKING_RANGE_LABEL: Record<StudentRankingRange, string> = {
+  daily: "일간",
+  weekly: "주간",
+  monthly: "월간",
+};
 
 function toKstDate(baseDate: Date = new Date()) {
   const formatted = baseDate.toLocaleString("en-US", { timeZone: "Asia/Seoul" });
@@ -465,6 +475,11 @@ function buildAwardEntries(
     .filter((entry): entry is RankedStudentEntry => Boolean(entry));
 }
 
+function buildRankingRewardNotificationMessage(range: StudentRankingRange, award: RankedStudentEntry) {
+  const rangeLabel = RANKING_RANGE_LABEL[range];
+  return `${rangeLabel} 랭킹 ${award.rank}위로 ${award.points.toLocaleString()}포인트가 지급되었어요. 알림함에서 다시 확인할 수 있습니다.`;
+}
+
 async function buildDailyAwardEntries(
   db: admin.firestore.Firestore,
   centerId: string,
@@ -699,7 +714,7 @@ async function applyAwardEntries(
   db: admin.firestore.Firestore,
   centerId: string,
   range: StudentRankingRange,
-  awardDateKey: string,
+  target: RankingNotificationTarget,
   awards: RankedStudentEntry[]
 ) {
   if (awards.length === 0) return [] as RankedStudentEntry[];
@@ -714,8 +729,8 @@ async function applyAwardEntries(
       const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
         ? (progressData.dailyPointStatus as Record<string, unknown>)
         : {};
-      const currentDayStatus = isPlainObject(dailyPointStatus[awardDateKey])
-        ? (dailyPointStatus[awardDateKey] as Record<string, unknown>)
+      const currentDayStatus = isPlainObject(dailyPointStatus[target.awardDateKey])
+        ? (dailyPointStatus[target.awardDateKey] as Record<string, unknown>)
         : {};
       const awardedPoints = clampDailyPointAward(currentDayStatus, award.points).awardedPoints;
       const pointStatusPayload: Record<string, unknown> = {
@@ -739,10 +754,33 @@ async function applyAwardEntries(
         pointsBalance: admin.firestore.FieldValue.increment(awardedPoints),
         totalPointsEarned: admin.firestore.FieldValue.increment(awardedPoints),
         dailyPointStatus: {
-          [awardDateKey]: pointStatusPayload,
+          [target.awardDateKey]: pointStatusPayload,
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
+
+      if (awardedPoints > 0) {
+        const notificationRef = db.doc(
+          `centers/${centerId}/studentNotifications/ranking_reward_${range}_${target.periodKey}_${award.studentId}`
+        );
+        transaction.set(notificationRef, {
+          centerId,
+          studentId: award.studentId,
+          teacherId: "ranking-system",
+          teacherName: "랭킹 시스템",
+          type: "ranking_reward",
+          title: `${RANKING_RANGE_LABEL[range]} 랭킹 ${award.rank}위 축하`,
+          message: buildRankingRewardNotificationMessage(range, { ...award, points: awardedPoints }),
+          rankingRange: range,
+          rankingRank: award.rank,
+          rankingRewardPoints: awardedPoints,
+          rankingPeriodKey: target.periodKey,
+          awardDateKey: target.awardDateKey,
+          readAt: null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
 
       return {
         ...award,
@@ -853,7 +891,10 @@ export const scheduledRankingRewardSettlement = functions
 
         try {
           const awards = await buildDailyAwardEntries(db, centerId, candidate.competitionDate, await getContext());
-          const appliedAwards = await applyAwardEntries(db, centerId, "daily", awardDateKey, awards);
+          const appliedAwards = await applyAwardEntries(db, centerId, "daily", {
+            periodKey: candidate.periodKey,
+            awardDateKey,
+          }, awards);
           await completeSettlement(settlementRef, {
             awardDateKey,
             awardCount: appliedAwards.length,
@@ -891,7 +932,10 @@ export const scheduledRankingRewardSettlement = functions
               weeklyCandidate.endDate,
               await getContext()
             );
-            const appliedAwards = await applyAwardEntries(db, centerId, "weekly", awardDateKey, awards);
+            const appliedAwards = await applyAwardEntries(db, centerId, "weekly", {
+              periodKey: weeklyCandidate.periodKey,
+              awardDateKey,
+            }, awards);
             await completeSettlement(settlementRef, {
               awardDateKey,
               awardCount: appliedAwards.length,
@@ -923,7 +967,10 @@ export const scheduledRankingRewardSettlement = functions
         if (claimed) {
           try {
             const awards = await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.monthKey, await getContext());
-            const appliedAwards = await applyAwardEntries(db, centerId, "monthly", awardDateKey, awards);
+            const appliedAwards = await applyAwardEntries(db, centerId, "monthly", {
+              periodKey: monthlyCandidate.periodKey,
+              awardDateKey,
+            }, awards);
             await completeSettlement(settlementRef, {
               awardDateKey,
               awardCount: appliedAwards.length,
