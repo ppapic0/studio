@@ -803,8 +803,7 @@ export default function GrowthPage() {
 
           <div className={cn("gap-4", isMobile ? "flex flex-col" : "flex items-center justify-between gap-3")}>
             <div className={cn(isMobile ? "w-full" : "")}>
-              <p className="surface-kicker text-[11px]">POINT TRACK</p>
-              <h1 className="font-aggro-display mt-2 text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
+              <h1 className="font-aggro-display text-[2rem] font-black tracking-tight text-white">포인트트랙</h1>
               <div className="mt-3 grid grid-cols-2 gap-2.5">
                 <HeroMetricChip
                   icon={Flame}
@@ -820,19 +819,6 @@ export default function GrowthPage() {
                   floatingGain={floatingGain}
                 />
               </div>
-            </div>
-            <div
-              className={cn(
-                'surface-chip px-3 py-1 text-[10px] uppercase tracking-[0.22em]',
-                isMobile ? "self-start" : "",
-                totalAvailableBoxes > 0
-                  ? 'surface-chip--accent'
-                  : isTimerActive
-                    ? 'border border-sky-200/20 bg-sky-200/10 text-white'
-                    : 'surface-chip--dark text-[var(--text-on-dark-soft)]'
-              )}
-            >
-              {totalAvailableBoxes > 0 ? 'BOX READY' : heroMode === 'studying' ? '집중 중' : '대기'}
             </div>
           </div>
 
@@ -939,8 +925,7 @@ export default function GrowthPage() {
         <section className="surface-card surface-card--secondary on-dark rounded-[1.8rem] px-4 py-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="surface-kicker text-[11px]">VAULT</p>
-              <h2 className="mt-1 text-lg font-black tracking-tight text-white">보관함</h2>
+              <h2 className="text-lg font-black tracking-tight text-white">보관함</h2>
             </div>
             <div className="surface-chip surface-chip--accent px-3 py-1 text-[11px]">
               READY {totalAvailableBoxes}
@@ -974,8 +959,7 @@ export default function GrowthPage() {
         <section className="rounded-[1.8rem] border border-[#FFE1B7]/50 bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] px-4 py-4 shadow-[0_20px_48px_-34px_rgba(0,0,0,0.28)] backdrop-blur-xl">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4D679F]">REWARD SHOP</p>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <Gift className="h-4 w-4 text-[#FF7A16]" />
                 <p className="font-aggro-display text-base font-black tracking-tight text-[#14295F]">Giftishow 보상샵</p>
               </div>
@@ -1091,8 +1075,7 @@ export default function GrowthPage() {
         <section className="surface-card surface-card--light rounded-[1.8rem] px-4 py-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)]">MY REWARDS</p>
-              <h2 className="mt-1 text-lg font-black tracking-tight text-[var(--text-primary)]">내 요청 히스토리</h2>
+              <h2 className="text-lg font-black tracking-tight text-[var(--text-primary)]">내 요청 히스토리</h2>
             </div>
             <Badge className="border-none bg-slate-100 text-slate-700 font-black">{giftishowOrders.length}건</Badge>
           </div>
