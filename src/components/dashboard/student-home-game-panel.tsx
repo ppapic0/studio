@@ -574,6 +574,7 @@ export function StudentHomeGamePanel({
   onNextBox: () => void;
   nextCountdownLabel: string;
   }) {
+  const homeHeaderLabel = [dateLabel, homeFocusSummaryLabel].filter(Boolean).join(" · ");
   const maxTrend = weeklyTrend.reduce((max, item) => Math.max(max, item.minutes), 1);
   const trendAxisMarks = [1, 0.75, 0.5, 0.25].map((ratio, index) => {
     const minutes = Math.max(1, Math.round(maxTrend * ratio));
@@ -629,29 +630,23 @@ export function StudentHomeGamePanel({
           </div>
         ) : null}
         <div className={cn("relative z-10", isMobile ? "space-y-4" : "space-y-5")}>
-          <div className={cn("flex items-start justify-between gap-3", isMobile ? "flex-col" : "items-center")}>
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-black text-white">{dateLabel}</span>
-              </div>
-              {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
-            </div>
-
+          <div className="space-y-2">
             <button
               type="button"
               onClick={onOpenFocusEditor}
-              title={homeFocusSummaryLabel}
+              title={homeHeaderLabel}
               className={cn(
-                "surface-chip surface-chip--dark inline-flex max-w-full items-center gap-2 px-3 py-2 text-left shadow-[0_18px_34px_-26px_rgba(0,0,0,0.45)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/28",
-                isMobile ? "max-w-[14.5rem] self-start" : "min-w-[12rem] max-w-[16rem]"
+                "group inline-flex max-w-full items-center gap-2 rounded-full text-left transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/28",
+                isMobile ? "pr-1" : "pr-1.5"
               )}
             >
               <span className={cn("truncate font-black text-white", isMobile ? "text-[11px]" : "text-[12px]")}>
-                {homeFocusSummaryLabel}
+                {homeHeaderLabel}
               </span>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/72" />
-              <span className="sr-only">{homeFocusSummaryLabel}</span>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/72 transition-transform duration-200 group-hover:translate-x-0.5" />
+              <span className="sr-only">{homeHeaderLabel}</span>
             </button>
+            {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
           </div>
 
           <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-[1.35fr_0.95fr]")}>

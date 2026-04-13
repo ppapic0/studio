@@ -1804,7 +1804,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const homeFocusExamLabel = primaryExamCountdown?.dLabel || 'D-day 미설정';
   const homeGoalTypeLabel = resolvedGoalPathType === 'job' ? '희망 직업' : '희망 학교';
   const homeGoalLabel = resolvedGoalPathLabel.trim() || homeGoalTypeLabel;
-  const homeFocusSummaryLabel = `${homeGoalLabel} / ${homeFocusExamLabel}`;
+  const homeFocusSummaryLabel = `${homeGoalLabel} · ${homeFocusExamLabel}`;
 
   const subjectProgress = useMemo(() => {
     const bucket = new Map<string, { total: number; done: number }>();
@@ -3350,7 +3350,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     >
       <StudentHomeGamePanel
         isMobile={isMobile}
-        dateLabel={today ? format(today, 'M월 d일 EEEE', { locale: ko }) : ''}
+        dateLabel={today ? format(today, 'M월 d일', { locale: ko }) : ''}
         heroMessage={null}
         totalMinutesLabel={formatMinutesToKorean(totalMinutesCount)}
         growthLabel={`${formatMinutesMini(totalMinutesCount)} / ${formatMinutesMini(growthGoalMinutes)}`}
