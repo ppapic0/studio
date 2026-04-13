@@ -1526,6 +1526,7 @@ function getParentCalendarCellClass(minutes: number, isCurrentMonth: boolean, is
 
 function getParentCalendarValueTone(minutes: number, isCurrentMonth: boolean) {
   if (!isCurrentMonth) return 'text-[#C6CFDD]';
+  if (minutes <= 0) return 'text-[#FF7A16]';
   return minutes >= PARENT_CALENDAR_THRESHOLDS.medium ? 'text-white' : 'text-black';
 }
 
