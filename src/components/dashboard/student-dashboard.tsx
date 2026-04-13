@@ -99,8 +99,10 @@ import {
   getClaimedStudyBoxes,
   getOpenedStudyBoxes,
   getStudyBoxFallbackRarity,
+  normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
   rollStudyBoxReward,
+  upsertStudyBoxRewardEntry,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
@@ -1009,31 +1011,6 @@ function MiniBestStudySparkline({
   );
 }
 
-function coerceStudyBoxRewards(dayStatus: Record<string, any>) {
-  const raw = Array.isArray(dayStatus.studyBoxRewards) ? dayStatus.studyBoxRewards : [];
-  return raw
-    .map((entry): StudyBoxReward | null => {
-      const milestone = Number(entry?.milestone);
-      const minReward = Number(entry?.minReward);
-      const maxReward = Number(entry?.maxReward);
-      const awardedPoints = Number(entry?.awardedPoints);
-      const multiplier = Number(entry?.multiplier ?? 1);
-      const rarity = entry?.rarity;
-      if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
-      if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
-      return {
-        milestone,
-        rarity: rarity === 'epic' || rarity === 'rare' || rarity === 'common' ? rarity : getStudyBoxFallbackRarity(milestone),
-        minReward,
-        maxReward,
-        awardedPoints,
-        multiplier: Number.isFinite(multiplier) ? multiplier : 1,
-      };
-    })
-    .filter((entry): entry is StudyBoxReward => Boolean(entry))
-    .sort((a, b) => a.milestone - b.milestone);
-}
-
 function normalizeStudyBoxHours(values: unknown) {
   return normalizeStudyBoxHourValues(values);
 }
@@ -1065,15 +1042,6 @@ function writeStudyBoxHoursCache(storageKey: string | null, values: number[]) {
   } catch {
     // Ignore storage access issues and keep runtime state only.
   }
-}
-
-function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxReward) {
-  const next = new Map<number, StudyBoxReward>();
-  entries.forEach((entry) => {
-    next.set(entry.milestone, entry);
-  });
-  next.set(reward.milestone, reward);
-  return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
 
 function coerceOpenedStudyBoxes(dayStatus: Record<string, any>) {
@@ -1277,7 +1245,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const homeLiveClaimKeyRef = useRef<string | null>(null);
   const autoRequestDateRef = useRef('');
   const [homeClaimedBoxes, setHomeClaimedBoxes] = useState<number[]>([]);
-  const [homeRewardEntries, setHomeRewardEntries] = useState<ReturnType<typeof coerceStudyBoxRewards>>([]);
+  const [homeRewardEntries, setHomeRewardEntries] = useState<StudyBoxReward[]>([]);
   const [homeOpenedBoxes, setHomeOpenedBoxes] = useState<number[]>([]);
   const [homeArrivalCount, setHomeArrivalCount] = useState(0);
   const [freshReadyHours, setFreshReadyHours] = useState<number[]>([]);
@@ -2667,10 +2635,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const liveTodaySeconds = Math.max(0, Number(todayStudyLog?.totalMinutes || 0) * 60 + localSeconds);
   const liveTodayMinutes = Math.floor(liveTodaySeconds / 60);
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayPointStatus), [todayPointStatus]);
-  const persistedRewardEntries = useMemo(() => coerceStudyBoxRewards(todayPointStatus), [todayPointStatus]);
+  const persistedRewardEntries = useMemo(
+    () => normalizeStoredStudyBoxRewardEntries(todayPointStatus.studyBoxRewards),
+    [todayPointStatus]
+  );
   const persistedOpenedBoxes = useMemo(() => coerceOpenedStudyBoxes(todayPointStatus), [todayPointStatus]);
   const persistedCarryoverClaimedBoxes = useMemo(() => getClaimedStudyBoxes(yesterdayPointStatus), [yesterdayPointStatus]);
-  const persistedCarryoverRewardEntries = useMemo(() => coerceStudyBoxRewards(yesterdayPointStatus), [yesterdayPointStatus]);
+  const persistedCarryoverRewardEntries = useMemo(
+    () => normalizeStoredStudyBoxRewardEntries(yesterdayPointStatus.studyBoxRewards),
+    [yesterdayPointStatus]
+  );
   const persistedCarryoverOpenedBoxes = useMemo(() => coerceOpenedStudyBoxes(yesterdayPointStatus), [yesterdayPointStatus]);
   const studyBoxClaimCacheKey = useMemo(() => {
     if (!activeMembership?.id || !user?.uid) return null;

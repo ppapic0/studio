@@ -42,8 +42,11 @@ export type StudyBoxReward = {
   rarity: StudyBoxRarity;
   minReward: number;
   maxReward: number;
+  basePoints: number;
   awardedPoints: number;
   multiplier: number;
+  earnedAt?: string | null;
+  boostEventId?: string | null;
 };
 
 function normalizeStoredStudyBoxReward(value: unknown): StudyBoxReward | null {
@@ -51,11 +54,14 @@ function normalizeStoredStudyBoxReward(value: unknown): StudyBoxReward | null {
   const minReward = Number((value as StudyBoxReward | null | undefined)?.minReward);
   const maxReward = Number((value as StudyBoxReward | null | undefined)?.maxReward);
   const awardedPoints = Number((value as StudyBoxReward | null | undefined)?.awardedPoints);
+  const basePoints = Number((value as StudyBoxReward | null | undefined)?.basePoints ?? awardedPoints);
   const multiplier = Number((value as StudyBoxReward | null | undefined)?.multiplier ?? 1);
+  const earnedAtValue = (value as StudyBoxReward | null | undefined)?.earnedAt;
+  const boostEventIdValue = (value as StudyBoxReward | null | undefined)?.boostEventId;
   const rarity = (value as StudyBoxReward | null | undefined)?.rarity;
 
   if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
-  if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
+  if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(basePoints) || !Number.isFinite(awardedPoints)) return null;
   if (rarity !== 'common' && rarity !== 'rare' && rarity !== 'epic') return null;
 
   return {
@@ -63,12 +69,15 @@ function normalizeStoredStudyBoxReward(value: unknown): StudyBoxReward | null {
     rarity,
     minReward,
     maxReward,
+    basePoints: Math.max(0, Math.floor(basePoints)),
     awardedPoints: Math.max(0, Math.floor(awardedPoints)),
-    multiplier: Number.isFinite(multiplier) ? multiplier : 1,
+    multiplier: Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1,
+    earnedAt: typeof earnedAtValue === 'string' && earnedAtValue.trim() ? earnedAtValue.trim() : null,
+    boostEventId: typeof boostEventIdValue === 'string' && boostEventIdValue.trim() ? boostEventIdValue.trim() : null,
   };
 }
 
-function normalizeStoredStudyBoxRewardEntries(values: unknown): StudyBoxReward[] {
+export function normalizeStoredStudyBoxRewardEntries(values: unknown): StudyBoxReward[] {
   if (!Array.isArray(values)) return [];
 
   return values
@@ -77,7 +86,7 @@ function normalizeStoredStudyBoxRewardEntries(values: unknown): StudyBoxReward[]
     .sort((a, b) => a.milestone - b.milestone);
 }
 
-function getRankRewardPoints(dayStatus?: Record<string, any>): number {
+export function getRankRewardPoints(dayStatus?: Record<string, any>): number {
   return ['dailyRankRewardAmount', 'weeklyRankRewardAmount', 'monthlyRankRewardAmount'].reduce((total, key) => {
     const points = Number(dayStatus?.[key] ?? 0);
     if (!Number.isFinite(points)) return total;
@@ -194,6 +203,46 @@ export function getOpenedStudyBoxes(dayStatus?: Record<string, any>): number[] {
   return inferOpenedStudyBoxHours(dayStatus);
 }
 
+export function getDailyAwardedPointTotal(dayStatus?: Record<string, any>): number {
+  const total = Number(dayStatus?.dailyPointAmount ?? 0);
+  if (Number.isFinite(total)) {
+    return Math.max(
+      0,
+      Math.max(
+        Math.floor(total),
+        normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).reduce((sum, entry) => sum + Math.max(0, entry.awardedPoints), 0)
+          + getRankRewardPoints(dayStatus)
+      )
+    );
+  }
+
+  return normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).reduce((sum, entry) => sum + Math.max(0, entry.awardedPoints), 0)
+    + getRankRewardPoints(dayStatus);
+}
+
+export function getDailyStudyBoxAwardPoints(dayStatus?: Record<string, any>): number {
+  const rewardByHour = new Map<number, number>();
+  normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).forEach((entry) => {
+    rewardByHour.set(entry.milestone, Math.max(0, Math.floor(entry.awardedPoints)));
+  });
+
+  return getOpenedStudyBoxes(dayStatus).reduce((total, hour) => total + (rewardByHour.get(hour) ?? 0), 0);
+}
+
+export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
+  const totalPoints = getDailyAwardedPointTotal(dayStatus);
+  const rankPoints = Math.min(totalPoints, getRankRewardPoints(dayStatus));
+  const studyBoxPoints = Math.min(Math.max(0, totalPoints - rankPoints), getDailyStudyBoxAwardPoints(dayStatus));
+  const otherPoints = Math.max(0, totalPoints - rankPoints - studyBoxPoints);
+
+  return {
+    totalPoints,
+    studyBoxPoints,
+    rankPoints,
+    otherPoints,
+  };
+}
+
 export function getAvailableStudyBoxMilestones(totalMinutes: number, claimedStudyBoxes?: number[]) {
   const crossedMilestones = Math.max(0, Math.min(8, Math.floor(Math.max(0, totalMinutes) / 60)));
   const claimed = new Set((claimedStudyBoxes || []).filter((value) => value >= 1 && value <= 8));
@@ -209,9 +258,21 @@ export function rollStudyBoxReward(milestone: number): StudyBoxReward {
     rarity,
     minReward,
     maxReward,
+    basePoints: awardedPoints,
     awardedPoints,
     multiplier: 1,
+    earnedAt: null,
+    boostEventId: null,
   };
+}
+
+export function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxReward) {
+  const next = new Map<number, StudyBoxReward>();
+  entries.forEach((entry) => {
+    next.set(entry.milestone, entry);
+  });
+  next.set(reward.milestone, reward);
+  return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
 
 function hashString(input: string) {

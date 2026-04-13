@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -122,7 +122,7 @@ function normalizeStudyBoxHoursFromUnknown(value) {
         .map((entry) => Math.round(entry)))).sort((a, b) => a - b);
 }
 function normalizeStoredStudyBoxReward(value) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     if (!isPlainObject(value))
         return null;
     const milestone = Math.round((_a = parseFiniteNumber(value.milestone)) !== null && _a !== void 0 ? _a : Number.NaN);
@@ -130,20 +130,26 @@ function normalizeStoredStudyBoxReward(value) {
     const minReward = Math.round((_b = parseFiniteNumber(value.minReward)) !== null && _b !== void 0 ? _b : Number.NaN);
     const maxReward = Math.round((_c = parseFiniteNumber(value.maxReward)) !== null && _c !== void 0 ? _c : Number.NaN);
     const awardedPoints = Math.round((_d = parseFiniteNumber(value.awardedPoints)) !== null && _d !== void 0 ? _d : Number.NaN);
-    const multiplier = Math.max(1, Math.round((_e = parseFiniteNumber(value.multiplier)) !== null && _e !== void 0 ? _e : 1));
+    const basePoints = Math.round((_e = parseFiniteNumber(value.basePoints)) !== null && _e !== void 0 ? _e : awardedPoints);
+    const multiplier = Math.max(1, (_f = parseFiniteNumber(value.multiplier)) !== null && _f !== void 0 ? _f : 1);
+    const earnedAt = asTrimmedString(value.earnedAt);
+    const boostEventId = asTrimmedString(value.boostEventId);
     if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8)
         return null;
     if (rarity !== "common" && rarity !== "rare" && rarity !== "epic")
         return null;
-    if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints))
+    if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(basePoints) || !Number.isFinite(awardedPoints))
         return null;
     return {
         milestone,
         rarity,
         minReward,
         maxReward,
+        basePoints,
         awardedPoints,
         multiplier,
+        earnedAt: earnedAt || null,
+        boostEventId: boostEventId || null,
     };
 }
 function normalizeStudyBoxRewardEntries(existing) {
@@ -252,9 +258,86 @@ function buildDeterministicStudyBoxReward(params) {
         rarity,
         minReward,
         maxReward,
+        basePoints: awardedPoints,
         awardedPoints,
         multiplier: 1,
+        earnedAt: null,
+        boostEventId: null,
     };
+}
+function normalizePointBoostMode(value) {
+    if (value === "day" || value === "window")
+        return value;
+    return null;
+}
+function normalizePointBoostMultiplier(value) {
+    const multiplier = parseFiniteNumber(value);
+    if (multiplier === null || !Number.isFinite(multiplier))
+        return null;
+    if (multiplier <= 1 || multiplier > 100)
+        return null;
+    return Number(multiplier.toFixed(2));
+}
+function isPointBoostEventCancelled(value) {
+    return toMillisSafe(value === null || value === void 0 ? void 0 : value.cancelledAt) > 0;
+}
+function isPointBoostEventActiveAt(value, targetMs) {
+    const event = value;
+    const startAtMs = toMillisSafe(event === null || event === void 0 ? void 0 : event.startAt);
+    const endAtMs = toMillisSafe(event === null || event === void 0 ? void 0 : event.endAt);
+    if (startAtMs <= 0 || endAtMs <= 0)
+        return false;
+    if (isPointBoostEventCancelled(event))
+        return false;
+    return startAtMs <= targetMs && targetMs < endAtMs;
+}
+function doTimeRangesOverlap(startAtMs, endAtMs, otherStartAtMs, otherEndAtMs) {
+    return startAtMs < otherEndAtMs && otherStartAtMs < endAtMs;
+}
+async function listPointBoostEventDocs(db, centerId, limitCount = 200) {
+    const snap = await db
+        .collection(`centers/${centerId}/pointBoostEvents`)
+        .orderBy("startAt", "desc")
+        .limit(limitCount)
+        .get();
+    return snap.docs;
+}
+function buildStudyTimelineSegments(params) {
+    var _a, _b, _c, _d;
+    const segments = [];
+    params.sessionDocs.forEach((docSnap) => {
+        var _a;
+        const data = docSnap.data();
+        const startAtMs = toMillisSafe(data.startTime);
+        const durationMinutes = Math.max(0, Math.floor((_a = parseFiniteNumber(data.durationMinutes)) !== null && _a !== void 0 ? _a : 0));
+        if (startAtMs <= 0 || durationMinutes <= 0)
+            return;
+        segments.push({ startAtMs, durationMinutes });
+    });
+    if (((_a = params.liveSessionStartMs) !== null && _a !== void 0 ? _a : 0) > 0 && ((_b = params.liveSessionMinutes) !== null && _b !== void 0 ? _b : 0) > 0) {
+        segments.push({
+            startAtMs: (_c = params.liveSessionStartMs) !== null && _c !== void 0 ? _c : 0,
+            durationMinutes: Math.max(0, Math.floor((_d = params.liveSessionMinutes) !== null && _d !== void 0 ? _d : 0)),
+        });
+    }
+    return segments.sort((left, right) => left.startAtMs - right.startAtMs);
+}
+function resolveStudyBoxMilestoneEarnedAtMs(params) {
+    const thresholdMinutes = Math.max(1, Math.floor(params.milestone)) * 60;
+    let cumulativeMinutes = 0;
+    for (const segment of buildStudyTimelineSegments(params)) {
+        const nextCumulativeMinutes = cumulativeMinutes + segment.durationMinutes;
+        if (nextCumulativeMinutes < thresholdMinutes) {
+            cumulativeMinutes = nextCumulativeMinutes;
+            continue;
+        }
+        const remainingMinutes = Math.max(0, thresholdMinutes - cumulativeMinutes);
+        return segment.startAtMs + remainingMinutes * 60 * 1000;
+    }
+    if (params.persistedDayMinutes >= thresholdMinutes) {
+        return null;
+    }
+    return null;
 }
 function getAttendanceActivityRank(status) {
     if (status === "studying")
@@ -5043,6 +5126,121 @@ exports.scheduledClassroomSignalsRefresh = functions
 /**
  * 교사/센터관리자가 특정 센터의 교실 관제 신호를 수동 갱신합니다.
  */
+exports.createPointBoostEventSecure = functions.region(region).https.onCall(async (data, context) => {
+    var _a, _b, _c;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const mode = normalizePointBoostMode(data === null || data === void 0 ? void 0 : data.mode);
+    const startAtMs = Math.round((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.startAtMs)) !== null && _b !== void 0 ? _b : Number.NaN);
+    const endAtMs = Math.round((_c = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.endAtMs)) !== null && _c !== void 0 ? _c : Number.NaN);
+    const multiplier = normalizePointBoostMultiplier(data === null || data === void 0 ? void 0 : data.multiplier);
+    if (!centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+            userMessage: "센터 정보를 다시 확인해 주세요.",
+        });
+    }
+    if (!mode) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid boost mode.", {
+            userMessage: "부스트 유형을 다시 선택해 주세요.",
+        });
+    }
+    if (!Number.isFinite(startAtMs) || !Number.isFinite(endAtMs) || startAtMs <= 0 || endAtMs <= 0 || endAtMs <= startAtMs) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid boost time range.", {
+            userMessage: "부스트 시작/종료 시간을 다시 확인해 주세요.",
+        });
+    }
+    if (multiplier === null) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid boost multiplier.", {
+            userMessage: "배율은 1보다 큰 숫자로 입력해 주세요.",
+        });
+    }
+    if (endAtMs <= Date.now()) {
+        throw new functions.https.HttpsError("failed-precondition", "Cannot create a boost event in the past.", {
+            userMessage: "이미 지난 시간에는 부스트를 만들 수 없습니다.",
+        });
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!membership.role || !isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Only center admins can manage point boost events.", {
+            userMessage: "센터 관리자만 포인트 부스트를 관리할 수 있습니다.",
+        });
+    }
+    const existingEvents = await listPointBoostEventDocs(db, centerId);
+    const overlappingEvent = existingEvents.find((docSnap) => {
+        const event = docSnap.data();
+        if (isPointBoostEventCancelled(event))
+            return false;
+        return doTimeRangesOverlap(startAtMs, endAtMs, toMillisSafe(event.startAt), toMillisSafe(event.endAt));
+    });
+    if (overlappingEvent) {
+        throw new functions.https.HttpsError("already-exists", "Overlapping boost event exists.", {
+            userMessage: "겹치는 시간에 이미 포인트 부스트가 있습니다.",
+        });
+    }
+    const eventRef = db.collection(`centers/${centerId}/pointBoostEvents`).doc();
+    await eventRef.set({
+        centerId,
+        mode,
+        startAt: admin.firestore.Timestamp.fromMillis(startAtMs),
+        endAt: admin.firestore.Timestamp.fromMillis(endAtMs),
+        multiplier,
+        createdBy: context.auth.uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return {
+        ok: true,
+        eventId: eventRef.id,
+    };
+});
+exports.cancelPointBoostEventSecure = functions.region(region).https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const eventId = asTrimmedString(data === null || data === void 0 ? void 0 : data.eventId);
+    if (!centerId || !eventId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId and eventId are required.", {
+            userMessage: "취소할 부스트 이벤트를 다시 선택해 주세요.",
+        });
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!membership.role || !isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Only center admins can manage point boost events.", {
+            userMessage: "센터 관리자만 포인트 부스트를 관리할 수 있습니다.",
+        });
+    }
+    const eventRef = db.doc(`centers/${centerId}/pointBoostEvents/${eventId}`);
+    const eventSnap = await eventRef.get();
+    if (!eventSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Point boost event not found.", {
+            userMessage: "포인트 부스트 이벤트를 찾지 못했습니다.",
+        });
+    }
+    const eventData = eventSnap.data();
+    if (isPointBoostEventCancelled(eventData)) {
+        throw new functions.https.HttpsError("failed-precondition", "Boost event is already cancelled.", {
+            userMessage: "이미 취소된 부스트 이벤트입니다.",
+        });
+    }
+    if (toMillisSafe(eventData.endAt) <= Date.now()) {
+        throw new functions.https.HttpsError("failed-precondition", "Completed boost event cannot be cancelled.", {
+            userMessage: "이미 종료된 부스트 이벤트는 취소할 수 없습니다.",
+        });
+    }
+    await eventRef.set({
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        cancelledBy: context.auth.uid,
+    }, { merge: true });
+    return {
+        ok: true,
+        eventId,
+    };
+});
 exports.applyPenaltyEventSecure = functions.region(region).https.onCall(async (data, context) => {
     var _a, _b;
     const db = admin.firestore();
@@ -5275,7 +5473,7 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
     };
 });
 exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -5307,12 +5505,13 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
     }
     const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${dateKey}`);
     const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
-    const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap, progressSnap] = await Promise.all([
+    const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap, progressSnap, sessionsSnap] = await Promise.all([
         db.doc(`centers/${centerId}/members/${authUid}`).get(),
         db.doc(`centers/${centerId}/students/${authUid}`).get(),
         studyDayRef.get(),
-        db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(1).get(),
+        db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(10).get(),
         progressRef.get(),
+        studyDayRef.collection("sessions").orderBy("startTime", "asc").get(),
     ]);
     if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
         throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
@@ -5321,18 +5520,21 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
     }
     const persistedDayMinutes = Math.max(0, Math.floor((_d = parseFiniteNumber((_c = studyDaySnap.data()) === null || _c === void 0 ? void 0 : _c.totalMinutes)) !== null && _d !== void 0 ? _d : 0));
     const todayKstKey = toDateKey(toKstDate());
+    const nowMs = Date.now();
+    const dayStartMs = Date.parse(`${dateKey}T00:00:00+09:00`);
     let liveSessionMinutes = 0;
+    let liveSessionStartMs = 0;
     if (dateKey === todayKstKey && !attendanceSnap.empty) {
-        const attendanceData = (_e = attendanceSnap.docs[0]) === null || _e === void 0 ? void 0 : _e.data();
+        const preferredAttendanceDoc = pickPreferredAttendanceSeatDoc(attendanceSnap.docs);
+        const attendanceData = preferredAttendanceDoc === null || preferredAttendanceDoc === void 0 ? void 0 : preferredAttendanceDoc.data();
         const attendanceStatus = asTrimmedString(attendanceData === null || attendanceData === void 0 ? void 0 : attendanceData.status);
         const liveStartedAtMs = toMillisSafe(attendanceData === null || attendanceData === void 0 ? void 0 : attendanceData.lastCheckInAt);
-        const dayStartMs = Date.parse(`${dateKey}T00:00:00+09:00`);
-        const nowMs = Date.now();
         if (ACTIVE_STUDY_ATTENDANCE_STATUSES.has(attendanceStatus) &&
             liveStartedAtMs > 0 &&
             Number.isFinite(dayStartMs) &&
             nowMs > liveStartedAtMs) {
             const effectiveStartMs = Math.max(liveStartedAtMs, dayStartMs);
+            liveSessionStartMs = effectiveStartMs;
             liveSessionMinutes = Math.max(0, Math.floor((nowMs - effectiveStartMs) / 60000));
         }
     }
@@ -5353,12 +5555,31 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
             userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
         });
     }
-    const reward = buildDeterministicStudyBoxReward({
+    const baseReward = buildDeterministicStudyBoxReward({
         centerId,
         studentId: authUid,
         dateKey,
         milestone: hour,
     });
+    const earnedAtMs = resolveStudyBoxMilestoneEarnedAtMs({
+        milestone: hour,
+        persistedDayMinutes,
+        sessionDocs: sessionsSnap.docs,
+        liveSessionStartMs,
+        liveSessionMinutes,
+    });
+    let boostMultiplier = 1;
+    let boostEventId = null;
+    if (earnedAtMs) {
+        const pointBoostDocs = await listPointBoostEventDocs(db, centerId);
+        const matchedBoostDoc = (_e = pointBoostDocs.find((docSnap) => isPointBoostEventActiveAt(docSnap.data(), earnedAtMs))) !== null && _e !== void 0 ? _e : null;
+        const matchedBoostEvent = matchedBoostDoc === null || matchedBoostDoc === void 0 ? void 0 : matchedBoostDoc.data();
+        if (matchedBoostEvent) {
+            boostMultiplier = matchedBoostEvent.multiplier;
+            boostEventId = (_f = matchedBoostDoc === null || matchedBoostDoc === void 0 ? void 0 : matchedBoostDoc.id) !== null && _f !== void 0 ? _f : null;
+        }
+    }
+    const reward = Object.assign(Object.assign({}, baseReward), { awardedPoints: Math.max(0, Math.round(baseReward.basePoints * boostMultiplier)), multiplier: boostMultiplier, earnedAt: earnedAtMs ? new Date(earnedAtMs).toISOString() : null, boostEventId });
     const result = await db.runTransaction(async (transaction) => {
         var _a, _b, _c;
         const progressSnap = await transaction.get(progressRef);

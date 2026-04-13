@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   Select,
@@ -82,7 +83,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts } from '@/lib/types';
+import { AttendanceCurrent, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
@@ -101,6 +102,8 @@ import {
   normalizeLayoutRooms,
   resolveSeatIdentity,
 } from '@/lib/seat-layout';
+import { createPointBoostEventSecure, cancelPointBoostEventSecure } from '@/lib/point-boost-actions';
+import { getDailyPointBreakdown } from '@/lib/student-rewards';
 
 const isLikelyUid = (value: string): boolean => {
   const normalized = value.trim();
@@ -340,6 +343,62 @@ const getCommunicationKindLabel = (item: any): string => {
   return '연락';
 };
 
+const DAY_RANGE_MS = 24 * 60 * 60 * 1000;
+
+const formatPointBoostMultiplier = (value: number): string => {
+  const safe = Number(value);
+  if (!Number.isFinite(safe) || safe <= 0) return '1배';
+  const label = Number.isInteger(safe) ? safe.toFixed(0) : safe.toFixed(2).replace(/\.?0+$/, '');
+  return `${label}배`;
+};
+
+const parseKstDayRange = (dateKey: string): { startAtMs: number; endAtMs: number } | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+  const startAtMs = Date.parse(`${dateKey}T00:00:00+09:00`);
+  if (!Number.isFinite(startAtMs)) return null;
+  return {
+    startAtMs,
+    endAtMs: startAtMs + DAY_RANGE_MS,
+  };
+};
+
+const parseKstDateTimeInput = (value: string): number | null => {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const parsed = Date.parse(`${value}:00+09:00`);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatDateTimeLocalInput = (value: Date) => {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hours = String(value.getHours()).padStart(2, '0');
+  const minutes = String(value.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const roundUpToNextTenMinutes = (value: Date) => {
+  const rounded = new Date(value);
+  rounded.setSeconds(0, 0);
+  const nextMinutes = Math.ceil((rounded.getMinutes() + 1) / 10) * 10;
+  rounded.setMinutes(nextMinutes, 0, 0);
+  return rounded;
+};
+
+const formatPointBoostWindowLabel = (event: PointBoostEvent) => {
+  const startAt = toTimestampDateSafe(event.startAt);
+  const endAt = toTimestampDateSafe(event.endAt);
+  if (!startAt || !endAt) return '시간 미상';
+  if (event.mode === 'day') {
+    return `${format(startAt, 'M/d')} 하루 종일`;
+  }
+  const sameDay = format(startAt, 'yyyy-MM-dd') === format(endAt, 'yyyy-MM-dd');
+  if (sameDay) {
+    return `${format(startAt, 'M/d HH:mm')} - ${format(endAt, 'HH:mm')}`;
+  }
+  return `${format(startAt, 'M/d HH:mm')} - ${format(endAt, 'M/d HH:mm')}`;
+};
+
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const functions = useFunctions();
@@ -378,6 +437,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [noticeAudience, setNoticeAudience] = useState<'parent' | 'student' | 'all'>('parent');
   const [isNoticeSubmitting, setIsNoticeSubmitting] = useState(false);
   const [isAnnouncementDialogOpen, setIsAnnouncementDialogOpen] = useState(false);
+  const [isTodayPointsDialogOpen, setIsTodayPointsDialogOpen] = useState(false);
+  const [isPointBoostDialogOpen, setIsPointBoostDialogOpen] = useState(false);
+  const [pointBoostModeDraft, setPointBoostModeDraft] = useState<'day' | 'window'>('day');
+  const [pointBoostDateDraft, setPointBoostDateDraft] = useState('');
+  const [pointBoostStartDraft, setPointBoostStartDraft] = useState('');
+  const [pointBoostEndDraft, setPointBoostEndDraft] = useState('');
+  const [pointBoostMultiplierDraft, setPointBoostMultiplierDraft] = useState('2');
+  const [isCreatingPointBoost, setIsCreatingPointBoost] = useState(false);
+  const [cancellingPointBoostId, setCancellingPointBoostId] = useState<string | null>(null);
   const [isOpenClawExporting, setIsOpenClawExporting] = useState(false);
   const [optimisticAnnouncements, setOptimisticAnnouncements] = useState<Array<{
     id: string;
@@ -418,6 +486,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
+
+  useEffect(() => {
+    if (!today) return;
+    if (!pointBoostDateDraft) {
+      setPointBoostDateDraft(format(today, 'yyyy-MM-dd'));
+    }
+    if (!pointBoostStartDraft || !pointBoostEndDraft) {
+      const nextWindowStart = roundUpToNextTenMinutes(new Date());
+      const nextWindowEnd = new Date(nextWindowStart.getTime() + 2 * 60 * 60 * 1000);
+      if (!pointBoostStartDraft) {
+        setPointBoostStartDraft(formatDateTimeLocalInput(nextWindowStart));
+      }
+      if (!pointBoostEndDraft) {
+        setPointBoostEndDraft(formatDateTimeLocalInput(nextWindowEnd));
+      }
+    }
+  }, [pointBoostDateDraft, pointBoostEndDraft, pointBoostStartDraft, today]);
+
   const parentActivityWindowStart = useMemo(
     () => Timestamp.fromDate(subDays(today ?? new Date(), 30)),
     [today]
@@ -442,6 +528,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return doc(firestore, 'centers', centerId, 'integrations', 'openclaw');
   }, [firestore, centerId]);
   const { data: openClawIntegration } = useDoc<OpenClawIntegrationDoc>(openClawIntegrationRef);
+
+  const pointBoostEventsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'pointBoostEvents'),
+      orderBy('startAt', 'desc'),
+      limit(40)
+    );
+  }, [firestore, centerId]);
+  const { data: pointBoostEvents } = useCollection<PointBoostEvent>(pointBoostEventsQuery, { enabled: isActive });
 
   const roomConfigs = useMemo(
     () => normalizeLayoutRooms(centerData?.layoutSettings),
@@ -565,6 +661,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const studentMembersById = useMemo(
     () => new Map((activeMembers || []).map((member) => [member.id, member])),
     [activeMembers]
+  );
+
+  const progressById = useMemo(
+    () => new Map((progressList || []).map((progress) => [progress.id, progress])),
+    [progressList]
   );
 
   const seatById = useMemo(
@@ -799,6 +900,93 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () => new Set(filteredStudentMembers.map((member) => member.id)),
     [filteredStudentMembers]
   );
+
+  const todayPointRows = useMemo(
+    () =>
+      filteredStudentMembers
+        .map((member) => {
+          const progress = progressById.get(member.id);
+          const dayStatus = (((progress?.dailyPointStatus || {}) as Record<string, any>)[todayKey] || {}) as Record<string, any>;
+          const breakdown = getDailyPointBreakdown(dayStatus);
+
+          return {
+            studentId: member.id,
+            studentName: toSafeStudentName(member.displayName, member.id),
+            className: member.className || '-',
+            totalPoints: breakdown.totalPoints,
+            studyBoxPoints: breakdown.studyBoxPoints,
+            rankPoints: breakdown.rankPoints,
+            otherPoints: breakdown.otherPoints,
+          };
+        })
+        .sort((left, right) => {
+          if (right.totalPoints !== left.totalPoints) return right.totalPoints - left.totalPoints;
+          if (right.studyBoxPoints !== left.studyBoxPoints) return right.studyBoxPoints - left.studyBoxPoints;
+          return left.studentName.localeCompare(right.studentName, 'ko');
+        }),
+    [filteredStudentMembers, progressById, todayKey]
+  );
+
+  const todayPointsSummary = useMemo(
+    () =>
+      todayPointRows.reduce(
+        (acc, row) => ({
+          totalPoints: acc.totalPoints + row.totalPoints,
+          studyBoxPoints: acc.studyBoxPoints + row.studyBoxPoints,
+          rankPoints: acc.rankPoints + row.rankPoints,
+          otherPoints: acc.otherPoints + row.otherPoints,
+          earners: acc.earners + (row.totalPoints > 0 ? 1 : 0),
+        }),
+        { totalPoints: 0, studyBoxPoints: 0, rankPoints: 0, otherPoints: 0, earners: 0 }
+      ),
+    [todayPointRows]
+  );
+
+  const pointBoostOverview = useMemo(() => {
+    const active: Array<PointBoostEvent & { startAtMs: number; endAtMs: number; cancelledAtMs: number; label: string; multiplierLabel: string }> = [];
+    const upcoming: Array<PointBoostEvent & { startAtMs: number; endAtMs: number; cancelledAtMs: number; label: string; multiplierLabel: string }> = [];
+    const history: Array<PointBoostEvent & { startAtMs: number; endAtMs: number; cancelledAtMs: number; label: string; multiplierLabel: string }> = [];
+    const nowMs = now || Date.now();
+
+    (pointBoostEvents || []).forEach((event) => {
+      const startAtMs = toTimestampDateSafe(event.startAt)?.getTime() ?? 0;
+      const endAtMs = toTimestampDateSafe(event.endAt)?.getTime() ?? 0;
+      const cancelledAtMs = toTimestampDateSafe(event.cancelledAt)?.getTime() ?? 0;
+      if (startAtMs <= 0 || endAtMs <= 0) return;
+
+      const normalized = {
+        ...event,
+        startAtMs,
+        endAtMs,
+        cancelledAtMs,
+        label: formatPointBoostWindowLabel(event),
+        multiplierLabel: formatPointBoostMultiplier(event.multiplier),
+      };
+
+      if (cancelledAtMs > 0 || endAtMs <= nowMs) {
+        history.push(normalized);
+        return;
+      }
+
+      if (startAtMs <= nowMs) {
+        active.push(normalized);
+        return;
+      }
+
+      upcoming.push(normalized);
+    });
+
+    active.sort((left, right) => left.startAtMs - right.startAtMs);
+    upcoming.sort((left, right) => left.startAtMs - right.startAtMs);
+    history.sort((left, right) => Math.max(right.cancelledAtMs, right.endAtMs) - Math.max(left.cancelledAtMs, left.endAtMs));
+
+    return {
+      active,
+      upcoming,
+      history,
+      activeEvent: active[0] ?? null,
+    };
+  }, [now, pointBoostEvents]);
 
   const studentNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -2759,6 +2947,81 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setCounselTrackDialogTab(tab);
     setIsCounselTrackDialogOpen(true);
   };
+  const handleCreatePointBoost = async () => {
+    if (!centerId) return;
+
+    const multiplier = Number(pointBoostMultiplierDraft);
+    if (!Number.isFinite(multiplier) || multiplier <= 1) {
+      toast({
+        variant: 'destructive',
+        title: '배율 확인 필요',
+        description: '배율은 1보다 큰 숫자로 입력해 주세요.',
+      });
+      return;
+    }
+
+    let startAtMs: number | null = null;
+    let endAtMs: number | null = null;
+    if (pointBoostModeDraft === 'day') {
+      const dayRange = parseKstDayRange(pointBoostDateDraft);
+      startAtMs = dayRange?.startAtMs ?? null;
+      endAtMs = dayRange?.endAtMs ?? null;
+    } else {
+      startAtMs = parseKstDateTimeInput(pointBoostStartDraft);
+      endAtMs = parseKstDateTimeInput(pointBoostEndDraft);
+    }
+
+    if (!startAtMs || !endAtMs || endAtMs <= startAtMs) {
+      toast({
+        variant: 'destructive',
+        title: '시간 설정 확인 필요',
+        description: '부스트 시작 시간과 종료 시간을 다시 확인해 주세요.',
+      });
+      return;
+    }
+
+    setIsCreatingPointBoost(true);
+    try {
+      await createPointBoostEventSecure({
+        centerId,
+        mode: pointBoostModeDraft,
+        startAtMs,
+        endAtMs,
+        multiplier,
+      });
+      toast({
+        title: '포인트 부스트 생성 완료',
+        description: `${formatPointBoostMultiplier(multiplier)} 이벤트를 저장했어요.`,
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 부스트 생성 실패',
+        description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsCreatingPointBoost(false);
+    }
+  };
+  const handleCancelPointBoost = async (eventId: string) => {
+    if (!centerId) return;
+    setCancellingPointBoostId(eventId);
+    try {
+      await cancelPointBoostEventSecure({ centerId, eventId });
+      toast({
+        title: '포인트 부스트 취소 완료',
+        description: '선택한 부스트 이벤트를 취소했어요.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 부스트 취소 실패',
+        description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setCancellingPointBoostId((current) => (current === eventId ? null : current));
+    }
+  };
   function renderHomeHeroSection() {
     // ── KPI cards for the summary bar ──
     const kpiCards = [
@@ -2816,6 +3079,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           : metrics.focusKpi.levelLabel,
       },
       {
+        key: 'today-points',
+        label: '오늘 지급 포인트',
+        value: todayPointsSummary.totalPoints.toLocaleString(),
+        unit: '점',
+        icon: Sparkles,
+        tone: pointBoostOverview.activeEvent ? 'orange' as const : 'blue' as const,
+        delta: null,
+        deltaLabel: pointBoostOverview.activeEvent
+          ? `${pointBoostOverview.activeEvent.multiplierLabel} 부스트 진행중`
+          : `지급 학생 ${todayPointsSummary.earners}명`,
+        onClick: () => setIsTodayPointsDialogOpen(true),
+      },
+      {
         key: 'lead-pipeline',
         label: '상담·리드',
         value: metrics.leadPipelineCount30d,
@@ -2859,6 +3135,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       경고 {totalControlAlerts}건
                     </Badge>
                   )}
+                  {pointBoostOverview.activeEvent ? (
+                    <Badge className="rounded-full border border-[#FFB57A]/30 bg-[#FF7A16]/14 px-2.5 py-1 text-[10px] font-black text-[#FFD7BA]">
+                      포인트 {pointBoostOverview.activeEvent.multiplierLabel}
+                    </Badge>
+                  ) : null}
                 </div>
                 <h1 className="admin-section-title text-[1.75rem] tracking-tight text-white sm:text-[2rem]">
                   {homeStatusHeadline}
@@ -2875,6 +3156,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <span className="admin-kpi-number text-lg text-white">{liveSyncLabel}</span>
                 </div>
                 <div className="flex gap-1.5">
+                  <button type="button" onClick={() => setIsPointBoostDialogOpen(true)} title="포인트 부스트" className={cn(
+                    'group inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border text-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:text-white',
+                    pointBoostOverview.activeEvent
+                      ? 'border-[#FFB57A]/40 bg-[#FF7A16]/18 text-[#FFD7BA] hover:bg-[#FF7A16]/24'
+                      : 'border-white/10 bg-white/8 hover:border-[#FF7A16]/40 hover:bg-[#FF7A16]/14'
+                  )}>
+                    <Sparkles className="h-4 w-4" />
+                  </button>
                   <button type="button" onClick={() => setIsAnnouncementDialogOpen(true)} title="공지 보내기" className="group inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-white/10 bg-white/8 text-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/40 hover:bg-[#FF7A16]/14 hover:text-white">
                     <Megaphone className="h-4 w-4" />
                   </button>
@@ -2888,7 +3177,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         </motion.div>
 
         {/* ═══ B. KPI Summary Bar ═══ */}
-        <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-3 xl:grid-cols-6')}>
+        <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-3 xl:grid-cols-7')}>
           {kpiCards.map((card, index) => {
             const KpiIcon = card.icon;
             const toneMap: Record<string, { card: string; label: string; value: string; iconBg: string; icon: string }> = {
@@ -3574,6 +3863,330 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {renderHomeHeroSection()}
           {renderAttendanceDashboardSection()}
           {renderHomeInsightsSection()}
+
+          <Dialog open={isTodayPointsDialogOpen} onOpenChange={setIsTodayPointsDialogOpen}>
+            <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-2xl')}>
+              <div className={studioDialogHeaderClassName}>
+                <DialogHeader className="text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">오늘 지급 포인트</Badge>
+                    <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                      {selectedClass === 'all' ? '센터 전체' : selectedClass}
+                    </Badge>
+                    <Badge className="border-none bg-[#FF7A16] px-2.5 py-1 text-[10px] font-black text-white">
+                      지급 학생 {todayPointsSummary.earners}명
+                    </Badge>
+                  </div>
+                  <DialogTitle className="text-2xl font-black tracking-tight">
+                    오늘 총 {todayPointsSummary.totalPoints.toLocaleString()}점 지급
+                  </DialogTitle>
+                  <DialogDescription className="text-sm font-medium text-white/76">
+                    상자 {todayPointsSummary.studyBoxPoints.toLocaleString()}점 · 랭킹 {todayPointsSummary.rankPoints.toLocaleString()}점
+                    {todayPointsSummary.otherPoints > 0 ? ` · 기타 ${todayPointsSummary.otherPoints.toLocaleString()}점` : ''}
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+                {todayPointRows.length === 0 ? (
+                  <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-10 text-center text-sm font-bold text-[#5c6e97]">
+                    오늘 포인트 집계 대상 학생이 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {todayPointRows.map((row, index) => (
+                      <div
+                        key={row.studentId}
+                        className={cn(
+                          'rounded-[1.45rem] border px-4 py-4 shadow-[0_18px_32px_-28px_rgba(20,41,95,0.16)]',
+                          index === 0 && row.totalPoints > 0 ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {index < 3 && row.totalPoints > 0 ? (
+                                <Badge className={cn(
+                                  'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                                  index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]'
+                                )}>
+                                  {index === 0 ? '오늘 1위' : `${index + 1}위`}
+                                </Badge>
+                              ) : null}
+                              <p className="truncate text-base font-black tracking-tight text-[#14295F]">{row.studentName}</p>
+                              <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
+                                {row.className}
+                              </Badge>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Badge className="h-6 rounded-full border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">
+                                상자 {row.studyBoxPoints.toLocaleString()}점
+                              </Badge>
+                              <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
+                                랭킹 {row.rankPoints.toLocaleString()}점
+                              </Badge>
+                              {row.otherPoints > 0 ? (
+                                <Badge className="h-6 rounded-full border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
+                                  기타 {row.otherPoints.toLocaleString()}점
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">총 지급</p>
+                            <p className="admin-kpi-number mt-2 text-[1.55rem] text-[#14295F]">{row.totalPoints.toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
+                <DialogClose asChild>
+                  <Button type="button" className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]">
+                    닫기
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isPointBoostDialogOpen} onOpenChange={setIsPointBoostDialogOpen}>
+            <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-3xl')}>
+              <div className={studioDialogHeaderClassName}>
+                <DialogHeader className="text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">포인트 부스트</Badge>
+                    <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                      진행중 {pointBoostOverview.active.length}개
+                    </Badge>
+                    <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                      예정 {pointBoostOverview.upcoming.length}개
+                    </Badge>
+                  </div>
+                  <DialogTitle className="text-2xl font-black tracking-tight">포인트 부스트 운영</DialogTitle>
+                  <DialogDescription className="text-sm font-medium text-white/76">
+                    하루형 또는 시간형 이벤트를 예약해 두고, 겹치지 않는 범위에서 생성하거나 취소할 수 있습니다.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="max-h-[72vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+                <div className="rounded-[1.55rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className={studioSectionEyebrowClassName}>새 부스트 생성</p>
+                      <p className="mt-1 text-base font-black text-[#14295F]">예약 또는 당일 부스트 열기</p>
+                    </div>
+                    <Badge className="rounded-full border-none bg-[#FFF2E8] px-2.5 py-1 text-[10px] font-black text-[#C95A08]">
+                      상자 달성 시각 기준 적용
+                    </Badge>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">유형</Label>
+                      <Select value={pointBoostModeDraft} onValueChange={(value: 'day' | 'window') => setPointBoostModeDraft(value)}>
+                        <SelectTrigger className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="day">하루 전체</SelectItem>
+                          <SelectItem value="window">시간 구간</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">배율</Label>
+                      <Input
+                        type="number"
+                        min="1.1"
+                        step="0.1"
+                        value={pointBoostMultiplierDraft}
+                        onChange={(event) => setPointBoostMultiplierDraft(event.target.value)}
+                        className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                        placeholder="2"
+                      />
+                    </div>
+                  </div>
+                  {pointBoostModeDraft === 'day' ? (
+                    <div className="mt-3 space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">적용 날짜</Label>
+                      <Input
+                        type="date"
+                        value={pointBoostDateDraft}
+                        onChange={(event) => setPointBoostDateDraft(event.target.value)}
+                        className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">시작</Label>
+                        <Input
+                          type="datetime-local"
+                          value={pointBoostStartDraft}
+                          onChange={(event) => setPointBoostStartDraft(event.target.value)}
+                          className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">종료</Label>
+                        <Input
+                          type="datetime-local"
+                          value={pointBoostEndDraft}
+                          onChange={(event) => setPointBoostEndDraft(event.target.value)}
+                          className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => void handleCreatePointBoost()}
+                      disabled={isCreatingPointBoost}
+                      className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]"
+                    >
+                      {isCreatingPointBoost ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                      부스트 생성
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                  <section className="rounded-[1.55rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className={studioSectionEyebrowClassName}>활성</p>
+                        <p className="mt-1 text-sm font-black text-[#14295F]">진행중 이벤트</p>
+                      </div>
+                      <Badge className="rounded-full border-none bg-[#FFF2E8] px-2.5 py-1 text-[10px] font-black text-[#C95A08]">
+                        {pointBoostOverview.active.length}개
+                      </Badge>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {pointBoostOverview.active.length === 0 ? (
+                        <div className="rounded-[1.2rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-4 py-8 text-center text-xs font-bold text-[#5c6e97]">
+                          지금 진행중인 부스트가 없습니다.
+                        </div>
+                      ) : pointBoostOverview.active.map((event) => (
+                        <div key={event.id} className="rounded-[1.2rem] border border-[#FFD7BA] bg-[#FFF8F2] px-3.5 py-3.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">진행중</Badge>
+                                <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#C95A08]">{event.multiplierLabel}</Badge>
+                              </div>
+                              <p className="mt-3 text-sm font-black text-[#14295F]">{event.label}</p>
+                              <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">생성 {formatDashboardTrackTime(event.createdAt)}</p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={cancellingPointBoostId === event.id}
+                              onClick={() => void handleCancelPointBoost(event.id)}
+                              className="h-8 rounded-full border-[#FFD7BA] bg-white px-3 text-[10px] font-black text-[#C95A08] hover:bg-[#FFF2E8]"
+                            >
+                              {cancellingPointBoostId === event.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '취소'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-[1.55rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className={studioSectionEyebrowClassName}>예정</p>
+                        <p className="mt-1 text-sm font-black text-[#14295F]">예약 이벤트</p>
+                      </div>
+                      <Badge className="rounded-full border-none bg-[#EEF4FF] px-2.5 py-1 text-[10px] font-black text-[#2554D7]">
+                        {pointBoostOverview.upcoming.length}개
+                      </Badge>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {pointBoostOverview.upcoming.length === 0 ? (
+                        <div className="rounded-[1.2rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-4 py-8 text-center text-xs font-bold text-[#5c6e97]">
+                          예정된 부스트가 없습니다.
+                        </div>
+                      ) : pointBoostOverview.upcoming.map((event) => (
+                        <div key={event.id} className="rounded-[1.2rem] border border-[#DCE7FF] bg-[#F7FAFF] px-3.5 py-3.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">예정</Badge>
+                                <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F]">{event.multiplierLabel}</Badge>
+                              </div>
+                              <p className="mt-3 text-sm font-black text-[#14295F]">{event.label}</p>
+                              <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">생성 {formatDashboardTrackTime(event.createdAt)}</p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={cancellingPointBoostId === event.id}
+                              onClick={() => void handleCancelPointBoost(event.id)}
+                              className="h-8 rounded-full border-[#DCE7FF] bg-white px-3 text-[10px] font-black text-[#14295F]"
+                            >
+                              {cancellingPointBoostId === event.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '취소'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-[1.55rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className={studioSectionEyebrowClassName}>지난 기록</p>
+                        <p className="mt-1 text-sm font-black text-[#14295F]">종료·취소 이벤트</p>
+                      </div>
+                      <Badge className="rounded-full border-none bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-700">
+                        {pointBoostOverview.history.length}개
+                      </Badge>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {pointBoostOverview.history.length === 0 ? (
+                        <div className="rounded-[1.2rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-4 py-8 text-center text-xs font-bold text-[#5c6e97]">
+                          아직 지난 이벤트 기록이 없습니다.
+                        </div>
+                      ) : pointBoostOverview.history.map((event) => (
+                        <div key={event.id} className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={cn(
+                                  'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                                  event.cancelledAtMs > 0 ? 'bg-slate-100 text-slate-700' : 'bg-[#EEF4FF] text-[#2554D7]'
+                                )}>
+                                  {event.cancelledAtMs > 0 ? '취소됨' : '종료'}
+                                </Badge>
+                                <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F]">{event.multiplierLabel}</Badge>
+                              </div>
+                              <p className="mt-3 text-sm font-black text-[#14295F]">{event.label}</p>
+                              <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">
+                                {event.cancelledAtMs > 0 ? `취소 ${formatDashboardTrackTime(event.cancelledAt)}` : `종료 ${formatDashboardTrackTime(event.endAt)}`}
+                              </p>
+                            </div>
+                            <History className="mt-1 h-4 w-4 text-[#5c6e97]" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              </div>
+              <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
+                <DialogClose asChild>
+                  <Button type="button" className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]">
+                    닫기
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Sheet open={isOperationsMemoOpen} onOpenChange={setIsOperationsMemoOpen}>
             <SheetContent

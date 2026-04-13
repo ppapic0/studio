@@ -50,8 +50,10 @@ import {
   getClaimedStudyBoxes,
   getOpenedStudyBoxes,
   getStudyBoxFallbackRarity,
+  normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
   rollStudyBoxReward,
+  upsertStudyBoxRewardEntry,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
@@ -203,40 +205,6 @@ function formatHeroTimer(seconds: number) {
     return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
   return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-function coerceStudyBoxRewards(dayStatus: Record<string, any>): StudyBoxReward[] {
-  const raw = Array.isArray(dayStatus.studyBoxRewards) ? dayStatus.studyBoxRewards : [];
-  return raw
-    .map((entry) => {
-      const milestone = Number(entry?.milestone);
-      const minReward = Number(entry?.minReward);
-      const maxReward = Number(entry?.maxReward);
-      const awardedPoints = Number(entry?.awardedPoints);
-      const multiplier = Number(entry?.multiplier ?? 1);
-      const rarity = entry?.rarity;
-      if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
-      if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
-      return {
-        milestone,
-        rarity: rarity === 'epic' || rarity === 'rare' || rarity === 'common' ? rarity : getStudyBoxFallbackRarity(milestone),
-        minReward,
-        maxReward,
-        awardedPoints,
-        multiplier: Number.isFinite(multiplier) ? multiplier : 1,
-      } satisfies StudyBoxReward;
-    })
-    .filter((entry): entry is StudyBoxReward => Boolean(entry))
-    .sort((a, b) => a.milestone - b.milestone);
-}
-
-function upsertStudyBoxRewardEntry(entries: StudyBoxReward[], reward: StudyBoxReward) {
-  const next = new Map<number, StudyBoxReward>();
-  entries.forEach((entry) => {
-    next.set(entry.milestone, entry);
-  });
-  next.set(reward.milestone, reward);
-  return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
 
 function buildRewardBoxes({
@@ -431,7 +399,10 @@ export default function GrowthPage() {
   }, [activeMembership?.id, todayKey, user?.uid]);
 
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayStatus), [todayStatus]);
-  const persistedRewardEntries = useMemo(() => coerceStudyBoxRewards(todayStatus), [todayStatus]);
+  const persistedRewardEntries = useMemo(
+    () => normalizeStoredStudyBoxRewardEntries(todayStatus.studyBoxRewards),
+    [todayStatus]
+  );
   const persistedOpenedBoxes = useMemo(() => getOpenedStudyBoxes(todayStatus), [todayStatus]);
 
   const stats = useMemo(() => {

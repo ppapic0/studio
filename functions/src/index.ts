@@ -172,8 +172,29 @@ type SecureStudyBoxReward = {
   rarity: StudyBoxRarity;
   minReward: number;
   maxReward: number;
+  basePoints: number;
   awardedPoints: number;
   multiplier: number;
+  earnedAt?: string | null;
+  boostEventId?: string | null;
+};
+
+type PointBoostEventMode = "day" | "window";
+type PointBoostEventDoc = {
+  centerId: string;
+  mode: PointBoostEventMode;
+  startAt: admin.firestore.Timestamp;
+  endAt: admin.firestore.Timestamp;
+  multiplier: number;
+  createdBy: string;
+  createdAt?: admin.firestore.Timestamp;
+  cancelledAt?: admin.firestore.Timestamp | null;
+  cancelledBy?: string | null;
+};
+
+type StudyTimelineSegment = {
+  startAtMs: number;
+  durationMinutes: number;
 };
 
 const STUDY_BOX_REWARD_RANGE_BY_RARITY: Record<StudyBoxRarity, readonly [number, number]> = {
@@ -228,19 +249,25 @@ function normalizeStoredStudyBoxReward(value: unknown): SecureStudyBoxReward | n
   const minReward = Math.round(parseFiniteNumber(value.minReward) ?? Number.NaN);
   const maxReward = Math.round(parseFiniteNumber(value.maxReward) ?? Number.NaN);
   const awardedPoints = Math.round(parseFiniteNumber(value.awardedPoints) ?? Number.NaN);
-  const multiplier = Math.max(1, Math.round(parseFiniteNumber(value.multiplier) ?? 1));
+  const basePoints = Math.round(parseFiniteNumber(value.basePoints) ?? awardedPoints);
+  const multiplier = Math.max(1, parseFiniteNumber(value.multiplier) ?? 1);
+  const earnedAt = asTrimmedString(value.earnedAt);
+  const boostEventId = asTrimmedString(value.boostEventId);
 
   if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return null;
   if (rarity !== "common" && rarity !== "rare" && rarity !== "epic") return null;
-  if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(awardedPoints)) return null;
+  if (!Number.isFinite(minReward) || !Number.isFinite(maxReward) || !Number.isFinite(basePoints) || !Number.isFinite(awardedPoints)) return null;
 
   return {
     milestone,
     rarity,
     minReward,
     maxReward,
+    basePoints,
     awardedPoints,
     multiplier,
+    earnedAt: earnedAt || null,
+    boostEventId: boostEventId || null,
   };
 }
 
@@ -391,9 +418,107 @@ function buildDeterministicStudyBoxReward(params: {
     rarity,
     minReward,
     maxReward,
+    basePoints: awardedPoints,
     awardedPoints,
     multiplier: 1,
+    earnedAt: null,
+    boostEventId: null,
   };
+}
+
+function normalizePointBoostMode(value: unknown): PointBoostEventMode | null {
+  if (value === "day" || value === "window") return value;
+  return null;
+}
+
+function normalizePointBoostMultiplier(value: unknown): number | null {
+  const multiplier = parseFiniteNumber(value);
+  if (multiplier === null || !Number.isFinite(multiplier)) return null;
+  if (multiplier <= 1 || multiplier > 100) return null;
+  return Number(multiplier.toFixed(2));
+}
+
+function isPointBoostEventCancelled(value: unknown): boolean {
+  return toMillisSafe((value as PointBoostEventDoc | null | undefined)?.cancelledAt) > 0;
+}
+
+function isPointBoostEventActiveAt(value: unknown, targetMs: number): boolean {
+  const event = value as PointBoostEventDoc | null | undefined;
+  const startAtMs = toMillisSafe(event?.startAt);
+  const endAtMs = toMillisSafe(event?.endAt);
+  if (startAtMs <= 0 || endAtMs <= 0) return false;
+  if (isPointBoostEventCancelled(event)) return false;
+  return startAtMs <= targetMs && targetMs < endAtMs;
+}
+
+function doTimeRangesOverlap(startAtMs: number, endAtMs: number, otherStartAtMs: number, otherEndAtMs: number): boolean {
+  return startAtMs < otherEndAtMs && otherStartAtMs < endAtMs;
+}
+
+async function listPointBoostEventDocs(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  limitCount = 200
+): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
+  const snap = await db
+    .collection(`centers/${centerId}/pointBoostEvents`)
+    .orderBy("startAt", "desc")
+    .limit(limitCount)
+    .get();
+  return snap.docs;
+}
+
+function buildStudyTimelineSegments(params: {
+  sessionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+  liveSessionStartMs?: number;
+  liveSessionMinutes?: number;
+}): StudyTimelineSegment[] {
+  const segments: StudyTimelineSegment[] = [];
+
+  params.sessionDocs.forEach((docSnap) => {
+    const data = docSnap.data() as Record<string, unknown>;
+    const startAtMs = toMillisSafe(data.startTime);
+    const durationMinutes = Math.max(0, Math.floor(parseFiniteNumber(data.durationMinutes) ?? 0));
+    if (startAtMs <= 0 || durationMinutes <= 0) return;
+    segments.push({ startAtMs, durationMinutes });
+  });
+
+  if ((params.liveSessionStartMs ?? 0) > 0 && (params.liveSessionMinutes ?? 0) > 0) {
+    segments.push({
+      startAtMs: params.liveSessionStartMs ?? 0,
+      durationMinutes: Math.max(0, Math.floor(params.liveSessionMinutes ?? 0)),
+    });
+  }
+
+  return segments.sort((left, right) => left.startAtMs - right.startAtMs);
+}
+
+function resolveStudyBoxMilestoneEarnedAtMs(params: {
+  milestone: number;
+  persistedDayMinutes: number;
+  sessionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+  liveSessionStartMs?: number;
+  liveSessionMinutes?: number;
+}): number | null {
+  const thresholdMinutes = Math.max(1, Math.floor(params.milestone)) * 60;
+  let cumulativeMinutes = 0;
+
+  for (const segment of buildStudyTimelineSegments(params)) {
+    const nextCumulativeMinutes = cumulativeMinutes + segment.durationMinutes;
+    if (nextCumulativeMinutes < thresholdMinutes) {
+      cumulativeMinutes = nextCumulativeMinutes;
+      continue;
+    }
+
+    const remainingMinutes = Math.max(0, thresholdMinutes - cumulativeMinutes);
+    return segment.startAtMs + remainingMinutes * 60 * 1000;
+  }
+
+  if (params.persistedDayMinutes >= thresholdMinutes) {
+    return null;
+  }
+
+  return null;
 }
 
 function getAttendanceActivityRank(status?: string | null): number {
@@ -6174,6 +6299,136 @@ export const scheduledClassroomSignalsRefresh = functions
 /**
  * 교사/센터관리자가 특정 센터의 교실 관제 신호를 수동 갱신합니다.
  */
+export const createPointBoostEventSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  const mode = normalizePointBoostMode(data?.mode);
+  const startAtMs = Math.round(parseFiniteNumber(data?.startAtMs) ?? Number.NaN);
+  const endAtMs = Math.round(parseFiniteNumber(data?.endAtMs) ?? Number.NaN);
+  const multiplier = normalizePointBoostMultiplier(data?.multiplier);
+
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+      userMessage: "센터 정보를 다시 확인해 주세요.",
+    });
+  }
+  if (!mode) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid boost mode.", {
+      userMessage: "부스트 유형을 다시 선택해 주세요.",
+    });
+  }
+  if (!Number.isFinite(startAtMs) || !Number.isFinite(endAtMs) || startAtMs <= 0 || endAtMs <= 0 || endAtMs <= startAtMs) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid boost time range.", {
+      userMessage: "부스트 시작/종료 시간을 다시 확인해 주세요.",
+    });
+  }
+  if (multiplier === null) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid boost multiplier.", {
+      userMessage: "배율은 1보다 큰 숫자로 입력해 주세요.",
+    });
+  }
+  if (endAtMs <= Date.now()) {
+    throw new functions.https.HttpsError("failed-precondition", "Cannot create a boost event in the past.", {
+      userMessage: "이미 지난 시간에는 부스트를 만들 수 없습니다.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+  if (!membership.role || !isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only center admins can manage point boost events.", {
+      userMessage: "센터 관리자만 포인트 부스트를 관리할 수 있습니다.",
+    });
+  }
+
+  const existingEvents = await listPointBoostEventDocs(db, centerId);
+  const overlappingEvent = existingEvents.find((docSnap) => {
+    const event = docSnap.data() as PointBoostEventDoc;
+    if (isPointBoostEventCancelled(event)) return false;
+    return doTimeRangesOverlap(startAtMs, endAtMs, toMillisSafe(event.startAt), toMillisSafe(event.endAt));
+  });
+
+  if (overlappingEvent) {
+    throw new functions.https.HttpsError("already-exists", "Overlapping boost event exists.", {
+      userMessage: "겹치는 시간에 이미 포인트 부스트가 있습니다.",
+    });
+  }
+
+  const eventRef = db.collection(`centers/${centerId}/pointBoostEvents`).doc();
+  await eventRef.set({
+    centerId,
+    mode,
+    startAt: admin.firestore.Timestamp.fromMillis(startAtMs),
+    endAt: admin.firestore.Timestamp.fromMillis(endAtMs),
+    multiplier,
+    createdBy: context.auth.uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  return {
+    ok: true,
+    eventId: eventRef.id,
+  };
+});
+
+export const cancelPointBoostEventSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  const eventId = asTrimmedString(data?.eventId);
+
+  if (!centerId || !eventId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId and eventId are required.", {
+      userMessage: "취소할 부스트 이벤트를 다시 선택해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+  if (!membership.role || !isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only center admins can manage point boost events.", {
+      userMessage: "센터 관리자만 포인트 부스트를 관리할 수 있습니다.",
+    });
+  }
+
+  const eventRef = db.doc(`centers/${centerId}/pointBoostEvents/${eventId}`);
+  const eventSnap = await eventRef.get();
+  if (!eventSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "Point boost event not found.", {
+      userMessage: "포인트 부스트 이벤트를 찾지 못했습니다.",
+    });
+  }
+
+  const eventData = eventSnap.data() as PointBoostEventDoc;
+  if (isPointBoostEventCancelled(eventData)) {
+    throw new functions.https.HttpsError("failed-precondition", "Boost event is already cancelled.", {
+      userMessage: "이미 취소된 부스트 이벤트입니다.",
+    });
+  }
+  if (toMillisSafe(eventData.endAt) <= Date.now()) {
+    throw new functions.https.HttpsError("failed-precondition", "Completed boost event cannot be cancelled.", {
+      userMessage: "이미 종료된 부스트 이벤트는 취소할 수 없습니다.",
+    });
+  }
+
+  await eventRef.set({
+    cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+    cancelledBy: context.auth.uid,
+  }, { merge: true });
+
+  return {
+    ok: true,
+    eventId,
+  };
+});
+
 export const applyPenaltyEventSecure = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
 
@@ -6495,12 +6750,13 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
   const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${dateKey}`);
   const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
 
-  const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap, progressSnap] = await Promise.all([
+  const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap, progressSnap, sessionsSnap] = await Promise.all([
     db.doc(`centers/${centerId}/members/${authUid}`).get(),
     db.doc(`centers/${centerId}/students/${authUid}`).get(),
     studyDayRef.get(),
-    db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(1).get(),
+    db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(10).get(),
     progressRef.get(),
+    studyDayRef.collection("sessions").orderBy("startTime", "asc").get(),
   ]);
 
   if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
@@ -6511,14 +6767,16 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
 
   const persistedDayMinutes = Math.max(0, Math.floor(parseFiniteNumber(studyDaySnap.data()?.totalMinutes) ?? 0));
   const todayKstKey = toDateKey(toKstDate());
+  const nowMs = Date.now();
+  const dayStartMs = Date.parse(`${dateKey}T00:00:00+09:00`);
   let liveSessionMinutes = 0;
+  let liveSessionStartMs = 0;
 
   if (dateKey === todayKstKey && !attendanceSnap.empty) {
-    const attendanceData = attendanceSnap.docs[0]?.data() as Record<string, unknown> | undefined;
+    const preferredAttendanceDoc = pickPreferredAttendanceSeatDoc(attendanceSnap.docs);
+    const attendanceData = preferredAttendanceDoc?.data() as Record<string, unknown> | undefined;
     const attendanceStatus = asTrimmedString(attendanceData?.status);
     const liveStartedAtMs = toMillisSafe(attendanceData?.lastCheckInAt);
-    const dayStartMs = Date.parse(`${dateKey}T00:00:00+09:00`);
-    const nowMs = Date.now();
 
     if (
       ACTIVE_STUDY_ATTENDANCE_STATUSES.has(attendanceStatus) &&
@@ -6527,6 +6785,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
       nowMs > liveStartedAtMs
     ) {
       const effectiveStartMs = Math.max(liveStartedAtMs, dayStartMs);
+      liveSessionStartMs = effectiveStartMs;
       liveSessionMinutes = Math.max(0, Math.floor((nowMs - effectiveStartMs) / 60000));
     }
   }
@@ -6550,12 +6809,39 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     });
   }
 
-  const reward = buildDeterministicStudyBoxReward({
+  const baseReward = buildDeterministicStudyBoxReward({
     centerId,
     studentId: authUid,
     dateKey,
     milestone: hour,
   });
+  const earnedAtMs = resolveStudyBoxMilestoneEarnedAtMs({
+    milestone: hour,
+    persistedDayMinutes,
+    sessionDocs: sessionsSnap.docs,
+    liveSessionStartMs,
+    liveSessionMinutes,
+  });
+  let boostMultiplier = 1;
+  let boostEventId: string | null = null;
+
+  if (earnedAtMs) {
+    const pointBoostDocs = await listPointBoostEventDocs(db, centerId);
+    const matchedBoostDoc = pointBoostDocs.find((docSnap) => isPointBoostEventActiveAt(docSnap.data(), earnedAtMs)) ?? null;
+    const matchedBoostEvent = matchedBoostDoc?.data() as PointBoostEventDoc | undefined;
+    if (matchedBoostEvent) {
+      boostMultiplier = matchedBoostEvent.multiplier;
+      boostEventId = matchedBoostDoc?.id ?? null;
+    }
+  }
+
+  const reward = {
+    ...baseReward,
+    awardedPoints: Math.max(0, Math.round(baseReward.basePoints * boostMultiplier)),
+    multiplier: boostMultiplier,
+    earnedAt: earnedAtMs ? new Date(earnedAtMs).toISOString() : null,
+    boostEventId,
+  };
 
   const result = await db.runTransaction(async (transaction) => {
     const progressSnap = await transaction.get(progressRef);

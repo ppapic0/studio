@@ -801,6 +801,19 @@ export interface GrowthProgress {
   updatedAt: Timestamp;
 }
 
+export interface PointBoostEvent {
+  id: string;
+  centerId: string;
+  mode: 'day' | 'window';
+  startAt: Timestamp;
+  endAt: Timestamp;
+  multiplier: number;
+  createdBy: string;
+  createdAt?: Timestamp;
+  cancelledAt?: Timestamp | null;
+  cancelledBy?: string | null;
+}
+
 export interface StudyPlanItem {
   id: string;
   studyPlanWeekId: string;
