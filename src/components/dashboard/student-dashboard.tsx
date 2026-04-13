@@ -2854,6 +2854,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     });
     return map;
   }, [persistedCarryoverRewardEntries]);
+  const remainingCarryoverClaimedBoxes = useMemo(
+    () => persistedCarryoverClaimedBoxes.filter((hour) => !resolvedCarryoverOpenedBoxes.includes(hour)),
+    [persistedCarryoverClaimedBoxes, resolvedCarryoverOpenedBoxes]
+  );
   const earnedBoxes = Math.min(8, Math.floor(liveTodaySeconds / 3600));
   const currentCycleSeconds = earnedBoxes >= 8 ? 3600 : liveTodaySeconds % 3600;
   const nextBoxSecondsLeft = earnedBoxes >= 8 ? 0 : Math.max(0, 3600 - currentCycleSeconds);
@@ -2874,10 +2878,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => {
       if (!canRenderCarryoverBoxes) return [] as StudentHomeRewardBox[];
 
-      return persistedCarryoverClaimedBoxes.map((hour) => ({
+      return remainingCarryoverClaimedBoxes.map((hour) => ({
         id: `carryover-box-${yesterdayKey}-${hour}`,
         hour,
-        state: resolvedCarryoverOpenedBoxes.includes(hour) ? ('opened' as const) : ('ready' as const),
+        state: 'ready' as const,
         rarity: carryoverRewardByHour.get(hour)?.rarity || getStudyBoxFallbackRarity(hour),
         reward: carryoverRewardByHour.get(hour)?.awardedPoints,
       }));
@@ -2885,8 +2889,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     [
       canRenderCarryoverBoxes,
       carryoverRewardByHour,
-      persistedCarryoverClaimedBoxes,
-      resolvedCarryoverOpenedBoxes,
+      remainingCarryoverClaimedBoxes,
       yesterdayKey,
     ]
   );
@@ -2898,7 +2901,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => carryoverReadyBoxes.map((box) => box.hour).join(','),
     [carryoverReadyBoxes]
   );
-  const activeVaultDateKey = vaultSourceDateKey === yesterdayKey ? yesterdayKey : todayKey;
+  const shouldUseCarryoverVault =
+    vaultSourceDateKey === yesterdayKey && (carryoverReadyBoxes.length > 0 || isVaultOpen);
+  const activeVaultDateKey = shouldUseCarryoverVault ? yesterdayKey : todayKey;
   const activeRewardBoxes = useMemo(
     () => (activeVaultDateKey === yesterdayKey ? carryoverRewardBoxes : homeRewardBoxes),
     [activeVaultDateKey, carryoverRewardBoxes, homeRewardBoxes, yesterdayKey]
@@ -2912,7 +2917,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => (activeVaultDateKey === yesterdayKey ? resolvedCarryoverOpenedBoxes.length : homeOpenedBoxes.length),
     [activeVaultDateKey, homeOpenedBoxes, resolvedCarryoverOpenedBoxes, yesterdayKey]
   );
-  const activeVaultContextLabel = activeVaultDateKey === yesterdayKey
+  const activeVaultContextLabel = shouldUseCarryoverVault
     ? '어제 남아 있던 상자예요.'
     : null;
   const activeVaultReadyBoxCount = useMemo(
@@ -3195,7 +3200,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, []);
 
   const handleRevealHomeBox = useCallback(async () => {
-    const isRevealableBox = selectedHomeBox?.state === 'ready' || selectedHomeBox?.state === 'opened';
+    const isRevealableBox = selectedHomeBox?.state === 'ready';
     if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !activeVaultDateKey || !activeMembership?.id || !user?.uid) return;
     const targetHour = selectedHomeBox.hour;
     const targetDateKey = activeVaultDateKey;

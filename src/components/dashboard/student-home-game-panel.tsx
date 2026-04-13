@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   ChevronRight,
@@ -223,6 +223,7 @@ function RewardModal({
   open,
   onOpenChange,
   selectedBox,
+  displayBox,
   boxContextLabel,
   boxStage,
   onReveal,
@@ -235,6 +236,7 @@ function RewardModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedBox: StudentHomeRewardBox | null;
+  displayBox: StudentHomeRewardBox | null;
   boxContextLabel?: string | null;
   boxStage: BoxStage;
   onReveal: () => void;
@@ -245,17 +247,16 @@ function RewardModal({
   hasMoreBoxes: boolean;
 }) {
   const canRevealSelectedBox =
-    revealedReward === null && Boolean(selectedBox && (selectedBox.state === "ready" || selectedBox.state === "opened"));
-  const revealHeadline =
-    selectedBox?.state === "opened" ? "다시 확인하기" : "터치해서 열기";
+    revealedReward === null && Boolean(selectedBox && selectedBox.state === "ready");
+  const modalBox = displayBox ?? selectedBox;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
           "point-track-modal-shell w-[min(92vw,26rem)] overflow-hidden rounded-[2rem] border-none bg-transparent p-0 text-white shadow-none",
-          selectedBox?.rarity === "rare" && "point-track-modal-shell--rare",
-          selectedBox?.rarity === "epic" && "point-track-modal-shell--epic",
+          modalBox?.rarity === "rare" && "point-track-modal-shell--rare",
+          modalBox?.rarity === "epic" && "point-track-modal-shell--epic",
         )}
       >
         <div className="p-5">
@@ -272,8 +273,8 @@ function RewardModal({
           <div
             className={cn(
               "point-track-modal-stage mt-4 text-center",
-              selectedBox?.rarity === "rare" && "point-track-modal-stage--rare",
-              selectedBox?.rarity === "epic" && "point-track-modal-stage--epic",
+              modalBox?.rarity === "rare" && "point-track-modal-stage--rare",
+              modalBox?.rarity === "epic" && "point-track-modal-stage--epic",
             )}
           >
             <div className="point-track-modal-particles">
@@ -293,19 +294,19 @@ function RewardModal({
               state="ready"
               intense={boxStage === "shake" || boxStage === "burst" || boxStage === "revealed"}
               stage={boxStage}
-              rarity={selectedBox?.rarity ?? null}
-              label={`${selectedBox?.hour || 0}시간 상자`}
+              rarity={modalBox?.rarity ?? null}
+              label={`${modalBox?.hour || 0}시간 상자`}
               onClick={canRevealSelectedBox ? onReveal : undefined}
             />
             {revealedReward === null ? (
               <div className="mt-4">
                 <div className="text-sm font-black text-[var(--accent-orange-soft)]">
-                  {selectedBox ? `${selectedBox.hour}시간 상자` : "보상 상자"}
+                  {modalBox ? `${modalBox.hour}시간 상자` : "보상 상자"}
                 </div>
                 {boxContextLabel ? (
                   <div className="mt-1 text-[11px] font-semibold text-white/70">{boxContextLabel}</div>
                 ) : null}
-                <div className="mt-2 text-xl font-black tracking-tight text-white">{revealHeadline}</div>
+                <div className="mt-2 text-xl font-black tracking-tight text-white">터치해서 열기</div>
               </div>
             ) : (
               <div className="point-track-reward-burst surface-card surface-card--highlight mt-5 rounded-[1.35rem] px-4 py-5">
@@ -581,6 +582,7 @@ export function StudentHomeGamePanel({
   });
   const hasMoreReadyBoxes = (vaultReadyBoxCount ?? totalAvailableBoxes) > 0;
   const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false);
+  const [selectedBoxSnapshot, setSelectedBoxSnapshot] = useState<StudentHomeRewardBox | null>(null);
   const rankPreview = selectedHomeRank.preview.slice(0, 3);
   const rankLiveBadge = selectedHomeRank.isLive ? selectedHomeRank.liveBadge || "LIVE" : null;
   const selectedRangeLabel = getRankRangeLabel(selectedRankRange);
@@ -600,6 +602,17 @@ export function StudentHomeGamePanel({
     if (!dailyPointStatus) return 0;
     return Object.keys(dailyPointStatus).sort((a, b) => b.localeCompare(a)).slice(0, 30).length;
   }, [dailyPointStatus]);
+  useEffect(() => {
+    if (!isVaultOpen) {
+      setSelectedBoxSnapshot(null);
+      return;
+    }
+
+    if (selectedBox) {
+      setSelectedBoxSnapshot(selectedBox);
+    }
+  }, [isVaultOpen, selectedBox]);
+  const displaySelectedBox = selectedBox ?? selectedBoxSnapshot;
 
   return (
     <>
@@ -1175,6 +1188,7 @@ export function StudentHomeGamePanel({
         open={isVaultOpen}
         onOpenChange={onVaultChange}
         selectedBox={selectedBox}
+        displayBox={displaySelectedBox}
         boxContextLabel={boxContextLabel}
         boxStage={boxStage}
         onReveal={onRevealBox}
