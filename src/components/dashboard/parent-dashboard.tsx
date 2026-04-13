@@ -1526,7 +1526,7 @@ function getParentCalendarCellClass(minutes: number, isCurrentMonth: boolean, is
 
 function getParentCalendarValueTone(minutes: number, isCurrentMonth: boolean) {
   if (!isCurrentMonth) return 'text-[#C6CFDD]';
-  return '!text-[#FF7A16]';
+  return '!text-black';
 }
 
 function getParentLegendChipClass(level: ParentCalendarFlowLevel) {
