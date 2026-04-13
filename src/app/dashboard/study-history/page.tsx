@@ -754,11 +754,7 @@ export default function StudyHistoryPage() {
 
   const getStudentCalendarValueTone = (minutes: number, isCurrentMonth: boolean, isMobileView: boolean) => {
     if (!isCurrentMonth) return 'text-[#C6CFDD]';
-    const level = getStudyHistoryFlowLevel(minutes);
-    if (level === 'none') return 'text-[#FF7A16]';
-    if (level === 'light') return 'text-[#2F6F48]';
-    if (level === 'medium') return 'text-[#175336]';
-    return 'text-white';
+    return '!text-[#FF7A16]';
   };
 
   const getStudentLegendChipClass = (level: StudyHistoryFlowLevel) => {
