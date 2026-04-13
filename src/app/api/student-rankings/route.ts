@@ -5,7 +5,7 @@ import { noStoreJson } from '@/lib/api-security';
 import { shouldExcludeFromCompetitionTrack } from '@/lib/counseling-demo';
 import { adminAuth, adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
-import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate } from '@/lib/student-ranking-policy';
+import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate, type DailyRankWindowState } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
 type ActiveLiveRankStatus = 'studying' | 'away' | 'break';
@@ -27,12 +27,15 @@ type RankEntrySeed = Omit<RankEntry, 'rank'> & {
   liveStartedAtMs: number | null;
 };
 
-type StudentRankingSnapshot = Record<RankRange, RankEntry[]>;
+type StudentRankingSnapshot = Record<RankRange, RankEntry[]> & {
+  dailyWaitingTopMinutes?: number | null;
+};
 
 const EMPTY_SNAPSHOT: StudentRankingSnapshot = {
   daily: [],
   weekly: [],
   monthly: [],
+  dailyWaitingTopMinutes: null,
 };
 
 export const dynamic = 'force-dynamic';
@@ -243,6 +246,30 @@ function applyCompetitionRanks(entries: Omit<RankEntry, 'rank'>[]): RankEntry[] 
   });
 }
 
+function collectDailyTotalsFromSessionSnapshots(
+  sessionSnapshots: Array<{ studentId: string; snapshot: FirebaseFirestore.QuerySnapshot }>,
+  dailyRankWindow: Pick<DailyRankWindowState, 'startsAt' | 'endsAt'>,
+  shouldInclude: (studentId: string) => boolean
+) {
+  const totals = new Map<string, number>();
+
+  sessionSnapshots.forEach(({ studentId: fallbackStudentId, snapshot }) => {
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      const studentId = typeof data.studentId === 'string' && data.studentId.trim()
+        ? data.studentId.trim()
+        : fallbackStudentId;
+      const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
+      const value = getDailyRankWindowOverlapMinutes(startedAtMs, referenceMs, dailyRankWindow);
+
+      if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+      addRankMinutes(totals, studentId, value);
+    });
+  });
+
+  return totals;
+}
+
 async function hasCenterAccess(uid: string, centerId: string) {
   const [userCenterSnap, memberSnap] = await Promise.all([
     adminDb.doc(`userCenters/${uid}/centers/${centerId}`).get(),
@@ -288,6 +315,10 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const nowKst = toKstDate(now);
     const dailyRankWindow = getDailyRankWindowState(now);
+    const previousDailyWindowReference = new Date(dailyRankWindow.startsAt);
+    previousDailyWindowReference.setDate(previousDailyWindowReference.getDate() - 1);
+    previousDailyWindowReference.setHours(18, 0, 0, 0);
+    const previousDailyRankWindow = getDailyRankWindowState(previousDailyWindowReference);
     const dailyDateKeys = dailyRankWindow.coveredDateKeys;
     const dailyDateKeySet = new Set(dailyDateKeys);
     const weekDateKeys = eachDayOfInterval({
@@ -481,12 +512,16 @@ export async function GET(request: NextRequest) {
       return snapshots;
     };
 
-    const [dailyStudyDayDocs, weeklyStudyDayDocs, monthlyStudyDayDocs] = await Promise.all([
+    const [dailyStudyDayDocs, previousDailyStudyDayDocs, weeklyStudyDayDocs, monthlyStudyDayDocs] = await Promise.all([
       fetchStudyLogDayDocs(dailyDateKeys),
+      fetchStudyLogDayDocs(previousDailyRankWindow.coveredDateKeys),
       fetchStudyLogDayDocs(weekDateKeys),
       fetchStudyLogDayDocs(monthDateKeys),
     ]);
-    const dailyStudySessionSnaps = await fetchStudyLogSessionSnapshots(dailyStudyDayDocs);
+    const [dailyStudySessionSnaps, previousDailyStudySessionSnaps] = await Promise.all([
+      fetchStudyLogSessionSnapshots(dailyStudyDayDocs),
+      fetchStudyLogSessionSnapshots(previousDailyStudyDayDocs),
+    ]);
 
     const seatIdToStudentId = new Map<string, string | null>();
     const roomSeatToStudentId = new Map<string, string | null>();
@@ -506,23 +541,18 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const dailyTotals = new Map<string, number>();
+    const dailyTotals = collectDailyTotalsFromSessionSnapshots(
+      dailyStudySessionSnaps,
+      dailyRankWindow,
+      shouldInclude
+    );
+    const previousDailyTotals = collectDailyTotalsFromSessionSnapshots(
+      previousDailyStudySessionSnaps,
+      previousDailyRankWindow,
+      shouldInclude
+    );
     const weeklyMinutesByStudentDate = new Map<string, number>();
     const monthlyMinutesByStudentDate = new Map<string, number>();
-
-    dailyStudySessionSnaps.forEach(({ studentId: fallbackStudentId, snapshot }) => {
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const studentId = typeof data.studentId === 'string' && data.studentId.trim()
-          ? data.studentId.trim()
-          : fallbackStudentId;
-        const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
-        const value = getDailyRankWindowOverlapMinutes(startedAtMs, referenceMs, dailyRankWindow);
-
-        if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
-        addRankMinutes(dailyTotals, studentId, value);
-      });
-    });
 
     weeklySnaps.forEach((snapshot, index) => {
       const fallbackDateKey = weekDateKeys[index] || '';
@@ -669,11 +699,16 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    const dailyWaitingTopMinutes = previousDailyTotals.size > 0
+      ? Math.max(...Array.from(previousDailyTotals.values()))
+      : 0;
+
     return noStoreJson({
       ...EMPTY_SNAPSHOT,
       daily: dailyEntries,
       weekly: weeklyEntries,
       monthly: monthlyEntries,
+      dailyWaitingTopMinutes,
     });
   } catch (error) {
     if (process.env.NODE_ENV !== 'production' && isMissingAdminCredentialsError(error)) {

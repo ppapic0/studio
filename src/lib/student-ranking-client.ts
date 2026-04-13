@@ -12,12 +12,15 @@ export type StudentRankEntry = {
   liveStartedAtMs?: number | null;
 };
 
-export type StudentRankingSnapshot = Record<StudentRankRange, StudentRankEntry[]>;
+export type StudentRankingSnapshot = Record<StudentRankRange, StudentRankEntry[]> & {
+  dailyWaitingTopMinutes?: number | null;
+};
 
 export const EMPTY_STUDENT_RANKING_SNAPSHOT: StudentRankingSnapshot = {
   daily: [],
   weekly: [],
   monthly: [],
+  dailyWaitingTopMinutes: null,
 };
 
 type IdTokenUser = {
@@ -49,5 +52,8 @@ export async function fetchStudentRankingSnapshot({
     daily: Array.isArray(payload.daily) ? payload.daily : [],
     weekly: Array.isArray(payload.weekly) ? payload.weekly : [],
     monthly: Array.isArray(payload.monthly) ? payload.monthly : [],
+    dailyWaitingTopMinutes: Number.isFinite(Number(payload.dailyWaitingTopMinutes))
+      ? Math.max(0, Number(payload.dailyWaitingTopMinutes))
+      : null,
   };
 }

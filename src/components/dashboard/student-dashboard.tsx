@@ -2435,6 +2435,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const validDailyRankEntries = rankSnapshot.daily;
   const validWeeklyRankEntries = rankSnapshot.weekly;
+  const dailyWaitingTopMinutes = Math.max(0, Number(rankSnapshot.dailyWaitingTopMinutes || 0));
   const dailyStudyRank = useMemo(() => {
     if (!user || validDailyRankEntries.length === 0) return 0;
     const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === user.uid);
@@ -2620,10 +2621,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               ? `${formatStudyDurationWithSeconds(effectiveDailyDisplaySeconds)} 누적`
               : `${formatStudyMinutes(Math.max(0, effectiveDailyMinutes))} 누적`
             : '오늘 기록이 쌓이면 바로 보여요'
-          : `다음 오픈 ${dailyRankWindow.nextOpensAtLabel}`,
+          : dailyWaitingTopMinutes > 0
+            ? `어제 1위 ${formatStudyMinutes(dailyWaitingTopMinutes)}`
+            : `다음 오픈 ${dailyRankWindow.nextOpensAtLabel}`,
         description: dailyRankWindow.isLive
           ? `${dailyRankWindow.windowLabel} 공부 기록만 반영 · ${formatStudentRankRewardSummary('daily')}`
-          : `${dailyRankWindow.windowLabel} 공부 기록만 반영 · ${formatStudentRankRewardSummary('daily')}`,
+          : dailyWaitingTopMinutes > 0
+            ? `어제 1위 ${formatStudyMinutes(dailyWaitingTopMinutes)} · ${formatStudentRankRewardSummary('daily')}`
+            : `${dailyRankWindow.windowLabel} 공부 기록만 반영 · ${formatStudentRankRewardSummary('daily')}`,
         preview: dailyTop,
         isLoading: rankSnapshotLoading,
         isLive: dailyRankWindow.isLive,
@@ -2678,6 +2683,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     dailyStudyRank,
     dailyStudyRankDisplaySeconds,
     dailyStudyRankMinutes,
+    dailyWaitingTopMinutes,
     isRankContextLoading,
     isTimerActive,
     localSeconds,

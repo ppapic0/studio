@@ -1405,9 +1405,11 @@ function StandingsSidebar({
 function DailyWaitingCard({
   windowLabel,
   nextOpensAtLabel,
+  yesterdayTopMinutes,
 }: {
   windowLabel: string;
   nextOpensAtLabel: string;
+  yesterdayTopMinutes: number;
 }) {
   return (
     <section className={cn(RANKING_SECTION_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-white md:p-6')}>
@@ -1433,8 +1435,10 @@ function DailyWaitingCard({
             <div className="font-aggro-display mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-white">{nextOpensAtLabel}</div>
           </div>
           <div className="rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]">
-            <div className="text-[11px] font-black tracking-[0.18em] text-[#AFC0E6]">반영 기준</div>
-            <div className="font-aggro-display mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-white">오픈 후 실시간 집계</div>
+            <div className="text-[11px] font-black tracking-[0.18em] text-[#AFC0E6]">어제 1위</div>
+            <div className="font-aggro-display mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-white">
+              {yesterdayTopMinutes > 0 ? formatStudyCompact(yesterdayTopMinutes) : '기록 없음'}
+            </div>
           </div>
         </div>
       </div>
@@ -1658,6 +1662,7 @@ export default function RankingBattlePage() {
   }, [centerId, user]);
 
   const currentRangeEntries = snapshot[range] ?? [];
+  const dailyWaitingTopMinutes = Math.max(0, Number(snapshot.dailyWaitingTopMinutes || 0));
 
   const baseEntries = useMemo(() => {
     return ensureViewerEntry(currentRangeEntries.slice(0, 50), viewerId).map((entry) => ({
@@ -1828,6 +1833,7 @@ export default function RankingBattlePage() {
               <DailyWaitingCard
                 windowLabel={dailyRankWindow.windowLabel}
                 nextOpensAtLabel={dailyRankWindow.nextOpensAtLabel}
+                yesterdayTopMinutes={dailyWaitingTopMinutes}
               />
             </div>
           </div>
