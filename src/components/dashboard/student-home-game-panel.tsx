@@ -714,7 +714,6 @@ export function StudentHomeGamePanel({
             <div className="surface-card surface-card--secondary on-dark rounded-[1.5rem] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="surface-kicker text-[10px]">reward</div>
                   <div className="font-aggro-display mt-2 text-[1.65rem] font-black tracking-tight text-white">
                     {totalAvailableBoxes > 0 ? `${totalAvailableBoxes}개 대기` : "상자 생성중"}
                   </div>
