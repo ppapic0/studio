@@ -3258,11 +3258,6 @@ export default function StudyPlanPage() {
   const examTemplate = BUILTIN_PLANNER_TEMPLATES.find((template) => template.id === 'builtin-exam') || BUILTIN_PLANNER_TEMPLATES[0];
   const selectedDateTitle = format(selectedDate || new Date(), 'M월 d일 EEEE', { locale: ko });
   const selectedDateSheetLabel = format(selectedDate || new Date(), 'yyyy. MM. dd', { locale: ko });
-  const selectedDateHeroKicker = isToday
-    ? '오늘의 투두리스트'
-    : isPast
-      ? '지난 날짜 투두리스트'
-      : '선택한 날짜 투두리스트';
 
   if (!isStudent) {
     return <div className="flex items-center justify-center h-[400px] px-4"><Card className="max-w-md w-full rounded-[2.5rem] border-none shadow-2xl"><CardHeader className="text-center"><CardTitle className="font-black text-2xl tracking-tighter">학생 전용 페이지</CardTitle><CardDescription className="font-bold">학생 계정으로 로그인해야 학습 계획을 관리할 수 있습니다.</CardDescription></CardHeader></Card></div>;
@@ -3295,9 +3290,6 @@ export default function StudyPlanPage() {
           )}>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1 space-y-3">
-                <Badge className="student-aggro-kicker border-none bg-white/12 px-3 py-1 text-[9px] text-white shadow-none">
-                  {selectedDateHeroKicker}
-                </Badge>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className={cn("font-aggro-display break-keep font-black tracking-[-0.04em] text-white", isMobile ? "text-[1.65rem] leading-[1.08]" : "text-[2.35rem] leading-[1.03]")}>
