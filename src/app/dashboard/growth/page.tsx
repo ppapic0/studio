@@ -1024,18 +1024,10 @@ export default function GrowthPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            <div className="rounded-[1.3rem] border border-white/70 bg-white/88 px-3 py-3">
+          <div className="mt-4">
+            <div className="w-full max-w-[10rem] rounded-[1.3rem] border border-white/70 bg-white/88 px-3 py-3">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">내 포인트</p>
               <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{formatGiftishowPoints(pointBalance)}</p>
-            </div>
-            <div className="rounded-[1.3rem] border border-white/70 bg-white/88 px-3 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">동기화 상품</p>
-              <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{giftishowProducts.length.toLocaleString()}개</p>
-            </div>
-            <div className="col-span-2 rounded-[1.3rem] border border-white/70 bg-white/88 px-3 py-3 sm:col-span-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 가능</p>
-              <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{availableGiftishowProducts.length.toLocaleString()}개</p>
             </div>
           </div>
 
