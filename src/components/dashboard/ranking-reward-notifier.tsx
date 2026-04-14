@@ -19,20 +19,8 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
+import { getRankingRewardContextCopy, getRankingRewardHeadline } from '@/lib/ranking-reward-display';
 import { StudentNotification } from '@/lib/types';
-
-const RANGE_LABEL: Record<'daily' | 'weekly' | 'monthly', string> = {
-  daily: '일간',
-  weekly: '주간',
-  monthly: '월간',
-};
-
-function getRangeLabel(range?: StudentNotification['rankingRange']) {
-  if (range === 'daily' || range === 'weekly' || range === 'monthly') {
-    return RANGE_LABEL[range];
-  }
-  return '랭킹';
-}
 
 export function RankingRewardNotifier() {
   const firestore = useFirestore();
@@ -67,8 +55,8 @@ export function RankingRewardNotifier() {
   }, [latestRankingReward, clearLatestRankingReward]);
 
   const points = Math.max(0, Number(notification?.rankingRewardPoints || 0));
-  const rank = Math.max(0, Number(notification?.rankingRank || 0));
-  const rangeLabel = getRangeLabel(notification?.rankingRange);
+  const rewardHeadline = getRankingRewardHeadline(notification);
+  const rewardContextCopy = getRankingRewardContextCopy(notification);
 
   if (!notification || points <= 0) return null;
 
@@ -102,10 +90,10 @@ export function RankingRewardNotifier() {
               <div className="rounded-2xl bg-white/14 p-2">
                 <Crown className="h-5 w-5" />
               </div>
-              축하해요! {rangeLabel} 랭킹 {rank}위
+              축하해요! {rewardHeadline}
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold text-white/72">
-              이번 순위 달성으로 포인트가 지급되었습니다. 학생 알림함에서도 다시 확인할 수 있어요.
+              {rewardContextCopy} 학생 알림함에서도 다시 확인할 수 있어요.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -114,7 +102,7 @@ export function RankingRewardNotifier() {
           <div className="app-depth-card rounded-[1.75rem] px-5 py-5 sm:px-6 sm:py-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary/55">
-                {notification.title || `${rangeLabel} 랭킹 보상`}
+                {`${rewardHeadline} 보상`}
               </p>
               <Badge className="border border-[#ffd9b7] bg-[#fff3e9] text-[#ff7a16] font-black">
                 지급 완료

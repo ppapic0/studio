@@ -409,9 +409,60 @@ function buildAwardEntries(range, rankedEntries) {
     })
         .filter((entry) => Boolean(entry));
 }
-function buildRankingRewardNotificationMessage(range, award) {
+function formatDateKeyLabel(dateKey) {
+    if (!dateKey)
+        return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.trim());
+    if (!match)
+        return null;
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!Number.isFinite(month) || !Number.isFinite(day))
+        return null;
+    return `${month}월 ${day}일`;
+}
+function formatMonthKeyLabel(monthKey) {
+    if (!monthKey)
+        return null;
+    const match = /^(\d{4})-(\d{2})$/.exec(monthKey.trim());
+    if (!match)
+        return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    if (!Number.isFinite(year) || !Number.isFinite(month))
+        return null;
+    return `${year}년 ${month}월`;
+}
+function buildRankingRewardPeriodLabel(range, periodKey, awardDateKey) {
+    if (range === "daily") {
+        return formatDateKeyLabel(periodKey || awardDateKey);
+    }
+    if (range === "weekly") {
+        const [startKey, endKey] = (periodKey || "").split("_");
+        const startLabel = formatDateKeyLabel(startKey);
+        const endLabel = formatDateKeyLabel(endKey);
+        if (startLabel && endLabel)
+            return `${startLabel}~${endLabel}`;
+        return startLabel || endLabel || null;
+    }
+    if (range === "monthly") {
+        return formatMonthKeyLabel(periodKey);
+    }
+    return null;
+}
+function buildRankingRewardNotificationTitle(range, rank, periodKey, awardDateKey) {
     const rangeLabel = RANKING_RANGE_LABEL[range];
-    return `${rangeLabel} 랭킹 ${award.rank}위로 ${award.points.toLocaleString()}포인트가 지급되었어요. 알림함에서 다시 확인할 수 있습니다.`;
+    const periodLabel = buildRankingRewardPeriodLabel(range, periodKey, awardDateKey);
+    const baseLabel = `${rangeLabel} 랭킹 ${rank}위 축하`;
+    return periodLabel ? `${periodLabel} ${baseLabel}` : baseLabel;
+}
+function buildRankingRewardNotificationMessageWithPeriod(range, award, periodKey, awardDateKey) {
+    const rangeLabel = RANKING_RANGE_LABEL[range];
+    const periodLabel = buildRankingRewardPeriodLabel(range, periodKey, awardDateKey);
+    const rewardLabel = `${rangeLabel} 랭킹 ${award.rank}위로 ${award.points.toLocaleString()}포인트가 지급되었어요.`;
+    return periodLabel
+        ? `${periodLabel} ${rewardLabel} 알림함에서 다시 확인할 수 있습니다.`
+        : `${rewardLabel} 알림함에서 다시 확인할 수 있습니다.`;
 }
 async function buildDailyAwardEntries(db, centerId, competitionDate, context) {
     const dailyWindow = buildCompetitionWindow(competitionDate);
@@ -621,8 +672,8 @@ async function applyAwardEntries(db, centerId, range, target, awards) {
                     teacherId: "ranking-system",
                     teacherName: "랭킹 시스템",
                     type: "ranking_reward",
-                    title: `${RANKING_RANGE_LABEL[range]} 랭킹 ${award.rank}위 축하`,
-                    message: buildRankingRewardNotificationMessage(range, Object.assign(Object.assign({}, award), { points: awardedPoints })),
+                    title: buildRankingRewardNotificationTitle(range, award.rank, target.periodKey, target.awardDateKey),
+                    message: buildRankingRewardNotificationMessageWithPeriod(range, Object.assign(Object.assign({}, award), { points: awardedPoints }), target.periodKey, target.awardDateKey),
                     rankingRange: range,
                     rankingRank: award.rank,
                     rankingRewardPoints: awardedPoints,

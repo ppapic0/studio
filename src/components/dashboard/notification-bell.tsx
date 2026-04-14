@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
+import { getRankingRangeLabel, getRankingRewardContextCopy, getRankingRewardHeadline } from '@/lib/ranking-reward-display';
 import { StudentNotification } from '@/lib/types';
 import { isAdminRole } from '@/lib/dashboard-access';
 
@@ -89,19 +90,6 @@ function toMillis(value?: { toDate?: () => Date } | null) {
   } catch {
     return 0;
   }
-}
-
-const RANKING_RANGE_LABEL: Record<'daily' | 'weekly' | 'monthly', string> = {
-  daily: '일간',
-  weekly: '주간',
-  monthly: '월간',
-};
-
-function getRankingRangeLabel(range?: StudentNotification['rankingRange']) {
-  if (range === 'daily' || range === 'weekly' || range === 'monthly') {
-    return RANKING_RANGE_LABEL[range];
-  }
-  return '랭킹';
 }
 
 export function NotificationBell() {
@@ -224,14 +212,13 @@ export function NotificationBell() {
     }));
 
     const rewardItems: NotificationFeedItem[] = rankingRewards.map((reward) => {
-      const rangeLabel = getRankingRangeLabel(reward.rankingRange);
-      const rank = Math.max(0, Number(reward.rankingRank || 0));
+      const headline = getRankingRewardHeadline(reward);
       const points = Math.max(0, Number(reward.rankingRewardPoints || 0));
       return {
         id: `reward-${reward.id}`,
         kind: 'reward',
-        title: reward.title || `${rangeLabel} 랭킹 ${rank}위`,
-        description: points > 0 ? `${rangeLabel} ${rank}위 · +${points.toLocaleString()}P 지급` : reward.message,
+        title: headline,
+        description: points > 0 ? `${headline} · +${points.toLocaleString()}P 지급` : reward.message,
         timestamp: Math.max(toMillis(reward.updatedAt), toMillis(reward.createdAt)),
         unread: !reward.readAt,
         payload: reward,
@@ -599,20 +586,20 @@ export function NotificationBell() {
                   <div className="rounded-2xl bg-white/12 p-2">
                     <Gift className="h-5 w-5" />
                   </div>
-                  {selectedReward?.title || '랭킹 보상'}
+                  {selectedReward ? `${getRankingRewardHeadline(selectedReward)} 축하` : '랭킹 보상'}
                 </DialogTitle>
                 <DialogDescription className="text-white/75 font-semibold">
-                  {getRankingRangeLabel(selectedReward?.rankingRange)} 랭킹에서 얻은 포인트 보상입니다.
+                  {getRankingRewardContextCopy(selectedReward)}
                 </DialogDescription>
               </DialogHeader>
             </div>
 
             <div className="bg-[#fafafa] px-6 py-6">
               <div className="app-depth-card rounded-[1.65rem] px-5 py-5">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary/55">
-                    {getRankingRangeLabel(selectedReward?.rankingRange)} 랭킹 {Math.max(0, Number(selectedReward?.rankingRank || 0))}위
-                  </p>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary/55">
+                    {getRankingRewardHeadline(selectedReward)}
+                </p>
                   <Badge className="border border-[#ffd9b7] bg-[#fff3e9] text-[#ff7a16] font-black">
                     +{Math.max(0, Number(selectedReward?.rankingRewardPoints || 0)).toLocaleString()}P
                   </Badge>
