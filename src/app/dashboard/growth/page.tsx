@@ -1045,9 +1045,6 @@ export default function GrowthPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-base font-black tracking-tight text-[#14295F]">상품 고르기</p>
-                <p className="mt-1 text-[12px] font-bold leading-5 text-[#4D679F]">
-                  전체 {giftishowProducts.length.toLocaleString()}개 상품을 검색하고, 포인트에 맞는 상품만 골라 요청할 수 있어요.
-                </p>
               </div>
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F]">
                 <ChevronRight className="h-4 w-4" />
