@@ -1010,13 +1010,9 @@ export default function GrowthPage() {
                   <Gift className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="font-aggro-display text-[1.05rem] font-black tracking-tight text-[#14295F]">Giftishow 보상샵</p>
-                  <p className="mt-0.5 text-[11px] font-black tracking-[0.18em] text-[#C77718]">POINT EXCHANGE</p>
+                  <p className="font-aggro-display text-[1.05rem] font-black tracking-tight text-[#14295F]">트랙 상점</p>
                 </div>
               </div>
-              <p className="mt-3 text-sm font-bold leading-5 text-[#24457f]">
-                관리자 승인 후 학생 번호로 MMS 쿠폰이 발송돼요. 검색해서 원하는 상품을 바로 골라볼 수 있어요.
-              </p>
             </div>
             <div className="flex flex-col items-end gap-2">
               <Badge className={cn('border-none font-black', giftishowSettings?.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
