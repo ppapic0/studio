@@ -41,7 +41,7 @@ if (admin.apps.length === 0) {
 }
 const region = "asia-northeast3";
 const GIFTISHOW_BASE_URL = "https://bizapi.giftishow.com/bizApi";
-const GIFTISHOW_SEND_URL = "https://bizapi.giftishow.com/coupon/send";
+const GIFTISHOW_SEND_URL = "https://bizapi.giftishow.com/bizApi/send";
 const GIFTISHOW_CATALOG_PAGE_SIZE = 100;
 const GIFTISHOW_SYNC_BATCH_LIMIT = 320;
 const GIFTISHOW_SEND_TIMEOUT_MS = 14000;
@@ -174,7 +174,7 @@ class LiveGiftishowClient {
         this.mode = "live";
     }
     async listGoodsPage(start, size) {
-        var _a;
+        var _a, _b, _c;
         const payload = await this.postForm("/goods", {
             api_code: "0101",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
@@ -188,12 +188,13 @@ class LiveGiftishowClient {
         const items = Array.isArray(result.goodsList)
             ? result.goodsList.filter((item) => isPlainObject(item))
             : [];
-        const totalCount = Math.max(items.length, Math.floor((_a = parseFiniteNumber(result.totalCount)) !== null && _a !== void 0 ? _a : items.length));
+        const totalHint = parseFiniteNumber((_c = (_b = (_a = result.totalCount) !== null && _a !== void 0 ? _a : result.listNum) !== null && _b !== void 0 ? _b : payload.totalCount) !== null && _c !== void 0 ? _c : payload.listNum);
+        const totalCount = Math.max(items.length, Math.floor(totalHint !== null && totalHint !== void 0 ? totalHint : items.length));
         return { items, totalCount };
     }
     async getGoodsDetail(goodsCode) {
         const payload = await this.postForm(`/goods/${encodeURIComponent(goodsCode)}`, {
-            api_code: "0102",
+            api_code: "0111",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
             dev_yn: "N",
@@ -203,23 +204,24 @@ class LiveGiftishowClient {
         return findFirstGiftishowRecord(payload, ["goodsCode", "goods_code"]);
     }
     async listBrands() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d, _e;
         const payload = await this.postForm("/brands", {
-            api_code: "0103",
+            api_code: "0102",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
             dev_yn: "N",
         });
         assertGiftishowSuccess(payload, "브랜드 조회");
         const items = findGiftishowRecords(payload, ["brandCode", "brand_code"]).filter((item) => readGiftishowString(item, "brandCode", "brand_code").length > 0);
+        const totalHint = parseFiniteNumber((_e = (_d = (_b = (_a = asRecord(payload.result)) === null || _a === void 0 ? void 0 : _a.totalCount) !== null && _b !== void 0 ? _b : (_c = asRecord(payload.result)) === null || _c === void 0 ? void 0 : _c.listNum) !== null && _d !== void 0 ? _d : payload.totalCount) !== null && _e !== void 0 ? _e : payload.listNum);
         return {
             items,
-            totalCount: Math.max(items.length, Math.floor((_c = parseFiniteNumber((_b = (_a = asRecord(payload.result)) === null || _a === void 0 ? void 0 : _a.totalCount) !== null && _b !== void 0 ? _b : payload.totalCount)) !== null && _c !== void 0 ? _c : items.length)),
+            totalCount: Math.max(items.length, Math.floor(totalHint !== null && totalHint !== void 0 ? totalHint : items.length)),
         };
     }
     async getBrandDetail(brandCode) {
-        const payload = await this.postForm("/brands", {
-            api_code: "0104",
+        const payload = await this.postForm(`/brands/${encodeURIComponent(brandCode)}`, {
+            api_code: "0112",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
             dev_yn: "N",
@@ -828,17 +830,15 @@ async function syncGiftishowCatalogForCenter(db, centerId, requestedBy) {
     }, { merge: true });
     try {
         const allItems = [];
-        let start = 0;
-        let totalCount = Number.POSITIVE_INFINITY;
-        while (allItems.length < totalCount) {
-            const page = await client.listGoodsPage(start, GIFTISHOW_CATALOG_PAGE_SIZE);
+        let pageNumber = 1;
+        while (true) {
+            const page = await client.listGoodsPage(pageNumber, GIFTISHOW_CATALOG_PAGE_SIZE);
             allItems.push(...page.items);
-            totalCount = page.totalCount;
             if (page.items.length === 0)
                 break;
-            start += page.items.length;
             if (page.items.length < GIFTISHOW_CATALOG_PAGE_SIZE)
                 break;
+            pageNumber += 1;
         }
         const brandPage = await client.listBrands();
         const now = admin.firestore.Timestamp.now();
@@ -1135,8 +1135,8 @@ function normalizeGiftishowBrand(item, syncedAt) {
     return {
         brandCode,
         brandName: readGiftishowString(item, "brandName", "brand_name") || brandCode || "기프티쇼 브랜드",
-        brandIconImg: readGiftishowString(item, "brandIconImg", "brand_icon_img") || null,
-        brandImg: readGiftishowString(item, "brandImg", "brand_img", "brandImage", "brand_image") || null,
+        brandIconImg: readGiftishowString(item, "brandIconImg", "brandIConImg", "brand_icon_img") || null,
+        brandImg: readGiftishowString(item, "brandBannerImg", "brandImg", "brand_img", "brandImage", "brand_image") || null,
         brandDescription: readGiftishowString(item, "brandDescription", "brand_description", "description") || null,
         goodsCount,
         isAvailable: goodsCount > 0 || readGiftishowString(item, "useYn", "use_yn") !== "N",
@@ -1309,6 +1309,13 @@ function resolveGiftishowCode(payload) {
 }
 function resolveGiftishowMessage(payload, fallback) {
     var _a, _b;
+    const code = resolveGiftishowCode(payload);
+    if (code === "E0006") {
+        return "Invalid Authorization. 기프티쇼 비즈 > 주문발송 > API연동발송 > 서비스 관리에서 상용KEY 승인/활성 상태와 인증Key/Token Key 조합을 확인해 주세요.";
+    }
+    if (code === "ERR0201") {
+        return "필수 요청값이 누락되었습니다. 기프티쇼 규격서의 필수 파라미터를 다시 확인해 주세요.";
+    }
     return (asTrimmedString(payload.message)
         || asTrimmedString(payload.resMsg)
         || asTrimmedString((_a = asRecord(payload.result)) === null || _a === void 0 ? void 0 : _a.message)
