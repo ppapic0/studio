@@ -623,6 +623,23 @@ service cloud.firestore {
         allow read, write: if isCenterAdmin(centerId);
       }
 
+      match /giftishowProducts/{productId} {
+        allow read: if isActiveMember(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /giftishowBrands/{brandId} {
+        allow read: if isActiveMember(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /giftishowOrders/{orderId} {
+        allow read: if isTeacherOrAdmin(centerId)
+          || (isStudent(centerId) && resource.data.studentId == request.auth.uid)
+          || isLinkedParentFromResource(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
       match /leaderboards/{boardId}/entries/{entryId} {
         allow read: if isActiveMember(centerId);
         allow create, update: if isCenterAdmin(centerId)

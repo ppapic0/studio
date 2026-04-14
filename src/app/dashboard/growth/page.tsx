@@ -14,6 +14,7 @@ import {
   where,
 } from 'firebase/firestore';
 import {
+  ChevronRight,
   Flame,
   Gift,
   Loader2,
@@ -31,6 +32,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -310,6 +312,7 @@ export default function GrowthPage() {
   const [openedBoxes, setOpenedBoxes] = useState<number[]>([]);
   const [pointBalance, setPointBalance] = useState(0);
   const [requestingGoodsCode, setRequestingGoodsCode] = useState<string | null>(null);
+  const [isGiftishowShopOpen, setIsGiftishowShopOpen] = useState(false);
   const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const liveClaimKeyRef = useRef<string | null>(null);
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
@@ -459,6 +462,10 @@ export default function GrowthPage() {
   const availableGiftishowProducts = useMemo(
     () => giftishowProducts.filter((product) => isGiftishowProductAvailable(product, giftishowSettings)),
     [giftishowProducts, giftishowSettings]
+  );
+  const giftishowPreviewProducts = useMemo(
+    () => (availableGiftishowProducts.length > 0 ? availableGiftishowProducts : giftishowProducts).slice(0, 3),
+    [availableGiftishowProducts, giftishowProducts]
   );
 
   useEffect(() => {
@@ -772,6 +779,7 @@ export default function GrowthPage() {
         title: '교환 요청을 보냈어요.',
         description: '센터 관리자 승인 후 MMS 쿠폰이 발송됩니다.',
       });
+      setIsGiftishowShopOpen(false);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -994,82 +1002,40 @@ export default function GrowthPage() {
             </div>
           ) : null}
 
-          <div className="mt-4 space-y-3">
-            {giftishowProducts.length === 0 ? (
-              <div className="rounded-[1.4rem] border border-dashed border-[#FFD39E] bg-white/70 px-4 py-8 text-center text-sm font-bold text-[#7B5A2A]">
-                아직 동기화된 상품이 없어요. 센터에서 카탈로그를 연결하면 이곳에 상품이 보여요.
+          <button
+            type="button"
+            onClick={() => setIsGiftishowShopOpen(true)}
+            className="mt-4 w-full rounded-[1.45rem] border border-white/75 bg-white/88 px-4 py-4 text-left shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black tracking-tight text-[#14295F]">상품 고르기</p>
+                <p className="mt-1 text-[12px] font-bold leading-5 text-[#4D679F]">
+                  팝업에서 동기화된 상품을 보고 원하는 상품을 골라 요청할 수 있어요.
+                </p>
               </div>
-            ) : (
-              giftishowProducts.slice(0, 6).map((product) => {
-                const disabledReason = getGiftishowRequestDisabledReason({
-                  settings: giftishowSettings,
-                  product,
-                  pointBalance,
-                  hasStudentPhone,
-                });
-                const productImage = getGiftishowProductImage(product);
-                const isRequesting = requestingGoodsCode === product.goodsCode;
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F]">
+                <ChevronRight className="h-4 w-4" />
+              </span>
+            </div>
 
-                return (
-                  <div
-                    key={product.id || product.goodsCode}
-                    className="overflow-hidden rounded-[1.45rem] border border-white/70 bg-white/92 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)]"
+            <div className="mt-4 flex flex-wrap gap-2">
+              {giftishowPreviewProducts.length > 0 ? (
+                giftishowPreviewProducts.map((product) => (
+                  <span
+                    key={`giftishow-preview-${product.id || product.goodsCode}`}
+                    className="inline-flex max-w-full truncate rounded-full border border-[#FFD39E] bg-[#FFF3E2] px-3 py-1 text-[11px] font-black text-[#915A1E]"
                   >
-                    <div className="flex gap-3 p-3">
-                      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[1.1rem] bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)]">
-                        {productImage ? (
-                          <img src={productImage} alt={product.goodsName} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-[10px] font-black tracking-[0.2em] text-[#7D8FB3]">GIFT</div>
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className={cn('border-none font-black', isGiftishowProductAvailable(product, giftishowSettings) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
-                            {product.goodsStateCd || 'UNKNOWN'}
-                          </Badge>
-                          <p className="truncate text-[11px] font-bold text-[#6E7FA7]">
-                            {product.brandName || product.affiliate || '브랜드'}
-                          </p>
-                        </div>
-
-                        <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{product.goodsName}</p>
-
-                        <div className="mt-3 flex items-end justify-between gap-3">
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
-                <p className="mt-1 text-lg font-black tracking-tight text-[var(--text-accent-fixed)]">
-                              {formatGiftishowPoints(product.pointCost)}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={disabledReason ? 'outline' : 'secondary'}
-                            className="rounded-full font-black"
-                            disabled={Boolean(disabledReason) || isRequesting}
-                            onClick={() => void handleGiftishowRequest(product)}
-                          >
-                            {isRequesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                            요청하기
-                          </Button>
-                        </div>
-
-                        {disabledReason ? (
-                          <p className="mt-2 text-[11px] font-bold leading-5 text-[#915A1E]">{disabledReason}</p>
-                        ) : (
-                          <p className="mt-2 text-[11px] font-bold leading-5 text-[#4D679F]">
-                            승인되면 {resolvedStudentPhone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')} 번호로 발송돼요.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                    {product.goodsName}
+                  </span>
+                ))
+              ) : (
+                <span className="inline-flex rounded-full border border-dashed border-[#FFD39E] bg-[#FFF8EE] px-3 py-1 text-[11px] font-black text-[#915A1E]">
+                  동기화된 상품을 불러오면 여기서 바로 고를 수 있어요.
+                </span>
+              )}
+            </div>
+          </button>
         </section>
 
         <section className="surface-card surface-card--light rounded-[1.8rem] px-4 py-4">
@@ -1210,6 +1176,118 @@ export default function GrowthPage() {
                 )}
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isGiftishowShopOpen} onOpenChange={setIsGiftishowShopOpen}>
+        <DialogContent className="w-[min(94vw,30rem)] overflow-hidden rounded-[2rem] border-none bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
+          <DialogHeader className="border-b border-[#FFE1B7]/70 px-5 pb-0 pt-5 text-left">
+            <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
+              <Gift className="h-5 w-5 text-[var(--text-accent-fixed)]" />
+              Giftishow 상품 고르기
+            </DialogTitle>
+            <DialogDescription className="pb-4 text-sm font-bold leading-5 text-[#4D679F]">
+              동기화된 상품을 확인하고 원하는 쿠폰을 골라 교환 요청해 보세요.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 px-5 py-4">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">동기화 상품</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{giftishowProducts.length}개</p>
+              </div>
+              <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 가능</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{availableGiftishowProducts.length}개</p>
+              </div>
+            </div>
+
+            {!hasStudentPhone ? (
+              <div className="rounded-[1.2rem] border border-rose-100 bg-rose-50 px-3 py-3 text-xs font-bold leading-5 text-rose-700">
+                학생 휴대폰 번호가 아직 등록되지 않았어요. 프로필 설정에서 번호를 저장하면 상품 요청 버튼이 활성화돼요.
+              </div>
+            ) : null}
+
+            <ScrollArea className="max-h-[min(62vh,34rem)] pr-1">
+              <div className="space-y-3">
+                {giftishowProducts.length === 0 ? (
+                  <div className="rounded-[1.4rem] border border-dashed border-[#FFD39E] bg-white/70 px-4 py-10 text-center text-sm font-bold text-[#7B5A2A]">
+                    아직 동기화된 상품이 없어요. 센터에서 카탈로그를 연결하면 이곳에서 바로 고를 수 있어요.
+                  </div>
+                ) : (
+                  giftishowProducts.map((product) => {
+                    const disabledReason = getGiftishowRequestDisabledReason({
+                      settings: giftishowSettings,
+                      product,
+                      pointBalance,
+                      hasStudentPhone,
+                    });
+                    const productImage = getGiftishowProductImage(product);
+                    const isRequesting = requestingGoodsCode === product.goodsCode;
+
+                    return (
+                      <div
+                        key={`giftishow-dialog-${product.id || product.goodsCode}`}
+                        className="overflow-hidden rounded-[1.45rem] border border-white/70 bg-white/92 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)]"
+                      >
+                        <div className="flex gap-3 p-3">
+                          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[1.1rem] bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)]">
+                            {productImage ? (
+                              <img src={productImage} alt={product.goodsName} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-[10px] font-black tracking-[0.2em] text-[#7D8FB3]">GIFT</div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className={cn('border-none font-black', isGiftishowProductAvailable(product, giftishowSettings) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
+                                {product.goodsStateCd || 'UNKNOWN'}
+                              </Badge>
+                              <p className="truncate text-[11px] font-bold text-[#6E7FA7]">
+                                {product.brandName || product.affiliate || '브랜드'}
+                              </p>
+                            </div>
+
+                            <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{product.goodsName}</p>
+
+                            <div className="mt-3 flex items-end justify-between gap-3">
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
+                                <p className="mt-1 text-lg font-black tracking-tight text-[var(--text-accent-fixed)]">
+                                  {formatGiftishowPoints(product.pointCost)}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={disabledReason ? 'outline' : 'secondary'}
+                                className="rounded-full font-black"
+                                disabled={Boolean(disabledReason) || isRequesting}
+                                onClick={() => void handleGiftishowRequest(product)}
+                              >
+                                {isRequesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                                요청하기
+                              </Button>
+                            </div>
+
+                            {disabledReason ? (
+                              <p className="mt-2 text-[11px] font-bold leading-5 text-[#915A1E]">{disabledReason}</p>
+                            ) : (
+                              <p className="mt-2 text-[11px] font-bold leading-5 text-[#4D679F]">
+                                승인되면 {resolvedStudentPhone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')} 번호로 발송돼요.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
           </div>
         </DialogContent>
       </Dialog>
