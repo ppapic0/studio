@@ -53,6 +53,7 @@ import {
 import {
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
+  getDailyPointBreakdown,
   getOpenedStudyBoxes,
   getRemainingCarryoverStudyBoxHours,
   getRenderableTodayStudyBoxHours,
@@ -255,12 +256,14 @@ function HeroMetricChip({
   value,
   accentClass,
   floatingGain,
+  onClick,
 }: {
   icon: typeof Flame;
   label: string;
   value: string;
   accentClass: string;
   floatingGain?: FloatingGain | null;
+  onClick?: () => void;
 }) {
   const valueLength = value.length;
   const valueClass =
@@ -272,8 +275,8 @@ function HeroMetricChip({
           ? 'text-[0.9rem] tracking-[-0.06em] sm:text-[1.08rem]'
           : 'text-[0.98rem] tracking-[-0.04em] sm:text-[1.2rem]';
 
-  return (
-    <div className="surface-card point-track-panel on-dark relative min-w-0 rounded-[1.35rem] px-3 py-3">
+  const content = (
+    <>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
       {floatingGain ? (
         <div key={floatingGain.key} className="point-track-floating-gain">
@@ -289,8 +292,22 @@ function HeroMetricChip({
           <div className={cn("font-aggro-display mt-1 whitespace-nowrap leading-none font-black text-white", valueClass)}>{value}</div>
         </div>
       </div>
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="surface-card point-track-panel on-dark relative min-w-0 rounded-[1.35rem] px-3 py-3 text-left transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)]"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className="surface-card point-track-panel on-dark relative min-w-0 rounded-[1.35rem] px-3 py-3">{content}</div>;
 }
 
 export default function GrowthPage() {
@@ -319,6 +336,7 @@ export default function GrowthPage() {
   const [openedBoxes, setOpenedBoxes] = useState<number[]>([]);
   const [carryoverOpenedBoxes, setCarryoverOpenedBoxes] = useState<number[]>([]);
   const [pointBalance, setPointBalance] = useState(0);
+  const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false);
   const [requestingGoodsCode, setRequestingGoodsCode] = useState<string | null>(null);
   const [isGiftishowShopOpen, setIsGiftishowShopOpen] = useState(false);
   const [giftishowSearch, setGiftishowSearch] = useState('');
@@ -409,6 +427,30 @@ export default function GrowthPage() {
   const previousStudyDayStatus = useMemo(() => {
     return ((progress?.dailyPointStatus || {})[previousStudyDayKey] || {}) as Record<string, any>;
   }, [previousStudyDayKey, progress?.dailyPointStatus]);
+  const recentPointHistory = useMemo(() => {
+    const dailyPointStatus = progress?.dailyPointStatus || {};
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const studyDayDate = subDays(activeStudyDayDate, index);
+      const dateKey = format(studyDayDate, 'yyyy-MM-dd');
+      const breakdown = getDailyPointBreakdown((dailyPointStatus[dateKey] || {}) as Record<string, any>);
+
+      return {
+        dateKey,
+        dateLabel: format(studyDayDate, 'M월 d일'),
+        relativeLabel: index === 0 ? '오늘' : index === 1 ? '어제' : `${index + 1}일 전`,
+        ...breakdown,
+      };
+    });
+  }, [activeStudyDayDate, progress?.dailyPointStatus]);
+  const recentPointTotal = useMemo(
+    () => recentPointHistory.reduce((sum, entry) => sum + entry.totalPoints, 0),
+    [recentPointHistory]
+  );
+  const recentPointActiveDays = useMemo(
+    () => recentPointHistory.filter((entry) => entry.totalPoints > 0).length,
+    [recentPointHistory]
+  );
 
   const claimCacheKey = useMemo(() => {
     if (!activeMembership?.id || !user?.uid) return null;
@@ -948,6 +990,7 @@ export default function GrowthPage() {
                   value={`${pointBalance.toLocaleString()}P`}
                   accentClass="text-amber-200"
                   floatingGain={floatingGain}
+                  onClick={() => setIsPointHistoryOpen(true)}
                 />
               </div>
             </div>
@@ -1306,6 +1349,76 @@ export default function GrowthPage() {
                 )}
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPointHistoryOpen} onOpenChange={setIsPointHistoryOpen}>
+        <DialogContent className="w-[min(94vw,28rem)] overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
+          <DialogHeader className="border-b border-[#FFE1B7]/70 px-5 pb-0 pt-5 text-left">
+            <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
+              <Wallet className="h-5 w-5 text-[var(--text-accent-fixed)]" />
+              최근 7일 포인트
+            </DialogTitle>
+            <DialogDescription className="pb-4 text-sm font-bold leading-5 text-[#4D679F]">
+              날짜별로 얻은 포인트를 한 번에 확인해 보세요.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 px-5 py-4">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">최근 7일 합계</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{recentPointTotal.toLocaleString()}P</p>
+              </div>
+              <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">포인트 얻은 날</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{recentPointActiveDays}일</p>
+              </div>
+            </div>
+
+            <ScrollArea className="max-h-[min(60vh,30rem)] pr-1">
+              <div className="space-y-3">
+                {recentPointHistory.map((entry) => (
+                  <div
+                    key={`point-history-${entry.dateKey}`}
+                    className="rounded-[1.35rem] border border-white/75 bg-white/82 px-4 py-4 shadow-[0_20px_34px_-30px_rgba(20,41,95,0.24)]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-[#14295F]">{entry.dateLabel}</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#6E7FA7]">{entry.relativeLabel}</p>
+                      </div>
+                      <p className="text-lg font-black tracking-tight text-[var(--text-accent-fixed)]">
+                        {entry.totalPoints.toLocaleString()}P
+                      </p>
+                    </div>
+
+                    {entry.totalPoints > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {entry.studyBoxPoints > 0 ? (
+                          <span className="inline-flex rounded-full bg-[#FFF3E2] px-3 py-1 text-[11px] font-black text-[#915A1E]">
+                            상자 {entry.studyBoxPoints.toLocaleString()}P
+                          </span>
+                        ) : null}
+                        {entry.rankPoints > 0 ? (
+                          <span className="inline-flex rounded-full bg-[#EAF1FF] px-3 py-1 text-[11px] font-black text-[#3357A5]">
+                            랭킹 {entry.rankPoints.toLocaleString()}P
+                          </span>
+                        ) : null}
+                        {entry.otherPoints > 0 ? (
+                          <span className="inline-flex rounded-full bg-[#F3F4F7] px-3 py-1 text-[11px] font-black text-[#51627E]">
+                            기타 {entry.otherPoints.toLocaleString()}P
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs font-bold text-[#7A89A5]">이 날에는 얻은 포인트가 없어요.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
         </DialogContent>
       </Dialog>
