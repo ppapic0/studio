@@ -267,7 +267,7 @@ function HeroMetricChip({
           : 'text-[0.98rem] tracking-[-0.04em] sm:text-[1.2rem]';
 
   return (
-    <div className="surface-card surface-card--secondary on-dark relative min-w-0 rounded-[1.35rem] px-3 py-3">
+    <div className="surface-card point-track-panel on-dark relative min-w-0 rounded-[1.35rem] px-3 py-3">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-[radial-gradient(circle_at_top,rgba(255,208,137,0.18),transparent_72%)]" />
       {floatingGain ? (
         <div key={floatingGain.key} className="point-track-floating-gain">
@@ -873,7 +873,7 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <section className="surface-card surface-card--secondary on-dark rounded-[1.7rem] px-4 py-4">
+        <section className="surface-card point-track-panel on-dark rounded-[1.7rem] px-4 py-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Timer className="h-4 w-4 text-[var(--text-accent-soft-fixed)]" />
@@ -922,7 +922,7 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <section className="surface-card surface-card--secondary on-dark rounded-[1.8rem] px-4 py-4">
+        <section className="surface-card point-track-panel on-dark rounded-[1.8rem] px-4 py-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-black tracking-tight text-white">보관함</h2>
