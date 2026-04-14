@@ -196,6 +196,40 @@ type PointBoostEventDoc = {
 type StudyTimelineSegment = {
   startAtMs: number;
   durationMinutes: number;
+  durationSeconds: number;
+};
+
+type StudyDayRangeSegment = {
+  dateKey: string;
+  startMs: number;
+  endMs: number;
+  durationMs: number;
+  durationMinutes: number;
+  durationSeconds: number;
+};
+
+type FinalizeStudySessionParams = {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  startMs: number;
+  endMs: number;
+  closeSeatRef?: FirebaseFirestore.DocumentReference | null;
+  shouldCloseSeat?: boolean;
+  progressExtra?: Record<string, unknown>;
+  sessionMetadata?: Record<string, unknown>;
+};
+
+type FinalizeStudySessionResult = {
+  duplicatedSession: boolean;
+  sessionId: string;
+  sessionIds: string[];
+  sessionDateKey: string;
+  sessionMinutes: number;
+  totalMinutesAfterSession: number;
+  totalMinutesByDateKey: Record<string, number>;
+  attendanceAchieved: boolean;
+  bonus6hAchieved: boolean;
 };
 
 const STUDY_BOX_REWARD_RANGE_BY_RARITY: Record<StudyBoxRarity, readonly [number, number]> = {
@@ -216,6 +250,11 @@ const LATE_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: num
 const DAILY_POINT_EARN_CAP = 1000;
 const ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES = ["studying", "away", "break"] as const;
 const ACTIVE_STUDY_ATTENDANCE_STATUSES = new Set<string>(ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES);
+const STUDY_DAY_RESET_HOUR = 1;
+const STUDY_DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+const SECOND_MS = 1000;
+const MAX_STUDY_SESSION_MINUTES = 360;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -491,7 +530,7 @@ async function listPointBoostEventDocs(
 function buildStudyTimelineSegments(params: {
   sessionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
   liveSessionStartMs?: number;
-  liveSessionMinutes?: number;
+  liveSessionDurationSeconds?: number;
 }): StudyTimelineSegment[] {
   const segments: StudyTimelineSegment[] = [];
 
@@ -499,14 +538,23 @@ function buildStudyTimelineSegments(params: {
     const data = docSnap.data() as Record<string, unknown>;
     const startAtMs = toMillisSafe(data.startTime);
     const durationMinutes = Math.max(0, Math.floor(parseFiniteNumber(data.durationMinutes) ?? 0));
-    if (startAtMs <= 0 || durationMinutes <= 0) return;
-    segments.push({ startAtMs, durationMinutes });
+    const durationSeconds = Math.max(
+      0,
+      Math.floor(parseFiniteNumber(data.durationSeconds) ?? durationMinutes * 60)
+    );
+    if (startAtMs <= 0 || durationSeconds <= 0) return;
+    segments.push({
+      startAtMs,
+      durationMinutes: Math.max(durationMinutes, Math.ceil(durationSeconds / 60)),
+      durationSeconds,
+    });
   });
 
-  if ((params.liveSessionStartMs ?? 0) > 0 && (params.liveSessionMinutes ?? 0) > 0) {
+  if ((params.liveSessionStartMs ?? 0) > 0 && (params.liveSessionDurationSeconds ?? 0) > 0) {
     segments.push({
       startAtMs: params.liveSessionStartMs ?? 0,
-      durationMinutes: Math.max(0, Math.floor(params.liveSessionMinutes ?? 0)),
+      durationMinutes: Math.max(1, Math.ceil((params.liveSessionDurationSeconds ?? 0) / 60)),
+      durationSeconds: Math.max(1, Math.floor(params.liveSessionDurationSeconds ?? 0)),
     });
   }
 
@@ -518,27 +566,214 @@ function resolveStudyBoxMilestoneEarnedAtMs(params: {
   persistedDayMinutes: number;
   sessionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
   liveSessionStartMs?: number;
-  liveSessionMinutes?: number;
+  liveSessionDurationSeconds?: number;
 }): number | null {
-  const thresholdMinutes = Math.max(1, Math.floor(params.milestone)) * 60;
-  let cumulativeMinutes = 0;
+  const thresholdSeconds = Math.max(1, Math.floor(params.milestone)) * 3600;
+  let cumulativeSeconds = 0;
 
   for (const segment of buildStudyTimelineSegments(params)) {
-    const nextCumulativeMinutes = cumulativeMinutes + segment.durationMinutes;
-    if (nextCumulativeMinutes < thresholdMinutes) {
-      cumulativeMinutes = nextCumulativeMinutes;
+    const nextCumulativeSeconds = cumulativeSeconds + segment.durationSeconds;
+    if (nextCumulativeSeconds < thresholdSeconds) {
+      cumulativeSeconds = nextCumulativeSeconds;
       continue;
     }
 
-    const remainingMinutes = Math.max(0, thresholdMinutes - cumulativeMinutes);
-    return segment.startAtMs + remainingMinutes * 60 * 1000;
+    const remainingSeconds = Math.max(0, thresholdSeconds - cumulativeSeconds);
+    return segment.startAtMs + remainingSeconds * SECOND_MS;
   }
 
-  if (params.persistedDayMinutes >= thresholdMinutes) {
+  if (params.persistedDayMinutes * 60 >= thresholdSeconds) {
     return null;
   }
 
   return null;
+}
+
+async function finalizeStudySession(params: FinalizeStudySessionParams): Promise<FinalizeStudySessionResult> {
+  const { db, centerId, studentId, closeSeatRef, shouldCloseSeat, progressExtra, sessionMetadata } = params;
+  const startMs = Math.max(0, Math.floor(params.startMs));
+  const rawEndMs = Math.max(startMs, Math.floor(params.endMs));
+  const effectiveEndMs = Math.min(rawEndMs, startMs + MAX_STUDY_SESSION_MINUTES * MINUTE_MS);
+  const segments = splitRangeByStudyDayBoundary(startMs, effectiveEndMs);
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+  const activeSessionDateKey = toStudyDayKey(new Date(effectiveEndMs));
+  const sessionEntries = segments.map((segment) => {
+    const sessionId = `session_${startMs}_${segment.startMs}`;
+    const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${segment.dateKey}`);
+    return {
+      ...segment,
+      sessionId,
+      dayRef,
+      sessionRef: dayRef.collection("sessions").doc(sessionId),
+    };
+  });
+
+  return db.runTransaction(async (transaction) => {
+    const progressSnap = await transaction.get(progressRef);
+    const daySnapshots = await Promise.all(sessionEntries.map((entry) => transaction.get(entry.dayRef)));
+    const sessionSnapshots = await Promise.all(sessionEntries.map((entry) => transaction.get(entry.sessionRef)));
+    const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+    const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+      ? (progressData.dailyPointStatus as Record<string, unknown>)
+      : {};
+
+    const totalMinutesByDateKey: Record<string, number> = {};
+    const dailyPointStatusUpdates: Record<string, Record<string, unknown>> = {};
+    let attendanceAchieved = false;
+    let bonus6hAchieved = false;
+
+    sessionEntries.forEach((entry, index) => {
+      const daySnap = daySnapshots[index];
+      const sessionSnap = sessionSnapshots[index];
+      const dayData = daySnap.exists ? (daySnap.data() as Record<string, unknown>) : {};
+      const previousFirstSessionAt = toTimestampOrNow(dayData.firstSessionStartAt);
+      const previousLastSessionAt = toTimestampOrNow(dayData.lastSessionEndAt);
+      const existingTotalMinutes =
+        totalMinutesByDateKey[entry.dateKey] ??
+        Math.max(0, Math.floor(parseFiniteNumber(dayData.totalMinutes) ?? 0));
+
+      totalMinutesByDateKey[entry.dateKey] = existingTotalMinutes;
+
+      if (sessionSnap.exists || entry.durationMinutes <= 0) {
+        return;
+      }
+
+      const awayGapMinutes = entry.startMs === startMs && previousLastSessionAt
+        ? Math.round((entry.startMs - previousLastSessionAt.toMillis()) / MINUTE_MS)
+        : 0;
+      const normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
+      const nextFirstSessionAt =
+        previousFirstSessionAt && previousFirstSessionAt.toMillis() <= entry.startMs
+          ? previousFirstSessionAt
+          : admin.firestore.Timestamp.fromMillis(entry.startMs);
+      const nextLastSessionAt =
+        previousLastSessionAt && previousLastSessionAt.toMillis() >= entry.endMs
+          ? previousLastSessionAt
+          : admin.firestore.Timestamp.fromMillis(entry.endMs);
+      const nextTotalMinutes = existingTotalMinutes + entry.durationMinutes;
+      totalMinutesByDateKey[entry.dateKey] = nextTotalMinutes;
+
+      transaction.set(
+        entry.dayRef,
+        {
+          studentId,
+          centerId,
+          dateKey: entry.dateKey,
+          totalMinutes: nextTotalMinutes,
+          firstSessionStartAt: nextFirstSessionAt,
+          lastSessionEndAt: nextLastSessionAt,
+          ...(normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {}),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      transaction.set(
+        entry.sessionRef,
+        {
+          centerId,
+          studentId,
+          dateKey: entry.dateKey,
+          startTime: admin.firestore.Timestamp.fromMillis(entry.startMs),
+          endTime: admin.firestore.Timestamp.fromMillis(entry.endMs),
+          durationMinutes: entry.durationMinutes,
+          durationSeconds: entry.durationSeconds,
+          sessionId: entry.sessionId,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          ...(sessionMetadata ?? {}),
+        },
+        { merge: true }
+      );
+
+      const currentDayStatus = isPlainObject(dailyPointStatus[entry.dateKey])
+        ? { ...(dailyPointStatus[entry.dateKey] as Record<string, unknown>) }
+        : {};
+      let shouldPersistDayStatus = false;
+      const currentClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.claimedStudyBoxes);
+      const crossedMilestones = Math.max(0, Math.min(8, Math.floor(nextTotalMinutes / 60)));
+      const nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([
+        ...currentClaimedStudyBoxes,
+        ...Array.from({ length: crossedMilestones }, (_, index) => index + 1),
+      ]);
+      if (nextClaimedStudyBoxes.length > currentClaimedStudyBoxes.length) {
+        currentDayStatus.claimedStudyBoxes = nextClaimedStudyBoxes;
+        shouldPersistDayStatus = true;
+      }
+
+      const storedRewardEntries = normalizeStudyBoxRewardEntries(currentDayStatus.studyBoxRewards);
+      let nextRewardEntries = storedRewardEntries;
+      nextClaimedStudyBoxes
+        .filter((hour) => !storedRewardEntries.some((rewardEntry) => rewardEntry.milestone === hour))
+        .forEach((hour) => {
+          nextRewardEntries = upsertStudyBoxRewardEntries(
+            nextRewardEntries,
+            buildDeterministicStudyBoxReward({
+              centerId,
+              studentId,
+              dateKey: entry.dateKey,
+              milestone: hour,
+            })
+          );
+        });
+      if (nextRewardEntries.length > storedRewardEntries.length) {
+        currentDayStatus.studyBoxRewards = nextRewardEntries;
+        shouldPersistDayStatus = true;
+      }
+
+      if (nextTotalMinutes >= 180 && currentDayStatus.attendance !== true) {
+        currentDayStatus.attendance = true;
+        attendanceAchieved = true;
+        shouldPersistDayStatus = true;
+      }
+      if (nextTotalMinutes >= 360 && currentDayStatus.bonus6h !== true) {
+        currentDayStatus.bonus6h = true;
+        bonus6hAchieved = true;
+        shouldPersistDayStatus = true;
+      }
+
+      if (shouldPersistDayStatus) {
+        currentDayStatus.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+        dailyPointStatusUpdates[entry.dateKey] = currentDayStatus;
+      }
+    });
+
+    if (shouldCloseSeat && closeSeatRef) {
+      transaction.set(
+        closeSeatRef,
+        {
+          status: "absent",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    const hasDailyPointStatusUpdates = Object.keys(dailyPointStatusUpdates).length > 0;
+    if (hasDailyPointStatusUpdates || progressExtra) {
+      transaction.set(
+        progressRef,
+        {
+          ...(hasDailyPointStatusUpdates ? { dailyPointStatus: dailyPointStatusUpdates } : {}),
+          ...(progressExtra ?? {}),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    const duplicatedSession = sessionSnapshots.every((snapshot) => snapshot.exists);
+    return {
+      duplicatedSession,
+      sessionId: sessionEntries[0]?.sessionId ?? `session_${startMs}`,
+      sessionIds: sessionEntries.map((entry) => entry.sessionId),
+      sessionDateKey: activeSessionDateKey,
+      sessionMinutes: sessionEntries.reduce((sum, entry) => sum + entry.durationMinutes, 0),
+      totalMinutesAfterSession: totalMinutesByDateKey[activeSessionDateKey] ?? 0,
+      totalMinutesByDateKey,
+      attendanceAchieved,
+      bonus6hAchieved,
+    };
+  });
 }
 
 function getAttendanceActivityRank(status?: string | null): number {
@@ -625,6 +860,69 @@ function toDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function toStudyDayDate(baseDate: Date = new Date()): Date {
+  const kstDate = toKstDate(baseDate);
+  if (kstDate.getHours() < STUDY_DAY_RESET_HOUR) {
+    kstDate.setDate(kstDate.getDate() - 1);
+  }
+  kstDate.setHours(0, 0, 0, 0);
+  return kstDate;
+}
+
+function toStudyDayKey(baseDate: Date = new Date()): string {
+  return toDateKey(toStudyDayDate(baseDate));
+}
+
+function getStudyDayWindowBounds(dateKey: string): { startMs: number; endMs: number } {
+  const hourLabel = String(STUDY_DAY_RESET_HOUR).padStart(2, "0");
+  const startMs = Date.parse(`${dateKey}T${hourLabel}:00:00+09:00`);
+  return {
+    startMs,
+    endMs: startMs + STUDY_DAY_MS,
+  };
+}
+
+function getTimeRangeOverlapMs(rangeStartMs: number, rangeEndMs: number, windowStartMs: number, windowEndMs: number): number {
+  if (!Number.isFinite(rangeStartMs) || !Number.isFinite(rangeEndMs)) return 0;
+  const overlapStartMs = Math.max(rangeStartMs, windowStartMs);
+  const overlapEndMs = Math.min(rangeEndMs, windowEndMs);
+  if (overlapEndMs <= overlapStartMs) return 0;
+  return overlapEndMs - overlapStartMs;
+}
+
+function splitRangeByStudyDayBoundary(startMs: number, endMs: number): StudyDayRangeSegment[] {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return [];
+
+  const segments: StudyDayRangeSegment[] = [];
+  let cursorMs = startMs;
+
+  while (cursorMs < endMs) {
+    const dateKey = toStudyDayKey(new Date(cursorMs));
+    const { startMs: windowStartMs, endMs: windowEndMs } = getStudyDayWindowBounds(dateKey);
+    const segmentStartMs = Math.max(cursorMs, windowStartMs);
+    const segmentEndMs = Math.min(endMs, windowEndMs);
+
+    if (segmentEndMs <= segmentStartMs) {
+      cursorMs = windowEndMs;
+      continue;
+    }
+
+    const durationMs = segmentEndMs - segmentStartMs;
+    segments.push({
+      dateKey,
+      startMs: segmentStartMs,
+      endMs: segmentEndMs,
+      durationMs,
+      durationMinutes: Math.max(1, Math.ceil(durationMs / MINUTE_MS)),
+      durationSeconds: Math.max(1, Math.ceil(durationMs / SECOND_MS)),
+    });
+
+    cursorMs = segmentEndMs;
+  }
+
+  return segments;
 }
 
 function toTimeLabel(date: Date): string {
@@ -5692,9 +5990,8 @@ export const scheduledAttendanceCheck = functions
   .onRun(async () => {
     const db = admin.firestore();
     const nowKst = toKstDate();
-    const MAX_SESSION_MINUTES = 360; // 6시간
     const cutoffTimestamp = admin.firestore.Timestamp.fromMillis(
-      Date.now() - MAX_SESSION_MINUTES * 60 * 1000
+      Date.now() - MAX_STUDY_SESSION_MINUTES * MINUTE_MS
     );
 
     const centersSnap = await db.collection("centers").get();
@@ -5726,80 +6023,32 @@ export const scheduledAttendanceCheck = functions
         const studentId = seat.studentId as string | undefined;
         if (!studentId) continue;
 
-        const startKst = toKstDate(lastCheckInAt.toDate());
-        const sessionDateKey = toDateKey(startKst);
-        const autoEndTime = admin.firestore.Timestamp.fromMillis(
-          lastCheckInAt.toMillis() + MAX_SESSION_MINUTES * 60 * 1000
-        );
-
-        const batch = db.batch();
-
-        batch.update(seatDoc.ref, {
-          status: "absent",
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        const logRef = db
-          .collection("centers").doc(centerId)
-          .collection("studyLogs").doc(studentId)
-          .collection("days").doc(sessionDateKey);
-        const existingLogSnap = await logRef.get();
-        const existingLog = existingLogSnap.exists ? (existingLogSnap.data() as Record<string, any>) : null;
-        const previousFirstSessionAt = toTimestampOrNow(existingLog?.firstSessionStartAt);
-        const previousLastSessionAt = toTimestampOrNow(existingLog?.lastSessionEndAt);
-        const nextFirstSessionAt = previousFirstSessionAt && previousFirstSessionAt.toMillis() <= lastCheckInAt.toMillis()
-          ? previousFirstSessionAt
-          : lastCheckInAt;
-        const nextLastSessionAt = previousLastSessionAt && previousLastSessionAt.toMillis() >= autoEndTime.toMillis()
-          ? previousLastSessionAt
-          : autoEndTime;
-        const awayGapMinutes = previousLastSessionAt
-          ? Math.round((lastCheckInAt.toMillis() - previousLastSessionAt.toMillis()) / 60000)
-          : 0;
-        const normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
-
-        batch.set(logRef, {
-          studentId,
-          centerId,
-          dateKey: sessionDateKey,
-          firstSessionStartAt: nextFirstSessionAt,
-          lastSessionEndAt: nextLastSessionAt,
-          ...(normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {}),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-
-        const sessionRef = logRef.collection("sessions").doc();
-        batch.set(sessionRef, {
+        const autoEndTimeMs = lastCheckInAt.toMillis() + MAX_STUDY_SESSION_MINUTES * MINUTE_MS;
+        const result = await finalizeStudySession({
+          db,
           centerId,
           studentId,
-          dateKey: sessionDateKey,
-          startTime: lastCheckInAt,
-          endTime: autoEndTime,
-          durationMinutes: MAX_SESSION_MINUTES,
-          autoClosedAt: admin.firestore.FieldValue.serverTimestamp(),
-          closedReason: "auto_6h_limit",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          startMs: lastCheckInAt.toMillis(),
+          endMs: autoEndTimeMs,
+          closeSeatRef: seatDoc.ref,
+          shouldCloseSeat: true,
+          progressExtra: {
+            seasonLp: admin.firestore.FieldValue.increment(MAX_STUDY_SESSION_MINUTES),
+            "stats.focus": admin.firestore.FieldValue.increment(0.1),
+          },
+          sessionMetadata: {
+            autoClosedAt: admin.firestore.FieldValue.serverTimestamp(),
+            closedReason: "auto_6h_limit",
+          },
         });
-
-        const progressRef = db
-          .collection("centers").doc(centerId)
-          .collection("growthProgress").doc(studentId);
-
-        batch.set(progressRef, {
-          seasonLp: admin.firestore.FieldValue.increment(MAX_SESSION_MINUTES),
-          "stats.focus": admin.firestore.FieldValue.increment(0.1),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-
-        await batch.commit();
         totalClosed++;
 
         console.log("[auto-close-session] 6시간 초과 세션 자동 종료", {
           centerId,
           studentId,
-          sessionDateKey,
+          sessionDateKey: result.sessionDateKey,
           lastCheckInAt: lastCheckInAt.toDate().toISOString(),
-          autoEndTime: autoEndTime.toDate().toISOString(),
+          autoEndTime: new Date(autoEndTimeMs).toISOString(),
         });
       }
     }
@@ -6788,13 +7037,13 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
   }
 
   const persistedDayMinutes = Math.max(0, Math.floor(parseFiniteNumber(studyDaySnap.data()?.totalMinutes) ?? 0));
-  const todayKstKey = toDateKey(toKstDate());
+  const currentStudyDayKey = toStudyDayKey();
   const nowMs = Date.now();
-  const dayStartMs = Date.parse(`${dateKey}T00:00:00+09:00`);
-  let liveSessionMinutes = 0;
+  const { startMs: studyDayStartMs, endMs: studyDayEndMs } = getStudyDayWindowBounds(dateKey);
+  let liveSessionDurationSeconds = 0;
   let liveSessionStartMs = 0;
 
-  if (dateKey === todayKstKey && !attendanceSnap.empty) {
+  if (dateKey === currentStudyDayKey && !attendanceSnap.empty) {
     const preferredAttendanceDoc = pickPreferredAttendanceSeatDoc(attendanceSnap.docs);
     const attendanceData = preferredAttendanceDoc?.data() as Record<string, unknown> | undefined;
     const attendanceStatus = asTrimmedString(attendanceData?.status);
@@ -6803,17 +7052,19 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     if (
       ACTIVE_STUDY_ATTENDANCE_STATUSES.has(attendanceStatus) &&
       liveStartedAtMs > 0 &&
-      Number.isFinite(dayStartMs) &&
+      Number.isFinite(studyDayStartMs) &&
       nowMs > liveStartedAtMs
     ) {
-      const effectiveStartMs = Math.max(liveStartedAtMs, dayStartMs);
-      liveSessionStartMs = effectiveStartMs;
-      liveSessionMinutes = Math.max(0, Math.floor((nowMs - effectiveStartMs) / 60000));
+      const overlapMs = getTimeRangeOverlapMs(liveStartedAtMs, nowMs, studyDayStartMs, studyDayEndMs);
+      if (overlapMs > 0) {
+        liveSessionStartMs = Math.max(liveStartedAtMs, studyDayStartMs);
+        liveSessionDurationSeconds = Math.max(0, Math.floor(overlapMs / SECOND_MS));
+      }
     }
   }
 
-  const effectiveDayMinutes = Math.max(persistedDayMinutes, persistedDayMinutes + liveSessionMinutes);
-  const earnedHours = Math.min(8, Math.floor(effectiveDayMinutes / 60));
+  const effectiveDaySeconds = Math.max(0, persistedDayMinutes * 60 + liveSessionDurationSeconds);
+  const earnedHours = Math.min(8, Math.floor(effectiveDaySeconds / 3600));
   const preExistingProgress = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
   const preExistingDailyPointStatus = isPlainObject(preExistingProgress.dailyPointStatus)
     ? (preExistingProgress.dailyPointStatus as Record<string, unknown>)
@@ -6825,7 +7076,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
   const preExistingOpenedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(preExistingDayStatus);
   const hasClaimedBoxRecord = preExistingClaimedStudyBoxes.includes(hour);
   const alreadyOpenedByRecord = preExistingOpenedStudyBoxes.includes(hour);
-  const canOpenCarryoverByRecord = dateKey !== todayKstKey && hasClaimedBoxRecord;
+  const canOpenCarryoverByRecord = dateKey !== currentStudyDayKey && hasClaimedBoxRecord;
 
   if (!alreadyOpenedByRecord && !canOpenCarryoverByRecord && earnedHours < hour) {
     throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
@@ -6844,7 +7095,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     persistedDayMinutes,
     sessionDocs: sessionsSnap.docs,
     liveSessionStartMs,
-    liveSessionMinutes,
+    liveSessionDurationSeconds,
   });
   let boostMultiplier = 1;
   let boostEventId: string | null = null;
@@ -6992,137 +7243,22 @@ export const stopStudentStudySessionSecure = functions.region(region).https.onCa
     resolvedStartTimeMs = nowMs;
   }
 
-  const MAX_MINUTES = 360;
-  const sessionSeconds = Math.max(0, Math.floor((nowMs - resolvedStartTimeMs) / 1000));
-  const sessionMinutes = sessionSeconds > 0 ? Math.min(MAX_MINUTES, Math.max(1, Math.ceil(sessionSeconds / 60))) : 0;
-  const startAt = admin.firestore.Timestamp.fromMillis(resolvedStartTimeMs);
-  const endAt = admin.firestore.Timestamp.fromMillis(nowMs);
-  const sessionDateKey = toDateKey(toKstDate(new Date(resolvedStartTimeMs)));
-  const sessionId = `session_${resolvedStartTimeMs}`;
-  const dayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${sessionDateKey}`);
-  const sessionRef = dayRef.collection("sessions").doc(sessionId);
-  const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
-
-  const result = await db.runTransaction(async (transaction) => {
-    const [daySnap, sessionSnap, progressSnap] = await Promise.all([
-      transaction.get(dayRef),
-      transaction.get(sessionRef),
-      transaction.get(progressRef),
-    ]);
-
-    const dayData = daySnap.exists ? (daySnap.data() as Record<string, unknown>) : {};
-    const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
-    const existingTotalMinutes = Math.max(0, Math.floor(parseFiniteNumber(dayData.totalMinutes) ?? 0));
-    const duplicatedSession = sessionSnap.exists;
-    const previousFirstSessionAt = toTimestampOrNow(dayData.firstSessionStartAt);
-    const previousLastSessionAt = toTimestampOrNow(dayData.lastSessionEndAt);
-    const awayGapMinutes = previousLastSessionAt
-      ? Math.round((resolvedStartTimeMs - previousLastSessionAt.toMillis()) / 60000)
-      : 0;
-    const normalizedAwayGapMinutes = awayGapMinutes > 0 && awayGapMinutes < 180 ? awayGapMinutes : 0;
-    const nextFirstSessionAt =
-      previousFirstSessionAt && previousFirstSessionAt.toMillis() <= resolvedStartTimeMs
-        ? previousFirstSessionAt
-        : startAt;
-    const nextLastSessionAt =
-      previousLastSessionAt && previousLastSessionAt.toMillis() >= nowMs
-        ? previousLastSessionAt
-        : endAt;
-
-    let totalMinutesAfterSession = existingTotalMinutes;
-    let attendanceAchieved = false;
-    let bonus6hAchieved = false;
-
-    if (!duplicatedSession && sessionMinutes > 0) {
-      totalMinutesAfterSession = existingTotalMinutes + sessionMinutes;
-      const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
-        ? (progressData.dailyPointStatus as Record<string, unknown>)
-        : {};
-      const currentDayStatus = isPlainObject(dailyPointStatus[sessionDateKey])
-        ? { ...(dailyPointStatus[sessionDateKey] as Record<string, unknown>) }
-        : {};
-
-      if (totalMinutesAfterSession >= 180 && currentDayStatus.attendance !== true) {
-        currentDayStatus.attendance = true;
-        attendanceAchieved = true;
-      }
-      if (totalMinutesAfterSession >= 360 && currentDayStatus.bonus6h !== true) {
-        currentDayStatus.bonus6h = true;
-        bonus6hAchieved = true;
-      }
-
-      transaction.set(
-        dayRef,
-        {
-          studentId: authUid,
-          centerId,
-          dateKey: sessionDateKey,
-          totalMinutes: totalMinutesAfterSession,
-          firstSessionStartAt: nextFirstSessionAt,
-          lastSessionEndAt: nextLastSessionAt,
-          ...(normalizedAwayGapMinutes > 0 ? { awayMinutes: admin.firestore.FieldValue.increment(normalizedAwayGapMinutes) } : {}),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      transaction.set(
-        sessionRef,
-        {
-          centerId,
-          studentId: authUid,
-          dateKey: sessionDateKey,
-          startTime: startAt,
-          endTime: endAt,
-          durationMinutes: sessionMinutes,
-          sessionId,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      if (attendanceAchieved || bonus6hAchieved) {
-        transaction.set(
-          progressRef,
-          {
-            dailyPointStatus: {
-              [sessionDateKey]: {
-                ...currentDayStatus,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              },
-            },
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-      }
-    }
-
-    if (preferredSeatDoc?.ref && hasActiveSeatSession) {
-      transaction.set(
-        preferredSeatDoc.ref,
-        {
-          status: "absent",
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-    }
-
-    return {
-      duplicatedSession,
-      totalMinutesAfterSession,
-      attendanceAchieved,
-      bonus6hAchieved,
-    };
+  const result = await finalizeStudySession({
+    db,
+    centerId,
+    studentId: authUid,
+    startMs: resolvedStartTimeMs,
+    endMs: nowMs,
+    closeSeatRef: preferredSeatDoc?.ref ?? null,
+    shouldCloseSeat: hasActiveSeatSession,
   });
 
   return {
     ok: true,
     duplicatedSession: result.duplicatedSession,
-    sessionId,
-    sessionDateKey,
-    sessionMinutes,
+    sessionId: result.sessionId,
+    sessionDateKey: result.sessionDateKey,
+    sessionMinutes: result.sessionMinutes,
     totalMinutesAfterSession: result.totalMinutesAfterSession,
     attendanceAchieved: result.attendanceAchieved,
     bonus6hAchieved: result.bonus6hAchieved,

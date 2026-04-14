@@ -54,6 +54,7 @@ import {
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
   getOpenedStudyBoxes,
+  getRemainingCarryoverStudyBoxHours,
   getRenderableTodayStudyBoxHours,
   getStudyBoxFallbackRarity,
   normalizeStoredStudyBoxRewardEntries,
@@ -62,6 +63,7 @@ import {
   upsertStudyBoxRewardEntry,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
+import { getCurrentStudyDayLiveSeconds, getStudyDayContext } from '@/lib/study-day';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, StudyLogDay } from '@/lib/types';
@@ -193,10 +195,6 @@ function formatProgressCounter(seconds: number) {
   return `${mins}:${secs.toString().padStart(2, '0')} / 60:00`;
 }
 
-function getTodayKey() {
-  return format(new Date(), 'yyyy-MM-dd');
-}
-
 function formatCountdown(seconds: number) {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const mins = Math.floor(safeSeconds / 60);
@@ -302,9 +300,12 @@ export default function GrowthPage() {
   const { activeMembership, viewMode, isTimerActive, startTime } = useAppContext();
   const firestore = useFirestore();
   const isMobile = viewMode === 'mobile';
-  const todayKey = getTodayKey();
-  const periodKey = format(new Date(), 'yyyy-MM');
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const studyDayContext = useMemo(() => getStudyDayContext(new Date(nowMs)), [nowMs]);
+  const activeStudyDayKey = studyDayContext.dateKey;
+  const previousStudyDayKey = studyDayContext.previousDateKey;
+  const activeStudyDayDate = studyDayContext.studyDayDate;
+  const periodKey = format(activeStudyDayDate, 'yyyy-MM');
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [selectedBoxHour, setSelectedBoxHour] = useState<number | null>(null);
   const [boxStage, setBoxStage] = useState<BoxStage>('idle');
@@ -316,6 +317,7 @@ export default function GrowthPage() {
   const [claimedBoxes, setClaimedBoxes] = useState<number[]>([]);
   const [rewardEntries, setRewardEntries] = useState<StudyBoxReward[]>([]);
   const [openedBoxes, setOpenedBoxes] = useState<number[]>([]);
+  const [carryoverOpenedBoxes, setCarryoverOpenedBoxes] = useState<number[]>([]);
   const [pointBalance, setPointBalance] = useState(0);
   const [requestingGoodsCode, setRequestingGoodsCode] = useState<string | null>(null);
   const [isGiftishowShopOpen, setIsGiftishowShopOpen] = useState(false);
@@ -385,16 +387,16 @@ export default function GrowthPage() {
   const { data: seasonStudyLogs } = useCollection<StudyLogDay>(seasonStudyLogsQuery);
 
   const todayLog = useMemo(() => {
-    return (seasonStudyLogs || []).find((log) => log.dateKey === todayKey) || null;
-  }, [seasonStudyLogs, todayKey]);
+    return (seasonStudyLogs || []).find((log) => log.dateKey === activeStudyDayKey) || null;
+  }, [activeStudyDayKey, seasonStudyLogs]);
 
   const todayMinutes = Math.max(0, Number(todayLog?.totalMinutes || 0));
   const weeklyMinutes = useMemo(() => {
-    const keys = new Set(Array.from({ length: 7 }, (_, index) => format(subDays(new Date(), index), 'yyyy-MM-dd')));
+    const keys = new Set(Array.from({ length: 7 }, (_, index) => format(subDays(activeStudyDayDate, index), 'yyyy-MM-dd')));
     return (seasonStudyLogs || [])
       .filter((log) => keys.has(log.dateKey))
       .reduce((sum, log) => sum + Math.max(0, Number(log.totalMinutes || 0)), 0);
-  }, [seasonStudyLogs]);
+  }, [activeStudyDayDate, seasonStudyLogs]);
   const monthlyMinutes = useMemo(() => {
     return (seasonStudyLogs || [])
       .filter((log) => log.dateKey.startsWith(periodKey))
@@ -402,13 +404,16 @@ export default function GrowthPage() {
   }, [seasonStudyLogs, periodKey]);
 
   const todayStatus = useMemo(() => {
-    return ((progress?.dailyPointStatus || {})[todayKey] || {}) as Record<string, any>;
-  }, [progress?.dailyPointStatus, todayKey]);
+    return ((progress?.dailyPointStatus || {})[activeStudyDayKey] || {}) as Record<string, any>;
+  }, [activeStudyDayKey, progress?.dailyPointStatus]);
+  const previousStudyDayStatus = useMemo(() => {
+    return ((progress?.dailyPointStatus || {})[previousStudyDayKey] || {}) as Record<string, any>;
+  }, [previousStudyDayKey, progress?.dailyPointStatus]);
 
   const claimCacheKey = useMemo(() => {
     if (!activeMembership?.id || !user?.uid) return null;
-    return `${STUDY_BOX_CLAIM_CACHE_PREFIX}:${activeMembership.id}:${user.uid}:${todayKey}`;
-  }, [activeMembership?.id, todayKey, user?.uid]);
+    return `${STUDY_BOX_CLAIM_CACHE_PREFIX}:${activeMembership.id}:${user.uid}:${activeStudyDayKey}`;
+  }, [activeMembership?.id, activeStudyDayKey, user?.uid]);
 
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayStatus), [todayStatus]);
   const persistedRewardEntries = useMemo(
@@ -416,6 +421,18 @@ export default function GrowthPage() {
     [todayStatus]
   );
   const persistedOpenedBoxes = useMemo(() => getOpenedStudyBoxes(todayStatus), [todayStatus]);
+  const persistedCarryoverClaimedBoxes = useMemo(
+    () => getClaimedStudyBoxes(previousStudyDayStatus),
+    [previousStudyDayStatus]
+  );
+  const persistedCarryoverRewardEntries = useMemo(
+    () => normalizeStoredStudyBoxRewardEntries(previousStudyDayStatus.studyBoxRewards),
+    [previousStudyDayStatus]
+  );
+  const persistedCarryoverOpenedBoxes = useMemo(
+    () => getOpenedStudyBoxes(previousStudyDayStatus),
+    [previousStudyDayStatus]
+  );
 
   const stats = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
@@ -441,12 +458,16 @@ export default function GrowthPage() {
   }, [persistedRewardEntries]);
 
   useEffect(() => {
-    const cachedOpenedBoxes = readStudyBoxOpenedCache(user?.uid, todayKey);
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(user?.uid, activeStudyDayKey);
     const nextOpenedBoxes = normalizeStudyBoxHours([...persistedOpenedBoxes, ...cachedOpenedBoxes]);
 
     setOpenedBoxes(nextOpenedBoxes);
-    writeStudyBoxOpenedCache(user?.uid, todayKey, nextOpenedBoxes);
-  }, [persistedOpenedBoxes, todayKey, user?.uid]);
+    writeStudyBoxOpenedCache(user?.uid, activeStudyDayKey, nextOpenedBoxes);
+  }, [activeStudyDayKey, persistedOpenedBoxes, user?.uid]);
+
+  useEffect(() => {
+    setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
+  }, [persistedCarryoverOpenedBoxes]);
 
   useEffect(() => {
     setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
@@ -508,11 +529,10 @@ export default function GrowthPage() {
   }, [currentGiftishowPage, filteredGiftishowProducts]);
 
   useEffect(() => {
-    if (!isTimerActive || !startTime) return;
     setNowMs(Date.now());
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
-    }, 1000);
+    }, isTimerActive && startTime ? 1000 : 30000);
     return () => window.clearInterval(timer);
   }, [isTimerActive, startTime]);
 
@@ -533,7 +553,11 @@ export default function GrowthPage() {
   }, [giftishowPage, totalGiftishowPages]);
 
   const liveSessionSeconds = isTimerActive && startTime ? Math.max(0, Math.floor((nowMs - startTime) / 1000)) : 0;
-  const liveTodaySeconds = Math.max(0, todayMinutes * 60 + liveSessionSeconds);
+  const liveStudyDaySeconds = useMemo(() => {
+    if (!isTimerActive || !startTime) return 0;
+    return getCurrentStudyDayLiveSeconds(startTime, new Date(nowMs));
+  }, [isTimerActive, nowMs, startTime]);
+  const liveTodaySeconds = Math.max(0, todayMinutes * 60 + liveStudyDaySeconds);
   const liveTodayMinutes = Math.floor(liveTodaySeconds / 60);
   const rewardByHour = useMemo(() => {
     const map = new Map<number, StudyBoxReward>();
@@ -542,6 +566,13 @@ export default function GrowthPage() {
     });
     return map;
   }, [rewardEntries]);
+  const carryoverRewardByHour = useMemo(() => {
+    const map = new Map<number, StudyBoxReward>();
+    persistedCarryoverRewardEntries.forEach((entry) => {
+      map.set(entry.milestone, entry);
+    });
+    return map;
+  }, [persistedCarryoverRewardEntries]);
   const earnedBoxes = Math.min(8, Math.floor(liveTodaySeconds / 3600));
   const currentCycleSeconds = earnedBoxes >= 8 ? 3600 : liveTodaySeconds % 3600;
   const nextBoxSecondsLeft = earnedBoxes >= 8 ? 0 : Math.max(0, 3600 - currentCycleSeconds);
@@ -566,15 +597,42 @@ export default function GrowthPage() {
       }),
     [renderableTodayStudyBoxState, rewardByHour]
   );
-
-  const readyBoxes = boxes.filter((box) => box.state === 'ready');
+  const carryoverReadyHours = useMemo(
+    () =>
+      getRemainingCarryoverStudyBoxHours({
+        claimedHours: persistedCarryoverClaimedBoxes,
+        openedHours: carryoverOpenedBoxes,
+      }),
+    [carryoverOpenedBoxes, persistedCarryoverClaimedBoxes]
+  );
+  const hasCarryoverReadyBoxes = carryoverReadyHours.length > 0;
+  const carryoverBoxes = useMemo(
+    () =>
+      buildRewardBoxes({
+        earnedHours: persistedCarryoverClaimedBoxes.at(-1) || 0,
+        claimedHours: persistedCarryoverClaimedBoxes,
+        openedHours: carryoverOpenedBoxes,
+        rewardByHour: carryoverRewardByHour,
+      }),
+    [carryoverOpenedBoxes, carryoverRewardByHour, persistedCarryoverClaimedBoxes]
+  );
+  const activeBoxes = hasCarryoverReadyBoxes ? carryoverBoxes : boxes;
+  const readyBoxes = activeBoxes.filter((box) => box.state === 'ready');
   const totalAvailableBoxes = readyBoxes.length;
   const heroBoxRarity =
     readyBoxes[0]?.rarity ??
-    boxes.find((box) => box.state === 'charging')?.rarity ??
-    boxes[0]?.rarity ??
+    activeBoxes.find((box) => box.state === 'charging')?.rarity ??
+    activeBoxes[0]?.rarity ??
     'common';
-  const todayOpenedCount = renderableTodayStudyBoxState.openedHours.length;
+  const todayOpenedCount = hasCarryoverReadyBoxes
+    ? carryoverOpenedBoxes.length
+    : renderableTodayStudyBoxState.openedHours.length;
+  const activeVaultDateKey = hasCarryoverReadyBoxes ? previousStudyDayKey : activeStudyDayKey;
+  const activeRewardByHour = hasCarryoverReadyBoxes ? carryoverRewardByHour : rewardByHour;
+  const activeRewardEntries = hasCarryoverReadyBoxes ? persistedCarryoverRewardEntries : rewardEntries;
+  const activeClaimedBoxes = hasCarryoverReadyBoxes ? persistedCarryoverClaimedBoxes : claimedBoxes;
+  const activeOpenedBoxes = hasCarryoverReadyBoxes ? carryoverOpenedBoxes : openedBoxes;
+  const activeDayStatus = hasCarryoverReadyBoxes ? previousStudyDayStatus : todayStatus;
 
   const heroMode = totalAvailableBoxes > 0 ? 'ready' : isTimerActive ? 'studying' : 'idle';
   const heroPrimaryLabel =
@@ -600,7 +658,7 @@ export default function GrowthPage() {
           ? `계속 공부 중 · ${formatCountdown(nextBoxSecondsLeft)}`
           : '공부 시작하고 상자 채우기';
 
-  const selectedBox = selectedBoxHour ? boxes.find((box) => box.hour === selectedBoxHour) || null : null;
+  const selectedBox = selectedBoxHour ? activeBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
 
   useEffect(() => {
     if (!isTimerActive || !progressRef) return;
@@ -609,7 +667,7 @@ export default function GrowthPage() {
     const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, claimedBoxes);
     if (availableMilestones.length === 0) return;
 
-    const claimKey = `${todayKey}:${availableMilestones.join(',')}:${liveTodayMinutes}`;
+    const claimKey = `${activeStudyDayKey}:${availableMilestones.join(',')}:${liveTodayMinutes}`;
     if (liveClaimKeyRef.current === claimKey) return;
     liveClaimKeyRef.current = claimKey;
 
@@ -636,7 +694,7 @@ export default function GrowthPage() {
       progressRef,
       {
         dailyPointStatus: {
-          [todayKey]: nextDayStatus,
+          [activeStudyDayKey]: nextDayStatus,
         },
         updatedAt: serverTimestamp(),
       },
@@ -647,7 +705,7 @@ export default function GrowthPage() {
 
         const arrivalToastKey =
           activeMembership?.id && user?.uid
-            ? `${STUDY_BOX_ARRIVAL_TOAST_PREFIX}:${activeMembership.id}:${user.uid}:${todayKey}:${availableMilestones.join(',')}`
+            ? `${STUDY_BOX_ARRIVAL_TOAST_PREFIX}:${activeMembership.id}:${user.uid}:${activeStudyDayKey}:${availableMilestones.join(',')}`
             : null;
 
         if (!hasSeenStudyBoxArrivalToast(arrivalToastKey)) {
@@ -677,7 +735,7 @@ export default function GrowthPage() {
     progress?.pointsBalance,
     progressRef,
     rewardEntries,
-    todayKey,
+    activeStudyDayKey,
     todayStatus,
     toast,
     user?.uid,
@@ -713,17 +771,17 @@ export default function GrowthPage() {
     if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !activeMembership?.id || !user?.uid) return;
     const targetHour = selectedBox.hour;
     const currentDayStatus = {
-      ...todayStatus,
-      claimedStudyBoxes: claimedBoxes,
-      openedStudyBoxes: openedBoxes,
-      studyBoxRewards: rewardEntries,
+      ...activeDayStatus,
+      claimedStudyBoxes: activeClaimedBoxes,
+      openedStudyBoxes: activeOpenedBoxes,
+      studyBoxRewards: activeRewardEntries,
     };
     const rewardOpenPromise = openStudyRewardBoxSecure({
       centerId: activeMembership.id,
       studentId: user.uid,
-      dateKey: todayKey,
+      dateKey: activeVaultDateKey,
       hour: targetHour,
-      reward: rewardByHour.get(targetHour) || rollStudyBoxReward(targetHour),
+      reward: activeRewardByHour.get(targetHour) || rollStudyBoxReward(targetHour),
       dayStatus: currentDayStatus,
       currentPointsBalance: pointBalance,
       currentTotalPointsEarned: Number(progress?.totalPointsEarned || 0),
@@ -753,15 +811,19 @@ export default function GrowthPage() {
         const nextRewardEntry = result.reward;
         const reward =
           nextRewardEntry?.awardedPoints
-          ?? rewardByHour.get(targetHour)?.awardedPoints
+          ?? activeRewardByHour.get(targetHour)?.awardedPoints
           ?? selectedBox.reward
           ?? 0;
 
-        setOpenedBoxes(nextOpenedBoxes);
-        setClaimedBoxes(nextClaimedBoxes);
-        writeStudyBoxOpenedCache(user.uid, todayKey, nextOpenedBoxes);
-        if (nextRewardEntry) {
-          setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
+        if (activeVaultDateKey === activeStudyDayKey) {
+          setOpenedBoxes(nextOpenedBoxes);
+          setClaimedBoxes(nextClaimedBoxes);
+          writeStudyBoxOpenedCache(user.uid, activeStudyDayKey, nextOpenedBoxes);
+          if (nextRewardEntry) {
+            setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
+          }
+        } else {
+          setCarryoverOpenedBoxes(nextOpenedBoxes);
         }
         if (typeof result.pointsBalance === 'number') {
           setPointBalance(Math.max(0, result.pointsBalance));
@@ -777,9 +839,13 @@ export default function GrowthPage() {
         timeoutsRef.current.push(clearFloating);
       } catch (error) {
         console.error('[point-track] reward box open failed', error);
-        setOpenedBoxes(persistedOpenedBoxes);
-        setClaimedBoxes(persistedClaimedBoxes);
-        setRewardEntries(persistedRewardEntries);
+        if (activeVaultDateKey === activeStudyDayKey) {
+          setOpenedBoxes(persistedOpenedBoxes);
+          setClaimedBoxes(persistedClaimedBoxes);
+          setRewardEntries(persistedRewardEntries);
+        } else {
+          setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
+        }
         setBoxStage('idle');
       } finally {
         setIsClaimingBox(false);
@@ -790,7 +856,7 @@ export default function GrowthPage() {
   };
 
   const handleNextBox = () => {
-    const nextReady = boxes.find((box) => box.state === 'ready' && box.hour !== selectedBoxHour);
+    const nextReady = activeBoxes.find((box) => box.state === 'ready' && box.hour !== selectedBoxHour);
     if (!nextReady) {
       handleVaultChange(false);
       return;
@@ -997,7 +1063,7 @@ export default function GrowthPage() {
             </div>
           </div>
           <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
-            {boxes.map((box) => (
+            {activeBoxes.map((box) => (
               <RewardVaultSlot
                 key={box.id}
                 box={box}

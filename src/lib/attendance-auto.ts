@@ -15,6 +15,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
+import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
 
 export type AttendanceRecordStatus =
   | 'requested'
@@ -283,9 +284,10 @@ export async function syncAutoAttendanceRecord(params: {
     overwriteManual = false,
   } = params;
 
-  const dateKey = format(targetDate, 'yyyy-MM-dd');
-  const todayDateKey = format(new Date(), 'yyyy-MM-dd');
-  const weekKey = format(targetDate, "yyyy-'W'II");
+  const studyDayDate = getStudyDayDate(targetDate);
+  const dateKey = getStudyDayKey(targetDate);
+  const todayDateKey = getStudyDayKey(new Date());
+  const weekKey = format(studyDayDate, "yyyy-'W'II");
 
   const recordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', studentId);
   const existingSnap = await getDoc(recordRef);
@@ -299,7 +301,7 @@ export async function syncAutoAttendanceRecord(params: {
   const existingCheckedAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
   const accessCheckedAt = checkInAt || existingCheckedAt;
   const derived = deriveAttendanceDisplayState({
-    selectedDate: targetDate,
+    selectedDate: studyDayDate,
     dateKey,
     todayDateKey,
     routine,
