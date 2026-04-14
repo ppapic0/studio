@@ -7,6 +7,7 @@ if (admin.apps.length === 0) {
 
 const region = "asia-northeast3";
 const GIFTISHOW_BASE_URL = "https://bizapi.giftishow.com/bizApi";
+const GIFTISHOW_SEND_URL = "https://bizapi.giftishow.com/coupon/send";
 const GIFTISHOW_CATALOG_PAGE_SIZE = 100;
 const GIFTISHOW_SYNC_BATCH_LIMIT = 320;
 const GIFTISHOW_SEND_TIMEOUT_MS = 14_000;
@@ -43,7 +44,12 @@ type GiftishowSettingsDoc = {
   userIdConfigured?: boolean;
   callbackNoConfigured?: boolean;
   lastCatalogSyncedAt?: admin.firestore.Timestamp | null;
+  lastBrandSyncedAt?: admin.firestore.Timestamp | null;
+  lastDetailSyncedAt?: admin.firestore.Timestamp | null;
   lastBizmoneyBalance?: number | null;
+  lastBrandCount?: number | null;
+  lastDetailSyncedCount?: number | null;
+  lastBrandDetailSyncedCount?: number | null;
   lastSyncStatus?: GiftishowSyncStatus;
   lastErrorMessage?: string | null;
   updatedAt?: admin.firestore.Timestamp;
@@ -85,6 +91,20 @@ type GiftishowProductDoc = {
   pointCost: number;
   isAvailable: boolean;
   lastSyncedAt?: admin.firestore.Timestamp | null;
+  detailSyncedAt?: admin.firestore.Timestamp | null;
+  updatedAt?: admin.firestore.Timestamp;
+};
+
+type GiftishowBrandDoc = {
+  brandCode: string;
+  brandName: string;
+  brandIconImg?: string | null;
+  brandImg?: string | null;
+  brandDescription?: string | null;
+  goodsCount?: number | null;
+  isAvailable: boolean;
+  lastSyncedAt?: admin.firestore.Timestamp | null;
+  detailSyncedAt?: admin.firestore.Timestamp | null;
   updatedAt?: admin.firestore.Timestamp;
 };
 
@@ -154,9 +174,15 @@ type GiftishowCredentials = {
 };
 
 type GiftishowGoodsItem = Record<string, unknown>;
+type GiftishowBrandItem = Record<string, unknown>;
 
 type GiftishowListGoodsPageResult = {
   items: GiftishowGoodsItem[];
+  totalCount: number;
+};
+
+type GiftishowListBrandsResult = {
+  items: GiftishowBrandItem[];
   totalCount: number;
 };
 
@@ -204,6 +230,9 @@ type GiftishowSendCouponInput = {
 type GiftishowClient = {
   mode: GiftishowProviderMode;
   listGoodsPage(start: number, size: number): Promise<GiftishowListGoodsPageResult>;
+  getGoodsDetail(goodsCode: string): Promise<GiftishowGoodsItem | null>;
+  listBrands(): Promise<GiftishowListBrandsResult>;
+  getBrandDetail(brandCode: string): Promise<GiftishowBrandItem | null>;
   getBizmoney(): Promise<number>;
   sendCoupon(input: GiftishowSendCouponInput): Promise<GiftishowSendSuccess>;
   getCoupon(trId: string): Promise<GiftishowCouponLookupResult>;
@@ -240,6 +269,37 @@ class MockGiftishowClient implements GiftishowClient {
       items: all.slice(sliceStart, sliceEnd),
       totalCount: all.length,
     };
+  }
+
+  async getGoodsDetail(goodsCode: string): Promise<GiftishowGoodsItem | null> {
+    return buildMockGiftishowGoods().find((item) => asTrimmedString(item.goodsCode) === goodsCode) || null;
+  }
+
+  async listBrands(): Promise<GiftishowListBrandsResult> {
+    const brandMap = new Map<string, GiftishowBrandItem>();
+    for (const item of buildMockGiftishowGoods()) {
+      const brandCode = asTrimmedString(item.brandCode);
+      if (!brandCode) continue;
+      if (!brandMap.has(brandCode)) {
+        brandMap.set(brandCode, {
+          brandCode,
+          brandName: asTrimmedString(item.brandName) || brandCode,
+          brandIconImg: asTrimmedString(item.brandIconImg) || asTrimmedString(item.goodsImgS) || null,
+          goodsCount: 0,
+        });
+      }
+      const current = brandMap.get(brandCode);
+      if (current) {
+        current.goodsCount = Math.max(0, Math.floor(parseFiniteNumber(current.goodsCount) ?? 0)) + 1;
+      }
+    }
+    const items = [...brandMap.values()];
+    return { items, totalCount: items.length };
+  }
+
+  async getBrandDetail(brandCode: string): Promise<GiftishowBrandItem | null> {
+    const brand = (await this.listBrands()).items.find((item) => asTrimmedString(item.brandCode) === brandCode);
+    return brand || null;
   }
 
   async getBizmoney(): Promise<number> {
@@ -333,6 +393,50 @@ class LiveGiftishowClient implements GiftishowClient {
     return { items, totalCount };
   }
 
+  async getGoodsDetail(goodsCode: string): Promise<GiftishowGoodsItem | null> {
+    const payload = await this.postForm(`/goods/${encodeURIComponent(goodsCode)}`, {
+      api_code: "0102",
+      custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
+      custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
+      dev_yn: "N",
+      goods_code: goodsCode,
+    });
+
+    assertGiftishowSuccess(payload, "상품 상세 조회");
+    return findFirstGiftishowRecord(payload, ["goodsCode", "goods_code"]);
+  }
+
+  async listBrands(): Promise<GiftishowListBrandsResult> {
+    const payload = await this.postForm("/brands", {
+      api_code: "0103",
+      custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
+      custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
+      dev_yn: "N",
+    });
+
+    assertGiftishowSuccess(payload, "브랜드 조회");
+    const items = findGiftishowRecords(payload, ["brandCode", "brand_code"]).filter(
+      (item) => readGiftishowString(item, "brandCode", "brand_code").length > 0
+    );
+    return {
+      items,
+      totalCount: Math.max(items.length, Math.floor(parseFiniteNumber(asRecord(payload.result)?.totalCount ?? payload.totalCount) ?? items.length)),
+    };
+  }
+
+  async getBrandDetail(brandCode: string): Promise<GiftishowBrandItem | null> {
+    const payload = await this.postForm("/brands", {
+      api_code: "0104",
+      custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
+      custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
+      dev_yn: "N",
+      brand_code: brandCode,
+    });
+
+    assertGiftishowSuccess(payload, "브랜드 상세 조회");
+    return findFirstGiftishowRecord(payload, ["brandCode", "brand_code"]);
+  }
+
   async getBizmoney(): Promise<number> {
     const payload = await this.postForm("/bizmoney", {
       api_code: "0301",
@@ -358,7 +462,7 @@ class LiveGiftishowClient implements GiftishowClient {
     assertGiftishowSendLimits(input.trId, input.mmsTitle);
 
     const payload = await this.postForm(
-      "/send",
+      GIFTISHOW_SEND_URL,
       {
         api_code: "0204",
         custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
@@ -492,7 +596,7 @@ class LiveGiftishowClient implements GiftishowClient {
   }
 
   private async postForm(
-    path: string,
+    pathOrUrl: string,
     payload: Record<string, unknown>,
     timeoutMs = 10_000
   ): Promise<Record<string, unknown>> {
@@ -500,7 +604,8 @@ class LiveGiftishowClient implements GiftishowClient {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(`${GIFTISHOW_BASE_URL}${path}`, {
+      const url = pathOrUrl.startsWith("http") ? pathOrUrl : `${GIFTISHOW_BASE_URL}${pathOrUrl}`;
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "content-type": "application/x-www-form-urlencoded",
@@ -618,6 +723,9 @@ export const syncGiftishowCatalogSecure = giftishowSecureFunctions.https.onCall(
   return {
     syncedCount: result.syncedCount,
     availableCount: result.availableCount,
+    brandCount: result.brandCount,
+    detailSyncedCount: result.detailSyncedCount,
+    brandDetailSyncedCount: result.brandDetailSyncedCount,
     lastCatalogSyncedAt: result.lastCatalogSyncedAt.toISOString(),
     mode: result.mode,
   };
@@ -1070,9 +1178,49 @@ async function syncGiftishowCatalogForCenter(
       if (page.items.length < GIFTISHOW_CATALOG_PAGE_SIZE) break;
     }
 
+    const brandPage = await client.listBrands();
     const now = admin.firestore.Timestamp.now();
     const productDocs = allItems.map((item) => normalizeGiftishowProduct(item, now));
-    const chunks = chunkArray(productDocs, GIFTISHOW_SYNC_BATCH_LIMIT);
+    const productDetails = await mapWithConcurrency(productDocs, 4, async (product) => {
+      try {
+        return product.goodsCode ? await client.getGoodsDetail(product.goodsCode) : null;
+      } catch (error) {
+        functions.logger.warn("giftishow product detail sync failed", {
+          centerId,
+          goodsCode: product.goodsCode,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      }
+    });
+    const mergedProducts = productDocs.map((product, index) =>
+      mergeGiftishowProductDetail(product, productDetails[index], now)
+    );
+    const detailSyncedCount = mergedProducts.filter((product) => product.detailSyncedAt).length;
+
+    const brandDocs = buildGiftishowBrandDocs({
+      brands: brandPage.items,
+      products: mergedProducts,
+      syncedAt: now,
+    });
+    const brandDetails = await mapWithConcurrency(brandDocs, 4, async (brand) => {
+      try {
+        return brand.brandCode ? await client.getBrandDetail(brand.brandCode) : null;
+      } catch (error) {
+        functions.logger.warn("giftishow brand detail sync failed", {
+          centerId,
+          brandCode: brand.brandCode,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      }
+    });
+    const mergedBrands = brandDocs.map((brand, index) =>
+      mergeGiftishowBrandDetail(brand, brandDetails[index], now)
+    );
+    const brandDetailSyncedCount = mergedBrands.filter((brand) => brand.detailSyncedAt).length;
+
+    const chunks = chunkArray(mergedProducts, GIFTISHOW_SYNC_BATCH_LIMIT);
 
     for (const chunk of chunks) {
       const batch = db.batch();
@@ -1082,8 +1230,22 @@ async function syncGiftishowCatalogForCenter(
       await batch.commit();
     }
 
+    const brandChunks = chunkArray(mergedBrands, GIFTISHOW_SYNC_BATCH_LIMIT);
+    for (const chunk of brandChunks) {
+      const batch = db.batch();
+      for (const brand of chunk) {
+        batch.set(db.doc(`centers/${centerId}/giftishowBrands/${brand.brandCode}`), brand, { merge: true });
+      }
+      await batch.commit();
+    }
+
     await runtime.settingsRef.set({
       lastCatalogSyncedAt: now,
+      lastBrandSyncedAt: now,
+      lastDetailSyncedAt: now,
+      lastBrandCount: mergedBrands.length,
+      lastDetailSyncedCount: detailSyncedCount,
+      lastBrandDetailSyncedCount: brandDetailSyncedCount,
       lastSyncStatus: "success",
       lastErrorMessage: admin.firestore.FieldValue.delete(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1091,8 +1253,11 @@ async function syncGiftishowCatalogForCenter(
     }, { merge: true });
 
     return {
-      syncedCount: productDocs.length,
-      availableCount: productDocs.filter((product) => product.isAvailable).length,
+      syncedCount: mergedProducts.length,
+      availableCount: mergedProducts.filter((product) => product.isAvailable).length,
+      brandCount: mergedBrands.length,
+      detailSyncedCount,
+      brandDetailSyncedCount,
       lastCatalogSyncedAt: now.toDate(),
       mode: client.mode,
     };
@@ -1450,37 +1615,135 @@ function normalizeGiftishowProduct(
   item: GiftishowGoodsItem,
   syncedAt: admin.firestore.Timestamp
 ): GiftishowProductDoc {
-  const goodsCode = asTrimmedString(item.goodsCode);
-  const salePrice = Math.max(0, Math.floor(parseFiniteNumber(item.salePrice) ?? 0));
-  const discountPrice = Math.max(0, Math.floor(parseFiniteNumber(item.discountPrice) ?? salePrice));
-  const stateCode = asTrimmedString(item.goodsStateCd);
+  const goodsCode = readGiftishowString(item, "goodsCode", "goods_code");
+  const salePrice = Math.max(0, Math.floor(readGiftishowNumber(item, "salePrice", "sale_price") ?? 0));
+  const discountPrice = Math.max(0, Math.floor(readGiftishowNumber(item, "discountPrice", "discount_price") ?? salePrice));
+  const stateCode = readGiftishowString(item, "goodsStateCd", "goods_state_cd");
 
   return {
     goodsCode,
-    goodsName: asTrimmedString(item.goodsName) || "기프티쇼 상품",
-    brandCode: asTrimmedString(item.brandCode) || null,
-    brandName: asTrimmedString(item.brandName) || null,
-    content: asTrimmedString(item.content) || null,
-    contentAddDesc: asTrimmedString(item.contentAddDesc) || null,
-    goodsTypeNm: asTrimmedString(item.goodsTypeNm) || null,
-    goodsTypeDtlNm: asTrimmedString(item.goodsTypeDtlNm) || null,
-    affiliate: asTrimmedString(item.affiliate) || null,
-    goodsImgS: asTrimmedString(item.goodsImgS) || null,
-    goodsImgB: asTrimmedString(item.goodsImgB) || null,
-    mmsGoodsImg: asTrimmedString(item.mmsGoodsImg) || null,
-    brandIconImg: asTrimmedString(item.brandIconImg) || null,
+    goodsName: readGiftishowString(item, "goodsName", "goods_name") || "기프티쇼 상품",
+    brandCode: readGiftishowString(item, "brandCode", "brand_code") || null,
+    brandName: readGiftishowString(item, "brandName", "brand_name") || null,
+    content: readGiftishowString(item, "content") || null,
+    contentAddDesc: readGiftishowString(item, "contentAddDesc", "content_add_desc") || null,
+    goodsTypeNm: readGiftishowString(item, "goodsTypeNm", "goods_type_nm") || null,
+    goodsTypeDtlNm: readGiftishowString(item, "goodsTypeDtlNm", "goods_type_dtl_nm") || null,
+    affiliate: readGiftishowString(item, "affiliate") || null,
+    goodsImgS: readGiftishowString(item, "goodsImgS", "goods_img_s") || null,
+    goodsImgB: readGiftishowString(item, "goodsImgB", "goods_img_b") || null,
+    mmsGoodsImg: readGiftishowString(item, "mmsGoodsImg", "mms_goods_img") || null,
+    brandIconImg: readGiftishowString(item, "brandIconImg", "brand_icon_img") || null,
     salePrice,
     discountPrice,
-    realPrice: Math.max(0, Math.floor(parseFiniteNumber(item.realPrice) ?? discountPrice)),
-    validPrdTypeCd: asTrimmedString(item.validPrdTypeCd) || null,
-    validPrdDay: asTrimmedString(item.validPrdDay) || null,
-    limitDay: Math.max(0, Math.floor(parseFiniteNumber(item.limitDay) ?? 0)),
+    realPrice: Math.max(0, Math.floor(readGiftishowNumber(item, "realPrice", "real_price") ?? discountPrice)),
+    validPrdTypeCd: readGiftishowString(item, "validPrdTypeCd", "valid_prd_type_cd") || null,
+    validPrdDay: readGiftishowString(item, "validPrdDay", "valid_prd_day") || null,
+    limitDay: Math.max(0, Math.floor(readGiftishowNumber(item, "limitDay", "limit_day") ?? 0)),
     goodsStateCd: stateCode || null,
-    mmsReserveFlag: asTrimmedString(item.mmsReserveFlag) || null,
-    mmsBarcdCreateYn: asTrimmedString(item.mmsBarcdCreateYn) || null,
+    mmsReserveFlag: readGiftishowString(item, "mmsReserveFlag", "mms_reserve_flag") || null,
+    mmsBarcdCreateYn: readGiftishowString(item, "mmsBarcdCreateYn", "mms_barcd_create_yn") || null,
     pointCost: salePrice,
     isAvailable: stateCode === "SALE" && salePrice > 0,
     lastSyncedAt: syncedAt,
+    updatedAt: syncedAt,
+  };
+}
+
+function normalizeGiftishowBrand(
+  item: GiftishowBrandItem,
+  syncedAt: admin.firestore.Timestamp
+): GiftishowBrandDoc {
+  const brandCode = readGiftishowString(item, "brandCode", "brand_code");
+  const goodsCount = Math.max(0, Math.floor(readGiftishowNumber(item, "goodsCount", "goods_count") ?? 0));
+
+  return {
+    brandCode,
+    brandName: readGiftishowString(item, "brandName", "brand_name") || brandCode || "기프티쇼 브랜드",
+    brandIconImg: readGiftishowString(item, "brandIconImg", "brand_icon_img") || null,
+    brandImg: readGiftishowString(item, "brandImg", "brand_img", "brandImage", "brand_image") || null,
+    brandDescription: readGiftishowString(item, "brandDescription", "brand_description", "description") || null,
+    goodsCount,
+    isAvailable: goodsCount > 0 || readGiftishowString(item, "useYn", "use_yn") !== "N",
+    lastSyncedAt: syncedAt,
+    updatedAt: syncedAt,
+  };
+}
+
+function mergeGiftishowProductDetail(
+  base: GiftishowProductDoc,
+  detail: GiftishowGoodsItem | null,
+  syncedAt: admin.firestore.Timestamp
+): GiftishowProductDoc {
+  if (!detail) {
+    return {
+      ...base,
+      updatedAt: syncedAt,
+    };
+  }
+
+  const detailDoc = normalizeGiftishowProduct({ ...base, ...detail }, syncedAt);
+  return {
+    ...base,
+    ...detailDoc,
+    detailSyncedAt: syncedAt,
+    updatedAt: syncedAt,
+  };
+}
+
+function buildGiftishowBrandDocs(params: {
+  brands: GiftishowBrandItem[];
+  products: GiftishowProductDoc[];
+  syncedAt: admin.firestore.Timestamp;
+}) {
+  const map = new Map<string, GiftishowBrandDoc>();
+  for (const brand of params.brands) {
+    const normalized = normalizeGiftishowBrand(brand, params.syncedAt);
+    if (!normalized.brandCode) continue;
+    map.set(normalized.brandCode, normalized);
+  }
+
+  for (const product of params.products) {
+    const brandCode = asTrimmedString(product.brandCode);
+    if (!brandCode) continue;
+    const current = map.get(brandCode);
+    const goodsCount = (current?.goodsCount ?? 0) + 1;
+    map.set(brandCode, {
+      brandCode,
+      brandName: current?.brandName || asTrimmedString(product.brandName) || brandCode,
+      brandIconImg: current?.brandIconImg || product.brandIconImg || product.goodsImgS || null,
+      brandImg: current?.brandImg || product.goodsImgB || null,
+      brandDescription: current?.brandDescription || null,
+      goodsCount,
+      isAvailable: current?.isAvailable ?? product.isAvailable,
+      lastSyncedAt: params.syncedAt,
+      detailSyncedAt: current?.detailSyncedAt || null,
+      updatedAt: params.syncedAt,
+    });
+  }
+
+  return [...map.values()].sort((left, right) => left.brandName.localeCompare(right.brandName, "ko"));
+}
+
+function mergeGiftishowBrandDetail(
+  base: GiftishowBrandDoc,
+  detail: GiftishowBrandItem | null,
+  syncedAt: admin.firestore.Timestamp
+): GiftishowBrandDoc {
+  if (!detail) {
+    return {
+      ...base,
+      updatedAt: syncedAt,
+    };
+  }
+
+  const detailDoc = normalizeGiftishowBrand({ ...base, ...detail }, syncedAt);
+  return {
+    ...base,
+    ...detailDoc,
+    goodsCount: Math.max(base.goodsCount ?? 0, detailDoc.goodsCount ?? 0),
+    isAvailable: base.isAvailable || detailDoc.isAvailable,
+    detailSyncedAt: syncedAt,
     updatedAt: syncedAt,
   };
 }
@@ -1654,6 +1917,62 @@ function asTrimmedString(value: unknown, fallback = "") {
   if (typeof value !== "string") return fallback;
   const normalized = value.trim();
   return normalized || fallback;
+}
+
+function readGiftishowString(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = asTrimmedString(record[key]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function readGiftishowNumber(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = parseFiniteNumber(record[key]);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+function findGiftishowRecords(value: unknown, keys: string[], depth = 0): Record<string, unknown>[] {
+  if (depth > 6 || value == null) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => findGiftishowRecords(item, keys, depth + 1));
+  }
+  if (!isPlainObject(value)) {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  const matches = keys.some((key) => asTrimmedString(record[key]).length > 0);
+  const nested = Object.values(record).flatMap((item) => findGiftishowRecords(item, keys, depth + 1));
+  return matches ? [record, ...nested] : nested;
+}
+
+function findFirstGiftishowRecord(value: unknown, keys: string[]) {
+  return findGiftishowRecords(value, keys)[0] || null;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+) {
+  const safeConcurrency = Math.max(1, Math.floor(concurrency));
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  await Promise.all(
+    Array.from({ length: Math.min(safeConcurrency, items.length) }, async () => {
+      while (cursor < items.length) {
+        const currentIndex = cursor++;
+        results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+      }
+    })
+  );
+
+  return results;
 }
 
 function parseFiniteNumber(value: unknown): number | null {

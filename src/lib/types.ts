@@ -1108,7 +1108,12 @@ export interface GiftishowSettings {
   userIdConfigured?: boolean;
   callbackNoConfigured?: boolean;
   lastCatalogSyncedAt?: Timestamp | null;
+  lastBrandSyncedAt?: Timestamp | null;
+  lastDetailSyncedAt?: Timestamp | null;
   lastBizmoneyBalance?: number | null;
+  lastBrandCount?: number | null;
+  lastDetailSyncedCount?: number | null;
+  lastBrandDetailSyncedCount?: number | null;
   lastSyncStatus?: GiftishowSyncStatus;
   lastErrorMessage?: string | null;
   updatedAt?: Timestamp;
@@ -1141,6 +1146,20 @@ export interface GiftishowProduct {
   pointCost: number;
   isAvailable: boolean;
   lastSyncedAt?: Timestamp | null;
+  detailSyncedAt?: Timestamp | null;
+  updatedAt?: Timestamp;
+}
+
+export interface GiftishowBrand {
+  brandCode: string;
+  brandName: string;
+  brandIconImg?: string | null;
+  brandImg?: string | null;
+  brandDescription?: string | null;
+  goodsCount?: number | null;
+  isAvailable: boolean;
+  lastSyncedAt?: Timestamp | null;
+  detailSyncedAt?: Timestamp | null;
   updatedAt?: Timestamp;
 }
 

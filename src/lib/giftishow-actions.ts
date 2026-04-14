@@ -8,6 +8,9 @@ import type { GiftishowOrder, GiftishowSettings } from '@/lib/types';
 type GiftishowProductSyncSummary = {
   syncedCount: number;
   availableCount: number;
+  brandCount: number;
+  detailSyncedCount: number;
+  brandDetailSyncedCount: number;
   lastCatalogSyncedAt: string;
   mode: 'mock' | 'live';
 };

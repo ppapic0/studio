@@ -45,7 +45,13 @@ import {
   sortGiftishowOrdersByRecent,
   sortGiftishowProducts,
 } from '@/lib/giftishow';
-import type { GiftishowOrder, GiftishowProduct, GiftishowSettings, GiftishowSyncStatus } from '@/lib/types';
+import type {
+  GiftishowBrand,
+  GiftishowOrder,
+  GiftishowProduct,
+  GiftishowSettings,
+  GiftishowSyncStatus,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type GiftishowFormState = {
@@ -239,6 +245,12 @@ export default function GiftishowSettingsPage() {
   }, [firestore, centerId, isAdmin]);
   const { data: giftishowProductsRaw } = useCollection<GiftishowProduct>(productsQuery, { enabled: isAdmin });
 
+  const brandsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(collection(firestore, 'centers', centerId, 'giftishowBrands'), limit(200));
+  }, [firestore, centerId, isAdmin]);
+  const { data: giftishowBrandsRaw } = useCollection<GiftishowBrand>(brandsQuery, { enabled: isAdmin });
+
   const ordersQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(collection(firestore, 'centers', centerId, 'giftishowOrders'), limit(200));
@@ -255,11 +267,26 @@ export default function GiftishowSettingsPage() {
   }, [settingsDoc?.enabled, settingsDoc?.bannerId, settingsDoc?.templateId]);
 
   const products = useMemo(() => sortGiftishowProducts(giftishowProductsRaw || []), [giftishowProductsRaw]);
+  const brands = useMemo(
+    () => [...(giftishowBrandsRaw || [])].sort((left, right) => (left.brandName || '').localeCompare(right.brandName || '', 'ko')),
+    [giftishowBrandsRaw]
+  );
   const orders = useMemo(() => sortGiftishowOrdersByRecent(giftishowOrdersRaw || []), [giftishowOrdersRaw]);
 
   const availableProducts = useMemo(
     () => products.filter((product) => product.isAvailable && product.goodsStateCd === 'SALE'),
     [products]
+  );
+  const detailSyncedProducts = useMemo(
+    () => products.filter((product) => Boolean(product.detailSyncedAt)).length,
+    [products]
+  );
+  const detailSyncedBrands = useMemo(() => brands.filter((brand) => Boolean(brand.detailSyncedAt)).length, [brands]);
+  const brandCount = Math.max(brands.length, Math.max(0, Number(settingsDoc?.lastBrandCount || 0)));
+  const detailSyncedCount = Math.max(detailSyncedProducts, Math.max(0, Number(settingsDoc?.lastDetailSyncedCount || 0)));
+  const brandDetailSyncedCount = Math.max(
+    detailSyncedBrands,
+    Math.max(0, Number(settingsDoc?.lastBrandDetailSyncedCount || 0))
   );
   const requestedOrders = useMemo(() => orders.filter((order) => order.status === 'requested'), [orders]);
   const deliveryOrders = useMemo(
@@ -359,14 +386,14 @@ export default function GiftishowSettingsPage() {
     try {
       const result = await syncGiftishowCatalogSecure(centerId);
       toast({
-        title: '카탈로그 동기화를 완료했습니다.',
-        description: `${result.syncedCount.toLocaleString()}개 동기화 · 판매 가능 ${result.availableCount.toLocaleString()}개 · ${result.mode.toUpperCase()}`,
+        title: '필수 API 동기화를 완료했습니다.',
+        description: `상품 ${result.syncedCount.toLocaleString()}개 · 상품 상세 ${result.detailSyncedCount.toLocaleString()}개 · 브랜드 ${result.brandCount.toLocaleString()}개 · 브랜드 상세 ${result.brandDetailSyncedCount.toLocaleString()}개 · ${result.mode.toUpperCase()}`,
       });
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: '카탈로그 동기화 실패',
-        description: getSafeErrorMessage(error, '카탈로그 동기화 중 오류가 발생했습니다.'),
+        title: '필수 API 동기화 실패',
+        description: getSafeErrorMessage(error, '필수 API 동기화 중 오류가 발생했습니다.'),
       });
     } finally {
       setIsSyncingCatalog(false);
@@ -618,11 +645,11 @@ export default function GiftishowSettingsPage() {
               운영 상태
             </CardTitle>
             <CardDescription className="font-bold text-sm">
-              비즈머니 잔액, 동기화 상태, 카탈로그 현황을 한 번에 확인합니다.
+              비즈머니와 함께 상품 목록, 상품 상세, 브랜드, 브랜드 상세 필수 API 동기화 현황을 확인합니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 p-6">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
                 <p className="text-[11px] font-black uppercase text-slate-500">카탈로그 상품</p>
                 <p className="mt-2 text-xl font-black text-slate-900">{products.length.toLocaleString()}개</p>
@@ -630,6 +657,18 @@ export default function GiftishowSettingsPage() {
               <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
                 <p className="text-[11px] font-black uppercase text-slate-500">판매 가능</p>
                 <p className="mt-2 text-xl font-black text-slate-900">{availableProducts.length.toLocaleString()}개</p>
+              </div>
+              <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-[11px] font-black uppercase text-slate-500">브랜드</p>
+                <p className="mt-2 text-xl font-black text-slate-900">{brandCount.toLocaleString()}개</p>
+              </div>
+              <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-[11px] font-black uppercase text-slate-500">상품 상세</p>
+                <p className="mt-2 text-xl font-black text-slate-900">{detailSyncedCount.toLocaleString()}개</p>
+              </div>
+              <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-[11px] font-black uppercase text-slate-500">브랜드 상세</p>
+                <p className="mt-2 text-xl font-black text-slate-900">{brandDetailSyncedCount.toLocaleString()}개</p>
               </div>
               <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
                 <p className="text-[11px] font-black uppercase text-slate-500">비즈머니</p>
@@ -648,7 +687,7 @@ export default function GiftishowSettingsPage() {
               </Button>
               <Button type="button" variant="outline" className="rounded-xl font-black" disabled={isSyncingCatalog} onClick={() => void handleSyncCatalog()}>
                 {isSyncingCatalog ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
-                카탈로그 동기화
+                필수 API 동기화
               </Button>
             </div>
 
