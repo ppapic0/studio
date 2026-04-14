@@ -11,6 +11,13 @@ const GIFTISHOW_CATALOG_PAGE_SIZE = 100;
 const GIFTISHOW_SYNC_BATCH_LIMIT = 320;
 const GIFTISHOW_SEND_TIMEOUT_MS = 14_000;
 const GIFTISHOW_MANUAL_REVIEW_THRESHOLD = 3;
+const GIFTISHOW_SECRET_NAMES = [
+  "GIFTISHOW_AUTH_CODE",
+  "GIFTISHOW_AUTH_TOKEN",
+] as const;
+const giftishowSecureFunctions = functions
+  .region(region)
+  .runWith({ secrets: [...GIFTISHOW_SECRET_NAMES] });
 
 type GiftishowDeliveryMode = "mms";
 type GiftishowSyncStatus = "idle" | "syncing" | "success" | "error";
@@ -187,6 +194,7 @@ type GiftishowRuntimeConfig = {
 
 type GiftishowSendCouponInput = {
   trId: string;
+  orderNo: string;
   goodsCode: string;
   phoneNo: string;
   mmsTitle: string;
@@ -305,11 +313,10 @@ class LiveGiftishowClient implements GiftishowClient {
   constructor(private readonly credentials: GiftishowCredentials) {}
 
   async listGoodsPage(start: number, size: number): Promise<GiftishowListGoodsPageResult> {
-    const payload = await this.postJson("/goods", {
+    const payload = await this.postForm("/goods", {
       api_code: "0101",
       custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
       custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
-      user_id: requireCredential(this.credentials.userId, "userId"),
       dev_yn: "N",
       start,
       size,
@@ -327,7 +334,7 @@ class LiveGiftishowClient implements GiftishowClient {
   }
 
   async getBizmoney(): Promise<number> {
-    const payload = await this.postJson("/bizmoney", {
+    const payload = await this.postForm("/bizmoney", {
       api_code: "0301",
       custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
       custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
@@ -350,7 +357,7 @@ class LiveGiftishowClient implements GiftishowClient {
 
     assertGiftishowSendLimits(input.trId, input.mmsTitle);
 
-    const payload = await this.postJson(
+    const payload = await this.postForm(
       "/send",
       {
         api_code: "0204",
@@ -360,6 +367,7 @@ class LiveGiftishowClient implements GiftishowClient {
         dev_yn: "N",
         gubun: "N",
         goods_code: input.goodsCode,
+        order_no: input.orderNo,
         phone_no: input.phoneNo,
         callback_no: callbackNo,
         mms_title: input.mmsTitle,
@@ -392,7 +400,7 @@ class LiveGiftishowClient implements GiftishowClient {
   }
 
   async getCoupon(trId: string): Promise<GiftishowCouponLookupResult> {
-    const payload = await this.postJson("/coupons", {
+    const payload = await this.postForm("/coupons", {
       api_code: "0201",
       custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
       custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
@@ -410,12 +418,26 @@ class LiveGiftishowClient implements GiftishowClient {
       throw new GiftishowProviderError(topLevelCode, resolveGiftishowMessage(payload, "쿠폰 조회에 실패했습니다."));
     }
 
-    const result = asRecord(payload.result) || payload;
-    const list = Array.isArray(result.couponInfoList)
-      ? result.couponInfoList.filter((item): item is Record<string, unknown> => isPlainObject(item))
-      : Array.isArray(payload.couponInfoList)
-        ? payload.couponInfoList.filter((item): item is Record<string, unknown> => isPlainObject(item))
-        : [];
+    const resultRoot = payload.result;
+    const resultRow = Array.isArray(resultRoot)
+      ? resultRoot.find((item): item is Record<string, unknown> => isPlainObject(item)) || null
+      : asRecord(resultRoot);
+    const nestedCode = resultRow ? resolveGiftishowCode(resultRow) : null;
+    if (nestedCode && nestedCode !== "0000") {
+      const notFoundCodes = new Set(["ERR0204", "ERR0212", "NO_DATA"]);
+      if (notFoundCodes.has(nestedCode)) {
+        return { found: false };
+      }
+      throw new GiftishowProviderError(
+        nestedCode,
+        resolveGiftishowMessage(resultRow || payload, "쿠폰 조회에 실패했습니다.")
+      );
+    }
+
+    const couponInfoSource =
+      (resultRow && Array.isArray(resultRow.couponInfoList) ? resultRow.couponInfoList : null)
+      || (Array.isArray(payload.couponInfoList) ? payload.couponInfoList : []);
+    const list = couponInfoSource.filter((item): item is Record<string, unknown> => isPlainObject(item));
 
     const first = list[0];
     if (!first) {
@@ -436,7 +458,7 @@ class LiveGiftishowClient implements GiftishowClient {
   }
 
   async cancelCoupon(trId: string): Promise<{ alreadyCancelled?: boolean }> {
-    const payload = await this.postJson("/cancel", {
+    const payload = await this.postForm("/cancel", {
       api_code: "0202",
       custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
       custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
@@ -456,19 +478,20 @@ class LiveGiftishowClient implements GiftishowClient {
   }
 
   async resendCoupon(trId: string): Promise<void> {
-    const payload = await this.postJson("/resend", {
+    const payload = await this.postForm("/resend", {
       api_code: "0203",
       custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
       custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
       user_id: requireCredential(this.credentials.userId, "userId"),
       dev_yn: "N",
       tr_id: trId,
+      sms_flag: "N",
     });
 
     assertGiftishowSuccess(payload, "쿠폰 재전송");
   }
 
-  private async postJson(
+  private async postForm(
     path: string,
     payload: Record<string, unknown>,
     timeoutMs = 10_000
@@ -480,10 +503,10 @@ class LiveGiftishowClient implements GiftishowClient {
       const response = await fetch(`${GIFTISHOW_BASE_URL}${path}`, {
         method: "POST",
         headers: {
-          "content-type": "application/json",
+          "content-type": "application/x-www-form-urlencoded",
           accept: "application/json",
         },
-        body: JSON.stringify(cleanUndefinedValues(payload)),
+        body: toGiftishowFormBody(payload),
         signal: controller.signal,
       });
 
@@ -515,7 +538,7 @@ class LiveGiftishowClient implements GiftishowClient {
   }
 }
 
-export const saveGiftishowSettingsSecure = functions.region(region).https.onCall(async (data, context) => {
+export const saveGiftishowSettingsSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth?.uid) {
@@ -535,8 +558,8 @@ export const saveGiftishowSettingsSecure = functions.region(region).https.onCall
   const currentPublic = (publicSnap.exists ? publicSnap.data() : {}) as GiftishowSettingsDoc;
   const currentPrivate = (privateSnap.exists ? privateSnap.data() : {}) as GiftishowSecretDoc;
 
-  const authCode = asTrimmedString(data?.authCode) || asTrimmedString(currentPrivate.authCode);
-  const authToken = asTrimmedString(data?.authToken) || asTrimmedString(currentPrivate.authToken);
+  const authCode = getGiftishowRuntimeSecret("GIFTISHOW_AUTH_CODE") || asTrimmedString(currentPrivate.authCode);
+  const authToken = getGiftishowRuntimeSecret("GIFTISHOW_AUTH_TOKEN") || asTrimmedString(currentPrivate.authToken);
   const userId = asTrimmedString(data?.userId) || asTrimmedString(currentPrivate.userId);
   const callbackNo = normalizePhoneNumber(asTrimmedString(data?.callbackNo) || asTrimmedString(currentPrivate.callbackNo));
 
@@ -560,10 +583,10 @@ export const saveGiftishowSettingsSecure = functions.region(region).https.onCall
   const batch = db.batch();
   batch.set(publicRef, payload, { merge: true });
   batch.set(privateRef, {
-    ...(asTrimmedString(data?.authCode) ? { authCode: asTrimmedString(data?.authCode) } : {}),
-    ...(asTrimmedString(data?.authToken) ? { authToken: asTrimmedString(data?.authToken) } : {}),
     ...(asTrimmedString(data?.userId) ? { userId: asTrimmedString(data?.userId) } : {}),
     ...(normalizePhoneNumber(data?.callbackNo) ? { callbackNo: normalizePhoneNumber(data?.callbackNo) } : {}),
+    ...(asTrimmedString(currentPrivate.authCode) ? { authCode: admin.firestore.FieldValue.delete() } : {}),
+    ...(asTrimmedString(currentPrivate.authToken) ? { authToken: admin.firestore.FieldValue.delete() } : {}),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedBy: context.auth.uid,
   }, { merge: true });
@@ -578,7 +601,7 @@ export const saveGiftishowSettingsSecure = functions.region(region).https.onCall
   };
 });
 
-export const syncGiftishowCatalogSecure = functions.region(region).https.onCall(async (data, context) => {
+export const syncGiftishowCatalogSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth?.uid) {
@@ -600,8 +623,7 @@ export const syncGiftishowCatalogSecure = functions.region(region).https.onCall(
   };
 });
 
-export const scheduledGiftishowCatalogSync = functions
-  .region(region)
+export const scheduledGiftishowCatalogSync = giftishowSecureFunctions
   .pubsub.schedule("20 4 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -627,7 +649,7 @@ export const scheduledGiftishowCatalogSync = functions
     return null;
   });
 
-export const getGiftishowBizmoneySecure = functions.region(region).https.onCall(async (data, context) => {
+export const getGiftishowBizmoneySecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth?.uid) {
@@ -724,7 +746,7 @@ export const createGiftishowOrderRequestSecure = functions.region(region).https.
   };
 });
 
-export const approveGiftishowOrderSecure = functions.region(region).https.onCall(async (data, context) => {
+export const approveGiftishowOrderSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth?.uid) {
@@ -784,6 +806,7 @@ export const approveGiftishowOrderSecure = functions.region(region).https.onCall
   try {
     const sendResult = await client.sendCoupon({
       trId,
+      orderNo: orderId,
       goodsCode: approvedOrder.goodsCode,
       phoneNo: studentContext.phoneNumber,
       mmsTitle,
@@ -882,7 +905,7 @@ export const rejectGiftishowOrderSecure = functions.region(region).https.onCall(
   };
 });
 
-export const cancelGiftishowOrderSecure = functions.region(region).https.onCall(async (data, context) => {
+export const cancelGiftishowOrderSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth?.uid) {
@@ -933,7 +956,7 @@ export const cancelGiftishowOrderSecure = functions.region(region).https.onCall(
   };
 });
 
-export const resendGiftishowOrderSecure = functions.region(region).https.onCall(async (data, context) => {
+export const resendGiftishowOrderSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth?.uid) {
@@ -983,8 +1006,7 @@ export const resendGiftishowOrderSecure = functions.region(region).https.onCall(
   };
 });
 
-export const reconcilePendingGiftishowOrders = functions
-  .region(region)
+export const reconcilePendingGiftishowOrders = giftishowSecureFunctions
   .pubsub.schedule("every 10 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1315,10 +1337,16 @@ async function loadGiftishowRuntimeConfig(
     settingsRef.get(),
     db.doc(`centers/${centerId}/settingsPrivate/giftishowSecret`).get(),
   ]);
+  const legacySecrets = (secretSnap.exists ? secretSnap.data() : {}) as GiftishowSecretDoc;
 
   return {
     settings: (settingsSnap.exists ? settingsSnap.data() : {}) as GiftishowSettingsDoc,
-    secrets: (secretSnap.exists ? secretSnap.data() : {}) as GiftishowSecretDoc,
+    secrets: {
+      authCode: getGiftishowRuntimeSecret("GIFTISHOW_AUTH_CODE") || asTrimmedString(legacySecrets.authCode),
+      authToken: getGiftishowRuntimeSecret("GIFTISHOW_AUTH_TOKEN") || asTrimmedString(legacySecrets.authToken),
+      userId: asTrimmedString(legacySecrets.userId),
+      callbackNo: asTrimmedString(legacySecrets.callbackNo),
+    },
     mode: shouldUseMockGiftishowProvider() ? "mock" : "live",
     settingsRef,
   };
@@ -1540,6 +1568,10 @@ function normalizePointEvents(value: unknown): GiftishowOrderPointEvent[] {
     }));
 }
 
+function getGiftishowRuntimeSecret(name: typeof GIFTISHOW_SECRET_NAMES[number]) {
+  return asTrimmedString(process.env[name]);
+}
+
 function shouldUseMockGiftishowProvider() {
   const providerMode = asTrimmedString(process.env.GIFTISHOW_PROVIDER_MODE).toLowerCase();
   if (providerMode === "mock") return true;
@@ -1561,6 +1593,15 @@ function requireCredential(value: string | undefined, field: string) {
 
 function cleanUndefinedValues(payload: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+}
+
+function toGiftishowFormBody(payload: Record<string, unknown>) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(cleanUndefinedValues(payload))) {
+    if (value === null) continue;
+    params.append(key, String(value));
+  }
+  return params.toString();
 }
 
 function safeParseJson(value: string) {

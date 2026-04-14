@@ -52,8 +52,6 @@ type GiftishowFormState = {
   enabled: boolean;
   bannerId: string;
   templateId: string;
-  authCode: string;
-  authToken: string;
   userId: string;
   callbackNo: string;
 };
@@ -71,8 +69,6 @@ const DEFAULT_FORM: GiftishowFormState = {
   enabled: false,
   bannerId: '',
   templateId: '',
-  authCode: '',
-  authToken: '',
   userId: '',
   callbackNo: '',
 };
@@ -331,23 +327,19 @@ export default function GiftishowSettingsPage() {
         enabled: form.enabled,
         bannerId: form.bannerId.trim(),
         templateId: form.templateId.trim(),
-        authCode: form.authCode.trim(),
-        authToken: form.authToken.trim(),
         userId: form.userId.trim(),
         callbackNo: form.callbackNo.trim(),
       });
 
       setForm((current) => ({
         ...current,
-        authCode: '',
-        authToken: '',
         userId: '',
         callbackNo: '',
       }));
 
       toast({
         title: '기프티쇼 설정을 저장했습니다.',
-        description: '비밀값은 저장 여부만 표시되고, 입력창은 보안상 비워졌습니다.',
+        description: '서버 시크릿 상태와 발송 정보를 안전하게 저장했습니다.',
       });
     } catch (error) {
       toast({
@@ -581,7 +573,7 @@ export default function GiftishowSettingsPage() {
               ))}
             </div>
             <p className="mt-3 text-xs font-bold leading-5 text-slate-500">
-              비밀값은 저장 여부만 표시합니다. 이미 저장된 값은 다시 노출되지 않으며, 새 값 입력 시에만 덮어씁니다.
+              인증 Key와 Token Key는 서버 시크릿에만 보관됩니다. 이 화면에서는 저장 여부만 확인하고, 센터별 발송 정보만 별도로 관리합니다.
             </p>
           </div>
         </CardContent>
@@ -589,32 +581,12 @@ export default function GiftishowSettingsPage() {
 
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
-          <CardTitle className="text-xl font-black tracking-tight">인증 정보 입력</CardTitle>
+          <CardTitle className="text-xl font-black tracking-tight">발송 정보 입력</CardTitle>
           <CardDescription className="font-bold text-sm">
-            상용 발급값을 입력하면 live 모드로 전환되고, 로컬/테스트에서는 mock 모드 응답을 재현합니다.
+            상용 인증키는 서버 시크릿에서만 읽습니다. 여기서는 센터별 `user_id`, `callback_no`만 저장합니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 p-6 lg:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="giftishow-auth-code" className="text-[11px] font-black uppercase text-muted-foreground">인증 Key</Label>
-            <Input
-              id="giftishow-auth-code"
-              value={form.authCode}
-              onChange={(event) => updateField('authCode', event.target.value)}
-              placeholder="DEV..."
-              className="h-11 rounded-xl border-2 font-bold"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="giftishow-auth-token" className="text-[11px] font-black uppercase text-muted-foreground">Token Key</Label>
-            <Input
-              id="giftishow-auth-token"
-              value={form.authToken}
-              onChange={(event) => updateField('authToken', event.target.value)}
-              placeholder="example-token"
-              className="h-11 rounded-xl border-2 font-bold"
-            />
-          </div>
           <div className="space-y-2">
             <Label htmlFor="giftishow-user-id" className="text-[11px] font-black uppercase text-muted-foreground">user_id</Label>
             <Input

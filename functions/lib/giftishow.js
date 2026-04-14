@@ -45,6 +45,13 @@ const GIFTISHOW_CATALOG_PAGE_SIZE = 100;
 const GIFTISHOW_SYNC_BATCH_LIMIT = 320;
 const GIFTISHOW_SEND_TIMEOUT_MS = 14000;
 const GIFTISHOW_MANUAL_REVIEW_THRESHOLD = 3;
+const GIFTISHOW_SECRET_NAMES = [
+    "GIFTISHOW_AUTH_CODE",
+    "GIFTISHOW_AUTH_TOKEN",
+];
+const giftishowSecureFunctions = functions
+    .region(region)
+    .runWith({ secrets: [...GIFTISHOW_SECRET_NAMES] });
 class GiftishowProviderError extends Error {
     constructor(code, message, retryable = false) {
         super(message);
@@ -137,11 +144,10 @@ class LiveGiftishowClient {
     }
     async listGoodsPage(start, size) {
         var _a;
-        const payload = await this.postJson("/goods", {
+        const payload = await this.postForm("/goods", {
             api_code: "0101",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
-            user_id: requireCredential(this.credentials.userId, "userId"),
             dev_yn: "N",
             start,
             size,
@@ -156,7 +162,7 @@ class LiveGiftishowClient {
     }
     async getBizmoney() {
         var _a, _b;
-        const payload = await this.postJson("/bizmoney", {
+        const payload = await this.postForm("/bizmoney", {
             api_code: "0301",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
@@ -174,7 +180,7 @@ class LiveGiftishowClient {
     async sendCoupon(input) {
         const callbackNo = requireCredential(this.credentials.callbackNo, "callbackNo");
         assertGiftishowSendLimits(input.trId, input.mmsTitle);
-        const payload = await this.postJson("/send", {
+        const payload = await this.postForm("/send", {
             api_code: "0204",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
@@ -182,6 +188,7 @@ class LiveGiftishowClient {
             dev_yn: "N",
             gubun: "N",
             goods_code: input.goodsCode,
+            order_no: input.orderNo,
             phone_no: input.phoneNo,
             callback_no: callbackNo,
             mms_title: input.mmsTitle,
@@ -208,7 +215,7 @@ class LiveGiftishowClient {
         };
     }
     async getCoupon(trId) {
-        const payload = await this.postJson("/coupons", {
+        const payload = await this.postForm("/coupons", {
             api_code: "0201",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
@@ -224,12 +231,21 @@ class LiveGiftishowClient {
             }
             throw new GiftishowProviderError(topLevelCode, resolveGiftishowMessage(payload, "쿠폰 조회에 실패했습니다."));
         }
-        const result = asRecord(payload.result) || payload;
-        const list = Array.isArray(result.couponInfoList)
-            ? result.couponInfoList.filter((item) => isPlainObject(item))
-            : Array.isArray(payload.couponInfoList)
-                ? payload.couponInfoList.filter((item) => isPlainObject(item))
-                : [];
+        const resultRoot = payload.result;
+        const resultRow = Array.isArray(resultRoot)
+            ? resultRoot.find((item) => isPlainObject(item)) || null
+            : asRecord(resultRoot);
+        const nestedCode = resultRow ? resolveGiftishowCode(resultRow) : null;
+        if (nestedCode && nestedCode !== "0000") {
+            const notFoundCodes = new Set(["ERR0204", "ERR0212", "NO_DATA"]);
+            if (notFoundCodes.has(nestedCode)) {
+                return { found: false };
+            }
+            throw new GiftishowProviderError(nestedCode, resolveGiftishowMessage(resultRow || payload, "쿠폰 조회에 실패했습니다."));
+        }
+        const couponInfoSource = (resultRow && Array.isArray(resultRow.couponInfoList) ? resultRow.couponInfoList : null)
+            || (Array.isArray(payload.couponInfoList) ? payload.couponInfoList : []);
+        const list = couponInfoSource.filter((item) => isPlainObject(item));
         const first = list[0];
         if (!first) {
             return { found: false };
@@ -247,7 +263,7 @@ class LiveGiftishowClient {
         };
     }
     async cancelCoupon(trId) {
-        const payload = await this.postJson("/cancel", {
+        const payload = await this.postForm("/cancel", {
             api_code: "0202",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
@@ -265,27 +281,28 @@ class LiveGiftishowClient {
         throw new GiftishowProviderError(code || "CANCEL_FAILED", resolveGiftishowMessage(payload, "쿠폰 취소에 실패했습니다."));
     }
     async resendCoupon(trId) {
-        const payload = await this.postJson("/resend", {
+        const payload = await this.postForm("/resend", {
             api_code: "0203",
             custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
             custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
             user_id: requireCredential(this.credentials.userId, "userId"),
             dev_yn: "N",
             tr_id: trId,
+            sms_flag: "N",
         });
         assertGiftishowSuccess(payload, "쿠폰 재전송");
     }
-    async postJson(path, payload, timeoutMs = 10000) {
+    async postForm(path, payload, timeoutMs = 10000) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         try {
             const response = await fetch(`${GIFTISHOW_BASE_URL}${path}`, {
                 method: "POST",
                 headers: {
-                    "content-type": "application/json",
+                    "content-type": "application/x-www-form-urlencoded",
                     accept: "application/json",
                 },
-                body: JSON.stringify(cleanUndefinedValues(payload)),
+                body: toGiftishowFormBody(payload),
                 signal: controller.signal,
             });
             const text = await response.text();
@@ -309,7 +326,7 @@ class LiveGiftishowClient {
         }
     }
 }
-exports.saveGiftishowSettingsSecure = functions.region(region).https.onCall(async (data, context) => {
+exports.saveGiftishowSettingsSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
     var _a, _b, _c;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -325,8 +342,8 @@ exports.saveGiftishowSettingsSecure = functions.region(region).https.onCall(asyn
     const [publicSnap, privateSnap] = await Promise.all([publicRef.get(), privateRef.get()]);
     const currentPublic = (publicSnap.exists ? publicSnap.data() : {});
     const currentPrivate = (privateSnap.exists ? privateSnap.data() : {});
-    const authCode = asTrimmedString(data === null || data === void 0 ? void 0 : data.authCode) || asTrimmedString(currentPrivate.authCode);
-    const authToken = asTrimmedString(data === null || data === void 0 ? void 0 : data.authToken) || asTrimmedString(currentPrivate.authToken);
+    const authCode = getGiftishowRuntimeSecret("GIFTISHOW_AUTH_CODE") || asTrimmedString(currentPrivate.authCode);
+    const authToken = getGiftishowRuntimeSecret("GIFTISHOW_AUTH_TOKEN") || asTrimmedString(currentPrivate.authToken);
     const userId = asTrimmedString(data === null || data === void 0 ? void 0 : data.userId) || asTrimmedString(currentPrivate.userId);
     const callbackNo = normalizePhoneNumber(asTrimmedString(data === null || data === void 0 ? void 0 : data.callbackNo) || asTrimmedString(currentPrivate.callbackNo));
     const payload = {
@@ -347,14 +364,14 @@ exports.saveGiftishowSettingsSecure = functions.region(region).https.onCall(asyn
     };
     const batch = db.batch();
     batch.set(publicRef, payload, { merge: true });
-    batch.set(privateRef, Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (asTrimmedString(data === null || data === void 0 ? void 0 : data.authCode) ? { authCode: asTrimmedString(data === null || data === void 0 ? void 0 : data.authCode) } : {})), (asTrimmedString(data === null || data === void 0 ? void 0 : data.authToken) ? { authToken: asTrimmedString(data === null || data === void 0 ? void 0 : data.authToken) } : {})), (asTrimmedString(data === null || data === void 0 ? void 0 : data.userId) ? { userId: asTrimmedString(data === null || data === void 0 ? void 0 : data.userId) } : {})), (normalizePhoneNumber(data === null || data === void 0 ? void 0 : data.callbackNo) ? { callbackNo: normalizePhoneNumber(data === null || data === void 0 ? void 0 : data.callbackNo) } : {})), { updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: context.auth.uid }), { merge: true });
+    batch.set(privateRef, Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (asTrimmedString(data === null || data === void 0 ? void 0 : data.userId) ? { userId: asTrimmedString(data === null || data === void 0 ? void 0 : data.userId) } : {})), (normalizePhoneNumber(data === null || data === void 0 ? void 0 : data.callbackNo) ? { callbackNo: normalizePhoneNumber(data === null || data === void 0 ? void 0 : data.callbackNo) } : {})), (asTrimmedString(currentPrivate.authCode) ? { authCode: admin.firestore.FieldValue.delete() } : {})), (asTrimmedString(currentPrivate.authToken) ? { authToken: admin.firestore.FieldValue.delete() } : {})), { updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: context.auth.uid }), { merge: true });
     await batch.commit();
     return {
         ok: true,
         settings: Object.assign(Object.assign({}, payload), { updatedAt: undefined }),
     };
 });
-exports.syncGiftishowCatalogSecure = functions.region(region).https.onCall(async (data, context) => {
+exports.syncGiftishowCatalogSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -373,8 +390,7 @@ exports.syncGiftishowCatalogSecure = functions.region(region).https.onCall(async
         mode: result.mode,
     };
 });
-exports.scheduledGiftishowCatalogSync = functions
-    .region(region)
+exports.scheduledGiftishowCatalogSync = giftishowSecureFunctions
     .pubsub.schedule("20 4 * * *")
     .timeZone("Asia/Seoul")
     .onRun(async () => {
@@ -398,7 +414,7 @@ exports.scheduledGiftishowCatalogSync = functions
     }
     return null;
 });
-exports.getGiftishowBizmoneySecure = functions.region(region).https.onCall(async (data, context) => {
+exports.getGiftishowBizmoneySecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -481,7 +497,7 @@ exports.createGiftishowOrderRequestSecure = functions.region(region).https.onCal
         order: serializeOrder(orderRef.id, orderPayload),
     };
 });
-exports.approveGiftishowOrderSecure = functions.region(region).https.onCall(async (data, context) => {
+exports.approveGiftishowOrderSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -533,6 +549,7 @@ exports.approveGiftishowOrderSecure = functions.region(region).https.onCall(asyn
     try {
         const sendResult = await client.sendCoupon({
             trId,
+            orderNo: orderId,
             goodsCode: approvedOrder.goodsCode,
             phoneNo: studentContext.phoneNumber,
             mmsTitle,
@@ -614,7 +631,7 @@ exports.rejectGiftishowOrderSecure = functions.region(region).https.onCall(async
         order: serializeOrder(orderId, order),
     };
 });
-exports.cancelGiftishowOrderSecure = functions.region(region).https.onCall(async (data, context) => {
+exports.cancelGiftishowOrderSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -658,7 +675,7 @@ exports.cancelGiftishowOrderSecure = functions.region(region).https.onCall(async
         order: nextOrder,
     };
 });
-exports.resendGiftishowOrderSecure = functions.region(region).https.onCall(async (data, context) => {
+exports.resendGiftishowOrderSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -697,8 +714,7 @@ exports.resendGiftishowOrderSecure = functions.region(region).https.onCall(async
         order: serializeOrder(orderId, nextOrder),
     };
 });
-exports.reconcilePendingGiftishowOrders = functions
-    .region(region)
+exports.reconcilePendingGiftishowOrders = giftishowSecureFunctions
     .pubsub.schedule("every 10 minutes")
     .timeZone("Asia/Seoul")
     .onRun(async () => {
@@ -878,9 +894,15 @@ async function loadGiftishowRuntimeConfig(db, centerId) {
         settingsRef.get(),
         db.doc(`centers/${centerId}/settingsPrivate/giftishowSecret`).get(),
     ]);
+    const legacySecrets = (secretSnap.exists ? secretSnap.data() : {});
     return {
         settings: (settingsSnap.exists ? settingsSnap.data() : {}),
-        secrets: (secretSnap.exists ? secretSnap.data() : {}),
+        secrets: {
+            authCode: getGiftishowRuntimeSecret("GIFTISHOW_AUTH_CODE") || asTrimmedString(legacySecrets.authCode),
+            authToken: getGiftishowRuntimeSecret("GIFTISHOW_AUTH_TOKEN") || asTrimmedString(legacySecrets.authToken),
+            userId: asTrimmedString(legacySecrets.userId),
+            callbackNo: asTrimmedString(legacySecrets.callbackNo),
+        },
         mode: shouldUseMockGiftishowProvider() ? "mock" : "live",
         settingsRef,
     };
@@ -1045,6 +1067,9 @@ function normalizePointEvents(value) {
         });
     });
 }
+function getGiftishowRuntimeSecret(name) {
+    return asTrimmedString(process.env[name]);
+}
 function shouldUseMockGiftishowProvider() {
     const providerMode = asTrimmedString(process.env.GIFTISHOW_PROVIDER_MODE).toLowerCase();
     if (providerMode === "mock")
@@ -1065,6 +1090,15 @@ function requireCredential(value, field) {
 }
 function cleanUndefinedValues(payload) {
     return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+}
+function toGiftishowFormBody(payload) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(cleanUndefinedValues(payload))) {
+        if (value === null)
+            continue;
+        params.append(key, String(value));
+    }
+    return params.toString();
 }
 function safeParseJson(value) {
     try {

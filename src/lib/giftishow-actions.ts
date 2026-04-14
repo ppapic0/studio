@@ -17,8 +17,6 @@ type GiftishowSettingsSaveInput = {
   enabled: boolean;
   bannerId?: string;
   templateId?: string;
-  authCode?: string;
-  authToken?: string;
   userId?: string;
   callbackNo?: string;
 };
