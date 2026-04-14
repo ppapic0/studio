@@ -266,54 +266,6 @@ function formatStudyDurationWithSeconds(totalSecs: number) {
   return `${mins}분 ${secs.toString().padStart(2, '0')}초`;
 }
 
-function formatAdmissionYearLabel(grade?: string | null, referenceDate?: Date | null) {
-  const normalized = (grade ?? '').trim();
-  if (!normalized) return null;
-
-  const safeReferenceDate = referenceDate ?? new Date();
-  const baseYear = safeReferenceDate.getFullYear() % 100;
-  const toLabel = (offset: number) => `${String((baseYear + offset + 100) % 100).padStart(2, '0')}학번`;
-
-  if (normalized.includes('고1')) return toLabel(3);
-  if (normalized.includes('고2')) return toLabel(2);
-  if (normalized.includes('고3')) return toLabel(1);
-  if (normalized.includes('N수') || normalized.includes('재수')) return toLabel(1);
-  return null;
-}
-
-function resolveGoalTrackCopy({
-  goalPathType,
-  goalPathLabel,
-  themeKey,
-}: {
-  goalPathType: 'school' | 'job';
-  goalPathLabel: string;
-  themeKey?: SupportedUniversityThemeKey | null;
-}) {
-  const trimmedGoal = goalPathLabel.trim();
-  if (goalPathType === 'job') {
-    return {
-      schoolLabel: '',
-      trackLabel: trimmedGoal || '진로',
-    };
-  }
-
-  const theme = themeKey ? UNIVERSITY_THEMES[themeKey] : null;
-  const aliases = theme ? [theme.label, theme.shortLabel, ...theme.aliases].sort((a, b) => b.length - a.length) : [];
-  const matchedAlias = aliases.find((alias) => trimmedGoal.startsWith(alias));
-  const schoolLabel = matchedAlias || theme?.label || trimmedGoal.split(/\s+/)[0] || '희망학교';
-  const strippedTrackLabel = matchedAlias
-    ? trimmedGoal.slice(matchedAlias.length).trim()
-    : trimmedGoal.startsWith(`${schoolLabel} `)
-      ? trimmedGoal.slice(schoolLabel.length).trim()
-      : trimmedGoal;
-
-  return {
-    schoolLabel,
-    trackLabel: strippedTrackLabel || schoolLabel,
-  };
-}
-
 function toTimestampMillis(value?: Timestamp | null) {
   if (!value || typeof value.toMillis !== 'function') return 0;
   return value.toMillis();
@@ -1862,31 +1814,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   );
   const homeFocusExamLabel = primaryExamCountdown?.dLabel || 'D-day 미설정';
   const homeGoalTypeLabel = resolvedGoalPathType === 'job' ? '희망 직업' : '희망 학교';
-  const homeGoalLabel = resolvedGoalPathLabel.trim() || homeGoalTypeLabel;
-  const homeAdmissionYearLabel = useMemo(
-    () => formatAdmissionYearLabel(studentProfile?.grade, today),
-    [studentProfile?.grade, today]
-  );
-  const homeTrackCopy = useMemo(
-    () =>
-      resolveGoalTrackCopy({
-        goalPathType: resolvedGoalPathType,
-        goalPathLabel: homeGoalLabel,
-        themeKey: resolvedUniversityThemeKey,
-      }),
-    [homeGoalLabel, resolvedGoalPathType, resolvedUniversityThemeKey]
-  );
-  const homeWelcomeLabel = useMemo(() => {
-    const admissionLabel = homeAdmissionYearLabel ? ` ${homeAdmissionYearLabel}` : '';
-    if (resolvedGoalPathType === 'job') {
-      return `${homeTrackCopy.trackLabel}${admissionLabel} 트랙에 오신 걸 환영합니다.`;
-    }
-
-    const schoolLabel = homeTrackCopy.schoolLabel || '희망학교';
-    const trackLabel = homeTrackCopy.trackLabel;
-    const trackSegment = trackLabel && trackLabel !== schoolLabel ? ` ${trackLabel} 트랙에` : ' 트랙에';
-    return `${schoolLabel}${admissionLabel}${trackSegment} 오신 걸 환영합니다.`;
-  }, [homeAdmissionYearLabel, homeTrackCopy.schoolLabel, homeTrackCopy.trackLabel, resolvedGoalPathType]);
+  const homeWelcomeTargetLabel = resolvedGoalPathLabel.trim() || homeGoalTypeLabel;
+  const homeStudentName = user?.displayName || activeMembership?.displayName || '학생';
   const homeFocusSummaryLabel = `모의고사 ${homeFocusExamLabel} · 설정하기`;
 
   const subjectProgress = useMemo(() => {
@@ -3456,7 +3385,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         arrivalCount={homeArrivalCount}
         todayStudyLabel={formatMinutesToKorean(totalMinutesCount)}
         growthDeltaPercent={studyVsYesterday}
-        homeWelcomeLabel={homeWelcomeLabel}
+        homeWelcomeTargetLabel={homeWelcomeTargetLabel}
+        homeStudentName={homeStudentName}
         homeFocusSummaryLabel={homeFocusSummaryLabel}
         onOpenFocusEditor={() => setIsExamDialogOpen(true)}
         dailyPointStatus={progress?.dailyPointStatus}

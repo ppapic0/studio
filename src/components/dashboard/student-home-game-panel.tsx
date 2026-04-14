@@ -501,7 +501,8 @@ export function StudentHomeGamePanel({
   todayStudyLabel,
   growthDeltaPercent,
   todayOpenedBoxCount,
-  homeWelcomeLabel,
+  homeWelcomeTargetLabel,
+  homeStudentName,
   homeFocusSummaryLabel,
   onOpenFocusEditor,
   dailyPointStatus,
@@ -550,7 +551,8 @@ export function StudentHomeGamePanel({
   todayStudyLabel: string;
   growthDeltaPercent: number;
   todayOpenedBoxCount: number;
-  homeWelcomeLabel: string;
+  homeWelcomeTargetLabel: string;
+  homeStudentName: string;
   homeFocusSummaryLabel: string;
   onOpenFocusEditor: () => void;
   dailyPointStatus?: GrowthProgress["dailyPointStatus"];
@@ -577,6 +579,7 @@ export function StudentHomeGamePanel({
   nextCountdownLabel: string;
   }) {
   const homeFocusDetailLabel = [dateLabel, homeFocusSummaryLabel].filter(Boolean).join(" · ");
+  const homeWelcomeLineLabel = `${homeWelcomeTargetLabel} ${homeStudentName}님`.trim();
   const maxTrend = weeklyTrend.reduce((max, item) => Math.max(max, item.minutes), 1);
   const trendAxisMarks = [1, 0.75, 0.5, 0.25].map((ratio, index) => {
     const minutes = Math.max(1, Math.round(maxTrend * ratio));
@@ -633,24 +636,37 @@ export function StudentHomeGamePanel({
         ) : null}
         <div className={cn("relative z-10", isMobile ? "space-y-4" : "space-y-5")}>
           <div className="space-y-2">
-            <div className={cn("max-w-full break-keep font-black tracking-tight text-[var(--text-primary)]", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
-              {homeWelcomeLabel}
+            <div className={cn(
+              "rounded-[1.45rem] border border-[color:var(--border-subtle)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,var(--bg-surface-2)_100%)] shadow-[0_18px_34px_-28px_rgba(19,50,107,0.2)]",
+              isMobile ? "px-4 py-4" : "px-5 py-4"
+            )}>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <div className={cn("max-w-full break-keep font-black tracking-tight text-[var(--text-primary)]", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
+                    {homeWelcomeLineLabel}
+                  </div>
+                  <div className={cn("max-w-full break-keep font-black tracking-tight text-[var(--text-primary)]", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
+                    <span className="text-[var(--text-accent-fixed)]">트랙</span>
+                    <span>에 오신 걸 환영합니다!</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onOpenFocusEditor}
+                  title={homeFocusDetailLabel}
+                  className={cn(
+                    "group inline-flex max-w-full items-center gap-2 rounded-full text-left transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]",
+                    isMobile ? "pr-1" : "pr-1.5"
+                  )}
+                >
+                  <span className={cn("truncate font-black text-[var(--text-primary)]", isMobile ? "text-[11px]" : "text-[12px]")}>
+                    {homeFocusDetailLabel}
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] transition-transform duration-200 group-hover:translate-x-0.5" />
+                  <span className="sr-only">{homeFocusDetailLabel}</span>
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={onOpenFocusEditor}
-              title={homeFocusDetailLabel}
-              className={cn(
-                "group inline-flex max-w-full items-center gap-2 rounded-full text-left transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]",
-                isMobile ? "pr-1" : "pr-1.5"
-              )}
-            >
-              <span className={cn("truncate font-black text-[var(--text-primary)]", isMobile ? "text-[11px]" : "text-[12px]")}>
-                {homeFocusDetailLabel}
-              </span>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] transition-transform duration-200 group-hover:translate-x-0.5" />
-              <span className="sr-only">{homeFocusDetailLabel}</span>
-            </button>
             {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
           </div>
 

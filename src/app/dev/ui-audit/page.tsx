@@ -133,7 +133,8 @@ export default function UiAuditPage() {
           arrivalCount={2}
           todayStudyLabel="12시간 10분"
           todayOpenedBoxCount={3}
-          homeWelcomeLabel="경희대학교 27학번 국어국문학과 트랙에 오신 걸 환영합니다."
+          homeWelcomeTargetLabel="경희대학교 국어국문학과"
+          homeStudentName="김재윤"
           homeFocusSummaryLabel="모의고사 D-18 · 설정하기"
           onOpenFocusEditor={() => undefined}
           quests={[
