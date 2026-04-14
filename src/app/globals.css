@@ -4872,10 +4872,15 @@ select {
   overflow: hidden;
   border-radius: 2rem;
   padding: 1.25rem;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(circle at top, rgba(120, 187, 255, 0.14), transparent 42%),
+    linear-gradient(180deg, #224486 0%, #14295f 52%, #0d1c45 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.14) inset,
+    0 28px 56px -30px rgba(7, 17, 44, 0.58),
+    0 0 0 1px rgba(102, 185, 255, 0.08);
+  backdrop-filter: blur(16px);
 }
 
 .point-track-panel {
