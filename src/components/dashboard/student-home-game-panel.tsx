@@ -665,10 +665,10 @@ export function StudentHomeGamePanel({
                     isMobile ? "pr-1" : "pr-1.5"
                   )}
                 >
-                  <span className={cn("truncate font-black text-white/88", isMobile ? "text-[11px]" : "text-[12px]")}>
+                  <span className={cn("truncate font-black text-white", isMobile ? "text-[11px]" : "text-[12px]")}>
                     {homeFocusDetailLabel}
                   </span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/72 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white transition-transform duration-200 group-hover:translate-x-0.5" />
                   <span className="sr-only">{homeFocusDetailLabel}</span>
                 </button>
               </div>
