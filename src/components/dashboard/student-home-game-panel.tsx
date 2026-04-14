@@ -625,8 +625,8 @@ export function StudentHomeGamePanel({
       <div className={cn("student-night-page", isMobile ? "space-y-3" : "space-y-4")}>
       <section
         className={cn(
-          "point-track-hero-stage relative overflow-hidden",
-          arrivalCount > 0 && "point-track-hero-stage--arrival",
+          "student-home-hero-stage relative",
+          arrivalCount > 0 && "student-home-hero-stage--arrival",
         )}
       >
         {arrivalCount > 0 ? (
@@ -634,7 +634,13 @@ export function StudentHomeGamePanel({
             +{arrivalCount} BOX
           </div>
         ) : null}
-        <div className={cn("relative z-10", isMobile ? "space-y-4" : "space-y-5")}>
+        <div
+          className={cn(
+            "relative z-10",
+            isMobile ? "space-y-4" : "space-y-5",
+            arrivalCount > 0 && (isMobile ? "pt-10" : "pt-11")
+          )}
+        >
           <div className="space-y-2">
             <div className={cn(
               "rounded-[1.45rem] border border-[color:var(--border-subtle)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,var(--bg-surface-2)_100%)] shadow-[0_18px_34px_-28px_rgba(19,50,107,0.2)]",

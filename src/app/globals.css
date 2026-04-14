@@ -4883,6 +4883,30 @@ select {
   backdrop-filter: blur(16px);
 }
 
+.student-home-hero-stage {
+  position: relative;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.student-home-hero-stage::before {
+  content: none;
+}
+
+.student-home-hero-stage--arrival {
+  box-shadow: none;
+}
+
+.student-home-hero-stage .point-track-arrival-banner {
+  top: 0;
+  right: 0;
+}
+
 .point-track-panel {
   background:
     radial-gradient(circle at top, rgba(120, 187, 255, 0.2), transparent 58%),
