@@ -75,7 +75,7 @@ const STUDY_BOX_CLAIM_CACHE_PREFIX = 'point-track:claimed-boxes';
 const STUDY_BOX_ARRIVAL_TOAST_PREFIX = 'point-track:arrival-toast';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
 const GIFTISHOW_PRODUCT_FETCH_LIMIT = 2500;
-const GIFTISHOW_PRODUCT_PAGE_SIZE = 32;
+const GIFTISHOW_PRODUCT_PAGE_SIZE = 6;
 
 function normalizePhone(raw: string) {
   return raw.replace(/\D/g, '');
@@ -320,7 +320,7 @@ export default function GrowthPage() {
   const [isGiftishowShopOpen, setIsGiftishowShopOpen] = useState(false);
   const [giftishowSearch, setGiftishowSearch] = useState('');
   const [giftishowFilterMode, setGiftishowFilterMode] = useState<'available' | 'all'>('available');
-  const [visibleGiftishowCount, setVisibleGiftishowCount] = useState(GIFTISHOW_PRODUCT_PAGE_SIZE);
+  const [giftishowPage, setGiftishowPage] = useState(1);
   const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const liveClaimKeyRef = useRef<string | null>(null);
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
@@ -496,11 +496,15 @@ export default function GrowthPage() {
       return haystack.includes(giftishowSearchQuery);
     });
   }, [giftishowBrowseProducts, giftishowSearchQuery]);
-  const visibleGiftishowProducts = useMemo(
-    () => filteredGiftishowProducts.slice(0, visibleGiftishowCount),
-    [filteredGiftishowProducts, visibleGiftishowCount]
+  const totalGiftishowPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredGiftishowProducts.length / GIFTISHOW_PRODUCT_PAGE_SIZE)),
+    [filteredGiftishowProducts.length]
   );
-  const hasMoreGiftishowProducts = filteredGiftishowProducts.length > visibleGiftishowProducts.length;
+  const currentGiftishowPage = Math.min(giftishowPage, totalGiftishowPages);
+  const visibleGiftishowProducts = useMemo(() => {
+    const startIndex = (currentGiftishowPage - 1) * GIFTISHOW_PRODUCT_PAGE_SIZE;
+    return filteredGiftishowProducts.slice(startIndex, startIndex + GIFTISHOW_PRODUCT_PAGE_SIZE);
+  }, [currentGiftishowPage, filteredGiftishowProducts]);
 
   useEffect(() => {
     if (!isTimerActive || !startTime) return;
@@ -518,8 +522,14 @@ export default function GrowthPage() {
   }, []);
 
   useEffect(() => {
-    setVisibleGiftishowCount(GIFTISHOW_PRODUCT_PAGE_SIZE);
+    setGiftishowPage(1);
   }, [giftishowFilterMode, giftishowSearchQuery, isGiftishowShopOpen]);
+
+  useEffect(() => {
+    if (giftishowPage > totalGiftishowPages) {
+      setGiftishowPage(totalGiftishowPages);
+    }
+  }, [giftishowPage, totalGiftishowPages]);
 
   const liveSessionSeconds = isTimerActive && startTime ? Math.max(0, Math.floor((nowMs - startTime) / 1000)) : 0;
   const liveTodaySeconds = Math.max(0, todayMinutes * 60 + liveSessionSeconds);
@@ -1314,85 +1324,106 @@ export default function GrowthPage() {
                       : '검색 결과가 없어요. 다른 키워드로 다시 찾아보세요.'}
                   </div>
                 ) : (
-                  visibleGiftishowProducts.map((product) => {
-                    const disabledReason = getGiftishowRequestDisabledReason({
-                      settings: giftishowSettings,
-                      product,
-                      pointBalance,
-                      hasStudentPhone,
-                    });
-                    const productImage = getGiftishowProductImage(product);
-                    const isRequesting = requestingGoodsCode === product.goodsCode;
+                  <>
+                    {visibleGiftishowProducts.map((product) => {
+                      const disabledReason = getGiftishowRequestDisabledReason({
+                        settings: giftishowSettings,
+                        product,
+                        pointBalance,
+                        hasStudentPhone,
+                      });
+                      const productImage = getGiftishowProductImage(product);
+                      const isRequesting = requestingGoodsCode === product.goodsCode;
 
-                    return (
-                      <div
-                        key={`giftishow-dialog-${product.id || product.goodsCode}`}
-                        className="overflow-hidden rounded-[1.45rem] border border-white/70 bg-white/92 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)]"
-                      >
-                        <div className="flex gap-3 p-3.5">
-                          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[1.15rem] border border-[#F0E2CA] bg-[linear-gradient(180deg,#f8fafc_0%,#fff6e8_100%)]">
-                            {productImage ? (
-                              <img src={productImage} alt={product.goodsName} className="h-full w-full object-cover" />
-                            ) : (
-                              <div className="flex h-full items-center justify-center text-[10px] font-black tracking-[0.2em] text-[#7D8FB3]">GIFT</div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge className={cn('border-none font-black', isGiftishowProductAvailable(product, giftishowSettings) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
-                                {product.goodsStateCd || 'UNKNOWN'}
-                              </Badge>
-                              <p className="truncate text-[11px] font-bold text-[#6E7FA7]">
-                                {product.brandName || product.affiliate || '브랜드'}
-                              </p>
+                      return (
+                        <div
+                          key={`giftishow-dialog-${product.id || product.goodsCode}`}
+                          className="overflow-hidden rounded-[1.45rem] border border-white/70 bg-white/92 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)]"
+                        >
+                          <div className="flex gap-3 p-3.5">
+                            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[1.15rem] border border-[#F0E2CA] bg-[linear-gradient(180deg,#f8fafc_0%,#fff6e8_100%)]">
+                              {productImage ? (
+                                <img src={productImage} alt={product.goodsName} className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-[10px] font-black tracking-[0.2em] text-[#7D8FB3]">GIFT</div>
+                              )}
                             </div>
 
-                            <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{product.goodsName}</p>
-
-                            <div className="mt-3 flex items-end justify-between gap-3">
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
-                                <p className="mt-1 text-lg font-black tracking-tight text-[var(--text-accent-fixed)]">
-                                  {formatGiftishowPoints(product.pointCost)}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={cn('border-none font-black', isGiftishowProductAvailable(product, giftishowSettings) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
+                                  {product.goodsStateCd || 'UNKNOWN'}
+                                </Badge>
+                                <p className="truncate text-[11px] font-bold text-[#6E7FA7]">
+                                  {product.brandName || product.affiliate || '브랜드'}
                                 </p>
                               </div>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={disabledReason ? 'outline' : 'secondary'}
-                                className="rounded-full font-black"
-                                disabled={Boolean(disabledReason) || isRequesting}
-                                onClick={() => void handleGiftishowRequest(product)}
-                              >
-                                {isRequesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                                요청하기
-                              </Button>
-                            </div>
 
-                            {disabledReason ? (
-                              <p className="mt-2 text-[11px] font-bold leading-5 text-[#915A1E]">{disabledReason}</p>
-                            ) : (
-                              <p className="mt-2 text-[11px] font-bold leading-5 text-[#4D679F]">
-                                승인되면 {resolvedStudentPhone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')} 번호로 발송돼요.
-                              </p>
-                            )}
+                              <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{product.goodsName}</p>
+
+                              <div className="mt-3 flex items-end justify-between gap-3">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
+                                  <p className="mt-1 text-lg font-black tracking-tight text-[var(--text-accent-fixed)]">
+                                    {formatGiftishowPoints(product.pointCost)}
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={disabledReason ? 'outline' : 'secondary'}
+                                  className="rounded-full font-black"
+                                  disabled={Boolean(disabledReason) || isRequesting}
+                                  onClick={() => void handleGiftishowRequest(product)}
+                                >
+                                  {isRequesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                                  요청하기
+                                </Button>
+                              </div>
+
+                              {disabledReason ? (
+                                <p className="mt-2 text-[11px] font-bold leading-5 text-[#915A1E]">{disabledReason}</p>
+                              ) : (
+                                <p className="mt-2 text-[11px] font-bold leading-5 text-[#4D679F]">
+                                  승인되면 {resolvedStudentPhone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')} 번호로 발송돼요.
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
+                      );
+                    })}
+
+                    {filteredGiftishowProducts.length > GIFTISHOW_PRODUCT_PAGE_SIZE ? (
+                      <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-[#E5D7BF] bg-white/88 px-3 py-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-full border-[#E5D7BF] bg-white font-black text-[#14295F] disabled:opacity-40"
+                          disabled={currentGiftishowPage <= 1}
+                          onClick={() => setGiftishowPage((page) => Math.max(1, page - 1))}
+                        >
+                          이전
+                        </Button>
+                        <div className="text-center">
+                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#7D8FB3]">페이지</p>
+                          <p className="mt-1 text-sm font-black text-[#14295F]">
+                            {currentGiftishowPage} / {totalGiftishowPages}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-full border-[#E5D7BF] bg-white font-black text-[#14295F] disabled:opacity-40"
+                          disabled={currentGiftishowPage >= totalGiftishowPages}
+                          onClick={() => setGiftishowPage((page) => Math.min(totalGiftishowPages, page + 1))}
+                        >
+                          다음
+                        </Button>
                       </div>
-                    );
-                  })
+                    ) : null}
+                  </>
                 )}
-                {hasMoreGiftishowProducts ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-12 w-full rounded-[1.2rem] border-[#E5D7BF] bg-white/88 font-black text-[#14295F]"
-                    onClick={() => setVisibleGiftishowCount((current) => current + GIFTISHOW_PRODUCT_PAGE_SIZE)}
-                  >
-                    상품 더 보기 ({Math.min(GIFTISHOW_PRODUCT_PAGE_SIZE, filteredGiftishowProducts.length - visibleGiftishowProducts.length)}개)
-                  </Button>
-                ) : null}
               </div>
             </ScrollArea>
           </div>
