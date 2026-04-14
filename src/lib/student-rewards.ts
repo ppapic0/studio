@@ -260,6 +260,38 @@ export function getAvailableStudyBoxMilestones(totalMinutes: number, claimedStud
   return Array.from({ length: crossedMilestones }, (_, index) => index + 1).filter((milestone) => !claimed.has(milestone));
 }
 
+export function getRenderableTodayStudyBoxHours({
+  earnedHours,
+  claimedHours,
+  openedHours,
+}: {
+  earnedHours: number;
+  claimedHours?: unknown;
+  openedHours?: unknown;
+}) {
+  const cappedEarnedHours = Math.max(0, Math.min(8, Math.floor(Number(earnedHours) || 0)));
+  const claimableHours = new Set(Array.from({ length: cappedEarnedHours }, (_, index) => index + 1));
+  const renderableClaimedHours = normalizeStudyBoxHourValues(claimedHours).filter((hour) => claimableHours.has(hour));
+  const renderableOpenedHours = normalizeStudyBoxHourValues(openedHours).filter((hour) => claimableHours.has(hour));
+
+  return {
+    earnedHours: cappedEarnedHours,
+    claimedHours: renderableClaimedHours,
+    openedHours: renderableOpenedHours,
+  };
+}
+
+export function getRemainingCarryoverStudyBoxHours({
+  claimedHours,
+  openedHours,
+}: {
+  claimedHours?: unknown;
+  openedHours?: unknown;
+}) {
+  const openedHourSet = new Set(normalizeStudyBoxHourValues(openedHours));
+  return normalizeStudyBoxHourValues(claimedHours).filter((hour) => !openedHourSet.has(hour));
+}
+
 export function rollStudyBoxReward(milestone: number): StudyBoxReward {
   const rarity = rollStudyBoxRarity(milestone);
   const [minReward, maxReward] = STUDY_BOX_REWARD_RANGE_BY_RARITY[rarity];

@@ -5570,8 +5570,10 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         : {};
     const preExistingClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(preExistingDayStatus.claimedStudyBoxes);
     const preExistingOpenedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(preExistingDayStatus);
-    const hasUnlockedBoxRecord = preExistingClaimedStudyBoxes.includes(hour) || preExistingOpenedStudyBoxes.includes(hour);
-    if (!hasUnlockedBoxRecord && earnedHours < hour) {
+    const hasClaimedBoxRecord = preExistingClaimedStudyBoxes.includes(hour);
+    const alreadyOpenedByRecord = preExistingOpenedStudyBoxes.includes(hour);
+    const canOpenCarryoverByRecord = dateKey !== todayKstKey && hasClaimedBoxRecord;
+    if (!alreadyOpenedByRecord && !canOpenCarryoverByRecord && earnedHours < hour) {
         throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
             userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
         });

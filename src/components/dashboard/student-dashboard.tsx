@@ -98,6 +98,8 @@ import {
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
   getOpenedStudyBoxes,
+  getRemainingCarryoverStudyBoxHours,
+  getRenderableTodayStudyBoxHours,
   getStudyBoxFallbackRarity,
   normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
@@ -2875,7 +2877,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return map;
   }, [persistedCarryoverRewardEntries]);
   const remainingCarryoverClaimedBoxes = useMemo(
-    () => persistedCarryoverClaimedBoxes.filter((hour) => !resolvedCarryoverOpenedBoxes.includes(hour)),
+    () => getRemainingCarryoverStudyBoxHours({
+      claimedHours: persistedCarryoverClaimedBoxes,
+      openedHours: resolvedCarryoverOpenedBoxes,
+    }),
     [persistedCarryoverClaimedBoxes, resolvedCarryoverOpenedBoxes]
   );
   const earnedBoxes = Math.min(8, Math.floor(liveTodaySeconds / 3600));
@@ -2883,15 +2888,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const nextBoxSecondsLeft = earnedBoxes >= 8 ? 0 : Math.max(0, 3600 - currentCycleSeconds);
   const nextBoxProgressPercent = earnedBoxes >= 8 ? 100 : (currentCycleSeconds / 3600) * 100;
   const isNearNextBox = nextBoxProgressPercent >= 80 && nextBoxProgressPercent < 100;
+  const renderableTodayStudyBoxState = useMemo(
+    () => getRenderableTodayStudyBoxHours({
+      earnedHours: earnedBoxes,
+      claimedHours: syncedClaimedBoxes,
+      openedHours: syncedOpenedBoxes,
+    }),
+    [earnedBoxes, syncedClaimedBoxes, syncedOpenedBoxes]
+  );
   const homeRewardBoxes = useMemo(
     () =>
       buildRewardBoxes({
-        earnedHours: earnedBoxes,
-        claimedHours: syncedClaimedBoxes,
-        openedHours: syncedOpenedBoxes,
+        earnedHours: renderableTodayStudyBoxState.earnedHours,
+        claimedHours: renderableTodayStudyBoxState.claimedHours,
+        openedHours: renderableTodayStudyBoxState.openedHours,
         rewardByHour,
       }),
-    [earnedBoxes, syncedClaimedBoxes, syncedOpenedBoxes, rewardByHour]
+    [renderableTodayStudyBoxState, rewardByHour]
   );
   const readyBoxes = homeRewardBoxes.filter((box) => box.state === 'ready');
   const carryoverRewardBoxes = useMemo(
@@ -2934,8 +2947,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     [activeVaultDateKey, carryoverRewardByHour, rewardByHour, yesterdayKey]
   );
   const activeVaultOpenedCount = useMemo(
-    () => (activeVaultDateKey === yesterdayKey ? resolvedCarryoverOpenedBoxes.length : homeOpenedBoxes.length),
-    [activeVaultDateKey, homeOpenedBoxes, resolvedCarryoverOpenedBoxes, yesterdayKey]
+    () => (activeVaultDateKey === yesterdayKey ? resolvedCarryoverOpenedBoxes.length : renderableTodayStudyBoxState.openedHours.length),
+    [activeVaultDateKey, renderableTodayStudyBoxState, resolvedCarryoverOpenedBoxes, yesterdayKey]
   );
   const activeVaultContextLabel = shouldUseCarryoverVault
     ? '어제 남아 있던 상자예요.'

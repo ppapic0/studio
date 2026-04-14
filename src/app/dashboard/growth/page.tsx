@@ -54,6 +54,7 @@ import {
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
   getOpenedStudyBoxes,
+  getRenderableTodayStudyBoxHours,
   getStudyBoxFallbackRarity,
   normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
@@ -546,16 +547,24 @@ export default function GrowthPage() {
   const nextBoxSecondsLeft = earnedBoxes >= 8 ? 0 : Math.max(0, 3600 - currentCycleSeconds);
   const progressPercent = earnedBoxes >= 8 ? 100 : Math.max(4, (currentCycleSeconds / 3600) * 100);
   const isNearNextBox = progressPercent >= 80 && progressPercent < 100;
+  const renderableTodayStudyBoxState = useMemo(
+    () => getRenderableTodayStudyBoxHours({
+      earnedHours: earnedBoxes,
+      claimedHours: claimedBoxes,
+      openedHours: openedBoxes,
+    }),
+    [claimedBoxes, earnedBoxes, openedBoxes]
+  );
 
   const boxes = useMemo(
     () =>
       buildRewardBoxes({
-        earnedHours: earnedBoxes,
-        claimedHours: claimedBoxes,
-        openedHours: openedBoxes,
+        earnedHours: renderableTodayStudyBoxState.earnedHours,
+        claimedHours: renderableTodayStudyBoxState.claimedHours,
+        openedHours: renderableTodayStudyBoxState.openedHours,
         rewardByHour,
       }),
-    [earnedBoxes, claimedBoxes, openedBoxes, rewardByHour]
+    [renderableTodayStudyBoxState, rewardByHour]
   );
 
   const readyBoxes = boxes.filter((box) => box.state === 'ready');
@@ -565,7 +574,7 @@ export default function GrowthPage() {
     boxes.find((box) => box.state === 'charging')?.rarity ??
     boxes[0]?.rarity ??
     'common';
-  const todayOpenedCount = openedBoxes.length;
+  const todayOpenedCount = renderableTodayStudyBoxState.openedHours.length;
 
   const heroMode = totalAvailableBoxes > 0 ? 'ready' : isTimerActive ? 'studying' : 'idle';
   const heroPrimaryLabel =
