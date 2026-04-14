@@ -1230,7 +1230,7 @@ export default function GrowthPage() {
           <DialogHeader className="border-b border-[#FFE1B7]/70 px-5 pb-0 pt-5 text-left">
             <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
               <Gift className="h-5 w-5 text-[var(--text-accent-fixed)]" />
-              Giftishow 상품 고르기
+              트랙 상점
             </DialogTitle>
             <DialogDescription className="pb-4 text-sm font-bold leading-5 text-[#4D679F]">
               검색으로 원하는 상품을 빠르게 찾고, 필요한 순간 바로 교환 요청해 보세요.
