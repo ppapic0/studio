@@ -501,6 +501,7 @@ export function StudentHomeGamePanel({
   todayStudyLabel,
   growthDeltaPercent,
   todayOpenedBoxCount,
+  homeWelcomeLabel,
   homeFocusSummaryLabel,
   onOpenFocusEditor,
   dailyPointStatus,
@@ -549,6 +550,7 @@ export function StudentHomeGamePanel({
   todayStudyLabel: string;
   growthDeltaPercent: number;
   todayOpenedBoxCount: number;
+  homeWelcomeLabel: string;
   homeFocusSummaryLabel: string;
   onOpenFocusEditor: () => void;
   dailyPointStatus?: GrowthProgress["dailyPointStatus"];
@@ -574,7 +576,7 @@ export function StudentHomeGamePanel({
   onNextBox: () => void;
   nextCountdownLabel: string;
   }) {
-  const homeHeaderLabel = [dateLabel, homeFocusSummaryLabel].filter(Boolean).join(" · ");
+  const homeFocusDetailLabel = [dateLabel, homeFocusSummaryLabel].filter(Boolean).join(" · ");
   const maxTrend = weeklyTrend.reduce((max, item) => Math.max(max, item.minutes), 1);
   const trendAxisMarks = [1, 0.75, 0.5, 0.25].map((ratio, index) => {
     const minutes = Math.max(1, Math.round(maxTrend * ratio));
@@ -631,20 +633,23 @@ export function StudentHomeGamePanel({
         ) : null}
         <div className={cn("relative z-10", isMobile ? "space-y-4" : "space-y-5")}>
           <div className="space-y-2">
+            <div className={cn("max-w-full break-keep font-black tracking-tight text-[var(--text-primary)]", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
+              {homeWelcomeLabel}
+            </div>
             <button
               type="button"
               onClick={onOpenFocusEditor}
-              title={homeHeaderLabel}
+              title={homeFocusDetailLabel}
               className={cn(
                 "group inline-flex max-w-full items-center gap-2 rounded-full text-left transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]",
                 isMobile ? "pr-1" : "pr-1.5"
               )}
             >
               <span className={cn("truncate font-black text-[var(--text-primary)]", isMobile ? "text-[11px]" : "text-[12px]")}>
-                {homeHeaderLabel}
+                {homeFocusDetailLabel}
               </span>
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] transition-transform duration-200 group-hover:translate-x-0.5" />
-              <span className="sr-only">{homeHeaderLabel}</span>
+              <span className="sr-only">{homeFocusDetailLabel}</span>
             </button>
             {heroMessage ? <p className="surface-caption text-sm font-semibold">{heroMessage}</p> : null}
           </div>

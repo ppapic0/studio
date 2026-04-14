@@ -133,7 +133,8 @@ export default function UiAuditPage() {
           arrivalCount={2}
           todayStudyLabel="12시간 10분"
           todayOpenedBoxCount={3}
-          homeFocusSummaryLabel="경희대학교 국어국문학과 / D-18"
+          homeWelcomeLabel="경희대학교 27학번 국어국문학과 트랙에 오신 걸 환영합니다."
+          homeFocusSummaryLabel="모의고사 D-18 · 설정하기"
           onOpenFocusEditor={() => undefined}
           quests={[
             { id: 'quest-1', title: '영어 독해 2지문 완료', reward: 18, done: true, subjectLabel: '영어', timeLabel: '25m' },
