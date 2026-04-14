@@ -643,15 +643,15 @@ export function StudentHomeGamePanel({
         >
           <div className="space-y-2">
             <div className={cn(
-              "rounded-[1.45rem] border border-[color:var(--border-subtle)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,var(--bg-surface-2)_100%)] shadow-[0_18px_34px_-28px_rgba(19,50,107,0.2)]",
+              "rounded-[1.45rem] border border-white/15 bg-[linear-gradient(180deg,#183b82_0%,#14295F_100%)] shadow-[0_20px_38px_-28px_rgba(8,16,40,0.5)]",
               isMobile ? "px-4 py-4" : "px-5 py-4"
             )}>
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <div className={cn("max-w-full break-keep font-black tracking-tight text-[var(--text-primary)]", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
+                  <div className={cn("max-w-full break-keep font-black tracking-tight text-white", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
                     {homeWelcomeLineLabel}
                   </div>
-                  <div className={cn("max-w-full break-keep font-black tracking-tight text-[var(--text-primary)]", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
+                  <div className={cn("max-w-full break-keep font-black tracking-tight text-white", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
                     <span className="text-[var(--text-accent-fixed)]">트랙</span>
                     <span>에 오신 걸 환영합니다!</span>
                   </div>
@@ -665,10 +665,10 @@ export function StudentHomeGamePanel({
                     isMobile ? "pr-1" : "pr-1.5"
                   )}
                 >
-                  <span className={cn("truncate font-black text-[var(--text-primary)]", isMobile ? "text-[11px]" : "text-[12px]")}>
+                  <span className={cn("truncate font-black text-white/88", isMobile ? "text-[11px]" : "text-[12px]")}>
                     {homeFocusDetailLabel}
                   </span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] transition-transform duration-200 group-hover:translate-x-0.5" />
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/72 transition-transform duration-200 group-hover:translate-x-0.5" />
                   <span className="sr-only">{homeFocusDetailLabel}</span>
                 </button>
               </div>
