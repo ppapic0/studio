@@ -53,6 +53,13 @@ const GIFTISHOW_SECRET_NAMES = [
 const giftishowSecureFunctions = functions
     .region(region)
     .runWith({ secrets: [...GIFTISHOW_SECRET_NAMES] });
+const giftishowCatalogFunctions = functions
+    .region(region)
+    .runWith({
+    secrets: [...GIFTISHOW_SECRET_NAMES],
+    timeoutSeconds: 540,
+    memory: "1GB",
+});
 class GiftishowProviderError extends Error {
     constructor(code, message, retryable = false) {
         super(message);
@@ -469,7 +476,7 @@ exports.saveGiftishowSettingsSecure = giftishowSecureFunctions.https.onCall(asyn
         settings: Object.assign(Object.assign({}, payload), { updatedAt: undefined }),
     };
 });
-exports.syncGiftishowCatalogSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
+exports.syncGiftishowCatalogSecure = giftishowCatalogFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -491,7 +498,7 @@ exports.syncGiftishowCatalogSecure = giftishowSecureFunctions.https.onCall(async
         mode: result.mode,
     };
 });
-exports.scheduledGiftishowCatalogSync = giftishowSecureFunctions
+exports.scheduledGiftishowCatalogSync = giftishowCatalogFunctions
     .pubsub.schedule("20 4 * * *")
     .timeZone("Asia/Seoul")
     .onRun(async () => {

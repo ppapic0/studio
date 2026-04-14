@@ -19,6 +19,13 @@ const GIFTISHOW_SECRET_NAMES = [
 const giftishowSecureFunctions = functions
   .region(region)
   .runWith({ secrets: [...GIFTISHOW_SECRET_NAMES] });
+const giftishowCatalogFunctions = functions
+  .region(region)
+  .runWith({
+    secrets: [...GIFTISHOW_SECRET_NAMES],
+    timeoutSeconds: 540,
+    memory: "1GB",
+  });
 
 type GiftishowDeliveryMode = "mms";
 type GiftishowSyncStatus = "idle" | "syncing" | "success" | "error";
@@ -744,7 +751,7 @@ export const saveGiftishowSettingsSecure = giftishowSecureFunctions.https.onCall
   };
 });
 
-export const syncGiftishowCatalogSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
+export const syncGiftishowCatalogSecure = giftishowCatalogFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth?.uid) {
@@ -769,7 +776,7 @@ export const syncGiftishowCatalogSecure = giftishowSecureFunctions.https.onCall(
   };
 });
 
-export const scheduledGiftishowCatalogSync = giftishowSecureFunctions
+export const scheduledGiftishowCatalogSync = giftishowCatalogFunctions
   .pubsub.schedule("20 4 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
