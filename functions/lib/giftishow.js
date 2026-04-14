@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reconcilePendingGiftishowOrders = exports.resendGiftishowOrderSecure = exports.cancelGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.approveGiftishowOrderSecure = exports.createGiftishowOrderRequestSecure = exports.getGiftishowBizmoneySecure = exports.scheduledGiftishowCatalogSync = exports.syncGiftishowCatalogSecure = exports.saveGiftishowSettingsSecure = void 0;
+exports.reconcilePendingGiftishowOrders = exports.resendGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.cancelGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.approveGiftishowOrderSecure = exports.createGiftishowOrderRequestSecure = exports.getGiftishowBizmoneySecure = exports.scheduledGiftishowCatalogSync = exports.syncGiftishowCatalogSecure = exports.saveGiftishowSettingsSecure = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
 if (admin.apps.length === 0) {
@@ -159,6 +159,15 @@ class MockGiftishowClient {
         }
         if (getMockScenario() === "cancel-fail") {
             throw new GiftishowProviderError("MOCK-CANCEL", "Mock cancel failure.");
+        }
+        return {};
+    }
+    async cancelSendFailCoupon(_trId) {
+        if (getMockScenario() === "cancel-already") {
+            return { alreadyCancelled: true };
+        }
+        if (getMockScenario() === "cancel-fail") {
+            throw new GiftishowProviderError("MOCK-SEND-FAIL-CANCEL", "Mock send-fail cancel failure.");
         }
         return {};
     }
@@ -349,6 +358,24 @@ class LiveGiftishowClient {
             return { alreadyCancelled: true };
         }
         throw new GiftishowProviderError(code || "CANCEL_FAILED", resolveGiftishowMessage(payload, "쿠폰 취소에 실패했습니다."));
+    }
+    async cancelSendFailCoupon(trId) {
+        const payload = await this.postForm("/sendFail/cancel", {
+            api_code: "0205",
+            custom_auth_code: requireCredential(this.credentials.authCode, "authCode"),
+            custom_auth_token: requireCredential(this.credentials.authToken, "authToken"),
+            user_id: requireCredential(this.credentials.userId, "userId"),
+            dev_yn: "N",
+            tr_id: trId,
+        });
+        const code = resolveGiftishowCode(payload);
+        if (code === "0000") {
+            return {};
+        }
+        if (code === "ERR0208" || code === "ERR0210") {
+            return { alreadyCancelled: true };
+        }
+        throw new GiftishowProviderError(code || "SEND_FAIL_CANCEL_FAILED", resolveGiftishowMessage(payload, "발송실패 취소에 실패했습니다."));
     }
     async resendCoupon(trId) {
         const payload = await this.postForm("/resend", {
@@ -743,6 +770,50 @@ exports.cancelGiftishowOrderSecure = giftishowSecureFunctions.https.onCall(async
         byUid: context.auth.uid,
         reason: asTrimmedString(data === null || data === void 0 ? void 0 : data.reason) || "cancelled",
         cancelledReason: asTrimmedString(data === null || data === void 0 ? void 0 : data.reason),
+    });
+    return {
+        ok: true,
+        order: nextOrder,
+    };
+});
+exports.cancelGiftishowSendFailSecure = giftishowSecureFunctions.https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const orderId = asTrimmedString(data === null || data === void 0 ? void 0 : data.orderId);
+    if (!centerId || !orderId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId and orderId are required.");
+    }
+    await assertCenterAdmin(db, centerId, context.auth.uid);
+    const orderRef = db.doc(`centers/${centerId}/giftishowOrders/${orderId}`);
+    const [orderSnap, runtime] = await Promise.all([
+        orderRef.get(),
+        loadGiftishowRuntimeConfig(db, centerId),
+    ]);
+    if (!orderSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "주문 정보를 찾을 수 없습니다.");
+    }
+    const order = orderSnap.data();
+    if (!order.trId) {
+        throw new functions.https.HttpsError("failed-precondition", "발송실패 취소에 필요한 발송 정보가 없습니다.");
+    }
+    if (order.status !== "failed") {
+        throw new functions.https.HttpsError("failed-precondition", "발송실패 취소 가능한 실패 주문만 처리할 수 있습니다.");
+    }
+    const client = createGiftishowClient(runtime);
+    await client.cancelSendFailCoupon(order.trId);
+    const nextOrder = await refundGiftishowOrderPoints({
+        db,
+        centerId,
+        orderId,
+        orderRef,
+        status: "cancelled",
+        byUid: context.auth.uid,
+        reason: "send_fail_cancelled",
+        cancelledReason: asTrimmedString(data === null || data === void 0 ? void 0 : data.reason) || "발송실패 취소 완료",
     });
     return {
         ok: true,

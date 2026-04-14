@@ -115,6 +115,16 @@ export async function cancelGiftishowOrderSecure(input: { centerId: string; orde
   return result.data;
 }
 
+export async function cancelGiftishowSendFailSecure(input: { centerId: string; orderId: string; reason?: string }) {
+  const { functions } = initializeFirebase();
+  const callable = httpsCallable<{ centerId: string; orderId: string; reason?: string }, GiftishowOrderMutationResult>(
+    functions,
+    'cancelGiftishowSendFailSecure'
+  );
+  const result = await callable(input);
+  return result.data;
+}
+
 export async function resendGiftishowOrderSecure(input: { centerId: string; orderId: string }) {
   const { functions } = initializeFirebase();
   const callable = httpsCallable<{ centerId: string; orderId: string }, GiftishowOrderMutationResult>(

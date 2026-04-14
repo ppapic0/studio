@@ -7356,6 +7356,7 @@ export const ensureCurrentUserMemberships = functions
 export { scheduledRankingRewardSettlement } from "./rankingRewardSettlement";
 export {
   approveGiftishowOrderSecure,
+  cancelGiftishowSendFailSecure,
   cancelGiftishowOrderSecure,
   createGiftishowOrderRequestSecure,
   getGiftishowBizmoneySecure,

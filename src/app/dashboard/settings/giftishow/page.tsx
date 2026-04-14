@@ -30,6 +30,7 @@ import { canManageSettings } from '@/lib/dashboard-access';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import {
   approveGiftishowOrderSecure,
+  cancelGiftishowSendFailSecure,
   cancelGiftishowOrderSecure,
   getGiftishowBizmoneySecure,
   rejectGiftishowOrderSecure,
@@ -68,6 +69,7 @@ type GiftishowOrderCardProps = {
   onApprove: (orderId: string) => Promise<void>;
   onReject: (orderId: string) => Promise<void>;
   onCancel: (orderId: string) => Promise<void>;
+  onCancelSendFail: (orderId: string) => Promise<void>;
   onResend: (orderId: string) => Promise<void>;
 };
 
@@ -104,6 +106,7 @@ function GiftishowOrderCard({
   onApprove,
   onReject,
   onCancel,
+  onCancelSendFail,
   onResend,
 }: GiftishowOrderCardProps) {
   const actionButtons = [
@@ -147,6 +150,24 @@ function GiftishowOrderCard({
       >
         {actionKey === `cancel:${order.id}` ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <XCircle className="mr-1.5 h-3.5 w-3.5" />}
         취소
+      </Button>
+    ) : null,
+    order.status === 'failed' && order.trId ? (
+      <Button
+        key="cancel-send-fail"
+        type="button"
+        size="sm"
+        variant="outline"
+        className="rounded-full text-amber-700"
+        disabled={actionKey === `cancel-send-fail:${order.id}`}
+        onClick={() => void onCancelSendFail(order.id || '')}
+      >
+        {actionKey === `cancel-send-fail:${order.id}` ? (
+          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
+        )}
+        발송실패 취소
       </Button>
     ) : null,
     order.status === 'sent' ? (
@@ -480,6 +501,30 @@ export default function GiftishowSettingsPage() {
     }
   };
 
+  const handleCancelSendFail = async (orderId: string) => {
+    if (!centerId || !orderId) return;
+    const reason =
+      window.prompt(
+        '발송 실패 주문을 공급사 기준으로 정리합니다. 비워두면 기본 사유로 저장됩니다.',
+        '발송실패 취소 완료'
+      ) ?? null;
+    if (reason === null) return;
+
+    setActionKey(`cancel-send-fail:${orderId}`);
+    try {
+      await cancelGiftishowSendFailSecure({ centerId, orderId, reason: reason.trim() || undefined });
+      toast({ title: '발송실패 취소 완료', description: '실패 주문을 기프티쇼 기준으로 정리했습니다.' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '발송실패 취소 실패',
+        description: getSafeErrorMessage(error, '발송실패 취소 처리 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setActionKey(null);
+    }
+  };
+
   const handleResend = async (orderId: string) => {
     if (!centerId || !orderId) return;
     if (!window.confirm('이 쿠폰을 다시 전송할까요? 포인트는 다시 차감되지 않습니다.')) return;
@@ -777,6 +822,7 @@ export default function GiftishowSettingsPage() {
                     onApprove={handleApprove}
                     onReject={handleReject}
                     onCancel={handleCancel}
+                    onCancelSendFail={handleCancelSendFail}
                     onResend={handleResend}
                   />
                 ))
