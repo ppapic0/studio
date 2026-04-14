@@ -887,7 +887,6 @@ export default function AnalysisTrackPage() {
                   <h1 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.65rem] leading-[1.08]' : 'text-[clamp(1.65rem,2.6vw,2.48rem)] leading-[1.04]')}>
                     지금 흐름을 쉽게 읽어보세요
                   </h1>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">{growthSummary.statusSummary}</p>
                 </div>
 
                 <div className={cn('analysis-growth-summary-card analysis-growth-summary-card--soft rounded-[1.55rem]', isMobile ? 'p-4' : 'p-5')}>
@@ -1144,26 +1143,6 @@ export default function AnalysisTrackPage() {
             </div>
           </section>
 
-          <section className={cn('analysis-growth-action-panel rounded-[2rem]', isMobile ? 'p-5' : 'p-6')}>
-            <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'flex-wrap items-start justify-between')}>
-              <div className={cn('min-w-0', !isMobile && 'flex-1 basis-[16rem]')}>
-                <span className="analysis-growth-kicker">다음 추천</span>
-                <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>분석을 바로 계획으로 연결하세요</h2>
-                <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">지금 확인한 흐름을 다음 주 기본 계획에 바로 옮기면 유지력이 더 좋아집니다.</p>
-              </div>
-              <div className={cn('analysis-growth-light-card analysis-growth-light-card--accent rounded-[1.25rem] p-4', isMobile ? 'w-full min-w-0' : 'min-w-0 max-w-[22rem] flex-[0_1_20rem]')}>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#C86A10]">바로 실행할 한 가지</p>
-                <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1rem] leading-6' : 'text-lg leading-7')}>
-                  {hasBlankDays ? '공백일을 줄이는 루틴부터 고정하세요' : '잘되는 시간대를 계획 첫 블록에 고정하세요'}
-                </p>
-                <p className="mt-1 text-sm font-semibold leading-6 text-[#37507F]">
-                  {hasBlankDays
-                    ? '학습이 비는 날짜를 먼저 메우면 성장 그래프가 훨씬 안정적으로 올라갑니다.'
-                    : '현재 흐름이 좋은 시간대를 반복하면 다음 주에도 집중 시간이 쉽게 유지됩니다.'}
-                </p>
-              </div>
-            </div>
-          </section>
         </TabsContent>
 
         <TabsContent value="full" className="mt-0">
