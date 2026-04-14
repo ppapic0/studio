@@ -219,6 +219,7 @@ export default function StudentReportsPage() {
                   aiMeta={selectedReport.aiMeta}
                   dateKey={selectedReport.dateKey}
                   studentName={selectedReport.studentName}
+                  compactMode
                 />
               </div>
 

@@ -1530,6 +1530,7 @@ export default function StudyHistoryPage() {
                       aiMeta={dailyReport.aiMeta}
                       dateKey={dailyReport.dateKey}
                       studentName={dailyReport.studentName}
+                      compactMode
                     />
                   ) : (
                     <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20 italic">
@@ -1873,6 +1874,7 @@ export default function StudyHistoryPage() {
                       aiMeta={legacyReportAiMeta}
                       dateKey={legacyReportDateKey}
                       studentName={legacyReportStudentName}
+                      compactMode
                     />
                   ) : (
                     <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20 italic">

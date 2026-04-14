@@ -5253,6 +5253,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       dateKey={selectedChildReport.dateKey}
                       studentName={selectedChildReport.studentName}
                       displayHeadingsOnly
+                      compactMode
                     />
                   ) : (
                     <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-800">

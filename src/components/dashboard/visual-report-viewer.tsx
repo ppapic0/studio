@@ -133,6 +133,19 @@ function buildContentSummarySnippet(content: string) {
   return joined.length > 72 ? `${joined.slice(0, 71).trimEnd()}…` : joined;
 }
 
+function toCompactCopy(value?: string | null, maxLength = 92) {
+  const cleaned = (value || '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+
+  const sentenceCandidates = cleaned
+    .split(/(?<=[.!?])\s+|(?<=다\.)\s+|(?<=요\.)\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const joined = (sentenceCandidates.slice(0, 2).join(' ').trim() || cleaned).replace(/\s+/g, ' ');
+  return joined.length > maxLength ? `${joined.slice(0, maxLength - 1).trimEnd()}…` : joined;
+}
+
 function buildOverallSummary({
   aiMeta,
   studentName,
@@ -187,8 +200,10 @@ function buildFamilyQuestion(aiMeta: DailyReportAiMeta, studentName?: string) {
 
 function SummaryHeroMetrics({
   aiMeta,
+  compactMode = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
+  compactMode?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -216,7 +231,7 @@ function SummaryHeroMetrics({
         <div key={item.label} className="rounded-[1.35rem] border border-white/12 bg-white/10 px-4 py-3 backdrop-blur-sm">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{item.label}</p>
           <p className="mt-2 text-lg font-black tracking-tight text-white">{item.value}</p>
-          <p className="mt-1 text-xs font-bold text-white/68">{item.detail}</p>
+          <p className={cn('mt-1 text-xs font-bold text-white/68', compactMode && 'line-clamp-1')}>{item.detail}</p>
         </div>
       ))}
     </div>
@@ -226,9 +241,11 @@ function SummaryHeroMetrics({
 function ReportInsightBoard({
   aiMeta,
   displayHeadingsOnly = false,
+  compactMode = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
   displayHeadingsOnly?: boolean;
+  compactMode?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -252,12 +269,12 @@ function ReportInsightBoard({
         </div>
       </div>
 
-      <p className="mt-4 text-base font-black leading-relaxed tracking-tight text-slate-900">
-        {buildInterpretationCopy(aiMeta)}
+      <p className={cn('mt-4 font-black leading-relaxed tracking-tight text-slate-900', compactMode ? 'line-clamp-3 text-sm' : 'text-base')}>
+        {compactMode ? toCompactCopy(buildInterpretationCopy(aiMeta), 108) : buildInterpretationCopy(aiMeta)}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {bandBadges.map((item) => (
+        {(compactMode ? bandBadges.slice(0, 3) : bandBadges).map((item) => (
           <Badge key={item} variant="outline" className="rounded-full border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-700">
             {item}
           </Badge>
@@ -268,12 +285,14 @@ function ReportInsightBoard({
         <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결 리듬</p>
           <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.routineBand || '확인 중'}</p>
-          <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.'}</p>
+          <p className={cn('mt-1 text-xs font-bold leading-relaxed text-slate-600', compactMode && 'line-clamp-2')}>
+            {compactMode ? toCompactCopy(aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.', 56) : aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.'}
+          </p>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">성장 흐름</p>
           <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.growthBand || '분석 중'}</p>
-          <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+          <p className={cn('mt-1 text-xs font-bold leading-relaxed text-slate-600', compactMode && 'line-clamp-2')}>
             평균 대비 {formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg)} / {formatSignedPercent(aiMeta.metrics?.growthRate)}
           </p>
         </div>
@@ -286,10 +305,12 @@ function ReportActionBoard({
   aiMeta,
   studentName,
   displayHeadingsOnly = false,
+  compactMode = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
   studentName?: string;
   displayHeadingsOnly?: boolean;
+  compactMode?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -311,15 +332,19 @@ function ReportActionBoard({
       <div className="mt-4 grid gap-3">
         <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[#14295F] px-4 py-4 text-white">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">내일 교실 코칭</p>
-          <p className="mt-2 text-base font-black leading-relaxed tracking-tight">
-            {aiMeta.coachingFocus || '내일 첫 행동을 짧고 선명하게 잡겠습니다.'}
+          <p className={cn('mt-2 font-black leading-relaxed tracking-tight', compactMode ? 'line-clamp-2 text-sm' : 'text-base')}>
+            {compactMode
+              ? toCompactCopy(aiMeta.coachingFocus || '내일 첫 행동을 짧고 선명하게 잡겠습니다.', 60)
+              : aiMeta.coachingFocus || '내일 첫 행동을 짧고 선명하게 잡겠습니다.'}
           </p>
-          <p className="mt-2 text-sm font-bold leading-relaxed text-white/75">{improvementLead}</p>
+          <p className={cn('mt-2 font-bold leading-relaxed text-white/75', compactMode ? 'line-clamp-2 text-xs' : 'text-sm')}>
+            {compactMode ? toCompactCopy(improvementLead, 76) : improvementLead}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {aiMeta.pedagogyLens && (
               <Badge className="border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white">{aiMeta.pedagogyLens}</Badge>
             )}
-            {aiMeta.secondaryLens && (
+            {!compactMode && aiMeta.secondaryLens && (
               <Badge className="border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white/85">{aiMeta.secondaryLens}</Badge>
             )}
           </div>
@@ -327,19 +352,30 @@ function ReportActionBoard({
 
         <div className="rounded-[1.35rem] border border-amber-100 bg-amber-50/60 px-4 py-4">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700/70">가정 대화 포인트</p>
-          <p className="mt-2 text-base font-black leading-relaxed tracking-tight text-slate-900">
-            {aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.'}
+          <p className={cn('mt-2 font-black leading-relaxed tracking-tight text-slate-900', compactMode ? 'line-clamp-2 text-sm' : 'text-base')}>
+            {compactMode
+              ? toCompactCopy(aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.', 68)
+              : aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.'}
           </p>
-          <div className="mt-3 grid gap-2">
-            <div className="rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">먼저 인정</p>
-              <p className="mt-1 text-sm font-bold leading-relaxed text-slate-700">{strengthLead}</p>
+          {compactMode ? (
+            <div className="mt-3 rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">짧게 한마디</p>
+              <p className="mt-1 line-clamp-3 text-sm font-bold leading-relaxed text-slate-700">
+                {toCompactCopy(`${strengthLead} ${buildFamilyQuestion(aiMeta, studentName)}`, 92)}
+              </p>
             </div>
-            <div className="rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">짧게 질문</p>
-              <p className="mt-1 text-sm font-bold leading-relaxed text-slate-700">{buildFamilyQuestion(aiMeta, studentName)}</p>
+          ) : (
+            <div className="mt-3 grid gap-2">
+              <div className="rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">먼저 인정</p>
+                <p className="mt-1 text-sm font-bold leading-relaxed text-slate-700">{strengthLead}</p>
+              </div>
+              <div className="rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">짧게 질문</p>
+                <p className="mt-1 text-sm font-bold leading-relaxed text-slate-700">{buildFamilyQuestion(aiMeta, studentName)}</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -532,9 +568,11 @@ function SignalRadarCard({
 function KpiGraphGrid({
   aiMeta,
   displayHeadingsOnly = false,
+  compactMode = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
   displayHeadingsOnly?: boolean;
+  compactMode?: boolean;
 }) {
   if (!aiMeta) return null;
 
@@ -614,8 +652,10 @@ function KpiGraphGrid({
               style={{ width: `${completionWidth}%` }}
             />
           </div>
-          <p className="mt-3 text-xs font-bold leading-relaxed text-slate-600">
-            {aiMeta.metrics?.trendSummary || '최근 흐름 요약이 없습니다.'}
+          <p className={cn('mt-3 text-xs font-bold leading-relaxed text-slate-600', compactMode && 'line-clamp-2')}>
+            {compactMode
+              ? toCompactCopy(aiMeta.metrics?.trendSummary || '최근 흐름 요약이 없습니다.', 74)
+              : aiMeta.metrics?.trendSummary || '최근 흐름 요약이 없습니다.'}
           </p>
         </div>
       </div>
@@ -626,14 +666,16 @@ function KpiGraphGrid({
 function StrengthImprovementGrid({
   aiMeta,
   displayHeadingsOnly = false,
+  compactMode = false,
 }: {
   aiMeta?: DailyReportAiMeta | null;
   displayHeadingsOnly?: boolean;
+  compactMode?: boolean;
 }) {
   if (!aiMeta) return null;
 
-  const strengths = aiMeta.strengths?.slice(0, 3) || [];
-  const improvements = aiMeta.improvements?.slice(0, 3) || [];
+  const strengths = aiMeta.strengths?.slice(0, compactMode ? 2 : 3) || [];
+  const improvements = aiMeta.improvements?.slice(0, compactMode ? 2 : 3) || [];
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -653,7 +695,9 @@ function StrengthImprovementGrid({
               <div className="mb-2 h-1.5 w-full rounded-full bg-emerald-100">
                 <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${88 - index * 16}%` }} />
               </div>
-              <p className="text-sm font-bold leading-relaxed text-slate-700">{item}</p>
+              <p className={cn('text-sm font-bold leading-relaxed text-slate-700', compactMode && 'line-clamp-2')}>
+                {compactMode ? toCompactCopy(item, 72) : item}
+              </p>
             </div>
           )) : (
             <div className="rounded-2xl border border-dashed border-emerald-100 bg-emerald-50/35 px-3 py-4 text-sm font-semibold text-slate-500">
@@ -682,7 +726,9 @@ function StrengthImprovementGrid({
                 </div>
                 <span className="text-[10px] font-black text-amber-700">우선</span>
               </div>
-              <p className="text-sm font-bold leading-relaxed text-slate-700">{item}</p>
+              <p className={cn('text-sm font-bold leading-relaxed text-slate-700', compactMode && 'line-clamp-2')}>
+                {compactMode ? toCompactCopy(item, 72) : item}
+              </p>
             </div>
           )) : (
             <div className="rounded-2xl border border-dashed border-amber-100 bg-amber-50/35 px-3 py-4 text-sm font-semibold text-slate-500">
@@ -701,12 +747,14 @@ export function VisualReportViewer({
   dateKey,
   studentName,
   displayHeadingsOnly = false,
+  compactMode = false,
 }: {
   content: string;
   aiMeta?: DailyReport['aiMeta'] | null;
   dateKey?: string;
   studentName?: string;
   displayHeadingsOnly?: boolean;
+  compactMode?: boolean;
 }) {
   const sections = useMemo(() => {
     if (!content) return [];
@@ -745,26 +793,45 @@ export function VisualReportViewer({
                 <Badge className="border-none bg-white/10 text-white/85 font-black">{aiMeta.variationStyle}</Badge>
               )}
             </div>
-            <p className={cn('mt-4 text-xl font-black tracking-tight leading-snug break-keep sm:text-2xl', displayHeadingsOnly && 'font-aggro-display')}>{overallSummary.headline}</p>
-            <p className="mt-2 text-sm font-bold leading-relaxed text-white/80">{overallSummary.subline}</p>
-            <SummaryHeroMetrics aiMeta={aiMeta || null} />
+            <p className={cn('mt-4 font-black tracking-tight leading-snug break-keep', compactMode ? 'line-clamp-2 text-lg sm:text-[1.35rem]' : 'text-xl sm:text-2xl', displayHeadingsOnly && 'font-aggro-display')}>
+              {compactMode ? toCompactCopy(overallSummary.headline, 92) : overallSummary.headline}
+            </p>
+            <p className={cn('mt-2 font-bold leading-relaxed text-white/80', compactMode ? 'line-clamp-2 text-xs sm:text-sm' : 'text-sm')}>
+              {compactMode ? toCompactCopy(overallSummary.subline, 98) : overallSummary.subline}
+            </p>
+            <SummaryHeroMetrics aiMeta={aiMeta || null} compactMode={compactMode} />
           </CardContent>
         </Card>
       )}
 
       {aiMeta && (
-        <>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-            <ReportInsightBoard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-            <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} />
-          </div>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-            <MiniTrendChart aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-            <SignalRadarCard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-          </div>
-          <KpiGraphGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-          <StrengthImprovementGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-        </>
+        compactMode ? (
+          <>
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+              <MiniTrendChart aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+              <SignalRadarCard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+            </div>
+            <KpiGraphGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} compactMode />
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+              <ReportInsightBoard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} compactMode />
+              <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} compactMode />
+            </div>
+            <StrengthImprovementGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} compactMode />
+          </>
+        ) : (
+          <>
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+              <ReportInsightBoard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+              <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} />
+            </div>
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+              <MiniTrendChart aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+              <SignalRadarCard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+            </div>
+            <KpiGraphGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+            <StrengthImprovementGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+          </>
+        )
       )}
 
       {sections.map((section, index) => {
@@ -781,8 +848,8 @@ export function VisualReportViewer({
               </div>
             </CardHeader>
             <CardContent className="p-5">
-              <p className="whitespace-pre-wrap break-keep text-sm font-bold leading-relaxed text-foreground/80">
-                {body}
+              <p className={cn('whitespace-pre-wrap break-keep text-sm font-bold leading-relaxed text-foreground/80', compactMode && 'line-clamp-3')}>
+                {compactMode ? toCompactCopy(body.replace(/\n+/g, ' '), 110) : body}
               </p>
             </CardContent>
           </Card>
