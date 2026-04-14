@@ -18,6 +18,8 @@ import {
   Flame,
   Gift,
   Loader2,
+  Search,
+  Sparkles,
   Timer,
   Wallet,
 } from 'lucide-react';
@@ -32,6 +34,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
@@ -71,6 +74,8 @@ type FloatingGain = {
 const STUDY_BOX_CLAIM_CACHE_PREFIX = 'point-track:claimed-boxes';
 const STUDY_BOX_ARRIVAL_TOAST_PREFIX = 'point-track:arrival-toast';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
+const GIFTISHOW_PRODUCT_FETCH_LIMIT = 2500;
+const GIFTISHOW_PRODUCT_PAGE_SIZE = 32;
 
 function normalizePhone(raw: string) {
   return raw.replace(/\D/g, '');
@@ -313,6 +318,9 @@ export default function GrowthPage() {
   const [pointBalance, setPointBalance] = useState(0);
   const [requestingGoodsCode, setRequestingGoodsCode] = useState<string | null>(null);
   const [isGiftishowShopOpen, setIsGiftishowShopOpen] = useState(false);
+  const [giftishowSearch, setGiftishowSearch] = useState('');
+  const [giftishowFilterMode, setGiftishowFilterMode] = useState<'available' | 'all'>('available');
+  const [visibleGiftishowCount, setVisibleGiftishowCount] = useState(GIFTISHOW_PRODUCT_PAGE_SIZE);
   const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const liveClaimKeyRef = useRef<string | null>(null);
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
@@ -347,7 +355,7 @@ export default function GrowthPage() {
 
   const giftishowProductsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user) return null;
-    return query(collection(firestore, 'centers', activeMembership.id, 'giftishowProducts'), limit(80));
+    return query(collection(firestore, 'centers', activeMembership.id, 'giftishowProducts'), limit(GIFTISHOW_PRODUCT_FETCH_LIMIT));
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: giftishowProductsRaw } = useCollection<GiftishowProduct>(giftishowProductsQuery, {
     enabled: Boolean(activeMembership && user),
@@ -467,6 +475,32 @@ export default function GrowthPage() {
     () => (availableGiftishowProducts.length > 0 ? availableGiftishowProducts : giftishowProducts).slice(0, 3),
     [availableGiftishowProducts, giftishowProducts]
   );
+  const giftishowSearchQuery = useMemo(() => giftishowSearch.trim().toLowerCase(), [giftishowSearch]);
+  const giftishowBrowseProducts = useMemo(
+    () => (giftishowFilterMode === 'available' ? availableGiftishowProducts : giftishowProducts),
+    [availableGiftishowProducts, giftishowFilterMode, giftishowProducts]
+  );
+  const filteredGiftishowProducts = useMemo(() => {
+    if (!giftishowSearchQuery) return giftishowBrowseProducts;
+    return giftishowBrowseProducts.filter((product) => {
+      const haystack = [
+        product.goodsName,
+        product.brandName,
+        product.affiliate,
+        product.goodsTypeNm,
+        product.goodsTypeDtlNm,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(giftishowSearchQuery);
+    });
+  }, [giftishowBrowseProducts, giftishowSearchQuery]);
+  const visibleGiftishowProducts = useMemo(
+    () => filteredGiftishowProducts.slice(0, visibleGiftishowCount),
+    [filteredGiftishowProducts, visibleGiftishowCount]
+  );
+  const hasMoreGiftishowProducts = filteredGiftishowProducts.length > visibleGiftishowProducts.length;
 
   useEffect(() => {
     if (!isTimerActive || !startTime) return;
@@ -482,6 +516,10 @@ export default function GrowthPage() {
       timeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
     };
   }, []);
+
+  useEffect(() => {
+    setVisibleGiftishowCount(GIFTISHOW_PRODUCT_PAGE_SIZE);
+  }, [giftishowFilterMode, giftishowSearchQuery, isGiftishowShopOpen]);
 
   const liveSessionSeconds = isTimerActive && startTime ? Math.max(0, Math.floor((nowMs - startTime) / 1000)) : 0;
   const liveTodaySeconds = Math.max(0, todayMinutes * 60 + liveSessionSeconds);
@@ -964,15 +1002,20 @@ export default function GrowthPage() {
           </div>
         </section>
 
-        <section className="rounded-[1.8rem] border border-[#FFE1B7]/50 bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] px-4 py-4 shadow-[0_20px_48px_-34px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <section className="overflow-hidden rounded-[1.9rem] border border-[#FFD9A8]/70 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_34%),linear-gradient(180deg,#fffaf1_0%,#ffe9ca_100%)] px-4 py-4 shadow-[0_24px_56px_-34px_rgba(20,41,95,0.24)] backdrop-blur-xl">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2">
-                  <Gift className="h-4 w-4 text-[var(--text-accent-fixed)]" />
-                <p className="font-aggro-display text-base font-black tracking-tight text-[#14295F]">Giftishow 보상샵</p>
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/80 bg-white/80 text-[var(--text-accent-fixed)] shadow-[0_16px_28px_-22px_rgba(0,0,0,0.32)]">
+                  <Gift className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="font-aggro-display text-[1.05rem] font-black tracking-tight text-[#14295F]">Giftishow 보상샵</p>
+                  <p className="mt-0.5 text-[11px] font-black tracking-[0.18em] text-[#C77718]">POINT EXCHANGE</p>
+                </div>
               </div>
-              <p className="mt-2 text-sm font-bold leading-5 text-[#24457f]">
-                관리자 승인 후 학생 번호로 MMS 쿠폰이 발송돼요. 상품 포인트는 기프티쇼 판매가와 1:1이에요.
+              <p className="mt-3 text-sm font-bold leading-5 text-[#24457f]">
+                관리자 승인 후 학생 번호로 MMS 쿠폰이 발송돼요. 검색해서 원하는 상품을 바로 골라볼 수 있어요.
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -985,14 +1028,18 @@ export default function GrowthPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2.5">
-            <div className="rounded-[1.3rem] border border-white/70 bg-white/85 px-3 py-3">
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <div className="rounded-[1.3rem] border border-white/70 bg-white/88 px-3 py-3">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">내 포인트</p>
               <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{formatGiftishowPoints(pointBalance)}</p>
             </div>
-            <div className="rounded-[1.3rem] border border-white/70 bg-white/85 px-3 py-3">
+            <div className="rounded-[1.3rem] border border-white/70 bg-white/88 px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">동기화 상품</p>
+              <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{giftishowProducts.length.toLocaleString()}개</p>
+            </div>
+            <div className="col-span-2 rounded-[1.3rem] border border-white/70 bg-white/88 px-3 py-3 sm:col-span-1">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 가능</p>
-              <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{availableGiftishowProducts.length}개</p>
+              <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{availableGiftishowProducts.length.toLocaleString()}개</p>
             </div>
           </div>
 
@@ -1005,13 +1052,13 @@ export default function GrowthPage() {
           <button
             type="button"
             onClick={() => setIsGiftishowShopOpen(true)}
-            className="mt-4 w-full rounded-[1.45rem] border border-white/75 bg-white/88 px-4 py-4 text-left shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)]"
+            className="mt-4 w-full rounded-[1.55rem] border border-white/75 bg-white/90 px-4 py-4 text-left shadow-[0_22px_36px_-28px_rgba(20,41,95,0.24)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)]"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-black tracking-tight text-[#14295F]">상품 고르기</p>
+                <p className="text-base font-black tracking-tight text-[#14295F]">상품 고르기</p>
                 <p className="mt-1 text-[12px] font-bold leading-5 text-[#4D679F]">
-                  팝업에서 동기화된 상품을 보고 원하는 상품을 골라 요청할 수 있어요.
+                  전체 {giftishowProducts.length.toLocaleString()}개 상품을 검색하고, 포인트에 맞는 상품만 골라 요청할 수 있어요.
                 </p>
               </div>
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F]">
@@ -1019,18 +1066,31 @@ export default function GrowthPage() {
               </span>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 grid grid-cols-3 gap-2.5">
               {giftishowPreviewProducts.length > 0 ? (
-                giftishowPreviewProducts.map((product) => (
-                  <span
-                    key={`giftishow-preview-${product.id || product.goodsCode}`}
-                    className="inline-flex max-w-full truncate rounded-full border border-[#FFD39E] bg-[#FFF3E2] px-3 py-1 text-[11px] font-black text-[#915A1E]"
-                  >
-                    {product.goodsName}
-                  </span>
-                ))
+                giftishowPreviewProducts.map((product) => {
+                  const previewImage = getGiftishowProductImage(product);
+                  return (
+                    <div
+                      key={`giftishow-preview-${product.id || product.goodsCode}`}
+                      className="overflow-hidden rounded-[1.2rem] border border-[#FFE1B7] bg-[#FFF8EF] shadow-[0_16px_28px_-24px_rgba(20,41,95,0.22)]"
+                    >
+                      <div className="aspect-square bg-[linear-gradient(180deg,#ffffff_0%,#fff6e7_100%)]">
+                        {previewImage ? (
+                          <img src={previewImage} alt={product.goodsName} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-[10px] font-black tracking-[0.2em] text-[#A67C45]">GIFT</div>
+                        )}
+                      </div>
+                      <div className="px-2.5 py-2">
+                        <p className="line-clamp-2 text-[11px] font-black leading-4 text-[#14295F]">{product.goodsName}</p>
+                        <p className="mt-1 text-[11px] font-black text-[var(--text-accent-fixed)]">{formatGiftishowPoints(product.pointCost)}</p>
+                      </div>
+                    </div>
+                  );
+                })
               ) : (
-                <span className="inline-flex rounded-full border border-dashed border-[#FFD39E] bg-[#FFF8EE] px-3 py-1 text-[11px] font-black text-[#915A1E]">
+                <span className="col-span-3 inline-flex rounded-full border border-dashed border-[#FFD39E] bg-[#FFF8EE] px-3 py-1 text-[11px] font-black text-[#915A1E]">
                   동기화된 상품을 불러오면 여기서 바로 고를 수 있어요.
                 </span>
               )}
@@ -1181,26 +1241,76 @@ export default function GrowthPage() {
       </Dialog>
 
       <Dialog open={isGiftishowShopOpen} onOpenChange={setIsGiftishowShopOpen}>
-        <DialogContent className="w-[min(94vw,30rem)] overflow-hidden rounded-[2rem] border-none bg-[linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
+        <DialogContent className="w-[min(94vw,34rem)] overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
           <DialogHeader className="border-b border-[#FFE1B7]/70 px-5 pb-0 pt-5 text-left">
             <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
               <Gift className="h-5 w-5 text-[var(--text-accent-fixed)]" />
               Giftishow 상품 고르기
             </DialogTitle>
             <DialogDescription className="pb-4 text-sm font-bold leading-5 text-[#4D679F]">
-              동기화된 상품을 확인하고 원하는 쿠폰을 골라 교환 요청해 보세요.
+              검색으로 원하는 상품을 빠르게 찾고, 필요한 순간 바로 교환 요청해 보세요.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 px-5 py-4">
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-3 gap-2.5">
               <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">동기화 상품</p>
-                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{giftishowProducts.length}개</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{giftishowProducts.length.toLocaleString()}개</p>
               </div>
               <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 가능</p>
-                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{availableGiftishowProducts.length}개</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{availableGiftishowProducts.length.toLocaleString()}개</p>
+              </div>
+              <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">내 포인트</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{formatGiftishowPoints(pointBalance)}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-[1.35rem] border border-white/70 bg-white/72 p-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6E7FA7]" />
+                <Input
+                  value={giftishowSearch}
+                  onChange={(event) => setGiftishowSearch(event.target.value)}
+                  placeholder="상품명, 브랜드명으로 검색"
+                  className="h-11 rounded-[1rem] border-[#E5D7BF] bg-white pl-10 font-bold text-[#14295F] placeholder:text-[#8AA0C8]"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={giftishowFilterMode === 'available' ? 'secondary' : 'outline'}
+                  className={cn(
+                    'rounded-full font-black',
+                    giftishowFilterMode === 'available'
+                      ? 'bg-[var(--accent-orange)] text-white hover:bg-[var(--accent-orange)]/90'
+                      : 'border-[#E5D7BF] bg-white text-[#6E7FA7]'
+                  )}
+                  onClick={() => setGiftishowFilterMode('available')}
+                >
+                  교환 가능만
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={giftishowFilterMode === 'all' ? 'secondary' : 'outline'}
+                  className={cn(
+                    'rounded-full font-black',
+                    giftishowFilterMode === 'all'
+                      ? 'bg-[#14295F] text-white hover:bg-[#14295F]/90'
+                      : 'border-[#E5D7BF] bg-white text-[#6E7FA7]'
+                  )}
+                  onClick={() => setGiftishowFilterMode('all')}
+                >
+                  전체 보기
+                </Button>
+                <span className="inline-flex items-center rounded-full bg-[#FFF3E2] px-3 py-1 text-[11px] font-black text-[#915A1E]">
+                  <Sparkles className="mr-1 h-3.5 w-3.5" />
+                  {filteredGiftishowProducts.length.toLocaleString()}개 찾음
+                </span>
               </div>
             </div>
 
@@ -1212,12 +1322,14 @@ export default function GrowthPage() {
 
             <ScrollArea className="max-h-[min(62vh,34rem)] pr-1">
               <div className="space-y-3">
-                {giftishowProducts.length === 0 ? (
+                {filteredGiftishowProducts.length === 0 ? (
                   <div className="rounded-[1.4rem] border border-dashed border-[#FFD39E] bg-white/70 px-4 py-10 text-center text-sm font-bold text-[#7B5A2A]">
-                    아직 동기화된 상품이 없어요. 센터에서 카탈로그를 연결하면 이곳에서 바로 고를 수 있어요.
+                    {giftishowProducts.length === 0
+                      ? '아직 동기화된 상품이 없어요. 센터에서 카탈로그를 연결하면 이곳에서 바로 고를 수 있어요.'
+                      : '검색 결과가 없어요. 다른 키워드로 다시 찾아보세요.'}
                   </div>
                 ) : (
-                  giftishowProducts.map((product) => {
+                  visibleGiftishowProducts.map((product) => {
                     const disabledReason = getGiftishowRequestDisabledReason({
                       settings: giftishowSettings,
                       product,
@@ -1232,8 +1344,8 @@ export default function GrowthPage() {
                         key={`giftishow-dialog-${product.id || product.goodsCode}`}
                         className="overflow-hidden rounded-[1.45rem] border border-white/70 bg-white/92 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)]"
                       >
-                        <div className="flex gap-3 p-3">
-                          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[1.1rem] bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)]">
+                        <div className="flex gap-3 p-3.5">
+                          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[1.15rem] border border-[#F0E2CA] bg-[linear-gradient(180deg,#f8fafc_0%,#fff6e8_100%)]">
                             {productImage ? (
                               <img src={productImage} alt={product.goodsName} className="h-full w-full object-cover" />
                             ) : (
@@ -1286,6 +1398,16 @@ export default function GrowthPage() {
                     );
                   })
                 )}
+                {hasMoreGiftishowProducts ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 w-full rounded-[1.2rem] border-[#E5D7BF] bg-white/88 font-black text-[#14295F]"
+                    onClick={() => setVisibleGiftishowCount((current) => current + GIFTISHOW_PRODUCT_PAGE_SIZE)}
+                  >
+                    상품 더 보기 ({Math.min(GIFTISHOW_PRODUCT_PAGE_SIZE, filteredGiftishowProducts.length - visibleGiftishowProducts.length)}개)
+                  </Button>
+                ) : null}
               </div>
             </ScrollArea>
           </div>
