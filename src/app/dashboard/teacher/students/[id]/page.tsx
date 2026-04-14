@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import StudentAnalysisOverviewSection from '@/components/dashboard/student-analysis-overview-section';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,10 +31,12 @@ import { Progress } from '@/components/ui/progress';
 import {
   buildAwayTimeInsight,
   buildDailyStudyInsight,
+  buildStudentFullAnalysisSummary,
   buildRhythmInsight,
   buildStartEndInsight,
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
+import { EMPTY_STUDENT_RANKING_SNAPSHOT, fetchStudentRankingSnapshot, type StudentRankEntry, type StudentRankingSnapshot } from '@/lib/student-ranking-client';
 import { canManageSettings, canManageStaff, canReadFinance } from '@/lib/dashboard-access';
 import { type StudentOperationsTimelinePoint } from '@/components/dashboard/student-operations-graph-board';
 import { useStudentDetailPresentationMode, type DetailPresentationMode } from '@/components/dashboard/student-detail-presentation-mode';
@@ -266,6 +269,27 @@ function addNumberMapValue(map: Map<string, number>, key: string | null | undefi
   map.set(key, (map.get(key) || 0) + amount);
 }
 
+function buildRelativeRanking(entries: StudentRankEntry[], studentId: string) {
+  if (!entries.length) return null;
+  const sortedEntries = [...entries].sort((left, right) => {
+    if (right.value !== left.value) return right.value - left.value;
+    return left.displayNameSnapshot.localeCompare(right.displayNameSnapshot, 'ko');
+  });
+  const targetIndex = sortedEntries.findIndex((entry) => entry.studentId === studentId);
+  if (targetIndex < 0) return null;
+
+  return {
+    rank: targetIndex + 1,
+    total: sortedEntries.length,
+    value: Math.max(0, Math.round(sortedEntries[targetIndex]?.value || 0)),
+  };
+}
+
+function toTopPercent(rank: number | null, total: number | null): number | null {
+  if (typeof rank !== 'number' || typeof total !== 'number' || total <= 0) return null;
+  return Math.max(1, Math.round((rank / total) * 100));
+}
+
 const CustomTooltip = ({ active, payload, label, unit = '분', presentationMode = 'default' }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -492,6 +516,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [sessionAdjustments, setSessionAdjustments] = useState<Record<string, number>>({});
   const [isSessionSaving, setIsSessionSaving] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
+  const [rankingSnapshot, setRankingSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
+  const [rankingLoading, setRankingLoading] = useState(false);
 
   const hasInitializedForm = useRef(false);
   const [editForm, setEditForm] = useState({
@@ -787,6 +813,37 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       cancelled = true;
     };
   }, [firestore, centerId, studentId, todayKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchRankingSnapshot = async () => {
+      if (!isAnalysisPresentation || !centerId || !currentUser) {
+        setRankingSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
+        setRankingLoading(false);
+        return;
+      }
+
+      setRankingLoading(true);
+      try {
+        const snapshot = await fetchStudentRankingSnapshot({ centerId, user: currentUser });
+        if (cancelled) return;
+        setRankingSnapshot(snapshot);
+      } catch (error) {
+        console.error('[Student Detail] Failed to load ranking snapshot:', error);
+        if (!cancelled) {
+          setRankingSnapshot(EMPTY_STUDENT_RANKING_SNAPSHOT);
+        }
+      } finally {
+        if (!cancelled) setRankingLoading(false);
+      }
+    };
+
+    fetchRankingSnapshot();
+    return () => {
+      cancelled = true;
+    };
+  }, [centerId, currentUser, isAnalysisPresentation]);
 
   const studentCounselingLogs = useMemo(() => {
     return (counselingLogsRaw || []).filter((log) => log.studentId === studentId).sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
@@ -1208,6 +1265,68 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!latestCounselDate || isBefore(latestCounselDate, subDays(today, 30))) chips.push('최근 30일 상담 기록 부족');
     return chips;
   }, [avgCompletionRate, avgStudyMinutes, rhythmScore, studentCounselingLogs, todayKey]);
+
+  const currentClassName = useMemo(() => {
+    const membershipClass = centerStudents?.find((member) => member.id === studentId)?.className;
+    return student?.className || membershipClass || null;
+  }, [centerStudents, student?.className, studentId]);
+
+  const recent14Series = useMemo(() => fullSeries.slice(-14), [fullSeries]);
+  const recent14BlankDays = useMemo(
+    () => recent14Series.filter((item) => Math.max(0, Math.round(item.studyMinutes || 0)) === 0).length,
+    [recent14Series]
+  );
+  const recent14StudyDays = useMemo(
+    () => recent14Series.filter((item) => Math.max(0, Math.round(item.studyMinutes || 0)) > 0).length,
+    [recent14Series]
+  );
+
+  const centerRankingSummary = useMemo(
+    () => buildRelativeRanking(rankingSnapshot.weekly, studentId),
+    [rankingSnapshot.weekly, studentId]
+  );
+  const classRankingSummary = useMemo(() => {
+    if (!currentClassName) return null;
+    const sameClassEntries = rankingSnapshot.weekly.filter((entry) => entry.classNameSnapshot === currentClassName);
+    if (sameClassEntries.length < 5) return null;
+    return buildRelativeRanking(sameClassEntries, studentId);
+  }, [rankingSnapshot.weekly, currentClassName, studentId]);
+  const studentFullAnalysisSummary = useMemo(() => {
+    const weeklyMinutes = centerRankingSummary?.value ?? weeklyGrowthData[weeklyGrowthData.length - 1]?.totalMinutes ?? 0;
+    const hasEnoughComparisonData =
+      !rankingLoading &&
+      (centerRankingSummary?.total || 0) >= 5 &&
+      recent14StudyDays >= 3 &&
+      weeklyMinutes > 0;
+
+    return buildStudentFullAnalysisSummary({
+      centerTopPercent: toTopPercent(centerRankingSummary?.rank ?? null, centerRankingSummary?.total ?? null),
+      centerRank: centerRankingSummary?.rank ?? null,
+      centerTotal: centerRankingSummary?.total ?? 0,
+      classTopPercent: toTopPercent(classRankingSummary?.rank ?? null, classRankingSummary?.total ?? null),
+      classRank: classRankingSummary?.rank ?? null,
+      classTotal: classRankingSummary?.total ?? 0,
+      weeklyMinutes,
+      blankDays: recent14BlankDays,
+      weekDiffPct: latestWeeklyLearningGrowthPercent,
+      completionRate: avgCompletionRate,
+      maxStreak: studyStreakDays,
+      avgMinutes: avgStudyMinutes,
+      studyDays: recent14StudyDays,
+      hasEnoughData: hasEnoughComparisonData,
+    });
+  }, [
+    avgCompletionRate,
+    avgStudyMinutes,
+    centerRankingSummary,
+    classRankingSummary,
+    latestWeeklyLearningGrowthPercent,
+    rankingLoading,
+    recent14BlankDays,
+    recent14StudyDays,
+    studyStreakDays,
+    weeklyGrowthData,
+  ]);
 
   const days30AgoMs = subDays(today, 30).getTime();
   const studentDailyReports = useMemo(
@@ -1928,67 +2047,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const detailSecondaryTextClass = isAnalysisPresentation ? 'text-[#5F7299]' : 'text-[#5c6e97]';
   const analysisWarmBadgeClass = isAnalysisPresentation ? 'analysis-warm-badge' : '';
   const analysisSoftBadgeClass = isAnalysisPresentation ? 'analysis-soft-badge' : '';
-  const analysisSubChipClass = isAnalysisPresentation ? 'analysis-subchip' : '';
-  const analysisIconBubbleClass = isAnalysisPresentation ? 'analysis-icon-bubble' : '';
-  const analysisMeterTrackClass = isAnalysisPresentation ? 'analysis-meter-track' : '';
-  const focusKpiCards = [
-    {
-      key: 'growth',
-      label: '오늘 학습 성장률',
-      compactLabel: '오늘 성장률',
-      value: formatSignedPercent(focusKpi.todayGrowthPercent),
-      helper: '최근 7일 평균 대비',
-      note: focusKpi.todayGrowthPercent >= 0 ? '상승 흐름 유지' : '리듬 회복 필요',
-      Icon: focusKpi.todayGrowthPercent >= 0 ? TrendingUp : Activity,
-      iconClass: focusKpi.todayGrowthPercent >= 0 ? 'text-emerald-600' : 'text-rose-500',
-      panelClass: 'border-emerald-100/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.96)_0%,rgba(255,255,255,0.88)_100%)]',
-      chipClass: 'text-emerald-700 bg-emerald-100/80',
-      meterClass: focusKpi.todayGrowthPercent >= 0 ? 'from-emerald-400 via-emerald-500 to-teal-500' : 'from-rose-300 via-rose-400 to-rose-500',
-      meterValue: Math.max(14, Math.min(100, 50 + focusKpi.todayGrowthPercent)),
-    },
-    {
-      key: 'recent',
-      label: '최근 7일 평균',
-      compactLabel: '최근7일 평균',
-      value: minutesToLabel(focusKpi.recent7AvgMinutes),
-      helper: '일 평균 공부시간',
-      note: '기준 페이스',
-      Icon: Clock3,
-      iconClass: 'text-[#2554d4]',
-      panelClass: 'border-[#dbe7ff] bg-[linear-gradient(180deg,rgba(241,246,255,0.98)_0%,rgba(255,255,255,0.9)_100%)]',
-      chipClass: 'text-[#2554d4] bg-[#e8f0ff]',
-      meterClass: 'from-[#8fb6ff] via-[#4f7cff] to-[#2554d4]',
-      meterValue: Math.max(12, Math.min(100, Math.round((focusKpi.recent7AvgMinutes / 240) * 100))),
-    },
-    {
-      key: 'completion',
-      label: '계획 완수율',
-      compactLabel: '계획 완수율',
-      value: `${focusKpi.completionRate}%`,
-      helper: '최근 기간 평균',
-      note: focusKpi.completionRate >= 70 ? '실행 안정권' : '실행 루틴 점검',
-      Icon: CheckCircle2,
-      iconClass: 'text-amber-500',
-      panelClass: 'border-amber-100/80 bg-[linear-gradient(180deg,rgba(255,247,237,0.98)_0%,rgba(255,255,255,0.92)_100%)]',
-      chipClass: 'text-amber-700 bg-amber-100/80',
-      meterClass: 'from-amber-300 via-amber-400 to-[#ff7a16]',
-      meterValue: Math.max(12, Math.min(100, focusKpi.completionRate)),
-    },
-    {
-      key: 'rhythm',
-      label: '학습 리듬 점수',
-      compactLabel: '리듬 점수',
-      value: `${focusKpi.rhythmScore}점`,
-      helper: '공부시간 분산 기반',
-      note: focusKpi.rhythmScore >= 70 ? '리듬 안정적' : '흔들림 관리 필요',
-      Icon: Activity,
-      iconClass: 'text-violet-600',
-      panelClass: 'border-violet-100/80 bg-[linear-gradient(180deg,rgba(247,245,255,0.98)_0%,rgba(255,255,255,0.92)_100%)]',
-      chipClass: 'text-violet-700 bg-violet-100/80',
-      meterClass: 'from-violet-300 via-violet-400 to-violet-500',
-      meterValue: Math.max(12, Math.min(100, focusKpi.rhythmScore)),
-    },
-  ] as const;
   const chartInsightHeadline = chartInsights.weekly.trend;
   const chartInsightSummary = chartInsights.daily.improve;
   const insightHighlights = [
@@ -2034,6 +2092,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       bgClass: 'border-rose-100/80 bg-white/85',
     },
   ] as const;
+  const hasCompletionTrendData = displaySeries.some((item) => item.hasCompletion || item.completionRate > 0);
   const defaultSectionMotion = (delay = 0) => (prefersReducedMotion ? {} : {
     initial: { opacity: 0, y: 18 },
     animate: { opacity: 1, y: 0 },
@@ -2750,187 +2809,43 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           )}
         >
           {isAnalysisPresentation ? (
-            <section className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]')}>
-              <Card className={cn(
-                "analysis-premium-card analysis-full-board-card analysis-focus-kpi-board surface-card surface-card--secondary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none",
-                isMobile && "analysis-focus-kpi-board--compact"
-              )}>
-                <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
-                  <div className={cn(isMobile ? "flex flex-col items-stretch gap-3" : "flex items-start justify-between gap-3")}>
-                    <div className="min-w-0">
-                      <Badge
-                        variant={isAnalysisPresentation ? 'outline' : 'dark'}
-                        className={cn(
-                          "px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shadow-none",
-                          isAnalysisPresentation
-                            ? "border-white/20 bg-white/10 text-white"
-                            : analysisSoftBadgeClass
-                        )}
-                      >
-                        핵심 지표
-                      </Badge>
-                      <CardTitle className={cn(
-                        "font-aggro-display mt-3 break-keep text-[clamp(1rem,1.5vw,1.18rem)] font-black tracking-tight",
-                        isAnalysisPresentation ? detailPrimaryTextClass : "text-[var(--text-on-dark)]"
-                      )}>
-                        개인 집중도 KPI
-                      </CardTitle>
-                      <CardDescription className={cn(
-                        "mt-1 text-[11px] font-semibold leading-5",
-                        isAnalysisPresentation ? detailSecondaryTextClass : "text-[var(--text-on-dark-soft)]"
-                      )}>
-                        이번 주 학습 상태를 가장 먼저 읽을 수 있도록 핵심 수치만 모았습니다.
-                      </CardDescription>
-                    </div>
-                    <div className={cn(
-                      "analysis-focus-kpi-summary surface-card surface-card--ghost on-dark rounded-[1.15rem] border border-white/10 shadow-none",
-                      isMobile ? "flex flex-col items-center justify-center gap-1.5 px-3.5 py-2.5 text-center" : "flex flex-col items-center justify-center px-3 py-2 text-center"
-                    )}>
-                      <p className={cn(
-                        "analysis-focus-kpi-summary-label text-[10px] font-black uppercase tracking-[0.2em]",
-                        detailSecondaryTextClass
-                      )}>
-                        이번 주 포인트
-                      </p>
-                      <p className={cn("analysis-focus-kpi-summary-value font-aggro-display font-black text-[#D86A11]", isMobile ? "text-base whitespace-nowrap" : "mt-1 text-sm")}>
-                        {focusKpi.todayGrowthPercent >= 0 ? '상승세' : '리듬 조정'}
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className={cn("relative z-10 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
-                  <div className={cn("analysis-focus-kpi-grid grid gap-3", isMobile ? "grid-cols-2 gap-2.5" : "grid-cols-2")}>
-                    {focusKpiCards.map(({ key, label, compactLabel, value, helper, note, Icon, iconClass, panelClass, chipClass, meterClass, meterValue }) => {
-                      const displayLabel = isAnalysisPresentation && isMobile ? compactLabel : label;
-                      const displayValue = isAnalysisPresentation && isMobile ? value.replace(/\s+/g, '\n') : value;
-
-                      return (
-                        <div
-                          key={key}
-                          className={cn(
-                            "analysis-focus-kpi-card min-w-0 overflow-hidden rounded-[1.35rem] border px-4 py-4",
-                            isMobile && "analysis-focus-kpi-card--compact",
-                            isAnalysisPresentation ? "surface-card surface-card--ghost on-dark border-white/10 shadow-none" : panelClass
-                          )}
-                        >
-                          <div className="analysis-focus-kpi-card-body space-y-3">
-                            <div className={cn("analysis-focus-kpi-card-top", isMobile ? "flex items-start justify-between gap-2.5" : "flex items-start justify-between gap-3")}>
-                              <span className={cn(
-                                "analysis-focus-kpi-card-chip inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]",
-                                isAnalysisPresentation ? analysisSubChipClass : chipClass,
-                                isMobile && "max-w-[calc(100%-3.1rem)] whitespace-nowrap leading-4"
-                              )}>
-                                {displayLabel}
-                              </span>
-                              <div className={cn("analysis-focus-kpi-card-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] shadow-none", isAnalysisPresentation ? analysisIconBubbleClass : "border border-white/12 bg-white/10")}>
-                                <Icon className={cn("analysis-focus-kpi-card-icon-svg h-5 w-5", iconClass)} />
-                              </div>
-                            </div>
-                          </div>
-                          <p className={cn(
-                            "analysis-focus-kpi-card-value mt-3 break-keep font-black tracking-tight",
-                            isAnalysisPresentation ? "text-[#17326B]" : "text-[var(--text-on-dark)]",
-                            isMobile ? "text-[clamp(2rem,8vw,2.55rem)] leading-[0.95]" : "text-[clamp(1.25rem,3.2vw,1.8rem)]"
-                          )}>
-                            {displayValue}
-                          </p>
-                          <div className="analysis-focus-kpi-card-copy mt-3 space-y-1.5">
-                            <p className={cn(
-                              "analysis-focus-kpi-card-helper text-[11px] font-semibold leading-5 break-keep",
-                              isAnalysisPresentation ? "text-[#5F7299]" : "text-[var(--text-on-dark-soft)]"
-                            )}>
-                              {helper}
-                            </p>
-                            <p className="analysis-focus-kpi-card-note text-[11px] font-black break-keep text-[var(--accent-orange-soft)]">{note}</p>
-                          </div>
-                          <div className={cn("analysis-focus-kpi-card-meter mt-4 h-1.5 overflow-hidden rounded-full", isAnalysisPresentation ? analysisMeterTrackClass : "bg-white/12")}>
-                            <div className={cn("h-full rounded-full bg-gradient-to-r", meterClass)} style={{ width: `${meterValue}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="analysis-premium-card analysis-full-board-card surface-card surface-card--primary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none">
-                <CardHeader className={cn("relative z-10", isMobile ? "px-4 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-[var(--accent-orange)]" />
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-orange-soft)]">인사이트 요약</p>
-                    </div>
-                    <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,1.25fr)_auto] items-start")}>
-                      <div className="min-w-0">
-                        <CardTitle className={cn(
-                          "font-aggro-display break-keep text-[clamp(1rem,1.5vw,1.2rem)] font-black tracking-tight",
-                          isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[var(--text-on-dark)]"
-                        )}>
-                          {chartInsightHeadline}
-                        </CardTitle>
-                        <CardDescription className={cn(
-                          "mt-2 text-[11px] font-semibold leading-5",
-                          isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[var(--text-on-dark-soft)]"
-                        )}>
-                          {chartInsightSummary}
-                        </CardDescription>
-                      </div>
-                      <Badge variant={isAnalysisPresentation ? 'outline' : 'secondary'} className={cn("w-fit px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] shadow-none", isAnalysisPresentation && analysisWarmBadgeClass)}>
-                        분석 포인트
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className={cn("relative z-10 space-y-3 pt-0", isMobile ? "px-4 pb-4" : "px-5 pb-5")}>
-                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                    {insightHighlights.map(({ key, label, badge, value, detail, accentClass }) => (
-                      <div
-                        key={key}
-                        className="surface-card surface-card--ghost on-dark overflow-hidden rounded-[1.35rem] border border-white/10 p-4 shadow-none"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <Badge variant="outline" className={cn("px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] shadow-none", key === 'daily' ? analysisWarmBadgeClass : analysisSoftBadgeClass)}>
-                            {badge}
-                          </Badge>
-                          <div className={cn("h-2 w-14 rounded-full bg-gradient-to-r", accentClass)} />
-                        </div>
-                        <p className={cn(
-                          "mt-3 text-[10px] font-black uppercase tracking-[0.18em]",
-                          isAnalysisPresentation ? 'text-[#17326B]' : analysisReadableSoftTextClass
-                        )}>
-                          {label}
-                        </p>
-                        <p className={cn(
-                          "mt-2 break-keep text-sm font-black leading-6",
-                          isAnalysisPresentation ? "text-[#17326B]" : "text-[var(--text-on-dark)]"
-                        )}>
-                          {value}
-                        </p>
-                        <p className={cn(
-                          "mt-2 text-[12px] font-semibold leading-5",
-                          isAnalysisPresentation ? "text-[#5F7299]" : "text-[var(--text-on-dark-soft)]"
-                        )}>
-                          {detail}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-                    {insightSupportCards.map(({ key, label, value, toneClass }) => (
-                      <div key={key} className="surface-card surface-card--ghost on-dark rounded-[1.2rem] border border-white/10 px-3.5 py-3 shadow-none">
-                        <p className={cn(
-                          "text-[10px] font-black uppercase tracking-[0.18em]",
-                          isAnalysisPresentation ? 'text-[#17326B]' : analysisReadableSoftTextClass
-                        )}>
-                          {label}
-                        </p>
-                        <p className={cn("mt-2 break-keep text-[12px] font-black leading-5", toneClass)}>{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
+            <StudentAnalysisOverviewSection
+              isMobile={isMobile}
+              rankingLoading={rankingLoading}
+              summary={studentFullAnalysisSummary}
+              chartInsights={chartInsights}
+              hasWeeklyGrowthData={hasWeeklyGrowthData}
+              hasDailyGrowthData={hasDailyGrowthData}
+              hasCompletionTrendData={hasCompletionTrendData}
+              hasRhythmScoreOnlyTrend={hasRhythmScoreOnlyTrend}
+              hasStartEndTimeData={hasStartEndTimeData}
+              hasAwayTimeData={hasAwayTimeData}
+              latestWeeklyLearningGrowthPercent={latestWeeklyLearningGrowthPercent}
+              latestDailyLearningGrowthPercent={latestDailyLearningGrowthPercent}
+              weeklyGrowthData={weeklyGrowthData}
+              dailyGrowthWindowData={dailyGrowthWindowData}
+              dailyGrowthWindowLabel={dailyGrowthWindowLabel}
+              focusedChartDays={RANGE_MAP[focusedChartView]}
+              canGoPrevDailyWindow={boundedDailyGrowthWindowIndex < dailyGrowthWindowCount - 1}
+              canGoNextDailyWindow={boundedDailyGrowthWindowIndex > 0}
+              onPrevDailyWindow={() => setDailyGrowthWindowIndex((prev) => Math.min(dailyGrowthWindowCount - 1, prev + 1))}
+              onNextDailyWindow={() => setDailyGrowthWindowIndex((prev) => Math.max(0, prev - 1))}
+              completionTrendData={displaySeries}
+              recentStudySessions={recentStudySessions}
+              avgCompletionRate={avgCompletionRate}
+              avgStudyMinutes={avgStudyMinutes}
+              todayStudyMinutes={todayStudyMinutes}
+              studyStreakDays={studyStreakDays}
+              rhythmScore={rhythmScore}
+              averageRhythmScore={averageRhythmScore}
+              latestRhythmScore={latestRhythmScore}
+              rhythmScoreOnlyTrend={rhythmScoreOnlyTrend}
+              startEndTimeTrendData={startEndTimeTrendData}
+              latestStartEndSnapshot={latestStartEndSnapshot}
+              awayTimeData={awayTimeData}
+              averageAwayMinutes={averageAwayMinutes}
+              riskSignals={riskSignals}
+            />
           ) : (
             <motion.section
               {...defaultSectionMotion(0.12)}
@@ -3100,7 +3015,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </motion.section>
           ) : null}
 
-          {!isMobile && (
+          {!isAnalysisPresentation && !isMobile && (
           <motion.section {...defaultSectionMotion(0.16)} className="analysis-full-chart-stack space-y-5">
             {!isAnalysisPresentation ? (
               <div className="rounded-[1.9rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] px-5 py-5 shadow-[0_28px_70px_-56px_rgba(20,41,95,0.36)]">
@@ -3458,7 +3373,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </motion.section>
           )}
 
-          {isMobile ? (
+          {!isAnalysisPresentation && isMobile ? (
             <motion.section {...defaultSectionMotion(0.18)} className="space-y-4">
               {!isAnalysisPresentation ? (
                 <div className="rounded-[1.75rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] px-4 py-4 shadow-[0_24px_60px_-52px_rgba(20,41,95,0.34)]">

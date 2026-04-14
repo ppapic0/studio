@@ -19,6 +19,19 @@ export type StudentGrowthSummary = {
   coachNote: string;
 };
 
+export type StudentFullAnalysisSummary = {
+  tone: StudentGrowthSummaryTone;
+  positionTitle: string;
+  positionDetail: string;
+  statusLabel: string;
+  statusDetail: string;
+  strengthTitle: string;
+  strengthDetail: string;
+  improvementTitle: string;
+  improvementDetail: string;
+  coachNote: string;
+};
+
 const EMPTY_INSIGHT: ChartInsight = {
   trend: '아직 분석할 데이터가 부족합니다.',
   growth: '최근 7~14일 학습 로그가 쌓이면 성장 추세를 더 정확하게 볼 수 있습니다.',
@@ -41,6 +54,11 @@ function formatMinutesLabel(minutes: number): string {
   if (hours === 0) return `${mins}분`;
   if (mins === 0) return `${hours}시간`;
   return `${hours}시간 ${mins}분`;
+}
+
+function formatTopPercent(percent: number | null): string | null {
+  if (typeof percent !== 'number' || !Number.isFinite(percent)) return null;
+  return `상위 ${Math.max(1, Math.round(percent))}%`;
 }
 
 export function buildStudentGrowthSummary(input: {
@@ -154,6 +172,149 @@ export function buildStudentGrowthSummary(input: {
     weaknessDetail: weakness.detail,
     growthTitle: '성장 정도',
     growthDetail,
+    coachNote,
+  };
+}
+
+export function buildStudentFullAnalysisSummary(input: {
+  centerTopPercent: number | null;
+  centerRank: number | null;
+  centerTotal: number;
+  classTopPercent?: number | null;
+  classRank?: number | null;
+  classTotal?: number;
+  weeklyMinutes: number;
+  blankDays: number;
+  weekDiffPct: number;
+  completionRate: number;
+  maxStreak: number;
+  avgMinutes: number;
+  studyDays: number;
+  hasEnoughData: boolean;
+}): StudentFullAnalysisSummary {
+  const blankDays = Math.max(0, Math.round(input.blankDays));
+  const weekDiffPct = Math.round(input.weekDiffPct);
+  const completionRate = Math.max(0, Math.round(input.completionRate));
+  const maxStreak = Math.max(0, Math.round(input.maxStreak));
+  const avgMinutes = Math.max(0, Math.round(input.avgMinutes));
+  const weeklyMinutes = Math.max(0, Math.round(input.weeklyMinutes));
+  const studyDays = Math.max(0, Math.round(input.studyDays));
+  const centerTopPercentLabel = formatTopPercent(input.centerTopPercent);
+  const classTopPercentLabel = formatTopPercent(
+    typeof input.classTotal === 'number' && input.classTotal >= 5 ? input.classTopPercent ?? null : null
+  );
+
+  if (!input.hasEnoughData || !centerTopPercentLabel) {
+    return {
+      tone: 'steady',
+      positionTitle: '기록이 더 쌓이면 현재 위치를 더 정확하게 보여줄게요.',
+      positionDetail: `최근 ${studyDays}일의 기록이 쌓였어요. 이번 주 누적 ${formatMinutesLabel(weeklyMinutes)}를 먼저 꾸준히 만드는 단계예요.`,
+      statusLabel: '기록 축적 중',
+      statusDetail: '지금은 그래프를 정교하게 해석하기보다 빈 날 없이 기록을 쌓는 것이 가장 중요해요.',
+      strengthTitle: '잘하고 있어요',
+      strengthDetail: `${studyDays}일의 학습 기록이 모였어요. 기록을 이어가는 것 자체가 첫 성장 신호예요.`,
+      improvementTitle: '지금 고치면 좋아요',
+      improvementDetail: '최근 7~14일 동안 빈 날을 줄이고 같은 시간대에 공부를 시작해 보세요.',
+      coachNote: '데이터가 조금만 더 쌓이면 센터 안에서의 현재 위치와 흐름을 훨씬 정확하게 읽을 수 있어요.',
+    };
+  }
+
+  const tone: StudentGrowthSummaryTone =
+    blankDays >= 3 || weekDiffPct <= -12 || completionRate < 60
+      ? 'recovery'
+      : weekDiffPct >= 10 || completionRate >= 82 || maxStreak >= 5
+        ? 'good'
+        : 'steady';
+
+  const statusLabel =
+    tone === 'good' ? '상승 가능성 높음' : tone === 'recovery' ? '보완 필요' : '유지 중';
+
+  const positionTitle = classTopPercentLabel
+    ? `센터 ${centerTopPercentLabel} · 같은 반 ${classTopPercentLabel}`
+    : `센터 ${centerTopPercentLabel}`;
+
+  const positionDetail = classTopPercentLabel
+    ? `이번 주 누적 ${formatMinutesLabel(weeklyMinutes)}으로 센터 ${input.centerRank}/${input.centerTotal}위, 반 ${input.classRank}/${input.classTotal}위 흐름이에요.`
+    : `이번 주 누적 ${formatMinutesLabel(weeklyMinutes)}으로 센터 ${input.centerRank}/${input.centerTotal}위 수준이에요.`;
+
+  const statusDetail =
+    tone === 'good'
+      ? `지난주 대비 ${Math.abs(weekDiffPct)}% 변화와 ${maxStreak}일 연속 기록이 함께 보여요. 지금 패턴이면 이번 주도 올라갈 가능성이 높아요.`
+      : tone === 'recovery'
+        ? `최근 흐름이 잠깐 흔들렸어요. 빈 날 ${blankDays}일과 완료율 ${completionRate}% 중 하나만 먼저 바로잡아도 다시 올라갈 수 있어요.`
+        : `흐름은 유지되고 있어요. 작은 보완 하나만 더하면 다음 구간에서 더 뚜렷하게 올라갈 수 있어요.`;
+
+  const strength =
+    blankDays === 0 && maxStreak >= 5
+      ? {
+          title: '잘하고 있어요',
+          detail: `${maxStreak}일 연속으로 공부를 이어가고 있어요. 지금 가장 큰 강점은 끊기지 않는 꾸준함이에요.`,
+        }
+      : completionRate >= 82
+        ? {
+            title: '잘하고 있어요',
+            detail: `최근 완료율이 ${completionRate}%예요. 시작한 공부를 끝까지 마무리하는 힘이 좋아요.`,
+          }
+        : weekDiffPct >= 10
+          ? {
+              title: '잘하고 있어요',
+              detail: `지난주보다 공부시간이 ${Math.abs(weekDiffPct)}% 늘었어요. 상승 방향은 분명히 맞아요.`,
+            }
+          : avgMinutes >= 180
+            ? {
+                title: '잘하고 있어요',
+                detail: `최근 14일 평균 ${formatMinutesLabel(avgMinutes)}으로 기본 공부량이 안정적으로 잡히고 있어요.`,
+              }
+            : {
+                title: '잘하고 있어요',
+                detail: `이번 주 누적 ${formatMinutesLabel(weeklyMinutes)}이 쌓였어요. 지금은 흐름을 이어가는 힘이 중요해요.`,
+              };
+
+  const improvement =
+    blankDays > 0
+      ? {
+          title: '지금 고치면 좋아요',
+          detail: `최근 14일 중 기록이 비어 있는 날이 ${blankDays}일 있어요. 공백일부터 줄이면 전체 그래프가 가장 빠르게 안정돼요.`,
+        }
+      : completionRate < 70
+        ? {
+            title: '지금 고치면 좋아요',
+            detail: `완료율 ${completionRate}%를 먼저 80% 근처까지 올려보세요. 공부를 더 늘리기보다 마무리 힘을 붙이는 게 우선이에요.`,
+          }
+        : weekDiffPct < 0
+          ? {
+              title: '지금 고치면 좋아요',
+              detail: `지난주보다 공부시간이 ${Math.abs(weekDiffPct)}% 줄었어요. 이번 주는 기본 공부량을 다시 회복하는 것이 먼저예요.`,
+            }
+          : avgMinutes < 120
+            ? {
+                title: '지금 고치면 좋아요',
+                detail: `하루 평균 ${formatMinutesLabel(avgMinutes)}에서 30분만 더해도 성장 체감이 훨씬 빨라질 수 있어요.`,
+              }
+            : {
+                title: '지금 고치면 좋아요',
+                detail: '큰 약점보다 유지력이 중요한 구간이에요. 잘되는 시간대를 반복해서 습관으로 굳혀보세요.',
+              };
+
+  const coachNote =
+    blankDays > 0
+      ? '이번 주 목표는 더 많이가 아니라 빈 날 없이 이어 가는 것 하나면 충분해요.'
+      : completionRate < 70
+        ? '공부 시작보다 끝까지 가져가는 힘을 붙이면 다음 그래프가 더 예쁘게 올라올 거예요.'
+        : tone === 'good'
+          ? '지금 패턴을 같은 시간대에 한 번 더 반복하면 상승 흐름을 더 길게 가져갈 수 있어요.'
+          : '흐름은 이미 만들어졌어요. 이번 주엔 가장 흔들리는 한 지점만 고치면 충분해요.';
+
+  return {
+    tone,
+    positionTitle,
+    positionDetail,
+    statusLabel,
+    statusDetail,
+    strengthTitle: strength.title,
+    strengthDetail: strength.detail,
+    improvementTitle: improvement.title,
+    improvementDetail: improvement.detail,
     coachNote,
   };
 }
