@@ -6053,9 +6053,11 @@ select {
 }
 
 .point-track-modal-shell {
-  background:
+  color: var(--text-on-dark);
+  background-color: #14295F !important;
+  background-image:
     radial-gradient(circle at top, var(--accent-orange-surface-strong), transparent 28%),
-    linear-gradient(180deg, var(--student-night-bg-soft) 0%, var(--student-night-bg) 100%);
+    linear-gradient(180deg, #14295F 0%, var(--student-night-bg) 100%) !important;
 }
 
 .point-track-modal-stage {
@@ -6070,15 +6072,17 @@ select {
 }
 
 .point-track-modal-shell--rare {
-  background:
+  background-color: #14295F !important;
+  background-image:
     radial-gradient(circle at top, rgba(255, 165, 68, 0.38), transparent 28%),
-    linear-gradient(180deg, #14295f 0%, #1f2a56 42%, #3f230e 100%);
+    linear-gradient(180deg, #14295f 0%, #1f2a56 42%, #3f230e 100%) !important;
 }
 
 .point-track-modal-shell--epic {
-  background:
+  background-color: #14295F !important;
+  background-image:
     radial-gradient(circle at top, rgba(176, 126, 255, 0.34), transparent 30%),
-    linear-gradient(180deg, #14295f 0%, #201f61 46%, #301955 100%);
+    linear-gradient(180deg, #14295f 0%, #201f61 46%, #301955 100%) !important;
 }
 
 .point-track-modal-stage--rare {
