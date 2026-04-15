@@ -530,8 +530,9 @@ export default function GrowthPage() {
   }, [activeStudyDayKey, persistedOpenedBoxes, user?.uid]);
 
   useEffect(() => {
-    setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
-  }, [persistedCarryoverOpenedBoxes]);
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(user?.uid, previousStudyDayKey);
+    setCarryoverOpenedBoxes(normalizeStudyBoxHours([...persistedCarryoverOpenedBoxes, ...cachedOpenedBoxes]));
+  }, [persistedCarryoverOpenedBoxes, previousStudyDayKey, user?.uid]);
 
   useEffect(() => {
     setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
@@ -734,7 +735,7 @@ export default function GrowthPage() {
     if (!isTimerActive || !progressRef || !activeMembership?.id || !user?.uid) return;
     if ((claimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY) !== hydratedClaimCacheKey) return;
 
-    const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, claimedBoxes);
+    const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, claimedBoxes, openedBoxes);
     if (availableMilestones.length === 0) return;
 
     const claimKey = `${activeStudyDayKey}:${availableMilestones.join(',')}:${liveTodayMinutes}`;
@@ -750,7 +751,10 @@ export default function GrowthPage() {
       })
     );
     const nextClaimedBoxes = Array.from(new Set([...claimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
-    const nextRewardEntries = [...rewardEntries, ...nextRewards].sort((a, b) => a.milestone - b.milestone);
+    const nextRewardEntries = nextRewards.reduce(
+      (entries, reward) => upsertStudyBoxRewardEntry(entries, reward),
+      rewardEntries
+    );
     const nextDayStatus = {
       ...todayStatus,
       claimedStudyBoxes: nextClaimedBoxes,
@@ -806,6 +810,7 @@ export default function GrowthPage() {
     hydratedClaimCacheKey,
     isTimerActive,
     liveTodayMinutes,
+    openedBoxes,
     activeMembership?.id,
     persistedClaimedBoxes,
     persistedRewardEntries,
@@ -915,6 +920,7 @@ export default function GrowthPage() {
           }
         } else {
           setCarryoverOpenedBoxes(nextOpenedBoxes);
+          writeStudyBoxOpenedCache(user.uid, activeVaultDateKey, nextOpenedBoxes);
         }
         if (typeof result.pointsBalance === 'number') {
           setPointBalance(Math.max(0, result.pointsBalance));
@@ -929,7 +935,10 @@ export default function GrowthPage() {
           setClaimedBoxes(persistedClaimedBoxes);
           setRewardEntries(persistedRewardEntries);
         } else {
-          setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
+          setCarryoverOpenedBoxes(normalizeStudyBoxHours([
+            ...persistedCarryoverOpenedBoxes,
+            ...readStudyBoxOpenedCache(user?.uid, previousStudyDayKey),
+          ]));
         }
         setBoxStage('idle');
         setFloatingGain(null);

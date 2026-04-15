@@ -311,10 +311,17 @@ export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
   };
 }
 
-export function getAvailableStudyBoxMilestones(totalMinutes: number, claimedStudyBoxes?: number[]) {
+export function getAvailableStudyBoxMilestones(
+  totalMinutes: number,
+  claimedStudyBoxes?: unknown,
+  openedStudyBoxes?: unknown
+) {
   const crossedMilestones = Math.max(0, Math.min(8, Math.floor(Math.max(0, totalMinutes) / 60)));
-  const claimed = new Set((claimedStudyBoxes || []).filter((value) => value >= 1 && value <= 8));
-  return Array.from({ length: crossedMilestones }, (_, index) => index + 1).filter((milestone) => !claimed.has(milestone));
+  const completed = new Set([
+    ...normalizeStudyBoxHourValues(claimedStudyBoxes),
+    ...normalizeStudyBoxHourValues(openedStudyBoxes),
+  ]);
+  return Array.from({ length: crossedMilestones }, (_, index) => index + 1).filter((milestone) => !completed.has(milestone));
 }
 
 export function getRenderableTodayStudyBoxHours({

@@ -3060,7 +3060,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!isActive || !isTimerActive || !progressRef || !activeStudyDayKey || !activeMembership?.id || !user?.uid) return;
     if ((studyBoxClaimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY) !== hydratedStudyBoxClaimCacheKey) return;
 
-    const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, syncedClaimedBoxes);
+    const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, syncedClaimedBoxes, syncedOpenedBoxes);
     if (availableMilestones.length === 0) return;
 
     const claimKey = `${activeStudyDayKey}:${availableMilestones.join(',')}:${liveTodayMinutes}`;
@@ -3078,7 +3078,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       })
     );
     const nextClaimedBoxes = Array.from(new Set([...syncedClaimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
-    const nextRewardEntries = [...syncedRewardEntries, ...rewards].sort((a, b) => a.milestone - b.milestone);
+    const nextRewardEntries = rewards.reduce(
+      (entries, reward) => upsertStudyBoxRewardEntry(entries, reward),
+      syncedRewardEntries
+    );
     const nextDayStatus = {
       ...todayPointStatus,
       claimedStudyBoxes: nextClaimedBoxes,
@@ -3123,6 +3126,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     isTimerActive,
     liveTodayMinutes,
     syncedClaimedBoxes,
+    syncedOpenedBoxes,
     syncedRewardEntries,
     persistedClaimedBoxes,
     persistedRewardEntries,

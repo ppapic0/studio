@@ -119,6 +119,10 @@ export function RewardVaultSlot({
   rarityLabels?: Record<RewardBoxRarity, string>;
 }) {
   const isMysterySlot = box.state === 'locked' || box.state === 'charging';
+  const openedReward = Number(box.reward);
+  const openedRewardLabel = Number.isFinite(openedReward)
+    ? `+${Math.max(0, Math.floor(openedReward)).toLocaleString()}P`
+    : '보상확인';
 
   return (
     <button
@@ -189,7 +193,9 @@ export function RewardVaultSlot({
                   ? 'READY'
                   : 'LOCK'}
             </span>
-            <span>{box.state === 'opened' ? '완료' : box.state === 'ready' ? '열기' : '잠김'}</span>
+            <span className={cn(box.state === 'opened' && 'text-[var(--text-accent-soft-fixed)]')}>
+              {box.state === 'opened' ? openedRewardLabel : box.state === 'ready' ? '열기' : '잠김'}
+            </span>
           </div>
         )}
       </div>
