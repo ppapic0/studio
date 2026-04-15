@@ -251,22 +251,19 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
   const handleUpdateSettings = async () => {
     if (!firestore || !user || !activeMembership) return;
 
-    const normalizedSchoolName = schoolName.trim();
-    const normalizedGrade = grade.trim();
-    const normalizedParentLinkCode = normalizeParentLinkCode(parentLinkCode);
-    const normalizedPhoneNumber = normalizePhone(phoneNumber);
-    const currentParentLinkCode = normalizeParentLinkCode(studentProfile?.parentLinkCode);
-
-    if (activeMembership.role === 'student' && normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
+    if (activeMembership.role === 'student') {
       toast({
-        variant: 'destructive',
-        title: '\uC785\uB825 \uD655\uC778',
-        description: '\uD559\uBD80\uBAA8 \uC5F0\uB3D9 \uCF54\uB4DC\uB294 6\uC790\uB9AC \uC22B\uC790\uB85C \uC785\uB825\uD574 \uC8FC\uC138\uC694.',
+        title: '프로필은 조회 전용입니다.',
+        description: '정보 변경이 필요하면 센터 관리자에게 요청해 주세요.',
       });
+      setIsSettingsOpen(false);
       return;
     }
 
-    if ((activeMembership.role === 'student' || activeMembership.role === 'parent') && !isValidKoreanMobilePhone(normalizedPhoneNumber)) {
+    const normalizedSchoolName = schoolName.trim();
+    const normalizedPhoneNumber = normalizePhone(phoneNumber);
+
+    if (activeMembership.role === 'parent' && !isValidKoreanMobilePhone(normalizedPhoneNumber)) {
       toast({
         variant: 'destructive',
         title: '\uC785\uB825 \uD655\uC778',
@@ -277,24 +274,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
 
     setIsUpdating(true);
     try {
-      if (activeMembership.role === 'student') {
-        if (!functions) {
-          throw new Error('함수 연결이 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.');
-        }
-
-        const updateFn = httpsCallable(functions, 'updateStudentAccount');
-        const payload: any = {
-          studentId: user.uid,
-          centerId: activeMembership.id,
-          schoolName: normalizedSchoolName,
-          grade: normalizedGrade,
-          phoneNumber: normalizedPhoneNumber,
-        };
-        if (normalizedParentLinkCode !== currentParentLinkCode) {
-          payload.parentLinkCode = normalizedParentLinkCode || null;
-        }
-        await updateFn(payload);
-      } else if (activeMembership.role === 'parent') {
+      if (activeMembership.role === 'parent') {
         if (!functions) {
           throw new Error('함수 연결이 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.');
         }
@@ -454,7 +434,9 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
           <div className="bg-primary text-white relative overflow-hidden p-6 sm:p-8">
             <Sparkles className="absolute top-0 right-0 p-8 h-32 w-32 opacity-10" />
             <DialogTitle className="font-black tracking-tighter text-xl sm:text-2xl">프로필 설정</DialogTitle>
-            <DialogDescription className="text-white/60 font-bold mt-1 text-xs">정보를 수정할 수 있습니다.</DialogDescription>
+            <DialogDescription className="text-white/60 font-bold mt-1 text-xs">
+              {activeMembership?.role === 'student' ? '등록된 프로필을 확인할 수 있습니다.' : '정보를 수정할 수 있습니다.'}
+            </DialogDescription>
           </div>
 
           <div className="space-y-6 bg-white p-6 sm:p-8">
@@ -465,8 +447,10 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
                 <Input
                   value={schoolName}
                   onChange={(e) => setSchoolName(e.target.value)}
+                  readOnly={activeMembership?.role === 'student'}
+                  disabled={activeMembership?.role === 'student'}
                   className="h-12 pl-10 rounded-xl border-2 font-bold"
-                  placeholder="학교명을 입력하세요"
+                  placeholder={activeMembership?.role === 'student' ? '등록된 학교 정보 없음' : '학교명을 입력하세요'}
                 />
               </div>
             </div>
@@ -479,8 +463,10 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
                   <Input
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    readOnly={activeMembership?.role === 'student'}
+                    disabled={activeMembership?.role === 'student'}
                     className="h-12 rounded-xl border-2 pl-10 font-black tracking-tight"
-                    placeholder="01012345678"
+                    placeholder={activeMembership?.role === 'student' ? '등록된 전화번호 없음' : '01012345678'}
                     maxLength={11}
                   />
                 </div>
@@ -491,7 +477,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
               <>
                 <div className="grid gap-2">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">현재 학년</Label>
-                  <Select value={grade} onValueChange={setGrade}>
+                  <Select value={grade} onValueChange={setGrade} disabled>
                     <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
                       <SelectValue placeholder="학년 선택" />
                     </SelectTrigger>
@@ -509,8 +495,10 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
                   <Input
                     value={parentLinkCode}
                     onChange={(e) => setParentLinkCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                    readOnly
+                    disabled
                     className="h-12 rounded-xl border-2 font-black tracking-[0.25em] text-center"
-                    placeholder="123456"
+                    placeholder="등록된 코드 없음"
                     maxLength={6}
                   />
                 </div>
@@ -520,11 +508,11 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
 
           <DialogFooter className="bg-muted/20 border-t p-6 sm:p-8">
             <Button
-              onClick={handleUpdateSettings}
+              onClick={activeMembership?.role === 'student' ? () => setIsSettingsOpen(false) : handleUpdateSettings}
               disabled={isUpdating}
               className="w-full h-14 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all"
             >
-              {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : '저장'}
+              {isUpdating ? <Loader2 className="animate-spin h-5 w-5" /> : activeMembership?.role === 'student' ? '확인' : '저장'}
             </Button>
           </DialogFooter>
         </DialogContent>

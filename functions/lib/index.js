@@ -2892,26 +2892,10 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             }
         }
     }
-    if (isSelfStudentCaller) {
-        const hasForbiddenUpdate = (typeof password === "string" && password.trim().length > 0) ||
-            trimmedDisplayName.length > 0 ||
-            hasClassName ||
-            memberStatusProvided ||
-            seasonLp !== undefined ||
-            stats !== undefined ||
-            todayStudyMinutes !== undefined ||
-            dateKey !== undefined;
-        if (hasForbiddenUpdate) {
-            throw new functions.https.HttpsError("permission-denied", "학생 계정은 일부 항목만 수정할 수 있습니다.", {
-                userMessage: "학생은 학교/학년/학부모 연동 코드만 수정할 수 있습니다.",
-            });
-        }
-        const hasSelfEditableFieldInPayload = typeof schoolName === "string" || typeof grade === "string" || parentLinkCodeProvided;
-        if (!hasSelfEditableFieldInPayload) {
-            throw new functions.https.HttpsError("invalid-argument", "No editable field provided.", {
-                userMessage: "수정할 항목을 입력해 주세요.",
-            });
-        }
+    if (isSelfStudentCaller && !canEditOtherStudent) {
+        throw new functions.https.HttpsError("permission-denied", "Student profiles are read-only for students.", {
+            userMessage: "학생은 본인 프로필을 확인만 할 수 있습니다. 변경이 필요하면 센터 관리자에게 요청해 주세요.",
+        });
     }
     try {
         if (isAdminCaller) {
