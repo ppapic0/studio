@@ -64,7 +64,7 @@ import {
   upsertStudyBoxRewardEntry,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
-import { getCurrentStudyDayLiveSeconds, getStudyDayContext } from '@/lib/study-day';
+import { getCurrentStudyDayLiveSeconds, getStudyDayContext, hasStudyBoxCarryoverExpired } from '@/lib/study-day';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, StudyLogDay } from '@/lib/types';
@@ -497,6 +497,10 @@ export default function GrowthPage() {
     () => getOpenedStudyBoxes(previousStudyDayStatus),
     [previousStudyDayStatus]
   );
+  const isCarryoverExpired = useMemo(
+    () => hasStudyBoxCarryoverExpired(previousStudyDayKey, new Date(nowMs)),
+    [nowMs, previousStudyDayKey]
+  );
 
   const stats = useMemo(() => {
     const raw = progress?.stats || { focus: 0, consistency: 0, achievement: 0, resilience: 0 };
@@ -666,17 +670,20 @@ export default function GrowthPage() {
     [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, user?.uid]
   );
   const carryoverReadyHours = useMemo(
-    () =>
-      getRemainingCarryoverStudyBoxHours({
+    () => {
+      if (isCarryoverExpired) return [];
+      return getRemainingCarryoverStudyBoxHours({
         claimedHours: persistedCarryoverClaimedBoxes,
         openedHours: carryoverOpenedBoxes,
-      }),
-    [carryoverOpenedBoxes, persistedCarryoverClaimedBoxes]
+      });
+    },
+    [carryoverOpenedBoxes, isCarryoverExpired, persistedCarryoverClaimedBoxes]
   );
-  const hasCarryoverReadyBoxes = carryoverReadyHours.length > 0;
+  const hasCarryoverReadyBoxes = !isCarryoverExpired && carryoverReadyHours.length > 0;
   const carryoverBoxes = useMemo(
-    () =>
-      buildRewardBoxes({
+    () => {
+      if (isCarryoverExpired) return [] as RewardBox[];
+      return buildRewardBoxes({
         earnedHours: persistedCarryoverClaimedBoxes.at(-1) || 0,
         claimedHours: persistedCarryoverClaimedBoxes,
         openedHours: carryoverOpenedBoxes,
@@ -684,8 +691,9 @@ export default function GrowthPage() {
         centerId: activeMembership?.id,
         studentId: user?.uid,
         dateKey: previousStudyDayKey,
-      }),
-    [activeMembership?.id, carryoverOpenedBoxes, carryoverRewardByHour, persistedCarryoverClaimedBoxes, previousStudyDayKey, user?.uid]
+      });
+    },
+    [activeMembership?.id, carryoverOpenedBoxes, carryoverRewardByHour, isCarryoverExpired, persistedCarryoverClaimedBoxes, previousStudyDayKey, user?.uid]
   );
   const activeBoxes = hasCarryoverReadyBoxes ? carryoverBoxes : boxes;
   const readyBoxes = activeBoxes.filter((box) => box.state === 'ready');

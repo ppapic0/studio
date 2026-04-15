@@ -136,13 +136,87 @@ function parseFiniteNumber(value: unknown): number | null {
   return null;
 }
 
+function normalizeStudyBoxHoursFromUnknown(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((entry) => {
+          if (typeof entry === "number") return entry;
+          if (typeof entry === "string") {
+            const trimmed = entry.trim().toLowerCase();
+            if (!trimmed) return Number.NaN;
+            const legacyMatch = trimmed.match(/^(\d+)\s*(?:h|시간)$/);
+            return Number(legacyMatch?.[1] ?? trimmed);
+          }
+          return Number.NaN;
+        })
+        .filter((entry) => Number.isFinite(entry) && entry >= 1 && entry <= 8)
+        .map((entry) => Math.round(entry))
+    )
+  ).sort((a, b) => a - b);
+}
+
+function getStudyBoxRewardPointByHour(dayStatus: Record<string, unknown>): Map<number, number> {
+  const rewardByHour = new Map<number, number>();
+  if (!Array.isArray(dayStatus.studyBoxRewards)) return rewardByHour;
+
+  dayStatus.studyBoxRewards.forEach((entry) => {
+    if (!isPlainObject(entry)) return;
+    const milestone = Math.round(parseFiniteNumber(entry.milestone) ?? Number.NaN);
+    if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8) return;
+    rewardByHour.set(milestone, Math.max(0, Math.floor(parseFiniteNumber(entry.awardedPoints) ?? 0)));
+  });
+
+  return rewardByHour;
+}
+
+function resolveOpenedStudyBoxHoursFromDayStatus(dayStatus: Record<string, unknown>): number[] {
+  const explicitOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.openedStudyBoxes);
+  const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.claimedStudyBoxes);
+
+  if (claimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
+
+  const rewardByHour = getStudyBoxRewardPointByHour(dayStatus);
+  if (explicitOpenedStudyBoxes.some((hour) => !rewardByHour.has(hour))) {
+    return explicitOpenedStudyBoxes;
+  }
+
+  const persistedDailyPointAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.dailyPointAmount) ?? 0));
+  const studyBoxAwardedPoints = Math.max(0, persistedDailyPointAmount - getRankRewardAwardTotal(dayStatus));
+  const explicitOpenedStudyBoxPoints = explicitOpenedStudyBoxes.reduce(
+    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
+    0
+  );
+  const remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
+  const missingClaimedStudyBoxes = claimedStudyBoxes.filter(
+    (hour) => !explicitOpenedStudyBoxes.includes(hour) && rewardByHour.has(hour)
+  );
+
+  if (missingClaimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
+
+  const missingClaimedRewardTotal = missingClaimedStudyBoxes.reduce(
+    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
+    0
+  );
+
+  if (missingClaimedRewardTotal > 0 && remainingAwardedStudyBoxPoints < missingClaimedRewardTotal) {
+    return explicitOpenedStudyBoxes;
+  }
+
+  return normalizeStudyBoxHoursFromUnknown([...explicitOpenedStudyBoxes, ...missingClaimedStudyBoxes]);
+}
+
+function getOpenedStudyBoxAwardTotal(dayStatus: Record<string, unknown>): number {
+  const rewardByHour = getStudyBoxRewardPointByHour(dayStatus);
+  return resolveOpenedStudyBoxHoursFromDayStatus(dayStatus).reduce(
+    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
+    0
+  );
+}
+
 function getLegacyDailyPointAwardTotal(dayStatus: Record<string, unknown>): number {
-  const studyBoxPoints = Array.isArray(dayStatus.studyBoxRewards)
-    ? dayStatus.studyBoxRewards.reduce((total, entry) => {
-        if (!isPlainObject(entry)) return total;
-        return total + Math.max(0, Math.floor(parseFiniteNumber(entry.awardedPoints) ?? 0));
-      }, 0)
-    : 0;
+  const studyBoxPoints = getOpenedStudyBoxAwardTotal(dayStatus);
   const rankRewardPoints = getRankRewardAwardTotal(dayStatus);
   return studyBoxPoints + rankRewardPoints;
 }

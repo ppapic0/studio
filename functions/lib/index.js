@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -99,6 +99,7 @@ const DAILY_POINT_EARN_CAP = 1000;
 const ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES = ["studying", "away", "break"];
 const ACTIVE_STUDY_ATTENDANCE_STATUSES = new Set(ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES);
 const STUDY_DAY_RESET_HOUR = 1;
+const STUDY_BOX_CARRYOVER_GRACE_MINUTES = 30;
 const STUDY_DAY_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 const SECOND_MS = 1000;
@@ -173,8 +174,14 @@ function upsertStudyBoxRewardEntries(existing, reward) {
     next.set(reward.milestone, reward);
     return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
+function getOpenedStudyBoxAwardTotal(dayStatus) {
+    const openedHourSet = new Set(resolveOpenedStudyBoxHoursFromDayStatus(dayStatus));
+    return normalizeStudyBoxRewardEntries(dayStatus.studyBoxRewards)
+        .filter((entry) => openedHourSet.has(entry.milestone))
+        .reduce((total, entry) => total + Math.max(0, Math.floor(entry.awardedPoints)), 0);
+}
 function getLegacyDailyPointAwardTotal(dayStatus) {
-    const studyBoxPoints = normalizeStudyBoxRewardEntries(dayStatus.studyBoxRewards).reduce((total, entry) => total + Math.max(0, Math.floor(entry.awardedPoints)), 0);
+    const studyBoxPoints = getOpenedStudyBoxAwardTotal(dayStatus);
     const rankRewardPoints = getRankRewardAwardTotal(dayStatus);
     return studyBoxPoints + rankRewardPoints;
 }
@@ -593,6 +600,17 @@ function getStudyDayWindowBounds(dateKey) {
         startMs,
         endMs: startMs + STUDY_DAY_MS,
     };
+}
+function getStudyBoxCarryoverExpiresAtMs(dateKey) {
+    return getStudyDayWindowBounds(dateKey).endMs + STUDY_BOX_CARRYOVER_GRACE_MINUTES * MINUTE_MS;
+}
+function hasStudyBoxCarryoverExpired(dateKey, baseDate = new Date()) {
+    return baseDate.getTime() >= getStudyBoxCarryoverExpiresAtMs(dateKey);
+}
+function getExpiredStudyBoxCarryoverDateKey(baseDate = new Date()) {
+    const currentStudyDayDate = toStudyDayDate(baseDate);
+    currentStudyDayDate.setDate(currentStudyDayDate.getDate() - 1);
+    return toDateKey(currentStudyDayDate);
 }
 function getTimeRangeOverlapMs(rangeStartMs, rangeEndMs, windowStartMs, windowEndMs) {
     if (!Number.isFinite(rangeStartMs) || !Number.isFinite(rangeEndMs))
@@ -5697,8 +5715,15 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         });
     }
     const persistedDayMinutes = Math.max(0, Math.floor((_d = parseFiniteNumber((_c = studyDaySnap.data()) === null || _c === void 0 ? void 0 : _c.totalMinutes)) !== null && _d !== void 0 ? _d : 0));
-    const currentStudyDayKey = toStudyDayKey();
     const nowMs = Date.now();
+    const nowDate = new Date(nowMs);
+    const currentStudyDayKey = toStudyDayKey(nowDate);
+    const isCarryoverDate = dateKey !== currentStudyDayKey;
+    if (isCarryoverDate && hasStudyBoxCarryoverExpired(dateKey, nowDate)) {
+        throw new functions.https.HttpsError("failed-precondition", "Study box carryover expired.", {
+            userMessage: "전날 상자는 새벽 1시 30분까지만 열 수 있습니다. 오늘 상자를 새로 모아 주세요.",
+        });
+    }
     const { startMs: studyDayStartMs, endMs: studyDayEndMs } = getStudyDayWindowBounds(dateKey);
     let liveSessionDurationSeconds = 0;
     let liveSessionStartMs = 0;
@@ -5731,7 +5756,7 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
     const preExistingOpenedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(preExistingDayStatus);
     const hasClaimedBoxRecord = preExistingClaimedStudyBoxes.includes(hour);
     const alreadyOpenedByRecord = preExistingOpenedStudyBoxes.includes(hour);
-    const canOpenCarryoverByRecord = dateKey !== currentStudyDayKey && hasClaimedBoxRecord;
+    const canOpenCarryoverByRecord = isCarryoverDate && hasClaimedBoxRecord;
     if (!alreadyOpenedByRecord && !canOpenCarryoverByRecord && earnedHours < hour) {
         throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
             userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
@@ -5820,6 +5845,92 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         pointsBalance: result.pointsBalance,
         totalPointsEarned: result.totalPointsEarned,
     };
+});
+function buildExpiredStudyBoxCarryoverStatusUpdate(dayStatus) {
+    const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.claimedStudyBoxes);
+    if (claimedStudyBoxes.length === 0)
+        return null;
+    const openedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(dayStatus);
+    const openedHourSet = new Set(openedStudyBoxes);
+    const expiredStudyBoxes = claimedStudyBoxes.filter((hour) => !openedHourSet.has(hour));
+    if (expiredStudyBoxes.length === 0)
+        return null;
+    const retainedClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([
+        ...claimedStudyBoxes.filter((hour) => openedHourSet.has(hour)),
+        ...openedStudyBoxes,
+    ]);
+    const retainedStudyBoxRewards = normalizeStudyBoxRewardEntries(dayStatus.studyBoxRewards)
+        .filter((entry) => openedHourSet.has(entry.milestone));
+    const mergedExpiredStudyBoxes = normalizeStudyBoxHoursFromUnknown([
+        ...normalizeStudyBoxHoursFromUnknown(dayStatus.expiredStudyBoxes),
+        ...expiredStudyBoxes,
+    ]);
+    return {
+        expiredStudyBoxes,
+        nextDayStatus: Object.assign(Object.assign({}, dayStatus), { claimedStudyBoxes: retainedClaimedStudyBoxes, openedStudyBoxes, studyBoxRewards: retainedStudyBoxRewards, expiredStudyBoxes: mergedExpiredStudyBoxes, studyBoxCarryoverExpiredAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }),
+    };
+}
+exports.scheduledStudyBoxCarryoverExpiry = functions
+    .region(region)
+    .runWith({
+    timeoutSeconds: 540,
+    memory: "1GB",
+})
+    .pubsub.schedule("30 1 * * *")
+    .timeZone("Asia/Seoul")
+    .onRun(async () => {
+    const db = admin.firestore();
+    const expiredDateKey = getExpiredStudyBoxCarryoverDateKey();
+    const centersSnap = await db.collection("centers").get();
+    let scannedProgressDocs = 0;
+    let cleanedProgressDocs = 0;
+    let expiredBoxCount = 0;
+    for (const centerDoc of centersSnap.docs) {
+        const centerId = centerDoc.id;
+        const progressSnap = await db.collection(`centers/${centerId}/growthProgress`).get();
+        let batch = db.batch();
+        let pendingWrites = 0;
+        for (const progressDoc of progressSnap.docs) {
+            scannedProgressDocs += 1;
+            const progressData = progressDoc.data();
+            const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+                ? progressData.dailyPointStatus
+                : {};
+            const dayStatus = isPlainObject(dailyPointStatus[expiredDateKey])
+                ? dailyPointStatus[expiredDateKey]
+                : null;
+            if (!dayStatus)
+                continue;
+            const update = buildExpiredStudyBoxCarryoverStatusUpdate(dayStatus);
+            if (!update)
+                continue;
+            batch.set(progressDoc.ref, {
+                dailyPointStatus: {
+                    [expiredDateKey]: update.nextDayStatus,
+                },
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            pendingWrites += 1;
+            cleanedProgressDocs += 1;
+            expiredBoxCount += update.expiredStudyBoxes.length;
+            if (pendingWrites >= 400) {
+                await batch.commit();
+                batch = db.batch();
+                pendingWrites = 0;
+            }
+        }
+        if (pendingWrites > 0) {
+            await batch.commit();
+        }
+    }
+    functions.logger.info("study box carryover expiry complete", {
+        expiredDateKey,
+        centerCount: centersSnap.size,
+        scannedProgressDocs,
+        cleanedProgressDocs,
+        expiredBoxCount,
+    });
+    return null;
 });
 exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(async (data, context) => {
     var _a, _b, _c;

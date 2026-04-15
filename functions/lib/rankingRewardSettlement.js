@@ -127,15 +127,70 @@ function parseFiniteNumber(value) {
     }
     return null;
 }
+function normalizeStudyBoxHoursFromUnknown(value) {
+    if (!Array.isArray(value))
+        return [];
+    return Array.from(new Set(value
+        .map((entry) => {
+        var _a;
+        if (typeof entry === "number")
+            return entry;
+        if (typeof entry === "string") {
+            const trimmed = entry.trim().toLowerCase();
+            if (!trimmed)
+                return Number.NaN;
+            const legacyMatch = trimmed.match(/^(\d+)\s*(?:h|시간)$/);
+            return Number((_a = legacyMatch === null || legacyMatch === void 0 ? void 0 : legacyMatch[1]) !== null && _a !== void 0 ? _a : trimmed);
+        }
+        return Number.NaN;
+    })
+        .filter((entry) => Number.isFinite(entry) && entry >= 1 && entry <= 8)
+        .map((entry) => Math.round(entry)))).sort((a, b) => a - b);
+}
+function getStudyBoxRewardPointByHour(dayStatus) {
+    const rewardByHour = new Map();
+    if (!Array.isArray(dayStatus.studyBoxRewards))
+        return rewardByHour;
+    dayStatus.studyBoxRewards.forEach((entry) => {
+        var _a, _b;
+        if (!isPlainObject(entry))
+            return;
+        const milestone = Math.round((_a = parseFiniteNumber(entry.milestone)) !== null && _a !== void 0 ? _a : Number.NaN);
+        if (!Number.isFinite(milestone) || milestone < 1 || milestone > 8)
+            return;
+        rewardByHour.set(milestone, Math.max(0, Math.floor((_b = parseFiniteNumber(entry.awardedPoints)) !== null && _b !== void 0 ? _b : 0)));
+    });
+    return rewardByHour;
+}
+function resolveOpenedStudyBoxHoursFromDayStatus(dayStatus) {
+    var _a;
+    const explicitOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.openedStudyBoxes);
+    const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.claimedStudyBoxes);
+    if (claimedStudyBoxes.length === 0)
+        return explicitOpenedStudyBoxes;
+    const rewardByHour = getStudyBoxRewardPointByHour(dayStatus);
+    if (explicitOpenedStudyBoxes.some((hour) => !rewardByHour.has(hour))) {
+        return explicitOpenedStudyBoxes;
+    }
+    const persistedDailyPointAmount = Math.max(0, Math.floor((_a = parseFiniteNumber(dayStatus.dailyPointAmount)) !== null && _a !== void 0 ? _a : 0));
+    const studyBoxAwardedPoints = Math.max(0, persistedDailyPointAmount - getRankRewardAwardTotal(dayStatus));
+    const explicitOpenedStudyBoxPoints = explicitOpenedStudyBoxes.reduce((total, hour) => { var _a; return total + ((_a = rewardByHour.get(hour)) !== null && _a !== void 0 ? _a : 0); }, 0);
+    const remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
+    const missingClaimedStudyBoxes = claimedStudyBoxes.filter((hour) => !explicitOpenedStudyBoxes.includes(hour) && rewardByHour.has(hour));
+    if (missingClaimedStudyBoxes.length === 0)
+        return explicitOpenedStudyBoxes;
+    const missingClaimedRewardTotal = missingClaimedStudyBoxes.reduce((total, hour) => { var _a; return total + ((_a = rewardByHour.get(hour)) !== null && _a !== void 0 ? _a : 0); }, 0);
+    if (missingClaimedRewardTotal > 0 && remainingAwardedStudyBoxPoints < missingClaimedRewardTotal) {
+        return explicitOpenedStudyBoxes;
+    }
+    return normalizeStudyBoxHoursFromUnknown([...explicitOpenedStudyBoxes, ...missingClaimedStudyBoxes]);
+}
+function getOpenedStudyBoxAwardTotal(dayStatus) {
+    const rewardByHour = getStudyBoxRewardPointByHour(dayStatus);
+    return resolveOpenedStudyBoxHoursFromDayStatus(dayStatus).reduce((total, hour) => { var _a; return total + ((_a = rewardByHour.get(hour)) !== null && _a !== void 0 ? _a : 0); }, 0);
+}
 function getLegacyDailyPointAwardTotal(dayStatus) {
-    const studyBoxPoints = Array.isArray(dayStatus.studyBoxRewards)
-        ? dayStatus.studyBoxRewards.reduce((total, entry) => {
-            var _a;
-            if (!isPlainObject(entry))
-                return total;
-            return total + Math.max(0, Math.floor((_a = parseFiniteNumber(entry.awardedPoints)) !== null && _a !== void 0 ? _a : 0));
-        }, 0)
-        : 0;
+    const studyBoxPoints = getOpenedStudyBoxAwardTotal(dayStatus);
     const rankRewardPoints = getRankRewardAwardTotal(dayStatus);
     return studyBoxPoints + rankRewardPoints;
 }

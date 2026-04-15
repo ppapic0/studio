@@ -272,20 +272,13 @@ export function getOpenedStudyBoxes(dayStatus?: Record<string, any>): number[] {
 }
 
 export function getDailyAwardedPointTotal(dayStatus?: Record<string, any>): number {
+  const earnedPointTotal = getDailyStudyBoxAwardPoints(dayStatus) + getRankRewardPoints(dayStatus);
   const total = Number(dayStatus?.dailyPointAmount ?? 0);
   if (Number.isFinite(total)) {
-    return Math.max(
-      0,
-      Math.max(
-        Math.floor(total),
-        normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).reduce((sum, entry) => sum + Math.max(0, entry.awardedPoints), 0)
-          + getRankRewardPoints(dayStatus)
-      )
-    );
+    return Math.max(0, Math.max(Math.floor(total), earnedPointTotal));
   }
 
-  return normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).reduce((sum, entry) => sum + Math.max(0, entry.awardedPoints), 0)
-    + getRankRewardPoints(dayStatus);
+  return earnedPointTotal;
 }
 
 export function getDailyStudyBoxAwardPoints(dayStatus?: Record<string, any>): number {

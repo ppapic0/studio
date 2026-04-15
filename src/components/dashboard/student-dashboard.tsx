@@ -131,7 +131,12 @@ import {
 } from '@/lib/university-theme';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
-import { getCurrentStudyDayLiveSeconds, getStudyDayContext, getStudyDayKey } from '@/lib/study-day';
+import {
+  getCurrentStudyDayLiveSeconds,
+  getStudyDayContext,
+  getStudyDayKey,
+  hasStudyBoxCarryoverExpired,
+} from '@/lib/study-day';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
 const STUDY_BOX_CLAIM_CACHE_PREFIX = 'student-dashboard:claimed-boxes';
@@ -2801,6 +2806,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     [yesterdayPointStatus]
   );
   const persistedCarryoverOpenedBoxes = useMemo(() => coerceOpenedStudyBoxes(yesterdayPointStatus), [yesterdayPointStatus]);
+  const isCarryoverExpired = useMemo(
+    () => hasStudyBoxCarryoverExpired(previousStudyDayKey, new Date(rankPreviewNowMs)),
+    [previousStudyDayKey, rankPreviewNowMs]
+  );
   const studyBoxClaimCacheKey = useMemo(() => {
     if (!activeMembership?.id || !user?.uid) return null;
     return `${STUDY_BOX_CLAIM_CACHE_PREFIX}:${activeMembership.id}:${user.uid}:${activeStudyDayKey}`;
@@ -2878,7 +2887,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     persistedCarryoverOpenedBoxes,
     previousStudyDayKey,
   ]);
-  const canRenderCarryoverBoxes = Boolean(previousStudyDayKey) && !isProgressLoading && isCarryoverOpenedCacheHydrated;
+  const canRenderCarryoverBoxes =
+    Boolean(previousStudyDayKey) && !isCarryoverExpired && !isProgressLoading && isCarryoverOpenedCacheHydrated;
 
   useEffect(() => {
     setCarryoverOpenedSnapshot({
@@ -2908,11 +2918,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return map;
   }, [persistedCarryoverRewardEntries]);
   const remainingCarryoverClaimedBoxes = useMemo(
-    () => getRemainingCarryoverStudyBoxHours({
-      claimedHours: persistedCarryoverClaimedBoxes,
-      openedHours: resolvedCarryoverOpenedBoxes,
-    }),
-    [persistedCarryoverClaimedBoxes, resolvedCarryoverOpenedBoxes]
+    () => {
+      if (isCarryoverExpired) return [];
+      return getRemainingCarryoverStudyBoxHours({
+        claimedHours: persistedCarryoverClaimedBoxes,
+        openedHours: resolvedCarryoverOpenedBoxes,
+      });
+    },
+    [isCarryoverExpired, persistedCarryoverClaimedBoxes, resolvedCarryoverOpenedBoxes]
   );
   const earnedBoxes = Math.min(8, Math.floor(liveTodaySeconds / 3600));
   const currentCycleSeconds = earnedBoxes >= 8 ? 3600 : liveTodaySeconds % 3600;

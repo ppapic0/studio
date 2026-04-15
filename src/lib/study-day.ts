@@ -1,6 +1,8 @@
 export const STUDY_DAY_RESET_HOUR = 1;
+export const STUDY_BOX_CARRYOVER_GRACE_MINUTES = 30;
 
 const STUDY_DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
 
 function padNumber(value: number) {
   return String(value).padStart(2, '0');
@@ -34,6 +36,16 @@ export function getStudyDayWindowForKey(dateKey: string) {
     startAt,
     endAt: new Date(startAt.getTime() + STUDY_DAY_MS),
   };
+}
+
+export function getStudyBoxCarryoverExpiresAtForKey(dateKey: string) {
+  const { endAt } = getStudyDayWindowForKey(dateKey);
+  return new Date(endAt.getTime() + STUDY_BOX_CARRYOVER_GRACE_MINUTES * MINUTE_MS);
+}
+
+export function hasStudyBoxCarryoverExpired(dateKey: string | null | undefined, baseDate: Date = new Date()) {
+  if (!dateKey) return true;
+  return baseDate.getTime() >= getStudyBoxCarryoverExpiresAtForKey(dateKey).getTime();
 }
 
 export function getStudyDayContext(baseDate: Date = new Date()) {
