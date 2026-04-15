@@ -179,6 +179,18 @@ type SecureStudyBoxReward = {
   boostEventId?: string | null;
 };
 
+type DailyPointEventDoc = {
+  id: string;
+  source: "study_box" | "daily_rank" | "weekly_rank" | "monthly_rank" | "manual_adjustment" | "legacy";
+  label: string;
+  points: number;
+  createdAt: string;
+  hour?: number;
+  range?: "daily" | "weekly" | "monthly";
+  rank?: number;
+  periodKey?: string;
+};
+
 type PointBoostEventMode = "day" | "window";
 type PointBoostEventDoc = {
   centerId: string;
@@ -330,6 +342,60 @@ function upsertStudyBoxRewardEntries(existing: unknown, reward: SecureStudyBoxRe
   next.set(reward.milestone, reward);
 
   return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
+}
+
+function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | null {
+  if (!isPlainObject(value)) return null;
+
+  const id = asTrimmedString(value.id);
+  const source = asTrimmedString(value.source) as DailyPointEventDoc["source"];
+  const label = asTrimmedString(value.label);
+  const points = Math.max(0, Math.floor(parseFiniteNumber(value.points) ?? 0));
+  const createdAt = asTrimmedString(value.createdAt);
+
+  if (!id || !source || !label || points <= 0 || !createdAt) return null;
+  if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "manual_adjustment", "legacy"].includes(source)) {
+    return null;
+  }
+
+  const event: DailyPointEventDoc = {
+    id,
+    source,
+    label,
+    points,
+    createdAt,
+  };
+
+  const hour = Math.round(parseFiniteNumber(value.hour) ?? Number.NaN);
+  if (Number.isFinite(hour) && hour >= 1 && hour <= 8) event.hour = hour;
+
+  const range = asTrimmedString(value.range);
+  if (range === "daily" || range === "weekly" || range === "monthly") event.range = range;
+
+  const rank = Math.max(0, Math.floor(parseFiniteNumber(value.rank) ?? 0));
+  if (rank > 0) event.rank = rank;
+
+  const periodKey = asTrimmedString(value.periodKey);
+  if (periodKey) event.periodKey = periodKey;
+
+  return event;
+}
+
+function normalizeDailyPointEvents(value: unknown): DailyPointEventDoc[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => normalizeDailyPointEventEntry(entry))
+    .filter((entry): entry is DailyPointEventDoc => entry !== null)
+    .slice(-80);
+}
+
+function upsertDailyPointEvent(existing: unknown, event: DailyPointEventDoc): DailyPointEventDoc[] {
+  const next = new Map<string, DailyPointEventDoc>();
+  normalizeDailyPointEvents(existing).forEach((entry) => {
+    next.set(entry.id, entry);
+  });
+  next.set(event.id, event);
+  return Array.from(next.values()).slice(-80);
 }
 
 function getOpenedStudyBoxAwardTotal(dayStatus: Record<string, unknown>): number {
@@ -7185,6 +7251,16 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     const nextOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...openedStudyBoxes, hour]);
     const nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...claimedStudyBoxes, hour]);
     const nextRewardEntries = upsertStudyBoxRewardEntries(storedRewardEntries, creditedReward);
+    const nextPointEvents = awardedDelta > 0
+      ? upsertDailyPointEvent(currentDayStatus.pointEvents, {
+          id: `study_box:${dateKey}:${hour}`,
+          source: "study_box",
+          label: `${hour}시간 상자`,
+          points: awardedDelta,
+          createdAt: new Date(nowMs).toISOString(),
+          hour,
+        })
+      : normalizeDailyPointEvents(currentDayStatus.pointEvents);
     const currentPointsBalance = Math.max(0, Math.floor(parseFiniteNumber(progressData.pointsBalance) ?? 0));
     const currentTotalPointsEarned = Math.max(0, Math.floor(parseFiniteNumber(progressData.totalPointsEarned) ?? 0));
 
@@ -7199,6 +7275,7 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
             claimedStudyBoxes: nextClaimedStudyBoxes,
             studyBoxRewards: nextRewardEntries,
             openedStudyBoxes: nextOpenedStudyBoxes,
+            pointEvents: nextPointEvents,
             dailyPointAmount: admin.firestore.FieldValue.increment(awardedDelta),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           },

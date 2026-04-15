@@ -3995,7 +3995,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </DialogTitle>
                   <DialogDescription className="text-sm font-medium text-white/76">
                     상자 {formatPointsInPt(selectedPointHistoryData.summary.studyBoxPoints)} · 랭킹 {formatPointsInPt(selectedPointHistoryData.summary.rankPoints)}
-                    {selectedPointHistoryData.summary.otherPoints > 0 ? ` · 기타 ${formatPointsInPt(selectedPointHistoryData.summary.otherPoints)}` : ''}
+                    {selectedPointHistoryData.summary.otherPoints > 0 ? ` · 이전 기록 ${formatPointsInPt(selectedPointHistoryData.summary.otherPoints)}` : ''}
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -4064,7 +4064,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                               </Badge>
                               {row.otherPoints > 0 ? (
                                 <Badge className="h-6 rounded-full border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
-                                  기타 {formatPointsInPt(row.otherPoints)}
+                                  이전 기록 {formatPointsInPt(row.otherPoints)}
                                 </Badge>
                               ) : null}
                             </div>

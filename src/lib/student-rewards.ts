@@ -49,6 +49,15 @@ export type StudyBoxReward = {
   boostEventId?: string | null;
 };
 
+export type DailyPointBreakdownItemTone = 'box' | 'rank' | 'legacy' | 'adjustment';
+
+export type DailyPointBreakdownItem = {
+  key: string;
+  label: string;
+  points: number;
+  tone: DailyPointBreakdownItemTone;
+};
+
 function normalizeStoredStudyBoxReward(value: unknown): StudyBoxReward | null {
   const milestone = Number((value as StudyBoxReward | null | undefined)?.milestone);
   const minReward = Number((value as StudyBoxReward | null | undefined)?.minReward);
@@ -97,6 +106,110 @@ function getDailyRankRewardPoints(dayStatus?: Record<string, any>): number {
     getNormalizedRewardAmount(dayStatus?.dailyRankRewardAmount),
     getNormalizedRewardAmount(dayStatus?.dailyTopRewardAmount)
   );
+}
+
+function getDailyPointEventTone(source: string): DailyPointBreakdownItemTone {
+  if (source === 'study_box') return 'box';
+  if (source.includes('rank')) return 'rank';
+  if (source.includes('adjustment')) return 'adjustment';
+  return 'legacy';
+}
+
+function getDailyPointEventLabel(event: Record<string, any>): string {
+  const explicitLabel = typeof event.label === 'string' ? event.label.trim() : '';
+  if (explicitLabel) return explicitLabel;
+
+  const source = typeof event.source === 'string' ? event.source : '';
+  const hour = Number(event.hour ?? event.milestone);
+  const rank = Math.max(0, Math.floor(Number(event.rank || 0)));
+  const rangeLabel =
+    source === 'weekly_rank'
+      ? '주간 랭킹'
+      : source === 'monthly_rank'
+        ? '월간 랭킹'
+        : '일간 랭킹';
+
+  if (source === 'study_box' && Number.isFinite(hour) && hour > 0) return `${hour}시간 상자`;
+  if (source.includes('rank')) return rank > 0 ? `${rangeLabel} ${rank}위` : rangeLabel;
+  if (source.includes('adjustment')) return '포인트 조정';
+  return '이전 포인트 기록';
+}
+
+function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyPointBreakdownItem[] {
+  if (!Array.isArray(value) || maxTotal <= 0) return [];
+
+  let remaining = maxTotal;
+  const seenKeys = new Set<string>();
+  const items: DailyPointBreakdownItem[] = [];
+
+  value.forEach((event, index) => {
+    if (!event || typeof event !== 'object' || remaining <= 0) return;
+
+    const points = getNormalizedRewardAmount((event as Record<string, any>).points);
+    if (points <= 0) return;
+
+    const keySource = typeof (event as Record<string, any>).id === 'string'
+      ? (event as Record<string, any>).id.trim()
+      : '';
+    const key = keySource || `point-event-${index}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+
+    const source = typeof (event as Record<string, any>).source === 'string'
+      ? (event as Record<string, any>).source
+      : '';
+    const cappedPoints = Math.min(remaining, points);
+    if (cappedPoints <= 0) return;
+
+    items.push({
+      key,
+      label: getDailyPointEventLabel(event as Record<string, any>),
+      points: cappedPoints,
+      tone: getDailyPointEventTone(source),
+    });
+    remaining -= cappedPoints;
+  });
+
+  return items;
+}
+
+function pushBreakdownItem(
+  items: DailyPointBreakdownItem[],
+  key: string,
+  label: string,
+  points: number,
+  tone: DailyPointBreakdownItemTone
+) {
+  const normalizedPoints = getNormalizedRewardAmount(points);
+  if (normalizedPoints <= 0) return;
+
+  items.push({ key, label, points: normalizedPoints, tone });
+}
+
+function getRankRewardBreakdownItems(dayStatus: Record<string, any> | undefined, maxPoints: number): DailyPointBreakdownItem[] {
+  const items: DailyPointBreakdownItem[] = [];
+  let remaining = Math.max(0, Math.floor(maxPoints));
+  if (remaining <= 0) return items;
+
+  const dailyRankPoints = getDailyRankRewardPoints(dayStatus);
+  const dailyRank = Math.max(0, Math.floor(Number(dayStatus?.dailyRankRewardRank || (dailyRankPoints > 0 ? 1 : 0))));
+  const weeklyRankPoints = getNormalizedRewardAmount(dayStatus?.weeklyRankRewardAmount);
+  const weeklyRank = Math.max(0, Math.floor(Number(dayStatus?.weeklyRankRewardRank || 0)));
+  const monthlyRankPoints = getNormalizedRewardAmount(dayStatus?.monthlyRankRewardAmount);
+  const monthlyRank = Math.max(0, Math.floor(Number(dayStatus?.monthlyRankRewardRank || 0)));
+
+  const appendRankItem = (key: string, label: string, points: number) => {
+    const cappedPoints = Math.min(remaining, getNormalizedRewardAmount(points));
+    if (cappedPoints <= 0) return;
+    pushBreakdownItem(items, key, label, cappedPoints, 'rank');
+    remaining -= cappedPoints;
+  };
+
+  appendRankItem('rank-daily', dailyRank > 0 ? `일간 랭킹 ${dailyRank}위` : '일간 랭킹', dailyRankPoints);
+  appendRankItem('rank-weekly', weeklyRank > 0 ? `주간 랭킹 ${weeklyRank}위` : '주간 랭킹', weeklyRankPoints);
+  appendRankItem('rank-monthly', monthlyRank > 0 ? `월간 랭킹 ${monthlyRank}위` : '월간 랭킹', monthlyRankPoints);
+
+  return items;
 }
 
 export function getRankRewardPoints(dayStatus?: Record<string, any>): number {
@@ -290,17 +403,60 @@ export function getDailyStudyBoxAwardPoints(dayStatus?: Record<string, any>): nu
   return getOpenedStudyBoxes(dayStatus).reduce((total, hour) => total + (rewardByHour.get(hour) ?? 0), 0);
 }
 
+function getStoredStudyBoxRewardTotal(dayStatus?: Record<string, any>): number {
+  return normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).reduce(
+    (total, entry) => total + Math.max(0, Math.floor(entry.awardedPoints)),
+    0
+  );
+}
+
 export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
   const totalPoints = getDailyAwardedPointTotal(dayStatus);
   const rankPoints = Math.min(totalPoints, getRankRewardPoints(dayStatus));
   const studyBoxPoints = Math.min(Math.max(0, totalPoints - rankPoints), getDailyStudyBoxAwardPoints(dayStatus));
-  const otherPoints = Math.max(0, totalPoints - rankPoints - studyBoxPoints);
+  const nonPrimaryPoints = Math.max(0, totalPoints - rankPoints - studyBoxPoints);
+  const pointItems = normalizeDailyPointEventItems(dayStatus?.pointEvents, totalPoints);
+
+  if (pointItems.length > 0) {
+    const eventTotal = pointItems.reduce((sum, item) => sum + item.points, 0);
+    const legacyPoints = Math.max(0, totalPoints - eventTotal);
+    if (legacyPoints > 0) {
+      pushBreakdownItem(pointItems, 'legacy-point-record', '이전 포인트 기록', legacyPoints, 'legacy');
+    }
+
+    return {
+      totalPoints,
+      studyBoxPoints,
+      rankPoints,
+      otherPoints: nonPrimaryPoints,
+      legacyStudyBoxPoints: 0,
+      legacyPointRecordPoints: legacyPoints,
+      pointItems,
+    };
+  }
+
+  const fallbackItems: DailyPointBreakdownItem[] = [];
+  pushBreakdownItem(fallbackItems, 'study-box-opened', '상자', studyBoxPoints, 'box');
+  getRankRewardBreakdownItems(dayStatus, rankPoints).forEach((item) => fallbackItems.push(item));
+
+  const storedStudyBoxPoints = getStoredStudyBoxRewardTotal(dayStatus);
+  const legacyStudyBoxPoints = Math.min(
+    nonPrimaryPoints,
+    Math.max(0, storedStudyBoxPoints - studyBoxPoints)
+  );
+  pushBreakdownItem(fallbackItems, 'legacy-study-box-record', '이전 상자 기록', legacyStudyBoxPoints, 'legacy');
+
+  const legacyPointRecordPoints = Math.max(0, nonPrimaryPoints - legacyStudyBoxPoints);
+  pushBreakdownItem(fallbackItems, 'legacy-point-record', '이전 포인트 기록', legacyPointRecordPoints, 'legacy');
 
   return {
     totalPoints,
     studyBoxPoints,
     rankPoints,
-    otherPoints,
+    otherPoints: nonPrimaryPoints,
+    legacyStudyBoxPoints,
+    legacyPointRecordPoints,
+    pointItems: fallbackItems,
   };
 }
 

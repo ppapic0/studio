@@ -174,6 +174,57 @@ function upsertStudyBoxRewardEntries(existing, reward) {
     next.set(reward.milestone, reward);
     return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
+function normalizeDailyPointEventEntry(value) {
+    var _a, _b, _c;
+    if (!isPlainObject(value))
+        return null;
+    const id = asTrimmedString(value.id);
+    const source = asTrimmedString(value.source);
+    const label = asTrimmedString(value.label);
+    const points = Math.max(0, Math.floor((_a = parseFiniteNumber(value.points)) !== null && _a !== void 0 ? _a : 0));
+    const createdAt = asTrimmedString(value.createdAt);
+    if (!id || !source || !label || points <= 0 || !createdAt)
+        return null;
+    if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "manual_adjustment", "legacy"].includes(source)) {
+        return null;
+    }
+    const event = {
+        id,
+        source,
+        label,
+        points,
+        createdAt,
+    };
+    const hour = Math.round((_b = parseFiniteNumber(value.hour)) !== null && _b !== void 0 ? _b : Number.NaN);
+    if (Number.isFinite(hour) && hour >= 1 && hour <= 8)
+        event.hour = hour;
+    const range = asTrimmedString(value.range);
+    if (range === "daily" || range === "weekly" || range === "monthly")
+        event.range = range;
+    const rank = Math.max(0, Math.floor((_c = parseFiniteNumber(value.rank)) !== null && _c !== void 0 ? _c : 0));
+    if (rank > 0)
+        event.rank = rank;
+    const periodKey = asTrimmedString(value.periodKey);
+    if (periodKey)
+        event.periodKey = periodKey;
+    return event;
+}
+function normalizeDailyPointEvents(value) {
+    if (!Array.isArray(value))
+        return [];
+    return value
+        .map((entry) => normalizeDailyPointEventEntry(entry))
+        .filter((entry) => entry !== null)
+        .slice(-80);
+}
+function upsertDailyPointEvent(existing, event) {
+    const next = new Map();
+    normalizeDailyPointEvents(existing).forEach((entry) => {
+        next.set(entry.id, entry);
+    });
+    next.set(event.id, event);
+    return Array.from(next.values()).slice(-80);
+}
 function getOpenedStudyBoxAwardTotal(dayStatus) {
     const openedHourSet = new Set(resolveOpenedStudyBoxHoursFromDayStatus(dayStatus));
     return normalizeStudyBoxRewardEntries(dayStatus.studyBoxRewards)
@@ -5816,13 +5867,23 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         const nextOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...openedStudyBoxes, hour]);
         const nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...claimedStudyBoxes, hour]);
         const nextRewardEntries = upsertStudyBoxRewardEntries(storedRewardEntries, creditedReward);
+        const nextPointEvents = awardedDelta > 0
+            ? upsertDailyPointEvent(currentDayStatus.pointEvents, {
+                id: `study_box:${dateKey}:${hour}`,
+                source: "study_box",
+                label: `${hour}시간 상자`,
+                points: awardedDelta,
+                createdAt: new Date(nowMs).toISOString(),
+                hour,
+            })
+            : normalizeDailyPointEvents(currentDayStatus.pointEvents);
         const currentPointsBalance = Math.max(0, Math.floor((_b = parseFiniteNumber(progressData.pointsBalance)) !== null && _b !== void 0 ? _b : 0));
         const currentTotalPointsEarned = Math.max(0, Math.floor((_c = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _c !== void 0 ? _c : 0));
         transaction.set(progressRef, {
             pointsBalance: admin.firestore.FieldValue.increment(awardedDelta),
             totalPointsEarned: admin.firestore.FieldValue.increment(awardedDelta),
             dailyPointStatus: {
-                [dateKey]: Object.assign(Object.assign({}, currentDayStatus), { claimedStudyBoxes: nextClaimedStudyBoxes, studyBoxRewards: nextRewardEntries, openedStudyBoxes: nextOpenedStudyBoxes, dailyPointAmount: admin.firestore.FieldValue.increment(awardedDelta), updatedAt: admin.firestore.FieldValue.serverTimestamp() }),
+                [dateKey]: Object.assign(Object.assign({}, currentDayStatus), { claimedStudyBoxes: nextClaimedStudyBoxes, studyBoxRewards: nextRewardEntries, openedStudyBoxes: nextOpenedStudyBoxes, pointEvents: nextPointEvents, dailyPointAmount: admin.firestore.FieldValue.increment(awardedDelta), updatedAt: admin.firestore.FieldValue.serverTimestamp() }),
             },
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });

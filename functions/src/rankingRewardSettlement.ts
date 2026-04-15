@@ -9,6 +9,17 @@ if (admin.apps.length === 0) {
 
 type StudentRankingRange = "daily" | "weekly" | "monthly";
 
+type DailyPointEventDoc = {
+  id: string;
+  source: "study_box" | "daily_rank" | "weekly_rank" | "monthly_rank" | "manual_adjustment" | "legacy";
+  label: string;
+  points: number;
+  createdAt: string;
+  range?: StudentRankingRange;
+  rank?: number;
+  periodKey?: string;
+};
+
 type StudentRankRewardTier = {
   rank: number;
   points: number;
@@ -134,6 +145,61 @@ function parseFiniteNumber(value: unknown): number | null {
     }
   }
   return null;
+}
+
+function asNonEmptyString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | null {
+  if (!isPlainObject(value)) return null;
+
+  const id = asNonEmptyString(value.id);
+  const source = asNonEmptyString(value.source) as DailyPointEventDoc["source"];
+  const label = asNonEmptyString(value.label);
+  const points = Math.max(0, Math.floor(parseFiniteNumber(value.points) ?? 0));
+  const createdAt = asNonEmptyString(value.createdAt);
+
+  if (!id || !source || !label || points <= 0 || !createdAt) return null;
+  if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "manual_adjustment", "legacy"].includes(source)) {
+    return null;
+  }
+
+  const event: DailyPointEventDoc = {
+    id,
+    source,
+    label,
+    points,
+    createdAt,
+  };
+
+  const range = asNonEmptyString(value.range);
+  if (range === "daily" || range === "weekly" || range === "monthly") event.range = range;
+
+  const rank = Math.max(0, Math.floor(parseFiniteNumber(value.rank) ?? 0));
+  if (rank > 0) event.rank = rank;
+
+  const periodKey = asNonEmptyString(value.periodKey);
+  if (periodKey) event.periodKey = periodKey;
+
+  return event;
+}
+
+function normalizeDailyPointEvents(value: unknown): DailyPointEventDoc[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => normalizeDailyPointEventEntry(entry))
+    .filter((entry): entry is DailyPointEventDoc => entry !== null)
+    .slice(-80);
+}
+
+function upsertDailyPointEvent(existing: unknown, event: DailyPointEventDoc): DailyPointEventDoc[] {
+  const next = new Map<string, DailyPointEventDoc>();
+  normalizeDailyPointEvents(existing).forEach((entry) => {
+    next.set(entry.id, entry);
+  });
+  next.set(event.id, event);
+  return Array.from(next.values()).slice(-80);
 }
 
 function normalizeStudyBoxHoursFromUnknown(value: unknown): number[] {
@@ -893,6 +959,22 @@ async function applyAwardEntries(
       } else {
         pointStatusPayload.monthlyRankRewardAmount = awardedPoints;
         pointStatusPayload.monthlyRankRewardRank = award.rank;
+      }
+
+      if (awardedPoints > 0) {
+        const source = `${range}_rank` as DailyPointEventDoc["source"];
+        pointStatusPayload.pointEvents = upsertDailyPointEvent(currentDayStatus.pointEvents, {
+          id: `rank:${range}:${target.periodKey}:${award.rank}`,
+          source,
+          label: `${RANKING_RANGE_LABEL[range]} 랭킹 ${award.rank}위`,
+          points: awardedPoints,
+          createdAt: new Date().toISOString(),
+          range,
+          rank: award.rank,
+          periodKey: target.periodKey,
+        });
+      } else {
+        pointStatusPayload.pointEvents = normalizeDailyPointEvents(currentDayStatus.pointEvents);
       }
 
       transaction.set(progressRef, {

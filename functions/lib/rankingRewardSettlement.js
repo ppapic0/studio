@@ -127,6 +127,57 @@ function parseFiniteNumber(value) {
     }
     return null;
 }
+function asNonEmptyString(value) {
+    return typeof value === "string" ? value.trim() : "";
+}
+function normalizeDailyPointEventEntry(value) {
+    var _a, _b;
+    if (!isPlainObject(value))
+        return null;
+    const id = asNonEmptyString(value.id);
+    const source = asNonEmptyString(value.source);
+    const label = asNonEmptyString(value.label);
+    const points = Math.max(0, Math.floor((_a = parseFiniteNumber(value.points)) !== null && _a !== void 0 ? _a : 0));
+    const createdAt = asNonEmptyString(value.createdAt);
+    if (!id || !source || !label || points <= 0 || !createdAt)
+        return null;
+    if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "manual_adjustment", "legacy"].includes(source)) {
+        return null;
+    }
+    const event = {
+        id,
+        source,
+        label,
+        points,
+        createdAt,
+    };
+    const range = asNonEmptyString(value.range);
+    if (range === "daily" || range === "weekly" || range === "monthly")
+        event.range = range;
+    const rank = Math.max(0, Math.floor((_b = parseFiniteNumber(value.rank)) !== null && _b !== void 0 ? _b : 0));
+    if (rank > 0)
+        event.rank = rank;
+    const periodKey = asNonEmptyString(value.periodKey);
+    if (periodKey)
+        event.periodKey = periodKey;
+    return event;
+}
+function normalizeDailyPointEvents(value) {
+    if (!Array.isArray(value))
+        return [];
+    return value
+        .map((entry) => normalizeDailyPointEventEntry(entry))
+        .filter((entry) => entry !== null)
+        .slice(-80);
+}
+function upsertDailyPointEvent(existing, event) {
+    const next = new Map();
+    normalizeDailyPointEvents(existing).forEach((entry) => {
+        next.set(entry.id, entry);
+    });
+    next.set(event.id, event);
+    return Array.from(next.values()).slice(-80);
+}
 function normalizeStudyBoxHoursFromUnknown(value) {
     if (!Array.isArray(value))
         return [];
@@ -710,6 +761,22 @@ async function applyAwardEntries(db, centerId, range, target, awards) {
             else {
                 pointStatusPayload.monthlyRankRewardAmount = awardedPoints;
                 pointStatusPayload.monthlyRankRewardRank = award.rank;
+            }
+            if (awardedPoints > 0) {
+                const source = `${range}_rank`;
+                pointStatusPayload.pointEvents = upsertDailyPointEvent(currentDayStatus.pointEvents, {
+                    id: `rank:${range}:${target.periodKey}:${award.rank}`,
+                    source,
+                    label: `${RANKING_RANGE_LABEL[range]} 랭킹 ${award.rank}위`,
+                    points: awardedPoints,
+                    createdAt: new Date().toISOString(),
+                    range,
+                    rank: award.rank,
+                    periodKey: target.periodKey,
+                });
+            }
+            else {
+                pointStatusPayload.pointEvents = normalizeDailyPointEvents(currentDayStatus.pointEvents);
             }
             transaction.set(progressRef, {
                 pointsBalance: admin.firestore.FieldValue.increment(awardedPoints),

@@ -72,6 +72,12 @@ import { cn } from '@/lib/utils';
 
 const REWARD_BOX_BURST_DELAY_MS = 380;
 const REWARD_TEXT_REVEAL_DELAY_MS = 460;
+const POINT_BREAKDOWN_CHIP_CLASS = {
+  box: 'bg-[#FFF3E2] text-[#915A1E]',
+  rank: 'bg-[#EAF1FF] text-[#3357A5]',
+  legacy: 'bg-[#F0F3FA] text-[#44546F]',
+  adjustment: 'bg-[#F2F7EF] text-[#49733E]',
+} as const;
 
 type FloatingGain = {
   key: number;
@@ -1463,21 +1469,17 @@ export default function GrowthPage() {
 
                     {entry.totalPoints > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {entry.studyBoxPoints > 0 ? (
-                          <span className="inline-flex rounded-full bg-[#FFF3E2] px-3 py-1 text-[11px] font-black text-[#915A1E]">
-                            상자 {entry.studyBoxPoints.toLocaleString()}P
+                        {entry.pointItems.map((item) => (
+                          <span
+                            key={`${entry.dateKey}-${item.key}`}
+                            className={cn(
+                              'inline-flex rounded-full px-3 py-1 text-[11px] font-black',
+                              POINT_BREAKDOWN_CHIP_CLASS[item.tone]
+                            )}
+                          >
+                            {item.label} {item.points.toLocaleString()}P
                           </span>
-                        ) : null}
-                        {entry.rankPoints > 0 ? (
-                          <span className="inline-flex rounded-full bg-[#EAF1FF] px-3 py-1 text-[11px] font-black text-[#3357A5]">
-                            랭킹 {entry.rankPoints.toLocaleString()}P
-                          </span>
-                        ) : null}
-                        {entry.otherPoints > 0 ? (
-                          <span className="inline-flex rounded-full bg-[#F3F4F7] px-3 py-1 text-[11px] font-black text-[#51627E]">
-                            기타 {entry.otherPoints.toLocaleString()}P
-                          </span>
-                        ) : null}
+                        ))}
                       </div>
                     ) : (
                       <p className="mt-3 text-xs font-bold text-[#7A89A5]">이 날에는 얻은 포인트가 없어요.</p>
