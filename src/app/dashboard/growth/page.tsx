@@ -70,6 +70,9 @@ import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+const REWARD_BOX_BURST_DELAY_MS = 380;
+const REWARD_TEXT_REVEAL_DELAY_MS = 460;
+
 type FloatingGain = {
   key: number;
   amount: number;
@@ -873,10 +876,19 @@ export default function GrowthPage() {
 
     const shakeTimeout = setTimeout(() => {
       setBoxStage('burst');
-    }, 220);
+    }, REWARD_BOX_BURST_DELAY_MS);
     timeoutsRef.current.push(shakeTimeout);
 
     const revealTimeout = setTimeout(async () => {
+      const optimisticReward = activeRewardByHour.get(targetHour)?.awardedPoints ?? selectedBox.reward ?? 0;
+      setRevealedReward(optimisticReward);
+      setBoxStage('revealed');
+      setFloatingGain({ key: Date.now(), amount: optimisticReward });
+      const clearFloating = setTimeout(() => {
+        setFloatingGain(null);
+      }, 1800);
+      timeoutsRef.current.push(clearFloating);
+
       try {
         const rewardResult = await rewardOpenPromise;
         if (!rewardResult.ok) throw rewardResult.error;
@@ -909,13 +921,7 @@ export default function GrowthPage() {
         }
 
         setRevealedReward(reward);
-        setBoxStage('revealed');
-        setFloatingGain({ key: Date.now(), amount: reward });
-
-        const clearFloating = setTimeout(() => {
-          setFloatingGain(null);
-        }, 1800);
-        timeoutsRef.current.push(clearFloating);
+        setFloatingGain((current) => current ? { ...current, amount: reward } : current);
       } catch (error) {
         console.error('[point-track] reward box open failed', error);
         if (activeVaultDateKey === activeStudyDayKey) {
@@ -926,10 +932,11 @@ export default function GrowthPage() {
           setCarryoverOpenedBoxes(persistedCarryoverOpenedBoxes);
         }
         setBoxStage('idle');
+        setFloatingGain(null);
       } finally {
         setIsClaimingBox(false);
       }
-    }, 340);
+    }, REWARD_TEXT_REVEAL_DELAY_MS);
 
     timeoutsRef.current.push(revealTimeout);
   };

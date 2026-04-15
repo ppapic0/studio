@@ -133,6 +133,8 @@ const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', '
 const STUDY_BOX_CLAIM_CACHE_PREFIX = 'student-dashboard:claimed-boxes';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
 const POINT_BOOST_POPUP_SESSION_PREFIX = 'student-point-boost-popup';
+const HOME_REWARD_BOX_BURST_DELAY_MS = 360;
+const HOME_REWARD_TEXT_REVEAL_DELAY_MS = 440;
 
 type StudentWifiRequestRecord = {
   id: string;
@@ -3322,10 +3324,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     setIsClaimingHomeBox(true);
     setHomeBoxStage('shake');
 
-    const burstId = setTimeout(() => setHomeBoxStage('burst'), 220);
+    const burstId = setTimeout(() => setHomeBoxStage('burst'), HOME_REWARD_BOX_BURST_DELAY_MS);
     homeBoxTimeoutsRef.current.push(burstId);
 
     const revealId = setTimeout(async () => {
+      const optimisticReward = activeRewardByHour.get(targetHour)?.awardedPoints ?? selectedHomeBox.reward ?? 0;
+      setRevealedHomeReward(optimisticReward);
+      setHomeBoxStage('revealed');
+
       try {
         const rewardResult = await rewardOpenPromise;
         if (!rewardResult.ok) throw rewardResult.error;
@@ -3363,7 +3369,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
 
         setRevealedHomeReward(reward);
-        setHomeBoxStage('revealed');
       } catch (error) {
         logHandledClientIssue('[student-track] home reward open failed', error);
         if (targetDateKey === activeStudyDayKey) {
@@ -3385,7 +3390,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       } finally {
         setIsClaimingHomeBox(false);
       }
-    }, 340);
+    }, HOME_REWARD_TEXT_REVEAL_DELAY_MS);
 
     homeBoxTimeoutsRef.current.push(revealId);
   }, [
