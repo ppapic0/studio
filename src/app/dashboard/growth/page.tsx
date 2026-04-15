@@ -738,6 +738,8 @@ export default function GrowthPage() {
           : '공부 시작하고 상자 채우기';
 
   const selectedBox = selectedBoxHour ? activeBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
+  const isRewardRevealed = boxStage === 'revealed' && revealedReward !== null;
+  const isOpeningReward = isClaimingBox && !isRewardRevealed;
 
   useEffect(() => {
     if (!isTimerActive || !progressRef || !activeMembership?.id || !user?.uid) return;
@@ -1392,7 +1394,7 @@ export default function GrowthPage() {
               </div>
 
               <div className="mt-4 flex gap-2">
-                {boxStage === 'revealed' && readyBoxes.filter((box) => box.hour !== selectedBoxHour).length > 0 ? (
+                {isRewardRevealed && readyBoxes.filter((box) => box.hour !== selectedBoxHour).length > 0 ? (
                   <Button
                     className="h-12 flex-1 rounded-[1.2rem] bg-[linear-gradient(180deg,#ffb24d_0%,#ff8a20_100%)] text-sm font-black text-white hover:brightness-105"
                     onClick={handleNextBox}
@@ -1403,9 +1405,13 @@ export default function GrowthPage() {
                   <Button
                     className="h-12 flex-1 rounded-[1.2rem] bg-[linear-gradient(180deg,#ffb24d_0%,#ff8a20_100%)] text-sm font-black text-white hover:brightness-105"
                     onClick={selectedBox?.state === 'ready' && boxStage === 'idle' ? handleRevealBox : () => handleVaultChange(false)}
-                    disabled={isClaimingBox}
+                    disabled={isOpeningReward}
                   >
-                    {selectedBox?.state === 'ready' && boxStage === 'idle' ? '지금 열기' : '확인했어요'}
+                    {selectedBox?.state === 'ready' && boxStage === 'idle'
+                      ? '지금 열기'
+                      : isRewardRevealed
+                        ? '확인했어요'
+                        : '열고 있어요'}
                   </Button>
                 )}
               </div>
