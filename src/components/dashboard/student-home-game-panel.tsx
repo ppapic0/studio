@@ -662,18 +662,15 @@ export function StudentHomeGamePanel({
                   onClick={onOpenFocusEditor}
                   title={`${homeFocusDetailLabel} 설정`}
                   className={cn(
-                    "group grid max-w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-[0.95rem] border border-white/14 bg-white/10 px-2.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-white/22 hover:bg-white/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]",
-                    isMobile ? "w-full" : "w-fit"
+                    "group flex w-full max-w-full items-center justify-between gap-3 rounded-[0.95rem] border border-white/14 bg-white/10 px-2.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-white/22 hover:bg-white/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]"
                   )}
                 >
                   <span className={cn("font-aggro-display min-w-0 truncate font-black tracking-normal text-white", isMobile ? "text-[11px] leading-4" : "text-[12px] leading-4")}>
                     {homeFocusDetailLabel}
                   </span>
-                  <span className="font-aggro-display inline-flex shrink-0 items-center justify-self-center gap-1 rounded-[0.7rem] border border-white/16 bg-white/14 px-2 py-1 text-[10px] font-black leading-none tracking-normal text-white shadow-[0_10px_18px_-14px_rgba(0,0,0,0.42)]">
+                  <span className="font-aggro-display inline-flex shrink-0 items-center rounded-[0.7rem] border border-white/16 bg-white/14 px-2 py-1 text-[10px] font-black leading-none tracking-normal text-white shadow-[0_10px_18px_-14px_rgba(0,0,0,0.42)]">
                     (설정)
-                    <ChevronRight className="h-3 w-3 shrink-0 text-white transition-transform duration-200 group-hover:translate-x-0.5" />
                   </span>
-                  <span aria-hidden="true" className="min-w-0" />
                   <span className="sr-only">{homeFocusDetailLabel} 설정</span>
                 </button>
               </div>
