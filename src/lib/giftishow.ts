@@ -52,6 +52,8 @@ const GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES = [
   },
 ];
 
+const GIFTISHOW_STUDENT_REVIEW_ALLOWLIST_KEYWORDS = ['세븐일레븐', '7-eleven', '7 eleven', 'seven eleven'];
+
 const GIFTISHOW_STUDENT_REVIEW_RULES = [
   ...GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES,
   {
@@ -143,6 +145,7 @@ export function isGiftishowStudentCatalogProduct(product?: GiftishowProduct | nu
 export function getGiftishowStudentReviewCandidateReasons(product?: GiftishowProduct | null) {
   const text = getGiftishowProductSearchText(product);
   if (!text) return [];
+  if (GIFTISHOW_STUDENT_REVIEW_ALLOWLIST_KEYWORDS.some((keyword) => text.includes(keyword))) return [];
 
   return GIFTISHOW_STUDENT_REVIEW_RULES
     .map((rule) => {

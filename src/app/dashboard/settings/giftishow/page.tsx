@@ -311,7 +311,7 @@ export default function GiftishowSettingsPage() {
           reasons: getGiftishowStudentReviewCandidateReasons(product),
           exclusionReason: getGiftishowStudentCatalogExclusionReason(product),
         }))
-        .filter((item) => item.reasons.length > 0),
+        .filter((item) => item.reasons.length > 0 && !item.exclusionReason),
     [products]
   );
   const brands = useMemo(
