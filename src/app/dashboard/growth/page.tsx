@@ -90,7 +90,7 @@ const STUDY_BOX_CLAIM_CACHE_PREFIX = 'point-track:claimed-boxes';
 const STUDY_BOX_ARRIVAL_TOAST_PREFIX = 'point-track:arrival-toast';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
 const GIFTISHOW_PRODUCT_FETCH_LIMIT = 2500;
-const GIFTISHOW_PRODUCT_PAGE_SIZE = 3;
+const GIFTISHOW_PRODUCT_PAGE_SIZE = 2;
 
 function normalizePhone(raw: string) {
   return raw.replace(/\D/g, '');
@@ -1634,7 +1634,7 @@ export default function GrowthPage() {
                                   type="button"
                                   size="sm"
                                   variant={disabledReason ? 'outline' : 'secondary'}
-                                  className="rounded-full font-black"
+                                  className="h-9 shrink-0 whitespace-nowrap rounded-full px-4 font-black"
                                   disabled={Boolean(disabledReason) || isRequesting}
                                   onClick={() => void handleGiftishowRequest(product)}
                                 >
@@ -1645,11 +1645,7 @@ export default function GrowthPage() {
 
                               {disabledReason ? (
                                 <p className="mt-2 text-[11px] font-bold leading-5 text-[#915A1E]">{disabledReason}</p>
-                              ) : (
-                                <p className="mt-2 text-[11px] font-bold leading-5 text-[#4D679F]">
-                                  승인되면 {resolvedStudentPhone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')} 번호로 발송돼요.
-                                </p>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         </div>
