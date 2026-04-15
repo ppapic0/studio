@@ -5777,13 +5777,17 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         const storedRewardEntries = normalizeStudyBoxRewardEntries(currentDayStatus.studyBoxRewards);
         const storedReward = (_a = storedRewardEntries.find((entry) => entry.milestone === hour)) !== null && _a !== void 0 ? _a : null;
         const alreadyOpened = openedStudyBoxes.includes(hour);
+        const rewardBase = storedReward !== null && storedReward !== void 0 ? storedReward : baseReward;
+        const resolvedReward = alreadyOpened
+            ? (storedReward !== null && storedReward !== void 0 ? storedReward : reward)
+            : Object.assign(Object.assign({}, rewardBase), { awardedPoints: Math.max(0, Math.round(Math.max(0, Math.floor(rewardBase.basePoints)) * boostMultiplier)), multiplier: boostMultiplier, earnedAt: earnedAtMs ? new Date(earnedAtMs).toISOString() : null, boostEventId });
         const awardClamp = alreadyOpened
             ? { currentAwardedTotal: getDailyAwardedPointTotal(currentDayStatus), remainingPoints: 0, awardedPoints: 0 }
-            : clampDailyPointAward(currentDayStatus, reward.awardedPoints);
+            : clampDailyPointAward(currentDayStatus, resolvedReward.awardedPoints);
         const awardedDelta = alreadyOpened ? 0 : awardClamp.awardedPoints;
         const creditedReward = alreadyOpened
-            ? (storedReward !== null && storedReward !== void 0 ? storedReward : reward)
-            : Object.assign(Object.assign({}, reward), { awardedPoints: awardedDelta });
+            ? resolvedReward
+            : Object.assign(Object.assign({}, resolvedReward), { awardedPoints: awardedDelta });
         const nextOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...openedStudyBoxes, hour]);
         const nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...claimedStudyBoxes, hour]);
         const nextRewardEntries = upsertStudyBoxRewardEntries(storedRewardEntries, creditedReward);

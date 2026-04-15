@@ -93,6 +93,7 @@ import {
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import {
   NAVY_REWARD_THEME,
+  buildDeterministicStudyBoxReward,
   formatStudyMinutes,
   formatStudyMinutesShort,
   getAvailableStudyBoxMilestones,
@@ -103,7 +104,6 @@ import {
   getStudyBoxFallbackRarity,
   normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
-  rollStudyBoxReward,
   upsertStudyBoxRewardEntry,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
@@ -1103,11 +1103,17 @@ function buildRewardBoxes({
   claimedHours,
   openedHours,
   rewardByHour,
+  centerId,
+  studentId,
+  dateKey,
 }: {
   earnedHours: number;
   claimedHours: number[];
   openedHours: number[];
   rewardByHour: Map<number, StudyBoxReward>;
+  centerId?: string | null;
+  studentId?: string | null;
+  dateKey?: string | null;
 }): StudentHomeRewardBox[] {
   const claimedSet = new Set(claimedHours);
   const openedSet = new Set(openedHours);
@@ -1123,13 +1129,26 @@ function buildRewardBoxes({
         : hour === nextHour && cappedEarned < 8
           ? 'charging'
           : 'locked';
+    const storedReward = rewardByHour.get(hour);
+    let fallbackReward: StudyBoxReward | null = null;
+
+    if (!storedReward && (claimedSet.has(hour) || openedSet.has(hour)) && centerId && studentId && dateKey) {
+      fallbackReward = buildDeterministicStudyBoxReward({
+        centerId,
+        studentId,
+        dateKey,
+        milestone: hour,
+      });
+    }
+
+    const reward = storedReward ?? fallbackReward;
 
     return {
       id: `home-box-${hour}`,
       hour,
       state,
-      rarity: rewardByHour.get(hour)?.rarity || getStudyBoxFallbackRarity(hour),
-      reward: rewardByHour.get(hour)?.awardedPoints,
+      rarity: reward?.rarity || getStudyBoxFallbackRarity(hour),
+      reward: reward?.awardedPoints,
     };
   });
 }
@@ -2911,27 +2930,45 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         claimedHours: renderableTodayStudyBoxState.claimedHours,
         openedHours: renderableTodayStudyBoxState.openedHours,
         rewardByHour,
+        centerId: activeMembership?.id,
+        studentId: user?.uid,
+        dateKey: activeStudyDayKey,
       }),
-    [renderableTodayStudyBoxState, rewardByHour]
+    [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, user?.uid]
   );
   const readyBoxes = homeRewardBoxes.filter((box) => box.state === 'ready');
   const carryoverRewardBoxes = useMemo(
     () => {
       if (!canRenderCarryoverBoxes) return [] as StudentHomeRewardBox[];
 
-      return remainingCarryoverClaimedBoxes.map((hour) => ({
-        id: `carryover-box-${previousStudyDayKey}-${hour}`,
-        hour,
-        state: 'ready' as const,
-        rarity: carryoverRewardByHour.get(hour)?.rarity || getStudyBoxFallbackRarity(hour),
-        reward: carryoverRewardByHour.get(hour)?.awardedPoints,
-      }));
+      return remainingCarryoverClaimedBoxes.map((hour) => {
+        let reward = carryoverRewardByHour.get(hour) ?? null;
+
+        if (!reward && activeMembership?.id && user?.uid && previousStudyDayKey) {
+          reward = buildDeterministicStudyBoxReward({
+            centerId: activeMembership.id,
+            studentId: user.uid,
+            dateKey: previousStudyDayKey,
+            milestone: hour,
+          });
+        }
+
+        return {
+          id: `carryover-box-${previousStudyDayKey}-${hour}`,
+          hour,
+          state: 'ready' as const,
+          rarity: reward?.rarity || getStudyBoxFallbackRarity(hour),
+          reward: reward?.awardedPoints,
+        };
+      });
     },
     [
+      activeMembership?.id,
       canRenderCarryoverBoxes,
       carryoverRewardByHour,
       remainingCarryoverClaimedBoxes,
       previousStudyDayKey,
+      user?.uid,
     ]
   );
   const carryoverReadyBoxes = useMemo(
@@ -3028,11 +3065,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (homeLiveClaimKeyRef.current === claimKey) return;
     homeLiveClaimKeyRef.current = claimKey;
 
-    const rewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone));
-    const nextClaimedBoxes = Array.from(new Set([...syncedClaimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
-    const nextRewardEntries = [...syncedRewardEntries, ...rewards].sort((a, b) => a.milestone - b.milestone);
     const membershipId = activeMembership.id;
     const userId = user.uid;
+    const rewards = availableMilestones.map((milestone) =>
+      buildDeterministicStudyBoxReward({
+        centerId: membershipId,
+        studentId: userId,
+        dateKey: activeStudyDayKey,
+        milestone,
+      })
+    );
+    const nextClaimedBoxes = Array.from(new Set([...syncedClaimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
+    const nextRewardEntries = [...syncedRewardEntries, ...rewards].sort((a, b) => a.milestone - b.milestone);
     const nextDayStatus = {
       ...todayPointStatus,
       claimedStudyBoxes: nextClaimedBoxes,
@@ -3263,7 +3307,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       studentId: user.uid,
       dateKey: targetDateKey,
       hour: targetHour,
-      reward: activeRewardByHour.get(targetHour) || rollStudyBoxReward(targetHour),
+      reward: activeRewardByHour.get(targetHour) || buildDeterministicStudyBoxReward({
+        centerId: activeMembership.id,
+        studentId: user.uid,
+        dateKey: targetDateKey,
+        milestone: targetHour,
+      }),
       dayStatus: currentDayStatus,
       currentTotalPointsEarned: Number(progress?.totalPointsEarned || 0),
     })

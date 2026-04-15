@@ -51,6 +51,7 @@ import {
   sortGiftishowProducts,
 } from '@/lib/giftishow';
 import {
+  buildDeterministicStudyBoxReward,
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
   getDailyPointBreakdown,
@@ -60,7 +61,6 @@ import {
   getStudyBoxFallbackRarity,
   normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
-  rollStudyBoxReward,
   upsertStudyBoxRewardEntry,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
@@ -219,11 +219,17 @@ function buildRewardBoxes({
   claimedHours,
   openedHours,
   rewardByHour,
+  centerId,
+  studentId,
+  dateKey,
 }: {
   earnedHours: number;
   claimedHours: number[];
   openedHours: number[];
   rewardByHour: Map<number, StudyBoxReward>;
+  centerId?: string | null;
+  studentId?: string | null;
+  dateKey?: string | null;
 }) {
   const claimedSet = new Set(claimedHours);
   const openedSet = new Set(openedHours);
@@ -236,16 +242,29 @@ function buildRewardBoxes({
       ? 'opened'
       : claimedSet.has(hour)
         ? 'ready'
-      : hour === nextHour && cappedEarned < 8
+        : hour === nextHour && cappedEarned < 8
           ? 'charging'
           : 'locked';
+    const storedReward = rewardByHour.get(hour);
+    let fallbackReward: StudyBoxReward | null = null;
+
+    if (!storedReward && (claimedSet.has(hour) || openedSet.has(hour)) && centerId && studentId && dateKey) {
+      fallbackReward = buildDeterministicStudyBoxReward({
+        centerId,
+        studentId,
+        dateKey,
+        milestone: hour,
+      });
+    }
+
+    const reward = storedReward ?? fallbackReward;
 
     return {
       id: `point-box-${hour}`,
       hour,
       state,
-      rarity: rewardByHour.get(hour)?.rarity || getStudyBoxFallbackRarity(hour),
-      reward: rewardByHour.get(hour)?.awardedPoints,
+      rarity: reward?.rarity || getStudyBoxFallbackRarity(hour),
+      reward: reward?.awardedPoints,
     } satisfies RewardBox;
   });
 }
@@ -636,8 +655,11 @@ export default function GrowthPage() {
         claimedHours: renderableTodayStudyBoxState.claimedHours,
         openedHours: renderableTodayStudyBoxState.openedHours,
         rewardByHour,
+        centerId: activeMembership?.id,
+        studentId: user?.uid,
+        dateKey: activeStudyDayKey,
       }),
-    [renderableTodayStudyBoxState, rewardByHour]
+    [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, user?.uid]
   );
   const carryoverReadyHours = useMemo(
     () =>
@@ -655,8 +677,11 @@ export default function GrowthPage() {
         claimedHours: persistedCarryoverClaimedBoxes,
         openedHours: carryoverOpenedBoxes,
         rewardByHour: carryoverRewardByHour,
+        centerId: activeMembership?.id,
+        studentId: user?.uid,
+        dateKey: previousStudyDayKey,
       }),
-    [carryoverOpenedBoxes, carryoverRewardByHour, persistedCarryoverClaimedBoxes]
+    [activeMembership?.id, carryoverOpenedBoxes, carryoverRewardByHour, persistedCarryoverClaimedBoxes, previousStudyDayKey, user?.uid]
   );
   const activeBoxes = hasCarryoverReadyBoxes ? carryoverBoxes : boxes;
   const readyBoxes = activeBoxes.filter((box) => box.state === 'ready');
@@ -703,7 +728,7 @@ export default function GrowthPage() {
   const selectedBox = selectedBoxHour ? activeBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
 
   useEffect(() => {
-    if (!isTimerActive || !progressRef) return;
+    if (!isTimerActive || !progressRef || !activeMembership?.id || !user?.uid) return;
     if ((claimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY) !== hydratedClaimCacheKey) return;
 
     const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, claimedBoxes);
@@ -713,7 +738,14 @@ export default function GrowthPage() {
     if (liveClaimKeyRef.current === claimKey) return;
     liveClaimKeyRef.current = claimKey;
 
-    const nextRewards = availableMilestones.map((milestone) => rollStudyBoxReward(milestone));
+    const nextRewards = availableMilestones.map((milestone) =>
+      buildDeterministicStudyBoxReward({
+        centerId: activeMembership.id,
+        studentId: user.uid,
+        dateKey: activeStudyDayKey,
+        milestone,
+      })
+    );
     const nextClaimedBoxes = Array.from(new Set([...claimedBoxes, ...availableMilestones])).sort((a, b) => a - b);
     const nextRewardEntries = [...rewardEntries, ...nextRewards].sort((a, b) => a.milestone - b.milestone);
     const nextDayStatus = {
@@ -823,7 +855,12 @@ export default function GrowthPage() {
       studentId: user.uid,
       dateKey: activeVaultDateKey,
       hour: targetHour,
-      reward: activeRewardByHour.get(targetHour) || rollStudyBoxReward(targetHour),
+      reward: activeRewardByHour.get(targetHour) || buildDeterministicStudyBoxReward({
+        centerId: activeMembership.id,
+        studentId: user.uid,
+        dateKey: activeVaultDateKey,
+        milestone: targetHour,
+      }),
       dayStatus: currentDayStatus,
       currentPointsBalance: pointBalance,
       currentTotalPointsEarned: Number(progress?.totalPointsEarned || 0),

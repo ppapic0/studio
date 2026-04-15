@@ -206,6 +206,63 @@ export function rollStudyBoxRarity(milestone: number): StudyBoxRarity {
   return weights.at(-1)?.rarity ?? "common";
 }
 
+function hashSeedToUInt32(input: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededUnitInterval(seed: string): number {
+  return hashSeedToUInt32(seed) / 0xffffffff;
+}
+
+function rollDeterministicStudyBoxRarity(milestone: number, seed: string): StudyBoxRarity {
+  const weights = getStudyBoxRarityWeights(milestone);
+  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+  const rolled = seededUnitInterval(`${seed}:rarity`) * totalWeight;
+  let cursor = 0;
+
+  for (const entry of weights) {
+    cursor += entry.weight;
+    if (rolled < cursor) return entry.rarity;
+  }
+
+  return weights.at(-1)?.rarity ?? "common";
+}
+
+export function buildDeterministicStudyBoxReward({
+  centerId,
+  studentId,
+  dateKey,
+  milestone,
+}: {
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  milestone: number;
+}): StudyBoxReward {
+  const seed = `${centerId}:${studentId}:${dateKey}:${milestone}`;
+  const rarity = rollDeterministicStudyBoxRarity(milestone, seed);
+  const [minReward, maxReward] = STUDY_BOX_REWARD_RANGE_BY_RARITY[rarity];
+  const rewardSpan = maxReward - minReward + 1;
+  const awardedPoints = minReward + Math.floor(seededUnitInterval(`${seed}:points`) * rewardSpan);
+
+  return {
+    milestone,
+    rarity,
+    minReward,
+    maxReward,
+    basePoints: awardedPoints,
+    awardedPoints,
+    multiplier: 1,
+    earnedAt: null,
+    boostEventId: null,
+  };
+}
+
 export function getClaimedStudyBoxes(dayStatus?: Record<string, any>): number[] {
   return normalizeStudyBoxHourValues(dayStatus?.claimedStudyBoxes);
 }
