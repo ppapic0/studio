@@ -22,10 +22,11 @@ import {
   type StudentRankEntry,
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
+import { getDailyRankWindowState } from '@/lib/student-ranking-policy';
 import {
-  getDailyRankWindowOverlapMinutes,
-  getDailyRankWindowState,
-} from '@/lib/student-ranking-policy';
+  assignStudentRankingTrackRanks,
+  getLiveAdjustedStudentRankValue,
+} from '@/lib/student-ranking-live';
 import { cn } from '@/lib/utils';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
@@ -190,22 +191,10 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function assignRanks(entries: BattleEntry[]) {
-  return [...entries]
-    .sort((a, b) => {
-      if (b.value !== a.value) return b.value - a.value;
-      return a.displayNameSnapshot.localeCompare(b.displayNameSnapshot, 'ko');
-    })
-    .map((entry, index) => ({
-      ...entry,
-      rank: index + 1,
-    }));
-}
-
 function ensureViewerEntry(entries: StudentRankEntry[], viewerId: string) {
   const hasViewer = entries.some((entry) => entry.studentId === viewerId);
   if (hasViewer) {
-    return assignRanks(entries.map((entry) => ({ ...entry, isViewer: entry.studentId === viewerId })));
+    return assignStudentRankingTrackRanks(entries.map((entry) => ({ ...entry, isViewer: entry.studentId === viewerId })));
   }
 
   const fallbackViewer: BattleEntry = {
@@ -221,45 +210,7 @@ function ensureViewerEntry(entries: StudentRankEntry[], viewerId: string) {
     liveStartedAtMs: null,
   };
 
-  return assignRanks([...entries.map((entry) => ({ ...entry, isViewer: entry.studentId === viewerId })), fallbackViewer]);
-}
-
-function getLiveAdjustedValue({
-  entry,
-  range,
-  nowMs,
-  viewerId,
-  selfLiveStartedAtMs,
-}: {
-  entry: BattleEntry;
-  range: RankRange;
-  nowMs: number;
-  viewerId: string;
-  selfLiveStartedAtMs: number;
-}) {
-  const serverLiveStartedAtMs = Number(entry.liveStartedAtMs || 0);
-  const hasServerLive = Boolean(entry.liveStatus && serverLiveStartedAtMs > 0);
-  const hasSelfLive = entry.studentId === viewerId && selfLiveStartedAtMs > 0;
-
-  if (!hasServerLive && !hasSelfLive) {
-    return Math.max(0, Number(entry.value || 0));
-  }
-
-  const effectiveStartedAtMs =
-    serverLiveStartedAtMs > 0 && selfLiveStartedAtMs > 0 && entry.studentId === viewerId
-      ? Math.min(serverLiveStartedAtMs, selfLiveStartedAtMs)
-      : Math.max(serverLiveStartedAtMs, hasSelfLive ? selfLiveStartedAtMs : 0);
-
-  if (effectiveStartedAtMs <= 0 || effectiveStartedAtMs >= nowMs) {
-    return Math.max(0, Number(entry.value || 0));
-  }
-
-  const liveMinutes =
-    range === 'daily'
-      ? getDailyRankWindowOverlapMinutes(effectiveStartedAtMs, nowMs, getDailyRankWindowState(new Date(nowMs)))
-      : Math.max(1, Math.ceil((nowMs - effectiveStartedAtMs) / 60000));
-
-  return Math.max(0, Number(entry.value || 0)) + liveMinutes;
+  return assignStudentRankingTrackRanks([...entries.map((entry) => ({ ...entry, isViewer: entry.studentId === viewerId })), fallbackViewer]);
 }
 
 function getBattleMode(rank: number, diffAbove: number, diffBelow: number): BattleMode {
@@ -1672,10 +1623,10 @@ export default function RankingBattlePage() {
   }, [currentRangeEntries, viewerId]);
 
   const battleEntries = useMemo(() => {
-    return assignRanks(
+    return assignStudentRankingTrackRanks(
       baseEntries.map((entry) => ({
         ...entry,
-        value: getLiveAdjustedValue({
+        value: getLiveAdjustedStudentRankValue({
           entry,
           range,
           nowMs: clockNowMs,

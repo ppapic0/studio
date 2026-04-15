@@ -114,6 +114,10 @@ import {
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
 import {
+  assignStudentRankingTrackRanks,
+  getLiveAdjustedStudentRankValue,
+} from '@/lib/student-ranking-live';
+import {
   formatStudentRankRewardSummary,
   getDailyRankWindowState,
 } from '@/lib/student-ranking-policy';
@@ -1283,7 +1287,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
-  const [rankPreviewNowMs, setRankPreviewNowMs] = useState(0);
+  const [rankPreviewNowMs, setRankPreviewNowMs] = useState(() => Date.now());
   const [pointBoostNowMs, setPointBoostNowMs] = useState(0);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const actionLockAtRef = useRef<number | null>(null);
@@ -2526,127 +2530,127 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const ownEntry = validRankEntries.find((entry) => entry.studentId === user?.uid);
     return Number(ownEntry?.value || 0);
   }, [user?.uid, validRankEntries]);
-  const liveRankSessionSeconds = isTimerActive ? localSeconds : 0;
-  const dailyStudyRankDisplaySeconds = Math.max(0, dailyStudyRankMinutes * 60 + liveRankSessionSeconds);
-  const weeklyStudyRankDisplaySeconds = Math.max(0, weeklyStudyRankMinutes * 60 + liveRankSessionSeconds);
-  const monthlyStudyRankDisplaySeconds = Math.max(0, monthlyStudyRankMinutes * 60 + liveRankSessionSeconds);
+  const selfLiveRankStartedAtMs = isTimerActive && startTime ? startTime : 0;
 
   const homeRankMap = useMemo(() => {
     const buildRankPreviewEntries = (
       entries: StudentRankingSnapshot['daily'],
+      range: RankRange,
       allowLiveTrack = true
-    ): StudentHomeRankPreviewEntry[] =>
-      entries.map((entry, index) => {
-        const studentId = typeof entry.studentId === 'string' ? entry.studentId : null;
-        const baseMinutes = Math.max(0, Number(entry.value || 0));
-        const isSelfLive = Boolean(allowLiveTrack && studentId && studentId === user?.uid && isTimerActive);
-        const serverLiveStartedAtMs = allowLiveTrack
-          && studentId
-          && studentId !== user?.uid
-          && ['studying', 'away', 'break'].includes(String(entry.liveStatus || ''))
-          ? Math.max(0, Number(entry.liveStartedAtMs || 0))
-          : 0;
-        const serverLiveSeconds = serverLiveStartedAtMs > 0
-          ? Math.max(0, Math.floor((rankPreviewNowMs - serverLiveStartedAtMs) / 1000))
-          : 0;
-        const liveSeconds = isSelfLive
-          ? localSeconds
-          : allowLiveTrack
-            ? serverLiveSeconds
-            : 0;
+    ): StudentHomeRankPreviewEntry[] => {
+      const rankedEntries = assignStudentRankingTrackRanks(
+        entries.map((entry) => {
+          const studentId = typeof entry.studentId === 'string' ? entry.studentId : null;
+          const baseMinutes = Math.max(0, Number(entry.value || 0));
+          const adjustedMinutes = allowLiveTrack
+            ? getLiveAdjustedStudentRankValue({
+                entry,
+                range,
+                nowMs: rankPreviewNowMs,
+                viewerId: user?.uid ?? '',
+                selfLiveStartedAtMs: selfLiveRankStartedAtMs,
+                dailyRankWindow,
+              })
+            : baseMinutes;
+          const isSelfLive = Boolean(allowLiveTrack && studentId && studentId === user?.uid && selfLiveRankStartedAtMs > 0);
+          const isServerLive = Boolean(
+            allowLiveTrack
+            && studentId
+            && ['studying', 'away', 'break'].includes(String(entry.liveStatus || ''))
+            && Number(entry.liveStartedAtMs || 0) > 0
+          );
 
-        return {
-          rank: Number(entry.rank || index + 1),
-          studentId,
-          name: entry.displayNameSnapshot || '학생',
-          schoolName: entry.schoolNameSnapshot || null,
-          minutes: baseMinutes,
-          baseMinutes,
-          displaySeconds: Math.max(0, baseMinutes * 60 + liveSeconds),
-          isLive: isSelfLive || liveSeconds > 0,
-        };
-      });
-
-    const getPreviewDisplaySeconds = (entry: StudentHomeRankPreviewEntry) =>
-      Math.max(
-        0,
-        typeof entry.displaySeconds === 'number' && Number.isFinite(entry.displaySeconds)
-          ? Math.floor(entry.displaySeconds)
-          : Math.round((entry.baseMinutes ?? entry.minutes ?? 0) * 60)
+          return {
+            rank: Number(entry.rank || 0),
+            studentId,
+            name: entry.displayNameSnapshot || '학생',
+            schoolName: entry.schoolNameSnapshot || null,
+            minutes: adjustedMinutes,
+            baseMinutes,
+            displaySeconds: Math.max(0, adjustedMinutes * 60),
+            isLive: isSelfLive || isServerLive,
+            value: adjustedMinutes,
+            displayNameSnapshot: entry.displayNameSnapshot || '학생',
+          };
+        }).filter((entry) => entry.value > 0)
       );
 
-    const applyPreviewRanks = (entries: StudentHomeRankPreviewEntry[]) => {
-      const sortedEntries = [...entries]
-        .filter((entry) => getPreviewDisplaySeconds(entry) > 0)
-        .sort((left, right) => {
-          const secondsDiff = getPreviewDisplaySeconds(right) - getPreviewDisplaySeconds(left);
-          if (secondsDiff !== 0) return secondsDiff;
-
-          const minuteDiff = Math.max(0, Number(right.baseMinutes || right.minutes || 0))
-            - Math.max(0, Number(left.baseMinutes || left.minutes || 0));
-          if (minuteDiff !== 0) return minuteDiff;
-
-          return (left.name || '').localeCompare(right.name || '', 'ko');
-        });
-
-      let lastSeconds: number | null = null;
-      let currentRank = 0;
-
-      return sortedEntries.map((entry, index) => {
-        const displaySeconds = getPreviewDisplaySeconds(entry);
-        if (lastSeconds === null || displaySeconds < lastSeconds) {
-          currentRank = index + 1;
-          lastSeconds = displaySeconds;
-        }
-
-        return {
-          ...entry,
-          rank: currentRank,
-          displaySeconds,
-        };
-      });
+      return rankedEntries.map(({ value, displayNameSnapshot, ...entry }) => entry);
     };
 
-    const mappedDailyEntries = buildRankPreviewEntries(validDailyRankEntries, dailyRankWindow.isLive);
+    const mappedDailyEntries = buildRankPreviewEntries(validDailyRankEntries, 'daily', dailyRankWindow.isLive);
     const hasDailySelfEntry = Boolean(user?.uid && mappedDailyEntries.some((entry) => entry.studentId === user.uid));
+    const dailySelfFallbackMinutes = user?.uid
+      ? getLiveAdjustedStudentRankValue({
+          entry: {
+            studentId: user.uid,
+            value: dailyStudyRankMinutes,
+            liveStatus: null,
+            liveStartedAtMs: null,
+          },
+          range: 'daily',
+          nowMs: rankPreviewNowMs,
+          viewerId: user.uid,
+          selfLiveStartedAtMs: selfLiveRankStartedAtMs,
+          dailyRankWindow,
+        })
+      : 0;
     const shouldAddDailySelfFallback = Boolean(
       dailyRankWindow.isLive &&
       user?.uid &&
       !hasDailySelfEntry &&
-      dailyStudyRankDisplaySeconds > 0
+      dailySelfFallbackMinutes > 0
     );
-    const rankedDailyEntries = applyPreviewRanks([
-      ...mappedDailyEntries,
+    const rankedDailyEntries = assignStudentRankingTrackRanks([
+      ...mappedDailyEntries.map((entry) => ({
+        ...entry,
+        value: Math.max(0, Number(entry.minutes || 0)),
+        displayNameSnapshot: entry.name || '학생',
+      })),
       ...(shouldAddDailySelfFallback
         ? [{
             rank: 0,
             studentId: user?.uid || null,
             name: user?.displayName || activeMembership?.displayName || '학생',
             schoolName: studentProfile?.schoolName || null,
-            minutes: Math.max(0, Number(dailyStudyRankMinutes || 0)),
+            minutes: dailySelfFallbackMinutes,
             baseMinutes: Math.max(0, Number(dailyStudyRankMinutes || 0)),
-            displaySeconds: dailyStudyRankDisplaySeconds,
+            displaySeconds: Math.max(0, dailySelfFallbackMinutes * 60),
             isLive: isTimerActive,
-          } satisfies StudentHomeRankPreviewEntry]
+            value: dailySelfFallbackMinutes,
+            displayNameSnapshot: user?.displayName || activeMembership?.displayName || '학생',
+          } satisfies StudentHomeRankPreviewEntry & { value: number; displayNameSnapshot: string }]
         : []),
-    ]);
+    ]).map(({ value, displayNameSnapshot, ...entry }) => entry);
     const dailySelfEntry = user?.uid
       ? rankedDailyEntries.find((entry) => entry.studentId === user.uid) || null
       : null;
     const effectiveDailyRank = dailySelfEntry?.rank || dailyStudyRank;
     const effectiveDailyMinutes = Math.max(
       0,
-      Number(dailySelfEntry?.baseMinutes ?? dailySelfEntry?.minutes ?? dailyStudyRankMinutes ?? 0)
+      Number(dailySelfEntry?.minutes ?? dailyStudyRankMinutes ?? 0)
     );
     const effectiveDailyDisplaySeconds = Math.max(
       0,
-      Number(dailySelfEntry?.displaySeconds ?? dailyStudyRankDisplaySeconds ?? 0)
+      Number(dailySelfEntry?.displaySeconds ?? effectiveDailyMinutes * 60)
     );
     const dailyTop = rankedDailyEntries.slice(0, 3);
-    const weeklyTop = buildRankPreviewEntries(validWeeklyRankEntries).slice(0, 3);
-    const monthlyTop = buildRankPreviewEntries(
-      [...validRankEntries].sort((a, b) => Number(b.value || 0) - Number(a.value || 0))
-    ).slice(0, 3);
+    const weeklyEntries = buildRankPreviewEntries(validWeeklyRankEntries, 'weekly');
+    const monthlyEntries = buildRankPreviewEntries(validRankEntries, 'monthly');
+    const weeklyTop = weeklyEntries.slice(0, 3);
+    const monthlyTop = monthlyEntries.slice(0, 3);
+    const weeklySelfEntry = user?.uid
+      ? weeklyEntries.find((entry) => entry.studentId === user.uid) ?? null
+      : null;
+    const monthlySelfEntry = user?.uid
+      ? monthlyEntries.find((entry) => entry.studentId === user.uid) ?? null
+      : null;
+    const effectiveWeeklyRank = weeklySelfEntry?.rank || weeklyStudyRank;
+    const effectiveWeeklyMinutes = Math.max(0, Number(weeklySelfEntry?.minutes ?? weeklyStudyRankMinutes ?? 0));
+    const effectiveWeeklyDisplaySeconds = Math.max(0, Number(weeklySelfEntry?.displaySeconds ?? effectiveWeeklyMinutes * 60));
+    const effectiveMonthlyRank = monthlySelfEntry?.rank || monthlyStudyRank;
+    const effectiveMonthlyMinutes = Math.max(0, Number(monthlySelfEntry?.minutes ?? monthlyStudyRankMinutes ?? 0));
+    const effectiveMonthlyDisplaySeconds = Math.max(0, Number(monthlySelfEntry?.displaySeconds ?? effectiveMonthlyMinutes * 60));
 
     return {
       daily: {
@@ -2681,13 +2685,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       },
       weekly: {
         title: '주간 랭킹',
-        rank: weeklyStudyRank,
-        minutes: weeklyStudyRankMinutes,
-        badge: rankSnapshotLoading ? '집계 중' : weeklyStudyRank > 0 ? `이번 주 ${weeklyStudyRank}위` : '집계 준비중',
-        caption: weeklyStudyRankDisplaySeconds > 0
+        rank: effectiveWeeklyRank,
+        minutes: effectiveWeeklyMinutes,
+        badge: rankSnapshotLoading ? '집계 중' : effectiveWeeklyRank > 0 ? `이번 주 ${effectiveWeeklyRank}위` : '집계 준비중',
+        caption: effectiveWeeklyDisplaySeconds > 0
           ? isTimerActive
-            ? `${formatStudyDurationWithSeconds(weeklyStudyRankDisplaySeconds)} 누적`
-            : `${formatStudyMinutes(Math.max(0, weeklyStudyRankMinutes))} 누적`
+            ? `${formatStudyDurationWithSeconds(effectiveWeeklyDisplaySeconds)} 누적`
+            : `${formatStudyMinutes(Math.max(0, effectiveWeeklyMinutes))} 누적`
           : '이번 주 기록이 쌓이면 보여요',
         description: `${formatStudentRankRewardSummary('weekly')} 지급`,
         preview: weeklyTop,
@@ -2697,13 +2701,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       },
       monthly: {
         title: '월간 랭킹',
-        rank: monthlyStudyRank,
-        minutes: monthlyStudyRankMinutes,
-        badge: isRankContextLoading ? '집계 중' : monthlyStudyRank > 0 ? `이번 달 ${monthlyStudyRank}위` : '집계 준비중',
-        caption: monthlyStudyRankDisplaySeconds > 0
+        rank: effectiveMonthlyRank,
+        minutes: effectiveMonthlyMinutes,
+        badge: isRankContextLoading ? '집계 중' : effectiveMonthlyRank > 0 ? `이번 달 ${effectiveMonthlyRank}위` : '집계 준비중',
+        caption: effectiveMonthlyDisplaySeconds > 0
           ? isTimerActive
-            ? `${formatStudyDurationWithSeconds(monthlyStudyRankDisplaySeconds)} 누적`
-            : `${formatStudyMinutes(Math.max(0, monthlyStudyRankMinutes))} 누적`
+            ? `${formatStudyDurationWithSeconds(effectiveMonthlyDisplaySeconds)} 누적`
+            : `${formatStudyMinutes(Math.max(0, effectiveMonthlyMinutes))} 누적`
           : '이번 달 공부시간이 쌓이면 순위가 보여요',
         description: `${formatStudentRankRewardSummary('monthly')} 지급`,
         preview: monthlyTop,
@@ -2726,17 +2730,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [
     activeMembership?.displayName,
     dailyStudyRank,
-    dailyStudyRankDisplaySeconds,
     dailyStudyRankMinutes,
     dailyWaitingTopMinutes,
     isRankContextLoading,
     isTimerActive,
     localSeconds,
     monthlyStudyRank,
-    monthlyStudyRankDisplaySeconds,
     monthlyStudyRankMinutes,
     rankPreviewNowMs,
     rankSnapshotLoading,
+    selfLiveRankStartedAtMs,
     studentProfile?.schoolName,
     user?.displayName,
     user?.uid,
@@ -2744,7 +2747,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     validRankEntries,
     validWeeklyRankEntries,
     weeklyStudyRank,
-    weeklyStudyRankDisplaySeconds,
     weeklyStudyRankMinutes,
     dailyRankWindow,
   ]);
