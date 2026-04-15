@@ -612,7 +612,9 @@ service cloud.firestore {
       }
 
       match /settings/{settingId} {
-        allow read, write: if isCenterAdmin(centerId);
+        allow read: if isCenterAdmin(centerId)
+          || (settingId == 'giftishow' && isActiveMember(centerId));
+        allow write: if isCenterAdmin(centerId);
       }
 
       match /settingsPrivate/{settingId} {
