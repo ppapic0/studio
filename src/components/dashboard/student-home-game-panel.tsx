@@ -578,7 +578,8 @@ export function StudentHomeGamePanel({
   onNextBox: () => void;
   nextCountdownLabel: string;
   }) {
-  const homeFocusDetailLabel = [dateLabel, homeFocusSummaryLabel].filter(Boolean).join(" · ");
+  const homeFocusSummaryDisplayLabel = homeFocusSummaryLabel.replace(/\s*·\s*설정하기\s*$/, "").trim();
+  const homeFocusDetailLabel = [dateLabel, homeFocusSummaryDisplayLabel].filter(Boolean).join(" · ");
   const homeWelcomeLineLabel = `${homeWelcomeTargetLabel} ${homeStudentName}님`.trim();
   const maxTrend = weeklyTrend.reduce((max, item) => Math.max(max, item.minutes), 1);
   const trendAxisMarks = [1, 0.75, 0.5, 0.25].map((ratio, index) => {
@@ -648,10 +649,10 @@ export function StudentHomeGamePanel({
             )}>
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <div className={cn("max-w-full break-keep font-black tracking-tight text-white", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
+                  <div className={cn("font-aggro-display max-w-full break-keep font-black tracking-normal text-white", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
                     {homeWelcomeLineLabel}
                   </div>
-                  <div className={cn("max-w-full break-keep font-black tracking-tight text-white", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
+                  <div className={cn("font-aggro-display max-w-full break-keep font-black tracking-normal text-white", isMobile ? "text-[1rem] leading-[1.45]" : "text-[1.08rem] leading-[1.5]")}>
                     <span className="text-[var(--text-accent-fixed)]">트랙</span>
                     <span>에 오신 걸 환영합니다!</span>
                   </div>
@@ -659,17 +660,20 @@ export function StudentHomeGamePanel({
                 <button
                   type="button"
                   onClick={onOpenFocusEditor}
-                  title={homeFocusDetailLabel}
+                  title={`${homeFocusDetailLabel} 설정`}
                   className={cn(
-                    "group inline-flex max-w-full items-center gap-2 rounded-full text-left transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]",
-                    isMobile ? "pr-1" : "pr-1.5"
+                    "group flex max-w-full items-center justify-between gap-2 rounded-[0.95rem] border border-white/14 bg-white/10 px-2.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-white/22 hover:bg-white/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange-border)]",
+                    isMobile ? "w-full" : "w-fit"
                   )}
                 >
-                  <span className={cn("truncate font-black text-white", isMobile ? "text-[11px]" : "text-[12px]")}>
+                  <span className={cn("font-aggro-display min-w-0 truncate font-black tracking-normal text-white", isMobile ? "text-[11px] leading-4" : "text-[12px] leading-4")}>
                     {homeFocusDetailLabel}
                   </span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white transition-transform duration-200 group-hover:translate-x-0.5" />
-                  <span className="sr-only">{homeFocusDetailLabel}</span>
+                  <span className="font-aggro-display inline-flex shrink-0 items-center gap-1 rounded-[0.7rem] border border-white/16 bg-white/14 px-2 py-1 text-[10px] font-black leading-none tracking-normal text-white shadow-[0_10px_18px_-14px_rgba(0,0,0,0.42)]">
+                    (설정)
+                    <ChevronRight className="h-3 w-3 shrink-0 text-white transition-transform duration-200 group-hover:translate-x-0.5" />
+                  </span>
+                  <span className="sr-only">{homeFocusDetailLabel} 설정</span>
                 </button>
               </div>
             </div>
