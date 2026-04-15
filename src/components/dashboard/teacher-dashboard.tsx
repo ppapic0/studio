@@ -23,7 +23,6 @@ import {
   Clock,
   Zap,
   Users,
-  Trophy,
   User,
   Sparkles,
   ArrowRight,
@@ -40,7 +39,6 @@ import {
   Timer,
   LogIn,
   LogOut,
-  Filter,
   LayoutGrid,
   BarChart3,
   TrendingUp,
@@ -100,6 +98,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { motion, useReducedMotion } from 'framer-motion';
 import { sendKakaoNotification } from '@/lib/kakao-service';
+import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
@@ -1199,84 +1198,239 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           transition: { duration: 0.48, delay, ease: 'easeOut' as const },
         };
 
-  const heroSummaryCards = [
-    {
-      key: 'total',
-      label: `${selectedClass === 'all' ? '센터 전체' : selectedClass} 오늘 누적`,
-      value: formatDurationMinutes(stats.totalCenterMinutes),
-      footnote: '실제 공부시간 기준',
-      icon: Activity,
-      iconClass: 'bg-white/10 text-white',
-      valueClass: 'text-white',
-    },
-    {
-      key: 'avg',
-      label: '평균 학습',
-      value: formatDurationMinutes(stats.avgMinutes),
-      footnote: '현재 필터 기준 평균',
-      icon: Users,
-      iconClass: 'bg-white/10 text-white',
-      valueClass: 'text-white',
-    },
-    {
-      key: 'top20',
-      label: '상위 20% 평균',
-      value: formatDurationMinutes(stats.top20Avg),
-      footnote: '상위권 기준점',
-      icon: Trophy,
-      iconClass: 'bg-white/10 text-white',
-      valueClass: 'text-white',
-    },
-  ];
+  const liveDateLabel = useMemo(
+    () => format(new Date(now), 'M월 d일 (EEE)', { locale: ko }),
+    [now]
+  );
+  const liveSyncLabel = useMemo(
+    () => format(new Date(now), 'HH:mm:ss'),
+    [now]
+  );
+  const currentTeacherScopeLabel = selectedClass === 'all' ? '센터 전체' : selectedClass;
+  const classFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: '센터 전체' },
+      ...availableClasses.map((className) => ({ value: className, label: className })),
+    ],
+    [availableClasses]
+  );
+  const teacherCounselingSummary = useMemo(() => {
+    const pendingCount = appointments.filter((apt) => apt.status === 'requested').length;
+    const confirmedUpcomingCount = appointments.filter((apt) => {
+      if (apt.status !== 'confirmed' || !apt.scheduledAt) return false;
+      return apt.scheduledAt.toMillis() >= now;
+    }).length;
 
-  const operationalKpis = [
-    {
-      key: 'studying',
-      label: '학습 중',
-      value: roomScopedKpi?.studying ?? stats.studying,
-      caption: '현재 공부 상태',
-      icon: Activity,
-      shellClass: 'border-[#D8E6FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)]',
-      iconClass: 'bg-[#EAF2FF] text-[#2554D7]',
-      valueClass: 'text-[#2554D7]',
-    },
-    {
-      key: 'absent',
-      label: '미입실',
-      value: roomScopedKpi?.absent ?? stats.absent,
-      caption: '출결 확인 우선',
-      icon: AlertCircle,
-      shellClass: 'border-rose-100 bg-[linear-gradient(180deg,#FFF8F9_0%,#FFF1F4_100%)]',
-      iconClass: 'bg-rose-100 text-rose-600',
-      valueClass: 'text-rose-600',
-    },
-    {
-      key: 'away',
-      label: '외출/휴식',
-      value: roomScopedKpi?.away ?? stats.away,
-      caption: '자리 이탈 상태',
-      icon: Clock,
-      shellClass: 'border-amber-100 bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF4E6_100%)]',
-      iconClass: 'bg-amber-100 text-amber-600',
-      valueClass: 'text-amber-600',
-    },
-    {
-      key: 'total',
-      label:
-        selectedRoomView === 'all'
-          ? selectedClass === 'all'
-            ? '전체 좌석'
-            : `${selectedClass} 정원`
-          : `${getRoomLabel(selectedRoomView, roomConfigs)} 좌석`,
-      value: roomScopedKpi?.total ?? stats.total,
-      caption: selectedRoomView === 'all' ? '운영 가능 좌석' : '선택 호실 기준',
-      icon: Armchair,
-      shellClass: 'border-[#D8E6FF] bg-[linear-gradient(180deg,#F8FAFF_0%,#EEF4FF_100%)]',
-      iconClass: 'bg-[#EAF2FF] text-[#14295F]',
-      valueClass: 'text-[#14295F]',
-      hasEdit: true,
-    },
-  ];
+    return {
+      pendingCount,
+      confirmedUpcomingCount,
+      totalCount: appointments.length,
+    };
+  }, [appointments, now]);
+  const teacherRiskCandidates = useMemo(
+    () =>
+      [...teacherSeatSignals]
+        .filter((signal) => Boolean(signal.studentId))
+        .sort((left, right) => {
+          const healthDiff = left.compositeHealth - right.compositeHealth;
+          if (healthDiff !== 0) return healthDiff;
+
+          const awayDiff = (right.currentAwayMinutes || 0) - (left.currentAwayMinutes || 0);
+          if (awayDiff !== 0) return awayDiff;
+
+          return left.studentName.localeCompare(right.studentName, 'ko');
+        })
+        .slice(0, 4),
+    [teacherSeatSignals]
+  );
+  const teacherHomeRoomRows = useMemo(() => roomSummaries.slice(0, 4), [roomSummaries]);
+  const teacherHomeAlertCount = useMemo(
+    () =>
+      attendanceBoardSummary.lateOrAbsentCount +
+      attendanceBoardSummary.longAwayCount +
+      seatOverlaySummary.riskCount +
+      teacherCounselingSummary.pendingCount,
+    [
+      attendanceBoardSummary.lateOrAbsentCount,
+      attendanceBoardSummary.longAwayCount,
+      seatOverlaySummary.riskCount,
+      teacherCounselingSummary.pendingCount,
+    ]
+  );
+  const teacherHomeActionSignalCount = useMemo(
+    () => teacherActionQueue.filter((item) => !item.key.endsWith('-overview')).length,
+    [teacherActionQueue]
+  );
+  const teacherHomeStatusMeta = useMemo(() => {
+    if (
+      seatOverlaySummary.riskCount > 0 ||
+      attendanceBoardSummary.lateOrAbsentCount > 0 ||
+      teacherCounselingSummary.pendingCount > 0
+    ) {
+      return {
+        label: '긴급',
+        headline: '지금은 조치와 좌석 흐름을 먼저 잡아야 합니다.',
+        detail: `위험 ${seatOverlaySummary.riskCount}명, 미입실·지각 ${attendanceBoardSummary.lateOrAbsentCount}명, 상담 승인 ${teacherCounselingSummary.pendingCount}건을 우선 확인하세요.`,
+        badgeClass: 'border-[#FFB38A]/30 bg-[#FF7A16] text-white',
+        dotClass: 'bg-[#FFB38A]',
+      };
+    }
+
+    if (
+      attendanceBoardSummary.longAwayCount > 0 ||
+      unreadReportCount > 0 ||
+      teacherHomeActionSignalCount > 0
+    ) {
+      return {
+        label: '주의',
+        headline: '큰 이상은 없지만 오늘 후속 확인이 남아 있습니다.',
+        detail: `장기 외출 ${attendanceBoardSummary.longAwayCount}명, 미열람 리포트 ${unreadReportCount}건을 홈에서 바로 이어서 확인할 수 있습니다.`,
+        badgeClass: 'border-amber-200/30 bg-amber-400/20 text-amber-100',
+        dotClass: 'bg-amber-300',
+      };
+    }
+
+    return {
+      label: '안정',
+      headline: '교실 흐름이 안정적으로 유지되고 있습니다.',
+      detail: '출결, 좌석, 상담, 리포트 흐름에 즉시 조치가 필요한 신호가 없습니다.',
+      badgeClass: 'border-emerald-200/25 bg-emerald-400/16 text-emerald-100',
+      dotClass: 'bg-emerald-300',
+    };
+  }, [
+    attendanceBoardSummary.lateOrAbsentCount,
+    attendanceBoardSummary.longAwayCount,
+    seatOverlaySummary.riskCount,
+    teacherHomeActionSignalCount,
+    teacherCounselingSummary.pendingCount,
+    unreadReportCount,
+  ]);
+  const teacherHomeKpiCards = useMemo(
+    () => [
+      {
+        key: 'studying',
+        label: '학습 중',
+        value: roomScopedKpi?.studying ?? stats.studying,
+        unit: '명',
+        caption: '현재 공부 상태',
+        icon: Activity,
+        tone: 'navy' as const,
+        deltaLabel: currentTeacherScopeLabel,
+        onClick: () => scrollToSection(liveBoardSectionRef),
+      },
+      {
+        key: 'late-absent',
+        label: '미입실·지각',
+        value: attendanceBoardSummary.lateOrAbsentCount,
+        unit: '명',
+        caption: '출결 확인 우선',
+        icon: AlertCircle,
+        tone: attendanceBoardSummary.lateOrAbsentCount > 0 ? 'rose' as const : 'default' as const,
+        deltaLabel: '오늘 출결 신호',
+        onClick: () => scrollToSection(liveBoardSectionRef),
+      },
+      {
+        key: 'away',
+        label: '외출/휴식',
+        value: roomScopedKpi?.away ?? stats.away,
+        unit: '명',
+        caption: `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
+        icon: Clock,
+        tone: attendanceBoardSummary.longAwayCount > 0 ? 'orange' as const : 'default' as const,
+        deltaLabel: '자리 이탈 상태',
+        onClick: () => scrollToSection(liveBoardSectionRef),
+      },
+      {
+        key: 'risk',
+        label: '위험 학생',
+        value: seatOverlaySummary.riskCount,
+        unit: '명',
+        caption: '학생 히트맵 기준',
+        icon: ShieldAlert,
+        tone: seatOverlaySummary.riskCount > 0 ? 'rose' as const : 'emerald' as const,
+        deltaLabel: `주의 ${seatOverlaySummary.warningCount}명`,
+        onClick: () => scrollToSection(seatInsightSectionRef),
+      },
+      {
+        key: 'total-minutes',
+        label: '오늘 누적',
+        value: formatDurationMinutes(stats.totalCenterMinutes),
+        unit: '',
+        caption: '실제 공부시간',
+        icon: Timer,
+        tone: 'blue' as const,
+        deltaLabel: currentTeacherScopeLabel,
+      },
+      {
+        key: 'average-minutes',
+        label: '평균 학습',
+        value: formatDurationMinutes(stats.avgMinutes),
+        unit: '',
+        caption: '현재 필터 평균',
+        icon: Users,
+        tone: 'default' as const,
+        deltaLabel: `상위 20% ${formatDurationMinutes(stats.top20Avg)}`,
+      },
+      {
+        key: 'unread-report',
+        label: '리포트 미열람',
+        value: unreadReportCount,
+        unit: '건',
+        caption: '최근 발송 기준',
+        icon: Eye,
+        tone: unreadReportCount > 0 ? 'orange' as const : 'default' as const,
+        deltaLabel: latestUnreadRecentReport?.studentName || '후속 확인',
+        onClick: () => {
+          if (latestUnreadRecentReport) {
+            setSelectedRecentReport(latestUnreadRecentReport);
+            return;
+          }
+          scrollToSection(reportsSectionRef);
+        },
+      },
+    ],
+    [
+      attendanceBoardSummary.lateOrAbsentCount,
+      attendanceBoardSummary.longAwayCount,
+      currentTeacherScopeLabel,
+      latestUnreadRecentReport,
+      roomScopedKpi?.away,
+      roomScopedKpi?.studying,
+      seatOverlaySummary.riskCount,
+      seatOverlaySummary.warningCount,
+      stats.away,
+      stats.avgMinutes,
+      stats.studying,
+      stats.top20Avg,
+      stats.totalCenterMinutes,
+      unreadReportCount,
+    ]
+  );
+  const teacherWorkbenchQuickActions = useMemo(
+    () => [
+      {
+        label: '오늘 우선순위',
+        icon: <ShieldAlert className="h-4 w-4" />,
+        onClick: () => setIsHeroPriorityDialogOpen(true),
+      },
+      {
+        label: '실시간 교실',
+        icon: <LayoutGrid className="h-4 w-4" />,
+        onClick: () => scrollToSection(liveBoardSectionRef),
+      },
+      {
+        label: '학생 360',
+        icon: <Users className="h-4 w-4" />,
+        href: '/dashboard/teacher/students',
+      },
+      {
+        label: '상담 현황',
+        icon: <MessageSquare className="h-4 w-4" />,
+        href: '/dashboard/appointments',
+      },
+    ],
+    []
+  );
 
   const unassignedStudents = useMemo(() => {
     if (!students || !studentMembers) return [];
@@ -2381,6 +2535,487 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     </ScrollArea>
   );
 
+  function renderTeacherHomeHeroSection() {
+    const kpiToneClassMap = {
+      default: {
+        shell: 'border-[#DCE7FF] bg-white text-[#14295F]',
+        icon: 'bg-[#EEF4FF] text-[#2554D7]',
+        value: 'text-[#14295F]',
+      },
+      navy: {
+        shell: 'border-[#C9D8FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)] text-[#14295F]',
+        icon: 'bg-[#14295F] text-white',
+        value: 'text-[#14295F]',
+      },
+      blue: {
+        shell: 'border-[#C9D8FF] bg-[linear-gradient(180deg,#F7FAFF_0%,#ECF4FF_100%)] text-[#14295F]',
+        icon: 'bg-[#E6F0FF] text-[#2554D7]',
+        value: 'text-[#2554D7]',
+      },
+      orange: {
+        shell: 'border-[#FFD7B0] bg-[linear-gradient(180deg,#FFF9F3_0%,#FFF1E4_100%)] text-[#14295F]',
+        icon: 'bg-[#FFF0DF] text-[#C95A08]',
+        value: 'text-[#C95A08]',
+      },
+      rose: {
+        shell: 'border-rose-200 bg-[linear-gradient(180deg,#FFF8FA_0%,#FFF1F4_100%)] text-[#14295F]',
+        icon: 'bg-rose-100 text-rose-600',
+        value: 'text-rose-600',
+      },
+      emerald: {
+        shell: 'border-emerald-200 bg-[linear-gradient(180deg,#F4FFF9_0%,#ECFFF4_100%)] text-[#14295F]',
+        icon: 'bg-emerald-100 text-emerald-700',
+        value: 'text-emerald-700',
+      },
+    };
+
+    return (
+      <motion.section className="space-y-5 px-1" {...getDeckMotionProps(0.04, 16)}>
+        <motion.div
+          className="relative overflow-hidden rounded-[2rem] border border-[#1C3A82] admin-exec-header text-white shadow-[0_32px_64px_-40px_rgba(20,41,95,0.62)]"
+          {...getDeckMotionProps(0.06, 16)}
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,122,22,0.16),transparent_42%),radial-gradient(ellipse_at_bottom_right,rgba(37,84,215,0.18),transparent_50%)]" />
+          <div className={cn("relative grid gap-5", isMobile ? "p-5" : "p-6 sm:p-7 lg:grid-cols-[minmax(0,1.4fr)_360px] lg:items-stretch")}>
+            <div className="flex min-w-0 flex-col justify-between gap-6">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={cn("h-7 rounded-full px-3 text-[10px] font-black", teacherHomeStatusMeta.badgeClass)}>
+                    <span className={cn("mr-1.5 inline-block h-2 w-2 rounded-full", teacherHomeStatusMeta.dotClass)} />
+                    {teacherHomeStatusMeta.label}
+                  </Badge>
+                  <Badge className="h-7 rounded-full border border-white/10 bg-white/10 px-3 text-[10px] font-black text-white">
+                    {currentTeacherScopeLabel}
+                  </Badge>
+                  <Badge className="h-7 rounded-full border border-white/10 bg-white/[0.07] px-3 text-[10px] font-black text-white/82">
+                    {liveDateLabel}
+                  </Badge>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.35rem] border border-white/10 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                    <Monitor className="h-6 w-6 text-white" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#FFD7BA]">teacher live studio</p>
+                    <h1 className={cn("mt-2 font-aggro-display tracking-tight text-white", isMobile ? "text-[1.9rem] leading-[1.08]" : "text-[2.55rem] leading-[0.98]")}>
+                      {teacherHomeStatusMeta.headline}
+                    </h1>
+                    <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-white/72">
+                      {teacherHomeStatusMeta.detail}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className={cn("grid gap-2.5", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+                <button
+                  type="button"
+                  onClick={() => setIsHeroPriorityDialogOpen(true)}
+                  className="rounded-[1.35rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-left transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.12]"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/56">오늘 조치</p>
+                  <p className="mt-2 text-base font-black text-white">
+                    {teacherHomeActionSignalCount > 0 ? `${teacherHomeActionSignalCount}건` : '안정'}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoomView('all');
+                    scrollToSection(liveBoardSectionRef);
+                  }}
+                  className="rounded-[1.35rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-left transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.12]"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/56">실시간 좌석</p>
+                  <p className="mt-2 text-base font-black text-white">{stats.studying}/{stats.total}</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollToSection(seatInsightSectionRef)}
+                  className={cn(
+                    "rounded-[1.35rem] border px-4 py-3 text-left transition-[transform,border-color,background-color] hover:-translate-y-0.5",
+                    seatOverlaySummary.riskCount > 0
+                      ? "border-[#FFB38A]/35 bg-[#FF7A16]/18 hover:bg-[#FF7A16]/24"
+                      : "border-white/10 bg-white/[0.08] hover:border-white/20 hover:bg-white/[0.12]"
+                  )}
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/56">학생 리스크</p>
+                  <p className="mt-2 text-base font-black text-white">위험 {seatOverlaySummary.riskCount}명</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (latestUnreadRecentReport) {
+                      setSelectedRecentReport(latestUnreadRecentReport);
+                      return;
+                    }
+                    scrollToSection(reportsSectionRef);
+                  }}
+                  className="rounded-[1.35rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-left transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.12]"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/56">리포트</p>
+                  <p className="mt-2 text-base font-black text-white">미열람 {unreadReportCount}건</p>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex h-full flex-col justify-between gap-3 rounded-[1.65rem] border border-white/10 bg-white/[0.09] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/56">live sync</p>
+                  <p className="dashboard-number mt-2 text-[1.55rem] text-white">{liveSyncLabel}</p>
+                </div>
+                <Badge className="h-7 rounded-full border border-white/10 bg-white px-3 text-[10px] font-black text-[#14295F]">
+                  운영실
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.08] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/50">확인 필요</p>
+                  <p className="dashboard-number mt-2 text-2xl text-[#FFD7BA]">{teacherHomeAlertCount}</p>
+                </div>
+                <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.08] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/50">현재 보기</p>
+                  <p className="mt-2 truncate text-sm font-black text-white">{selectedRoomLabel}</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setIsHeroRoomsDialogOpen(true)}
+                className="h-11 rounded-[1.15rem] bg-white text-xs font-black text-[#14295F] hover:bg-[#F4F7FF]"
+              >
+                호실 운영 요약 보기
+                <ChevronRight className="ml-1.5 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+
+        <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "md:grid-cols-3 xl:grid-cols-7")}>
+          {teacherHomeKpiCards.map((item, index) => {
+            const toneClasses = kpiToneClassMap[item.tone] || kpiToneClassMap.default;
+            const KpiIcon = item.icon;
+            const content = (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">{item.label}</p>
+                    <p className={cn("dashboard-number mt-3 break-keep leading-none", isMobile ? "text-[1.35rem]" : "text-[1.55rem]", toneClasses.value)}>
+                      {item.value}
+                      {item.unit ? <span className="ml-1 align-baseline text-[0.8rem] font-black">{item.unit}</span> : null}
+                    </p>
+                  </div>
+                  <span className={cn("inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem]", toneClasses.icon)}>
+                    <KpiIcon className="h-[18px] w-[18px]" />
+                  </span>
+                </div>
+                <div className="mt-4 min-h-[2.4rem]">
+                  <p className="text-[11px] font-bold leading-5 text-[#5C6E97]">{item.caption}</p>
+                  <p className="mt-0.5 truncate text-[10px] font-black text-[#8A98B5]">{item.deltaLabel}</p>
+                </div>
+              </>
+            );
+
+            return (
+              <motion.div key={item.key} {...getDeckMotionProps(0.1 + index * 0.035, 10)}>
+                {item.onClick ? (
+                  <button
+                    type="button"
+                    onClick={item.onClick}
+                    className={cn(
+                      "h-full w-full rounded-[1.55rem] border p-4 text-left shadow-[0_18px_34px_-30px_rgba(20,41,95,0.22)] transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:shadow-[0_24px_44px_-34px_rgba(20,41,95,0.3)]",
+                      toneClasses.shell
+                    )}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div className={cn("h-full rounded-[1.55rem] border p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.22)]", toneClasses.shell)}>
+                    {content}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
+
+        <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "lg:grid-cols-12")}>
+          <Card className="admin-surface-primary overflow-hidden rounded-[2rem] border-[#DCE7FF] lg:col-span-4">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">교실 현황</Badge>
+                  <p className="mt-3 text-lg font-black tracking-tight text-[#14295F]">호실별 좌석 흐름</p>
+                </div>
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] bg-[#14295F] text-white">
+                  <Armchair className="h-5 w-5" />
+                </span>
+              </div>
+              <div className="space-y-2.5">
+                {teacherHomeRoomRows.map((room) => (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRoomView(room.id);
+                      scrollToSection(liveBoardSectionRef);
+                    }}
+                    className={cn(
+                      "group w-full rounded-[1.25rem] border px-4 py-3 text-left transition-[transform,border-color,background-color] hover:-translate-y-0.5",
+                      selectedRoomView === room.id
+                        ? "border-[#FFB36D] bg-[#FFF5EA]"
+                        : "border-[#DCE7FF] bg-white hover:border-[#C9D8FF] hover:bg-[#F8FBFF]"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-[#14295F]">{getRoomLabel(room.id, roomConfigs)}</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#5C6E97]">
+                          착석 {room.studying} · 외출 {room.away} · 배정 {room.assigned}/{room.physicalSeats}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-[#8A98B5] transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setSelectedRoomView('all');
+                  scrollToSection(liveBoardSectionRef);
+                }}
+                className="h-11 w-full rounded-xl border-2 bg-white font-black text-[#14295F]"
+              >
+                전체 좌석 보기
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="admin-surface-primary overflow-hidden rounded-[2rem] border-[#DCE7FF] lg:col-span-4">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Badge className="h-6 rounded-full border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">오늘 우선 조치</Badge>
+                  <p className="mt-3 text-lg font-black tracking-tight text-[#14295F]">상위 3개만 고정</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsHeroPriorityDialogOpen(true)}
+                  className="h-10 rounded-xl border-2 bg-white px-3 text-xs font-black text-[#14295F]"
+                >
+                  전체
+                </Button>
+              </div>
+              {topTeacherPriority ? (
+                <div className="rounded-[1.45rem] border border-[#FFD7B0] bg-[#FFF8F2] p-4">
+                  <div className="flex items-start gap-3">
+                    <span className={cn("inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full", topTeacherPriority.toneClass)}>
+                      {TopTeacherPriorityIcon ? <TopTeacherPriorityIcon className="h-5 w-5" /> : null}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">1순위</Badge>
+                        <p className="truncate text-sm font-black text-[#14295F]">{topTeacherPriority.title}</p>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-xs font-bold leading-5 text-[#5C6E97]">{topTeacherPriority.detail}</p>
+                      <Button
+                        type="button"
+                        onClick={topTeacherPriority.onClick}
+                        className="mt-3 h-9 rounded-xl bg-[#14295F] px-3 text-xs font-black text-white hover:bg-[#10224C]"
+                      >
+                        {topTeacherPriority.actionLabel}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-white px-4 py-8 text-center text-sm font-black text-[#5C6E97]">
+                  지금 바로 처리할 항목이 없습니다.
+                </div>
+              )}
+              <div className="space-y-2.5">
+                {secondaryTeacherPriorities.map((item, index) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={item.onClick}
+                    className="group flex w-full items-center justify-between gap-3 rounded-[1.15rem] border border-[#DCE7FF] bg-white px-4 py-3 text-left transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-[#C9D8FF] hover:bg-[#F8FBFF]"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">{index + 2}순위</Badge>
+                        <p className="truncate text-sm font-black text-[#14295F]">{item.title}</p>
+                      </div>
+                      <p className="mt-1 truncate text-[11px] font-bold text-[#5C6E97]">{item.detail}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[#8A98B5] transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="admin-surface-primary overflow-hidden rounded-[2rem] border-[#DCE7FF] lg:col-span-4">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Badge className="h-6 rounded-full border-none bg-rose-50 px-2.5 text-[10px] font-black text-rose-600">학생 리스크</Badge>
+                  <p className="mt-3 text-lg font-black tracking-tight text-[#14295F]">우선 확인 학생</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => scrollToSection(seatInsightSectionRef)}
+                  className="h-10 rounded-xl border-2 bg-white px-3 text-xs font-black text-[#14295F]"
+                >
+                  히트맵
+                </Button>
+              </div>
+              <div className="space-y-2.5">
+                {teacherRiskCandidates.length === 0 ? (
+                  <div className="rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-white px-4 py-8 text-center text-sm font-black text-[#5C6E97]">
+                    현재 표시할 위험 학생이 없습니다.
+                  </div>
+                ) : (
+                  teacherRiskCandidates.map((signal, index) => (
+                    <button
+                      key={`${signal.studentId}-${signal.seatId}`}
+                      type="button"
+                      onClick={() => {
+                        if (signal.roomId) setSelectedRoomView(signal.roomId);
+                        scrollToSection(seatInsightSectionRef);
+                      }}
+                      className="group w-full rounded-[1.2rem] border border-[#DCE7FF] bg-white px-4 py-3 text-left transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-[#C9D8FF] hover:bg-[#F8FBFF]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge className={cn("h-6 rounded-full border-none px-2.5 text-[10px] font-black", index === 0 ? "bg-rose-100 text-rose-700" : "bg-[#EEF4FF] text-[#2554D7]")}>
+                              {signal.compositeHealth}점
+                            </Badge>
+                            <p className="truncate text-sm font-black text-[#14295F]">{signal.studentName}</p>
+                          </div>
+                          <p className="mt-1 truncate text-[11px] font-bold text-[#5C6E97]">
+                            {signal.className || '반 미지정'} · {signal.primaryChip} · {signal.topReason}
+                          </p>
+                        </div>
+                        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#8A98B5] transition-transform group-hover:translate-x-0.5" />
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="admin-surface-primary overflow-hidden rounded-[2rem] border-[#DCE7FF] lg:col-span-5">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">상담·리포트</Badge>
+                  <p className="mt-3 text-lg font-black tracking-tight text-[#14295F]">오늘 커뮤니케이션 흐름</p>
+                </div>
+                <Button asChild variant="outline" className="h-10 rounded-xl border-2 bg-white px-3 text-xs font-black text-[#14295F]">
+                  <Link href="/dashboard/appointments">상담</Link>
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                {[
+                  { label: '오늘 상담', value: teacherCounselingSummary.totalCount, tone: 'text-[#14295F]' },
+                  { label: '승인 대기', value: teacherCounselingSummary.pendingCount, tone: teacherCounselingSummary.pendingCount > 0 ? 'text-[#C95A08]' : 'text-[#14295F]' },
+                  { label: '미열람', value: unreadReportCount, tone: unreadReportCount > 0 ? 'text-[#C95A08]' : 'text-[#14295F]' },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-[1.2rem] border border-[#DCE7FF] bg-white p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#5C6E97]">{item.label}</p>
+                    <p className={cn("dashboard-number mt-2 text-2xl", item.tone)}>{item.value}</p>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (recentReportsFeed[0]) {
+                    setSelectedRecentReport(recentReportsFeed[0]);
+                    return;
+                  }
+                  scrollToSection(reportsSectionRef);
+                }}
+                className="group w-full rounded-[1.25rem] border border-[#DCE7FF] bg-white px-4 py-3 text-left transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-[#C9D8FF] hover:bg-[#F8FBFF]"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-[#14295F]">
+                      {recentReportsFeed[0] ? `${recentReportsFeed[0].studentName || '학생'} 리포트` : '최근 리포트 없음'}
+                    </p>
+                    <p className="mt-1 truncate text-[11px] font-bold text-[#5C6E97]">
+                      {recentReportsFeed[0]
+                        ? `${recentReportsFeed[0].dateKey} · ${recentReportsFeed[0].viewedAt ? '열람 완료' : '미열람'}`
+                        : '리포트 섹션에서 발송 흐름을 확인하세요.'}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#8A98B5] transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </button>
+            </CardContent>
+          </Card>
+
+          <Card className="admin-surface-dark overflow-hidden rounded-[2rem] border-[#1C3A82] lg:col-span-7">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Badge className="h-6 rounded-full border border-white/10 bg-white/10 px-2.5 text-[10px] font-black text-white">학습 온도</Badge>
+                  <p className="mt-3 text-lg font-black tracking-tight text-white">최근 30일 누적 학습 흐름</p>
+                  <p className="mt-1 text-xs font-semibold text-white/58">홈 안에서 오늘 흐름과 장기 흐름을 함께 봅니다.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {trendLoading ? <Loader2 className="h-4 w-4 animate-spin text-white/70" /> : null}
+                  <Badge className="h-8 rounded-full border border-white/10 bg-white/[0.08] px-3 text-[10px] font-black text-white">
+                    {trendLoading ? '업데이트 중' : '최근 30일'}
+                  </Badge>
+                </div>
+              </div>
+              <div className="h-[210px] w-full rounded-[1.55rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.02)_100%)] px-1 pb-2 pt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={centerTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="teacherHomeTrend" x1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6EE7B7" stopOpacity={0.32} />
+                        <stop offset="95%" stopColor="#6EE7B7" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.12)" />
+                    <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.62)' }} />
+                    <YAxis fontSize={9} fontWeight="900" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.62)' }} />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="rounded-xl border border-white/10 bg-[#08142F]/96 p-3 shadow-2xl">
+                              <p className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/55">{label}</p>
+                              <p className="dashboard-number text-base text-emerald-200">
+                                {payload[0].value}시간 ({Number(payload[0].payload.totalMinutes).toLocaleString()}분)
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area type="monotone" dataKey="hours" stroke="#6EE7B7" strokeWidth={3} fillOpacity={1} fill="url(#teacherHomeTrend)" animationDuration={prefersReducedMotion ? 0 : 1400} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </motion.section>
+    );
+  }
+
   if (!mounted) return (
     <div className="flex flex-col h-[70vh] w-full items-center justify-center gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
@@ -2389,334 +3024,31 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   );
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-24 min-h-screen">
-      <motion.section className="px-4 pt-6" {...getDeckMotionProps(0.02, 22)}>
-        <Card className="marketing-card-dark relative overflow-hidden rounded-[2.8rem] border-none">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(129,173,255,0.3),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,160,67,0.14),transparent_30%)]" />
-          <div className="pointer-events-none absolute -right-12 top-0 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
-          <CardContent className={cn("relative", isMobile ? "p-4" : "p-6 sm:p-7")}>
-            <div className={cn("grid gap-5", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.2fr)_420px] xl:items-stretch")}>
-              <div className="flex flex-col justify-between gap-6">
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="h-6 rounded-full border border-white/10 bg-white/10 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-none">
-                      Teacher Control Deck
-                    </Badge>
-                    <Badge className="h-6 rounded-full border-none bg-[#FF8A1F] px-3 text-[10px] font-black text-white shadow-[0_10px_24px_-16px_rgba(255,138,31,0.85)]">
-                      실시간
-                    </Badge>
-                    <Badge className="h-6 rounded-full border border-white/10 bg-white/[0.06] px-3 text-[10px] font-black text-white/90 shadow-none">
-                      {selectedClass === 'all' ? '센터 전체 운영' : `${selectedClass} 운영`}
-                    </Badge>
-                  </div>
+    <div className={cn("mx-auto flex min-h-screen w-full max-w-[1520px] flex-col gap-6", isMobile ? "px-2 pb-10 pt-3" : "px-4 py-6 pb-24")}>
+      <AdminWorkbenchCommandBar
+        eyebrow="실시간 운영"
+        title="선생님 실시간 홈"
+        description="오늘 조치와 실시간 좌석을 첫 화면에서 바로 판단할 수 있게 선생님 운영 흐름을 재정리했습니다."
+        variant="adminStudio"
+        quickActions={teacherWorkbenchQuickActions}
+        selectValue={selectedClass}
+        onSelectChange={setSelectedClass}
+        selectOptions={classFilterOptions}
+        selectLabel="운영 범위"
+        className="top-3"
+      >
+        <Badge className="h-8 rounded-full border-none bg-white/12 px-3.5 text-[10px] font-black text-white">
+          {currentTeacherScopeLabel}
+        </Badge>
+        <Badge className={cn("h-8 rounded-full border-none px-3.5 text-[10px] font-black", seatOverlaySummary.riskCount > 0 ? "bg-[#FF7A16] text-white" : "bg-white px-3.5 text-[#14295F]")}>
+          위험 {seatOverlaySummary.riskCount}명
+        </Badge>
+        <Badge className={cn("h-8 rounded-full border-none px-3.5 text-[10px] font-black", unreadReportCount > 0 ? "bg-[#FFD7BA] text-[#14295F]" : "bg-white text-[#14295F]")}>
+          미열람 {unreadReportCount}건
+        </Badge>
+      </AdminWorkbenchCommandBar>
 
-                  <div className="flex items-start gap-4">
-                    <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.5rem] border border-white/10 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                      <Monitor className="h-7 w-7 text-white" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.34em] text-white">통합 관제 센터</p>
-                      <h1 className={cn("mt-2 font-aggro-display text-white", isMobile ? "text-[2.15rem]" : "text-[3.2rem] leading-[0.98]")}>
-                        실시간 관제 홈
-                      </h1>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-3")}>
-                  <button
-                    type="button"
-                    onClick={() => setIsHeroPriorityDialogOpen(true)}
-                    className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 text-left backdrop-blur-sm transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.1]"
-                  >
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">오늘 우선순위</p>
-                    <p className="mt-2 text-lg font-black tracking-tight text-white">
-                      {teacherActionQueue.length > 0 ? `${teacherActionQueue.length}건 바로 확인` : '즉시 처리 항목 없음'}
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsHeroRoomsDialogOpen(true)}
-                    className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 text-left backdrop-blur-sm transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.1]"
-                  >
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">실시간 교실</p>
-                    <p className="mt-2 text-lg font-black tracking-tight text-white">
-                      {selectedRoomView === 'all' ? '전체 호실 보기' : getRoomLabel(selectedRoomView, roomConfigs)}
-                    </p>
-                  </button>
-                  <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">학생 리스크</p>
-                    <p className="mt-2 text-lg font-black tracking-tight text-white">
-                      위험 {seatOverlaySummary.riskCount}명 · 미열람 {seatOverlaySummary.unreadCount}건
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-white">
-                    <Filter className="h-3.5 w-3.5" />
-                    반 선택
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 rounded-[1.3rem] border border-white/10 bg-white/[0.06] p-1.5 pl-4 text-white shadow-[0_18px_34px_-24px_rgba(0,0,0,0.45)]">
-                    <Filter className="h-3.5 w-3.5 shrink-0 text-white/55" />
-                    <Select value={selectedClass} onValueChange={setSelectedClass}>
-                      <SelectTrigger className="h-9 w-full border-none bg-transparent px-0 text-left text-xs font-black text-white shadow-none placeholder:text-white/55 focus:ring-0 [&_svg]:text-white/55">
-                        <SelectValue placeholder="반 선택" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none shadow-2xl">
-                        <SelectItem value="all" className="font-black">센터 전체 보기</SelectItem>
-                        {availableClasses.map((c) => (
-                          <SelectItem key={c} value={c} className="font-black">{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                  {heroSummaryCards.map((item) => (
-                    <div
-                      key={item.key}
-                      className={cn(
-                        "rounded-[1.7rem] border border-white/10 bg-white/[0.08] p-4 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]",
-                        item.key === 'top20' && isMobile ? 'col-span-2' : ''
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white">{item.label}</p>
-                          <p className={cn("dashboard-number mt-2 whitespace-nowrap text-[1.4rem] leading-none sm:text-[1.75rem]", item.valueClass)}>
-                            {item.value}
-                          </p>
-                          <p className="mt-2 text-[11px] font-bold text-white">{item.footnote}</p>
-                        </div>
-                        <span className={cn("inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem]", item.iconClass)}>
-                          <item.icon className="h-[18px] w-[18px]" />
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.section>
-
-      <motion.section className="px-4" {...getDeckMotionProps(0.1, 18)}>
-        <Card className="marketing-card relative overflow-visible rounded-[2.75rem] border-none">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 rounded-t-[2.75rem] bg-[linear-gradient(180deg,rgba(244,248,255,0.85)_0%,rgba(255,255,255,0)_100%)]" />
-          <CardContent className={cn("relative space-y-5", isMobile ? "p-4 pb-5" : "p-5 pb-6 sm:p-6 sm:pb-7")}>
-            <div className={cn("flex gap-3", isMobile ? "flex-col" : "items-start justify-between")}>
-              <div>
-                <div className="flex items-center gap-2">
-                  <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black tracking-[0.16em] uppercase text-white">
-                    오늘의 우선순위
-                  </Badge>
-                  <Badge className="h-6 rounded-full border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">
-                    TOP 3
-                  </Badge>
-                </div>
-                <p className={cn("mt-4 text-[#14295F]", isMobile ? "font-aggro-display text-[1.7rem]" : "font-aggro-display text-[2.2rem]")}>
-                  오늘 먼저 처리할 일
-                </p>
-                <p className="mt-2 max-w-[42rem] text-xs font-bold leading-6 text-slate-500 sm:text-sm">
-                  상담, 출결, 학생 리스크, 리포트 후속 가운데 오늘성 높은 작업만 위로 고정했습니다.
-                  클릭하면 해당 섹션으로 바로 이동합니다.
-                </p>
-              </div>
-              <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_16px_28px_-24px_rgba(20,41,95,0.32)]">
-                {selectedClass === 'all' ? '센터 전체' : selectedClass}
-              </Badge>
-            </div>
-
-            {!topTeacherPriority ? (
-              <div className="rounded-[1.9rem] border border-dashed border-slate-200 bg-white px-5 py-10 text-center text-sm font-black text-slate-500">
-                현재 바로 처리해야 할 우선순위 항목이 없습니다.
-              </div>
-            ) : (
-              <div className={cn("-mx-1 grid gap-3 px-1 pb-1", isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.82fr)]")}>
-                <motion.div {...getDeckMotionProps(0.14, 14)}>
-                  <div className="app-depth-card-warm rounded-[2rem] border px-5 py-5 sm:px-6 sm:py-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className="h-7 rounded-full border-none bg-[#FF7A16] px-3 text-[10px] font-black text-white">
-                            1순위
-                          </Badge>
-                          <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-full shadow-sm", topTeacherPriority.toneClass)}>
-                            {TopTeacherPriorityIcon ? <TopTeacherPriorityIcon className="h-[18px] w-[18px]" /> : null}
-                          </span>
-                          <span className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C95A08]/70">
-                            immediate action
-                          </span>
-                        </div>
-                        <p className={cn("mt-4 text-[#14295F]", isMobile ? "text-[1.45rem] leading-[1.1]" : "text-[1.85rem] leading-[1.08]", "font-aggro-display")}>
-                          {topTeacherPriority.title}
-                        </p>
-                        <p className="mt-3 max-w-[38rem] text-sm font-bold leading-7 text-slate-600">
-                          {topTeacherPriority.detail}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        className="h-11 shrink-0 rounded-[1.1rem] bg-[#14295F] px-4 text-xs font-black text-white shadow-[0_18px_34px_-24px_rgba(20,41,95,0.45)] hover:bg-[#10224C]"
-                        onClick={topTeacherPriority.onClick}
-                      >
-                        {topTeacherPriority.actionLabel}
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
-
-                <div className="grid auto-rows-fr gap-2.5 content-start">
-                  {secondaryTeacherPriorities.map((item, index) => (
-                    <motion.div key={item.key} {...getDeckMotionProps(0.18 + index * 0.05, 12)}>
-                      <button
-                        type="button"
-                        onClick={item.onClick}
-                        className={cn(
-                          "group flex h-full w-full rounded-[1.75rem] px-4 py-3.5 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5",
-                          index === 0 ? "app-depth-card" : "marketing-card-soft"
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <Badge className={cn(
-                                "h-5 rounded-full border-none px-2 text-[10px] font-black",
-                                index === 0 ? "bg-[#EEF4FF] text-[#2554D7]" : "bg-[#FFF2E8] text-[#C95A08]"
-                              )}>
-                                {index + 2}순위
-                              </Badge>
-                              <span className={cn("inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm", item.toneClass)}>
-                                <item.icon className="h-4 w-4" />
-                              </span>
-                            </div>
-                            <p className="mt-2.5 text-base font-black text-[#14295F]">{item.title}</p>
-                            <p className="mt-1 line-clamp-2 text-[11px] font-bold leading-5 text-slate-500">{item.detail}</p>
-                          </div>
-                          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-300 transition-transform duration-200 group-hover:translate-x-0.5" />
-                        </div>
-                      </button>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.section>
-
-      <motion.section className="px-4" {...getDeckMotionProps(0.16, 16)}>
-        <div className={cn("mb-3 flex gap-3 px-1", isMobile ? "flex-col" : "items-end justify-between")}>
-          <div>
-            <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#2554D7]">
-              운영 스냅샷
-            </Badge>
-            <p className="mt-3 text-xl font-black tracking-tight text-[#14295F] sm:text-[1.45rem]">지금 바로 읽히는 핵심 지표</p>
-            <p className="mt-1 text-xs font-bold text-slate-500 sm:text-sm">학습, 미입실, 외출, 좌석을 같은 시야 안에서 빠르게 판단할 수 있게 다시 정렬했습니다.</p>
-          </div>
-          <Badge className="h-8 rounded-full border-none bg-white px-3.5 text-[10px] font-black text-[#14295F] shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
-            {selectedRoomView === 'all' ? '홈 상단 스냅샷' : `${getRoomLabel(selectedRoomView, roomConfigs)} 스냅샷`}
-          </Badge>
-        </div>
-
-        <div className={cn("grid gap-4", isMobile ? "grid-cols-2" : "md:grid-cols-4")}>
-          {operationalKpis.map((item, index) => (
-            <motion.div key={item.key} {...getDeckMotionProps(0.2 + index * 0.05, 12)}>
-              <Card className={cn("rounded-[2rem] border p-5 sm:p-6", item.shellClass)}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={cn("font-black uppercase tracking-[0.18em] text-slate-500", isMobile ? "text-[9px]" : "text-[10px]")}>
-                      {item.label}
-                    </p>
-                    <p className={cn("dashboard-number mt-3 whitespace-nowrap leading-none", isMobile ? "text-[2.1rem]" : "text-[3.2rem]", item.valueClass)}>
-                      {item.value}
-                    </p>
-                    <p className="mt-2 text-[11px] font-bold text-slate-500">{item.caption}</p>
-                  </div>
-                  <span className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem]", item.iconClass)}>
-                    <item.icon className="h-5 w-5" />
-                  </span>
-                </div>
-                {item.hasEdit ? (
-                  <div className="mt-4">
-                    <Button
-                      variant={isEditMode ? "default" : "outline"}
-                      size="sm"
-                      onClick={handleToggleEditMode}
-                      className={cn(
-                        "h-9 rounded-xl px-3 font-black text-[10px] gap-1.5 shadow-sm",
-                        isEditMode ? "bg-primary text-white" : "border-2 hover:bg-primary/5"
-                      )}
-                    >
-                      <Settings2 className="h-3.5 w-3.5" /> {isMobile ? '배치' : isEditMode ? '수정 완료' : '배치 수정'}
-                    </Button>
-                  </div>
-                ) : null}
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      </motion.section>
-
-      <motion.section className="px-4" {...getDeckMotionProps(0.34, 14)}>
-        <Card className="marketing-card-dark overflow-hidden rounded-[2.55rem] border-none">
-          <CardContent className={cn("space-y-6", isMobile ? "p-4" : "p-6 sm:p-7")}>
-            <TeacherSectionHeader
-              badge="최근 30일 추이"
-              title="센터 전체 학습 온도 보기"
-              icon={TrendingUp}
-              tone="emerald"
-              onDark
-              right={
-                <div className="flex items-center gap-2">
-                  {trendLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" />}
-                  <Badge className="h-8 rounded-full border border-white/10 bg-white/[0.08] px-3.5 text-[10px] font-black text-white">
-                    {trendLoading ? "업데이트 중" : "최근 30일"}
-                  </Badge>
-                </div>
-              }
-            />
-
-            <div className="h-[220px] w-full rounded-[2rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.02)_100%)] px-1 pb-2 pt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={centerTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorTrend" x1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6EE7B7" stopOpacity={0.32}/>
-                      <stop offset="95%" stopColor="#6EE7B7" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.12)" />
-                  <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.62)' }} />
-                  <YAxis fontSize={9} fontWeight="900" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.62)' }} />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="rounded-xl border border-white/10 bg-[#08142F]/96 p-3 shadow-2xl">
-                            <p className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/55">{label}</p>
-                            <p className="dashboard-number text-base text-emerald-200">
-                              {payload[0].value}시간 ({Number(payload[0].payload.totalMinutes).toLocaleString()}분)
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area type="monotone" dataKey="hours" stroke="#6EE7B7" strokeWidth={3} fillOpacity={1} fill="url(#colorTrend)" animationDuration={prefersReducedMotion ? 0 : 1600} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.section>
-
+      {renderTeacherHomeHeroSection()}
       <CenterAdminAttendanceBoard
         roomConfigs={roomConfigs}
         selectedRoomView={selectedRoomView}
