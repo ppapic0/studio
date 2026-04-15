@@ -174,6 +174,15 @@ function normalizeParentLinkCode(value: unknown): string {
   return '';
 }
 
+function normalizePhoneNumber(value: unknown): string {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value).replace(/\D/g, '').slice(0, 11);
+}
+
+function isValidKoreanMobilePhone(value: string): boolean {
+  return /^01\d{8,9}$/.test(value);
+}
+
 function resolveCallableErrorMessage(error: any, fallback: string): string {
   const detailMessage =
     typeof error?.details === 'string'
@@ -525,6 +534,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     schoolName: '',
     grade: '',
     password: '',
+    phoneNumber: '',
     parentLinkCode: '',
     className: '',
     memberStatus: 'active' as 'active' | 'onHold' | 'withdrawn',
@@ -614,12 +624,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Array.from(classes).sort();
   }, [centerStudents, student?.className]);
 
+  const currentStudentMember = useMemo(
+    () => centerStudents?.find((member) => member.id === studentId) || null,
+    [centerStudents, studentId]
+  );
+
   const currentStudentMemberStatus = useMemo<'active' | 'onHold' | 'withdrawn'>(() => {
-    const raw = centerStudents?.find((member) => member.id === studentId)?.status;
+    const raw = currentStudentMember?.status;
     if (raw === 'onHold') return 'onHold';
     if (raw === 'withdrawn') return 'withdrawn';
     return 'active';
-  }, [centerStudents, studentId]);
+  }, [currentStudentMember?.status]);
 
   useEffect(() => {
     if (progress) {
@@ -636,13 +651,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         schoolName: student.schoolName,
         grade: student.grade,
         password: '',
+        phoneNumber: normalizePhoneNumber(student.phoneNumber || currentStudentMember?.phoneNumber || ''),
         parentLinkCode: normalizeParentLinkCode(student.parentLinkCode),
         className: student.className || '',
         memberStatus: currentStudentMemberStatus,
       });
       hasInitializedForm.current = true;
     }
-  }, [student, currentStudentMemberStatus]);
+  }, [student, currentStudentMember?.phoneNumber, currentStudentMemberStatus]);
 
   useEffect(() => {
     if (isEditStats) return;
@@ -1658,12 +1674,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!functions || !centerId || !studentId || !canEditStudentInfo) return;
 
     const normalizedParentLinkCode = normalizeParentLinkCode(editForm.parentLinkCode);
+    const normalizedPhoneNumber = normalizePhoneNumber(editForm.phoneNumber);
     const existingParentLinkCode = normalizeParentLinkCode(student?.parentLinkCode);
     if (normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
       toast({
         variant: 'destructive',
         title: '입력값 확인 필요',
         description: '부모 연동코드는 6자리 숫자로 입력해 주세요.',
+      });
+      return;
+    }
+    if (canManageStudentAccounts && normalizedPhoneNumber && !isValidKoreanMobilePhone(normalizedPhoneNumber)) {
+      toast({
+        variant: 'destructive',
+        title: '입력값 확인 필요',
+        description: '학생 전화번호는 01012345678 형식으로 입력해 주세요.',
       });
       return;
     }
@@ -1682,6 +1707,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       if (canManageStudentAccounts) {
         payload.memberStatus = editForm.memberStatus;
+        payload.phoneNumber = normalizedPhoneNumber || null;
       }
 
       if (normalizedParentLinkCode !== existingParentLinkCode) {
@@ -4583,6 +4609,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
               <div className={cn("grid gap-3", canManageStudentAccounts ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")}>
+                {canManageStudentAccounts ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-[#5c6e97]">학생 전화번호</Label>
+                    <Input
+                      value={editForm.phoneNumber}
+                      onChange={(event) => setEditForm({ ...editForm, phoneNumber: event.target.value.replace(/\D/g, '').slice(0, 11) })}
+                      inputMode="tel"
+                      maxLength={11}
+                      className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]"
+                      placeholder="01012345678"
+                    />
+                  </div>
+                ) : null}
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase text-[#5c6e97]">부모 연동코드 (6자리)</Label>
                   <Input value={editForm.parentLinkCode} onChange={(event) => setEditForm({ ...editForm, parentLinkCode: event.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" maxLength={6} className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold tracking-[0.2em] text-[#14295F]" placeholder="123456" />

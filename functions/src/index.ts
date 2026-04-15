@@ -3679,6 +3679,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     password,
     displayName,
     schoolName,
+    phoneNumber,
     grade,
     parentLinkCode,
     className,
@@ -3751,6 +3752,8 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
   const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
   const trimmedGrade = typeof grade === "string" ? grade.trim() : "";
+  const phoneNumberProvided = phoneNumber !== undefined;
+  const normalizedPhoneNumber = phoneNumberProvided ? normalizePhoneNumber(phoneNumber) : "";
   const hasClassName = className !== undefined;
   const normalizedClassName = hasClassName
     ? (typeof className === "string" && className.trim() ? className.trim() : null)
@@ -3775,6 +3778,18 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   if (memberStatusProvided && !normalizedMemberStatus) {
     throw new functions.https.HttpsError("invalid-argument", "Invalid member status.", {
       userMessage: "상태 값이 올바르지 않습니다. 재원/휴원/퇴원 중에서 선택해 주세요.",
+    });
+  }
+
+  if (phoneNumberProvided && !isAdminCaller) {
+    throw new functions.https.HttpsError("permission-denied", "Only admins can change student phone numbers.", {
+      userMessage: "학생 전화번호 변경은 센터 관리자만 가능합니다.",
+    });
+  }
+
+  if (phoneNumberProvided && phoneNumber !== null && String(phoneNumber).trim() && !normalizedPhoneNumber) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid phone number.", {
+      userMessage: "학생 전화번호는 01012345678 형식으로 입력해 주세요.",
     });
   }
 
@@ -3830,7 +3845,8 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     const userUpdate: any = { updatedAt: timestamp };
     if (trimmedDisplayName) userUpdate.displayName = trimmedDisplayName;
     if (trimmedSchoolName) userUpdate.schoolName = trimmedSchoolName;
-    const hasUserWrite = trimmedDisplayName.length > 0 || trimmedSchoolName.length > 0;
+    if (phoneNumberProvided) userUpdate.phoneNumber = normalizedPhoneNumber || null;
+    const hasUserWrite = trimmedDisplayName.length > 0 || trimmedSchoolName.length > 0 || phoneNumberProvided;
     if (hasUserWrite) {
       batch.set(userRef, userUpdate, { merge: true });
     }
@@ -3839,6 +3855,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     if (trimmedDisplayName) studentUpdate.name = trimmedDisplayName;
     if (trimmedSchoolName) studentUpdate.schoolName = trimmedSchoolName;
     if (trimmedGrade) studentUpdate.grade = trimmedGrade;
+    if (phoneNumberProvided) studentUpdate.phoneNumber = normalizedPhoneNumber || null;
     if (parentLinkCodeProvided) studentUpdate.parentLinkCode = normalizedParentLinkCode || null;
     if (canEditOtherStudent && hasClassName) studentUpdate.className = normalizedClassName;
     batch.set(studentRef, studentUpdate, { merge: true });
@@ -3887,6 +3904,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     const memberRef = db.doc("centers/" + centerId + "/members/" + studentId);
     const memberUpdate: any = { updatedAt: timestamp };
     if (trimmedDisplayName) memberUpdate.displayName = trimmedDisplayName;
+    if (phoneNumberProvided) memberUpdate.phoneNumber = normalizedPhoneNumber || null;
     if (hasClassName) memberUpdate.className = normalizedClassName;
     if (isAdminCaller && memberStatusProvided) memberUpdate.status = normalizedMemberStatus;
     if (canEditOtherStudent) {
@@ -3894,14 +3912,13 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     }
 
     const userCenterRef = db.doc("userCenters/" + studentId + "/centers/" + centerId);
-    const userCenterUpdate: any = {
-      className: normalizedClassName,
-      updatedAt: timestamp,
-    };
+    const userCenterUpdate: any = { updatedAt: timestamp };
+    if (hasClassName) userCenterUpdate.className = normalizedClassName;
+    if (phoneNumberProvided) userCenterUpdate.phoneNumber = normalizedPhoneNumber || null;
     if (isAdminCaller && memberStatusProvided) userCenterUpdate.status = normalizedMemberStatus;
-    if (canEditOtherStudent && hasClassName) {
+    if (canEditOtherStudent && (hasClassName || phoneNumberProvided)) {
       batch.set(userCenterRef, userCenterUpdate, { merge: true });
-    } else if (isAdminCaller && memberStatusProvided) {
+    } else if (isAdminCaller && (memberStatusProvided || phoneNumberProvided)) {
       batch.set(userCenterRef, userCenterUpdate, { merge: true });
     }
 
@@ -4662,6 +4679,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
   const studentLinkCode = String(studentLinkCodeInput).trim();
   const displayNameInput = String(data?.displayName || "").trim();
   const parentPhoneNumber = normalizePhoneNumber(data?.parentPhoneNumber || data?.phoneNumber || "");
+  const studentPhoneNumber = role === "student" ? normalizePhoneNumber(data?.phoneNumber || "") : "";
   const legalConsentsInput =
     data?.legalConsents && typeof data.legalConsents === "object"
       ? (data.legalConsents as Record<string, unknown>)
@@ -5088,6 +5106,8 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
         };
       if (role === "parent" && effectiveParentPhone) {
         userDocData.phoneNumber = effectiveParentPhone;
+      } else if (role === "student" && studentPhoneNumber) {
+        userDocData.phoneNumber = studentPhoneNumber;
       }
       t.set(db.doc(`users/${uid}`), userDocData, { merge: true });
 
@@ -5102,6 +5122,8 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       };
       if (role === "parent" && effectiveParentPhone) {
         memberData.phoneNumber = effectiveParentPhone;
+      } else if (role === "student" && studentPhoneNumber) {
+        memberData.phoneNumber = studentPhoneNumber;
       }
       if (linkedStudentIds.length > 0) {
         memberData.linkedStudentIds = linkedStudentIds;
@@ -5118,6 +5140,8 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       };
       if (role === "parent" && effectiveParentPhone) {
         userCenterData.phoneNumber = effectiveParentPhone;
+      } else if (role === "student" && studentPhoneNumber) {
+        userCenterData.phoneNumber = studentPhoneNumber;
       }
       if (linkedStudentIds.length > 0) {
         userCenterData.linkedStudentIds = linkedStudentIds;
@@ -5143,6 +5167,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           schoolName,
           grade,
           className: targetClassName,
+          phoneNumber: studentPhoneNumber || null,
           seatNo: 0,
           targetDailyMinutes: 360,
           parentUids: [],

@@ -155,6 +155,7 @@ export interface StudentProfile {
   name: string;
   grade: string;
   schoolName: string;
+  phoneNumber?: string | null;
   className?: string;
   seatNo: number;
   seatId?: string;

@@ -117,6 +117,15 @@ function normalizeParentLinkCode(value: unknown): string {
   return '';
 }
 
+function normalizePhoneNumber(value: unknown): string {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value).replace(/\D/g, '').slice(0, 11);
+}
+
+function isValidKoreanMobilePhone(value: string): boolean {
+  return /^01\d{8,9}$/.test(value);
+}
+
 type StudentMembershipStatus = 'active' | 'onHold' | 'withdrawn';
 
 function normalizeStudentMembershipStatus(value: unknown): StudentMembershipStatus {
@@ -151,6 +160,7 @@ export default function StudentAccountManagementPage() {
     password: '',
     schoolName: '',
     grade: '',
+    phoneNumber: '',
     parentLinkCode: '',
     className: '',
     memberStatus: 'active' as StudentMembershipStatus,
@@ -243,6 +253,7 @@ export default function StudentAccountManagementPage() {
       password: '',
       schoolName: profile?.schoolName || '',
       grade: profile?.grade || '1학년',
+      phoneNumber: normalizePhoneNumber(profile?.phoneNumber || member.phoneNumber || ''),
       parentLinkCode: normalizeParentLinkCode(profile?.parentLinkCode),
       className: member.className || '',
       memberStatus: normalizeStudentMembershipStatus(member.status),
@@ -262,12 +273,21 @@ export default function StudentAccountManagementPage() {
     if (!functions || !centerId || !selectedStudentForEdit) return;
 
     const normalizedParentLinkCode = normalizeParentLinkCode(editForm.parentLinkCode);
+    const normalizedPhoneNumber = normalizePhoneNumber(editForm.phoneNumber);
     const currentParentLinkCode = normalizeParentLinkCode(studentsProfiles?.find((profile) => profile.id === selectedStudentForEdit.id)?.parentLinkCode);
     if (normalizedParentLinkCode && !/^\d{6}$/.test(normalizedParentLinkCode)) {
       toast({
         variant: 'destructive',
         title: '\uBD80\uBAA8 \uC5F0\uB3D9\uCF54\uB4DC \uD615\uC2DD \uC624\uB958',
         description: '\uBD80\uBAA8 \uC5F0\uB3D9\uCF54\uB4DC\uB294 6\uC790\uB9AC \uC22B\uC790\uB85C \uC785\uB825\uD574 \uC8FC\uC138\uC694.',
+      });
+      return;
+    }
+    if (normalizedPhoneNumber && !isValidKoreanMobilePhone(normalizedPhoneNumber)) {
+      toast({
+        variant: 'destructive',
+        title: '전화번호 형식 오류',
+        description: '학생 전화번호는 01012345678 형식으로 입력해 주세요.',
       });
       return;
     }
@@ -281,6 +301,7 @@ export default function StudentAccountManagementPage() {
         displayName: editForm.displayName.trim() || undefined,
         schoolName: editForm.schoolName.trim() || undefined,
         grade: editForm.grade || undefined,
+        phoneNumber: normalizedPhoneNumber || null,
         parentLinkCode: normalizedParentLinkCode !== currentParentLinkCode ? (normalizedParentLinkCode || null) : undefined,
         className: editForm.className || null,
         memberStatus: editForm.memberStatus,
@@ -478,6 +499,7 @@ export default function StudentAccountManagementPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uC774\uB984'}</Label><Input value={editForm.displayName} onChange={e => setEditForm({...editForm, displayName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uBE44\uBC00\uBC88\uD638 (\uBCC0\uACBD \uC2DC\uC5D0\uB9CC)'}</Label><Input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
+                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">학생 전화번호</Label><Input value={editForm.phoneNumber} onChange={e => setEditForm({...editForm, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 11)})} inputMode="tel" maxLength={11} placeholder="01012345678" className="h-11 rounded-xl border-2 font-bold" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">{'\uD559\uAD50'}</Label><Input value={editForm.schoolName} onChange={e => setEditForm({...editForm, schoolName: e.target.value})} className="h-11 rounded-xl border-2 font-bold" /></div>
