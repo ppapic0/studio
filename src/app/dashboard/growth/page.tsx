@@ -1605,10 +1605,10 @@ export default function GrowthPage() {
                       return (
                         <div
                           key={`giftishow-dialog-${product.id || product.goodsCode}`}
-                          className="overflow-hidden rounded-[1.45rem] border border-white/70 bg-white/92 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)]"
+                          className="overflow-hidden rounded-[1.3rem] border border-white/70 bg-white/92 shadow-[0_18px_32px_-24px_rgba(20,41,95,0.22)]"
                         >
-                          <div className="flex gap-3 p-3.5">
-                            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[1.15rem] border border-[#F0E2CA] bg-[linear-gradient(180deg,#f8fafc_0%,#fff6e8_100%)]">
+                          <div className="flex gap-3 p-3">
+                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] border border-[#F0E2CA] bg-[linear-gradient(180deg,#f8fafc_0%,#fff6e8_100%)]">
                               {productImage ? (
                                 <img src={productImage} alt={product.goodsName} className="h-full w-full object-cover" />
                               ) : (
@@ -1617,39 +1617,39 @@ export default function GrowthPage() {
                             </div>
 
                             <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge className={cn('border-none font-black', isGiftishowProductAvailable(product, giftishowSettings) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
-                                  {product.goodsStateCd || 'UNKNOWN'}
-                                </Badge>
-                                <p className="truncate text-[11px] font-bold text-[#6E7FA7]">
-                                  {product.brandName || product.affiliate || '브랜드'}
-                                </p>
-                              </div>
-
-                              <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{product.goodsName}</p>
-
-                              <div className="mt-3 flex items-end justify-between gap-3">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
-                                  <p className="mt-1 text-lg font-black tracking-tight text-[var(--text-accent-fixed)]">
-                                    {formatGiftishowPoints(getGiftishowProductPointCost(product))}
-                                  </p>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge className={cn('border-none px-2 py-0.5 text-[9px] font-black', isGiftishowProductAvailable(product, giftishowSettings) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
+                                      {product.goodsStateCd || 'UNKNOWN'}
+                                    </Badge>
+                                    <p className="truncate text-[11px] font-bold text-[#6E7FA7]">
+                                      {product.brandName || product.affiliate || '브랜드'}
+                                    </p>
+                                  </div>
                                 </div>
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant={disabledReason ? 'outline' : 'secondary'}
-                                  className="h-9 shrink-0 whitespace-nowrap rounded-full px-4 font-black"
+                                  className="h-8 shrink-0 whitespace-nowrap rounded-full px-3 text-xs font-black"
                                   disabled={Boolean(disabledReason) || isRequesting}
                                   onClick={() => void handleGiftishowRequest(product)}
                                 >
-                                  {isRequesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                                  {isRequesting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
                                   요청하기
                                 </Button>
                               </div>
 
+                              <p className="mt-1.5 line-clamp-1 text-sm font-black leading-5 text-[#14295F]">{product.goodsName}</p>
+
+                              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 포인트</p>
+                              <p className="mt-0.5 text-lg font-black tracking-tight text-[var(--text-accent-fixed)]">
+                                {formatGiftishowPoints(getGiftishowProductPointCost(product))}
+                              </p>
+
                               {disabledReason ? (
-                                <p className="mt-2 text-[11px] font-bold leading-5 text-[#915A1E]">{disabledReason}</p>
+                                <p className="mt-1 text-[10px] font-bold leading-4 text-[#915A1E]">{disabledReason}</p>
                               ) : null}
                             </div>
                           </div>
