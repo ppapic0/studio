@@ -3273,7 +3273,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     setIsClaimingHomeBox(true);
     setHomeBoxStage('shake');
 
-    const burstId = setTimeout(() => setHomeBoxStage('burst'), 360);
+    const burstId = setTimeout(() => setHomeBoxStage('burst'), 220);
     homeBoxTimeoutsRef.current.push(burstId);
 
     const revealId = setTimeout(async () => {
@@ -3336,7 +3336,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       } finally {
         setIsClaimingHomeBox(false);
       }
-    }, 520);
+    }, 340);
 
     homeBoxTimeoutsRef.current.push(revealId);
   }, [

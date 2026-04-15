@@ -5129,19 +5129,19 @@ select {
 }
 
 .point-track-hero-box--shake .point-track-hero-box__body {
-  animation: point-track-box-shake 0.42s ease-in-out both;
+  animation: point-track-box-shake 0.26s ease-in-out both;
 }
 
 .point-track-hero-box--shake .point-track-hero-box__shadow {
-  animation: point-track-box-shadow-shake 0.42s ease-in-out both;
+  animation: point-track-box-shadow-shake 0.26s ease-in-out both;
 }
 
 .point-track-hero-box--burst .point-track-hero-box__glow {
-  animation: point-track-box-burst 0.62s ease-out both;
+  animation: point-track-box-burst 0.42s ease-out both;
 }
 
 .point-track-hero-box--burst .point-track-hero-box__lid {
-  animation: point-track-box-lid-open 0.65s ease-out forwards;
+  animation: point-track-box-lid-open 0.42s ease-out forwards;
   transform-origin: center top;
 }
 
@@ -5717,19 +5717,19 @@ select {
 }
 
 .point-track-hero-box--shake .point-track-box-figure__shell {
-  animation: point-track-box-shake 0.42s ease-in-out both;
+  animation: point-track-box-shake 0.26s ease-in-out both;
 }
 
 .point-track-hero-box--shake .point-track-box-figure__shadow {
-  animation: point-track-box-shadow-shake 0.42s ease-in-out both;
+  animation: point-track-box-shadow-shake 0.26s ease-in-out both;
 }
 
 .point-track-hero-box--burst .point-track-box-figure__glow {
-  animation: point-track-box-burst 0.62s ease-out both;
+  animation: point-track-box-burst 0.42s ease-out both;
 }
 
 .point-track-hero-box--burst .point-track-box-figure__lid {
-  animation: point-track-box-lid-open 0.65s ease-out forwards;
+  animation: point-track-box-lid-open 0.42s ease-out forwards;
   transform-origin: center top;
 }
 
@@ -6161,7 +6161,7 @@ select {
 }
 
 .point-track-modal-particle--visible {
-  animation: point-track-particle-burst 0.78s ease-out both;
+  animation: point-track-particle-burst 0.48s ease-out both;
 }
 
 .point-track-modal-particle:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg) translateY(-3.3rem); }
@@ -6173,7 +6173,7 @@ select {
 .point-track-modal-particle:nth-child(7) { transform: translate(-50%, -50%) rotate(315deg) translateY(-3.35rem); }
 
 .point-track-reward-burst {
-  animation: point-track-reward-pop 0.42s ease-out both;
+  animation: point-track-reward-pop 0.28s ease-out both;
 }
 
 @keyframes point-track-box-float {
