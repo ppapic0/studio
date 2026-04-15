@@ -1493,8 +1493,8 @@ export default function GrowthPage() {
       </Dialog>
 
       <Dialog open={isGiftishowShopOpen} onOpenChange={setIsGiftishowShopOpen}>
-        <DialogContent className="w-[min(94vw,34rem)] overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
-          <DialogHeader className="border-b border-[#FFE1B7]/70 px-5 pb-0 pt-5 text-left">
+        <DialogContent className="flex max-h-[min(92svh,46rem)] w-[min(94vw,34rem)] flex-col overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#fffaf1_0%,#fff0dc_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
+          <DialogHeader className="shrink-0 border-b border-[#FFE1B7]/70 px-5 pb-0 pt-5 text-left">
             <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
               <Gift className="h-5 w-5 text-[var(--text-accent-fixed)]" />
               트랙 상점
@@ -1504,7 +1504,7 @@ export default function GrowthPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 px-5 py-4">
+          <div className="flex min-h-0 flex-1 flex-col space-y-4 px-5 py-4">
             <div className="grid grid-cols-3 gap-2.5">
               <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">동기화 상품</p>
@@ -1572,7 +1572,7 @@ export default function GrowthPage() {
               </div>
             ) : null}
 
-            <ScrollArea className="max-h-[min(62vh,34rem)] pr-1">
+            <ScrollArea className="min-h-0 flex-1 pr-1">
               <div className="space-y-3">
                 {filteredGiftishowProducts.length === 0 ? (
                   <div className="rounded-[1.4rem] border border-dashed border-[#FFD39E] bg-white/70 px-4 py-10 text-center text-sm font-bold text-[#7B5A2A]">
