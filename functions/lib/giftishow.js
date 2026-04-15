@@ -92,6 +92,12 @@ const GIFTISHOW_UNAVAILABLE_STATE_CODES = new Set([
     "중지",
     "판매중지",
 ]);
+const GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES = [
+    {
+        reason: "노래방 관련",
+        keywords: ["노래방", "노래연습장", "노래연습", "코인노래", "코인 노래", "코노", "락휴", "karaoke"],
+    },
+];
 class GiftishowProviderError extends Error {
     constructor(code, message, retryable = false) {
         super(message);
@@ -604,6 +610,10 @@ exports.createGiftishowOrderRequestSecure = functions.region(region).https.onCal
         throw new functions.https.HttpsError("not-found", "상품 정보를 찾을 수 없습니다.");
     }
     const product = productSnap.data();
+    const studentCatalogExclusionReason = getGiftishowStudentCatalogExclusionReason(product);
+    if (studentCatalogExclusionReason) {
+        throw new functions.https.HttpsError("failed-precondition", studentCatalogExclusionReason);
+    }
     if (!isGiftishowProductRequestable(product)) {
         throw new functions.https.HttpsError("failed-precondition", "현재 교환할 수 없는 상품입니다.");
     }
@@ -1224,6 +1234,27 @@ function isGiftishowProductRequestable(product) {
     if (getGiftishowProductPointCost(product) <= 0)
         return false;
     return product.isAvailable === true || GIFTISHOW_AVAILABLE_STATE_CODES.has(normalizedStateCode);
+}
+function getGiftishowStudentCatalogExclusionReason(product) {
+    const text = getGiftishowProductSearchText(product);
+    if (!text)
+        return null;
+    const matchedRule = GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES.find((rule) => rule.keywords.some((keyword) => text.includes(keyword.toLowerCase())));
+    return matchedRule ? `학생 보상샵 제외 품목(${matchedRule.reason})` : null;
+}
+function getGiftishowProductSearchText(product) {
+    return [
+        product.goodsName,
+        product.brandName,
+        product.affiliate,
+        product.goodsTypeNm,
+        product.goodsTypeDtlNm,
+        product.content,
+        product.contentAddDesc,
+    ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 }
 function normalizeGiftishowProduct(item, syncedAt) {
     var _a, _b, _c, _d;

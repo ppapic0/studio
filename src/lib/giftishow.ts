@@ -45,6 +45,41 @@ const GIFTISHOW_UNAVAILABLE_STATE_CODES = new Set([
   '판매중지',
 ]);
 
+const GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES = [
+  {
+    reason: '노래방 관련',
+    keywords: ['노래방', '노래연습장', '노래연습', '코인노래', '코인 노래', '코노', '락휴', 'karaoke'],
+  },
+];
+
+const GIFTISHOW_STUDENT_REVIEW_RULES = [
+  ...GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES,
+  {
+    reason: '주류·음주 관련',
+    keywords: ['맥주', '소주', '와인', '위스키', '막걸리', '칵테일', '하이볼', '호프집', '주점'],
+  },
+  {
+    reason: '흡연 관련',
+    keywords: ['담배', '전자담배', '흡연', '라이터'],
+  },
+  {
+    reason: '성인·유흥 관련',
+    keywords: ['성인', '19금', '유흥', '클럽', '룸카페', '마사지'],
+  },
+  {
+    reason: '숙박 관련',
+    keywords: ['호텔', '모텔', '숙박', '펜션', '풀빌라'],
+  },
+  {
+    reason: '도박·복권 관련',
+    keywords: ['복권', '로또', '카지노', '토토'],
+  },
+  {
+    reason: '게임·PC방 관련',
+    keywords: ['pc방', '피씨방', '게임', '넥슨', '메이플', '스팀', '플레이스테이션'],
+  },
+];
+
 export function getGiftishowOrderStatusLabel(status?: GiftishowOrderStatus | null) {
   if (!status) return '상태 미정';
   return ORDER_STATUS_LABELS[status] || status;
@@ -88,6 +123,33 @@ export function getGiftishowProductAvailabilityReason(
 
 export function isGiftishowProductAvailable(product?: GiftishowProduct | null, settings?: GiftishowSettings | null) {
   return getGiftishowProductAvailabilityReason(product, settings) === null;
+}
+
+export function getGiftishowStudentCatalogExclusionReason(product?: GiftishowProduct | null) {
+  const text = getGiftishowProductSearchText(product);
+  if (!text) return null;
+
+  const matchedRule = GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES.find((rule) =>
+    rule.keywords.some((keyword) => text.includes(keyword.toLowerCase()))
+  );
+
+  return matchedRule ? `학생 보상샵 제외 품목(${matchedRule.reason})` : null;
+}
+
+export function isGiftishowStudentCatalogProduct(product?: GiftishowProduct | null) {
+  return getGiftishowStudentCatalogExclusionReason(product) === null;
+}
+
+export function getGiftishowStudentReviewCandidateReasons(product?: GiftishowProduct | null) {
+  const text = getGiftishowProductSearchText(product);
+  if (!text) return [];
+
+  return GIFTISHOW_STUDENT_REVIEW_RULES
+    .map((rule) => {
+      const keyword = rule.keywords.find((candidate) => text.includes(candidate.toLowerCase()));
+      return keyword ? `${rule.reason}: ${keyword}` : null;
+    })
+    .filter((reason): reason is string => Boolean(reason));
 }
 
 export function maskPhoneNumber(value?: string | null) {
@@ -170,4 +232,20 @@ function normalizeGiftishowStateCode(value?: string | null) {
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, '_');
+}
+
+function getGiftishowProductSearchText(product?: GiftishowProduct | null) {
+  if (!product) return '';
+  return [
+    product.goodsName,
+    product.brandName,
+    product.affiliate,
+    product.goodsTypeNm,
+    product.goodsTypeDtlNm,
+    product.content,
+    product.contentAddDesc,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
 }

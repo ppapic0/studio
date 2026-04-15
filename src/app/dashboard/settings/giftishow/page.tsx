@@ -43,8 +43,11 @@ import {
   getGiftishowOrderStatusLabel,
   getGiftishowOrderStatusTone,
   getGiftishowProductPointCost,
+  getGiftishowStudentCatalogExclusionReason,
+  getGiftishowStudentReviewCandidateReasons,
   getGiftishowSyncStatusLabel,
   isGiftishowProductAvailable,
+  isGiftishowStudentCatalogProduct,
   sortGiftishowOrdersByRecent,
   sortGiftishowProducts,
 } from '@/lib/giftishow';
@@ -82,6 +85,8 @@ const DEFAULT_FORM: GiftishowFormState = {
   userId: '',
   callbackNo: '',
 };
+const GIFTISHOW_ADMIN_PRODUCT_FETCH_LIMIT = 2500;
+const GIFTISHOW_REVIEW_CANDIDATE_PREVIEW_LIMIT = 30;
 
 function getGiftishowSyncTone(status?: GiftishowSyncStatus | null) {
   if (status === 'success') return 'bg-emerald-100 text-emerald-700';
@@ -264,7 +269,7 @@ export default function GiftishowSettingsPage() {
 
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
-    return query(collection(firestore, 'centers', centerId, 'giftishowProducts'), limit(200));
+    return query(collection(firestore, 'centers', centerId, 'giftishowProducts'), limit(GIFTISHOW_ADMIN_PRODUCT_FETCH_LIMIT));
   }, [firestore, centerId, isAdmin]);
   const { data: giftishowProductsRaw } = useCollection<GiftishowProduct>(productsQuery, { enabled: isAdmin });
 
@@ -290,6 +295,25 @@ export default function GiftishowSettingsPage() {
   }, [settingsDoc?.enabled, settingsDoc?.bannerId, settingsDoc?.templateId]);
 
   const products = useMemo(() => sortGiftishowProducts(giftishowProductsRaw || []), [giftishowProductsRaw]);
+  const studentCatalogProducts = useMemo(
+    () => products.filter(isGiftishowStudentCatalogProduct),
+    [products]
+  );
+  const studentExcludedProducts = useMemo(
+    () => products.filter((product) => Boolean(getGiftishowStudentCatalogExclusionReason(product))),
+    [products]
+  );
+  const studentReviewCandidates = useMemo(
+    () =>
+      products
+        .map((product) => ({
+          product,
+          reasons: getGiftishowStudentReviewCandidateReasons(product),
+          exclusionReason: getGiftishowStudentCatalogExclusionReason(product),
+        }))
+        .filter((item) => item.reasons.length > 0),
+    [products]
+  );
   const brands = useMemo(
     () => [...(giftishowBrandsRaw || [])].sort((left, right) => (left.brandName || '').localeCompare(right.brandName || '', 'ko')),
     [giftishowBrandsRaw]
@@ -796,19 +820,80 @@ export default function GiftishowSettingsPage() {
 
         <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
           <CardHeader className="border-b bg-muted/10">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight">
+                  <TriangleAlert className="h-5 w-5 text-amber-600" />
+                  학생 부적합 후보
+                </CardTitle>
+                <CardDescription className="mt-2 font-bold text-sm">
+                  노래방 관련 상품은 학생 앱에서 자동 제외했고, 아래 후보는 대표님이 보고 제외 여부를 판단할 목록입니다.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge className="border-none bg-rose-100 text-rose-700 font-black">
+                  자동 제외 {studentExcludedProducts.length.toLocaleString()}개
+                </Badge>
+                <Badge className="border-none bg-amber-100 text-amber-700 font-black">
+                  검토 후보 {studentReviewCandidates.length.toLocaleString()}개
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {studentReviewCandidates.length === 0 ? (
+              <div className="rounded-[1.5rem] border border-dashed py-12 text-center text-sm font-bold text-muted-foreground">
+                현재 키워드 기준으로 검토할 후보 상품이 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {studentReviewCandidates.slice(0, GIFTISHOW_REVIEW_CANDIDATE_PREVIEW_LIMIT).map(({ product, reasons, exclusionReason }) => (
+                  <div key={product.id || product.goodsCode} className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={cn('border-none font-black', exclusionReason ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700')}>
+                            {exclusionReason ? '학생 앱 제외' : '검토 필요'}
+                          </Badge>
+                          <p className="text-xs font-bold text-slate-500">{product.brandName || product.affiliate || '브랜드'}</p>
+                        </div>
+                        <p className="mt-2 text-sm font-black leading-5 text-slate-900">{product.goodsName}</p>
+                        <p className="mt-1 text-xs font-bold leading-5 text-slate-500">{reasons.join(' · ')}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-black text-[#14295F]">{formatPoints(getGiftishowProductPointCost(product))}</p>
+                        <p className="mt-1 text-[11px] font-bold text-slate-500">{product.goodsCode || '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {studentReviewCandidates.length > GIFTISHOW_REVIEW_CANDIDATE_PREVIEW_LIMIT ? (
+                  <div className="rounded-[1.25rem] border border-dashed border-amber-200 bg-amber-50/70 px-4 py-3 text-center text-xs font-black text-amber-700">
+                    외 {(studentReviewCandidates.length - GIFTISHOW_REVIEW_CANDIDATE_PREVIEW_LIMIT).toLocaleString()}개 후보가 더 있습니다.
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
+          <CardHeader className="border-b bg-muted/10">
             <CardTitle className="text-xl font-black tracking-tight">카탈로그 미리보기</CardTitle>
             <CardDescription className="font-bold text-sm">
-              학생 앱에 노출될 최근 상품입니다. 상품 포인트는 salePrice를 그대로 사용합니다.
+              학생 앱에 노출될 최근 상품입니다. 노래방 관련 자동 제외 품목은 이 목록에 보이지 않습니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            {products.length === 0 ? (
+            {studentCatalogProducts.length === 0 ? (
               <div className="rounded-[1.5rem] border border-dashed py-12 text-center text-sm font-bold text-muted-foreground">
-                아직 동기화된 상품이 없습니다. 먼저 카탈로그 동기화를 실행해 주세요.
+                {products.length === 0
+                  ? '아직 동기화된 상품이 없습니다. 먼저 카탈로그 동기화를 실행해 주세요.'
+                  : '학생 앱에 노출할 수 있는 상품이 없습니다. 제외 키워드를 확인해 주세요.'}
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {products.slice(0, 12).map((product) => {
+                {studentCatalogProducts.slice(0, 12).map((product) => {
                   const productImage = getProductImage(product);
                   return (
                     <div key={product.id || product.goodsCode} className="overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white shadow-sm">

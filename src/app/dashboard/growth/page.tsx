@@ -49,6 +49,7 @@ import {
   getGiftishowProductAvailabilityReason,
   getGiftishowProductPointCost,
   isGiftishowProductAvailable,
+  isGiftishowStudentCatalogProduct,
   sortGiftishowOrdersByRecent,
   sortGiftishowProducts,
 } from '@/lib/giftishow';
@@ -560,7 +561,7 @@ export default function GrowthPage() {
   const hasStudentPhone = useMemo(() => isValidKoreanMobilePhone(resolvedStudentPhone), [resolvedStudentPhone]);
 
   const giftishowProducts = useMemo(
-    () => sortGiftishowProducts(giftishowProductsRaw || []),
+    () => sortGiftishowProducts((giftishowProductsRaw || []).filter(isGiftishowStudentCatalogProduct)),
     [giftishowProductsRaw]
   );
   const giftishowOrders = useMemo(
