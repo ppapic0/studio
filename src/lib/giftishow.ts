@@ -24,6 +24,27 @@ const SYNC_STATUS_LABELS: Record<GiftishowSyncStatus, string> = {
   error: '오류',
 };
 
+const GIFTISHOW_AVAILABLE_STATE_CODES = new Set(['SALE', 'SALES', 'ONSALE', 'ON_SALE', 'AVAILABLE', 'Y', 'YES', 'TRUE', '1', '판매', '판매중']);
+const GIFTISHOW_UNAVAILABLE_STATE_CODES = new Set([
+  'STOP',
+  'STOPPED',
+  'SOLDOUT',
+  'SOLD_OUT',
+  'END',
+  'ENDED',
+  'EXPIRE',
+  'EXPIRED',
+  'DELETE',
+  'DELETED',
+  'N',
+  'NO',
+  'FALSE',
+  '0',
+  '품절',
+  '중지',
+  '판매중지',
+]);
+
 export function getGiftishowOrderStatusLabel(status?: GiftishowOrderStatus | null) {
   if (!status) return '상태 미정';
   return ORDER_STATUS_LABELS[status] || status;
@@ -45,10 +66,28 @@ export function getGiftishowOrderStatusTone(status?: GiftishowOrderStatus | null
   return 'bg-slate-100 text-slate-700';
 }
 
+export function getGiftishowProductPointCost(product?: GiftishowProduct | null) {
+  const rawCost = Number(product?.pointCost ?? product?.salePrice ?? 0);
+  return Number.isFinite(rawCost) ? Math.max(0, Math.floor(rawCost)) : 0;
+}
+
+export function getGiftishowProductAvailabilityReason(
+  product?: GiftishowProduct | null,
+  settings?: GiftishowSettings | null
+) {
+  if (!product) return '상품 정보를 찾지 못했어요.';
+  if (settings?.enabled === false) return '센터에서 보상샵을 준비 중이에요.';
+
+  const stateCode = normalizeGiftishowStateCode(product.goodsStateCd);
+  if (GIFTISHOW_UNAVAILABLE_STATE_CODES.has(stateCode)) return '판매 중지된 상품이에요.';
+  if (getGiftishowProductPointCost(product) <= 0) return '상품 포인트 정보가 아직 없어요.';
+  if (product.isAvailable === true || GIFTISHOW_AVAILABLE_STATE_CODES.has(stateCode)) return null;
+
+  return '현재 교환할 수 없는 상품이에요.';
+}
+
 export function isGiftishowProductAvailable(product?: GiftishowProduct | null, settings?: GiftishowSettings | null) {
-  if (!product) return false;
-  if (settings?.enabled === false) return false;
-  return product.isAvailable && product.goodsStateCd === 'SALE';
+  return getGiftishowProductAvailabilityReason(product, settings) === null;
 }
 
 export function maskPhoneNumber(value?: string | null) {
@@ -60,10 +99,10 @@ export function maskPhoneNumber(value?: string | null) {
 
 export function sortGiftishowProducts<T extends GiftishowProduct>(products: T[] | null | undefined) {
   return [...(products || [])].sort((left, right) => {
-    const availableDiff = Number(right.isAvailable) - Number(left.isAvailable);
+    const availableDiff = Number(isGiftishowProductAvailable(right)) - Number(isGiftishowProductAvailable(left));
     if (availableDiff !== 0) return availableDiff;
 
-    const pointDiff = left.pointCost - right.pointCost;
+    const pointDiff = getGiftishowProductPointCost(left) - getGiftishowProductPointCost(right);
     if (pointDiff !== 0) return pointDiff;
 
     return left.goodsName.localeCompare(right.goodsName, 'ko');
@@ -124,4 +163,11 @@ function toMillis(
     | undefined
 ) {
   return toDate(value)?.getTime() || 0;
+}
+
+function normalizeGiftishowStateCode(value?: string | null) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
 }

@@ -42,7 +42,9 @@ import {
   formatGiftishowTimestamp,
   getGiftishowOrderStatusLabel,
   getGiftishowOrderStatusTone,
+  getGiftishowProductPointCost,
   getGiftishowSyncStatusLabel,
+  isGiftishowProductAvailable,
   sortGiftishowOrdersByRecent,
   sortGiftishowProducts,
 } from '@/lib/giftishow';
@@ -295,7 +297,7 @@ export default function GiftishowSettingsPage() {
   const orders = useMemo(() => sortGiftishowOrdersByRecent(giftishowOrdersRaw || []), [giftishowOrdersRaw]);
 
   const availableProducts = useMemo(
-    () => products.filter((product) => product.isAvailable && product.goodsStateCd === 'SALE'),
+    () => products.filter((product) => isGiftishowProductAvailable(product)),
     [products]
   );
   const detailSyncedProducts = useMemo(
@@ -394,6 +396,44 @@ export default function GiftishowSettingsPage() {
         variant: 'destructive',
         title: '설정 저장 실패',
         description: getSafeErrorMessage(error, '기프티쇼 설정 저장 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEnabledChange = async (enabled: boolean) => {
+    if (!centerId || isSaving) return;
+
+    setForm((current) => ({ ...current, enabled }));
+    setIsSaving(true);
+    try {
+      await saveGiftishowSettingsSecure({
+        centerId,
+        enabled,
+        bannerId: form.bannerId.trim(),
+        templateId: form.templateId.trim(),
+        userId: form.userId.trim(),
+        callbackNo: form.callbackNo.trim(),
+      });
+
+      setForm((current) => ({
+        ...current,
+        enabled,
+        userId: '',
+        callbackNo: '',
+      }));
+
+      toast({
+        title: enabled ? '학생 요청을 허용했습니다.' : '학생 요청을 막았습니다.',
+        description: enabled ? '학생 보상샵의 요청 버튼이 바로 열립니다.' : '학생 보상샵 요청 버튼을 비활성화했습니다.',
+      });
+    } catch (error) {
+      setForm((current) => ({ ...current, enabled: settingsDoc?.enabled === true }));
+      toast({
+        variant: 'destructive',
+        title: '보상샵 상태 변경 실패',
+        description: getSafeErrorMessage(error, '보상샵 활성화 상태를 저장하지 못했습니다.'),
       });
     } finally {
       setIsSaving(false);
@@ -595,7 +635,7 @@ export default function GiftishowSettingsPage() {
               <Label className="text-[11px] font-black uppercase text-muted-foreground">보상샵 활성화</Label>
               <div className="flex h-11 items-center justify-between rounded-xl border-2 px-3">
                 <span className="text-sm font-bold">학생 요청 허용</span>
-                <Switch checked={form.enabled} onCheckedChange={(checked) => updateField('enabled', checked)} />
+                <Switch checked={form.enabled} onCheckedChange={(checked) => void handleEnabledChange(checked)} disabled={isSaving || isSettingsLoading} />
               </div>
             </div>
             <div className="space-y-2">
@@ -781,14 +821,14 @@ export default function GiftishowSettingsPage() {
                       </div>
                       <div className="space-y-2 p-4">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge className={cn('border-none font-black', product.isAvailable && product.goodsStateCd === 'SALE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
+                          <Badge className={cn('border-none font-black', isGiftishowProductAvailable(product) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')}>
                             {product.goodsStateCd || 'UNKNOWN'}
                           </Badge>
                           <p className="text-xs font-bold text-slate-500">{product.brandName || product.affiliate || '브랜드'}</p>
                         </div>
                         <p className="line-clamp-2 text-sm font-black leading-5 text-slate-900">{product.goodsName}</p>
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-base font-black text-[#14295F]">{formatPoints(product.pointCost)}</p>
+                          <p className="text-base font-black text-[#14295F]">{formatPoints(getGiftishowProductPointCost(product))}</p>
                           <p className="text-xs font-bold text-slate-500">{formatWon(product.salePrice)}</p>
                         </div>
                       </div>

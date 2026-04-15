@@ -60,6 +60,38 @@ const giftishowCatalogFunctions = functions
     timeoutSeconds: 540,
     memory: "1GB",
 });
+const GIFTISHOW_AVAILABLE_STATE_CODES = new Set([
+    "SALE",
+    "SALES",
+    "ONSALE",
+    "ON_SALE",
+    "AVAILABLE",
+    "Y",
+    "YES",
+    "TRUE",
+    "1",
+    "판매",
+    "판매중",
+]);
+const GIFTISHOW_UNAVAILABLE_STATE_CODES = new Set([
+    "STOP",
+    "STOPPED",
+    "SOLDOUT",
+    "SOLD_OUT",
+    "END",
+    "ENDED",
+    "EXPIRE",
+    "EXPIRED",
+    "DELETE",
+    "DELETED",
+    "N",
+    "NO",
+    "FALSE",
+    "0",
+    "품절",
+    "중지",
+    "판매중지",
+]);
 class GiftishowProviderError extends Error {
     constructor(code, message, retryable = false) {
         super(message);
@@ -572,7 +604,7 @@ exports.createGiftishowOrderRequestSecure = functions.region(region).https.onCal
         throw new functions.https.HttpsError("not-found", "상품 정보를 찾을 수 없습니다.");
     }
     const product = productSnap.data();
-    if (!product.isAvailable || product.goodsStateCd !== "SALE") {
+    if (!isGiftishowProductRequestable(product)) {
         throw new functions.https.HttpsError("failed-precondition", "현재 교환할 수 없는 상품입니다.");
     }
     if (!studentContext.phoneNumber) {
@@ -591,7 +623,7 @@ exports.createGiftishowOrderRequestSecure = functions.region(region).https.onCal
         brandName: product.brandName || null,
         salePrice: Math.max(0, Math.floor(product.salePrice || 0)),
         discountPrice: Math.max(0, Math.floor(product.discountPrice || 0)),
-        pointCost: Math.max(0, Math.floor(product.pointCost || product.salePrice || 0)),
+        pointCost: getGiftishowProductPointCost(product),
         status: "requested",
         pointEvents: [],
         requestedAt: now,
@@ -1171,6 +1203,28 @@ async function resolveCenterMembershipRole(db, centerId, uid) {
         status: userCenterData === null || userCenterData === void 0 ? void 0 : userCenterData.status,
     };
 }
+function normalizeGiftishowStateCode(value) {
+    return String(value !== null && value !== void 0 ? value : "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+}
+function getGiftishowProductPointCost(product) {
+    var _a, _b;
+    const rawCost = Number((_b = (_a = product.pointCost) !== null && _a !== void 0 ? _a : product.salePrice) !== null && _b !== void 0 ? _b : 0);
+    return Number.isFinite(rawCost) ? Math.max(0, Math.floor(rawCost)) : 0;
+}
+function isGiftishowProductStateAvailable(stateCode, salePrice) {
+    const normalizedStateCode = normalizeGiftishowStateCode(stateCode);
+    if (GIFTISHOW_UNAVAILABLE_STATE_CODES.has(normalizedStateCode))
+        return false;
+    return salePrice > 0 && GIFTISHOW_AVAILABLE_STATE_CODES.has(normalizedStateCode);
+}
+function isGiftishowProductRequestable(product) {
+    const normalizedStateCode = normalizeGiftishowStateCode(product.goodsStateCd);
+    if (GIFTISHOW_UNAVAILABLE_STATE_CODES.has(normalizedStateCode))
+        return false;
+    if (getGiftishowProductPointCost(product) <= 0)
+        return false;
+    return product.isAvailable === true || GIFTISHOW_AVAILABLE_STATE_CODES.has(normalizedStateCode);
+}
 function normalizeGiftishowProduct(item, syncedAt) {
     var _a, _b, _c, _d;
     const goodsCode = readGiftishowString(item, "goodsCode", "goods_code");
@@ -1201,7 +1255,7 @@ function normalizeGiftishowProduct(item, syncedAt) {
         mmsReserveFlag: readGiftishowString(item, "mmsReserveFlag", "mms_reserve_flag") || null,
         mmsBarcdCreateYn: readGiftishowString(item, "mmsBarcdCreateYn", "mms_barcd_create_yn") || null,
         pointCost: salePrice,
-        isAvailable: stateCode === "SALE" && salePrice > 0,
+        isAvailable: isGiftishowProductStateAvailable(stateCode, salePrice),
         lastSyncedAt: syncedAt,
         updatedAt: syncedAt,
     };

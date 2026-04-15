@@ -183,6 +183,39 @@ type GiftishowCredentials = {
 type GiftishowGoodsItem = Record<string, unknown>;
 type GiftishowBrandItem = Record<string, unknown>;
 
+const GIFTISHOW_AVAILABLE_STATE_CODES = new Set([
+  "SALE",
+  "SALES",
+  "ONSALE",
+  "ON_SALE",
+  "AVAILABLE",
+  "Y",
+  "YES",
+  "TRUE",
+  "1",
+  "판매",
+  "판매중",
+]);
+const GIFTISHOW_UNAVAILABLE_STATE_CODES = new Set([
+  "STOP",
+  "STOPPED",
+  "SOLDOUT",
+  "SOLD_OUT",
+  "END",
+  "ENDED",
+  "EXPIRE",
+  "EXPIRED",
+  "DELETE",
+  "DELETED",
+  "N",
+  "NO",
+  "FALSE",
+  "0",
+  "품절",
+  "중지",
+  "판매중지",
+]);
+
 type GiftishowListGoodsPageResult = {
   items: GiftishowGoodsItem[];
   totalCount: number;
@@ -862,7 +895,7 @@ export const createGiftishowOrderRequestSecure = functions.region(region).https.
   }
 
   const product = productSnap.data() as GiftishowProductDoc;
-  if (!product.isAvailable || product.goodsStateCd !== "SALE") {
+  if (!isGiftishowProductRequestable(product)) {
     throw new functions.https.HttpsError("failed-precondition", "현재 교환할 수 없는 상품입니다.");
   }
   if (!studentContext.phoneNumber) {
@@ -882,7 +915,7 @@ export const createGiftishowOrderRequestSecure = functions.region(region).https.
     brandName: product.brandName || null,
     salePrice: Math.max(0, Math.floor(product.salePrice || 0)),
     discountPrice: Math.max(0, Math.floor(product.discountPrice || 0)),
-    pointCost: Math.max(0, Math.floor(product.pointCost || product.salePrice || 0)),
+    pointCost: getGiftishowProductPointCost(product),
     status: "requested",
     pointEvents: [],
     requestedAt: now,
@@ -1705,6 +1738,30 @@ async function resolveCenterMembershipRole(
   };
 }
 
+function normalizeGiftishowStateCode(value: unknown) {
+  return String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+}
+
+function getGiftishowProductPointCost(product: Pick<GiftishowProductDoc, "pointCost" | "salePrice">) {
+  const rawCost = Number(product.pointCost ?? product.salePrice ?? 0);
+  return Number.isFinite(rawCost) ? Math.max(0, Math.floor(rawCost)) : 0;
+}
+
+function isGiftishowProductStateAvailable(stateCode: unknown, salePrice: number) {
+  const normalizedStateCode = normalizeGiftishowStateCode(stateCode);
+  if (GIFTISHOW_UNAVAILABLE_STATE_CODES.has(normalizedStateCode)) return false;
+  return salePrice > 0 && GIFTISHOW_AVAILABLE_STATE_CODES.has(normalizedStateCode);
+}
+
+function isGiftishowProductRequestable(
+  product: Pick<GiftishowProductDoc, "goodsStateCd" | "isAvailable" | "pointCost" | "salePrice">
+) {
+  const normalizedStateCode = normalizeGiftishowStateCode(product.goodsStateCd);
+  if (GIFTISHOW_UNAVAILABLE_STATE_CODES.has(normalizedStateCode)) return false;
+  if (getGiftishowProductPointCost(product) <= 0) return false;
+  return product.isAvailable === true || GIFTISHOW_AVAILABLE_STATE_CODES.has(normalizedStateCode);
+}
+
 function normalizeGiftishowProduct(
   item: GiftishowGoodsItem,
   syncedAt: admin.firestore.Timestamp
@@ -1738,7 +1795,7 @@ function normalizeGiftishowProduct(
     mmsReserveFlag: readGiftishowString(item, "mmsReserveFlag", "mms_reserve_flag") || null,
     mmsBarcdCreateYn: readGiftishowString(item, "mmsBarcdCreateYn", "mms_barcd_create_yn") || null,
     pointCost: salePrice,
-    isAvailable: stateCode === "SALE" && salePrice > 0,
+    isAvailable: isGiftishowProductStateAvailable(stateCode, salePrice),
     lastSyncedAt: syncedAt,
     updatedAt: syncedAt,
   };
