@@ -990,6 +990,7 @@ export default function GrowthPage() {
 
   const handleGiftishowRequest = async (product: GiftishowProduct) => {
     if (!activeMembership?.id || !product.goodsCode) return;
+    if (requestingGoodsCode) return;
 
     const disabledReason = getGiftishowRequestDisabledReason({
       settings: giftishowSettings,
@@ -1005,6 +1006,10 @@ export default function GrowthPage() {
       });
       return;
     }
+
+    const productName = product.goodsName?.trim() || '선택한 상품';
+    const confirmed = window.confirm(`${productName}을(를) 요청하시겠습니까?\n센터 관리자 승인 전에는 포인트가 차감되지 않습니다.`);
+    if (!confirmed) return;
 
     setRequestingGoodsCode(product.goodsCode);
     try {
