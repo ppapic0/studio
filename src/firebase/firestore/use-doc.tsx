@@ -45,8 +45,10 @@ export function useDoc<T = any>(
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
+  const [resolvedPath, setResolvedPath] = useState<string | null>(null);
 
   const enabled = options.enabled !== false;
+  const currentPath = memoizedDocRef?.path ?? null;
   const strictPermissionErrors = shouldUseStrictFirestorePermissionErrors();
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export function useDoc<T = any>(
       setData(null);
       setIsLoading(false);
       setError(null);
+      setResolvedPath(null);
       return;
     }
 
@@ -69,6 +72,7 @@ export function useDoc<T = any>(
           setData(null);
         }
         setError(null);
+        setResolvedPath(memoizedDocRef.path);
         setIsLoading(false);
       },
       (err: FirestoreError) => {
@@ -90,6 +94,7 @@ export function useDoc<T = any>(
         }
         
         setData(null)
+        setResolvedPath(memoizedDocRef.path)
         setIsLoading(false)
       }
     );
@@ -97,5 +102,12 @@ export function useDoc<T = any>(
     return () => unsubscribe();
   }, [memoizedDocRef, enabled]);
 
-  return { data, isLoading, error };
+  const isWaitingForFirstSnapshot = Boolean(memoizedDocRef && enabled && resolvedPath !== currentPath);
+  const shouldReturnEmptyData = !memoizedDocRef || !enabled || isWaitingForFirstSnapshot;
+
+  return {
+    data: shouldReturnEmptyData ? null : data,
+    isLoading: isLoading || isWaitingForFirstSnapshot,
+    error,
+  };
 }

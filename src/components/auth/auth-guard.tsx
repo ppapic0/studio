@@ -86,7 +86,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       try {
         await createServerAuthSession(user);
         if (!cancelled) {
+          setIsSessionSyncing(false);
+          if (typeof window !== 'undefined') {
+            window.location.replace(redirectPath);
+            return;
+          }
           router.replace(redirectPath);
+          router.refresh();
         }
       } catch (error) {
         logHandledClientIssue('[auth-guard] session sync failed', error);

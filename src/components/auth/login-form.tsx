@@ -152,6 +152,7 @@ export function LoginForm() {
       window.sessionStorage.setItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY, '1');
     }
     let hasServerSession = false;
+    let didStartPostLoginNavigation = false;
     try {
       const trimmedEmail = values.email.trim();
       const loginResponse = await fetch('/api/auth/login', {
@@ -199,6 +200,10 @@ export function LoginForm() {
       const memberships = await fetchMembershipRecords(userCredential.user.uid);
       const validation = validateStudentMembershipStatus(memberships);
       if (!validation.allowed) {
+        if (hasServerSession) {
+          await clearServerAuthSession().catch(() => undefined);
+          hasServerSession = false;
+        }
         await signOut(auth);
         toast({
           variant: 'destructive',
@@ -218,7 +223,14 @@ export function LoginForm() {
       if (typeof window !== 'undefined') {
         setDashboardEntryMotionKeys(resolveDashboardEntryMotionKeys(memberships));
       }
+      didStartPostLoginNavigation = true;
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY);
+        window.location.replace(postLoginPath);
+        return;
+      }
       router.replace(postLoginPath);
+      router.refresh();
     } catch (error: any) {
       if (hasServerSession) {
         await clearServerAuthSession().catch(() => undefined);
@@ -241,10 +253,12 @@ export function LoginForm() {
         description: errorMessage,
       });
     } finally {
-      if (typeof window !== 'undefined') {
+      if (!didStartPostLoginNavigation && typeof window !== 'undefined') {
         window.sessionStorage.removeItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY);
       }
-      setIsLoading(false);
+      if (!didStartPostLoginNavigation) {
+        setIsLoading(false);
+      }
     }
   }
 
