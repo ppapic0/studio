@@ -50,9 +50,13 @@ const GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES = [
     reason: '노래방 관련',
     keywords: ['노래방', '노래연습장', '노래연습', '코인노래', '코인 노래', '코노', '락휴', 'karaoke'],
   },
+  {
+    reason: '렌터카·카셰어링 관련',
+    keywords: ['쏘카', 'socar'],
+  },
 ];
 
-const GIFTISHOW_STUDENT_REVIEW_ALLOWLIST_KEYWORDS = ['세븐일레븐', '7-eleven', '7 eleven', 'seven eleven'];
+const GIFTISHOW_STUDENT_REVIEW_ALLOWLIST_KEYWORDS = ['세븐일레븐', '7-eleven', '7 eleven', 'seven eleven', '이디야', 'ediya'];
 
 const GIFTISHOW_STUDENT_REVIEW_RULES = [
   ...GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES,
@@ -145,7 +149,7 @@ export function isGiftishowStudentCatalogProduct(product?: GiftishowProduct | nu
 export function getGiftishowStudentReviewCandidateReasons(product?: GiftishowProduct | null) {
   const text = getGiftishowProductSearchText(product);
   if (!text) return [];
-  if (GIFTISHOW_STUDENT_REVIEW_ALLOWLIST_KEYWORDS.some((keyword) => text.includes(keyword))) return [];
+  if (GIFTISHOW_STUDENT_REVIEW_ALLOWLIST_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) return [];
 
   return GIFTISHOW_STUDENT_REVIEW_RULES
     .map((rule) => {

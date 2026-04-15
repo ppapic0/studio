@@ -220,6 +220,10 @@ const GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES = [
     reason: "노래방 관련",
     keywords: ["노래방", "노래연습장", "노래연습", "코인노래", "코인 노래", "코노", "락휴", "karaoke"],
   },
+  {
+    reason: "렌터카·카셰어링 관련",
+    keywords: ["쏘카", "socar"],
+  },
 ];
 
 type GiftishowListGoodsPageResult = {

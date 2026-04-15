@@ -827,7 +827,7 @@ export default function GiftishowSettingsPage() {
                   학생 부적합 후보
                 </CardTitle>
                 <CardDescription className="mt-2 font-bold text-sm">
-                  노래방 관련 상품은 학생 앱에서 자동 제외했고, 아래 후보는 대표님이 보고 제외 여부를 판단할 목록입니다.
+                  자동 제외 품목은 학생 앱에서 숨기고, 아래 후보는 대표님이 보고 제외 여부를 판단할 목록입니다.
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -881,7 +881,7 @@ export default function GiftishowSettingsPage() {
           <CardHeader className="border-b bg-muted/10">
             <CardTitle className="text-xl font-black tracking-tight">카탈로그 미리보기</CardTitle>
             <CardDescription className="font-bold text-sm">
-              학생 앱에 노출될 최근 상품입니다. 노래방 관련 자동 제외 품목은 이 목록에 보이지 않습니다.
+              학생 앱에 노출될 최근 상품입니다. 자동 제외 품목은 이 목록에 보이지 않습니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
