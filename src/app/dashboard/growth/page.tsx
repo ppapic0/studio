@@ -79,7 +79,7 @@ const STUDY_BOX_CLAIM_CACHE_PREFIX = 'point-track:claimed-boxes';
 const STUDY_BOX_ARRIVAL_TOAST_PREFIX = 'point-track:arrival-toast';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
 const GIFTISHOW_PRODUCT_FETCH_LIMIT = 2500;
-const GIFTISHOW_PRODUCT_PAGE_SIZE = 6;
+const GIFTISHOW_PRODUCT_PAGE_SIZE = 3;
 
 function normalizePhone(raw: string) {
   return raw.replace(/\D/g, '');
@@ -1582,38 +1582,39 @@ export default function GrowthPage() {
                       );
                     })}
 
-                    {filteredGiftishowProducts.length > GIFTISHOW_PRODUCT_PAGE_SIZE ? (
-                      <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-[#E5D7BF] bg-white/88 px-3 py-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10 rounded-full border-[#E5D7BF] bg-white font-black text-[#14295F] disabled:opacity-40"
-                          disabled={currentGiftishowPage <= 1}
-                          onClick={() => setGiftishowPage((page) => Math.max(1, page - 1))}
-                        >
-                          이전
-                        </Button>
-                        <div className="text-center">
-                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#7D8FB3]">페이지</p>
-                          <p className="mt-1 text-sm font-black text-[#14295F]">
-                            {currentGiftishowPage} / {totalGiftishowPages}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10 rounded-full border-[#E5D7BF] bg-white font-black text-[#14295F] disabled:opacity-40"
-                          disabled={currentGiftishowPage >= totalGiftishowPages}
-                          onClick={() => setGiftishowPage((page) => Math.min(totalGiftishowPages, page + 1))}
-                        >
-                          다음
-                        </Button>
-                      </div>
-                    ) : null}
                   </>
                 )}
               </div>
             </ScrollArea>
+
+            {totalGiftishowPages > 1 ? (
+              <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-[#E5D7BF] bg-white/88 px-3 py-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 rounded-full border-[#E5D7BF] bg-white px-4 font-black text-[#14295F] disabled:opacity-40"
+                  disabled={currentGiftishowPage <= 1}
+                  onClick={() => setGiftishowPage((page) => Math.max(1, page - 1))}
+                >
+                  이전
+                </Button>
+                <div className="text-center">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#7D8FB3]">페이지 이동하기</p>
+                  <p className="mt-1 text-sm font-black text-[#14295F]">
+                    {currentGiftishowPage} / {totalGiftishowPages}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 rounded-full border-[#E5D7BF] bg-white px-4 font-black text-[#14295F] disabled:opacity-40"
+                  disabled={currentGiftishowPage >= totalGiftishowPages}
+                  onClick={() => setGiftishowPage((page) => Math.min(totalGiftishowPages, page + 1))}
+                >
+                  다음
+                </Button>
+              </div>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
