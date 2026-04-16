@@ -101,6 +101,10 @@ const GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES = [
         reason: "렌터카·카셰어링 관련",
         keywords: ["쏘카", "socar"],
     },
+    {
+        reason: "IPTV·영상 서비스 관련",
+        keywords: ["지니tv", "지니 tv", "지니티비", "지니 티비", "genietv", "genie tv"],
+    },
 ];
 class GiftishowProviderError extends Error {
     constructor(code, message, retryable = false) {
