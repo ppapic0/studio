@@ -52,6 +52,7 @@ import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@
 import { deriveRequestOperationsSummary } from '@/lib/attendance-kpi';
 import { AttendanceKpiBoard } from '@/components/dashboard/attendance-kpi-board';
 import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import {
   canManageSettings,
   canReadFinance,
@@ -677,7 +678,9 @@ export default function AttendancePage() {
           })
         );
       } catch (error) {
-        console.error('[attendance] auto-sync failed', error);
+        if (!cancelled) {
+          logHandledClientIssue('[attendance] auto-sync failed', error);
+        }
       }
     };
 

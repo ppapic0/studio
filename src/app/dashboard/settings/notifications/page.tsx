@@ -2002,10 +2002,7 @@ export default function NotificationSettingsPage() {
                 <MessageSquare className="h-5 w-5" /> 문자 템플릿
               </CardTitle>
               <CardDescription className="font-bold text-sm">
-                사용 가능 변수: <Badge variant="outline" className="mx-1">{'{centerName}'}</Badge>
-                <Badge variant="outline" className="mx-1">{'{studentName}'}</Badge>
-                <Badge variant="outline" className="mx-1">{'{time}'}</Badge>
-                <Badge variant="outline" className="mx-1">{'{expectedTime}'}</Badge>
+                사용 가능 변수: {'{centerName}'}, {'{studentName}'}, {'{time}'}, {'{expectedTime}'}
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">

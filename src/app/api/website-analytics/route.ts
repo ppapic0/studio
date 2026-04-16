@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 import { noStoreJson } from '@/lib/api-security';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminAuth, adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +22,13 @@ async function getCenterRole(uid: string, centerId: string) {
   return normalizeRole(memberSnap.data()?.role || userCenterSnap.data()?.role);
 }
 
+function unavailableAnalyticsResponse() {
+  return noStoreJson({
+    events: [],
+    unavailableReason: 'missing-admin-credentials',
+  });
+}
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization') || '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -38,7 +45,10 @@ export async function GET(request: NextRequest) {
   let uid = '';
   try {
     uid = (await adminAuth.verifyIdToken(idToken)).uid;
-  } catch {
+  } catch (error) {
+    if (isMissingAdminCredentialsError(error)) {
+      return unavailableAnalyticsResponse();
+    }
     return noStoreJson({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -72,6 +82,9 @@ export async function GET(request: NextRequest) {
 
     return noStoreJson({ events });
   } catch (error) {
+    if (isMissingAdminCredentialsError(error)) {
+      return unavailableAnalyticsResponse();
+    }
     console.error('[website-analytics] query failed', error);
     return noStoreJson({ error: 'internal' }, { status: 500 });
   }

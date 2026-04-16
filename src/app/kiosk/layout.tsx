@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { getVerifiedServerSession } from '@/lib/server-auth-session';
 import {
   canAccessDashboardPath,
@@ -11,14 +12,34 @@ export default async function KioskLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getVerifiedServerSession();
-  if (!session) {
+  let session = null as Awaited<ReturnType<typeof getVerifiedServerSession>>;
+  let skipServerGuard = false;
+
+  try {
+    session = await getVerifiedServerSession();
+  } catch (error) {
+    if (isMissingAdminCredentialsError(error)) {
+      skipServerGuard = true;
+    } else {
+      throw error;
+    }
+  }
+
+  if (!session && !skipServerGuard) {
     redirect('/login?next=%2Fkiosk');
   }
 
-  const memberships = await getServerDashboardMemberships(session.uid);
-  if (!canAccessDashboardPath('/kiosk', memberships)) {
-    redirect('/dashboard');
+  if (session && !skipServerGuard) {
+    try {
+      const memberships = await getServerDashboardMemberships(session.uid);
+      if (!canAccessDashboardPath('/kiosk', memberships)) {
+        redirect('/dashboard');
+      }
+    } catch (error) {
+      if (!isMissingAdminCredentialsError(error)) {
+        throw error;
+      }
+    }
   }
 
   return <>{children}</>;

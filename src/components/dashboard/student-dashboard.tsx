@@ -1610,6 +1610,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     return query(
       collection(firestore, 'centers', activeMembership.id, 'parentCommunications'),
       where('studentId', '==', user.uid),
+      where('senderRole', '==', 'student'),
+      where('senderUid', '==', user.uid),
       limit(20)
     );
   }, [firestore, activeMembership?.id, user?.uid]);

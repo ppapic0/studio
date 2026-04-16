@@ -7,10 +7,11 @@ import { useState, type FormEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Loader2, ShieldCheck, UserCheck } from 'lucide-react';
 
-import { useAuth, useFunctions } from '@/firebase';
+import { useAuth, useFirestore, useFunctions } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -93,6 +94,7 @@ function isValidKoreanMobilePhone(raw: string): boolean {
 
 export function SignupForm() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const functions = useFunctions();
   const router = useRouter();
   const { toast } = useToast();
@@ -304,6 +306,33 @@ export function SignupForm() {
       setLoadingStatus('센터 가입 처리 중...');
       const completeSignupFn = httpsCallable(functions, 'completeSignupWithInvite');
       const consentRecordedAt = new Date().toISOString();
+      const legalConsents = {
+        terms: buildClientConsentSnapshot({
+          agreed: values.termsConsent,
+          version: TERMS_VERSION,
+          source: 'signup',
+          agreedAt: consentRecordedAt,
+        }),
+        privacy: buildClientConsentSnapshot({
+          agreed: values.privacyConsent,
+          version: PRIVACY_VERSION,
+          source: 'signup',
+          agreedAt: consentRecordedAt,
+        }),
+        age14: buildClientConsentSnapshot({
+          agreed: values.age14Consent,
+          version: PRIVACY_VERSION,
+          source: 'signup',
+          agreedAt: consentRecordedAt,
+        }),
+        marketingEmail: buildClientConsentSnapshot({
+          agreed: values.marketingEmailConsent,
+          version: MARKETING_CONSENT_VERSION,
+          source: 'signup',
+          channel: 'email',
+          agreedAt: consentRecordedAt,
+        }),
+      };
       await completeSignupFn({
         code: inviteCode,
         role: values.role,
@@ -313,35 +342,28 @@ export function SignupForm() {
         parentLinkCode: values.parentLinkCode || null,
         studentLinkCode: values.studentLinkCode || null,
         phoneNumber: values.phoneNumber || null,
-        legalConsents: {
-          terms: buildClientConsentSnapshot({
-            agreed: values.termsConsent,
-            version: TERMS_VERSION,
-            source: 'signup',
-            agreedAt: consentRecordedAt,
-          }),
-          privacy: buildClientConsentSnapshot({
-            agreed: values.privacyConsent,
-            version: PRIVACY_VERSION,
-            source: 'signup',
-            agreedAt: consentRecordedAt,
-          }),
-          age14: buildClientConsentSnapshot({
-            agreed: values.age14Consent,
-            version: PRIVACY_VERSION,
-            source: 'signup',
-            agreedAt: consentRecordedAt,
-          }),
-          marketingEmail: buildClientConsentSnapshot({
-            agreed: values.marketingEmailConsent,
-            version: MARKETING_CONSENT_VERSION,
-            source: 'signup',
-            channel: 'email',
-            agreedAt: consentRecordedAt,
-          }),
-        },
+        legalConsents,
       });
       signupCompleted = true;
+
+      if (firestore) {
+        try {
+          const userProfilePatch: Record<string, unknown> = {
+            id: userCredential.user.uid,
+            email: trimmedEmail,
+            displayName: finalDisplayName,
+            schoolName: values.schoolName || '',
+            legalConsents,
+            updatedAt: serverTimestamp(),
+          };
+          if (values.phoneNumber) {
+            userProfilePatch.phoneNumber = values.phoneNumber;
+          }
+          await setDoc(doc(firestore, 'users', userCredential.user.uid), userProfilePatch, { merge: true });
+        } catch (profileWriteError) {
+          logHandledClientIssue('[signup-form] legal consent mirror write failed', profileWriteError);
+        }
+      }
 
       try {
         await createServerAuthSession(userCredential.user);

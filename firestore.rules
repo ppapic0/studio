@@ -266,6 +266,11 @@ service cloud.firestore {
       }
     }
 
+    match /{path=**}/schedules/{dateKey} {
+      allow read: if (isSignedIn() && request.auth.uid == resource.data.uid)
+        || (resource.data.centerId != null && isTeacherOrAdmin(resource.data.centerId));
+    }
+
     match /inviteCodes/{code} {
       allow read: if isSignedIn()
         && resource.data.centerId != null
@@ -603,6 +608,11 @@ service cloud.firestore {
 
       match /websiteEntryEvents/{eventId} {
         allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /pointBoostEvents/{eventId} {
+        allow read: if isActiveMember(centerId);
         allow write: if isCenterAdmin(centerId);
       }
 
