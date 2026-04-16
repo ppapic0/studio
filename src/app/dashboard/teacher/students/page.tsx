@@ -115,6 +115,15 @@ function resolveCallableErrorMessage(error: any, fallback: string): string {
   return fallback;
 }
 
+function normalizePhoneNumber(value: unknown): string {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value).replace(/\D/g, '').slice(0, 11);
+}
+
+function isValidKoreanMobilePhone(value: string): boolean {
+  return /^01\d{8,9}$/.test(value);
+}
+
 type CounselingDemoAccount = {
   uid: string;
   email: string;
@@ -171,6 +180,7 @@ export default function StudentListPage() {
     password: '',
     schoolName: '',
     grade: '1학년',
+    phoneNumber: '',
   });
   const [isCounselingDemoDialogOpen, setIsCounselingDemoDialogOpen] = useState(false);
   const [isCounselingDemoCreating, setIsCounselingDemoCreating] = useState(false);
@@ -344,6 +354,11 @@ export default function StudentListPage() {
       toast({ variant: "destructive", title: "정보 미입력", description: "모든 필수 정보를 입력해 주세요." });
       return;
     }
+    const normalizedPhoneNumber = normalizePhoneNumber(newStudent.phoneNumber);
+    if (normalizedPhoneNumber && !isValidKoreanMobilePhone(normalizedPhoneNumber)) {
+      toast({ variant: "destructive", title: "전화번호 형식 오류", description: "학생 전화번호는 01012345678 형식으로 입력해 주세요." });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -354,13 +369,14 @@ export default function StudentListPage() {
         displayName: newStudent.name,
         schoolName: newStudent.schoolName,
         grade: newStudent.grade,
+        phoneNumber: normalizedPhoneNumber || null,
         centerId: centerId
       });
 
       if (result.data?.ok) {
         toast({ title: "등록 완료", description: `${newStudent.name} 학생의 계정이 생성되었습니다.` });
         setIsAddModalOpen(false);
-        setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '1학년' });
+        setNewStudent({ name: '', email: '', password: '', schoolName: '', grade: '1학년', phoneNumber: '' });
       }
     } catch (e: any) {
       toast({ variant: "destructive", title: "등록 실패", description: e.message });
@@ -888,6 +904,17 @@ export default function StudentListPage() {
                           <SelectItem value="N수생">N수생</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] font-black uppercase text-[#5c6e97]">학생 전화번호 (선택)</Label>
+                      <Input
+                        inputMode="tel"
+                        maxLength={11}
+                        placeholder="01012345678"
+                        value={newStudent.phoneNumber}
+                        onChange={(e) => setNewStudent({ ...newStudent, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 11) })}
+                        className="h-12 rounded-xl border-2 border-[#dbe7ff] font-bold text-[#14295F]"
+                      />
                     </div>
                   </div>
                 </div>

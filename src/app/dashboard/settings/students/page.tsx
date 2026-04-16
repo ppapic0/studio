@@ -428,6 +428,7 @@ export default function StudentAccountManagementPage() {
               {filteredStudents.map((member) => {
                 const profile = studentsProfiles?.find(p => p.id === member.id);
                 const normalizedStatus = normalizeStudentMembershipStatus(member.status);
+                const phoneNumber = normalizePhoneNumber(profile?.phoneNumber || member.phoneNumber || '');
                 return (
                   <div key={member.id} className="p-8 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-muted/5 transition-all group gap-6">
                     <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -447,6 +448,7 @@ export default function StudentAccountManagementPage() {
                           )}>{studentStatusLabel(normalizedStatus)}</Badge>
                         </div>
                         <p className="text-[10px] font-bold text-muted-foreground truncate">{profile?.schoolName || '학교 정보 없음'} · {profile?.grade}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground truncate">학생 번호: {phoneNumber || '미등록'}</p>
                         <p className="text-[8px] font-mono text-muted-foreground/40 mt-1 uppercase truncate">사용자번호: {member.id}</p>
                       </div>
                     </div>

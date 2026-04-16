@@ -3990,7 +3990,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       if (canEditOtherStudent) {
         coreWrites.push(memberRef.set(memberUpdate, { merge: true }));
       }
-      if (canEditOtherStudent && (hasClassName || (isAdminCaller && memberStatusProvided))) {
+      if (canEditOtherStudent && (hasClassName || phoneNumberProvided || (isAdminCaller && memberStatusProvided))) {
         coreWrites.push(userCenterRef.set(userCenterUpdate, { merge: true }));
       }
 
@@ -4180,11 +4180,17 @@ async function resolveCounselingDemoParentLinkCode(
 export const registerStudent = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
   const auth = admin.auth();
-  const { email, password, displayName, schoolName, grade, centerId } = data;
+  const { email, password, displayName, schoolName, grade, centerId, phoneNumber } = data;
 
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
   if (!email || !password || !displayName || !centerId) {
     throw new functions.https.HttpsError("invalid-argument", "필수값 누락");
+  }
+  const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+  if (phoneNumber !== undefined && phoneNumber !== null && String(phoneNumber).trim() && !normalizedPhoneNumber) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid phone number.", {
+      userMessage: "학생 전화번호는 01012345678 형식으로 입력해 주세요.",
+    });
   }
 
   const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
@@ -4198,10 +4204,11 @@ export const registerStudent = functions.region(region).https.onCall(async (data
     const timestamp = admin.firestore.Timestamp.now();
 
     await db.runTransaction(async (t) => {
-      t.set(db.doc(`users/${uid}`), { id: uid, email, displayName, schoolName, createdAt: timestamp, updatedAt: timestamp });
-      t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: "student", status: "active", joinedAt: timestamp, displayName });
-      t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: "student", status: "active", joinedAt: timestamp });
-      t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, createdAt: timestamp, updatedAt: timestamp });
+      const phonePayload = normalizedPhoneNumber ? { phoneNumber: normalizedPhoneNumber } : {};
+      t.set(db.doc(`users/${uid}`), { id: uid, email, displayName, schoolName, ...phonePayload, createdAt: timestamp, updatedAt: timestamp });
+      t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: "student", status: "active", joinedAt: timestamp, displayName, ...phonePayload });
+      t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: "student", status: "active", joinedAt: timestamp, ...phonePayload });
+      t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, phoneNumber: normalizedPhoneNumber || null, createdAt: timestamp, updatedAt: timestamp });
       t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
         seasonLp: 0,
         penaltyPoints: 0,
