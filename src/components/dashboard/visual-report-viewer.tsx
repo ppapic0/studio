@@ -485,7 +485,7 @@ function MiniTrendChart({
   const maxMinutes = Math.max(1, ...points.map((point) => Math.max(0, point.minutes || 0)));
 
   return (
-    <div className="min-w-0 rounded-[1.5rem] border border-slate-100 bg-white p-3 shadow-sm sm:p-4">
+    <div className="min-w-0 overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white p-3 shadow-sm sm:p-4">
       <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">학습시간 그래프</p>
@@ -495,8 +495,8 @@ function MiniTrendChart({
           {formatStudyTime(aiMeta.totalStudyMinutes)}
         </Badge>
       </div>
-      <div className="mt-4 overflow-x-auto pb-1">
-        <div className="relative min-w-[17.5rem] sm:min-w-0">
+      <div className="mt-4 overflow-hidden pb-1">
+        <div className="relative min-w-0">
           <div
             className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-200"
             style={{
@@ -504,16 +504,16 @@ function MiniTrendChart({
             }}
           />
           <div className="mb-2 flex justify-start sm:justify-end">
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500 sm:text-[10px]">
+            <span className="max-w-full rounded-full bg-slate-100 px-2 py-0.5 text-[8px] font-black text-slate-500 sm:text-[10px]">
               평균 {formatStudyTime(aiMeta.metrics?.avg7StudyMinutes)}
             </span>
           </div>
-          <div className="flex items-end gap-1.5 sm:gap-2">
+          <div className="grid grid-cols-8 items-end gap-1 sm:gap-2">
             {points.map((point, index) => {
               const height = Math.max(18, Math.round(((point.minutes || 0) / maxMinutes) * 88));
               const isToday = index === points.length - 1;
               return (
-                <div key={`${point.date}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                <div key={`${point.date}-${index}`} className="flex min-w-0 flex-col items-center gap-1.5 sm:gap-2">
                   <div
                     className={cn(
                       'w-full rounded-t-2xl rounded-b-md transition-all',
@@ -521,11 +521,11 @@ function MiniTrendChart({
                     )}
                     style={{ height }}
                   />
-                  <div className="text-center">
-                    <p className={cn('text-[9px] font-black sm:text-[10px]', isToday ? 'text-primary' : 'text-slate-400')}>
+                  <div className="w-full text-center">
+                    <p className={cn('truncate text-[8px] font-black leading-tight sm:text-[10px]', isToday ? 'text-primary' : 'text-slate-400')}>
                       {formatTrendDateLabel(point.date, isToday)}
                     </p>
-                    <p className="whitespace-nowrap text-[9px] font-bold text-slate-500 sm:text-[10px]">
+                    <p className="text-[8px] font-bold leading-tight text-slate-500 sm:text-[10px]">
                       {Math.round(point.minutes || 0)}분
                     </p>
                   </div>
@@ -599,7 +599,7 @@ function SignalRadarCard({
     .join(' ');
 
   return (
-    <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+    <div className="min-w-0 rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">핵심 상태 그래프</p>
@@ -894,23 +894,23 @@ export function VisualReportViewer({
       {aiMeta && (
         compactMode ? (
           <>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
               <MiniTrendChart aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
               <SignalRadarCard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
             <KpiGraphGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} compactMode />
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
               <ReportInsightBoard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} compactMode />
               <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} compactMode />
             </div>
           </>
         ) : (
           <>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
               <ReportInsightBoard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
               <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
               <MiniTrendChart aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
               <SignalRadarCard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
