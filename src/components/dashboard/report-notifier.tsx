@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useAppContext } from '@/contexts/app-context';
 import { useNotifications, ReportItem } from '@/contexts/notifications-context';
 import {
@@ -20,17 +21,33 @@ import { Badge } from '@/components/ui/badge';
 export function ReportNotifier() {
   const { viewMode } = useAppContext();
   const { latestReport, clearLatestReport } = useNotifications();
+  const pathname = usePathname();
   const isMobile = viewMode === 'mobile';
+  const shouldSuppressReportDialog =
+    pathname === '/dashboard'
+    || pathname.startsWith('/dashboard/student-reports')
+    || pathname.startsWith('/dashboard/study-history');
 
   const [notification, setNotification] = useState<ReportItem | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     if (!latestReport) return;
+    if (shouldSuppressReportDialog) {
+      clearLatestReport();
+      return;
+    }
     setNotification(latestReport);
     setIsOpen(true);
     clearLatestReport();
-  }, [latestReport, clearLatestReport]);
+  }, [clearLatestReport, latestReport, shouldSuppressReportDialog]);
+
+  useEffect(() => {
+    if (!shouldSuppressReportDialog) return;
+    if (!isOpen && !notification) return;
+    setIsOpen(false);
+    setNotification(null);
+  }, [isOpen, notification, shouldSuppressReportDialog]);
 
   const reportContent = typeof notification?.content === 'string' ? notification.content : '';
   const reportDateKey = notification?.dateKey || '새 리포트';
