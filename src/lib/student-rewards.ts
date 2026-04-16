@@ -302,6 +302,10 @@ export function getStudyBoxRarityWeights(milestone: number) {
   return milestone >= 5 ? LATE_STUDY_BOX_RARITY_WEIGHTS : EARLY_STUDY_BOX_RARITY_WEIGHTS;
 }
 
+export function getStudyBoxRewardRangeByRarity(rarity: StudyBoxRarity) {
+  return STUDY_BOX_REWARD_RANGE_BY_RARITY[rarity];
+}
+
 export function getStudyBoxFallbackRarity(milestone: number): StudyBoxRarity {
   return milestone >= 5 ? "rare" : "common";
 }

@@ -14,6 +14,7 @@ import {
   where,
 } from 'firebase/firestore';
 import {
+  BookOpen,
   ChevronRight,
   Flame,
   Gift,
@@ -62,6 +63,8 @@ import {
   getRemainingCarryoverStudyBoxHours,
   getRenderableTodayStudyBoxHours,
   getStudyBoxFallbackRarity,
+  getStudyBoxRewardRangeByRarity,
+  getStudyBoxRarityWeights,
   normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
   upsertStudyBoxRewardEntry,
@@ -70,7 +73,7 @@ import {
 import { getCurrentStudyDayLiveSeconds, getStudyDayContext, hasStudyBoxCarryoverExpired } from '@/lib/study-day';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
-import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, StudyLogDay } from '@/lib/types';
+import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, PointBoostEvent, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const REWARD_BOX_BURST_DELAY_MS = 380;
@@ -92,6 +95,19 @@ const STUDY_BOX_ARRIVAL_TOAST_PREFIX = 'point-track:arrival-toast';
 const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
 const GIFTISHOW_PRODUCT_FETCH_LIMIT = 2500;
 const GIFTISHOW_PRODUCT_PAGE_SIZE = 2;
+const STUDY_BOX_DAILY_LIMIT = 8;
+
+const STUDY_BOX_RARITY_LABELS: Record<'common' | 'rare' | 'epic', string> = {
+  common: '기본 상자',
+  rare: '레어 상자',
+  epic: '에픽 상자',
+};
+
+const STUDY_BOX_RARITY_TONES: Record<'common' | 'rare' | 'epic', string> = {
+  common: 'bg-slate-100 text-slate-700',
+  rare: 'bg-sky-100 text-sky-700',
+  epic: 'bg-violet-100 text-violet-700',
+};
 
 function normalizePhone(raw: string) {
   return raw.replace(/\D/g, '');
@@ -109,6 +125,39 @@ function isValidKoreanMobilePhone(raw: string): boolean {
 
 function formatGiftishowPoints(value?: number | null) {
   return `${Math.max(0, Number(value || 0)).toLocaleString()}P`;
+}
+
+function toTimestampMs(value?: { toDate?: () => Date } | null) {
+  try {
+    return value?.toDate?.().getTime?.() ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+function formatPointBoostMultiplierLabel(value: number) {
+  const safe = Number(value);
+  if (!Number.isFinite(safe) || safe <= 0) return '1배';
+  const label = Number.isInteger(safe) ? safe.toFixed(0) : safe.toFixed(2).replace(/\.?0+$/, '');
+  return `${label}배`;
+}
+
+function formatPointBoostWindowLabel(event: PointBoostEvent) {
+  const startAtMs = toTimestampMs(event.startAt);
+  const endAtMs = toTimestampMs(event.endAt);
+  if (!startAtMs || !endAtMs) return '시간 정보 확인 중';
+
+  const startAt = new Date(startAtMs);
+  const endAt = new Date(endAtMs);
+  const sameDay = format(startAt, 'yyyy-MM-dd') === format(endAt, 'yyyy-MM-dd');
+
+  if (event.mode === 'day') {
+    return `${format(startAt, 'M/d')} 하루 종일`;
+  }
+  if (sameDay) {
+    return `${format(startAt, 'M/d HH:mm')} - ${format(endAt, 'HH:mm')}`;
+  }
+  return `${format(startAt, 'M/d HH:mm')} - ${format(endAt, 'M/d HH:mm')}`;
 }
 
 function getGiftishowProductImage(product?: GiftishowProduct | null) {
@@ -374,6 +423,7 @@ export default function GrowthPage() {
   const [giftishowSearch, setGiftishowSearch] = useState('');
   const [giftishowFilterMode, setGiftishowFilterMode] = useState<'available' | 'all'>('available');
   const [giftishowPage, setGiftishowPage] = useState(1);
+  const [isPointTrackManualOpen, setIsPointTrackManualOpen] = useState(false);
   const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const liveClaimKeyRef = useRef<string | null>(null);
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
@@ -423,6 +473,14 @@ export default function GrowthPage() {
     );
   }, [firestore, activeMembership?.id, user?.uid]);
   const { data: giftishowOrdersRaw } = useCollection<GiftishowOrder>(giftishowOrdersQuery, {
+    enabled: Boolean(activeMembership && user),
+  });
+
+  const pointBoostEventsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !user) return null;
+    return query(collection(firestore, 'centers', activeMembership.id, 'pointBoostEvents'), limit(24));
+  }, [firestore, activeMembership?.id, user?.uid]);
+  const { data: pointBoostEvents } = useCollection<PointBoostEvent>(pointBoostEventsQuery, {
     enabled: Boolean(activeMembership && user),
   });
 
@@ -568,6 +626,59 @@ export default function GrowthPage() {
     () => sortGiftishowOrdersByRecent(giftishowOrdersRaw || []),
     [giftishowOrdersRaw]
   );
+  const studyBoxManualRows = useMemo(() => {
+    const earlyWeights = new Map(getStudyBoxRarityWeights(1).map((entry) => [entry.rarity, entry.weight]));
+    const lateWeights = new Map(getStudyBoxRarityWeights(5).map((entry) => [entry.rarity, entry.weight]));
+
+    return (['common', 'rare', 'epic'] as const).map((rarity) => {
+      const [minReward, maxReward] = getStudyBoxRewardRangeByRarity(rarity);
+      return {
+        rarity,
+        label: STUDY_BOX_RARITY_LABELS[rarity],
+        earlyWeight: earlyWeights.get(rarity) ?? 0,
+        lateWeight: lateWeights.get(rarity) ?? 0,
+        rewardLabel: `${minReward}P ~ ${maxReward}P`,
+      };
+    });
+  }, []);
+  const pointBoostGuide = useMemo(() => {
+    const active: Array<PointBoostEvent & { startAtMs: number; endAtMs: number; label: string; multiplierLabel: string }> = [];
+    const upcoming: Array<PointBoostEvent & { startAtMs: number; endAtMs: number; label: string; multiplierLabel: string }> = [];
+
+    (pointBoostEvents || []).forEach((event) => {
+      const startAtMs = toTimestampMs(event.startAt);
+      const endAtMs = toTimestampMs(event.endAt);
+      const cancelledAtMs = toTimestampMs(event.cancelledAt);
+      if (!startAtMs || !endAtMs || cancelledAtMs > 0) return;
+
+      const normalizedEvent = {
+        ...event,
+        startAtMs,
+        endAtMs,
+        label: formatPointBoostWindowLabel(event),
+        multiplierLabel: formatPointBoostMultiplierLabel(event.multiplier),
+      };
+
+      if (startAtMs <= nowMs && nowMs < endAtMs) {
+        active.push(normalizedEvent);
+      } else if (startAtMs > nowMs) {
+        upcoming.push(normalizedEvent);
+      }
+    });
+
+    active.sort((left, right) => left.startAtMs - right.startAtMs);
+    upcoming.sort((left, right) => left.startAtMs - right.startAtMs);
+
+    return {
+      active,
+      upcoming,
+      heroLabel: active[0]
+        ? `지금 ${active[0].multiplierLabel} 부스트 적용 중`
+        : upcoming[0]
+          ? `다음 부스트 ${upcoming[0].label}`
+          : '시간대 부스트가 없으면 기본 1배로 적용돼요',
+    };
+  }, [nowMs, pointBoostEvents]);
   const availableGiftishowProducts = useMemo(
     () => giftishowProducts.filter((product) => isGiftishowProductAvailable(product, giftishowSettings)),
     [giftishowProducts, giftishowSettings]
@@ -1337,6 +1448,50 @@ export default function GrowthPage() {
             </div>
           )}
         </section>
+
+        <section className="overflow-hidden rounded-[1.9rem] border border-[#D7E4FF] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.94),transparent_34%),linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)] px-4 py-4 shadow-[0_24px_56px_-34px_rgba(20,41,95,0.18)]">
+          <button
+            type="button"
+            onClick={() => setIsPointTrackManualOpen(true)}
+            className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-white text-[#14295F] shadow-[0_16px_28px_-22px_rgba(0,0,0,0.24)]">
+                    <BookOpen className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-aggro-display text-[1.05rem] font-black tracking-tight text-[#14295F]">메뉴얼 보기</p>
+                    <p className="mt-1 text-[11px] font-bold leading-5 text-[#5F729B]">
+                      상자 확률, 보상 범위, 누적 시간 규칙, 시간대 부스트까지 한 번에 확인할 수 있어요.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F]">
+                <ChevronRight className="h-4 w-4" />
+              </span>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#17326B] shadow-sm">
+                1시간마다 상자
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#17326B] shadow-sm">
+                하루 최대 {STUDY_BOX_DAILY_LIMIT}개
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#17326B] shadow-sm">
+                5시간부터 레어 확률 상승
+              </span>
+            </div>
+
+            <div className="mt-4 rounded-[1.2rem] border border-white/70 bg-white/88 px-3.5 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">시간대 부스트</p>
+              <p className="mt-2 text-sm font-black text-[#14295F]">{pointBoostGuide.heroLabel}</p>
+            </div>
+          </button>
+        </section>
       </div>
 
       <Dialog open={isVaultOpen} onOpenChange={handleVaultChange}>
@@ -1499,6 +1654,149 @@ export default function GrowthPage() {
                 ))}
               </div>
             </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPointTrackManualOpen} onOpenChange={setIsPointTrackManualOpen}>
+        <DialogContent className="w-[min(94vw,30rem)] overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#F8FBFF_0%,#EFF5FF_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
+          <DialogHeader className="border-b border-[#DCE7FB] px-5 pb-0 pt-5 text-left">
+            <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
+              <BookOpen className="h-5 w-5 text-[#14295F]" />
+              포인트트랙 메뉴얼
+            </DialogTitle>
+            <DialogDescription className="pb-4 text-sm font-bold leading-5 text-[#4D679F]">
+              상자 생성 규칙과 확률은 고정 규칙으로, 시간대에 따라 달라지는 건 부스트 배수예요.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[min(72vh,38rem)]">
+            <div className="space-y-4 px-5 py-4">
+              <section className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">상자 생성 규칙</p>
+                <div className="mt-3 grid gap-2.5">
+                  <div className="rounded-[1.1rem] bg-[#F6F9FF] px-3.5 py-3">
+                    <p className="text-sm font-black text-[#14295F]">공부 누적 1시간마다 상자 1개</p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-[#5F729B]">
+                      타이머가 켜진 실제 공부 시간 기준으로 채워지고, 하루에 최대 {STUDY_BOX_DAILY_LIMIT}개까지 열 수 있어요.
+                    </p>
+                  </div>
+                  <div className="rounded-[1.1rem] bg-[#F6F9FF] px-3.5 py-3">
+                    <p className="text-sm font-black text-[#14295F]">전날 상자는 새벽 1시 30분까지</p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-[#5F729B]">
+                      못 연 상자는 다음 공부일 초반까지 남아 있지만, 리셋 이후 1시 30분까지만 유지돼요.
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">희귀도 확률</p>
+                    <p className="mt-1 text-sm font-black text-[#14295F]">1~4번째 상자와 5~8번째 상자의 확률이 달라져요.</p>
+                  </div>
+                  <Badge className="border-none bg-[#14295F] text-white font-black">실제 규칙</Badge>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {studyBoxManualRows.map((row) => (
+                    <div key={`manual-row-${row.rarity}`} className="rounded-[1.15rem] border border-[#E1E9F8] bg-[#F8FBFF] px-3.5 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', STUDY_BOX_RARITY_TONES[row.rarity])}>
+                            {row.label}
+                          </span>
+                          <span className="text-xs font-black text-[#14295F]">{row.rewardLabel}</span>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-[1rem] bg-white px-3 py-2">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6E7FA7]">1~4번째 상자</p>
+                          <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">{row.earlyWeight}%</p>
+                        </div>
+                        <div className="rounded-[1rem] bg-white px-3 py-2">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6E7FA7]">5~8번째 상자</p>
+                          <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">{row.lateWeight}%</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mt-3 text-xs font-bold leading-5 text-[#5F729B]">
+                  즉, 시간대에 따라 희귀도 확률이 바뀌는 구조는 아니고, 오늘 몇 번째 상자인지에 따라 레어/에픽 확률이 올라가요.
+                </p>
+              </section>
+
+              <section className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">시간대 부스트</p>
+                <p className="mt-1 text-sm font-black text-[#14295F]">시간에 따라 달라질 수 있는 건 상자 pt 배수예요.</p>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#5F729B]">
+                  상자를 획득한 시각에 센터가 설정한 부스트 이벤트가 있으면, 상자에서 나온 기본 pt에 배수가 적용됩니다.
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-[1.15rem] border border-[#E1E9F8] bg-[#F8FBFF] px-3.5 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-black text-[#14295F]">현재 진행 중</p>
+                      <Badge className={cn('border-none font-black', pointBoostGuide.active.length > 0 ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700')}>
+                        {pointBoostGuide.active.length > 0 ? `${pointBoostGuide.active.length}개` : '없음'}
+                      </Badge>
+                    </div>
+                    {pointBoostGuide.active.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {pointBoostGuide.active.map((event) => (
+                          <div key={`active-boost-${event.id}`} className="rounded-[1rem] bg-white px-3 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-black text-[#14295F]">{event.multiplierLabel}</p>
+                              <span className="text-[11px] font-bold text-[#5F729B]">{event.label}</span>
+                            </div>
+                            {event.message ? (
+                              <p className="mt-1 text-xs font-bold leading-5 text-[#5F729B]">{event.message}</p>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs font-bold leading-5 text-[#5F729B]">지금은 부스트가 없어 상자 pt가 기본 1배로 적용돼요.</p>
+                    )}
+                  </div>
+
+                  <div className="rounded-[1.15rem] border border-[#E1E9F8] bg-[#F8FBFF] px-3.5 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-black text-[#14295F]">예정된 부스트</p>
+                      <Badge className={cn('border-none font-black', pointBoostGuide.upcoming.length > 0 ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-700')}>
+                        {pointBoostGuide.upcoming.length > 0 ? `${pointBoostGuide.upcoming.length}개` : '없음'}
+                      </Badge>
+                    </div>
+                    {pointBoostGuide.upcoming.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {pointBoostGuide.upcoming.slice(0, 3).map((event) => (
+                          <div key={`upcoming-boost-${event.id}`} className="rounded-[1rem] bg-white px-3 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-black text-[#14295F]">{event.multiplierLabel}</p>
+                              <span className="text-[11px] font-bold text-[#5F729B]">{event.label}</span>
+                            </div>
+                            {event.message ? (
+                              <p className="mt-1 text-xs font-bold leading-5 text-[#5F729B]">{event.message}</p>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs font-bold leading-5 text-[#5F729B]">예정된 시간대 부스트가 없어요. 필요하면 센터에서 추가로 설정할 수 있어요.</p>
+                    )}
+                  </div>
+                </div>
+              </section>
+            </div>
+          </ScrollArea>
+
+          <div className="border-t border-[#DCE7FB] bg-white px-5 py-4">
+            <Button onClick={() => setIsPointTrackManualOpen(false)} className="h-12 w-full rounded-[1.2rem] font-black">
+              확인했어요
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
