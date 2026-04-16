@@ -35,6 +35,10 @@ import { type StudentProfile, type User as UserType, type UserStudyProfile } fro
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
 import {
   buildClientConsentSnapshot,
+  LEGAL_CURRENT_DATA_CATEGORIES,
+  LEGAL_RECONSENT_DESCRIPTION,
+  LEGAL_REQUIRED_PRIVACY_SUMMARY,
+  LEGAL_REQUIRED_TERMS_SUMMARY,
   MARKETING_CONSENT_VERSION,
   PRIVACY_ROUTE,
   PRIVACY_VERSION,
@@ -667,8 +671,7 @@ export default function DashboardPage() {
               개인정보 처리 동의 확인
             </DialogTitle>
             <DialogDescription className="pt-2 text-sm font-bold leading-6 text-white/78">
-              서비스 운영 과정에서 이름, 이메일, 역할, 학교명, 학생·학부모 연동 코드, 학생 본인 번호, 학부모 본인 번호를 처리합니다.
-              계속 이용하려면 현재 약관과 개인정보처리방침 동의가 필요합니다.
+              {LEGAL_RECONSENT_DESCRIPTION}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -677,9 +680,9 @@ export default function DashboardPage() {
           <div className="rounded-[1.5rem] border border-[#14295F]/10 bg-[#f8fbff] p-4">
             <p className="text-sm font-black text-[#14295F]">현재 수집 항목</p>
             <div className="mt-3 grid gap-2 text-[11px] font-semibold leading-5 text-[#14295F]/70">
-              <p>계정 정보: 이름, 이메일, 역할, 학교명</p>
-              <p>연동 정보: 학생·학부모 연동 코드, 센터 초대 코드</p>
-              <p>연락 정보: 학생 본인 휴대폰번호, 학부모 본인 휴대폰번호</p>
+              {LEGAL_CURRENT_DATA_CATEGORIES.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
             </div>
           </div>
 
@@ -704,7 +707,7 @@ export default function DashboardPage() {
                 <div className="grid gap-1">
                   <p className="text-sm font-black text-[#14295F]">[필수] 이용약관에 동의합니다.</p>
                   <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
-                    서비스 이용 조건, 운영 공지, 계정 관리 기준을 확인합니다.
+                    {LEGAL_REQUIRED_TERMS_SUMMARY}
                   </p>
                   <Link
                     href={TERMS_ROUTE}
@@ -731,7 +734,7 @@ export default function DashboardPage() {
                 <div className="grid gap-1">
                   <p className="text-sm font-black text-[#14295F]">[필수] 개인정보 수집 및 이용에 동의합니다.</p>
                   <p className="text-[11px] font-semibold leading-5 text-[#14295F]/58">
-                    계정 생성, 학생·학부모 연동, 학생 본인 번호와 학부모 본인 번호 관리, 센터 운영 연락에 필요한 범위만 수집합니다.
+                    {LEGAL_REQUIRED_PRIVACY_SUMMARY}
                   </p>
                   <Link
                     href={PRIVACY_ROUTE}
