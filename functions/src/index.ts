@@ -133,6 +133,24 @@ type ParentLinkLookupDoc = {
   createdAt?: admin.firestore.Timestamp;
 };
 
+type StudentAccountChangeLogDoc = {
+  action: "student_phone_number_updated";
+  centerId: string;
+  studentId: string;
+  studentName?: string | null;
+  studentClassName?: string | null;
+  field: "phoneNumber";
+  previousValueMasked: string | null;
+  nextValueMasked: string | null;
+  previousValueLast4: string | null;
+  nextValueLast4: string | null;
+  changedByUid: string;
+  changedByRole: string | null;
+  changedByName?: string | null;
+  source: "updateStudentAccount";
+  createdAt: admin.firestore.Timestamp;
+};
+
 const SMS_BYTE_LIMIT = 90;
 const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
 const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
@@ -879,12 +897,64 @@ function normalizePhoneNumber(raw: unknown): string {
   return "";
 }
 
+function maskPhoneNumberForAudit(raw: unknown): string | null {
+  const digits = normalizePhoneNumber(raw);
+  if (!digits) return null;
+  if (digits.length < 7) return digits;
+  return `${digits.slice(0, 3)}-${digits.slice(3, digits.length - 4).replace(/\d/g, "*")}-${digits.slice(-4)}`;
+}
+
+function extractPhoneLast4(raw: unknown): string | null {
+  const digits = normalizePhoneNumber(raw);
+  return digits.length >= 4 ? digits.slice(-4) : null;
+}
+
 function resolveFirstValidPhoneNumber(...values: unknown[]): string {
   for (const value of values) {
     const normalized = normalizePhoneNumber(value);
     if (normalized) return normalized;
   }
   return "";
+}
+
+async function writeStudentPhoneNumberAuditLog(params: {
+  db: FirebaseFirestore.Firestore;
+  centerId: string;
+  studentId: string;
+  studentName?: string | null;
+  studentClassName?: string | null;
+  previousPhoneNumber?: string | null;
+  nextPhoneNumber?: string | null;
+  changedByUid: string;
+  changedByRole: string | null;
+  changedByName?: string | null;
+  createdAt: admin.firestore.Timestamp;
+}) {
+  const previousPhoneNumber = normalizePhoneNumber(params.previousPhoneNumber);
+  const nextPhoneNumber = normalizePhoneNumber(params.nextPhoneNumber);
+
+  if (previousPhoneNumber === nextPhoneNumber) return;
+
+  const payload: StudentAccountChangeLogDoc = {
+    action: "student_phone_number_updated",
+    centerId: params.centerId,
+    studentId: params.studentId,
+    studentName: params.studentName || null,
+    studentClassName: params.studentClassName || null,
+    field: "phoneNumber",
+    previousValueMasked: maskPhoneNumberForAudit(previousPhoneNumber),
+    nextValueMasked: maskPhoneNumberForAudit(nextPhoneNumber),
+    previousValueLast4: extractPhoneLast4(previousPhoneNumber),
+    nextValueLast4: extractPhoneLast4(nextPhoneNumber),
+    changedByUid: params.changedByUid,
+    changedByRole: params.changedByRole,
+    changedByName: params.changedByName || null,
+    source: "updateStudentAccount",
+    createdAt: params.createdAt,
+  };
+
+  const logRef = params.db.collection(`centers/${params.centerId}/studentAccountChangeLogs`).doc();
+  await logRef.set(payload);
 }
 
 function isCounselingDemoId(value: unknown): boolean {
@@ -3748,6 +3818,13 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
   }
 
   const existingParentLinkCode = normalizeParentLinkCodeValue(existingStudentData?.parentLinkCode);
+  const existingPhoneNumber = resolveFirstValidPhoneNumber(existingStudentData?.phoneNumber);
+  const callerDisplayName = asTrimmedString(
+    callerMemberData?.displayName
+      || callerMemberData?.name
+      || callerUserCenterData?.displayName
+      || context.auth.token?.name
+  );
 
   const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
   const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
@@ -3823,6 +3900,37 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     });
   }
 
+  const timestamp = admin.firestore.Timestamp.now();
+  const logPhoneNumberChangeIfNeeded = async () => {
+    if (!isAdminCaller || !phoneNumberProvided) return;
+
+    try {
+      await writeStudentPhoneNumberAuditLog({
+        db,
+        centerId,
+        studentId,
+        studentName: trimmedDisplayName || asTrimmedString(existingStudentData?.name || existingStudentData?.displayName),
+        studentClassName:
+          normalizedClassName !== undefined
+            ? normalizedClassName
+            : asTrimmedString(existingStudentData?.className),
+        previousPhoneNumber: existingPhoneNumber,
+        nextPhoneNumber: normalizedPhoneNumber || null,
+        changedByUid: callerUid,
+        changedByRole: callerRole,
+        changedByName: callerDisplayName || null,
+        createdAt: timestamp,
+      });
+    } catch (auditError: any) {
+      console.warn("[updateStudentAccount] phone audit log skipped", {
+        centerId,
+        studentId,
+        callerUid,
+        message: auditError?.message || auditError,
+      });
+    }
+  };
+
   try {
     if (isAdminCaller) {
       const authUpdates: any = {};
@@ -3838,7 +3946,6 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       }
     }
 
-    const timestamp = admin.firestore.Timestamp.now();
     const batch = db.batch();
 
     const userRef = db.doc("users/" + studentId);
@@ -3998,6 +4105,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
       const hasCoreFailure = coreResults.some((result) => result.status === "rejected");
 
       if (!hasCoreFailure) {
+        await logPhoneNumberChangeIfNeeded();
         console.warn("[updateStudentAccount] core fallback write succeeded after batch failure", {
           centerId,
           studentId,
@@ -4012,6 +4120,8 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
       throw batchError;
     }
+
+    await logPhoneNumberChangeIfNeeded();
 
     return { ok: true, updatedBy: isSelfStudentCaller ? "student" : isTeacherCaller ? "teacher" : "admin" };
   } catch (e: any) {

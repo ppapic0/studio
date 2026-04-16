@@ -583,6 +583,18 @@ function normalizePhoneNumber(raw) {
         return digits;
     return "";
 }
+function maskPhoneNumberForAudit(raw) {
+    const digits = normalizePhoneNumber(raw);
+    if (!digits)
+        return null;
+    if (digits.length < 7)
+        return digits;
+    return `${digits.slice(0, 3)}-${digits.slice(3, digits.length - 4).replace(/\d/g, "*")}-${digits.slice(-4)}`;
+}
+function extractPhoneLast4(raw) {
+    const digits = normalizePhoneNumber(raw);
+    return digits.length >= 4 ? digits.slice(-4) : null;
+}
 function resolveFirstValidPhoneNumber(...values) {
     for (const value of values) {
         const normalized = normalizePhoneNumber(value);
@@ -590,6 +602,31 @@ function resolveFirstValidPhoneNumber(...values) {
             return normalized;
     }
     return "";
+}
+async function writeStudentPhoneNumberAuditLog(params) {
+    const previousPhoneNumber = normalizePhoneNumber(params.previousPhoneNumber);
+    const nextPhoneNumber = normalizePhoneNumber(params.nextPhoneNumber);
+    if (previousPhoneNumber === nextPhoneNumber)
+        return;
+    const payload = {
+        action: "student_phone_number_updated",
+        centerId: params.centerId,
+        studentId: params.studentId,
+        studentName: params.studentName || null,
+        studentClassName: params.studentClassName || null,
+        field: "phoneNumber",
+        previousValueMasked: maskPhoneNumberForAudit(previousPhoneNumber),
+        nextValueMasked: maskPhoneNumberForAudit(nextPhoneNumber),
+        previousValueLast4: extractPhoneLast4(previousPhoneNumber),
+        nextValueLast4: extractPhoneLast4(nextPhoneNumber),
+        changedByUid: params.changedByUid,
+        changedByRole: params.changedByRole,
+        changedByName: params.changedByName || null,
+        source: "updateStudentAccount",
+        createdAt: params.createdAt,
+    };
+    const logRef = params.db.collection(`centers/${params.centerId}/studentAccountChangeLogs`).doc();
+    await logRef.set(payload);
 }
 function isCounselingDemoId(value) {
     if (typeof value !== "string")
@@ -2788,7 +2825,7 @@ exports.deleteTeacherAccount = functions.region(region).runWith({
     }
 });
 exports.updateStudentAccount = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a, _b, _c;
     const db = admin.firestore();
     const auth = admin.auth();
     const { studentId, centerId, password, displayName, schoolName, phoneNumber, grade, parentLinkCode, className, memberStatus, seasonLp, stats, todayStudyMinutes, dateKey, } = data;
@@ -2845,6 +2882,11 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
         });
     }
     const existingParentLinkCode = normalizeParentLinkCodeValue(existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.parentLinkCode);
+    const existingPhoneNumber = resolveFirstValidPhoneNumber(existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.phoneNumber);
+    const callerDisplayName = asTrimmedString((callerMemberData === null || callerMemberData === void 0 ? void 0 : callerMemberData.displayName)
+        || (callerMemberData === null || callerMemberData === void 0 ? void 0 : callerMemberData.name)
+        || (callerUserCenterData === null || callerUserCenterData === void 0 ? void 0 : callerUserCenterData.displayName)
+        || ((_c = context.auth.token) === null || _c === void 0 ? void 0 : _c.name));
     const trimmedDisplayName = typeof displayName === "string" ? displayName.trim() : "";
     const trimmedSchoolName = typeof schoolName === "string" ? schoolName.trim() : "";
     const trimmedGrade = typeof grade === "string" ? grade.trim() : "";
@@ -2909,6 +2951,36 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             userMessage: "학생은 본인 프로필을 확인만 할 수 있습니다. 변경이 필요하면 센터 관리자에게 요청해 주세요.",
         });
     }
+    const timestamp = admin.firestore.Timestamp.now();
+    const logPhoneNumberChangeIfNeeded = async () => {
+        if (!isAdminCaller || !phoneNumberProvided)
+            return;
+        try {
+            await writeStudentPhoneNumberAuditLog({
+                db,
+                centerId,
+                studentId,
+                studentName: trimmedDisplayName || asTrimmedString((existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.name) || (existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.displayName)),
+                studentClassName: normalizedClassName !== undefined
+                    ? normalizedClassName
+                    : asTrimmedString(existingStudentData === null || existingStudentData === void 0 ? void 0 : existingStudentData.className),
+                previousPhoneNumber: existingPhoneNumber,
+                nextPhoneNumber: normalizedPhoneNumber || null,
+                changedByUid: callerUid,
+                changedByRole: callerRole,
+                changedByName: callerDisplayName || null,
+                createdAt: timestamp,
+            });
+        }
+        catch (auditError) {
+            console.warn("[updateStudentAccount] phone audit log skipped", {
+                centerId,
+                studentId,
+                callerUid,
+                message: (auditError === null || auditError === void 0 ? void 0 : auditError.message) || auditError,
+            });
+        }
+    };
     try {
         if (isAdminCaller) {
             const authUpdates = {};
@@ -2925,7 +2997,6 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
                 }
             }
         }
-        const timestamp = admin.firestore.Timestamp.now();
         const batch = db.batch();
         const userRef = db.doc("users/" + studentId);
         const userUpdate = { updatedAt: timestamp };
@@ -3088,6 +3159,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             const coreResults = await Promise.allSettled(coreWrites);
             const hasCoreFailure = coreResults.some((result) => result.status === "rejected");
             if (!hasCoreFailure) {
+                await logPhoneNumberChangeIfNeeded();
                 console.warn("[updateStudentAccount] core fallback write succeeded after batch failure", {
                     centerId,
                     studentId,
@@ -3101,6 +3173,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             }
             throw batchError;
         }
+        await logPhoneNumberChangeIfNeeded();
         return { ok: true, updatedBy: isSelfStudentCaller ? "student" : isTeacherCaller ? "teacher" : "admin" };
     }
     catch (e) {
