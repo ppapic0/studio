@@ -679,6 +679,44 @@ export default function GrowthPage() {
           : '시간대 부스트가 없으면 기본 1배로 적용돼요',
     };
   }, [nowMs, pointBoostEvents]);
+  const studyBoxExampleGuide = useMemo(() => {
+    const lateCommon = studyBoxManualRows.find((row) => row.rarity === 'common')?.lateWeight ?? 0;
+    const lateRare = studyBoxManualRows.find((row) => row.rarity === 'rare')?.lateWeight ?? 0;
+    const lateEpic = studyBoxManualRows.find((row) => row.rarity === 'epic')?.lateWeight ?? 0;
+    const boostPreview = pointBoostGuide.active[0] ?? pointBoostGuide.upcoming[0] ?? null;
+    const rawMultiplier = Number(boostPreview?.multiplier);
+    const previewMultiplier = Number.isFinite(rawMultiplier) && rawMultiplier > 0 ? rawMultiplier : 2;
+    const previewMultiplierLabel = boostPreview?.multiplierLabel ?? formatPointBoostMultiplierLabel(previewMultiplier);
+    const previewBoostLabel = boostPreview
+      ? `${pointBoostGuide.active[0] ? '현재 진행 중' : '다음 예정'} ${boostPreview.label}`
+      : '예시 시간대 부스트';
+    const [rareMin, rareMax] = getStudyBoxRewardRangeByRarity('rare');
+    const [epicMin, epicMax] = getStudyBoxRewardRangeByRarity('epic');
+
+    return [
+      {
+        key: 'carryover',
+        eyebrow: '예시 1',
+        title: '3시간 20분 공부하면',
+        highlight: '상자 3개 + 다음 상자까지 40분',
+        description: '상자는 1시간 단위로 생기고, 남은 20분은 사라지지 않고 다음 상자 시간에 이어져요.',
+      },
+      {
+        key: 'late-box',
+        eyebrow: '예시 2',
+        title: '오늘 6번째 상자를 열면',
+        highlight: `기본 ${lateCommon}% · 레어 ${lateRare}% · 에픽 ${lateEpic}%`,
+        description: '5번째 상자부터는 후반 확률표가 적용돼서 레어와 에픽을 만날 가능성이 조금 더 올라가요.',
+      },
+      {
+        key: 'boost',
+        eyebrow: '예시 3',
+        title: `${previewMultiplierLabel} 부스트 시간에 레어 상자를 열면`,
+        highlight: `레어 ${rareMin}~${rareMax}P -> ${Math.round(rareMin * previewMultiplier)}~${Math.round(rareMax * previewMultiplier)}P`,
+        description: `${previewBoostLabel}에는 확률이 아니라 지급 pt 배수가 올라가고, 에픽도 ${epicMin}~${epicMax}P -> ${Math.round(epicMin * previewMultiplier)}~${Math.round(epicMax * previewMultiplier)}P로 같이 커져요.`,
+      },
+    ] as const;
+  }, [pointBoostGuide, studyBoxManualRows]);
   const availableGiftishowProducts = useMemo(
     () => giftishowProducts.filter((product) => isGiftishowProductAvailable(product, giftishowSettings)),
     [giftishowProducts, giftishowSettings]
@@ -1687,6 +1725,27 @@ export default function GrowthPage() {
                       못 연 상자는 다음 공부일 초반까지 남아 있지만, 리셋 이후 1시 30분까지만 유지돼요.
                     </p>
                   </div>
+                </div>
+              </section>
+
+              <section className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">예시로 보면</p>
+                <p className="mt-1 text-sm font-black text-[#14295F]">헷갈리는 부분만 실제 상황처럼 짧게 정리했어요.</p>
+
+                <div className="mt-4 space-y-3">
+                  {studyBoxExampleGuide.map((example) => (
+                    <div key={example.key} className="rounded-[1.15rem] border border-[#E1E9F8] bg-[#F8FBFF] px-3.5 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6E7FA7]">{example.eyebrow}</p>
+                          <p className="mt-1 text-sm font-black text-[#14295F]">{example.title}</p>
+                        </div>
+                        <Badge className="border-none bg-white text-[#17326B] shadow-sm">바로 이해</Badge>
+                      </div>
+                      <p className="mt-3 text-base font-black tracking-tight text-[#17326B]">{example.highlight}</p>
+                      <p className="mt-2 text-xs font-bold leading-5 text-[#5F729B]">{example.description}</p>
+                    </div>
+                  ))}
                 </div>
               </section>
 
