@@ -79,3 +79,14 @@ npm run dev
 - 회원가입 후에는 `/connection-test` 페이지로 리디렉션됩니다.
 - 이 페이지에서 `devJoinCenter` 함수를 사용하여 특정 역할로 테스트 센터에 가입할 수 있습니다.
 - 센터에 가입한 후에는 `/app` 페이지로 이동하여 "보안 규칙 테스트 패널"을 통해 역할 기반 권한을 확인할 수 있습니다.
+
+## 배포 주의
+
+- 이 프로젝트의 루트 `deploy` 스크립트는 보호용 라우터입니다.
+- Functions만 배포할 때는 `npm run deploy:functions`
+- Firestore rules/indexes는 `npm run deploy:firestore`, `npm run deploy:rules`, `npm run deploy:indexes`
+- App Hosting만 배포할 때는 `npm run deploy:apphosting`
+- App Hosting 수동 rollout은 `npm run rollout:apphosting`
+- 전체 Firebase 배포가 정말 필요할 때만 `npm run deploy:all`
+
+자세한 비용 절감 운영 가이드는 [docs/gcp-cost-playbook.md](./docs/gcp-cost-playbook.md)를 참고하세요.

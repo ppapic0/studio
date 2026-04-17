@@ -16,7 +16,16 @@
     "test:teacher-access": "node scripts/validate-teacher-access.cjs",
     "typecheck": "tsc --noEmit",
     "emulators": "firebase emulators:start",
-    "deploy": "firebase deploy"
+    "deploy": "node scripts/firebase-deploy-safe.cjs",
+    "deploy:functions": "node scripts/firebase-deploy-safe.cjs functions",
+    "deploy:firestore": "node scripts/firebase-deploy-safe.cjs firestore",
+    "deploy:rules": "node scripts/firebase-deploy-safe.cjs firestore:rules",
+    "deploy:indexes": "node scripts/firebase-deploy-safe.cjs firestore:indexes",
+    "deploy:apphosting": "node scripts/firebase-deploy-safe.cjs apphosting",
+    "deploy:all": "node scripts/firebase-deploy-safe.cjs all --confirm",
+    "rollout:apphosting": "node scripts/apphosting-rollout.cjs",
+    "ops:apphosting:backend": "firebase apphosting:backends:get studio",
+    "ops:apphosting:backends": "firebase apphosting:backends:list"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.28.0",

@@ -31,6 +31,26 @@
 - **Next.js 앱 실행**: `npm run dev` (접속: http://localhost:9002)
 - **Firebase 함수 배포**: `firebase deploy --only functions`
 
-## 5. 주의 사항
+## 5. 배포 운영 규칙
+
+이 프로젝트는 Firebase App Hosting backend `studio`를 함께 사용합니다. 루트에서 무심코 전체 배포를 하면 App Hosting까지 같이 배포되어 Cloud Build 비용이 추가될 수 있으므로, 이제는 대상별 명령만 사용합니다.
+
+- **Functions만 배포**: `npm run deploy:functions`
+- **Firestore rules + indexes 배포**: `npm run deploy:firestore`
+- **Firestore rules만 배포**: `npm run deploy:rules`
+- **Firestore indexes만 배포**: `npm run deploy:indexes`
+- **App Hosting만 배포**: `npm run deploy:apphosting`
+- **App Hosting 수동 rollout**: `npm run rollout:apphosting`
+- **전체 배포**: `npm run deploy:all`
+
+`npm run deploy`는 이제 보호용 가드 스크립트라서, 대상 없이 실행하면 어떤 배포가 Cloud Build를 유발하는지 설명하고 종료합니다.
+
+## 6. 비용 점검 메모
+
+- Firebase App Hosting은 Cloud Build로 앱을 빌드하고 Cloud Run으로 서빙합니다.
+- Firebase Studio는 Google Cloud VM 위에서 실행되므로, 사용하지 않는 Studio workspace VM이나 디스크가 남아 있으면 `Compute Engine` 비용이 따로 발생할 수 있습니다.
+- 비용 점검 절차는 [docs/gcp-cost-playbook.md](./docs/gcp-cost-playbook.md)에 정리해 두었습니다.
+
+## 7. 주의 사항
 - **CORS 설정**: 로컬 호출 시 Firebase Console에서 도메인 허용이 필요할 수 있습니다.
 - **동기화**: 데이터 수정 시 '데이터 통합 저장' 버튼을 누르면 Auth, Firestore, 랭킹 정보가 한꺼번에 업데이트됩니다.
