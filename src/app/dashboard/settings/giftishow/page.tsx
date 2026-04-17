@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, limit, query } from 'firebase/firestore';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { collection, doc, limit, query, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import {
   Gift,
   Loader2,
@@ -68,6 +68,8 @@ type GiftishowFormState = {
   callbackNo: string;
 };
 
+type GiftishowProductItem = GiftishowProduct & { id: string };
+
 type GiftishowOrderCardProps = {
   order: GiftishowOrder & { id: string };
   actionKey: string | null;
@@ -87,6 +89,7 @@ const DEFAULT_FORM: GiftishowFormState = {
 };
 const GIFTISHOW_ADMIN_PRODUCT_FETCH_LIMIT = 2500;
 const GIFTISHOW_REVIEW_CANDIDATE_PREVIEW_LIMIT = 30;
+const GIFTISHOW_REVIEW_APPROVAL_BATCH_LIMIT = 400;
 
 function getGiftishowSyncTone(status?: GiftishowSyncStatus | null) {
   if (status === 'success') return 'bg-emerald-100 text-emerald-700';
@@ -105,6 +108,21 @@ function formatPoints(value?: number | null) {
 
 function formatWon(value?: number | null) {
   return `${Math.max(0, Number(value || 0)).toLocaleString()}원`;
+}
+
+function getGiftishowProductDocId(product?: GiftishowProduct | GiftishowProductItem | null) {
+  if (!product) return '';
+  return ('id' in product ? product.id : '') || product.goodsCode || '';
+}
+
+function chunkItems<T>(items: T[], chunkSize: number) {
+  if (items.length <= chunkSize) return [items];
+
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+  return chunks;
 }
 
 function GiftishowOrderCard({
@@ -260,6 +278,9 @@ export default function GiftishowSettingsPage() {
   const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
   const [isFetchingBizmoney, setIsFetchingBizmoney] = useState(false);
   const [actionKey, setActionKey] = useState<string | null>(null);
+  const [reviewActionKey, setReviewActionKey] = useState<string | null>(null);
+  const [isApplyingReviewBaseline, setIsApplyingReviewBaseline] = useState(false);
+  const reviewBaselineRef = useRef<string | null>(null);
 
   const settingsRef = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -314,6 +335,83 @@ export default function GiftishowSettingsPage() {
         .filter((item) => item.reasons.length > 0 && !item.exclusionReason),
     [products]
   );
+
+  useEffect(() => {
+    if (!firestore || !centerId || !isAdmin || !settingsRef) return;
+    if (settingsDoc?.studentReviewBaselineApprovedAt) return;
+    if (studentReviewCandidates.length === 0) return;
+    if (reviewBaselineRef.current === centerId) return;
+
+    reviewBaselineRef.current = centerId;
+    let isCancelled = false;
+
+    const applyReviewBaseline = async () => {
+      setIsApplyingReviewBaseline(true);
+
+      try {
+        const baselineCandidates = studentReviewCandidates
+          .map(({ product }) => product)
+          .filter((product): product is GiftishowProductItem => Boolean(getGiftishowProductDocId(product)));
+
+        for (const candidateChunk of chunkItems(baselineCandidates, GIFTISHOW_REVIEW_APPROVAL_BATCH_LIMIT)) {
+          const batch = writeBatch(firestore);
+          for (const product of candidateChunk) {
+            batch.set(
+              doc(firestore, 'centers', centerId, 'giftishowProducts', getGiftishowProductDocId(product)),
+              {
+                studentReviewApprovedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
+          await batch.commit();
+        }
+
+        await setDoc(
+          settingsRef,
+          {
+            studentReviewBaselineApprovedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        if (!isCancelled) {
+          toast({
+            title: '기프티쇼 검토 후보 정리 완료',
+            description: `현재 검토 필요 ${baselineCandidates.length.toLocaleString()}건을 목록에서 제외했습니다.`,
+          });
+        }
+      } catch (error) {
+        reviewBaselineRef.current = null;
+
+        if (!isCancelled) {
+          toast({
+            variant: 'destructive',
+            title: '검토 후보 정리 실패',
+            description: getSafeErrorMessage(error, '기프티쇼 검토 후보 정리 중 오류가 발생했습니다.'),
+          });
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsApplyingReviewBaseline(false);
+        }
+      }
+    };
+
+    void applyReviewBaseline();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    centerId,
+    firestore,
+    isAdmin,
+    settingsDoc?.studentReviewBaselineApprovedAt,
+    settingsRef,
+    studentReviewCandidates,
+    toast,
+  ]);
   const brands = useMemo(
     () => [...(giftishowBrandsRaw || [])].sort((left, right) => (left.brandName || '').localeCompare(right.brandName || '', 'ko')),
     [giftishowBrandsRaw]
@@ -608,6 +706,37 @@ export default function GiftishowSettingsPage() {
     }
   };
 
+  const handleApproveReviewCandidate = async (product: GiftishowProductItem) => {
+    if (!firestore || !centerId) return;
+
+    const productId = getGiftishowProductDocId(product);
+    if (!productId) return;
+
+    setReviewActionKey(`approve-review:${productId}`);
+    try {
+      await setDoc(
+        doc(firestore, 'centers', centerId, 'giftishowProducts', productId),
+        {
+          studentReviewApprovedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      toast({
+        title: '검토 필요 제외 완료',
+        description: `${product.goodsName} 상품을 검토 필요 목록에서 제외했습니다.`,
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '검토 제외 실패',
+        description: getSafeErrorMessage(error, '기프티쇼 검토 후보 제외 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setReviewActionKey(null);
+    }
+  };
+
   if (membershipsLoading && !activeMembership) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -829,6 +958,11 @@ export default function GiftishowSettingsPage() {
                 <CardDescription className="mt-2 font-bold text-sm">
                   자동 제외 품목은 학생 앱에서 숨기고, 아래 후보는 대표님이 보고 제외 여부를 판단할 목록입니다.
                 </CardDescription>
+                {settingsDoc?.studentReviewBaselineApprovedAt ? (
+                  <p className="mt-2 text-xs font-bold text-slate-500">
+                    초기 검토 후보는 한 번 정리되었고, 이후 새로 걸리는 상품만 이 목록에 다시 표시됩니다.
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge className="border-none bg-rose-100 text-rose-700 font-black">
@@ -837,6 +971,11 @@ export default function GiftishowSettingsPage() {
                 <Badge className="border-none bg-amber-100 text-amber-700 font-black">
                   검토 후보 {studentReviewCandidates.length.toLocaleString()}개
                 </Badge>
+                {isApplyingReviewBaseline ? (
+                  <Badge className="border-none bg-slate-100 text-slate-700 font-black">
+                    현재 후보 정리 중
+                  </Badge>
+                ) : null}
               </div>
             </div>
           </CardHeader>
@@ -863,6 +1002,23 @@ export default function GiftishowSettingsPage() {
                       <div className="shrink-0 text-right">
                         <p className="text-sm font-black text-[#14295F]">{formatPoints(getGiftishowProductPointCost(product))}</p>
                         <p className="mt-1 text-[11px] font-bold text-slate-500">{product.goodsCode || '-'}</p>
+                        {!exclusionReason ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="mt-3 rounded-full"
+                            disabled={isApplyingReviewBaseline || reviewActionKey === `approve-review:${getGiftishowProductDocId(product)}`}
+                            onClick={() => void handleApproveReviewCandidate(product)}
+                          >
+                            {reviewActionKey === `approve-review:${getGiftishowProductDocId(product)}` ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            검토 제외
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   </div>

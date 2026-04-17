@@ -153,6 +153,7 @@ export function isGiftishowStudentCatalogProduct(product?: GiftishowProduct | nu
 export function getGiftishowStudentReviewCandidateReasons(product?: GiftishowProduct | null) {
   const text = getGiftishowProductSearchText(product);
   if (!text) return [];
+  if (product?.studentReviewApprovedAt) return [];
   if (GIFTISHOW_STUDENT_REVIEW_ALLOWLIST_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) return [];
 
   return GIFTISHOW_STUDENT_REVIEW_RULES

@@ -1117,6 +1117,7 @@ export interface GiftishowSettings {
   lastBrandDetailSyncedCount?: number | null;
   lastSyncStatus?: GiftishowSyncStatus;
   lastErrorMessage?: string | null;
+  studentReviewBaselineApprovedAt?: Timestamp | null;
   updatedAt?: Timestamp;
   updatedBy?: string;
 }
@@ -1148,6 +1149,7 @@ export interface GiftishowProduct {
   isAvailable: boolean;
   lastSyncedAt?: Timestamp | null;
   detailSyncedAt?: Timestamp | null;
+  studentReviewApprovedAt?: Timestamp | null;
   updatedAt?: Timestamp;
 }
 
