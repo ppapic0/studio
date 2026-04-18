@@ -2048,7 +2048,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     isAnalysisPresentation ? 'text-[var(--text-on-dark-soft)]' : 'text-[#5c6e97]'
   );
   const analysisReadableMutedTextClass = isAnalysisPresentation ? 'text-[#f4f8ff]' : 'text-[#6a7da6]';
-  const analysisReadableSoftTextClass = isAnalysisPresentation ? 'text-white/90' : 'text-[#5c6e97]';
+  const analysisReadableSoftTextClass = isAnalysisPresentation ? 'text-[#5F7299]' : 'text-[#5c6e97]';
   const analysisChartTickColor = '#14295F';
   const analysisChartTickSoftColor = '#14295F';
   const analysisChartAxisLine = { stroke: '#14295F', strokeOpacity: 0.24, strokeWidth: 1 };
@@ -2143,6 +2143,18 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     : currentStudentMemberStatus === 'onHold'
       ? '휴원생'
       : '퇴원생';
+  const analysisAttendanceBadgeClass = attendanceCurrent?.status === 'studying'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    : attendanceCurrent?.status === 'away'
+      ? 'border-rose-200 bg-rose-50 text-rose-600'
+      : attendanceCurrent?.status === 'break'
+        ? 'border-sky-200 bg-sky-50 text-sky-700'
+        : 'border-[#dbe7ff] bg-[#f8fbff] text-[#17326B]';
+  const analysisMemberBadgeClass = currentStudentMemberStatus === 'active'
+    ? 'border-[#dbe7ff] bg-white text-[#17326B]'
+    : currentStudentMemberStatus === 'onHold'
+      ? 'border-[#ffe1c5] bg-[#fff8ef] text-[#d86a11]'
+      : 'border-[#ffdbe2] bg-[#fff2f5] text-[#dc4b74]';
   const studentBriefMeta = [student?.schoolName, student?.grade, student?.className || '반 미지정']
     .filter(Boolean)
     .join(' · ');
@@ -2330,77 +2342,138 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     )}>
       {isAnalysisPresentation ? (
         <div className={cn(
-          'flex flex-col gap-4',
-          isAnalysisPresentation
-            ? (isMobile ? '' : 'flex-row items-end justify-between')
-            : 'lg:flex-row lg:items-end lg:justify-between',
-          isAnalysisPresentation && 'analysis-profile-shell'
+          'analysis-profile-shell grid gap-4',
+          isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.14fr)_minmax(20rem,0.86fr)]'
         )}>
-          <div className="flex items-start gap-4 min-w-0">
-            {!isStudentSelfView && (
-              <Button variant={isAnalysisPresentation ? 'outline' : 'ghost'} size="icon" className={cn("rounded-full h-10 w-10 shrink-0 mt-1", isAnalysisPresentation && detailActionButtonClass)} asChild>
-                <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
-              </Button>
-            )}
-            <div className={cn("flex flex-col gap-1 min-w-0", isAnalysisPresentation && "font-aggro-display")}>
+          <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.24fr)_minmax(17rem,0.92fr)]')}>
+            <div className={cn('analysis-profile-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className={cn(
-                  isAnalysisPresentation
-                    ? 'font-aggro-display break-keep font-black tracking-[-0.05em] text-[var(--text-on-dark)]'
-                    : 'font-black tracking-tighter truncate text-3xl sm:text-4xl',
-                  isAnalysisPresentation
-                    ? (isMobile ? 'text-[2rem] leading-[1.02]' : 'text-[clamp(2.4rem,4vw,3.25rem)] leading-[1.02]')
-                    : ''
-                )}>{student?.name || '학생'}</h1>
-                <Badge variant={isAnalysisPresentation ? 'outline' : 'default'} className={cn("px-2 py-0.5 rounded-full font-black text-[10px]", isAnalysisPresentation ? analysisWarmBadgeClass : "bg-primary text-white")}>{formatSeatLabel(student)}</Badge>
-                {!isStudentSelfView && (
-                  <Badge variant={isAnalysisPresentation ? 'outline' : 'outline'} className={cn("font-black text-[10px] rounded-full", isAnalysisPresentation && analysisSoftBadgeClass)}><UserRound className="h-3 w-3 mr-1" /> 학부모/선생님 공유용</Badge>
-                )}
+                {!isStudentSelfView ? (
+                  <Button variant="outline" size="icon" className={cn("h-10 w-10 shrink-0 rounded-full", detailActionButtonClass)} asChild>
+                    <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
+                  </Button>
+                ) : null}
+                <Badge variant="outline" className={cn('rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]', analysisAttendanceBadgeClass)}>
+                  {currentAttendanceLabel}
+                </Badge>
+                <Badge variant="outline" className={cn('rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]', analysisMemberBadgeClass)}>
+                  {currentMemberStatusLabel}
+                </Badge>
               </div>
-              <div className={cn("flex flex-wrap items-center gap-2 text-xs font-bold", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
-                <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-[#D86A11]" : "text-primary")}><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <h1 className={cn(
+                  'min-w-0 break-keep font-aggro-display font-black tracking-[-0.05em] text-[#17326B]',
+                  isMobile ? 'text-[2rem] leading-[1.02]' : 'text-[clamp(2.35rem,4vw,3.25rem)] leading-[1.01]'
+                )}>
+                  {student?.name || '학생'}
+                </h1>
+                <Badge variant="outline" className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', analysisWarmBadgeClass)}>
+                  {formatSeatLabel(student)}
+                </Badge>
+                {!isStudentSelfView ? (
+                  <Badge variant="outline" className={cn('rounded-full text-[10px] font-black', analysisSoftBadgeClass)}>
+                    <UserRound className="mr-1 h-3 w-3" /> 학부모/선생님 공유용
+                  </Badge>
+                ) : null}
+              </div>
+
+              <p className="mt-3 text-sm font-semibold leading-6 text-[#5F7299]">
+                실시간 상태와 최근 운영 흐름을 한 번에 읽고, 바로 상담과 관리 액션으로 이어질 수 있게 구성했습니다.
+              </p>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-[#5F7299]">
+                <span className="flex items-center gap-1 text-[#D86A11]"><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
                 <span className="opacity-30">|</span><span>{student?.grade}</span><span className="opacity-30">|</span>
-                <span className={cn("flex items-center gap-1", isAnalysisPresentation ? "text-[#2E9B73]" : "text-emerald-600")}><LayoutGrid className="h-3 w-3" /> {student?.className || '반 미지정'}</span>
+                <span className="flex items-center gap-1 text-[#2E9B73]"><LayoutGrid className="h-3 w-3" /> {student?.className || '반 미지정'}</span>
                 <span className="opacity-30">|</span><span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> 연속 공부 {studyStreakDays}일</span>
+              </div>
+            </div>
+
+            <div className={cn('analysis-profile-meta-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6A7DA6]">운영 브리프</p>
+                  <h2 className="mt-2 break-keep font-aggro-display text-[1.35rem] font-black tracking-[-0.04em] text-[#14295F]">
+                    학생 상태 요약
+                  </h2>
+                </div>
+                <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-[10px] font-black', analysisSoftBadgeClass)}>
+                  오늘 기준
+                </Badge>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="analysis-profile-mini-card px-4 py-4">
+                  <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.18em] text-[#6A7DA6]">소속 브리프</p>
+                  <p className="mt-3 break-keep font-aggro-display text-[1.15rem] font-black leading-6 tracking-[-0.03em] text-[#14295F]">
+                    {studentBriefMeta}
+                  </p>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#5F7299]">학교, 학년, 반 기준으로 학생 위치를 빠르게 확인합니다.</p>
+                </div>
+                <div className="analysis-profile-mini-card analysis-profile-mini-card--warm px-4 py-4">
+                  <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.18em] text-[#D86A11]">실시간 세션</p>
+                  <p className="mt-3 break-keep font-aggro-display text-[1.15rem] font-black leading-6 tracking-[-0.03em] text-[#14295F]">
+                    {attendanceCurrent?.status === 'studying' ? minutesToLabel(activeSessionMinutes) : currentAttendanceLabel}
+                  </p>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#5F7299]">오늘 누적 {minutesToLabel(todayStudyMinutes)} · 연속 공부 {studyStreakDays}일</p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className={cn('flex flex-wrap gap-2', isAnalysisPresentation && !isMobile && 'justify-end')}>
-            {!isStudentSelfView && (
-              <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-                <Link href="/dashboard/attendance"><CalendarDays className="h-4 w-4" /> 출결 상태</Link>
-              </Button>
-            )}
-            {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
-            {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
-            {canWriteCounseling && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
-            {!isStudentSelfView && (
-              <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-                <Link href="/dashboard/reports"><PenTool className="h-4 w-4" /> 리포트 생성/확인</Link>
-              </Button>
-            )}
-            {!isStudentSelfView && (
-              <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} asChild>
-                <Link href={canOpenSettings ? '/dashboard/settings/notifications' : '/dashboard/appointments'}>
-                  <MessageSquare className="h-4 w-4" /> {canOpenSettings ? '문자 보내기' : '상담/소통'}
-                </Link>
-              </Button>
-            )}
-            {canEditStudentInfo && <Button variant="outline" className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
-            {canEditGrowthData && (
-              <Button
-                variant="outline"
-                className={cn("rounded-2xl font-black h-11 px-5 text-xs gap-2", detailActionButtonClass)}
-                onClick={() => {
-                  setIsMasteryModalOpen(true);
-                  setIsEditStats(true);
-                }}
-              >
-                <Sparkles className="h-4 w-4" /> 지표/세션 보정
-              </Button>
-            )}
-            {canManageStudentAccounts && <Button variant="destructive" className="rounded-2xl font-black h-11 px-5 text-xs gap-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
+          <div className={cn('analysis-profile-action-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D86A11]">운영 액션</p>
+                <h2 className="mt-2 break-keep font-aggro-display text-[1.4rem] font-black tracking-[-0.04em] text-[#14295F]">
+                  지금 바로 쓰는 액션
+                </h2>
+              </div>
+              <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-[10px] font-black', analysisWarmBadgeClass)}>
+                홈 카드 구조
+              </Badge>
+            </div>
+            <p className="mt-2 text-xs font-semibold leading-5 text-[#5F7299]">
+              출결, 상담, 리포트, 문자, 보정 흐름을 한 덱에서 바로 실행할 수 있게 정리했습니다.
+            </p>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {!isStudentSelfView && (
+                <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
+                  <Link href="/dashboard/attendance"><CalendarDays className="h-4 w-4" /> 출결 상태</Link>
+                </Button>
+              )}
+              {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
+              {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
+              {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
+              {!isStudentSelfView && (
+                <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
+                  <Link href="/dashboard/reports"><PenTool className="h-4 w-4" /> 리포트 생성/확인</Link>
+                </Button>
+              )}
+              {!isStudentSelfView && (
+                <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
+                  <Link href={canOpenSettings ? '/dashboard/settings/notifications' : '/dashboard/appointments'}>
+                    <MessageSquare className="h-4 w-4" /> {canOpenSettings ? '문자 보내기' : '상담/소통'}
+                  </Link>
+                </Button>
+              )}
+              {canEditStudentInfo && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
+              {canEditGrowthData && (
+                <Button
+                  variant="outline"
+                  className={cn("analysis-action-button--accent h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)}
+                  onClick={() => {
+                    setIsMasteryModalOpen(true);
+                    setIsEditStats(true);
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" /> 지표/세션 보정
+                </Button>
+              )}
+              {canManageStudentAccounts && <Button variant="destructive" className="h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2 sm:col-span-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
+            </div>
           </div>
         </div>
       ) : (

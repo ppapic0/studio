@@ -159,10 +159,10 @@ function SectionStateBadge({ ready }: { ready: boolean }) {
     <Badge
       variant="outline"
       className={cn(
-        'shrink-0 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em]',
+        'shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]',
         ready
           ? 'border-[#F1DDC7] bg-[#FFF4E5] text-[#17326B]'
-          : 'border-white/20 bg-white/10 text-[var(--text-on-dark-soft)]'
+          : 'border-[#dbe7ff] bg-white text-[#5F7299]'
       )}
     >
       {ready ? '데이터 충분' : '기록 대기'}
@@ -182,9 +182,9 @@ function SummaryCard({
   titleClassName?: string;
 }) {
   return (
-    <div className="surface-card surface-card--ghost on-dark rounded-[1.35rem] border border-white/10 p-4 shadow-none">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B]">{label}</p>
-      <p className={cn('mt-2 break-keep text-sm font-black leading-6 text-[#17326B]', titleClassName)}>{title}</p>
+    <div className="analysis-summary-card surface-card surface-card--ghost on-dark rounded-[1.5rem] border border-white/10 p-4 shadow-none">
+      <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B]">{label}</p>
+      <p className={cn('mt-3 break-keep font-aggro-display text-[1rem] font-black leading-6 tracking-[-0.03em] text-[#17326B]', titleClassName)}>{title}</p>
       <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5F7299]">{detail}</p>
     </div>
   );
@@ -239,65 +239,64 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
   } as const;
 
   return (
-    <section className="space-y-4">
-      <Card className="analysis-premium-card analysis-full-board-card surface-card surface-card--secondary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none">
-        <CardHeader className={cn('relative z-10', isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
+    <section className="space-y-5">
+      <div className="analysis-overview-shell analysis-premium-card analysis-full-board-card surface-card surface-card--secondary on-dark">
+        <div className={cn(isMobile ? 'space-y-4' : 'space-y-5')}>
           <div className={cn(isMobile ? 'flex flex-col gap-3' : 'flex items-start justify-between gap-4')}>
             <div className="min-w-0">
-              <Badge variant="outline" className="border-white/20 bg-white/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-white shadow-none">
+              <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B] shadow-none">
                 한눈 요약
               </Badge>
-              <CardTitle className="font-aggro-display mt-3 break-keep text-[clamp(1.04rem,1.55vw,1.24rem)] font-black tracking-tight text-[var(--text-on-dark)]">
+              <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.08rem,1.55vw,1.28rem)] font-black tracking-[-0.03em] text-[#17326B]">
                 지금 위치와 흐름을 먼저 읽어보세요
-              </CardTitle>
-              <CardDescription className="mt-2 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+              </h2>
+              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5F7299]">
                 {summary.coachNote}
-              </CardDescription>
+              </p>
             </div>
-            <Badge variant="outline" className={cn('w-fit px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] shadow-none', rankingLoading ? 'border-white/20 bg-white/10 text-white/80' : tone.badge)}>
+            <Badge variant="outline" className={cn('w-fit rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] shadow-none', rankingLoading ? 'border-[#dbe7ff] bg-white text-[#5F7299]' : tone.badge)}>
               {rankingLoading ? '위치 계산 중' : '센터 비교 기준'}
             </Badge>
           </div>
-        </CardHeader>
-        <CardContent className={cn('relative z-10 space-y-4 pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+
           <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
             <SummaryCard label="현재 위치" title={summary.positionTitle} detail={summary.positionDetail} />
             <SummaryCard label="이번 흐름" title={summary.statusLabel} detail={summary.statusDetail} titleClassName={tone.text} />
             <SummaryCard label={summary.strengthTitle} title={summary.strengthDetail} detail="지금 유지하면 좋은 강점을 먼저 잡아드렸어요." />
             <SummaryCard label={summary.improvementTitle} title={summary.improvementDetail} detail="당장 손보면 체감이 빠른 한 가지를 먼저 골랐어요." />
           </div>
-          <div className="rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-orange-soft)]">자세히 보기</p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
+
+          <div className="analysis-summary-callout rounded-[1.35rem] px-4 py-3">
+            <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.18em] text-[#D86A11]">자세히 보기</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#5F7299]">
               자세한 그래프는 아래에서 보고 싶을 때만 펼쳐보세요. 먼저 읽어야 할 건 지금 내 위치와 이번 주 흐름이에요.
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card className="analysis-premium-card analysis-full-board-card surface-card surface-card--primary on-dark overflow-hidden rounded-[1.85rem] border-none shadow-none">
-        <CardHeader className={cn('relative z-10', isMobile ? 'px-4 pt-4 pb-3' : 'px-5 pt-5 pb-4')}>
+      <div className="analysis-overview-shell analysis-premium-card analysis-full-board-card surface-card surface-card--primary on-dark">
+        <div className={cn(isMobile ? 'space-y-4' : 'space-y-5')}>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[var(--accent-orange)]" />
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-orange-soft)]">펼쳐서 보는 그래프</p>
+              <Sparkles className="h-4 w-4 text-[#FF7A16]" />
+              <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.22em] text-[#D86A11]">펼쳐서 보는 그래프</p>
             </div>
-            <CardTitle className="font-aggro-display mt-3 break-keep text-[clamp(1rem,1.5vw,1.2rem)] font-black tracking-tight text-[var(--text-on-dark)]">
-              필요할 때만 자세히 확인해보세요
-            </CardTitle>
-            <CardDescription className="mt-2 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+            <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.04rem,1.5vw,1.22rem)] font-black tracking-[-0.03em] text-[#17326B]">
+              필요한 카드만 펼쳐서 확인해보세요
+            </h2>
+            <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5F7299]">
               제목과 한 줄 해석을 먼저 보고, 필요한 섹션만 펼치면 됩니다.
-            </CardDescription>
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className={cn('relative z-10 pt-0', isMobile ? 'px-4 pb-4' : 'px-5 pb-5')}>
+
           <Accordion type="multiple" className="space-y-3">
-            <AccordionItem value="study-volume" className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/8 px-4">
+            <AccordionItem value="study-volume" className="analysis-accordion-card overflow-hidden rounded-[1.45rem] px-4">
               <AccordionTrigger className="gap-4 py-4 text-left hover:no-underline">
                 <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-[var(--text-on-dark)]">공부량 추이</p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">{chartInsights.weekly.trend}</p>
+                    <p className="font-aggro-display text-[1rem] font-black tracking-[-0.03em] text-[#14295F]">공부량 추이</p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5F7299]">{chartInsights.weekly.trend}</p>
                   </div>
                   <SectionStateBadge ready={hasWeeklyGrowthData || hasDailyGrowthData} />
                 </div>
@@ -312,7 +311,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">주간 성장</Badge>
                             <Badge variant="outline" className="border-[#dbe7ff] bg-white text-[#2554d4]">최근 6주</Badge>
                           </div>
-                          <CardTitle className="mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">주간 학습시간 성장률</CardTitle>
+                          <CardTitle className="font-aggro-display mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">주간 학습시간 성장률</CardTitle>
                           <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">주간 누적 학습시간과 전주 대비 변화를 함께 읽습니다.</CardDescription>
                         </div>
                         <div className="rounded-[1rem] border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2 text-right">
@@ -366,7 +365,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">일간 흐름</Badge>
                             <Badge variant="outline" className="border-[#ffe1c5] bg-white text-[#d86a11]">{dailyGrowthWindowLabel}</Badge>
                           </div>
-                          <CardTitle className="mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">일자별 학습시간 성장률</CardTitle>
+                          <CardTitle className="font-aggro-display mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">일자별 학습시간 성장률</CardTitle>
                           <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">선택한 7일 구간의 평균 공부시간과 변화 폭을 같이 봅니다.</CardDescription>
                         </div>
                         <div className="space-y-2">
@@ -421,12 +420,12 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="execution" className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/8 px-4">
+            <AccordionItem value="execution" className="analysis-accordion-card overflow-hidden rounded-[1.45rem] px-4">
               <AccordionTrigger className="gap-4 py-4 text-left hover:no-underline">
                 <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-[var(--text-on-dark)]">완수·집중 밀도</p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+                    <p className="font-aggro-display text-[1rem] font-black tracking-[-0.03em] text-[#14295F]">완수·집중 밀도</p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5F7299]">
                       최근 {focusedChartDays}일 완료율 {avgCompletionRate}% · 연속 공부 {studyStreakDays}일
                     </p>
                   </div>
@@ -443,7 +442,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">실행력 점검</Badge>
                             <Badge variant="outline" className="border-[#ffe1c5] bg-white text-[#d86a11]">최근 {focusedChartDays}일</Badge>
                           </div>
-                          <CardTitle className="mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">계획 완수율 흐름</CardTitle>
+                          <CardTitle className="font-aggro-display mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">계획 완수율 흐름</CardTitle>
                           <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">일별 완료율로 실행력이 흔들리는 구간을 확인합니다.</CardDescription>
                         </div>
                         <div className="rounded-[1rem] border border-[#ffe1c5] bg-[#fff8ef] px-3 py-2 text-right">
@@ -480,22 +479,22 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                         <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">최근 기록</Badge>
                         <Badge variant="outline" className="border-[#dbe7ff] bg-white text-[#2554d4]">최근 7일</Badge>
                       </div>
-                      <CardTitle className="mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">짧게 읽는 실행 요약</CardTitle>
+                      <CardTitle className="font-aggro-display mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">짧게 읽는 실행 요약</CardTitle>
                       <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">오늘 공부량과 최근 기록을 함께 보면 실행 패턴이 더 선명하게 보여요.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 pt-0">
                       <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
                         <div className="rounded-[1.1rem] border border-[#dbe7ff] bg-white/90 px-3.5 py-3">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">오늘 공부</p>
-                          <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{minutesToLabel(todayStudyMinutes)}</p>
+                          <p className="font-aggro-display mt-2 text-lg font-black tracking-tight text-[#14295F]">{minutesToLabel(todayStudyMinutes)}</p>
                         </div>
                         <div className="rounded-[1.1rem] border border-[#ffe1c5] bg-[#fff8ef] px-3.5 py-3">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d86a11]">평균 완료율</p>
-                          <p className="mt-2 text-lg font-black tracking-tight text-[#d86a11]">{avgCompletionRate}%</p>
+                          <p className="font-aggro-display mt-2 text-lg font-black tracking-tight text-[#d86a11]">{avgCompletionRate}%</p>
                         </div>
                         <div className="rounded-[1.1rem] border border-[#d5f2e7] bg-[#effcf6] px-3.5 py-3">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0f8f65]">연속 공부</p>
-                          <p className="mt-2 text-lg font-black tracking-tight text-[#0f8f65]">{studyStreakDays}일</p>
+                          <p className="font-aggro-display mt-2 text-lg font-black tracking-tight text-[#0f8f65]">{studyStreakDays}일</p>
                         </div>
                       </div>
                       <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-white/90 p-3.5">
@@ -518,12 +517,12 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="rhythm" className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/8 px-4">
+            <AccordionItem value="rhythm" className="analysis-accordion-card overflow-hidden rounded-[1.45rem] px-4">
               <AccordionTrigger className="gap-4 py-4 text-left hover:no-underline">
                 <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-[var(--text-on-dark)]">공부 리듬</p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">{chartInsights.rhythm.trend}</p>
+                    <p className="font-aggro-display text-[1rem] font-black tracking-[-0.03em] text-[#14295F]">공부 리듬</p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5F7299]">{chartInsights.rhythm.trend}</p>
                   </div>
                   <SectionStateBadge ready={hasRhythmScoreOnlyTrend || hasStartEndTimeData} />
                 </div>
@@ -538,7 +537,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">리듬 분석</Badge>
                             <Badge variant="outline" className="border-[#d5f2e7] bg-white text-[#0f8f65]">최근 14일</Badge>
                           </div>
-                          <CardTitle className="mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">리듬 점수 그래프</CardTitle>
+                          <CardTitle className="font-aggro-display mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">리듬 점수 그래프</CardTitle>
                           <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">시작 시간 흔들림을 점수로 바꿔 리듬 안정성을 봅니다.</CardDescription>
                         </div>
                         <div className="rounded-[1rem] border border-[#d5f2e7] bg-[#effcf6] px-3 py-2 text-right">
@@ -585,7 +584,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">시간대 흐름</Badge>
                             <Badge variant="outline" className="border-[#eadfff] bg-white text-[#7d4ed8]">최근 14일</Badge>
                           </div>
-                          <CardTitle className="mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">공부 시작/종료 시각 추이</CardTitle>
+                          <CardTitle className="font-aggro-display mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">공부 시작/종료 시각 추이</CardTitle>
                           <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">시작과 종료 시각으로 생활 리듬을 비교합니다.</CardDescription>
                         </div>
                         <div className="rounded-[1rem] border border-[#eadfff] bg-[#f6f0ff] px-3 py-2 text-right">
@@ -622,12 +621,12 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="risk" className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/8 px-4">
+            <AccordionItem value="risk" className="analysis-accordion-card overflow-hidden rounded-[1.45rem] px-4">
               <AccordionTrigger className="gap-4 py-4 text-left hover:no-underline">
                 <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-[var(--text-on-dark)]">생활 리스크</p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+                    <p className="font-aggro-display text-[1rem] font-black tracking-[-0.03em] text-[#14295F]">생활 리스크</p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5F7299]">
                       {riskSignals.length === 0 ? '뚜렷한 위험 신호 없이 유지 중이에요.' : riskSignals[0]}
                     </p>
                   </div>
@@ -644,7 +643,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">외출 흐름</Badge>
                             <Badge variant="outline" className="border-[#ffdbe2] bg-white text-[#dc4b74]">최근 14일</Badge>
                           </div>
-                          <CardTitle className="mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">학습 중간 외출시간 추이</CardTitle>
+                          <CardTitle className="font-aggro-display mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">학습 중간 외출시간 추이</CardTitle>
                           <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">외출이 집중 흐름을 얼마나 끊는지 확인합니다.</CardDescription>
                         </div>
                         <div className="rounded-[1rem] border border-[#ffdbe2] bg-[#fff2f5] px-3 py-2 text-right">
@@ -690,7 +689,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                         <AlertTriangle className="h-4 w-4 text-rose-500" />
                         <Badge className="border border-[#ffd7b6] bg-[#fff3e9] text-[#ff7a16]">지금 고치면 좋아요</Badge>
                       </div>
-                      <CardTitle className="mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">이번 주 우선 보완 포인트</CardTitle>
+                      <CardTitle className="font-aggro-display mt-3 text-[clamp(1rem,1.45vw,1.22rem)] font-black tracking-tight text-[#14295F]">이번 주 우선 보완 포인트</CardTitle>
                       <CardDescription className="mt-1 text-sm font-semibold leading-6 text-[#5c6e97]">위험 신호는 길게 보기보다, 지금 바로 고치면 좋은 것 한 가지로 압축해서 보는 편이 좋아요.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 pt-0">
@@ -718,8 +717,8 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </section>
   );
 }
