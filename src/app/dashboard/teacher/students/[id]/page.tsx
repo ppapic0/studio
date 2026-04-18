@@ -2346,48 +2346,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.14fr)_minmax(20rem,0.86fr)]'
         )}>
           <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1.24fr)_minmax(17rem,0.92fr)]')}>
-            <div className={cn('analysis-profile-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
-              <div className="flex flex-wrap items-center gap-2">
-                {!isStudentSelfView ? (
-                  <Button variant="outline" size="icon" className={cn("h-10 w-10 shrink-0 rounded-full", detailActionButtonClass)} asChild>
-                    <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
-                  </Button>
-                ) : null}
-                <Badge variant="outline" className={cn('rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]', analysisAttendanceBadgeClass)}>
-                  {currentAttendanceLabel}
-                </Badge>
-                <Badge variant="outline" className={cn('rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]', analysisMemberBadgeClass)}>
-                  {currentMemberStatusLabel}
-                </Badge>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <h1 className={cn(
-                  'min-w-0 break-keep font-aggro-display font-black tracking-[-0.05em] text-[#17326B]',
-                  isMobile ? 'text-[2rem] leading-[1.02]' : 'text-[clamp(2.35rem,4vw,3.25rem)] leading-[1.01]'
-                )}>
-                  {student?.name || '학생'}
-                </h1>
-                <Badge variant="outline" className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', analysisWarmBadgeClass)}>
-                  {formatSeatLabel(student)}
-                </Badge>
-                {!isStudentSelfView ? (
-                  <Badge variant="outline" className={cn('rounded-full text-[10px] font-black', analysisSoftBadgeClass)}>
-                    <UserRound className="mr-1 h-3 w-3" /> 학부모/선생님 공유용
-                  </Badge>
-                ) : null}
-              </div>
-
-              <p className="mt-3 text-sm font-semibold leading-6 text-[#5F7299]">
-                실시간 상태와 최근 운영 흐름을 한 번에 읽고, 바로 상담과 관리 액션으로 이어질 수 있게 구성했습니다.
-              </p>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-[#5F7299]">
-                <span className="flex items-center gap-1 text-[#D86A11]"><Building2 className="h-3.5 w-3.5" /> {student?.schoolName}</span>
-                <span className="opacity-30">|</span><span>{student?.grade}</span><span className="opacity-30">|</span>
-                <span className="flex items-center gap-1 text-[#2E9B73]"><LayoutGrid className="h-3 w-3" /> {student?.className || '반 미지정'}</span>
-                <span className="opacity-30">|</span><span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> 연속 공부 {studyStreakDays}일</span>
-              </div>
+            <div className={cn('analysis-profile-card relative flex items-center', isMobile ? 'min-h-[7.5rem] px-4 py-5' : 'min-h-[9rem] px-5 py-6')}>
+              {!isStudentSelfView ? (
+                <Button variant="outline" size="icon" className={cn("absolute left-4 top-4 h-10 w-10 shrink-0 rounded-full", detailActionButtonClass)} asChild>
+                  <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
+                </Button>
+              ) : null}
+              <h1 className={cn(
+                'min-w-0 break-keep font-aggro-display font-black tracking-[-0.06em] text-[#17326B]',
+                !isStudentSelfView && 'pr-2',
+                isMobile
+                  ? (!isStudentSelfView ? 'pl-12 text-[2rem] leading-[1.02]' : 'text-[2rem] leading-[1.02]')
+                  : (!isStudentSelfView ? 'pl-14 text-[clamp(2.35rem,4vw,3.3rem)] leading-[1.01]' : 'text-[clamp(2.35rem,4vw,3.3rem)] leading-[1.01]')
+              )}>
+                {student?.name || '학생'}
+              </h1>
             </div>
 
             <div className={cn('analysis-profile-meta-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
@@ -2398,9 +2371,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     학생 상태 요약
                   </h2>
                 </div>
-                <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-[10px] font-black', analysisSoftBadgeClass)}>
-                  오늘 기준
-                </Badge>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Badge variant="outline" className={cn('rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]', analysisAttendanceBadgeClass)}>
+                    {currentAttendanceLabel}
+                  </Badge>
+                  <Badge variant="outline" className={cn('rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]', analysisMemberBadgeClass)}>
+                    {currentMemberStatusLabel}
+                  </Badge>
+                  <Badge variant="outline" className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', analysisWarmBadgeClass)}>
+                    {formatSeatLabel(student)}
+                  </Badge>
+                </div>
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -2409,6 +2390,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <p className="mt-3 break-keep font-aggro-display text-[1.15rem] font-black leading-6 tracking-[-0.03em] text-[#14295F]">
                     {studentBriefMeta}
                   </p>
+                  {!isStudentSelfView ? (
+                    <Badge variant="outline" className={cn('mt-3 rounded-full text-[10px] font-black', analysisSoftBadgeClass)}>
+                      <UserRound className="mr-1 h-3 w-3" /> 학부모/선생님 공유용
+                    </Badge>
+                  ) : null}
                   <p className="mt-2 text-xs font-semibold leading-5 text-[#5F7299]">학교, 학년, 반 기준으로 학생 위치를 빠르게 확인합니다.</p>
                 </div>
                 <div className="analysis-profile-mini-card analysis-profile-mini-card--warm px-4 py-4">
