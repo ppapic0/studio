@@ -816,7 +816,7 @@ function PointHistoryDialog({
             )}>
               <div className="min-w-0">
                 <div className={cn(
-                  "dashboard-number text-amber-600 leading-none tracking-tight",
+                  "dashboard-number text-amber-600 leading-none tracking-tight whitespace-nowrap",
                   isFeatured
                     ? isMobile
                       ? "text-[clamp(2.35rem,12vw,3rem)]"
@@ -825,7 +825,7 @@ function PointHistoryDialog({
                       ? "text-[clamp(2rem,10vw,2.7rem)]"
                       : "text-7xl"
                 )}>
-                  {totalPoints.toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>포인트</span>
+                  {totalPoints.toLocaleString('ko-KR')}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>포인트</span>
                 </div>
                 <div className={cn("flex items-center gap-2", isMobile ? "mt-3 flex-wrap" : isFeatured ? "mt-5" : "mt-6")}>
                   <Badge
@@ -894,7 +894,7 @@ function PointHistoryDialog({
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="dashboard-number text-sm text-primary">{Number(data.dailyPointAmount || 0).toLocaleString()}</span>
+                      <span className="dashboard-number text-sm text-primary">{Number(data.dailyPointAmount || 0).toLocaleString('ko-KR')}</span>
                       <span className="text-[9px] ml-0.5 font-bold text-muted-foreground/40 whitespace-nowrap">포인트</span>
                     </div>
                   </div>
@@ -966,7 +966,7 @@ function MiniLpTrendSparkline({
     )}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[8px] font-black uppercase tracking-[0.24em] text-amber-600/60">누적</span>
-        <span className="text-[9px] font-black text-amber-600">{lastPoint.total.toLocaleString()}</span>
+        <span className="text-[9px] font-black text-amber-600">{lastPoint.total.toLocaleString('ko-KR')}</span>
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
@@ -1532,7 +1532,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: recentLogs } = useCollection<StudyLogDay>(recentLogsQuery, { enabled: isActive });
 
   // 2. 계획 데이터 조회 (어제, 오늘, 내일)
-  const targetDays = useMemo(() => isMobile ? [todayKey] : [yesterdayKey, todayKey, tomorrowKey], [isMobile, yesterdayKey, todayKey, tomorrowKey]);
+  const targetDays = useMemo(() => [yesterdayKey, todayKey, tomorrowKey], [yesterdayKey, todayKey, tomorrowKey]);
   const allPlansRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !user || !weekKey) return null;
     return query(

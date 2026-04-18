@@ -75,7 +75,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
     student: [
       { href: '/dashboard', label: '홈', icon: LayoutDashboard },
       { href: '/dashboard/growth', label: '포인트', icon: Wallet },
-      { href: '/dashboard/study-history', label: '기록', icon: CalendarDays },
+      { href: '/dashboard/study-history', label: '기록', icon: History },
       { href: '/dashboard/plan', label: '계획', icon: CalendarDays },
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
     ],
