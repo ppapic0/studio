@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   BrainCircuit,
   CalendarDays,
   CheckCircle2,
   Clock,
+  Maximize2,
   MessageCircle,
   Sparkles,
   TrendingUp,
@@ -13,6 +14,13 @@ import {
 
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { DailyReport } from '@/lib/types';
 
@@ -358,7 +366,7 @@ function SummaryHeroMetrics({
         <div key={item.label} className="rounded-[1.35rem] border border-white/12 bg-white/10 px-4 py-3 backdrop-blur-sm">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{item.label}</p>
           <p className="mt-2 text-lg font-black tracking-tight text-white">{item.value}</p>
-          <p className={cn('mt-1 text-xs font-bold text-white/68', compactMode && 'line-clamp-1')}>{item.detail}</p>
+          <p className={cn('mt-1 text-xs font-bold text-white/68 break-keep', compactMode && 'leading-relaxed')}>{item.detail}</p>
         </div>
       ))}
     </div>
@@ -399,22 +407,22 @@ function ReportInsightBoard({
           </div>
         </div>
 
-        <p className="mt-4 line-clamp-2 text-sm font-black leading-relaxed tracking-tight text-slate-900">
-          {toCompactCopy(buildInterpretationCopy(aiMeta), 88)}
+        <p className="mt-4 text-sm font-black leading-relaxed tracking-tight text-slate-900 break-keep">
+          {buildInterpretationCopy(aiMeta)}
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결</p>
             <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.routineBand || '확인 중'}</p>
-            <p className="mt-1 line-clamp-1 text-xs font-bold text-slate-600">
-              {toCompactCopy(aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.', 34)}
+            <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep">
+              {aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.'}
             </p>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">성장</p>
             <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.growthBand || '분석 중'}</p>
-            <p className="mt-1 line-clamp-1 text-xs font-bold text-slate-600">
+            <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep">
               평균 대비 {formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg)}
             </p>
           </div>
@@ -459,14 +467,14 @@ function ReportInsightBoard({
         <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결 리듬</p>
           <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.routineBand || '확인 중'}</p>
-          <p className={cn('mt-1 text-xs font-bold leading-relaxed text-slate-600', compactMode && 'line-clamp-2')}>
-            {compactMode ? toCompactCopy(aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.', 56) : aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.'}
+          <p className={cn('mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep', compactMode && 'whitespace-normal')}>
+            {aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.'}
           </p>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">성장 흐름</p>
           <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.growthBand || '분석 중'}</p>
-          <p className={cn('mt-1 text-xs font-bold leading-relaxed text-slate-600', compactMode && 'line-clamp-2')}>
+          <p className={cn('mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep', compactMode && 'whitespace-normal')}>
             평균 대비 {formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg)} / {formatSignedPercent(aiMeta.metrics?.growthRate)}
           </p>
         </div>
@@ -509,21 +517,21 @@ function ReportActionBoard({
         <div className="mt-4 grid gap-3">
           <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[#14295F] px-4 py-4 text-white">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">내일 교실 코칭</p>
-            <p className="mt-2 line-clamp-2 text-sm font-black leading-relaxed tracking-tight">
-              {toCompactCopy(aiMeta.coachingFocus || '내일 첫 행동을 짧고 선명하게 잡겠습니다.', 52)}
+            <p className="mt-2 text-sm font-black leading-relaxed tracking-tight break-keep">
+              {aiMeta.coachingFocus || '내일 첫 행동을 짧고 선명하게 잡겠습니다.'}
             </p>
-            <p className="mt-2 line-clamp-2 text-xs font-bold leading-relaxed text-white/75">
-              {toCompactCopy(improvementLead, 68)}
+            <p className="mt-2 text-xs font-bold leading-relaxed text-white/75 break-keep">
+              {improvementLead}
             </p>
           </div>
 
           <div className="rounded-[1.35rem] border border-amber-100 bg-amber-50/60 px-4 py-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700/70">가정 한마디</p>
-            <p className="mt-2 line-clamp-2 text-sm font-black leading-relaxed tracking-tight text-slate-900">
-              {toCompactCopy(aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.', 58)}
+            <p className="mt-2 text-sm font-black leading-relaxed tracking-tight text-slate-900 break-keep">
+              {aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.'}
             </p>
-            <p className="mt-2 line-clamp-2 text-xs font-bold leading-relaxed text-slate-700">
-              {toCompactCopy(`${strengthLead} ${buildFamilyQuestion(aiMeta, studentName)}`, 74)}
+            <p className="mt-2 text-xs font-bold leading-relaxed text-slate-700 break-keep">
+              {`${strengthLead} ${buildFamilyQuestion(aiMeta, studentName)}`}
             </p>
           </div>
         </div>
@@ -600,10 +608,14 @@ function MiniTrendChart({
   aiMeta,
   displayHeadingsOnly = false,
   reportDateKey,
+  interactive = false,
+  onExpand,
 }: {
   aiMeta?: DailyReportAiMeta | null;
   displayHeadingsOnly?: boolean;
   reportDateKey?: string;
+  interactive?: boolean;
+  onExpand?: () => void;
 }) {
   if (!aiMeta) return null;
 
@@ -617,11 +629,23 @@ function MiniTrendChart({
       <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">학습시간 그래프</p>
-          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>최근 7일 + 오늘</p>
+          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900 break-keep', displayHeadingsOnly && 'font-aggro-display')}>최근 7일 + 오늘</p>
         </div>
-        <Badge className="shrink-0 border-none bg-blue-50 text-blue-700 font-black">
-          {formatStudyTime(aiMeta.totalStudyMinutes)}
-        </Badge>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <Badge className="shrink-0 border-none bg-blue-50 text-blue-700 font-black">
+            {formatStudyTime(aiMeta.totalStudyMinutes)}
+          </Badge>
+          {interactive && onExpand && (
+            <button
+              type="button"
+              onClick={onExpand}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+            >
+              <Maximize2 className="h-3 w-3" />
+              크게 보기
+            </button>
+          )}
+        </div>
       </div>
       <div className="mt-4 overflow-x-auto pb-1">
         <div className="relative min-w-[22rem] sm:min-w-0">
@@ -867,10 +891,8 @@ function KpiGraphGrid({
               style={{ width: `${completionWidth}%` }}
             />
           </div>
-          <p className={cn('mt-3 text-xs font-bold leading-relaxed text-slate-600', compactMode && 'line-clamp-2')}>
-            {compactMode
-              ? toCompactCopy(aiMeta.metrics?.trendSummary || '최근 흐름 요약이 없습니다.', 74)
-              : aiMeta.metrics?.trendSummary || '최근 흐름 요약이 없습니다.'}
+          <p className={cn('mt-3 text-xs font-bold leading-relaxed text-slate-600 break-keep', compactMode && 'whitespace-normal')}>
+            {aiMeta.metrics?.trendSummary || '최근 흐름 요약이 없습니다.'}
           </p>
         </div>
       </div>
@@ -971,6 +993,7 @@ export function VisualReportViewer({
   displayHeadingsOnly?: boolean;
   compactMode?: boolean;
 }) {
+  const [isTrendChartDialogOpen, setIsTrendChartDialogOpen] = useState(false);
   const normalizedAiMeta = useMemo(() => normalizeAiMeta(aiMeta), [aiMeta]);
   const sections = useMemo(() => {
     if (!content) return [];
@@ -1014,8 +1037,8 @@ export function VisualReportViewer({
                 {overallSummary.headline}
               </p>
             )}
-            <p className={cn('font-bold leading-relaxed text-white/80', compactMode ? 'mt-4 line-clamp-2 text-xs sm:text-sm' : 'mt-2 text-sm')}>
-              {compactMode ? toCompactCopy(overallSummary.subline, 98) : overallSummary.subline}
+            <p className={cn('font-bold leading-relaxed text-white/80 break-keep', compactMode ? 'mt-4 text-xs sm:text-sm' : 'mt-2 text-sm')}>
+              {overallSummary.subline}
             </p>
             <SummaryHeroMetrics aiMeta={normalizedAiMeta} compactMode={compactMode} />
           </CardContent>
@@ -1026,7 +1049,13 @@ export function VisualReportViewer({
         compactMode ? (
           <>
             <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-              <MiniTrendChart aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} reportDateKey={dateKey} />
+              <MiniTrendChart
+                aiMeta={normalizedAiMeta}
+                displayHeadingsOnly={displayHeadingsOnly}
+                reportDateKey={dateKey}
+                interactive
+                onExpand={() => setIsTrendChartDialogOpen(true)}
+              />
               <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
             <KpiGraphGrid aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
@@ -1072,6 +1101,26 @@ export function VisualReportViewer({
           </Card>
         );
       })}
+
+      {compactMode && normalizedAiMeta && (
+        <Dialog open={isTrendChartDialogOpen} onOpenChange={setIsTrendChartDialogOpen}>
+          <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden rounded-[2rem] border-none p-0">
+            <DialogHeader className="border-b bg-white px-6 py-5 text-left sm:px-8">
+              <DialogTitle className="text-xl font-black tracking-tight text-[#14295F]">학습시간 그래프</DialogTitle>
+              <DialogDescription className="font-bold text-slate-500">
+                최근 7일과 오늘 흐름을 크게 확인할 수 있어요.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[calc(90vh-5.5rem)] overflow-y-auto bg-[#fafafa] p-4 sm:p-6">
+              <MiniTrendChart
+                aiMeta={normalizedAiMeta}
+                displayHeadingsOnly={displayHeadingsOnly}
+                reportDateKey={dateKey}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
