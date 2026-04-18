@@ -1146,14 +1146,9 @@ export default function AnalysisTrackPage() {
         </TabsContent>
 
         <TabsContent value="full" className="mt-0">
-          <div className={cn(
-            'analysis-shell analysis-full-frame overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(20,40,92,0.98)_0%,rgba(10,23,56,0.98)_100%)] shadow-[0_28px_60px_-40px_rgba(2,8,24,0.68)]',
-            isMobile ? 'px-3 py-3' : 'px-4 py-4'
-          )}>
-            <StudentDetailPresentationProvider value="student-analysis">
-              <StudentDetailPage params={selfParams} />
-            </StudentDetailPresentationProvider>
-          </div>
+          <StudentDetailPresentationProvider value="student-analysis">
+            <StudentDetailPage params={selfParams} />
+          </StudentDetailPresentationProvider>
         </TabsContent>
       </Tabs>
     </div>

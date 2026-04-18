@@ -1889,6 +1889,38 @@ select {
       0 10px 18px -14px rgba(104, 141, 226, 0.12) !important;
   }
 
+  .analysis-full-shell .analysis-overview-canvas,
+  .analysis-full-shell .analysis-full-board-card,
+  .analysis-full-shell .analysis-full-section-card {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    --text-on-dark: #17326b;
+    --text-on-dark-soft: #5f7299;
+    --text-on-dark-muted: #6a7da6;
+    --accent-orange-soft: #d86a11;
+    color: #17326b !important;
+  }
+
+  .analysis-full-shell .analysis-overview-canvas {
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .analysis-full-shell .analysis-full-board-card > [data-slot="card-header"],
+  .analysis-full-shell .analysis-full-section-card > [data-slot="card-header"] {
+    padding-top: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .analysis-full-shell .analysis-full-board-card > [data-slot="card-content"],
+  .analysis-full-shell .analysis-full-section-card > [data-slot="card-content"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
   .analysis-full-shell .analysis-full-kpi-card--compact {
     min-width: 0;
     min-height: 0;
@@ -2232,6 +2264,12 @@ select {
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
         0 24px 48px -34px rgba(4, 10, 32, 0.56),
         0 0 0 1px rgba(112, 170, 255, 0.06) !important;
+    }
+
+    .analysis-full-shell .analysis-full-section-card:hover,
+    .analysis-full-shell .analysis-full-board-card:hover {
+      transform: none;
+      box-shadow: none !important;
     }
   }
 
