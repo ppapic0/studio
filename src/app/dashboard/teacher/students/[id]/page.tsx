@@ -2360,30 +2360,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       isAnalysisPresentation && 'analysis-shell student-analysis-shell analysis-full-shell'
     )}>
       {isAnalysisPresentation ? (
-        <div className={cn(
-          'analysis-profile-shell grid gap-4',
-          isMobile || !hasAnalysisQuickActions ? 'grid-cols-1' : 'xl:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]'
-        )}>
-          <div className={cn('analysis-profile-card relative flex items-center', isMobile ? 'min-h-[7.5rem] px-4 py-5' : 'min-h-[9rem] px-5 py-6')}>
-            {!isStudentSelfView ? (
-              <Button variant="outline" size="icon" className={cn("absolute left-4 top-4 h-10 w-10 shrink-0 rounded-full", detailActionButtonClass)} asChild>
-                <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
-              </Button>
-            ) : null}
-            <h1 className={cn(
-              'min-w-0 break-keep font-aggro-display font-black tracking-[-0.06em] text-[#17326B]',
-              !isStudentSelfView && 'pr-2',
-              isMobile
-                ? (!isStudentSelfView ? 'pl-12 text-[2rem] leading-[1.02]' : 'text-[2rem] leading-[1.02]')
-                : (!isStudentSelfView ? 'pl-14 text-[clamp(2.35rem,4vw,3.3rem)] leading-[1.01]' : 'text-[clamp(2.35rem,4vw,3.3rem)] leading-[1.01]')
-            )}>
-              {student?.name || '학생'}
-            </h1>
-          </div>
-
-          {hasAnalysisQuickActions ? (
+        hasAnalysisQuickActions ? (
+          <div className="analysis-profile-shell">
             <div className={cn('analysis-profile-action-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
               <div className="grid gap-2 sm:grid-cols-2">
+                {!isStudentSelfView && (
+                  <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
+                    <Link href={backHref}><ArrowLeft className="h-4 w-4" /> 학생 목록</Link>
+                  </Button>
+                )}
                 {!isStudentSelfView && (
                   <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
                     <Link href="/dashboard/attendance"><CalendarDays className="h-4 w-4" /> 출결 상태</Link>
@@ -2420,8 +2405,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 {canManageStudentAccounts && <Button variant="destructive" className="h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2 sm:col-span-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
               </div>
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null
       ) : (
         <motion.section
           {...defaultSectionMotion(0)}
