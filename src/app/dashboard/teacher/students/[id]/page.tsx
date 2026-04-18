@@ -9,7 +9,7 @@ import { ko } from 'date-fns/locale';
 import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, Timestamp, where, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar, ComposedChart, Line, LineChart as RechartsLineChart } from 'recharts';
-import { Loader2, ArrowLeft, Building2, Zap, Settings2, Activity, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore, PenTool } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowUpRight, Building2, Zap, Settings2, Activity, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore, PenTool } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification, DailyReport, AttendanceRequest, PenaltyLog, ParentActivityEvent, Invoice } from '@/lib/types';
@@ -498,6 +498,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isMasteryModalOpen, setIsMasteryModalOpen] = useState(false);
   const [isRhythmGuideModalOpen, setIsRhythmGuideModalOpen] = useState(false);
   const [isAvgStudyModalOpen, setIsAvgStudyModalOpen] = useState(false);
+  const [isStudyTrendModalOpen, setIsStudyTrendModalOpen] = useState(false);
   const [isCompletionTrendModalOpen, setIsCompletionTrendModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
@@ -2144,6 +2145,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     },
   ] as const;
   const hasCompletionTrendData = displaySeries.some((item) => item.hasCompletion || item.completionRate > 0);
+  const hasStudyTrendData = displaySeries.some((item) => item.studyMinutes > 0);
   const defaultSectionMotion = (delay = 0) => (prefersReducedMotion ? {} : {
     initial: { opacity: 0, y: 18 },
     animate: { opacity: 1, y: 0 },
@@ -3784,62 +3786,48 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           ) : (
             <>
               <div className="grid gap-6 lg:grid-cols-12">
-                <Card className={cn("lg:col-span-12", detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
-                <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <Badge className={detailBadgeClass}>운영 그래프</Badge>
-                      <Badge variant="outline" className={detailGrowthPeriodBadgeClass}>{RANGE_MAP[focusedChartView]}일 관찰</Badge>
-                      </div>
-                      <CardTitle className={cn("text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><Activity className={cn("h-5 w-5 text-primary", isAnalysisPresentation && "text-white")} /> 공부시간 추이</CardTitle>
-                      <CardDescription className={cn("font-bold text-[11px]", isAnalysisPresentation ? "text-white/85" : "text-[#5c6e97]")}>집중 시간이 흔들리는 구간을 먼저 읽고 리듬 변화 해석까지 연결합니다.</CardDescription>
-                    </div>
-                    <div className={cn("flex gap-1 rounded-xl p-1 w-fit", isAnalysisPresentation ? "bg-white/8" : "border border-[#dbe7ff] bg-[#f8fbff]")}>
-                      {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
-                        <Button key={key} variant={focusedChartView === key ? 'default' : 'ghost'} className={cn("h-8 px-3 rounded-lg text-[10px] font-black", isAnalysisPresentation && focusedChartView !== key && detailActionButtonClass)} onClick={() => setFocusedChartView(key)}>{RANGE_MAP[key]}일</Button>
-                      ))}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className={cn(detailChartPanelClass, "space-y-4")}>
-                      <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                        <div className="rounded-[1.1rem] border border-[#dbe7ff] bg-white/88 px-4 py-3 shadow-[0_16px_26px_-24px_rgba(20,41,95,0.22)]">
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최근 평균</p>
-                          <p className="font-aggro-display mt-2 text-[1.15rem] font-black tracking-[-0.04em] text-[#14295F]">
-                            {minutesToLabel(avgStudyMinutes)}
-                          </p>
-                          <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
-                            최근 {RANGE_MAP[focusedChartView]}일 기준 평균 공부시간
-                          </p>
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setIsStudyTrendModalOpen(true)}
+                  className="group relative flex min-h-[13.5rem] flex-col overflow-hidden rounded-[1.8rem] border border-[#dce7f8] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(246,250,255,0.985)_100%)] p-5 text-left shadow-[0_28px_46px_-34px_rgba(20,41,95,0.2)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_34px_52px_-34px_rgba(20,41,95,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff7a16] focus-visible:ring-offset-2 lg:col-span-12"
+                >
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.18),transparent_58%),radial-gradient(circle_at_top_left,rgba(37,84,212,0.14),transparent_52%)]" />
+                  <div className="relative flex h-full flex-col gap-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">운영 그래프</Badge>
+                          <Badge variant="outline" className="border-[#dbe7ff] bg-white text-[#2554d4]">{RANGE_MAP[focusedChartView]}일 관찰</Badge>
                         </div>
-                        <div className="rounded-[1.1rem] border border-[#ffe1c5] bg-[#fff8ef] px-4 py-3 shadow-[0_16px_26px_-24px_rgba(255,122,22,0.16)]">
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c86a10]">최고 집중일</p>
-                          <p className="font-aggro-display mt-2 text-[1.15rem] font-black tracking-[-0.04em] text-[#14295F]">
-                            {peakStudyPoint?.dateLabel ?? '기록 없음'}
-                          </p>
-                          <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
-                            {minutesToLabel(peakStudyPoint?.studyMinutes ?? 0)}으로 가장 길게 공부했어요.
-                          </p>
-                        </div>
+                        <p className="font-aggro-display mt-4 text-[clamp(1.26rem,2.1vw,1.55rem)] font-black leading-[1.04] tracking-[-0.04em] text-[#14295F]">
+                          공부시간 추이
+                        </p>
+                        <p className="mt-2 max-w-[32rem] text-[13px] font-semibold leading-6 text-[#5F7299]">
+                          집중 시간이 흔들리는 구간과 가장 잘 잡힌 날을 팝업에서 크게 확인할 수 있어요.
+                        </p>
                       </div>
-
-                      <div className="h-[280px] w-full rounded-[1.2rem] border border-white/45 bg-[linear-gradient(180deg,rgba(20,41,95,0.05)_0%,rgba(20,41,95,0.02)_100%)] px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="studyMinutesGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={analysisStudyTrendStrokeColor} stopOpacity={isAnalysisPresentation ? 0.28 : 0.35} /><stop offset="95%" stopColor={analysisStudyTrendStrokeColor} stopOpacity={isAnalysisPresentation ? 0.04 : 0.02} /></linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={analysisChartGridColor} />
-                            <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} />
-                            <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={38} />
-                            <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
-                            <Area type="monotone" dataKey="studyMinutes" stroke={analysisStudyTrendStrokeColor} strokeWidth={3} fill="url(#studyMinutesGradient)" />
-                          </AreaChart>
-                        </ResponsiveContainer>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] border border-[#ffd7b6] bg-[#fff3e9] text-[#ff7a16] shadow-[0_16px_30px_-24px_rgba(255,122,22,0.28)]">
+                        <ArrowUpRight className="h-4 w-4" />
+                      </span>
+                    </div>
+                    <div className="mt-auto flex items-end justify-between gap-3">
+                      <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-white px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">최근 평균</p>
+                        <p className="font-aggro-display mt-2 text-[1.15rem] font-black leading-none tracking-tight text-[#2554d4]">
+                          {hasStudyTrendData ? minutesToLabel(avgStudyMinutes) : '기록 없음'}
+                        </p>
+                      </div>
+                      <div className="min-w-0 text-right">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c86a10]">최고 집중일</p>
+                        <p className="mt-2 font-aggro-display text-[1.05rem] font-black leading-none tracking-tight text-[#14295F]">
+                          {hasStudyTrendData ? (peakStudyPoint?.dateLabel ?? '기록 없음') : '아직 없음'}
+                        </p>
+                        <p className="mt-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#17326B]">팝업 보기</p>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </button>
               </div>
 
                 <Card className={cn(detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
@@ -4248,6 +4236,126 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <Button className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">확인</Button>
                 </DialogClose>
               )}
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isStudyTrendModalOpen} onOpenChange={setIsStudyTrendModalOpen}>
+        <DialogContent className="rounded-[2.25rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl">
+          <div className={cn(
+            "px-6 py-5",
+            isAnalysisPresentation
+              ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE5C4_100%)] text-[#17326B]"
+              : "bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] text-white"
+          )}>
+            <DialogHeader>
+              {!isAnalysisPresentation ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                    {student?.name || '학생'}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    {formatSeatLabel(student)}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    운영 그래프
+                  </Badge>
+                </div>
+              ) : null}
+              <DialogTitle className="text-2xl font-black tracking-tight">공부시간 추이 그래프</DialogTitle>
+              <DialogDescription className={cn("font-semibold", isAnalysisPresentation ? "text-[#5F7299]" : "text-white/80")}>
+                최근 {RANGE_MAP[focusedChartView]}일 기준으로 평균 공부시간과 최고 집중일을 함께 보며 흐름을 읽습니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-4 bg-white px-6 py-5">
+            <div className={cn("mb-1 flex gap-1 rounded-xl p-1 w-fit", isAnalysisPresentation ? "bg-[#17326B]/8" : "border border-[#dbe7ff] bg-[#f8fbff]")}>
+              {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
+                <Button
+                  key={key}
+                  variant={focusedChartView === key ? 'default' : 'ghost'}
+                  className={cn(
+                    "h-8 px-3 rounded-lg text-[10px] font-black",
+                    !isAnalysisPresentation && focusedChartView !== key && "text-[#14295F] hover:bg-white hover:text-[#14295F]"
+                  )}
+                  onClick={() => setFocusedChartView(key)}
+                >
+                  {RANGE_MAP[key]}일
+                </Button>
+              ))}
+            </div>
+
+            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]")}>
+              <div className="space-y-4">
+                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                  <div className="rounded-[1.1rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3 shadow-[0_16px_26px_-24px_rgba(20,41,95,0.22)]">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최근 평균</p>
+                    <p className="font-aggro-display mt-2 text-[1.15rem] font-black tracking-[-0.04em] text-[#14295F]">
+                      {hasStudyTrendData ? minutesToLabel(avgStudyMinutes) : '기록 없음'}
+                    </p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                      최근 {RANGE_MAP[focusedChartView]}일 기준 평균 공부시간
+                    </p>
+                  </div>
+                  <div className="rounded-[1.1rem] border border-[#ffe1c5] bg-[#fff8ef] px-4 py-3 shadow-[0_16px_26px_-24px_rgba(255,122,22,0.16)]">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c86a10]">최고 집중일</p>
+                    <p className="font-aggro-display mt-2 text-[1.15rem] font-black tracking-[-0.04em] text-[#14295F]">
+                      {hasStudyTrendData ? (peakStudyPoint?.dateLabel ?? '기록 없음') : '아직 없음'}
+                    </p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                      {hasStudyTrendData ? `${minutesToLabel(peakStudyPoint?.studyMinutes ?? 0)}으로 가장 길게 공부했어요.` : '학습 기록이 더 모이면 최고 집중일을 보여드릴게요.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative h-[280px] w-full rounded-[1.2rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f8ff_100%)] px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="studyMinutesDialogGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#2554d4" stopOpacity={0.32} />
+                          <stop offset="95%" stopColor="#2554d4" stopOpacity={0.04} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dbe7ff" />
+                      <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: '#14295F' }} tickLine={false} axisLine={analysisChartAxisLine} />
+                      <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: '#14295F' }} tickLine={false} axisLine={analysisChartAxisLine} width={38} />
+                      <Tooltip content={<CustomTooltip unit="분" presentationMode={false} />} />
+                      <Area type="monotone" dataKey="studyMinutes" stroke="#2554d4" strokeWidth={3} fill="url(#studyMinutesDialogGradient)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                  {!hasStudyTrendData ? (
+                    <div className="pointer-events-none absolute inset-x-10 bottom-10 rounded-[1rem] border border-dashed border-[#dbe7ff] bg-white/92 px-3 py-2 text-center text-[11px] font-bold text-[#5c6e97] backdrop-blur-sm">
+                      공부시간 기록이 더 모이면 추이를 더 선명하게 볼 수 있어요.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="rounded-[1.35rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#2554d4]">흐름 해석</p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#14295F]">{chartInsights.daily.trend}</p>
+                  <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5c6e97]">{chartInsights.daily.improve}</p>
+                </div>
+                <div className="rounded-[1.35rem] border border-[#ffe1c5] bg-[#fff8ef] px-4 py-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d86a11]">오늘 누적</p>
+                  <p className="font-aggro-display mt-2 text-[1.35rem] font-black tracking-tight text-[#14295F]">
+                    {minutesToLabel(todayStudyMinutes)}
+                  </p>
+                  <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                    오늘 학습시간과 최근 평균을 함께 보며 오늘 페이스를 비교합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-1">
+              <DialogClose asChild>
+                <Button className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">확인</Button>
+              </DialogClose>
             </DialogFooter>
           </div>
         </DialogContent>
