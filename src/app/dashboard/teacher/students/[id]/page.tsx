@@ -980,6 +980,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!displaySeries.length) return 0;
     return Math.round(displaySeries.reduce((acc, item) => acc + item.studyMinutes, 0) / displaySeries.length);
   }, [displaySeries]);
+  const peakStudyPoint = useMemo(
+    () => (displaySeries.length ? displaySeries.reduce((best, item) => (item.studyMinutes > best.studyMinutes ? item : best)) : null),
+    [displaySeries]
+  );
 
   const avgCompletionRate = useMemo(() => {
     const values = displaySeries.filter((item) => item.hasCompletion).map((item) => item.completionRate);
@@ -3796,11 +3800,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <>
               <div className="grid gap-6 lg:grid-cols-12">
                 <Card className={cn("lg:col-span-12", detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
-                  <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <Badge className={detailBadgeClass}>운영 그래프</Badge>
-                        <Badge variant="outline" className={detailGrowthPeriodBadgeClass}>{RANGE_MAP[focusedChartView]}일 관찰</Badge>
+                <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge className={detailBadgeClass}>운영 그래프</Badge>
+                      <Badge variant="outline" className={detailGrowthPeriodBadgeClass}>{RANGE_MAP[focusedChartView]}일 관찰</Badge>
                       </div>
                       <CardTitle className={cn("text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><Activity className={cn("h-5 w-5 text-primary", isAnalysisPresentation && "text-white")} /> 공부시간 추이</CardTitle>
                       <CardDescription className={cn("font-bold text-[11px]", isAnalysisPresentation ? "text-white/85" : "text-[#5c6e97]")}>집중 시간이 흔들리는 구간을 먼저 읽고 리듬 변화 해석까지 연결합니다.</CardDescription>
@@ -3812,19 +3816,42 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="h-[280px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="studyMinutesGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={analysisStudyTrendStrokeColor} stopOpacity={isAnalysisPresentation ? 0.28 : 0.35} /><stop offset="95%" stopColor={analysisStudyTrendStrokeColor} stopOpacity={isAnalysisPresentation ? 0.04 : 0.02} /></linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={analysisChartGridColor} />
-                          <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} />
-                          <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={38} />
-                          <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
-                          <Area type="monotone" dataKey="studyMinutes" stroke={analysisStudyTrendStrokeColor} strokeWidth={3} fill="url(#studyMinutesGradient)" />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                    <div className={cn(detailChartPanelClass, "space-y-4")}>
+                      <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                        <div className="rounded-[1.1rem] border border-[#dbe7ff] bg-white/88 px-4 py-3 shadow-[0_16px_26px_-24px_rgba(20,41,95,0.22)]">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">최근 평균</p>
+                          <p className="font-aggro-display mt-2 text-[1.15rem] font-black tracking-[-0.04em] text-[#14295F]">
+                            {minutesToLabel(avgStudyMinutes)}
+                          </p>
+                          <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                            최근 {RANGE_MAP[focusedChartView]}일 기준 평균 공부시간
+                          </p>
+                        </div>
+                        <div className="rounded-[1.1rem] border border-[#ffe1c5] bg-[#fff8ef] px-4 py-3 shadow-[0_16px_26px_-24px_rgba(255,122,22,0.16)]">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c86a10]">최고 집중일</p>
+                          <p className="font-aggro-display mt-2 text-[1.15rem] font-black tracking-[-0.04em] text-[#14295F]">
+                            {peakStudyPoint?.dateLabel ?? '기록 없음'}
+                          </p>
+                          <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                            {minutesToLabel(peakStudyPoint?.studyMinutes ?? 0)}으로 가장 길게 공부했어요.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="h-[280px] w-full rounded-[1.2rem] border border-white/45 bg-[linear-gradient(180deg,rgba(20,41,95,0.05)_0%,rgba(20,41,95,0.02)_100%)] px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="studyMinutesGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={analysisStudyTrendStrokeColor} stopOpacity={isAnalysisPresentation ? 0.28 : 0.35} /><stop offset="95%" stopColor={analysisStudyTrendStrokeColor} stopOpacity={isAnalysisPresentation ? 0.04 : 0.02} /></linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={analysisChartGridColor} />
+                            <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} />
+                            <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={38} />
+                            <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
+                            <Area type="monotone" dataKey="studyMinutes" stroke={analysisStudyTrendStrokeColor} strokeWidth={3} fill="url(#studyMinutesGradient)" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
