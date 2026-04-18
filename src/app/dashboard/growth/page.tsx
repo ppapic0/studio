@@ -1711,7 +1711,7 @@ export default function GrowthPage() {
       </Dialog>
 
       <Dialog open={isPointTrackManualOpen} onOpenChange={setIsPointTrackManualOpen}>
-        <DialogContent className="flex max-h-[min(92svh,46rem)] w-[min(94vw,30rem)] flex-col overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#F8FBFF_0%,#EFF5FF_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
+        <DialogContent className="flex max-h-[min(92dvh,46rem)] w-[min(94vw,30rem)] flex-col overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#F8FBFF_0%,#EFF5FF_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
           <DialogHeader className="shrink-0 border-b border-[#DCE7FB] px-5 pb-0 pt-5 text-left">
             <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
               <BookOpen className="h-5 w-5 text-[#14295F]" />
@@ -1722,8 +1722,8 @@ export default function GrowthPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="space-y-4 px-5 py-4">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+            <div className="space-y-4 px-5 py-4 pb-6">
               <section className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 shadow-sm">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">상자 생성 규칙</p>
                 <div className="mt-3 grid gap-2.5">
@@ -1864,7 +1864,7 @@ export default function GrowthPage() {
                 </div>
               </section>
             </div>
-          </ScrollArea>
+          </div>
 
           <div className="shrink-0 border-t border-[#DCE7FB] bg-white px-5 py-4">
             <Button onClick={() => setIsPointTrackManualOpen(false)} className="h-12 w-full rounded-[1.2rem] font-black">
