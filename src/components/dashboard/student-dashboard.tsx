@@ -823,7 +823,7 @@ function PointHistoryDialog({
                       : "text-[clamp(3.2rem,5vw,4.8rem)]"
                     : isMobile
                       ? "text-[clamp(2rem,10vw,2.7rem)]"
-                      : "text-6xl sm:text-7xl"
+                      : "text-7xl"
                 )}>
                   {totalPoints.toLocaleString()}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>포인트</span>
                 </div>
@@ -847,7 +847,7 @@ function PointHistoryDialog({
           </CardContent>
         </Card>
       </DialogTrigger>
-      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "")}>
+      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "max-w-md")}>
         <div className={cn("bg-accent text-white relative", isMobile ? "p-6" : "p-10")}>
           <Sparkles className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
@@ -1222,7 +1222,7 @@ function StudySessionHistoryDialog({
               </div>
             </CardHeader>
             <CardContent className={cn("relative z-10 px-10 pb-10", isMobile ? "px-5 pb-5" : "")}>
-              <div className={cn("dashboard-number text-blue-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-6xl sm:text-7xl")}>
+              <div className={cn("dashboard-number text-blue-600 leading-none", isMobile ? "text-[clamp(2rem,10vw,2.7rem)]" : "text-7xl")}>
                 {h}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>h</span> {m}<span className={cn("opacity-40 font-bold uppercase", isMobile ? "text-sm ml-1" : "text-xl ml-1.5")}>m</span>
               </div>
               <div className={cn("mt-4 flex items-center gap-2", isMobile ? "mt-2.5 flex-wrap" : "mt-6")}>
@@ -1240,7 +1240,7 @@ function StudySessionHistoryDialog({
           </Card>
         )}
       </DialogTrigger>
-      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden sm:max-w-md", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "")}>
+      <DialogContent className={cn("rounded-[3rem] border border-slate-200 p-0 overflow-hidden", isMobile ? "w-[min(94vw,26rem)] max-h-[86svh] rounded-[2rem]" : "max-w-md")}>
         <div className={cn("bg-blue-600 text-white relative", isMobile ? "p-6" : "p-10")}>
           <Activity className="pointer-events-none absolute top-0 right-0 p-8 h-32 w-32 opacity-20" />
           <DialogHeader>
@@ -3507,7 +3507,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       />
 
       <Dialog open={isPointBoostPopupOpen} onOpenChange={setIsPointBoostPopupOpen}>
-        <DialogContent className={cn("overflow-hidden rounded-[2rem] border-0 p-0 shadow-[0_30px_80px_-40px_rgba(23,50,107,0.55)]", isMobile ? "w-[min(94vw,26rem)]" : "sm:max-w-md")}>
+        <DialogContent className={cn("overflow-hidden rounded-[2rem] border-0 p-0 shadow-[0_30px_80px_-40px_rgba(23,50,107,0.55)]", isMobile ? "w-[min(94vw,26rem)]" : "max-w-md")}>
           {pointBoostPopupEvent ? (
             <>
               <div className={cn("relative overflow-hidden bg-[linear-gradient(145deg,#17326B_0%,#2554D7_55%,#5B8CFF_100%)] text-white", isMobile ? "p-6" : "p-7")}>
@@ -3566,14 +3566,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
-        <DialogContent className={cn("flex max-h-[85vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0", isMobile ? "" : "sm:w-full sm:max-w-lg")}>
+        <DialogContent className={cn("flex max-h-[85vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0", isMobile ? "" : "w-full max-w-lg")}>
           <div className="bg-primary p-5 text-white">
             <DialogHeader>
               <DialogTitle className="text-xl font-black tracking-tight">시험 디데이 / 진로 목표</DialogTitle>
               <DialogDescription className="text-white/80">시험 일정과 희망 학교 또는 직업을 등록해두면 학생 홈 상단에서 바로 확인할 수 있어요.</DialogDescription>
             </DialogHeader>
           </div>
-          <div className="space-y-3 overflow-y-auto bg-white p-4 sm:p-5">
+          <div className={cn("space-y-3 overflow-y-auto bg-white", isMobile ? "p-4" : "p-5")}>
             <div className="rounded-2xl border border-primary/10 bg-slate-50/70 p-4">
               <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[132px_minmax(0,1fr)]")}>
                 <div className="space-y-1.5">
@@ -3665,7 +3665,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             ) : null}
           </div>
-          <DialogFooter className="border-t bg-white p-4 sm:p-5">
+          <DialogFooter className={cn("border-t bg-white", isMobile ? "p-4" : "p-5")}>
             <Button type="button" variant="ghost" className="h-10 rounded-xl font-bold" onClick={() => setIsExamDialogOpen(false)}>
               닫기
             </Button>
@@ -3711,7 +3711,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </button>
             </DialogTrigger>
-            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-[450px] max-h-[90vh]")}>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "max-w-[450px] max-h-[90vh]")}>
               <div className="bg-primary p-8 text-white relative shrink-0">
           <FileText className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
                 <DialogHeader>
@@ -3826,13 +3826,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
                 <div className="student-copy-stack grid min-w-0">
                   <span className={cn("font-black tracking-tighter text-[#17326B] break-keep", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
-                  <span className={cn("font-bold text-[#6781AE] uppercase tracking-widest text-[8px] sm:text-[10px]")}>빠른 요청</span>
+                  <span className={cn("font-bold text-[#6781AE] uppercase tracking-widest", isMobile ? "text-[8px]" : "text-[10px]")}>빠른 요청</span>
                 </div>
                 <ChevronRight className="ml-auto h-5 w-5 text-[#8AA0C7]" />
               </Card>
             </button>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
+          <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "max-w-2xl max-h-[90vh]")}>
             <div className="bg-amber-500 p-8 text-white relative shrink-0">
           <BellRing className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
@@ -3933,7 +3933,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </button>
             </DialogTrigger>
-            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-lg max-h-[90vh]")}>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "max-w-lg max-h-[90vh]")}>
               <div className="bg-[linear-gradient(180deg,#17326B_0%,#10244F_100%)] p-8 text-white relative shrink-0">
                 <ShieldAlert className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
                 <DialogHeader>
@@ -3971,7 +3971,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       <Info className="h-4 w-4 text-[#17326B]" />
                       <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-[#6781AE]">이럴 때 벌점이 반영돼요</h4>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className={cn("grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-2")}>
                       {STUDENT_PENALTY_GUIDE_ITEMS.map((item) => (
                         <div
                           key={item.key}
@@ -4085,7 +4085,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 </Card>
               </button>
             </DialogTrigger>
-            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "sm:max-w-2xl max-h-[90vh]")}>
+            <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "max-w-2xl max-h-[90vh]")}>
               <div className="bg-[linear-gradient(180deg,#FF9A2F_0%,#FF7A16_100%)] p-8 text-white relative shrink-0">
                 <Wifi className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
                 <DialogHeader>
