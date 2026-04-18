@@ -853,16 +853,16 @@ export default function AnalysisTrackPage() {
           <TabsTrigger value="growth" className={cn(
             'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[var(--accent-orange)]',
             growthTabMatchesDesktop
-              ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white'
-              : 'data-[state=active]:text-[#17326B] text-[#6B5676] hover:text-[#17326B]'
+              ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white data-[state=inactive]:bg-white/[0.04]'
+              : 'data-[state=active]:text-[#17326B] text-[#7A5830] hover:text-[#17326B] data-[state=inactive]:bg-white/55 data-[state=inactive]:shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]'
           )}>
             <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> 성장 맵
           </TabsTrigger>
           <TabsTrigger value="full" className={cn(
             'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[var(--accent-orange)]',
             growthTabMatchesDesktop
-              ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white'
-              : 'data-[state=active]:text-[#17326B] text-[#6B5676] hover:text-[#17326B]'
+              ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white data-[state=inactive]:bg-white/[0.04]'
+              : 'data-[state=active]:text-[#17326B] text-[#7A5830] hover:text-[#17326B] data-[state=inactive]:bg-white/55 data-[state=inactive]:shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]'
           )}>
             <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> 전체 분석
           </TabsTrigger>
