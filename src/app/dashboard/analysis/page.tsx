@@ -851,18 +851,18 @@ export default function AnalysisTrackPage() {
             : 'gap-1.5 border border-[#F0DDC9] bg-[linear-gradient(180deg,#FFF9F1_0%,#FFF2E5_100%)] shadow-[0_16px_34px_-28px_rgba(191,115,31,0.18)]'
         )}>
           <TabsTrigger value="growth" className={cn(
-            'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[var(--accent-orange)]',
+            'font-aggro-display rounded-[1.1rem] border px-3 py-2.5 text-xs font-black opacity-100 data-[state=active]:bg-[var(--accent-orange)]',
             growthTabMatchesDesktop
-              ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white data-[state=inactive]:bg-white/[0.04]'
-              : 'data-[state=active]:text-[#17326B] text-[#7A5830] hover:text-[#17326B] data-[state=inactive]:bg-white/55 data-[state=inactive]:shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]'
+              ? 'border-white/10 bg-white/[0.05] text-white/80 hover:text-white data-[state=active]:border-transparent data-[state=active]:text-white'
+              : 'border-[#EADBC8] bg-white/80 text-[#6F4D28] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:text-[#17326B] data-[state=active]:border-transparent data-[state=active]:text-[#17326B]'
           )}>
             <TrendingUp className="mr-1.5 h-3.5 w-3.5" /> 성장 맵
           </TabsTrigger>
           <TabsTrigger value="full" className={cn(
-            'font-aggro-display rounded-[1.1rem] px-3 py-2.5 text-xs font-black data-[state=active]:bg-[var(--accent-orange)]',
+            'font-aggro-display rounded-[1.1rem] border px-3 py-2.5 text-xs font-black opacity-100 data-[state=active]:bg-[var(--accent-orange)]',
             growthTabMatchesDesktop
-              ? 'data-[state=active]:text-white text-[var(--text-on-dark-soft)] hover:text-white data-[state=inactive]:bg-white/[0.04]'
-              : 'data-[state=active]:text-[#17326B] text-[#7A5830] hover:text-[#17326B] data-[state=inactive]:bg-white/55 data-[state=inactive]:shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]'
+              ? 'border-white/10 bg-white/[0.05] text-white/80 hover:text-white data-[state=active]:border-transparent data-[state=active]:text-white'
+              : 'border-[#EADBC8] bg-white/80 text-[#6F4D28] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:text-[#17326B] data-[state=active]:border-transparent data-[state=active]:text-[#17326B]'
           )}>
             <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> 전체 분석
           </TabsTrigger>
