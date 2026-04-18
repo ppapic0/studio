@@ -407,7 +407,7 @@ function StatAnalysisCard({
     return (
       <Card
         className={cn(
-          'analysis-premium-card analysis-full-kpi-card surface-card surface-card--secondary on-dark min-w-0 h-full overflow-hidden border-none transition-all',
+          'analysis-premium-card analysis-full-kpi-card surface-card surface-card--secondary on-dark min-w-0 h-full overflow-hidden border-none font-aggro-display transition-all',
           isCompactAnalysisKpi ? 'analysis-full-kpi-card--compact rounded-[1.2rem]' : 'rounded-[1.5rem]',
           onClick && 'cursor-pointer active:scale-[0.985]'
         )}
@@ -433,7 +433,7 @@ function StatAnalysisCard({
             <div className={cn('analysis-kpi-card-value dashboard-number font-aggro-display font-black tracking-tight break-keep text-[#17326B]', isCompactAnalysisKpi ? 'mt-2 whitespace-pre-line text-[0.95rem] leading-[0.95]' : isMobile ? 'mt-3 text-[1.9rem] leading-[0.92]' : 'mt-3 text-[1.85rem]')}>
               {displayedValue}
             </div>
-            <p className={cn('analysis-kpi-card-subvalue break-keep text-[#3E5488]', isCompactAnalysisKpi ? 'mt-1 text-[8px] font-bold leading-[1.28] tracking-[-0.02em]' : isMobile ? 'mt-1 text-[10px] font-semibold leading-5' : 'mt-1 text-[11px] font-semibold leading-5')}>
+            <p className={cn('analysis-kpi-card-subvalue font-aggro-display break-keep text-[#3E5488]', isCompactAnalysisKpi ? 'mt-1 text-[8px] font-bold leading-[1.28] tracking-[-0.02em]' : isMobile ? 'mt-1 text-[10px] font-semibold leading-5' : 'mt-1 text-[11px] font-semibold leading-5')}>
               {displayedSubValue}
             </p>
           </div>
@@ -2342,7 +2342,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <Link href={backHref}><ArrowLeft className="h-5 w-5" /></Link>
               </Button>
             )}
-            <div className="flex flex-col gap-1 min-w-0">
+            <div className={cn("flex flex-col gap-1 min-w-0", isAnalysisPresentation && "font-aggro-display")}>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className={cn(
                   isAnalysisPresentation
