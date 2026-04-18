@@ -498,6 +498,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isMasteryModalOpen, setIsMasteryModalOpen] = useState(false);
   const [isRhythmGuideModalOpen, setIsRhythmGuideModalOpen] = useState(false);
   const [isAvgStudyModalOpen, setIsAvgStudyModalOpen] = useState(false);
+  const [isCompletionTrendModalOpen, setIsCompletionTrendModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isQuickFeedbackModalOpen, setIsQuickFeedbackModalOpen] = useState(false);
@@ -985,6 +986,26 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!values.length) return 0;
     return Math.round(values.reduce((acc, value) => acc + value, 0) / values.length);
   }, [displaySeries]);
+  const completionGuideMeta = useMemo(() => {
+    const completionEntries = displaySeries.filter((item) => item.hasCompletion || item.completionRate > 0);
+    const latestEntry = completionEntries[completionEntries.length - 1];
+    const observedDays = completionEntries.length;
+    const stableDays = completionEntries.filter((item) => item.completionRate >= 80).length;
+    const cautionDays = completionEntries.filter((item) => item.completionRate > 0 && item.completionRate < 60).length;
+    const headline = avgCompletionRate >= 80
+      ? '완수 흐름이 안정적으로 유지되고 있어요.'
+      : avgCompletionRate >= 60
+        ? '핵심 과제 중심으로 압축하면 흐름이 더 좋아질 수 있어요.'
+        : '계획 볼륨을 줄이고 우선순위를 다시 잡는 편이 좋아요.';
+
+    return {
+      observedDays,
+      latestRate: latestEntry?.completionRate ?? 0,
+      stableDays,
+      cautionDays,
+      headline,
+    };
+  }, [avgCompletionRate, displaySeries]);
 
   const rhythmGuideMeta = useMemo(() => {
     const minutes = normalizeRhythmMinutes(displaySeries.map((item) => ({ studyMinutes: item.studyMinutes, hasActualStudyLog: item.hasActualStudyLog })));
@@ -2591,6 +2612,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               icon={CheckCircle2}
               colorClass="text-amber-500"
               isMobile={isMobile}
+              onClick={() => setIsCompletionTrendModalOpen(true)}
               presentationMode={presentationMode}
               progress={avgCompletionRate}
             />
@@ -3766,7 +3788,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           ) : (
             <>
               <div className="grid gap-6 lg:grid-cols-12">
-                <Card className={cn("lg:col-span-8", detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
+                <Card className={cn("lg:col-span-12", detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
                   <CardHeader className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -3795,30 +3817,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
                           <Area type="monotone" dataKey="studyMinutes" stroke={analysisStudyTrendStrokeColor} strokeWidth={3} fill="url(#studyMinutesGradient)" />
                         </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className={cn("lg:col-span-4", detailChartCardClass, isAnalysisPresentation && "analysis-chart-stage")}>
-                  <CardHeader className="pb-3">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <Badge className={detailBadgeClass}>실행력 점검</Badge>
-                    </div>
-                    <CardTitle className={cn("text-xl font-black tracking-tight flex items-center gap-2", analysisRequestedTitleClass)}><CheckCircle2 className="h-5 w-5 text-amber-500" /> 계획 완수율</CardTitle>
-                    <CardDescription className={cn("font-bold text-[11px]", isAnalysisPresentation ? "text-white/85" : "text-[#5c6e97]")}>일별 완료율로 실행력의 안정성과 흔들리는 날짜를 점검합니다.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[280px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
-                          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} />
-                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={32} domain={[0, 100]} />
-                          <Tooltip content={<CustomTooltip unit="%" presentationMode={presentationMode} />} />
-                          <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={14} />
-                          <Line type="monotone" dataKey="completionRate" stroke="#b45309" strokeWidth={2.5} dot={{ r: 3, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} activeDot={{ r: 5, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} />
-                        </ComposedChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
@@ -4237,6 +4235,130 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <Button className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">확인</Button>
                 </DialogClose>
               )}
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCompletionTrendModalOpen} onOpenChange={setIsCompletionTrendModalOpen}>
+        <DialogContent className="rounded-[2.25rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl">
+          <div className={cn(
+            "px-6 py-5",
+            isAnalysisPresentation
+              ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE5C4_100%)] text-[#17326B]"
+              : "bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] text-white"
+          )}>
+            <DialogHeader>
+              {!isAnalysisPresentation ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                    {student?.name || '학생'}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    {formatSeatLabel(student)}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    실행력 점검
+                  </Badge>
+                </div>
+              ) : null}
+              <DialogTitle className="text-2xl font-black tracking-tight">계획 완수율 그래프</DialogTitle>
+              <DialogDescription className={cn("font-semibold", isAnalysisPresentation ? "text-[#5F7299]" : "text-white/80")}>
+                최근 {RANGE_MAP[focusedChartView]}일 기준으로 일별 완료율 흐름과 흔들리는 날짜를 한 번에 확인합니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-4 bg-white px-6 py-5">
+            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]")}>
+              <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                <div className={cn("mb-3 flex gap-1 rounded-xl p-1 w-fit", isAnalysisPresentation ? "bg-[#17326B]/8" : "border border-[#dbe7ff] bg-[#f8fbff]")}>
+                  {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
+                    <Button
+                      key={key}
+                      variant={focusedChartView === key ? 'default' : 'ghost'}
+                      className={cn(
+                        "h-8 px-3 rounded-lg text-[10px] font-black",
+                        !isAnalysisPresentation && focusedChartView !== key && "text-[#14295F] hover:bg-white hover:text-[#14295F]"
+                      )}
+                      onClick={() => setFocusedChartView(key)}
+                    >
+                      {RANGE_MAP[key]}일
+                    </Button>
+                  ))}
+                </div>
+                {hasCompletionTrendData ? (
+                  <div className="h-[240px] w-full rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] p-3">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dbe7ff" />
+                        <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} />
+                        <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={36} domain={[0, 100]} />
+                        <Tooltip
+                          content={(
+                            <AnalysisTrendTooltip
+                              presentationMode={presentationMode}
+                              series={[
+                                { dataKey: 'completionRate', label: '완료율', color: '#d97706', formatter: (value) => `${Math.round(Number(value || 0))}%` },
+                              ]}
+                            />
+                          )}
+                        />
+                        <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={isMobile ? 14 : 18} />
+                        <Line type="monotone" dataKey="completionRate" stroke="#b45309" strokeWidth={2.5} dot={{ r: 3, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} activeDot={{ r: 5, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="rounded-[1.2rem] border border-dashed border-[#dbe7ff] bg-[#f8fbff] px-4 py-10 text-center text-sm font-bold text-[#5c6e97]">
+                    완수율 데이터가 더 쌓이면 실행력 흐름을 그래프로 보여드릴 수 있어요.
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">완수율 해석</p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#14295F]">
+                    {completionGuideMeta.headline}
+                  </p>
+                  <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5c6e97]">
+                    계획이 많은 날과 실행이 흔들린 날을 함께 보면 다음 주 과제 볼륨을 더 정확하게 조정할 수 있어요.
+                  </p>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                  <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2.5">
+                    <p className="font-black text-[#5c6e97]">평균 완수율</p>
+                    <p className="text-base font-black text-[#14295F]">{avgCompletionRate}%</p>
+                  </div>
+                  <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2.5">
+                    <p className="font-black text-[#5c6e97]">마지막 기록</p>
+                    <p className="text-base font-black text-[#14295F]">{completionGuideMeta.latestRate}%</p>
+                  </div>
+                  <div className="rounded-xl border border-[#d5f2e7] bg-[#f2fff8] px-3 py-2.5">
+                    <p className="font-black text-[#0f8f65]">안정권 일수</p>
+                    <p className="text-base font-black text-[#14295F]">{completionGuideMeta.stableDays}일</p>
+                  </div>
+                  <div className="rounded-xl border border-[#ffe1c5] bg-[#fff8ef] px-3 py-2.5">
+                    <p className="font-black text-[#d86a11]">점검 필요 일수</p>
+                    <p className="text-base font-black text-[#14295F]">{completionGuideMeta.cautionDays}일</p>
+                  </div>
+                  <div className="sm:col-span-2 rounded-xl border border-[#dbe7ff] bg-white px-3 py-3">
+                    <p className="font-black text-[#5c6e97]">관찰 구간</p>
+                    <p className="mt-1 text-lg font-black text-[#14295F]">최근 {RANGE_MAP[focusedChartView]}일</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">
+                      완료율이 기록된 날은 {completionGuideMeta.observedDays}일입니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-1">
+              <DialogClose asChild>
+                <Button className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">확인</Button>
+              </DialogClose>
             </DialogFooter>
           </div>
         </DialogContent>
