@@ -2845,7 +2845,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           {isAnalysisPresentation ? (
             <StudentAnalysisOverviewSection
               isMobile={isMobile}
-              rankingLoading={rankingLoading}
               summary={studentFullAnalysisSummary}
               chartInsights={chartInsights}
               hasWeeklyGrowthData={hasWeeklyGrowthData}

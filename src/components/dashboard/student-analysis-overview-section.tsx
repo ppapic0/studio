@@ -65,7 +65,6 @@ type StudySessionPoint = {
 
 type StudentAnalysisOverviewSectionProps = {
   isMobile: boolean;
-  rankingLoading: boolean;
   summary: StudentFullAnalysisSummary;
   chartInsights: {
     weekly: ChartInsight;
@@ -135,25 +134,6 @@ function formatSignedPercent(value: number): string {
   return `${rounded >= 0 ? '+' : ''}${rounded}%`;
 }
 
-function getToneClasses(tone: StudentFullAnalysisSummary['tone']) {
-  if (tone === 'good') {
-    return {
-      text: 'text-emerald-600',
-      badge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    };
-  }
-  if (tone === 'recovery') {
-    return {
-      text: 'text-rose-500',
-      badge: 'border-rose-200 bg-rose-50 text-rose-600',
-    };
-  }
-  return {
-    text: 'text-[#2554d4]',
-    badge: 'border-[#dbe7ff] bg-[#eef4ff] text-[#2554d4]',
-  };
-}
-
 function SectionStateBadge({ ready }: { ready: boolean }) {
   return (
     <Badge
@@ -170,30 +150,9 @@ function SectionStateBadge({ ready }: { ready: boolean }) {
   );
 }
 
-function SummaryCard({
-  label,
-  title,
-  detail,
-  titleClassName,
-}: {
-  label: string;
-  title: string;
-  detail: string;
-  titleClassName?: string;
-}) {
-  return (
-    <div className="analysis-summary-card surface-card surface-card--ghost on-dark rounded-[1.5rem] border border-white/10 p-4 shadow-none">
-      <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B]">{label}</p>
-      <p className={cn('mt-3 break-keep font-aggro-display text-[1rem] font-black leading-6 tracking-[-0.03em] text-[#17326B]', titleClassName)}>{title}</p>
-      <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5F7299]">{detail}</p>
-    </div>
-  );
-}
-
 export default function StudentAnalysisOverviewSection(props: StudentAnalysisOverviewSectionProps) {
   const {
     isMobile,
-    rankingLoading,
     summary,
     chartInsights,
     hasWeeklyGrowthData,
@@ -229,7 +188,6 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
     riskSignals,
   } = props;
 
-  const tone = getToneClasses(summary.tone);
   const chartMargin = isMobile ? { top: 10, right: 6, left: -10, bottom: 0 } : { top: 10, right: 10, left: -14, bottom: 0 };
   const tooltipStyle = {
     borderRadius: 18,
@@ -240,41 +198,6 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
 
   return (
     <section className="space-y-5">
-      <div className="analysis-overview-shell analysis-premium-card analysis-full-board-card surface-card surface-card--secondary on-dark">
-        <div className={cn(isMobile ? 'space-y-4' : 'space-y-5')}>
-          <div className={cn(isMobile ? 'flex flex-col gap-3' : 'flex items-start justify-between gap-4')}>
-            <div className="min-w-0">
-              <Badge variant="outline" className="rounded-full border-[#dbe7ff] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#17326B] shadow-none">
-                한눈 요약
-              </Badge>
-              <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.08rem,1.55vw,1.28rem)] font-black tracking-[-0.03em] text-[#17326B]">
-                지금 위치와 흐름을 먼저 읽어보세요
-              </h2>
-              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5F7299]">
-                {summary.coachNote}
-              </p>
-            </div>
-            <Badge variant="outline" className={cn('w-fit rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] shadow-none', rankingLoading ? 'border-[#dbe7ff] bg-white text-[#5F7299]' : tone.badge)}>
-              {rankingLoading ? '위치 계산 중' : '센터 비교 기준'}
-            </Badge>
-          </div>
-
-          <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
-            <SummaryCard label="현재 위치" title={summary.positionTitle} detail={summary.positionDetail} />
-            <SummaryCard label="이번 흐름" title={summary.statusLabel} detail={summary.statusDetail} titleClassName={tone.text} />
-            <SummaryCard label={summary.strengthTitle} title={summary.strengthDetail} detail="지금 유지하면 좋은 강점을 먼저 잡아드렸어요." />
-            <SummaryCard label={summary.improvementTitle} title={summary.improvementDetail} detail="당장 손보면 체감이 빠른 한 가지를 먼저 골랐어요." />
-          </div>
-
-          <div className="analysis-summary-callout rounded-[1.35rem] px-4 py-3">
-            <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.18em] text-[#D86A11]">자세히 보기</p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[#5F7299]">
-              자세한 그래프는 아래에서 보고 싶을 때만 펼쳐보세요. 먼저 읽어야 할 건 지금 내 위치와 이번 주 흐름이에요.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className="analysis-overview-shell analysis-premium-card analysis-full-board-card surface-card surface-card--primary on-dark">
         <div className={cn(isMobile ? 'space-y-4' : 'space-y-5')}>
           <div className="min-w-0">
