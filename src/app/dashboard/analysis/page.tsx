@@ -181,39 +181,6 @@ function AnalysisTooltip({
   );
 }
 
-function GrowthSummaryCard({
-  title,
-  detail,
-  metricLabel,
-  metricValue,
-  tone,
-}: {
-  title: string;
-  detail: string;
-  metricLabel: string;
-  metricValue: string;
-  tone: GrowthSummaryTone;
-}) {
-  const toneStyles = SUMMARY_TONE_STYLES[tone];
-
-  return (
-    <div className={cn('analysis-growth-signal-card rounded-[1.5rem] p-4 bg-gradient-to-br', toneStyles.glow)}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[rgba(240,247,255,0.72)]">{title}</p>
-          <p className="mt-3 text-sm font-semibold leading-6 text-white">{detail}</p>
-        </div>
-        <div className={cn('rounded-full border px-3 py-1.5 text-[10px] font-black tracking-[0.14em]', toneStyles.badge)}>
-          {metricLabel}
-        </div>
-      </div>
-      <p className={cn('font-aggro-display mt-4 break-keep text-[1.18rem] font-black tracking-[-0.04em]', toneStyles.accent)}>
-        {metricValue}
-      </p>
-    </div>
-  );
-}
-
 function SessionMetricCard({
   label,
   value,
@@ -698,7 +665,6 @@ export default function AnalysisTrackPage() {
     (best, item) => (item.totalMinutes > best.totalMinutes ? item : best),
     weeklyData[0] || { dateKey: format(new Date(), 'yyyy-MM-dd'), label: '오늘', shortLabel: '오늘', totalMinutes: 0, avgMinutes: 0 }
   );
-  const blankDayCount = useMemo(() => chartData.filter((item) => item.totalMinutes === 0).length, [chartData]);
   const hasBlankDays = useMemo(() => chartData.some((item) => item.totalMinutes === 0), [chartData]);
   const remainingGoalMinutes = Math.max(0, heroGoalMinutes - todayMinutes);
   const growthSummary = useMemo(
@@ -714,74 +680,6 @@ export default function AnalysisTrackPage() {
     [chartData, kpi.avgMin14, kpi.maxStreak, kpi.studyDays, kpi.weekDiffPct, sessionMetrics.completionRate]
   );
   const summaryToneStyles = SUMMARY_TONE_STYLES[growthSummary.tone];
-  const summaryCards = useMemo(
-    () => [
-      {
-        title: growthSummary.strengthTitle,
-        detail: growthSummary.strengthDetail,
-        metricLabel:
-          sessionMetrics.completionRate >= 85
-            ? '완료율'
-            : kpi.maxStreak >= 4
-              ? '연속 기록'
-              : kpi.weekDiffPct >= 10
-                ? '주간 변화'
-                : '14일 평균',
-        metricValue:
-          sessionMetrics.completionRate >= 85
-            ? `${sessionMetrics.completionRate}%`
-            : kpi.maxStreak >= 4
-              ? `${kpi.maxStreak}일`
-              : kpi.weekDiffPct >= 10
-                ? signedPercent(kpi.weekDiffPct)
-                : minutesToCompactLabel(kpi.avgMin14),
-        tone: 'good' as const,
-      },
-      {
-        title: growthSummary.weaknessTitle,
-        detail: growthSummary.weaknessDetail,
-        metricLabel:
-          blankDayCount > 0
-            ? '공백일'
-            : kpi.weekDiffPct < 0
-              ? '주간 변화'
-              : sessionMetrics.completionRate < 70
-                ? '완료율'
-                : '14일 평균',
-        metricValue:
-          blankDayCount > 0
-            ? `${blankDayCount}일`
-            : kpi.weekDiffPct < 0
-              ? signedPercent(kpi.weekDiffPct)
-              : sessionMetrics.completionRate < 70
-                ? `${sessionMetrics.completionRate}%`
-                : minutesToCompactLabel(kpi.avgMin14),
-        tone: blankDayCount > 0 || kpi.weekDiffPct < 0 || sessionMetrics.completionRate < 70 ? ('recovery' as const) : ('steady' as const),
-      },
-      {
-        title: growthSummary.growthTitle,
-        detail: growthSummary.growthDetail,
-        metricLabel: '이번 주',
-        metricValue: minutesToCompactLabel(kpi.thisWeekMin),
-        tone: growthSummary.tone,
-      },
-    ],
-    [
-      blankDayCount,
-      growthSummary.growthDetail,
-      growthSummary.growthTitle,
-      growthSummary.strengthDetail,
-      growthSummary.strengthTitle,
-      growthSummary.tone,
-      growthSummary.weaknessDetail,
-      growthSummary.weaknessTitle,
-      kpi.avgMin14,
-      kpi.maxStreak,
-      kpi.thisWeekMin,
-      kpi.weekDiffPct,
-      sessionMetrics.completionRate,
-    ]
-  );
   const densityData = useMemo(
     () => [
       { label: '완료율', value: clampPercent(sessionMetrics.completionRate) },
@@ -889,37 +787,6 @@ export default function AnalysisTrackPage() {
                   </h1>
                 </div>
 
-                <div className={cn('analysis-growth-summary-card analysis-growth-summary-card--soft rounded-[1.55rem]', isMobile ? 'p-4' : 'p-5')}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-on-dark-muted)]">지금 상태 한 줄</p>
-                      <p className={cn('font-aggro-display mt-2 break-keep font-black tracking-[-0.03em] text-white', isMobile ? 'text-[1.02rem] leading-6' : 'text-lg leading-7')}>
-                        {growthSummary.coachNote}
-                      </p>
-                    </div>
-                    <span className={cn('font-aggro-display text-sm font-black tracking-[-0.03em]', summaryToneStyles.accent)}>
-                      {kpi.weekDiffPct >= 0 ? `${signedPercent(kpi.weekDiffPct)} 상승` : `${signedPercent(kpi.weekDiffPct)} 조정`}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-sm font-semibold leading-6 text-[var(--text-on-dark-soft)]">
-                    {todayMinutes > 0
-                      ? `오늘은 ${minutesToCompactLabel(todayMinutes)}을 기록했고, 최근 14일 평균은 ${minutesToLabel(kpi.avgMin14)}이에요.`
-                      : `오늘 기록은 아직 없지만, 최근 14일 평균은 ${minutesToLabel(kpi.avgMin14)}으로 집계되고 있어요.`}
-                  </p>
-                </div>
-
-                <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
-                  {summaryCards.map((card) => (
-                    <GrowthSummaryCard
-                      key={`${card.title}-${card.metricLabel}`}
-                      title={card.title}
-                      detail={card.detail}
-                      metricLabel={card.metricLabel}
-                      metricValue={card.metricValue}
-                      tone={card.tone}
-                    />
-                  ))}
-                </div>
               </div>
 
               <div className="analysis-growth-summary-card rounded-[1.85rem] p-5">
@@ -974,22 +841,13 @@ export default function AnalysisTrackPage() {
           </section>
 
           <section className={cn('analysis-growth-map rounded-[2rem]', isMobile ? 'p-5' : 'p-6')}>
-            <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'flex-row items-start justify-between')}>
+            <div>
               <div>
                 <span className="analysis-growth-kicker">자세히 보기</span>
                 <h2 className={cn('font-aggro-display mt-3 break-keep font-black tracking-[-0.04em] text-white', isMobile ? 'text-[1.18rem] leading-7' : 'text-[1.35rem] leading-[1.1]')}>
                   보고 싶을 때만 그래프를 펼쳐보세요
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-on-dark-soft)]">지금은 핵심만 먼저 보여주고, 아래에서 필요한 분석만 골라서 볼 수 있어요.</p>
-              </div>
-              <div className="analysis-growth-light-card rounded-[1.2rem] px-4 py-3 text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7da6]">빠른 체크</p>
-                <p className="font-aggro-display mt-1 text-lg font-black tracking-[-0.03em] text-[#14295F]">
-                  {blankDayCount > 0 ? `${blankDayCount}일 공백` : '흐름 안정'}
-                </p>
-                <p className="mt-1 text-[12px] font-semibold text-[#5c6e97]">
-                  {blankDayCount > 0 ? '빈 날부터 줄이면 성장 그래프가 더 선명해져요.' : '최근 흐름이 매끄럽게 이어지고 있어요.'}
-                </p>
               </div>
             </div>
             <div className="student-analysis-shell mt-5">
