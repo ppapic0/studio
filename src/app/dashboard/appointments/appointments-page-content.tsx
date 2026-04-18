@@ -1172,6 +1172,7 @@ export function AppointmentsPageContent({
   const staffLabelClass = 'text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]';
   const staffInsetPanelClass = 'rounded-[1.4rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#f9fbff_0%,#eef4ff_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]';
   const staffInputClass = 'rounded-xl border-[#dbe5ff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] font-bold text-[#14295F] placeholder:text-[#8ca0c7]';
+  const studentTrackInputClass = 'border-[#dbe5ff] bg-white text-[#14295F] placeholder:text-[#8ca0c7] shadow-[0_16px_28px_-24px_rgba(20,41,95,0.18)]';
 
   const renderRequestedUrlPanel = (item: ParentCommunicationRecord, surface: 'student' | 'staff') => {
     if (item.supportKind !== 'wifi_unblock' || !item.requestedUrl) return null;
@@ -1370,7 +1371,7 @@ export function AppointmentsPageContent({
               surface === 'staff'
                 ? staffInputClass
                 : isStudentTrackTheme
-                  ? 'rounded-xl border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]'
+                  ? cn('rounded-xl border', studentTrackInputClass)
                   : 'rounded-xl border-2'
             )}
           />
@@ -2135,7 +2136,7 @@ export function AppointmentsPageContent({
                             ? '질문 제목 (선택)'
                             : '건의 제목 (선택)'
                       }
-                      className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]")}
+                      className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && studentTrackInputClass)}
                     />
                   </div>
                   {inquiryType === 'firewall' && (
@@ -2143,7 +2144,7 @@ export function AppointmentsPageContent({
                       value={firewallUrl}
                       onChange={(e) => setFirewallUrl(e.target.value)}
                       placeholder="예: classroom.google.com 또는 https://classroom.google.com"
-                      className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]")}
+                      className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && studentTrackInputClass)}
                     />
                   )}
                   <Textarea
@@ -2156,7 +2157,7 @@ export function AppointmentsPageContent({
                           ? '질문 내용을 입력해 주세요.'
                           : '건의사항 내용을 입력해 주세요.'
                     }
-                    className={cn("rounded-xl min-h-[120px] resize-none text-sm font-bold border-2", isStudentTrackTheme && "border-white/12 bg-white/[0.08] text-[var(--text-on-dark)] placeholder:text-[var(--text-on-dark-muted)]")}
+                    className={cn("rounded-xl min-h-[120px] resize-none text-sm font-bold border-2", isStudentTrackTheme && studentTrackInputClass)}
                   />
                   <div className="flex justify-end">
                     <Button
