@@ -138,6 +138,40 @@ function formatTrendDateLabel(date: string, isToday: boolean) {
   return `${Number(month)}/${Number(day)}`;
 }
 
+type TrendPoint = {
+  date: string;
+  minutes: number;
+};
+
+function isNormalizedTrendDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) || /^0000-\d{2}-\d{2}$/.test(value);
+}
+
+function buildMiniTrendPoints(aiMeta: DailyReportAiMeta, reportDateKey?: string): TrendPoint[] {
+  const normalizedReportDate = normalizeHistoryDate(reportDateKey);
+  const historyMap = new Map<string, TrendPoint>();
+
+  [...(aiMeta.history7Days || [])]
+    .map((entry) => ({
+      date: normalizeHistoryDate(entry.date),
+      minutes: Math.max(0, Math.round(Number(entry.minutes || 0))),
+    }))
+    .filter((entry) => isNormalizedTrendDate(entry.date))
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .forEach((entry) => {
+      if (normalizedReportDate && entry.date === normalizedReportDate) return;
+      historyMap.set(entry.date, entry);
+    });
+
+  return [
+    ...historyMap.values(),
+    {
+      date: normalizedReportDate || 'today',
+      minutes: Math.max(0, Math.round(aiMeta.totalStudyMinutes || 0)),
+    },
+  ];
+}
+
 function toSummaryTone(aiMeta?: DailyReportAiMeta | null) {
   if (!aiMeta?.growthBand && !aiMeta?.routineBand) return '차분한 흐름입니다.';
   if (aiMeta.growthBand === '급상승' || aiMeta.growthBand === '상승') {
@@ -565,14 +599,15 @@ function ReportActionBoard({
 function MiniTrendChart({
   aiMeta,
   displayHeadingsOnly = false,
+  reportDateKey,
 }: {
   aiMeta?: DailyReportAiMeta | null;
   displayHeadingsOnly?: boolean;
+  reportDateKey?: string;
 }) {
   if (!aiMeta) return null;
 
-  const history = Array.isArray(aiMeta.history7Days) ? aiMeta.history7Days : [];
-  const points = [...history, { date: 'today', minutes: aiMeta.totalStudyMinutes || 0 }];
+  const points = buildMiniTrendPoints(aiMeta, reportDateKey);
   if (points.length === 0) return null;
 
   const maxMinutes = Math.max(1, ...points.map((point) => Math.max(0, point.minutes || 0)));
@@ -974,10 +1009,12 @@ export function VisualReportViewer({
                 <Badge className="border-none bg-white/10 text-white/85 font-black">{normalizedAiMeta.variationStyle}</Badge>
               )}
             </div>
-            <p className={cn('mt-4 font-black tracking-tight leading-snug break-keep', compactMode ? 'line-clamp-2 text-lg sm:text-[1.35rem]' : 'text-xl sm:text-2xl', displayHeadingsOnly && 'font-aggro-display')}>
-              {compactMode ? toCompactCopy(overallSummary.headline, 92) : overallSummary.headline}
-            </p>
-            <p className={cn('mt-2 font-bold leading-relaxed text-white/80', compactMode ? 'line-clamp-2 text-xs sm:text-sm' : 'text-sm')}>
+            {!compactMode && (
+              <p className={cn('mt-4 font-black tracking-tight leading-snug break-keep text-xl sm:text-2xl', displayHeadingsOnly && 'font-aggro-display')}>
+                {overallSummary.headline}
+              </p>
+            )}
+            <p className={cn('font-bold leading-relaxed text-white/80', compactMode ? 'mt-4 line-clamp-2 text-xs sm:text-sm' : 'mt-2 text-sm')}>
               {compactMode ? toCompactCopy(overallSummary.subline, 98) : overallSummary.subline}
             </p>
             <SummaryHeroMetrics aiMeta={normalizedAiMeta} compactMode={compactMode} />
@@ -989,7 +1026,7 @@ export function VisualReportViewer({
         compactMode ? (
           <>
             <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-              <MiniTrendChart aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
+              <MiniTrendChart aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} reportDateKey={dateKey} />
               <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
             <KpiGraphGrid aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
@@ -1005,7 +1042,7 @@ export function VisualReportViewer({
               <ReportActionBoard aiMeta={normalizedAiMeta} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
             <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-              <MiniTrendChart aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
+              <MiniTrendChart aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} reportDateKey={dateKey} />
               <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
             <KpiGraphGrid aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />

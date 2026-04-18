@@ -4572,6 +4572,11 @@ export const createCounselingDemoBundle = functions.region(region).https.onCall(
       }, { merge: true });
 
       if (index >= sampleDays.length - 3) {
+        const reportHistoryWindow = sampleDays.slice(Math.max(0, index - 6), index);
+        const reportHistoryAverage = reportHistoryWindow.length > 0
+          ? Math.round(reportHistoryWindow.reduce((sum, item) => sum + item.minutes, 0) / reportHistoryWindow.length)
+          : 0;
+
         batch.set(db.doc(`centers/${centerId}/dailyReports/${day.dateKey}_${studentUid}`), {
           id: `${day.dateKey}_${studentUid}`,
           studentId: studentUid,
@@ -4594,14 +4599,14 @@ export const createCounselingDemoBundle = functions.region(region).https.onCall(
             improvements: ["수학 개념 회독 속도 보강", "막판 30분 정리 루틴 고정"],
             totalStudyMinutes: day.minutes,
             completionRate: day.completionRate,
-            history7Days: sampleDays.slice(Math.max(0, index - 6), index + 1).map((item) => ({
+            history7Days: reportHistoryWindow.map((item) => ({
               date: item.dateKey,
               minutes: item.minutes,
             })),
             metrics: {
               growthRate: day.growthRate,
-              deltaMinutesFromAvg: day.minutes - Math.round(sampleDays.reduce((sum, item) => sum + item.minutes, 0) / sampleDays.length),
-              avg7StudyMinutes: Math.round(sampleDays.slice(Math.max(0, index - 6), index + 1).reduce((sum, item) => sum + item.minutes, 0) / Math.min(index + 1, 7)),
+              deltaMinutesFromAvg: day.minutes - reportHistoryAverage,
+              avg7StudyMinutes: reportHistoryAverage,
               isNewRecord: day.minutes >= Math.max(...sampleDays.map((item) => item.minutes)),
               alertLow: day.minutes < 180,
               streakBadge: day.completionRate >= 80,
