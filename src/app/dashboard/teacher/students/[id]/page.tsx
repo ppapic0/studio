@@ -3906,13 +3906,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <div className={cn('grid gap-6', isAnalysisPresentation ? (isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]') : 'lg:grid-cols-12')}>
             <Card className={cn("rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]", !isAnalysisPresentation && "lg:col-span-5", isAnalysisPresentation && "analysis-full-section-card border-none shadow-lg")}>
               <CardHeader className="space-y-2">
-                {!isAnalysisPresentation ? (
-                  <Badge className="w-fit rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                <Badge className={cn("w-fit rounded-full px-2.5 py-1 text-[10px] font-black", isAnalysisPresentation ? "border border-[#dbe7ff] bg-white text-[#17326B]" : "border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]")}>
                     상담 예약 상태
                   </Badge>
-                ) : null}
-                <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><CalendarCheck2 className="h-5 w-5 text-indigo-500" /> 상담 예약 일정</CardTitle>
-                <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
+                <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[#17326B]" : "text-[#14295F]")}><CalendarCheck2 className="h-5 w-5 text-indigo-500" /> 상담 예약 일정</CardTitle>
+                <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[#5F7299]" : "text-[#5c6e97]")}>
                   예정, 완료, 지난 일정을 구분해 다음 상담 운영 흐름을 바로 읽습니다.
                 </CardDescription>
               </CardHeader>
@@ -3920,7 +3918,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 {reservationLoading ? (
                   <div className="flex items-center justify-center h-36 text-[#5c6e97]"><Loader2 className="h-5 w-5 animate-spin" /></div>
                 ) : studentReservations.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[#dbe7ff] py-8 text-center text-sm font-bold text-[#5c6e97]">등록된 상담 예약이 없습니다.</div>
+                  <div className={cn("rounded-xl border py-8 text-center text-sm font-bold", isAnalysisPresentation ? "analysis-empty-state-card analysis-empty-state-card--cool text-[#17326B]" : "border-dashed border-[#dbe7ff] text-[#5c6e97]")}>등록된 상담 예약이 없습니다.</div>
                 ) : (
                   studentReservations.slice(0, 8).map((reservation) => {
                     const scheduledAt = reservation.scheduledAt?.toDate();
@@ -3942,13 +3940,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
               <Card className={cn("rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]", !isAnalysisPresentation && "lg:col-span-7", isAnalysisPresentation && "analysis-full-section-card border-none shadow-lg")}>
                 <CardHeader className="space-y-2">
-                  {!isAnalysisPresentation ? (
-                    <Badge className="w-fit rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                  <Badge className={cn("w-fit rounded-full px-2.5 py-1 text-[10px] font-black", isAnalysisPresentation ? "border border-[#dbe7ff] bg-white text-[#17326B]" : "border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]")}>
                       상담 기록 캔버스
                     </Badge>
-                  ) : null}
-                  <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><MessageSquare className="h-5 w-5 text-rose-500" /> 개인 상담 일지</CardTitle>
-                  <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
+                  <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[#17326B]" : "text-[#14295F]")}><MessageSquare className="h-5 w-5 text-rose-500" /> 개인 상담 일지</CardTitle>
+                  <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[#5F7299]" : "text-[#5c6e97]")}>
                     최근 피드백과 상담 일지를 연결해 다음 대화 포인트를 바로 확인합니다.
                   </CardDescription>
                 </CardHeader>
@@ -3966,7 +3962,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       )}
                     </div>
                     {studentQuickFeedbacks.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-[#ffd7b6] bg-white px-3 py-4 text-center text-xs font-bold text-[#5c6e97]">
+                      <div className={cn("rounded-xl border bg-white px-3 py-4 text-center text-xs font-bold", isAnalysisPresentation ? "analysis-empty-state-card analysis-empty-state-card--warm text-[#17326B]" : "border-dashed border-[#ffd7b6] text-[#5c6e97]")}>
                         아직 전달한 한 줄 피드백이 없습니다.
                       </div>
                     ) : (
@@ -4002,7 +3998,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   {counselingLoading ? (
                     <div className="flex items-center justify-center h-36 text-[#5c6e97]"><Loader2 className="h-5 w-5 animate-spin" /></div>
                   ) : studentCounselingLogs.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[#dbe7ff] py-8 text-center text-sm font-bold text-[#5c6e97]">작성된 상담 일지가 없습니다.</div>
+                  <div className={cn("rounded-xl border py-8 text-center text-sm font-bold", isAnalysisPresentation ? "analysis-empty-state-card analysis-empty-state-card--cool text-[#17326B]" : "border-dashed border-[#dbe7ff] text-[#5c6e97]")}>작성된 상담 일지가 없습니다.</div>
                 ) : (
                   studentCounselingLogs.slice(0, 10).map((log) => {
                     const studentQuestion =
@@ -4052,9 +4048,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <TabsContent value="plans" className={cn("space-y-6 mt-0", isAnalysisPresentation && "analysis-full-tab-panel")}>
           {isAnalysisPresentation ? (
             <div className={cn('grid gap-4', isAnalysisPresentation ? (isMobile ? 'grid-cols-1' : 'grid-cols-3') : 'md:grid-cols-3')}>
-              <Card className={cn("rounded-[2rem] border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-full-mini-stat-card")}><CardHeader className="pb-2"><CardTitle className={cn("font-aggro-display text-lg font-black tracking-tight flex items-center gap-2", isAnalysisPresentation && "text-[var(--text-on-dark)]")}><CalendarDays className="h-4 w-4 text-primary" /> 오늘 학습 계획</CardTitle></CardHeader><CardContent><p className={cn("font-aggro-display text-3xl font-black tracking-tight text-primary", isAnalysisPresentation && "text-[var(--text-on-dark)]")}>{todayPlanSummary.studyDone}/{todayPlanSummary.studyTotal}</p><p className={cn("text-xs font-bold text-muted-foreground mt-1", isAnalysisPresentation && "text-[var(--text-on-dark-soft)]")}>완료 / 전체 학습 할 일</p></CardContent></Card>
-              <Card className={cn("rounded-[2rem] border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-full-mini-stat-card")}><CardHeader className="pb-2"><CardTitle className={cn("font-aggro-display text-lg font-black tracking-tight flex items-center gap-2", isAnalysisPresentation && "text-[var(--text-on-dark)]")}><Timer className="h-4 w-4 text-blue-500" /> 오늘 루틴 수</CardTitle></CardHeader><CardContent><p className={cn("font-aggro-display text-3xl font-black tracking-tight text-blue-600", isAnalysisPresentation && "text-[var(--text-on-dark)]")}>{todayPlanSummary.routineCount}</p><p className={cn("text-xs font-bold text-muted-foreground mt-1", isAnalysisPresentation && "text-[var(--text-on-dark-soft)]")}>등원/식사/학원 등 시간 루틴</p></CardContent></Card>
-              <Card className={cn("rounded-[2rem] border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-full-mini-stat-card")}><CardHeader className="pb-2"><CardTitle className={cn("font-aggro-display text-lg font-black tracking-tight flex items-center gap-2", isAnalysisPresentation && "text-[var(--text-on-dark)]")}><PlusCircle className="h-4 w-4 text-amber-500" /> 개인 할 일</CardTitle></CardHeader><CardContent><p className={cn("font-aggro-display text-3xl font-black tracking-tight text-amber-600", isAnalysisPresentation && "text-[var(--text-on-dark)]")}>{todayPlanSummary.personalCount}</p><p className={cn("text-xs font-bold text-muted-foreground mt-1", isAnalysisPresentation && "text-[var(--text-on-dark-soft)]")}>생활/기타 개인 체크 항목</p></CardContent></Card>
+              <Card className={cn("rounded-[2rem] border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-full-mini-stat-card")}><CardHeader className="pb-2"><CardTitle className={cn("font-aggro-display text-lg font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[#17326B]" : "")}><CalendarDays className="h-4 w-4 text-primary" /> 오늘 학습 계획</CardTitle></CardHeader><CardContent><p className={cn("font-aggro-display text-3xl font-black tracking-tight", isAnalysisPresentation ? "text-[#14295F]" : "text-primary")}>{todayPlanSummary.studyDone}/{todayPlanSummary.studyTotal}</p><p className={cn("text-xs font-bold mt-1", isAnalysisPresentation ? "text-[#5F7299]" : "text-muted-foreground")}>완료 / 전체 학습 할 일</p></CardContent></Card>
+              <Card className={cn("rounded-[2rem] border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-full-mini-stat-card")}><CardHeader className="pb-2"><CardTitle className={cn("font-aggro-display text-lg font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[#17326B]" : "")}><Timer className="h-4 w-4 text-blue-500" /> 오늘 루틴 수</CardTitle></CardHeader><CardContent><p className={cn("font-aggro-display text-3xl font-black tracking-tight", isAnalysisPresentation ? "text-[#14295F]" : "text-blue-600")}>{todayPlanSummary.routineCount}</p><p className={cn("text-xs font-bold mt-1", isAnalysisPresentation ? "text-[#5F7299]" : "text-muted-foreground")}>등원/식사/학원 등 시간 루틴</p></CardContent></Card>
+              <Card className={cn("rounded-[2rem] border-none shadow-lg bg-white", isAnalysisPresentation && "analysis-full-mini-stat-card")}><CardHeader className="pb-2"><CardTitle className={cn("font-aggro-display text-lg font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[#17326B]" : "")}><PlusCircle className="h-4 w-4 text-amber-500" /> 개인 할 일</CardTitle></CardHeader><CardContent><p className={cn("font-aggro-display text-3xl font-black tracking-tight", isAnalysisPresentation ? "text-[#14295F]" : "text-amber-600")}>{todayPlanSummary.personalCount}</p><p className={cn("text-xs font-bold mt-1", isAnalysisPresentation ? "text-[#5F7299]" : "text-muted-foreground")}>생활/기타 개인 체크 항목</p></CardContent></Card>
             </div>
           ) : (
             <motion.section
@@ -4136,13 +4132,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
           <Card className={cn("rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_28px_70px_-56px_rgba(20,41,95,0.38)]", isAnalysisPresentation && "analysis-full-section-card border-none shadow-lg")}>
             <CardHeader className="space-y-2">
-              {!isAnalysisPresentation ? (
-                <Badge className="w-fit rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+              <Badge className={cn("w-fit rounded-full px-2.5 py-1 text-[10px] font-black", isAnalysisPresentation ? "border border-[#dbe7ff] bg-white text-[#17326B]" : "border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]")}>
                   최근 실행 흐름
                 </Badge>
-              ) : null}
-              <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}><BookOpen className="h-5 w-5 text-emerald-500" /> 과거 7일 계획/루틴</CardTitle>
-              <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
+              <CardTitle className={cn("font-aggro-display text-xl font-black tracking-tight flex items-center gap-2", isAnalysisPresentation ? "text-[#17326B]" : "text-[#14295F]")}><BookOpen className="h-5 w-5 text-emerald-500" /> 과거 7일 계획/루틴</CardTitle>
+              <CardDescription className={cn("text-[12px] font-semibold leading-5", isAnalysisPresentation ? "text-[#5F7299]" : "text-[#5c6e97]")}>
                 오늘 계획 이후에는 최근 7일의 실행 흔적을 보고 루틴 안정성을 비교합니다.
               </CardDescription>
             </CardHeader>
@@ -4150,7 +4144,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               {isDataLoading ? (
                 <div className="flex items-center justify-center h-36 text-[#5c6e97]"><Loader2 className="h-5 w-5 animate-spin" /></div>
               ) : pastPlanGroups.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-[#dbe7ff] py-8 text-center text-sm font-bold text-[#5c6e97]">과거 7일 계획 데이터가 없습니다.</div>
+                <div className={cn("rounded-xl border py-8 text-center text-sm font-bold", isAnalysisPresentation ? "analysis-empty-state-card analysis-empty-state-card--cool text-[#17326B]" : "border-dashed border-[#dbe7ff] text-[#5c6e97]")}>과거 7일 계획 데이터가 없습니다.</div>
               ) : (
                 pastPlanGroups.map((group) => {
                   const date = new Date(`${group.dateKey}T00:00:00`);
