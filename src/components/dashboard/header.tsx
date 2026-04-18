@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   PanelLeft,
@@ -16,6 +17,21 @@ import {
   Loader2,
   Sparkles,
   Phone,
+  Play,
+  Square,
+  Gift,
+  Trophy,
+  ShieldAlert,
+  FileText,
+  Wallet,
+  History,
+  Target,
+  BellRing,
+  Lightbulb,
+  ChevronRight,
+  Wifi,
+  Clock,
+  Flame,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -65,6 +81,87 @@ import { CenterMembership, StudentProfile, User as UserType } from '@/lib/types'
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { clearServerAuthSession } from '@/lib/client-auth-session';
+
+function Pill({ children, tone = 'navy' }: { children: ReactNode; tone?: 'navy' | 'orange' | 'amber' | 'rose' }) {
+  const toneClass =
+    tone === 'orange'
+      ? 'bg-[#FFE5CC] text-[#B44A00] border-[#FFD0A3]'
+      : tone === 'amber'
+        ? 'bg-[#FEF3E0] text-[#9A5A00] border-[#F7D8A3]'
+        : tone === 'rose'
+          ? 'bg-[#FFE3EA] text-[#B02344] border-[#FBC4D1]'
+          : 'bg-[#E7ECF7] text-[#17326B] border-[#C8D4EC]';
+  return (
+    <span className={cn('inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-black whitespace-nowrap align-baseline', toneClass)}>
+      {children}
+    </span>
+  );
+}
+
+function GuideStep({ icon, title, body }: { icon: ReactNode; title: string; body: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-[0_4px_10px_-6px_rgba(10,28,72,0.2)]">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[12.5px] font-black tracking-tight text-[#17326B] break-keep">{title}</p>
+        <p className="mt-1 text-[11.5px] font-semibold leading-5 text-[#49597A] break-keep">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function GuideTip({ children, tone = 'orange' }: { children: ReactNode; tone?: 'orange' | 'amber' }) {
+  const toneClass =
+    tone === 'amber'
+      ? 'border-[#F7D8A3] bg-[#FEF3E0] text-[#9A5A00]'
+      : 'border-[#FFD0A3] bg-[#FFF4E8] text-[#B44A00]';
+  return (
+    <div className={cn('mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5', toneClass)}>
+      <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <p className="text-[11px] font-bold leading-5 break-keep">{children}</p>
+    </div>
+  );
+}
+
+function GuideSection({
+  step,
+  title,
+  icon,
+  accentColor,
+  tintColor,
+  children,
+}: {
+  step: number;
+  title: string;
+  icon: ReactNode;
+  accentColor: string;
+  tintColor: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_-34px_rgba(10,28,72,0.22)]">
+      <div className="flex items-center gap-3">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-[0_10px_22px_-14px_rgba(10,28,72,0.5)]"
+          style={{ backgroundColor: accentColor }}
+        >
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[9.5px] font-black uppercase tracking-[0.22em]" style={{ color: accentColor }}>
+            STEP {String(step).padStart(2, '0')}
+          </p>
+          <h4 className="font-black tracking-tight text-[#17326B] text-[15px] break-keep">{title}</h4>
+        </div>
+      </div>
+      <div className="mt-4 rounded-2xl p-4 space-y-3.5" style={{ backgroundColor: tintColor }}>
+        {children}
+      </div>
+    </section>
+  );
+}
 
 function extractPhoneNumber(source: unknown): string {
   if (!source || typeof source !== 'object') return '';
@@ -521,54 +618,249 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
       <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
         <DialogContent
           motionPreset={dashboardMotionPreset}
-          className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl flex flex-col transition-all duration-500 w-[95vw] max-w-[370px] sm:w-auto h-[80vh] sm:h-auto max-h-[85vh]"
+          className={cn(
+            "rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden flex flex-col transition-all duration-500",
+            isMobileView
+              ? "w-[95vw] max-w-[390px] h-[86vh] max-h-[86vh]"
+              : "w-auto max-w-2xl h-auto max-h-[85vh]"
+          )}
         >
-          <div className="bg-accent text-white shrink-0 relative overflow-hidden p-6 sm:p-8">
-            <BookOpen className="absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
-            <DialogTitle className="font-black tracking-tighter flex items-center gap-3 text-xl sm:text-3xl">
-              <BookOpen className="h-6 w-6" /> 가이드
+          <div className={cn(
+            "shrink-0 relative overflow-hidden text-white bg-[linear-gradient(140deg,#FF9A46_0%,#FF7A16_58%,#EF6100_100%)]",
+            isMobileView ? "p-6" : "p-8"
+          )}>
+            <BookOpen className="pointer-events-none absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
+            <Sparkles className="pointer-events-none absolute bottom-4 right-6 h-6 w-6 text-white/40" />
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/18 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]">
+              <Flame className="h-3 w-3" /> STUDENT MANUAL
+            </div>
+            <DialogTitle className={cn(
+              "font-black tracking-tighter flex items-center gap-3 mt-3",
+              isMobileView ? "text-2xl" : "text-3xl"
+            )}>
+              <BookOpen className="h-7 w-7" /> 스터디센터 이용 가이드
             </DialogTitle>
-            <DialogDescription className="text-white/70 font-bold mt-1 text-xs">앱 사용 메뉴얼입니다.</DialogDescription>
+            <DialogDescription className="text-white/85 font-bold mt-1.5 text-[12px] leading-5">
+              러닝 시스템을 120% 활용하는 방법을 하나씩 알려줄게요.
+            </DialogDescription>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-10 bg-[#fafafa] custom-scrollbar p-6 sm:p-8">
-            <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
-                <Zap className="h-5 w-5 text-accent fill-current" /> 1. 학습 트랙
-              </h4>
-              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  대시보드 상단의 **[트랙 시작]** 버튼을 누르면 실시간 학습 몰입 엔진이 가동됩니다.
-                </p>
+          <div className={cn(
+            "flex-1 overflow-y-auto bg-[#f6f7fb] custom-scrollbar",
+            isMobileView ? "p-5 space-y-6" : "p-8 space-y-8"
+          )}>
+            <section className="rounded-[1.75rem] border border-[#FFD7B0] bg-[linear-gradient(160deg,#FFF4E6_0%,#FFE5CC_100%)] p-5 shadow-[0_18px_40px_-32px_rgba(239,97,0,0.45)]">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_12px_24px_-14px_rgba(239,97,0,0.65)]">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#B44A00]">QUICK START</p>
+                  <p className="mt-1.5 text-sm font-black leading-6 text-[#17326B] break-keep">
+                    하루 3번만 기억하세요: <span className="text-[#FF7A16]">집중 시작</span> → <span className="text-[#FF7A16]">오늘 할 일</span> → <span className="text-[#FF7A16]">기록 확인</span>
+                  </p>
+                  <p className="mt-2 text-[11px] font-semibold leading-5 text-[#5A6F95] break-keep">
+                    센터에 도착하면 바로 타이머를 켜고, 홈 카드의 오늘 할 일을 체크한 뒤, 끝날 때 기록 탭에서 성장을 확인해요.
+                  </p>
+                </div>
               </div>
             </section>
 
-            <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
-                <CalendarDays className="h-5 w-5 text-accent fill-current" /> 2. 계획 및 루틴
-              </h4>
-              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  **[나의 학습 계획]** 메뉴에서 매일의 공부 할 일과 생활 루틴을 관리하세요.
-                </p>
-              </div>
-            </section>
+            <GuideSection
+              step={1}
+              title="학습 몰입 시작하기"
+              icon={<Play className="h-5 w-5" />}
+              accentColor="#2554D7"
+              tintColor="#EAF0FC"
+            >
+              <GuideStep
+                icon={<Play className="h-4 w-4 text-[#2554D7]" />}
+                title="집중 시작하기"
+                body={<>홈 상단의 <Pill>집중 시작하기</Pill> 버튼을 누르면 실시간 공부 타이머가 시작돼요. 자리에 앉아 공부에만 집중하세요.</>}
+              />
+              <GuideStep
+                icon={<Square className="h-4 w-4 text-[#2554D7]" />}
+                title="공부 종료하기"
+                body={<>공부가 끝나면 <Pill>공부 종료하기</Pill>를 눌러 세션을 저장해요. 포인트가 적립되고, 오늘의 트랙 카드에 누적 시간이 반영돼요.</>}
+              />
+              <GuideStep
+                icon={<Clock className="h-4 w-4 text-[#2554D7]" />}
+                title="화장실·잠깐 이석"
+                body={<>자리를 비울 땐 반드시 <Pill>종료</Pill>한 뒤, 돌아와서 다시 시작해요. 타이머를 켜둔 채 자리를 비우면 부정 기록으로 처리될 수 있어요.</>}
+              />
+              <GuideTip>
+                집중 중엔 카톡·유튜브 알림을 무음으로. 몰입한 만큼 포인트 적립 속도도 빨라져요.
+              </GuideTip>
+            </GuideSection>
 
-            <section className="space-y-4">
-              <h4 className="flex items-center gap-2 font-black text-lg text-primary">
-                <MessageCircle className="h-5 w-5 text-accent fill-current" /> 3. 상담 및 피드백
-              </h4>
-              <div className="p-5 rounded-[1.5rem] bg-white border shadow-sm space-y-3">
-                <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  고민이 생기면 언제든 **[상담 신청]**을 통해 도움을 요청하세요.
-                </p>
+            <GuideSection
+              step={2}
+              title="포인트 & 리워드 상자"
+              icon={<Gift className="h-5 w-5" />}
+              accentColor="#FF7A16"
+              tintColor="#FFF0DE"
+            >
+              <GuideStep
+                icon={<Trophy className="h-4 w-4 text-[#FF7A16]" />}
+                title="포인트 적립"
+                body={<>공부 시간에 비례해 <Pill tone="orange">러닝 포인트</Pill>가 쌓여요. 오늘 번 포인트와 누적은 홈의 포인트 카드 또는 <Pill>포인트</Pill> 탭에서 확인할 수 있어요.</>}
+              />
+              <GuideStep
+                icon={<Gift className="h-4 w-4 text-[#FF7A16]" />}
+                title="리워드 상자 열기"
+                body={<>일정 공부 시간에 도달하면 <Pill tone="orange">BOX READY</Pill> 표시와 함께 상자가 지급돼요. 홈의 상자 아이콘을 눌러 열면 랜덤 리워드가 나와요.</>}
+              />
+              <GuideStep
+                icon={<Zap className="h-4 w-4 text-[#FF7A16]" />}
+                title="부스트 이벤트"
+                body={<>센터에서 부스트를 띄우면 <Pill tone="orange">n배 적용 중</Pill> 배너가 떠요. 이 시간엔 같은 공부라도 포인트가 배로 들어오니 놓치지 마세요.</>}
+              />
+              <GuideTip>
+                상자는 자동 저장되지 않아요. 받은 날 바로 열어서 리워드를 확인하세요.
+              </GuideTip>
+            </GuideSection>
+
+            <GuideSection
+              step={3}
+              title="계획 & 루틴 관리"
+              icon={<CalendarDays className="h-5 w-5" />}
+              accentColor="#17326B"
+              tintColor="#E7ECF7"
+            >
+              <GuideStep
+                icon={<CalendarDays className="h-4 w-4 text-[#17326B]" />}
+                title="오늘 할 일 체크"
+                body={<>하단 <Pill>계획</Pill> 탭에서 일/주 단위로 공부 할 일을 등록하고, 끝낼 때마다 체크하세요. 홈 카드에도 오늘의 할 일이 표시돼요.</>}
+              />
+              <GuideStep
+                icon={<Target className="h-4 w-4 text-[#17326B]" />}
+                title="시험 D-day·진로 목표"
+                body={<>홈의 <Pill>시험 디데이 / 진로 목표</Pill> 카드에 시험일과 희망 학교/직업을 등록하면, 매일 남은 일수가 카운트다운돼요.</>}
+              />
+              <GuideStep
+                icon={<Flame className="h-4 w-4 text-[#17326B]" />}
+                title="매일 같은 시간"
+                body={<>공부는 <strong>시간보다 규칙성</strong>이 중요해요. 같은 시간대에 오고 가는 습관이 가장 빠른 성장을 만들어요.</>}
+              />
+            </GuideSection>
+
+            <GuideSection
+              step={4}
+              title="기록 & 성장 확인"
+              icon={<History className="h-5 w-5" />}
+              accentColor="#2554D7"
+              tintColor="#EAF0FC"
+            >
+              <GuideStep
+                icon={<History className="h-4 w-4 text-[#2554D7]" />}
+                title="기록 탭"
+                body={<>하단 <Pill>기록</Pill>에서 일자별 공부 시간, 세션 히스토리, 주/월 단위 추세를 볼 수 있어요.</>}
+              />
+              <GuideStep
+                icon={<FileText className="h-4 w-4 text-[#2554D7]" />}
+                title="선생님 리포트"
+                body={<>홈의 <Pill>선생님 리포트</Pill> 카드에 새 리포트가 오면 빨간 뱃지가 떠요. 개인화된 피드백을 꼭 확인해 다음 공부에 반영하세요.</>}
+              />
+              <GuideStep
+                icon={<Wallet className="h-4 w-4 text-[#2554D7]" />}
+                title="포인트 내역"
+                body={<><Pill>포인트</Pill> 탭에서 언제·어떤 활동으로 포인트를 얻었는지 전부 추적할 수 있어요.</>}
+              />
+            </GuideSection>
+
+            <GuideSection
+              step={5}
+              title="출결 & 센터 요청"
+              icon={<BellRing className="h-5 w-5" />}
+              accentColor="#D97706"
+              tintColor="#FEF3E0"
+            >
+              <GuideStep
+                icon={<BellRing className="h-4 w-4 text-[#D97706]" />}
+                title="지각·결석 신청"
+                body={<>홈의 <Pill tone="amber">지각/결석 신청</Pill>에서 사유를 10자 이상 적어 제출하세요. 담당 선생님 승인 후 센터 규정에 따라 반영돼요.</>}
+              />
+              <GuideStep
+                icon={<Wifi className="h-4 w-4 text-[#D97706]" />}
+                title="와이파이 방화벽 해제"
+                body={<>학습용 사이트가 차단돼 있으면 <Pill tone="amber">와이파이 요청</Pill>에서 주소와 이유를 적어 요청하세요. 상담 트랙으로 연결돼요.</>}
+              />
+              <GuideTip tone="amber">
+                당일 지각 신청도 가능하지만, 가능하면 전날까지 미리 제출하는 게 좋아요.
+              </GuideTip>
+            </GuideSection>
+
+            <GuideSection
+              step={6}
+              title="상담 & 피드백"
+              icon={<MessageCircle className="h-5 w-5" />}
+              accentColor="#17326B"
+              tintColor="#E7ECF7"
+            >
+              <GuideStep
+                icon={<MessageCircle className="h-4 w-4 text-[#17326B]" />}
+                title="상담 신청"
+                body={<>진로·학습·생활 무엇이든 하단 <Pill>상담</Pill>에서 신청할 수 있어요. 혼자 끙끙 앓지 말고 편하게 말해 주세요.</>}
+              />
+              <GuideStep
+                icon={<BellRing className="h-4 w-4 text-[#17326B]" />}
+                title="알림 확인"
+                body={<>헤더의 <Pill>벨 아이콘</Pill>에 새 리포트·상담 답변·공지가 모여요. 숫자 뱃지가 뜨면 바로 열어 확인해요.</>}
+              />
+            </GuideSection>
+
+            <GuideSection
+              step={7}
+              title="규칙 & 벌점"
+              icon={<ShieldAlert className="h-5 w-5" />}
+              accentColor="#EF476F"
+              tintColor="#FFE8EE"
+            >
+              <GuideStep
+                icon={<ShieldAlert className="h-4 w-4 text-[#EF476F]" />}
+                title="벌점 제도"
+                body={<>센터 규정 위반 시 벌점이 부여돼요. 홈의 <Pill tone="rose">나의 벌점 현황</Pill>에서 누적 점수와 반영 사유를 확인할 수 있어요.</>}
+              />
+              <GuideStep
+                icon={<Lightbulb className="h-4 w-4 text-[#EF476F]" />}
+                title="벌점을 피하려면"
+                body={<>자리 이탈 시 타이머 끄기, 휴대폰 사용 금지 시간 지키기, 조용한 학습 환경 유지하기 — 이 세 가지만 기억하면 충분해요.</>}
+              />
+            </GuideSection>
+
+            <section className="rounded-[1.75rem] border border-[#D9E1F2] bg-white p-5 shadow-[0_18px_40px_-32px_rgba(10,28,72,0.18)]">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-[#FF7A16]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">PRO TIPS</p>
               </div>
+              <ul className="mt-3 space-y-2.5 text-[12px] font-semibold leading-5 text-[#17326B]">
+                <li className="flex items-start gap-2">
+                  <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+                  <span>헤더 좌상단의 기기 아이콘으로 <strong>모바일/데스크톱 뷰</strong>를 언제든 전환할 수 있어요.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+                  <span>홈의 <strong>오늘의 트랙</strong> 카드를 탭하면 오늘 공부한 세션이 전부 펼쳐져요.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+                  <span>포인트 내역이 이상하면 당일 <Pill>상담</Pill>에서 바로 문의하세요.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+                  <span>성장 그래프는 일주일 단위로 확인하면 변화가 잘 보여요.</span>
+                </li>
+              </ul>
             </section>
           </div>
 
-          <div className="bg-white border-t shrink-0 flex justify-end p-4 sm:p-6">
+          <div className={cn(
+            "bg-white border-t shrink-0 flex items-center justify-between",
+            isMobileView ? "p-4" : "p-6"
+          )}>
+            <p className="text-[11px] font-bold text-[#6781AE]">도움이 더 필요하면 <span className="text-[#FF7A16]">상담</span>으로!</p>
             <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8 h-12 shadow-lg active:scale-95 transition-all">
-              닫기
+              확인했어요
             </Button>
           </div>
         </DialogContent>
