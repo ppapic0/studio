@@ -2351,22 +2351,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <div className={cn('analysis-profile-action-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D86A11]">운영 액션</p>
-                <h2 className="mt-2 break-keep font-aggro-display text-[1.4rem] font-black tracking-[-0.04em] text-[#14295F]">
-                  지금 바로 쓰는 액션
-                </h2>
-              </div>
-              <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-[10px] font-black', analysisWarmBadgeClass)}>
-                홈 카드 구조
-              </Badge>
-            </div>
-            <p className="mt-2 text-xs font-semibold leading-5 text-[#5F7299]">
-              출결, 상담, 리포트, 문자, 보정 흐름을 한 덱에서 바로 실행할 수 있게 정리했습니다.
-            </p>
-
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {!isStudentSelfView && (
                 <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
                   <Link href="/dashboard/attendance"><CalendarDays className="h-4 w-4" /> 출결 상태</Link>
