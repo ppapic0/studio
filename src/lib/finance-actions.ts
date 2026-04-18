@@ -89,6 +89,57 @@ export async function completePayment(
 }
 
 /**
+ * 인보이스 수납 상태 초기화
+ * 인보이스를 다시 수납 대기 상태로 되돌리고 연결된 결제 로그도 함께 정리한다.
+ */
+export async function resetInvoiceCollectionState(
+  db: Firestore,
+  centerId: string,
+  invoiceId: string
+) {
+  const invoiceRef = doc(db, 'centers', centerId, 'invoices', invoiceId);
+  const invoiceSnap = await getDoc(invoiceRef);
+
+  if (!invoiceSnap.exists()) throw new Error('인보이스를 찾을 수 없습니다.');
+
+  const paymentsQuery = query(
+    collection(db, `centers/${centerId}/payments`),
+    where('invoiceId', '==', invoiceId)
+  );
+  const paymentsSnap = await getDocs(paymentsQuery);
+
+  const batch = writeBatch(db);
+  const now = serverTimestamp();
+  const affectedDateKeys = new Set<string>();
+
+  paymentsSnap.docs.forEach((paymentDoc) => {
+    const paymentData = paymentDoc.data();
+    const processedAt = paymentData?.processedAt;
+    if (processedAt instanceof Timestamp) {
+      affectedDateKeys.add(format(processedAt.toDate(), 'yyyy-MM-dd'));
+    }
+    batch.delete(paymentDoc.ref);
+  });
+
+  batch.update(invoiceRef, {
+    status: 'issued',
+    paidAt: null,
+    paymentMethod: 'none',
+    updatedAt: now,
+  });
+
+  await batch.commit();
+
+  if (affectedDateKeys.size === 0) {
+    affectedDateKeys.add(format(new Date(), 'yyyy-MM-dd'));
+  }
+
+  await Promise.all(Array.from(affectedDateKeys).map((dateKey) => syncDailyKpi(db, centerId, dateKey)));
+
+  return { ok: true, deletedPayments: paymentsSnap.size };
+}
+
+/**
  * 신규 인보이스 생성 (관리형 독서실 표준 28일 주기 적용)
  */
 export async function issueInvoice(

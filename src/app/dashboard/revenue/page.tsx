@@ -76,11 +76,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, addDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { useToast } from '@/hooks/use-toast';
-import { updateInvoiceStatus, issueInvoice } from '@/lib/finance-actions';
+import { resetInvoiceCollectionState, updateInvoiceStatus, issueInvoice } from '@/lib/finance-actions';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { autoCheckPaymentReminders } from '@/lib/kakao-service';
@@ -155,6 +164,7 @@ export default function RevenuePage() {
   const [activeTab, setActiveTab] = useState('payments'); 
   const [paymentSubTab, setPaymentSubTab] = useState('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showRiskPanel, setShowRiskPanel] = useState(false);
   const [quickIssueAmount, setQuickIssueAmount] = useState('390000');
@@ -322,6 +332,42 @@ export default function RevenuePage() {
     });
   }, [allInvoices, timelineMonth, timelineTrackFilter]);
 
+  const scopedTimelineRows = useMemo(() => {
+    if (!focusedStudentId) return timelineRows;
+    return timelineRows.filter((invoice) => invoice.studentId === focusedStudentId);
+  }, [timelineRows, focusedStudentId]);
+
+  const resettableInvoices = useMemo(
+    () => scopedTimelineRows.filter((invoice) => invoice.status !== 'issued'),
+    [scopedTimelineRows]
+  );
+
+  const resetScopeLabel = useMemo(() => {
+    const trackLabel =
+      timelineTrackFilter === 'all'
+        ? '전체 트랙'
+        : timelineTrackFilter === 'studyRoom'
+          ? '독서실'
+          : '학원';
+
+    if (focusedStudent) {
+      return `${timelineMonth} · ${trackLabel} · ${focusedStudent.displayName || '선택 학생'}`;
+    }
+
+    return `${timelineMonth} · ${trackLabel}`;
+  }, [timelineMonth, timelineTrackFilter, focusedStudent]);
+
+  const resettableSummary = useMemo(() => {
+    return resettableInvoices.reduce(
+      (acc, invoice) => {
+        acc.amount += Number(invoice.finalPrice) || 0;
+        if (invoice.status === 'paid') acc.paidCount += 1;
+        return acc;
+      },
+      { amount: 0, paidCount: 0 }
+    );
+  }, [resettableInvoices]);
+
   const filteredInvoices = useMemo(() => {
     const baseRows = focusedStudentId
       ? timelineRows.filter((invoice) => invoice.studentId === focusedStudentId)
@@ -369,6 +415,30 @@ export default function RevenuePage() {
       router.refresh();
     } catch (e: any) {
       toast({ variant: 'destructive', title: '변경 실패', description: e.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetCollectionStatuses = async () => {
+    if (!firestore || !centerId || resettableInvoices.length === 0) return;
+    setIsSaving(true);
+    try {
+      for (const invoice of resettableInvoices) {
+        await resetInvoiceCollectionState(firestore, centerId, invoice.id);
+      }
+      setIsResetDialogOpen(false);
+      toast({
+        title: '수납상황을 초기화했습니다.',
+        description: `${resetScopeLabel} 범위 ${resettableInvoices.length}건을 수납 대기로 되돌렸습니다.`,
+      });
+      router.refresh();
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '수납상황 초기화 실패',
+        description: e?.message || '다시 시도해 주세요.',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -690,6 +760,16 @@ export default function RevenuePage() {
                     수납/미납 관리에서 입력한 인보이스를 월별·트랙별로 자동 집계합니다. 독서실/학원 데이터를 같은 화면에서 비교할 수 있습니다.
                   </CardDescription>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsResetDialogOpen(true)}
+                  disabled={isSaving || resettableInvoices.length === 0}
+                  className="rounded-xl border-rose-200 bg-rose-50 font-black text-rose-600 hover:bg-rose-100 hover:text-rose-700"
+                >
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarX className="mr-2 h-4 w-4" />}
+                  {resettableInvoices.length === 0 ? '초기화할 상태 없음' : '수납상황 초기화'}
+                </Button>
               </div>
 
               <div className={cn('flex items-center gap-2', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
@@ -1179,6 +1259,54 @@ export default function RevenuePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-black tracking-tight">현재 조회 범위 수납상황 초기화</AlertDialogTitle>
+            <AlertDialogDescription className="font-semibold leading-relaxed">
+              {resetScopeLabel} 범위의 인보이스를 다시 수납 대기로 되돌립니다. 연결된 결제 로그도 함께 정리해서 비즈니스 분석 수치가 다시 계산되도록 맞춥니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/80 p-4">
+              <p className="text-xs font-black uppercase tracking-wide text-rose-700">초기화 범위</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl bg-white/90 p-3">
+                  <p className="text-[10px] font-bold text-rose-500">대상 건수</p>
+                  <p className="mt-1 text-lg font-black text-rose-700">{resettableInvoices.length}건</p>
+                </div>
+                <div className="rounded-xl bg-white/90 p-3">
+                  <p className="text-[10px] font-bold text-rose-500">대상 금액</p>
+                  <p className="mt-1 text-lg font-black text-rose-700">{formatWon(resettableSummary.amount)}</p>
+                </div>
+                <div className="rounded-xl bg-white/90 p-3">
+                  <p className="text-[10px] font-bold text-rose-500">결제 로그 정리</p>
+                  <p className="mt-1 text-lg font-black text-rose-700">{resettableSummary.paidCount}건</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold leading-relaxed text-slate-600">
+              인보이스 자체는 삭제되지 않고 상태만 다시 `수납 대기`로 바뀝니다. 이미 완료 처리된 건은 연결된 결제 로그도 함께 정리됩니다.
+            </div>
+          </div>
+
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="rounded-xl font-black">취소</AlertDialogCancel>
+            <Button
+              type="button"
+              onClick={handleResetCollectionStatuses}
+              disabled={isSaving || resettableInvoices.length === 0}
+              className="rounded-xl bg-rose-600 font-black text-white hover:bg-rose-700"
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarX className="mr-2 h-4 w-4" />}
+              수납상황 초기화
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
