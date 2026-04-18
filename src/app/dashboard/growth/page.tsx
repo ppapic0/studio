@@ -1487,46 +1487,60 @@ export default function GrowthPage() {
           )}
         </section>
 
-        <section className="overflow-hidden rounded-[1.9rem] border border-[#D7E4FF] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.94),transparent_34%),linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)] px-4 py-4 shadow-[0_24px_56px_-34px_rgba(20,41,95,0.18)]">
+        <section className="relative overflow-hidden rounded-[1.9rem] border border-[#D7E4FF] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.94),transparent_34%),linear-gradient(180deg,#F8FBFF_0%,#EEF4FF_100%)] px-4 py-4 shadow-[0_24px_56px_-34px_rgba(20,41,95,0.18)]">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-6 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.84),transparent_72%)]"
+          />
           <button
             type="button"
             onClick={() => setIsPointTrackManualOpen(true)}
-            className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]"
+            className="relative w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-white text-[#14295F] shadow-[0_16px_28px_-22px_rgba(0,0,0,0.24)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-3">
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/80 bg-white text-[#14295F] shadow-[0_16px_28px_-22px_rgba(0,0,0,0.24)]">
                     <BookOpen className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="font-aggro-display text-[1.05rem] font-black tracking-tight text-[#14295F]">메뉴얼 보기</p>
-                    <p className="mt-1 text-[11px] font-bold leading-5 text-[#5F729B]">
-                      상자 확률, 보상 범위, 누적 시간 규칙, 시간대 부스트까지 한 번에 확인할 수 있어요.
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-aggro-display text-[1.05rem] font-black tracking-tight text-[#14295F]">메뉴얼 보기</p>
+                      <span className="inline-flex rounded-full border border-white/80 bg-white/80 px-2.5 py-1 text-[10px] font-black tracking-[0.14em] text-[#6E7FA7]">
+                        QUICK GUIDE
+                      </span>
+                    </div>
+                    <p className="mt-1.5 max-w-[16rem] text-[11px] font-bold leading-[1.35rem] text-[#5F729B]">
+                      상자 확률, 보상 범위, 누적 시간 규칙, 시간대 부스트를 한 장으로 빠르게 볼 수 있어요.
                     </p>
                   </div>
                 </div>
               </div>
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F]">
+              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F] shadow-[0_14px_24px_-22px_rgba(20,41,95,0.42)]">
                 <ChevronRight className="h-4 w-4" />
               </span>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#17326B] shadow-sm">
+            <div className="mt-3.5 flex flex-wrap gap-1.5">
+              <span className="rounded-full border border-white/85 bg-white/88 px-2.5 py-1.5 text-[10px] font-black leading-none text-[#17326B] shadow-sm">
                 1시간마다 상자
               </span>
-              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#17326B] shadow-sm">
+              <span className="rounded-full border border-white/85 bg-white/88 px-2.5 py-1.5 text-[10px] font-black leading-none text-[#17326B] shadow-sm">
                 하루 최대 {STUDY_BOX_DAILY_LIMIT}개
               </span>
-              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#17326B] shadow-sm">
+              <span className="rounded-full border border-white/85 bg-white/88 px-2.5 py-1.5 text-[10px] font-black leading-none text-[#17326B] shadow-sm">
                 5시간부터 레어 확률 상승
               </span>
             </div>
 
-            <div className="mt-4 rounded-[1.2rem] border border-white/70 bg-white/88 px-3.5 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">시간대 부스트</p>
-              <p className="mt-2 text-sm font-black text-[#14295F]">{pointBoostGuide.heroLabel}</p>
+            <div className="mt-3.5 flex items-start gap-3 rounded-[1.25rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,255,0.92)_100%)] px-3.5 py-3 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EDF4FF] text-[#17326B]">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">시간대 부스트</p>
+                <p className="mt-1 text-[13px] font-black leading-5 text-[#14295F]">{pointBoostGuide.heroLabel}</p>
+              </div>
             </div>
           </button>
         </section>
@@ -1697,8 +1711,8 @@ export default function GrowthPage() {
       </Dialog>
 
       <Dialog open={isPointTrackManualOpen} onOpenChange={setIsPointTrackManualOpen}>
-        <DialogContent className="w-[min(94vw,30rem)] overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#F8FBFF_0%,#EFF5FF_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
-          <DialogHeader className="border-b border-[#DCE7FB] px-5 pb-0 pt-5 text-left">
+        <DialogContent className="flex max-h-[min(92svh,46rem)] w-[min(94vw,30rem)] flex-col overflow-hidden rounded-[2rem] border-none bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),transparent_30%),linear-gradient(180deg,#F8FBFF_0%,#EFF5FF_100%)] p-0 shadow-[0_40px_100px_-36px_rgba(0,0,0,0.32)]">
+          <DialogHeader className="shrink-0 border-b border-[#DCE7FB] px-5 pb-0 pt-5 text-left">
             <DialogTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
               <BookOpen className="h-5 w-5 text-[#14295F]" />
               포인트트랙 메뉴얼
@@ -1708,7 +1722,7 @@ export default function GrowthPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[min(72vh,38rem)]">
+          <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-4 px-5 py-4">
               <section className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 shadow-sm">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">상자 생성 규칙</p>
@@ -1852,7 +1866,7 @@ export default function GrowthPage() {
             </div>
           </ScrollArea>
 
-          <div className="border-t border-[#DCE7FB] bg-white px-5 py-4">
+          <div className="shrink-0 border-t border-[#DCE7FB] bg-white px-5 py-4">
             <Button onClick={() => setIsPointTrackManualOpen(false)} className="h-12 w-full rounded-[1.2rem] font-black">
               확인했어요
             </Button>
