@@ -21,7 +21,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +31,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 function getReportPreviewText(content: string) {
   return content
@@ -44,7 +44,6 @@ export default function StudentReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { activeMembership, viewMode } = useAppContext();
-  const { toast } = useToast();
   const isMobile = viewMode === 'mobile';
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,12 +77,8 @@ export default function StudentReportsPage() {
         viewedAt: serverTimestamp(),
         viewedByUid: user.uid,
         viewedByName: user.displayName || activeMembership.displayName || '학생',
-      }).catch(() => {
-        toast({
-          variant: 'destructive',
-          title: '읽음 표시 실패',
-          description: '리포트는 열렸지만 읽음 상태를 저장하지 못했습니다.',
-        });
+      }).catch((error) => {
+        logHandledClientIssue('[student-reports] viewedAt update failed', error);
       });
     }
   };

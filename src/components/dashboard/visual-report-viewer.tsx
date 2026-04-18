@@ -18,6 +18,96 @@ import type { DailyReport } from '@/lib/types';
 
 type DailyReportAiMeta = NonNullable<DailyReport['aiMeta']>;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function readNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function readStringList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeHistoryDate(value: unknown) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  const isoMatch = trimmed.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const compactMatch = trimmed.match(/(\d{2})[./-](\d{2})$/);
+  if (compactMatch) return `0000-${compactMatch[1]}-${compactMatch[2]}`;
+
+  return trimmed;
+}
+
+function normalizeAiMeta(aiMeta?: DailyReport['aiMeta'] | null): DailyReportAiMeta | null {
+  if (!isRecord(aiMeta)) return null;
+
+  const rawMetrics: Record<string, unknown> = isRecord(aiMeta.metrics) ? aiMeta.metrics : {};
+  const rawHistory = Array.isArray(aiMeta.history7Days) ? aiMeta.history7Days : [];
+
+  return {
+    teacherOneLiner: readString(aiMeta.teacherOneLiner),
+    strengths: readStringList(aiMeta.strengths),
+    improvements: readStringList(aiMeta.improvements),
+    level: readNumber(aiMeta.level) || undefined,
+    levelName: readString(aiMeta.levelName) || undefined,
+    internalStage: readNumber(aiMeta.internalStage) || undefined,
+    generationAttempt: readNumber(aiMeta.generationAttempt) || undefined,
+    attendanceLabel: readString(aiMeta.attendanceLabel) || undefined,
+    totalStudyMinutes: readNumber(aiMeta.totalStudyMinutes),
+    completionRate: readNumber(aiMeta.completionRate),
+    history7Days: rawHistory
+      .map((entry) => {
+        if (!isRecord(entry)) return null;
+        const date = normalizeHistoryDate(entry.date);
+        if (!date) return null;
+        return {
+          date,
+          minutes: Math.max(0, Math.round(readNumber(entry.minutes))),
+        };
+      })
+      .filter((entry): entry is { date: string; minutes: number } => Boolean(entry))
+      .slice(-7),
+    pedagogyLens: (readString(aiMeta.pedagogyLens) || undefined) as DailyReportAiMeta['pedagogyLens'],
+    secondaryLens: (readString(aiMeta.secondaryLens) || undefined) as DailyReportAiMeta['secondaryLens'],
+    stateBucket: readString(aiMeta.stateBucket) || undefined,
+    variationKey: readString(aiMeta.variationKey) || undefined,
+    variationSignature: readString(aiMeta.variationSignature) || undefined,
+    variationStyle: (readString(aiMeta.variationStyle) || undefined) as DailyReportAiMeta['variationStyle'],
+    coachingFocus: readString(aiMeta.coachingFocus) || undefined,
+    homeTip: readString(aiMeta.homeTip) || undefined,
+    studyBand: (readString(aiMeta.studyBand) || undefined) as DailyReportAiMeta['studyBand'],
+    growthBand: (readString(aiMeta.growthBand) || undefined) as DailyReportAiMeta['growthBand'],
+    completionBand: (readString(aiMeta.completionBand) || undefined) as DailyReportAiMeta['completionBand'],
+    routineBand: (readString(aiMeta.routineBand) || undefined) as DailyReportAiMeta['routineBand'],
+    volatilityBand: (readString(aiMeta.volatilityBand) || undefined) as DailyReportAiMeta['volatilityBand'],
+    continuityBand: (readString(aiMeta.continuityBand) || undefined) as DailyReportAiMeta['continuityBand'],
+    metrics: {
+      growthRate: readNumber(rawMetrics.growthRate),
+      deltaMinutesFromAvg: readNumber(rawMetrics.deltaMinutesFromAvg),
+      avg7StudyMinutes: Math.max(0, Math.round(readNumber(rawMetrics.avg7StudyMinutes))),
+      isNewRecord: Boolean(rawMetrics.isNewRecord),
+      alertLow: Boolean(rawMetrics.alertLow),
+      streakBadge: Boolean(rawMetrics.streakBadge),
+      trendSummary: readString(rawMetrics.trendSummary),
+    },
+  };
+}
+
 function formatStudyTime(totalMinutes?: number | null) {
   const minutes = Math.max(0, Math.round(Number(totalMinutes || 0)));
   const hours = Math.floor(minutes / 60);
@@ -40,7 +130,10 @@ function formatSignedMinutes(value?: number | null) {
 function formatTrendDateLabel(date: string, isToday: boolean) {
   if (isToday) return '오늘';
 
-  const [month, day] = date.slice(5).split('-');
+  if (typeof date !== 'string' || !date.trim()) return '기록';
+
+  const normalized = date.trim();
+  const [month, day] = normalized.slice(5).split('-');
   if (!month || !day) return date.slice(5);
   return `${Number(month)}/${Number(day)}`;
 }
@@ -478,7 +571,7 @@ function MiniTrendChart({
 }) {
   if (!aiMeta) return null;
 
-  const history = aiMeta.history7Days || [];
+  const history = Array.isArray(aiMeta.history7Days) ? aiMeta.history7Days : [];
   const points = [...history, { date: 'today', minutes: aiMeta.totalStudyMinutes || 0 }];
   if (points.length === 0) return null;
 
@@ -495,8 +588,8 @@ function MiniTrendChart({
           {formatStudyTime(aiMeta.totalStudyMinutes)}
         </Badge>
       </div>
-      <div className="mt-4 overflow-hidden pb-1">
-        <div className="relative min-w-0">
+      <div className="mt-4 overflow-x-auto pb-1">
+        <div className="relative min-w-[22rem] sm:min-w-0">
           <div
             className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-200"
             style={{
@@ -508,12 +601,12 @@ function MiniTrendChart({
               평균 {formatStudyTime(aiMeta.metrics?.avg7StudyMinutes)}
             </span>
           </div>
-          <div className="grid grid-cols-8 items-end gap-1 sm:gap-2">
+          <div className="flex min-w-0 items-end gap-2 sm:grid sm:grid-cols-8 sm:gap-2">
             {points.map((point, index) => {
               const height = Math.max(18, Math.round(((point.minutes || 0) / maxMinutes) * 88));
               const isToday = index === points.length - 1;
               return (
-                <div key={`${point.date}-${index}`} className="flex min-w-0 flex-col items-center gap-1.5 sm:gap-2">
+                <div key={`${point.date}-${index}`} className="flex min-w-[2.25rem] flex-1 flex-col items-center gap-1.5 sm:gap-2">
                   <div
                     className={cn(
                       'w-full rounded-t-2xl rounded-b-md transition-all',
@@ -522,10 +615,10 @@ function MiniTrendChart({
                     style={{ height }}
                   />
                   <div className="w-full text-center">
-                    <p className={cn('truncate text-[8px] font-black leading-tight sm:text-[10px]', isToday ? 'text-primary' : 'text-slate-400')}>
+                    <p className={cn('whitespace-nowrap text-[8px] font-black leading-tight sm:text-[10px]', isToday ? 'text-primary' : 'text-slate-400')}>
                       {formatTrendDateLabel(point.date, isToday)}
                     </p>
-                    <p className="text-[8px] font-bold leading-tight text-slate-500 sm:text-[10px]">
+                    <p className="hidden whitespace-nowrap text-[8px] font-bold leading-tight text-slate-500 sm:block sm:text-[10px]">
                       {Math.round(point.minutes || 0)}분
                     </p>
                   </div>
@@ -843,6 +936,7 @@ export function VisualReportViewer({
   displayHeadingsOnly?: boolean;
   compactMode?: boolean;
 }) {
+  const normalizedAiMeta = useMemo(() => normalizeAiMeta(aiMeta), [aiMeta]);
   const sections = useMemo(() => {
     if (!content) return [];
     const parts = content.split(/(?=🕒|✅|📊|💬|🧠)/g);
@@ -850,8 +944,8 @@ export function VisualReportViewer({
   }, [content]);
 
   const overallSummary = useMemo(
-    () => buildOverallSummary({ aiMeta: aiMeta || null, studentName, dateKey, content }),
-    [aiMeta, content, dateKey, studentName]
+    () => buildOverallSummary({ aiMeta: normalizedAiMeta, studentName, dateKey, content }),
+    [normalizedAiMeta, content, dateKey, studentName]
   );
 
   if (!content) {
@@ -876,8 +970,8 @@ export function VisualReportViewer({
               {dateKey && (
                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white/65">{dateKey}</span>
               )}
-              {aiMeta?.variationStyle && (
-                <Badge className="border-none bg-white/10 text-white/85 font-black">{aiMeta.variationStyle}</Badge>
+              {normalizedAiMeta?.variationStyle && (
+                <Badge className="border-none bg-white/10 text-white/85 font-black">{normalizedAiMeta.variationStyle}</Badge>
               )}
             </div>
             <p className={cn('mt-4 font-black tracking-tight leading-snug break-keep', compactMode ? 'line-clamp-2 text-lg sm:text-[1.35rem]' : 'text-xl sm:text-2xl', displayHeadingsOnly && 'font-aggro-display')}>
@@ -886,36 +980,36 @@ export function VisualReportViewer({
             <p className={cn('mt-2 font-bold leading-relaxed text-white/80', compactMode ? 'line-clamp-2 text-xs sm:text-sm' : 'text-sm')}>
               {compactMode ? toCompactCopy(overallSummary.subline, 98) : overallSummary.subline}
             </p>
-            <SummaryHeroMetrics aiMeta={aiMeta || null} compactMode={compactMode} />
+            <SummaryHeroMetrics aiMeta={normalizedAiMeta} compactMode={compactMode} />
           </CardContent>
         </Card>
       )}
 
-      {aiMeta && (
+      {normalizedAiMeta && (
         compactMode ? (
           <>
             <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-              <MiniTrendChart aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-              <SignalRadarCard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+              <MiniTrendChart aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
+              <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
-            <KpiGraphGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} compactMode />
+            <KpiGraphGrid aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
             <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-              <ReportInsightBoard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} compactMode />
-              <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} compactMode />
+              <ReportInsightBoard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
+              <ReportActionBoard aiMeta={normalizedAiMeta} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} compactMode />
             </div>
           </>
         ) : (
           <>
             <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-              <ReportInsightBoard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-              <ReportActionBoard aiMeta={aiMeta || null} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} />
+              <ReportInsightBoard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
+              <ReportActionBoard aiMeta={normalizedAiMeta} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
             <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-              <MiniTrendChart aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-              <SignalRadarCard aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+              <MiniTrendChart aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
+              <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
             </div>
-            <KpiGraphGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
-            <StrengthImprovementGrid aiMeta={aiMeta || null} displayHeadingsOnly={displayHeadingsOnly} />
+            <KpiGraphGrid aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
+            <StrengthImprovementGrid aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
           </>
         )
       )}

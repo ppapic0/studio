@@ -2356,12 +2356,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       viewedAt: serverTimestamp(),
       viewedByUid: user.uid,
       viewedByName: user.displayName || activeMembership.displayName || '학생',
-    }).catch(() => {
-      toast({
-        variant: 'destructive',
-        title: '읽음 표시 실패',
-        description: '리포트는 열렸지만 읽음 상태를 저장하지 못했습니다.',
-      });
+    }).catch((error) => {
+      logHandledClientIssue('[student-dashboard] report viewed update failed', error);
     });
   };
 
