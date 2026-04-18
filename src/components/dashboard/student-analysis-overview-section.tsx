@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Sparkles } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import {
   Area,
   AreaChart,
@@ -200,19 +200,6 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
     <section className="space-y-5">
       <div className="analysis-overview-shell analysis-premium-card analysis-full-board-card surface-card surface-card--primary on-dark">
         <div className={cn(isMobile ? 'space-y-4' : 'space-y-5')}>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[#FF7A16]" />
-              <p className="font-aggro-display text-[10px] font-black uppercase tracking-[0.22em] text-[#D86A11]">펼쳐서 보는 그래프</p>
-            </div>
-            <h2 className="font-aggro-display mt-3 break-keep text-[clamp(1.04rem,1.5vw,1.22rem)] font-black tracking-[-0.03em] text-[#17326B]">
-              필요한 카드만 펼쳐서 확인해보세요
-            </h2>
-            <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5F7299]">
-              제목과 한 줄 해석을 먼저 보고, 필요한 섹션만 펼치면 됩니다.
-            </p>
-          </div>
-
           <Accordion type="multiple" className="space-y-3">
             <AccordionItem value="study-volume" className="analysis-accordion-card overflow-hidden rounded-[1.45rem] px-4">
               <AccordionTrigger className="gap-4 py-4 text-left hover:no-underline">
