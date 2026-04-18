@@ -2342,6 +2342,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       valueClass: 'text-[#d86a11]',
     },
   ] as const;
+  const hasAnalysisQuickActions =
+    !isStudentSelfView ||
+    canWriteCounseling ||
+    canEditStudentInfo ||
+    canEditGrowthData ||
+    canManageStudentAccounts;
 
   return (
     <div className={cn(
@@ -2352,7 +2358,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       {isAnalysisPresentation ? (
         <div className={cn(
           'analysis-profile-shell grid gap-4',
-          isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]'
+          isMobile || !hasAnalysisQuickActions ? 'grid-cols-1' : 'xl:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]'
         )}>
           <div className={cn('analysis-profile-card relative flex items-center', isMobile ? 'min-h-[7.5rem] px-4 py-5' : 'min-h-[9rem] px-5 py-6')}>
             {!isStudentSelfView ? (
@@ -2371,44 +2377,46 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </h1>
           </div>
 
-          <div className={cn('analysis-profile-action-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {!isStudentSelfView && (
-                <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
-                  <Link href="/dashboard/attendance"><CalendarDays className="h-4 w-4" /> 출결 상태</Link>
-                </Button>
-              )}
-              {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
-              {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
-              {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
-              {!isStudentSelfView && (
-                <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
-                  <Link href="/dashboard/reports"><PenTool className="h-4 w-4" /> 리포트 생성/확인</Link>
-                </Button>
-              )}
-              {!isStudentSelfView && (
-                <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
-                  <Link href={canOpenSettings ? '/dashboard/settings/notifications' : '/dashboard/appointments'}>
-                    <MessageSquare className="h-4 w-4" /> {canOpenSettings ? '문자 보내기' : '상담/소통'}
-                  </Link>
-                </Button>
-              )}
-              {canEditStudentInfo && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
-              {canEditGrowthData && (
-                <Button
-                  variant="outline"
-                  className={cn("analysis-action-button--accent h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)}
-                  onClick={() => {
-                    setIsMasteryModalOpen(true);
-                    setIsEditStats(true);
-                  }}
-                >
-                  <Sparkles className="h-4 w-4" /> 지표/세션 보정
-                </Button>
-              )}
-              {canManageStudentAccounts && <Button variant="destructive" className="h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2 sm:col-span-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
+          {hasAnalysisQuickActions ? (
+            <div className={cn('analysis-profile-action-card', isMobile ? 'px-4 py-4' : 'px-5 py-5')}>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {!isStudentSelfView && (
+                  <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
+                    <Link href="/dashboard/attendance"><CalendarDays className="h-4 w-4" /> 출결 상태</Link>
+                  </Button>
+                )}
+                {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsReservationModalOpen(true)}><CalendarCheck2 className="h-4 w-4" /> 상담 예약</Button>}
+                {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsLogModalOpen(true)}><ClipboardList className="h-4 w-4" /> 상담 일지 작성</Button>}
+                {canWriteCounseling && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsQuickFeedbackModalOpen(true)}><MessageSquareMore className="h-4 w-4" /> 한 줄 피드백</Button>}
+                {!isStudentSelfView && (
+                  <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
+                    <Link href="/dashboard/reports"><PenTool className="h-4 w-4" /> 리포트 생성/확인</Link>
+                  </Button>
+                )}
+                {!isStudentSelfView && (
+                  <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} asChild>
+                    <Link href={canOpenSettings ? '/dashboard/settings/notifications' : '/dashboard/appointments'}>
+                      <MessageSquare className="h-4 w-4" /> {canOpenSettings ? '문자 보내기' : '상담/소통'}
+                    </Link>
+                  </Button>
+                )}
+                {canEditStudentInfo && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
+                {canEditGrowthData && (
+                  <Button
+                    variant="outline"
+                    className={cn("analysis-action-button--accent h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)}
+                    onClick={() => {
+                      setIsMasteryModalOpen(true);
+                      setIsEditStats(true);
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4" /> 지표/세션 보정
+                  </Button>
+                )}
+                {canManageStudentAccounts && <Button variant="destructive" className="h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2 sm:col-span-2" onClick={() => { if (confirm('영구 삭제하시겠습니까?')) handleDeleteAccount(); }}><Trash2 className="h-4 w-4" /> 계정 삭제</Button>}
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       ) : (
         <motion.section
