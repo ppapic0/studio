@@ -337,25 +337,24 @@ export default function RevenuePage() {
     return timelineRows.filter((invoice) => invoice.studentId === focusedStudentId);
   }, [timelineRows, focusedStudentId]);
 
+  const timelineTrackLabel = useMemo(() => {
+    if (timelineTrackFilter === 'all') return '전체 트랙';
+    if (timelineTrackFilter === 'studyRoom') return '독서실';
+    return '학원';
+  }, [timelineTrackFilter]);
+
   const resettableInvoices = useMemo(
     () => scopedTimelineRows.filter((invoice) => invoice.status !== 'issued'),
     [scopedTimelineRows]
   );
 
   const resetScopeLabel = useMemo(() => {
-    const trackLabel =
-      timelineTrackFilter === 'all'
-        ? '전체 트랙'
-        : timelineTrackFilter === 'studyRoom'
-          ? '독서실'
-          : '학원';
-
     if (focusedStudent) {
-      return `${timelineMonth} · ${trackLabel} · ${focusedStudent.displayName || '선택 학생'}`;
+      return `${timelineMonth} · ${timelineTrackLabel} · ${focusedStudent.displayName || '선택 학생'}`;
     }
 
-    return `${timelineMonth} · ${trackLabel}`;
-  }, [timelineMonth, timelineTrackFilter, focusedStudent]);
+    return `${timelineMonth} · ${timelineTrackLabel}`;
+  }, [timelineMonth, timelineTrackLabel, focusedStudent]);
 
   const resettableSummary = useMemo(() => {
     return resettableInvoices.reduce(
@@ -367,6 +366,8 @@ export default function RevenuePage() {
       { amount: 0, paidCount: 0 }
     );
   }, [resettableInvoices]);
+
+  const hasResettableInvoices = resettableInvoices.length > 0;
 
   const filteredInvoices = useMemo(() => {
     const baseRows = focusedStudentId
@@ -760,16 +761,68 @@ export default function RevenuePage() {
                     수납/미납 관리에서 입력한 인보이스를 월별·트랙별로 자동 집계합니다. 독서실/학원 데이터를 같은 화면에서 비교할 수 있습니다.
                   </CardDescription>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsResetDialogOpen(true)}
-                  disabled={isSaving || resettableInvoices.length === 0}
-                  className="rounded-xl border-rose-200 bg-rose-50 font-black text-rose-600 hover:bg-rose-100 hover:text-rose-700"
-                >
-                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarX className="mr-2 h-4 w-4" />}
-                  {resettableInvoices.length === 0 ? '초기화할 상태 없음' : '수납상황 초기화'}
-                </Button>
+                <div className={cn('w-full shrink-0', isMobile ? '' : 'max-w-[360px]')}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsResetDialogOpen(true)}
+                    disabled={isSaving || !hasResettableInvoices}
+                    className={cn(
+                      'group h-auto w-full overflow-hidden rounded-[1.75rem] border px-4 py-4 text-left shadow-[0_24px_56px_-42px_rgba(15,23,42,0.28)] transition-all duration-300',
+                      hasResettableInvoices
+                        ? 'border-rose-200 bg-[linear-gradient(135deg,#fff6f8_0%,#ffffff_100%)] hover:-translate-y-0.5 hover:border-rose-300 hover:bg-[linear-gradient(135deg,#fff8fa_0%,#ffffff_100%)] hover:shadow-[0_32px_68px_-44px_rgba(225,29,72,0.38)]'
+                        : 'border-slate-200 bg-slate-50/80 text-slate-400 shadow-none'
+                    )}
+                  >
+                    <div className="flex w-full items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={cn(
+                            'flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.3rem] border bg-white shadow-sm transition-all duration-300',
+                            hasResettableInvoices
+                              ? 'border-rose-100 text-rose-600 group-hover:scale-[1.04]'
+                              : 'border-slate-200 text-slate-400'
+                          )}
+                        >
+                          {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <CalendarX className="h-5 w-5" />}
+                        </div>
+                        <div className="min-w-0 space-y-1">
+                          <p
+                            className={cn(
+                              'text-[10px] font-black uppercase tracking-[0.22em]',
+                              hasResettableInvoices ? 'text-rose-500/80' : 'text-slate-400'
+                            )}
+                          >
+                            정리 액션
+                          </p>
+                          <p className={cn('text-sm font-black tracking-tight', hasResettableInvoices ? 'text-slate-900' : 'text-slate-500')}>
+                            수납상황 초기화
+                          </p>
+                          <p className={cn('text-[11px] font-semibold', hasResettableInvoices ? 'text-slate-500' : 'text-slate-400')}>
+                            {hasResettableInvoices ? `${resettableInvoices.length}건 · ${formatWon(resettableSummary.amount)}` : '초기화할 상태가 없습니다.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div
+                        className={cn(
+                          'shrink-0 rounded-full px-3 py-1 text-[10px] font-black',
+                          hasResettableInvoices ? 'bg-rose-600 text-white shadow-[0_14px_28px_-18px_rgba(225,29,72,0.65)]' : 'bg-slate-200 text-slate-500'
+                        )}
+                      >
+                        {hasResettableInvoices ? `${resettableSummary.paidCount}건 정리` : '대기 중'}
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        'mt-4 flex items-center justify-between gap-3 rounded-[1.15rem] border px-3 py-2 text-[11px] font-semibold',
+                        hasResettableInvoices ? 'border-rose-100/80 bg-white/80 text-slate-600' : 'border-slate-200 bg-white/70 text-slate-400'
+                      )}
+                    >
+                      <span className="truncate">{resetScopeLabel}</span>
+                      <span className="shrink-0">{hasResettableInvoices ? '상세 확인' : '변경 없음'}</span>
+                    </div>
+                  </Button>
+                </div>
               </div>
 
               <div className={cn('flex items-center gap-2', isMobile ? 'flex-col items-stretch' : 'flex-row')}>
@@ -892,7 +945,7 @@ export default function RevenuePage() {
                           조회월 {timelineMonth}
                         </Badge>
                         <Badge variant="outline" className="font-black text-[10px]">
-                          {timelineTrackFilter === 'all' ? '전체 트랙' : timelineTrackFilter === 'studyRoom' ? '독서실' : '학원'}
+                          {timelineTrackLabel}
                         </Badge>
                       </div>
                     </div>
@@ -917,7 +970,7 @@ export default function RevenuePage() {
                         </div>
                         <div className="space-y-2">
                           <p className="text-lg font-black text-muted-foreground/40 uppercase tracking-widest">조회된 인보이스가 없습니다.</p>
-                          <p className="text-xs font-bold text-muted-foreground/30">{timelineMonth} · {timelineTrackFilter === 'all' ? '전체 트랙' : timelineTrackFilter === 'studyRoom' ? '독서실' : '학원'} 조건에서 인보이스를 찾지 못했습니다.</p>
+                          <p className="text-xs font-bold text-muted-foreground/30">{timelineMonth} · {timelineTrackLabel} 조건에서 인보이스를 찾지 못했습니다.</p>
                         </div>
                       </div>
                     ) : filteredInvoices.map((inv) => {
@@ -1261,50 +1314,118 @@ export default function RevenuePage() {
       </Dialog>
 
       <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-        <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl sm:max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-black tracking-tight">현재 조회 범위 수납상황 초기화</AlertDialogTitle>
-            <AlertDialogDescription className="font-semibold leading-relaxed">
-              {resetScopeLabel} 범위의 인보이스를 다시 수납 대기로 되돌립니다. 연결된 결제 로그도 함께 정리해서 비즈니스 분석 수치가 다시 계산되도록 맞춥니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+        <AlertDialogContent className="overflow-hidden rounded-[2rem] border-none bg-[linear-gradient(180deg,#ffffff_0%,#fff8fb_100%)] p-0 shadow-[0_32px_90px_-42px_rgba(148,27,75,0.42)] sm:max-w-[640px]">
+          <div className="relative overflow-hidden border-b border-rose-100/80 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.14),transparent_36%),linear-gradient(135deg,#fff7fa_0%,#ffffff_68%)] px-6 pb-6 pt-6 sm:px-8">
+            <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-rose-200/35 blur-3xl" />
+            <div className="absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-amber-100/60 blur-2xl" />
+            <AlertDialogHeader className="relative space-y-4 text-left">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.4rem] border border-rose-100 bg-white text-rose-600 shadow-[0_18px_30px_-24px_rgba(225,29,72,0.55)]">
+                  {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <CalendarX className="h-6 w-6" />}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-500/80">Collection Reset</p>
+                  <AlertDialogTitle className="text-[1.65rem] font-black tracking-tight text-slate-950">
+                    현재 조회 범위 수납상황 초기화
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="max-w-xl text-sm font-semibold leading-relaxed text-slate-600">
+                    {resetScopeLabel} 범위의 수납 상태를 다시 정리합니다. 이미 완료 처리된 건은 결제 로그와 KPI까지 함께 맞춰서 비즈니스 분석 숫자가 바로 정돈됩니다.
+                  </AlertDialogDescription>
+                </div>
+              </div>
+            </AlertDialogHeader>
+          </div>
 
-          <div className="space-y-4 py-2">
-            <div className="rounded-2xl border border-rose-100 bg-rose-50/80 p-4">
-              <p className="text-xs font-black uppercase tracking-wide text-rose-700">초기화 범위</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl bg-white/90 p-3">
-                  <p className="text-[10px] font-bold text-rose-500">대상 건수</p>
-                  <p className="mt-1 text-lg font-black text-rose-700">{resettableInvoices.length}건</p>
+          <div className="space-y-4 px-6 pb-6 pt-5 sm:px-8">
+            <div className="grid gap-3">
+              <div className="rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.26)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">적용 범위</p>
+                    <p className="text-base font-black tracking-tight text-slate-900">{resetScopeLabel}</p>
+                    <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
+                      인보이스는 삭제되지 않고 상태만 다시 수납 대기로 되돌아갑니다.
+                    </p>
+                  </div>
+                  <Badge className="border border-rose-100 bg-rose-50 px-3 py-1 text-[10px] font-black text-rose-600 shadow-none">
+                    {timelineTrackLabel}
+                  </Badge>
                 </div>
-                <div className="rounded-xl bg-white/90 p-3">
-                  <p className="text-[10px] font-bold text-rose-500">대상 금액</p>
-                  <p className="mt-1 text-lg font-black text-rose-700">{formatWon(resettableSummary.amount)}</p>
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-[1.1rem] border border-slate-100 bg-slate-50/80 p-3">
+                    <p className="text-[10px] font-bold text-slate-400">대상 건수</p>
+                    <p className="mt-1 text-lg font-black tracking-tight text-slate-900">{resettableInvoices.length}건</p>
+                  </div>
+                  <div className="rounded-[1.1rem] border border-slate-100 bg-slate-50/80 p-3">
+                    <p className="text-[10px] font-bold text-slate-400">대상 금액</p>
+                    <p className="mt-1 text-lg font-black tracking-tight text-slate-900">{formatWon(resettableSummary.amount)}</p>
+                  </div>
+                  <div className="rounded-[1.1rem] border border-slate-100 bg-slate-50/80 p-3">
+                    <p className="text-[10px] font-bold text-slate-400">결제 로그</p>
+                    <p className="mt-1 text-lg font-black tracking-tight text-slate-900">{resettableSummary.paidCount}건</p>
+                  </div>
                 </div>
-                <div className="rounded-xl bg-white/90 p-3">
-                  <p className="text-[10px] font-bold text-rose-500">결제 로그 정리</p>
-                  <p className="mt-1 text-lg font-black text-rose-700">{resettableSummary.paidCount}건</p>
+              </div>
+
+              <div className="rounded-[1.75rem] border border-rose-100 bg-[linear-gradient(180deg,#fff6f8_0%,#fffefb_100%)] p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-500/80">실행 결과</p>
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-start gap-3 rounded-2xl bg-white/85 px-3 py-3 shadow-[0_12px_24px_-18px_rgba(225,29,72,0.35)]">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black tracking-tight text-slate-900">수납 상태 복원</p>
+                      <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
+                        완료, 미납, 무효 상태를 다시 수납 대기 기준으로 정리합니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 rounded-2xl bg-white/85 px-3 py-3 shadow-[0_12px_24px_-18px_rgba(20,41,95,0.22)]">
+                    <History className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black tracking-tight text-slate-900">결제 로그 정리</p>
+                      <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
+                        완료 처리된 인보이스의 연결 로그를 함께 정리해 누적 수치가 어긋나지 않게 맞춥니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 rounded-2xl bg-white/85 px-3 py-3 shadow-[0_12px_24px_-18px_rgba(20,41,95,0.22)]">
+                    <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-[#2554D7]" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black tracking-tight text-slate-900">KPI 재동기화</p>
+                      <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
+                        초기화 직후 비즈니스 분석 카드와 월별 수납 수치가 다시 계산됩니다.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold leading-relaxed text-slate-600">
-              인보이스 자체는 삭제되지 않고 상태만 다시 `수납 대기`로 바뀝니다. 이미 완료 처리된 건은 연결된 결제 로그도 함께 정리됩니다.
+            <div className="flex items-start gap-3 rounded-[1.4rem] border border-amber-200 bg-amber-50/80 p-4 text-left">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div className="space-y-1">
+                <p className="text-xs font-black tracking-tight text-amber-900">실행 전에 범위를 확인해 주세요.</p>
+                <p className="text-[11px] font-semibold leading-relaxed text-amber-800">
+                  현재 선택한 월, 트랙, 학생 필터가 그대로 적용됩니다. 해당 범위의 수납 운영 데이터를 한 번에 다시 맞추는 용도입니다.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel className="rounded-xl font-black">취소</AlertDialogCancel>
-            <Button
-              type="button"
-              onClick={handleResetCollectionStatuses}
-              disabled={isSaving || resettableInvoices.length === 0}
-              className="rounded-xl bg-rose-600 font-black text-white hover:bg-rose-700"
-            >
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarX className="mr-2 h-4 w-4" />}
-              수납상황 초기화
-            </Button>
-          </AlertDialogFooter>
+            <AlertDialogFooter className="gap-2 border-t border-slate-100 pt-4 sm:gap-2">
+              <AlertDialogCancel className="rounded-2xl border-slate-200 bg-white font-black text-slate-600 hover:bg-slate-50">
+                취소
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                onClick={handleResetCollectionStatuses}
+                disabled={isSaving || !hasResettableInvoices}
+                className="rounded-2xl bg-[linear-gradient(135deg,#E11D48_0%,#F43F5E_100%)] px-5 font-black text-white shadow-[0_18px_36px_-20px_rgba(225,29,72,0.6)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_44px_-20px_rgba(225,29,72,0.7)]"
+              >
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarX className="mr-2 h-4 w-4" />}
+                수납상황 초기화
+              </Button>
+            </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </div>
