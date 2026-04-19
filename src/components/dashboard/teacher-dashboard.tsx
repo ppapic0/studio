@@ -101,9 +101,23 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
+import {
+  OperationsInbox,
+  type OperationsInboxPanel,
+  type OperationsInboxQueueItem,
+  type OperationsInboxSummaryChip,
+} from '@/components/dashboard/operations-inbox';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
+import { AppointmentsPageContent } from '@/app/dashboard/appointments/appointments-page-content';
+import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import type { CenterAdminAttendanceSeatSignal } from '@/lib/center-admin-attendance-board';
+import {
+  buildCounselingTrackOverview,
+  type DashboardCounselTrackTab,
+  type DashboardParentCommunicationRecord,
+  normalizeParentCommunicationRecord,
+} from '@/lib/dashboard-communications';
 import {
   buildCenterAdminPrimaryChip,
   buildCenterAdminSecondaryFlags,
@@ -392,6 +406,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const [isHeroPriorityDialogOpen, setIsHeroPriorityDialogOpen] = useState(false);
   const [isHeroRoomsDialogOpen, setIsHeroRoomsDialogOpen] = useState(false);
+  const [isCounselTrackDialogOpen, setIsCounselTrackDialogOpen] = useState(false);
+  const [counselTrackDialogTab, setCounselTrackDialogTab] = useState<DashboardCounselTrackTab>('reservations');
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
   const [trendLoading, setTrendLoading] = useState(false);
@@ -571,6 +587,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     });
     return mapped;
   }, [resolvedAttendanceList]);
+  const teacherStudentNameById = useMemo(() => {
+    const mapped = new Map<string, string>();
+    (studentMembers || []).forEach((member) => {
+      const studentProfile = studentsById.get(member.id);
+      const displayName = studentProfile?.name || member.displayName || member.id;
+      mapped.set(member.id, displayName);
+    });
+    return mapped;
+  }, [studentMembers, studentsById]);
 
   useEffect(() => {
     if (!firestore || !centerId || !isActive) return;
@@ -1002,6 +1027,35 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => recentReportsFeed.find((report) => !report.viewedAt) || null,
     [recentReportsFeed]
   );
+  const parentActivityWindowStart = useMemo(
+    () => Timestamp.fromDate(subDays(new Date(), 30)),
+    [todayKey]
+  );
+  const parentCommunicationsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'parentCommunications'),
+      where('createdAt', '>=', parentActivityWindowStart)
+    );
+  }, [firestore, centerId, parentActivityWindowStart]);
+  const { data: parentCommunications } = useCollection<DashboardParentCommunicationRecord>(parentCommunicationsQuery, {
+    enabled: isActive,
+  });
+  const normalizedParentCommunications = useMemo(
+    () => (parentCommunications || []).map((item) => normalizeParentCommunicationRecord(item)),
+    [parentCommunications]
+  );
+  const counselingReservationsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'counselingReservations'),
+      orderBy('createdAt', 'desc'),
+      limit(120),
+    );
+  }, [firestore, centerId]);
+  const { data: counselingReservations } = useCollection<CounselingReservation>(counselingReservationsQuery, {
+    enabled: isActive,
+  });
 
   const appointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -1023,6 +1077,298 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const scrollToSection = (sectionRef: { current: HTMLDivElement | null }) => {
     sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  const openCounselTrackDialog = (tab: DashboardCounselTrackTab = 'reservations') => {
+    setCounselTrackDialogTab(tab);
+    setIsCounselTrackDialogOpen(true);
+  };
+  const openTeacherAttendanceSignal = (signal: CenterAdminAttendanceSeatSignal) => {
+    const matchedSeat =
+      seatById.get(signal.seatId)
+      || (signal.studentId ? seatByStudentId.get(signal.studentId) || null : null);
+
+    if (signal.roomId) {
+      setSelectedRoomView(signal.roomId);
+    }
+    if (matchedSeat) {
+      setSelectedSeat(matchedSeat);
+    }
+    scrollToSection(liveBoardSectionRef);
+  };
+  const teacherCounselingTrackOverview = useMemo(
+    () =>
+      buildCounselingTrackOverview({
+        communications: normalizedParentCommunications,
+        reservations: counselingReservations || [],
+        studentNameById: teacherStudentNameById,
+        targetMemberIds,
+      }),
+    [counselingReservations, normalizedParentCommunications, targetMemberIds, teacherStudentNameById]
+  );
+  const teacherNoShowSignals = useMemo(
+    () =>
+      attendanceSeatSignals
+        .filter((signal) => signal.boardStatus === 'absent')
+        .filter((signal) =>
+          buildNoShowFlag({
+            now: new Date(now),
+            dateKey: todayKey,
+            selectedDateKey: todayKey,
+            arrivalPlannedAt: signal.routineExpectedArrivalTime,
+            actualArrivalAt: signal.hasAttendanceEvidence ? new Date(now) : null,
+            graceMinutes: 15,
+          })
+        )
+        .sort((left, right) => {
+          const leftExpected = left.routineExpectedArrivalTime || '99:99';
+          const rightExpected = right.routineExpectedArrivalTime || '99:99';
+          if (leftExpected !== rightExpected) return leftExpected.localeCompare(rightExpected, 'ko');
+          return (left.roomSeatNo ?? Number.MAX_SAFE_INTEGER) - (right.roomSeatNo ?? Number.MAX_SAFE_INTEGER);
+        }),
+    [attendanceSeatSignals, now, todayKey]
+  );
+  const teacherLateSignals = useMemo(
+    () =>
+      attendanceSeatSignals
+        .filter((signal) => signal.attendanceDisplayStatus === 'confirmed_late' || signal.boardStatus === 'late')
+        .sort(
+          (left, right) =>
+            (left.roomSeatNo ?? Number.MAX_SAFE_INTEGER) - (right.roomSeatNo ?? Number.MAX_SAFE_INTEGER)
+        ),
+    [attendanceSeatSignals]
+  );
+  const teacherOperationsInboxTotalOpenCount =
+    teacherNoShowSignals.length
+    + teacherLateSignals.length
+    + teacherCounselingTrackOverview.consultationCount
+    + teacherCounselingTrackOverview.wifiCount
+    + teacherCounselingTrackOverview.parentRequestCount;
+  const teacherOperationsInboxStatusTone =
+    teacherNoShowSignals.length > 0 || teacherLateSignals.length > 0
+      ? 'urgent'
+      : teacherOperationsInboxTotalOpenCount > 0
+        ? 'caution'
+        : 'stable';
+  const teacherOperationsInboxSummaryChips = useMemo<OperationsInboxSummaryChip[]>(
+    () => [
+      {
+        key: 'no-show',
+        label: '연락 필요 미입실',
+        value: `${teacherNoShowSignals.length}명`,
+        caption: teacherNoShowSignals.length > 0 ? '예정 등원 +15분 경과' : '현재 대상 없음',
+        tone: teacherNoShowSignals.length > 0 ? 'rose' : 'blue',
+        onClick: teacherNoShowSignals.length > 0 ? () => openTeacherAttendanceSignal(teacherNoShowSignals[0]) : undefined,
+      },
+      {
+        key: 'late',
+        label: '지각',
+        value: `${teacherLateSignals.length}명`,
+        caption: teacherLateSignals.length > 0 ? '입실 시간 확인 필요' : '현재 대상 없음',
+        tone: teacherLateSignals.length > 0 ? 'orange' : 'blue',
+        onClick: teacherLateSignals.length > 0 ? () => openTeacherAttendanceSignal(teacherLateSignals[0]) : undefined,
+      },
+      {
+        key: 'consultation',
+        label: '상담 문의/예약',
+        value: `${teacherCounselingTrackOverview.consultationCount}건`,
+        caption: '요청과 예약 대기',
+        tone: teacherCounselingTrackOverview.consultationCount > 0 ? 'violet' : 'blue',
+        onClick:
+          teacherCounselingTrackOverview.consultationCount > 0
+            ? () => openCounselTrackDialog('reservations')
+            : undefined,
+      },
+      {
+        key: 'wifi',
+        label: '방화벽 요청',
+        value: `${teacherCounselingTrackOverview.wifiCount}건`,
+        caption: '학생 문의 트랙',
+        tone: teacherCounselingTrackOverview.wifiCount > 0 ? 'amber' : 'blue',
+        onClick:
+          teacherCounselingTrackOverview.wifiCount > 0
+            ? () => openCounselTrackDialog('inquiries')
+            : undefined,
+      },
+      {
+        key: 'parent-request',
+        label: '학부모 문의',
+        value: `${teacherCounselingTrackOverview.parentRequestCount}건`,
+        caption: '일반 요청·건의',
+        tone: teacherCounselingTrackOverview.parentRequestCount > 0 ? 'teal' : 'blue',
+        onClick:
+          teacherCounselingTrackOverview.parentRequestCount > 0
+            ? () => openCounselTrackDialog('parent')
+            : undefined,
+      },
+    ],
+    [teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
+  );
+  const teacherOperationsInboxQueueItems = useMemo<OperationsInboxQueueItem[]>(
+    () =>
+      [
+        teacherNoShowSignals.length > 0
+          ? {
+              key: 'queue-no-show',
+              label: '연락 필요 미입실',
+              title: `연락이 필요한 미입실 학생 ${teacherNoShowSignals.length}명`,
+              detail: `${teacherNoShowSignals[0].studentName} 학생부터 예정 등원시간이 지나도 아직 입실하지 않았습니다.`,
+              meta: teacherNoShowSignals[0].routineExpectedArrivalTime
+                ? `예정 등원 ${teacherNoShowSignals[0].routineExpectedArrivalTime}`
+                : '예정 시간 미등록',
+              tone: 'rose' as const,
+              onClick: () => openTeacherAttendanceSignal(teacherNoShowSignals[0]),
+            }
+          : null,
+        teacherLateSignals.length > 0
+          ? {
+              key: 'queue-late',
+              label: '지각',
+              title: `지각 학생 ${teacherLateSignals.length}명`,
+              detail: `${teacherLateSignals[0].studentName} 학생부터 지각 입실 이후 수업 흐름을 확인하세요.`,
+              meta: teacherLateSignals[0].checkedAtLabel ? `입실 ${teacherLateSignals[0].checkedAtLabel}` : '입실 시간 확인 필요',
+              tone: 'orange' as const,
+              onClick: () => openTeacherAttendanceSignal(teacherLateSignals[0]),
+            }
+          : null,
+        teacherCounselingTrackOverview.consultationCount > 0
+          ? {
+              key: 'queue-consultation',
+              label: '상담 문의/예약',
+              title: `상담 문의·예약 대기 ${teacherCounselingTrackOverview.consultationCount}건`,
+              detail: `${teacherCounselingTrackOverview.consultationInbox[0]?.studentName || '학생'} 상담 흐름부터 바로 열어 확인할 수 있습니다.`,
+              meta: teacherCounselingTrackOverview.consultationInbox[0]?.timeLabel || '최근 접수 순',
+              tone: 'violet' as const,
+              onClick: () => openCounselTrackDialog('reservations'),
+            }
+          : null,
+        teacherCounselingTrackOverview.wifiCount > 0
+          ? {
+              key: 'queue-wifi',
+              label: '방화벽 요청',
+              title: `방화벽 요청 ${teacherCounselingTrackOverview.wifiCount}건`,
+              detail: `${teacherCounselingTrackOverview.wifiRequests[0]?.studentName || '학생'} 요청부터 접속 사유를 확인할 수 있습니다.`,
+              meta: teacherCounselingTrackOverview.wifiRequests[0]?.timeLabel || '최근 요청 순',
+              tone: 'amber' as const,
+              onClick: () => openCounselTrackDialog('inquiries'),
+            }
+          : null,
+        teacherCounselingTrackOverview.parentRequestCount > 0
+          ? {
+              key: 'queue-parent-request',
+              label: '학부모 문의',
+              title: `학부모 문의 ${teacherCounselingTrackOverview.parentRequestCount}건`,
+              detail: `${teacherCounselingTrackOverview.parentRequests[0]?.studentName || '학생'} 관련 요청부터 바로 열어볼 수 있습니다.`,
+              meta: teacherCounselingTrackOverview.parentRequests[0]?.timeLabel || '최근 접수 순',
+              tone: 'teal' as const,
+              onClick: () => openCounselTrackDialog('parent'),
+            }
+          : null,
+      ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
+    [teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
+  );
+  const teacherOperationsInboxPanels = useMemo<OperationsInboxPanel[]>(
+    () => [
+      {
+        key: 'panel-no-show',
+        label: '출결',
+        title: '연락 필요 미입실',
+        count: teacherNoShowSignals.length,
+        emptyLabel: '예정 등원시간을 넘긴 미입실 학생이 없습니다.',
+        tone: 'rose' as const,
+        rows: teacherNoShowSignals.slice(0, 3).map((signal) => ({
+          key: `no-show-${signal.seatId}`,
+          title: signal.studentName,
+          detail: signal.note || '예정 등원시간이 지났지만 아직 입실 증거가 없습니다.',
+          meta: signal.routineExpectedArrivalTime ? `예정 ${signal.routineExpectedArrivalTime}` : '예정 시간 미등록',
+          badge: signal.roomId ? `${getRoomLabel(signal.roomId, roomConfigs)} ${signal.roomSeatNo || ''}`.trim() : '좌석 미배정',
+          tone: 'rose' as const,
+          onClick: () => openTeacherAttendanceSignal(signal),
+        })),
+        onOpenAll: teacherNoShowSignals.length > 0 ? () => setIsHeroPriorityDialogOpen(true) : undefined,
+      },
+      {
+        key: 'panel-late',
+        label: '출결',
+        title: '지각',
+        count: teacherLateSignals.length,
+        emptyLabel: '오늘 지각 학생이 없습니다.',
+        tone: 'orange' as const,
+        rows: teacherLateSignals.slice(0, 3).map((signal) => ({
+          key: `late-${signal.seatId}`,
+          title: signal.studentName,
+          detail: signal.note || '지각 입실 이후 상태를 다시 확인할 필요가 있습니다.',
+          meta: signal.checkedAtLabel ? `입실 ${signal.checkedAtLabel}` : '입실 시간 확인 필요',
+          badge: signal.roomId ? `${getRoomLabel(signal.roomId, roomConfigs)} ${signal.roomSeatNo || ''}`.trim() : '좌석 미배정',
+          tone: 'orange' as const,
+          onClick: () => openTeacherAttendanceSignal(signal),
+        })),
+        onOpenAll: teacherLateSignals.length > 0 ? () => setIsHeroPriorityDialogOpen(true) : undefined,
+      },
+      {
+        key: 'panel-consultation',
+        label: '상담',
+        title: '상담 문의/예약',
+        count: teacherCounselingTrackOverview.consultationCount,
+        emptyLabel: '열린 상담 문의나 예약 대기가 없습니다.',
+        tone: 'violet' as const,
+        rows: teacherCounselingTrackOverview.consultationInbox.map((item) => ({
+          key: item.id,
+          title: item.studentName,
+          detail: item.preview,
+          meta: item.timeLabel,
+          badge: item.badge,
+          tone: item.tone,
+          onClick: () => openCounselTrackDialog(item.targetTab),
+        })),
+        onOpenAll:
+          teacherCounselingTrackOverview.consultationCount > 0
+            ? () => openCounselTrackDialog('reservations')
+            : undefined,
+      },
+      {
+        key: 'panel-wifi',
+        label: '요청',
+        title: '방화벽 요청',
+        count: teacherCounselingTrackOverview.wifiCount,
+        emptyLabel: '열린 방화벽 요청이 없습니다.',
+        tone: 'amber' as const,
+        rows: teacherCounselingTrackOverview.wifiRequests.map((item) => ({
+          key: item.id,
+          title: item.studentName,
+          detail: item.requestedUrl ? `${item.requestedUrl} · ${item.preview}` : item.preview,
+          meta: item.timeLabel,
+          badge: item.badge,
+          tone: item.tone,
+          onClick: () => openCounselTrackDialog(item.targetTab),
+        })),
+        onOpenAll:
+          teacherCounselingTrackOverview.wifiCount > 0
+            ? () => openCounselTrackDialog('inquiries')
+            : undefined,
+      },
+      {
+        key: 'panel-parent-request',
+        label: '학부모',
+        title: '학부모 문의',
+        count: teacherCounselingTrackOverview.parentRequestCount,
+        emptyLabel: '열린 학부모 문의가 없습니다.',
+        tone: 'teal' as const,
+        rows: teacherCounselingTrackOverview.parentRequests.map((item) => ({
+          key: item.id,
+          title: item.parentName ? `${item.studentName} · ${item.parentName}` : item.studentName,
+          detail: item.preview,
+          meta: item.timeLabel,
+          badge: item.badge,
+          tone: item.tone,
+          onClick: () => openCounselTrackDialog(item.targetTab),
+        })),
+        onOpenAll:
+          teacherCounselingTrackOverview.parentRequestCount > 0
+            ? () => openCounselTrackDialog('parent')
+            : undefined,
+      },
+    ],
+    [roomConfigs, teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
+  );
 
   const teacherActionQueue = useMemo(() => {
     const pendingAppointments = appointments.filter((apt) => apt.status === 'requested');
@@ -1259,8 +1605,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     ]
   );
   const teacherHomeActionSignalCount = useMemo(
-    () => teacherActionQueue.filter((item) => !item.key.endsWith('-overview')).length,
-    [teacherActionQueue]
+    () => teacherOperationsInboxQueueItems.length,
+    [teacherOperationsInboxQueueItems]
   );
   const teacherHomeStatusMeta = useMemo(() => {
     if (
@@ -1427,10 +1773,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       {
         label: '상담 현황',
         icon: <MessageSquare className="h-4 w-4" />,
-        href: '/dashboard/appointments',
+        onClick: () => openCounselTrackDialog('reservations'),
       },
     ],
-    []
+    [openCounselTrackDialog]
   );
 
   const unassignedStudents = useMemo(() => {
@@ -2537,6 +2883,45 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   );
 
   function renderTeacherHomeHeroSection() {
+    return (
+      <OperationsInbox
+        headline={teacherHomeStatusMeta.headline}
+        summary={teacherHomeStatusMeta.detail}
+        statusLabel={teacherHomeStatusMeta.label}
+        statusTone={teacherOperationsInboxStatusTone}
+        liveLabel={`${liveDateLabel} ${liveSyncLabel}`}
+        totalOpenCount={teacherOperationsInboxTotalOpenCount}
+        summaryChips={teacherOperationsInboxSummaryChips}
+        queueItems={teacherOperationsInboxQueueItems}
+        panels={teacherOperationsInboxPanels}
+        headerActions={
+          <>
+            <Badge className="h-10 rounded-xl border border-[#DCE7FF] bg-white px-3 text-[11px] font-black text-[#14295F]">
+              {currentTeacherScopeLabel}
+            </Badge>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsHeroRoomsDialogOpen(true)}
+              className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+            >
+              호실 요약
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => openCounselTrackDialog('reservations')}
+              className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+            >
+              상담/문의
+            </Button>
+          </>
+        }
+        queueButtonLabel="우선순위"
+        onOpenQueue={() => setIsHeroPriorityDialogOpen(true)}
+      />
+    );
+
     const kpiToneClassMap = {
       default: {
         shell: 'border-[#DCE7FF] bg-white text-[#14295F]',
@@ -3462,7 +3847,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   오늘 우선순위
                 </Badge>
                 <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
-                  {teacherActionQueue.length}건
+                  {teacherOperationsInboxQueueItems.length}건
                 </Badge>
               </div>
               <div className="space-y-1">
@@ -3470,56 +3855,53 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   바로 확인할 항목
                 </DialogTitle>
                 <DialogDescription className="text-sm font-semibold leading-6 text-white/82">
-                  상담, 출결, 학생 리스크, 리포트 후속 가운데 지금 먼저 볼 항목만 추렸습니다.
+                  미입실, 지각, 상담 문의, 방화벽 요청, 학부모 문의 가운데 지금 먼저 볼 항목만 추렸습니다.
                 </DialogDescription>
               </div>
             </DialogHeader>
           </div>
 
           <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] p-5 sm:p-6">
-            {teacherActionQueue.length === 0 ? (
+            {teacherOperationsInboxQueueItems.length === 0 ? (
               <div className="rounded-[1.8rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-12 text-center">
                 <p className="text-base font-black text-[#14295F]">지금 바로 처리할 우선 항목이 없습니다.</p>
                 <p className="mt-2 text-sm font-medium text-[#5c6e97]">현재 대시보드 흐름은 안정적입니다.</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {teacherActionQueue.map((item, index) => {
-                  const QueueIcon = item.icon;
-                  return (
-                    <div key={item.key} className="rounded-[1.7rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={cn("h-6 rounded-full border-none px-2.5 text-[10px] font-black", item.toneClass)}>
-                              {index === 0 ? '최우선' : `${index + 1}순위`}
-                            </Badge>
-                            <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#14295F]">
-                              {item.actionLabel}
-                            </Badge>
-                          </div>
-                          <p className="mt-3 text-base font-black text-[#14295F]">{item.title}</p>
-                          <p className="mt-2 text-[12px] font-bold leading-6 text-[#5c6e97]">{item.detail}</p>
+                {teacherOperationsInboxQueueItems.map((item, index) => (
+                  <div key={item.key} className="rounded-[1.7rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
+                            {index === 0 ? '최우선' : `${index + 1}순위`}
+                          </Badge>
+                          <Badge className="h-6 rounded-full border-none bg-[#F7FAFF] px-2.5 text-[10px] font-black text-[#14295F]">
+                            {item.label}
+                          </Badge>
                         </div>
-                        <span className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem]", item.toneClass)}>
-                          <QueueIcon className="h-[18px] w-[18px]" />
-                        </span>
-                      </div>
-                      <div className="mt-4 flex justify-end">
-                        <Button
-                          type="button"
-                          className="h-10 rounded-xl bg-[#FF7A16] px-4 text-sm font-black text-white hover:bg-[#E56D10]"
-                          onClick={() => {
-                            setIsHeroPriorityDialogOpen(false);
-                            item.onClick();
-                          }}
-                        >
-                          {item.actionLabel}
-                        </Button>
+                        <p className="mt-3 text-base font-black text-[#14295F]">{item.title}</p>
+                        <p className="mt-2 text-[12px] font-bold leading-6 text-[#5c6e97]">{item.detail}</p>
+                        {item.meta ? (
+                          <p className="mt-2 text-[11px] font-black text-[#8A98B5]">{item.meta}</p>
+                        ) : null}
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="mt-4 flex justify-end">
+                      <Button
+                        type="button"
+                        className="h-10 rounded-xl bg-[#FF7A16] px-4 text-sm font-black text-white hover:bg-[#E56D10]"
+                        onClick={() => {
+                          setIsHeroPriorityDialogOpen(false);
+                          item.onClick?.();
+                        }}
+                      >
+                        바로 열기
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -3529,6 +3911,40 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               닫기
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCounselTrackDialogOpen} onOpenChange={setIsCounselTrackDialogOpen}>
+        <DialogContent
+          className={cn(
+            "overflow-hidden border-none p-0 shadow-2xl",
+            isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "sm:max-w-6xl rounded-[2.4rem]"
+          )}
+        >
+          <div className="bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_58%,#FF8B2B_100%)] p-6 text-white sm:p-7">
+            <DialogHeader className="space-y-4 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-white">
+                  상담·문의 트랙
+                </Badge>
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                  {currentTeacherScopeLabel}
+                </Badge>
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="font-aggro-display text-2xl tracking-tight sm:text-[2rem]">
+                  상담 문의와 요청을 바로 확인합니다
+                </DialogTitle>
+                <DialogDescription className="text-sm font-semibold leading-6 text-white/82">
+                  예약 대기, 학생 문의, 방화벽 요청, 학부모 문의를 같은 모달 안에서 바로 확인할 수 있습니다.
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+          </div>
+
+          <div className="max-h-[78vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)]">
+            <AppointmentsPageContent forceTab={counselTrackDialogTab} />
+          </div>
         </DialogContent>
       </Dialog>
 

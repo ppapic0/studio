@@ -93,9 +93,24 @@ import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
 import { CenterAdminHeatmapCharts } from '@/components/dashboard/center-admin-heatmap-charts';
 import { AppointmentsPageContent } from '@/app/dashboard/appointments/appointments-page-content';
+import {
+  OperationsInbox,
+  type OperationsInboxPanel,
+  type OperationsInboxQueueItem,
+  type OperationsInboxSummaryChip,
+} from '@/components/dashboard/operations-inbox';
 import { motion, useReducedMotion } from 'framer-motion';
+import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
+import {
+  buildCounselingTrackOverview,
+  type DashboardCounselTrackTab,
+  type DashboardParentCommunicationRecord,
+  formatDashboardTrackTime,
+  getCommunicationKindLabel,
+  normalizeParentCommunicationRecord,
+} from '@/lib/dashboard-communications';
 import {
   buildSeatId,
   getGlobalSeatNo,
@@ -273,76 +288,6 @@ const resolveDateKey = (docId: string, rawDateKey: unknown): string => {
   return docId;
 };
 
-const normalizeParentCommunicationRecord = (item: any) => {
-  const senderRole = typeof item?.senderRole === 'string' ? item.senderRole : '';
-  const hasParentIdentity =
-    senderRole === 'parent'
-    || (typeof item?.parentUid === 'string' && item.parentUid.trim().length > 0)
-    || (typeof item?.parentName === 'string' && item.parentName.trim().length > 0)
-    || (typeof item?.parentPhone === 'string' && item.parentPhone.trim().length > 0);
-
-  const parentUid = hasParentIdentity
-    ? (
-      (typeof item?.parentUid === 'string' && item.parentUid.trim())
-      || (typeof item?.senderUid === 'string' && item.senderUid.trim())
-      || ''
-    )
-    : '';
-  const parentName = hasParentIdentity
-    ? (
-      (typeof item?.parentName === 'string' && item.parentName.trim())
-      || (typeof item?.senderName === 'string' && item.senderName.trim())
-      || ''
-    )
-    : '';
-  const parentPhone = typeof item?.parentPhone === 'string' ? item.parentPhone.trim() : '';
-
-  return {
-    ...item,
-    senderRole,
-    studentId: typeof item?.studentId === 'string' ? item.studentId : '',
-    parentUid,
-    parentName,
-    parentPhone,
-  };
-};
-
-const formatDashboardTrackTime = (value: unknown): string => {
-  const date = toTimestampDateSafe(value);
-  if (!date) return '시간 미상';
-  return format(date, 'M/d HH:mm');
-};
-
-const getCommunicationActivityDate = (item: any): Date | null => {
-  return (
-    toTimestampDateSafe(item?.latestMessageAt)
-    || toTimestampDateSafe(item?.updatedAt)
-    || toTimestampDateSafe(item?.repliedAt)
-    || toTimestampDateSafe(item?.createdAt)
-  );
-};
-
-const getCommunicationPreview = (item: any): string => {
-  const candidates = [
-    item?.latestMessagePreview,
-    item?.replyBody,
-    item?.body,
-    item?.title,
-  ];
-  const matched = candidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
-  return typeof matched === 'string' ? matched.trim() : '';
-};
-
-const getCommunicationKindLabel = (item: any): string => {
-  if (item?.supportKind === 'wifi_unblock') return '와이파이';
-  if (item?.supportKind === 'student_question') return '학생 질문';
-  if (item?.supportKind === 'student_suggestion') return '학생 건의';
-  if (item?.type === 'consultation') return '상담 문의';
-  if (item?.type === 'request') return '요청';
-  if (item?.type === 'suggestion') return '건의';
-  return '연락';
-};
-
 const DAY_RANGE_MS = 24 * 60 * 60 * 1000;
 
 const formatPointBoostMultiplier = (value: number): string => {
@@ -485,7 +430,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isAttendancePriorityDialogOpen, setIsAttendancePriorityDialogOpen] = useState(false);
   const [isControlAlertsDialogOpen, setIsControlAlertsDialogOpen] = useState(false);
   const [isCounselTrackDialogOpen, setIsCounselTrackDialogOpen] = useState(false);
-  const [counselTrackDialogTab, setCounselTrackDialogTab] = useState<'reservations' | 'logs' | 'inquiries' | 'parent'>('reservations');
+  const [counselTrackDialogTab, setCounselTrackDialogTab] = useState<DashboardCounselTrackTab>('reservations');
   const [selectedHomeAxisId, setSelectedHomeAxisId] = useState<string | null>(null);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const hasInitializedRoomViewRef = useRef(false);
@@ -879,10 +824,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       where('createdAt', '>=', parentActivityWindowStart)
     );
   }, [firestore, centerId, parentActivityWindowStart]);
-  const { data: parentCommunications, isLoading: parentCommunicationsLoading } = useCollection<any>(parentCommunicationsQuery, { enabled: isActive });
+  const { data: parentCommunications, isLoading: parentCommunicationsLoading } = useCollection<DashboardParentCommunicationRecord>(parentCommunicationsQuery, { enabled: isActive });
   const normalizedParentCommunications = useMemo(
-    () => (parentCommunications || []).map((item) => normalizeParentCommunicationRecord(item)),
+    () =>
+      (parentCommunications || []).map((item) => ({
+        ...normalizeParentCommunicationRecord(item),
+        id: item.id || '',
+      })),
     [parentCommunications]
+  );
+  const heatmapParentCommunications = useMemo(
+    () =>
+      normalizedParentCommunications.map((item) => ({
+        id: item.id || '',
+        studentId: item.studentId || undefined,
+        type: item.type,
+        createdAt: item.createdAt instanceof Timestamp ? item.createdAt : undefined,
+      })),
+    [normalizedParentCommunications]
   );
 
   const counselingReservationsQuery = useMemoFirebase(() => {
@@ -913,7 +872,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     preloadedAttendanceListLoading: attendanceLoading,
     preloadedParentActivityEvents: parentActivityEvents,
     preloadedParentActivityEventsLoading: parentActivityEventsLoading,
-    preloadedParentCommunications: normalizedParentCommunications,
+    preloadedParentCommunications: heatmapParentCommunications,
     preloadedParentCommunicationsLoading: parentCommunicationsLoading,
   });
 
@@ -1878,89 +1837,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, normalizedParentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs]);
 
-  const counselingTrackOverview = useMemo(() => {
-    const scopedCommunications = normalizedParentCommunications
-      .filter((item: any) => item.studentId && targetMemberIds.has(item.studentId))
-      .map((item: any) => {
-        const activityDate = getCommunicationActivityDate(item);
-        const studentName = studentNameById.get(item.studentId)
-          || (typeof item?.studentName === 'string' && item.studentName.trim())
-          || toSafeStudentName(undefined, item.studentId);
-        return {
-          ...item,
-          studentName,
-          preview: getCommunicationPreview(item),
-          activityDate,
-          activityMs: activityDate?.getTime() ?? 0,
-          activityLabel: formatDashboardTrackTime(activityDate),
-          roleLabel: item.senderRole === 'student' ? '학생 1:1' : '학부모 1:1',
-          targetTab: item.senderRole === 'student' ? 'inquiries' as const : 'parent' as const,
-        };
-      })
-      .sort((a, b) => b.activityMs - a.activityMs);
-
-    const wifiRequests = scopedCommunications.filter((item: any) => {
-      const status = typeof item?.status === 'string' ? item.status : 'requested';
-      return item.supportKind === 'wifi_unblock' && status !== 'done';
-    });
-
-    const recentContacts = scopedCommunications
-      .filter((item: any) => item.preview.length > 0 || (typeof item?.title === 'string' && item.title.trim().length > 0))
-      .slice(0, 5);
-
-    const consultationThreads = scopedCommunications
-      .filter((item: any) => {
-        const status = typeof item?.status === 'string' ? item.status : 'requested';
-        return item.type === 'consultation' && status !== 'done';
-      })
-      .map((item: any) => ({
-        id: `communication-${item.id}`,
-        studentName: item.studentName,
-        title: (typeof item?.title === 'string' && item.title.trim()) || '상담 문의',
-        preview: item.preview || '상담 문의가 접수되었습니다.',
-        timeLabel: item.activityLabel,
-        timeMs: item.activityMs,
-        targetTab: 'parent' as const,
-        badge: item.senderRole === 'student' ? '학생 문의' : '학부모 문의',
-        tone: 'orange' as const,
-      }));
-
-    const reservationThreads = (counselingReservations || [])
-      .filter((item) => item.studentId && targetMemberIds.has(item.studentId))
-      .filter((item) => item.status !== 'done' && item.status !== 'canceled')
-      .map((item) => {
-        const createdDate = toTimestampDateSafe(item.createdAt);
-        const studentName = studentNameById.get(item.studentId)
-          || (typeof item.studentName === 'string' && item.studentName.trim())
-          || toSafeStudentName(undefined, item.studentId);
-        return {
-          id: `reservation-${item.id}`,
-          studentName,
-          title: `${studentName} 상담 예약`,
-          preview: (typeof item.studentNote === 'string' && item.studentNote.trim())
-            || `${item.teacherName || '담당 선생님'} 상담이 대기 중입니다.`,
-          timeLabel: formatDashboardTrackTime(createdDate),
-          timeMs: createdDate?.getTime() ?? 0,
-          targetTab: 'reservations' as const,
-          badge: item.status === 'confirmed' ? '예약 확정' : '예약 요청',
-          tone: 'navy' as const,
-        };
-      });
-
-    const consultationInbox = [...consultationThreads, ...reservationThreads]
-      .sort((a, b) => b.timeMs - a.timeMs)
-      .slice(0, 4);
-
-    return {
-      wifiCount: wifiRequests.length,
-      studentContactCount: scopedCommunications.filter((item: any) => item.senderRole === 'student').length,
-      parentContactCount: scopedCommunications.filter((item: any) => item.senderRole !== 'student').length,
-      consultationCount: consultationInbox.length,
-      wifiRequests: wifiRequests.slice(0, 3),
-      recentContacts,
-      consultationInbox,
-    };
-  }, [normalizedParentCommunications, counselingReservations, studentNameById, targetMemberIds]);
+  const counselingTrackOverview = useMemo(
+    () =>
+      buildCounselingTrackOverview({
+        communications: normalizedParentCommunications,
+        reservations: counselingReservations || [],
+        studentNameById,
+        targetMemberIds,
+      }),
+    [normalizedParentCommunications, counselingReservations, studentNameById, targetMemberIds]
+  );
 
   const recentAnnouncementsPreview = announcementFeed.slice(0, 3);
   const topFocusPreview = metrics.focusTop10.slice(0, 4);
@@ -3049,7 +2935,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setIsImmediateInterventionSheetOpen(false);
     setSelectedFocusStudentId(studentId);
   };
-  const openCounselTrackDialog = (tab: 'reservations' | 'logs' | 'inquiries' | 'parent' = 'reservations') => {
+  const openCounselTrackDialog = (tab: DashboardCounselTrackTab = 'reservations') => {
     setCounselTrackDialogTab(tab);
     setIsCounselTrackDialogOpen(true);
   };
@@ -3057,6 +2943,300 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setSelectedPointHistoryWindow(window);
     setIsTodayPointsDialogOpen(true);
   };
+  const openAdminAttendanceSignal = (signal: {
+    roomId?: string;
+  }) => {
+    handleOpenAttendanceOverview(signal.roomId || 'all');
+  };
+  const adminNoShowSignals = useMemo(
+    () =>
+      attendanceSeatSignals
+        .filter((signal) => signal.boardStatus === 'absent')
+        .filter((signal) =>
+          buildNoShowFlag({
+            now: new Date(now),
+            dateKey: todayKey,
+            selectedDateKey: todayKey,
+            arrivalPlannedAt: signal.routineExpectedArrivalTime,
+            actualArrivalAt: signal.hasAttendanceEvidence ? new Date(now) : null,
+            graceMinutes: 15,
+          })
+        )
+        .sort((left, right) => {
+          const leftExpected = left.routineExpectedArrivalTime || '99:99';
+          const rightExpected = right.routineExpectedArrivalTime || '99:99';
+          if (leftExpected !== rightExpected) return leftExpected.localeCompare(rightExpected, 'ko');
+
+          const roomOrderDelta =
+            (roomOrderById.get(left.roomId || '') ?? Number.MAX_SAFE_INTEGER)
+            - (roomOrderById.get(right.roomId || '') ?? Number.MAX_SAFE_INTEGER);
+          if (roomOrderDelta !== 0) return roomOrderDelta;
+
+          return (left.roomSeatNo ?? Number.MAX_SAFE_INTEGER) - (right.roomSeatNo ?? Number.MAX_SAFE_INTEGER);
+        }),
+    [attendanceSeatSignals, now, roomOrderById, todayKey]
+  );
+  const adminLateSignals = useMemo(
+    () =>
+      attendanceSeatSignals
+        .filter((signal) => signal.attendanceDisplayStatus === 'confirmed_late' || signal.boardStatus === 'late')
+        .sort((left, right) => {
+          const roomOrderDelta =
+            (roomOrderById.get(left.roomId || '') ?? Number.MAX_SAFE_INTEGER)
+            - (roomOrderById.get(right.roomId || '') ?? Number.MAX_SAFE_INTEGER);
+          if (roomOrderDelta !== 0) return roomOrderDelta;
+
+          return (left.roomSeatNo ?? Number.MAX_SAFE_INTEGER) - (right.roomSeatNo ?? Number.MAX_SAFE_INTEGER);
+        }),
+    [attendanceSeatSignals, roomOrderById]
+  );
+  const adminOperationsInboxTotalOpenCount =
+    adminNoShowSignals.length
+    + adminLateSignals.length
+    + counselingTrackOverview.consultationCount
+    + counselingTrackOverview.wifiCount
+    + counselingTrackOverview.parentRequestCount;
+  const adminOperationsInboxStatusTone =
+    adminNoShowSignals.length > 0 || adminLateSignals.length > 0
+      ? 'urgent'
+      : adminOperationsInboxTotalOpenCount > 0
+        ? 'caution'
+        : 'stable';
+  const adminOperationsInboxSummaryChips = useMemo<OperationsInboxSummaryChip[]>(
+    () => [
+      {
+        key: 'no-show',
+        label: '연락 필요 미입실',
+        value: `${adminNoShowSignals.length}명`,
+        caption: adminNoShowSignals.length > 0 ? '예정 등원 +15분 경과' : '현재 대상 없음',
+        tone: adminNoShowSignals.length > 0 ? 'rose' : 'blue',
+        onClick: adminNoShowSignals.length > 0 ? () => openAdminAttendanceSignal(adminNoShowSignals[0]) : undefined,
+      },
+      {
+        key: 'late',
+        label: '지각',
+        value: `${adminLateSignals.length}명`,
+        caption: adminLateSignals.length > 0 ? '입실 시간 확인 필요' : '현재 대상 없음',
+        tone: adminLateSignals.length > 0 ? 'orange' : 'blue',
+        onClick: adminLateSignals.length > 0 ? () => openAdminAttendanceSignal(adminLateSignals[0]) : undefined,
+      },
+      {
+        key: 'consultation',
+        label: '상담 문의/예약',
+        value: `${counselingTrackOverview.consultationCount}건`,
+        caption: '요청과 예약 대기 흐름',
+        tone: counselingTrackOverview.consultationCount > 0 ? 'violet' : 'blue',
+        onClick:
+          counselingTrackOverview.consultationCount > 0
+            ? () => openCounselTrackDialog('reservations')
+            : undefined,
+      },
+      {
+        key: 'wifi',
+        label: '방화벽 요청',
+        value: `${counselingTrackOverview.wifiCount}건`,
+        caption: '해제 요청 바로 확인',
+        tone: counselingTrackOverview.wifiCount > 0 ? 'amber' : 'blue',
+        onClick:
+          counselingTrackOverview.wifiCount > 0
+            ? () => openCounselTrackDialog('inquiries')
+            : undefined,
+      },
+      {
+        key: 'parent-request',
+        label: '학부모 문의',
+        value: `${counselingTrackOverview.parentRequestCount}건`,
+        caption: '일반 요청·건의 기준',
+        tone: counselingTrackOverview.parentRequestCount > 0 ? 'teal' : 'blue',
+        onClick:
+          counselingTrackOverview.parentRequestCount > 0
+            ? () => openCounselTrackDialog('parent')
+            : undefined,
+      },
+    ],
+    [
+      adminLateSignals,
+      adminNoShowSignals,
+      counselingTrackOverview.consultationCount,
+      counselingTrackOverview.parentRequestCount,
+      counselingTrackOverview.wifiCount,
+    ]
+  );
+  const adminOperationsInboxQueueItems = useMemo<OperationsInboxQueueItem[]>(
+    () =>
+      [
+        adminNoShowSignals.length > 0
+          ? {
+              key: 'queue-no-show',
+              label: '연락 필요 미입실',
+              title: `연락이 필요한 미입실 학생 ${adminNoShowSignals.length}명`,
+              detail: `${adminNoShowSignals[0].studentName} 학생부터 예정 등원시간이 지나도 입실 증거가 없어 바로 확인이 필요합니다.`,
+              meta: adminNoShowSignals[0].routineExpectedArrivalTime
+                ? `예정 등원 ${adminNoShowSignals[0].routineExpectedArrivalTime}`
+                : '예정 시간 미등록',
+              tone: 'rose' as const,
+              onClick: () => openAdminAttendanceSignal(adminNoShowSignals[0]),
+            }
+          : null,
+        adminLateSignals.length > 0
+          ? {
+              key: 'queue-late',
+              label: '지각',
+              title: `지각 학생 ${adminLateSignals.length}명`,
+              detail: `${adminLateSignals[0].studentName} 학생부터 오늘 지각 흐름을 확인하고 교실 진입 이후 상태를 살펴보세요.`,
+              meta: adminLateSignals[0].checkedAtLabel ? `입실 ${adminLateSignals[0].checkedAtLabel}` : '입실 시간 확인 필요',
+              tone: 'orange' as const,
+              onClick: () => openAdminAttendanceSignal(adminLateSignals[0]),
+            }
+          : null,
+        counselingTrackOverview.consultationCount > 0
+          ? {
+              key: 'queue-consultation',
+              label: '상담 문의/예약',
+              title: `상담 문의·예약 대기 ${counselingTrackOverview.consultationCount}건`,
+              detail: `${counselingTrackOverview.consultationInbox[0]?.studentName || '학생'} 상담 흐름부터 바로 열어 답변과 일정 조정을 이어갈 수 있습니다.`,
+              meta: counselingTrackOverview.consultationInbox[0]?.timeLabel || '최근 접수 순',
+              tone: 'violet' as const,
+              onClick: () => openCounselTrackDialog('reservations'),
+            }
+          : null,
+        counselingTrackOverview.wifiCount > 0
+          ? {
+              key: 'queue-wifi',
+              label: '방화벽 요청',
+              title: `방화벽 요청 ${counselingTrackOverview.wifiCount}건`,
+              detail: `${counselingTrackOverview.wifiRequests[0]?.studentName || '학생'} 요청부터 접속 사유와 URL을 확인할 수 있습니다.`,
+              meta: counselingTrackOverview.wifiRequests[0]?.timeLabel || '최근 요청 순',
+              tone: 'amber' as const,
+              onClick: () => openCounselTrackDialog('inquiries'),
+            }
+          : null,
+        counselingTrackOverview.parentRequestCount > 0
+          ? {
+              key: 'queue-parent-request',
+              label: '학부모 문의',
+              title: `학부모 문의 ${counselingTrackOverview.parentRequestCount}건`,
+              detail: `${counselingTrackOverview.parentRequests[0]?.studentName || '학생'} 관련 학부모 요청부터 확인해 바로 후속조치를 이어가세요.`,
+              meta: counselingTrackOverview.parentRequests[0]?.timeLabel || '최근 접수 순',
+              tone: 'teal' as const,
+              onClick: () => openCounselTrackDialog('parent'),
+            }
+          : null,
+      ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
+    [adminLateSignals, adminNoShowSignals, counselingTrackOverview]
+  );
+  const adminOperationsInboxPanels = useMemo<OperationsInboxPanel[]>(
+    () => [
+      {
+        key: 'panel-no-show',
+        label: '출결',
+        title: '연락 필요 미입실',
+        count: adminNoShowSignals.length,
+        emptyLabel: '예정 등원시간을 넘긴 미입실 학생이 없습니다.',
+        tone: 'rose' as const,
+        rows: adminNoShowSignals.slice(0, 3).map((signal) => {
+          const roomName = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '좌석 미배정';
+          const roomLabel = signal.roomSeatNo ? `${roomName} ${signal.roomSeatNo}번` : roomName;
+          return {
+            key: `no-show-${signal.seatId}`,
+            title: signal.studentName,
+            detail: signal.note || '예정 등원시간이 지났지만 아직 입실 증거가 없습니다.',
+            meta: signal.routineExpectedArrivalTime ? `예정 ${signal.routineExpectedArrivalTime}` : '예정 시간 미등록',
+            badge: roomLabel,
+            tone: 'rose' as const,
+            onClick: () => openAdminAttendanceSignal(signal),
+          };
+        }),
+        onOpenAll: adminNoShowSignals.length > 0 ? () => setIsAttendancePriorityDialogOpen(true) : undefined,
+      },
+      {
+        key: 'panel-late',
+        label: '출결',
+        title: '지각',
+        count: adminLateSignals.length,
+        emptyLabel: '오늘 지각 학생이 없습니다.',
+        tone: 'orange' as const,
+        rows: adminLateSignals.slice(0, 3).map((signal) => {
+          const roomName = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '좌석 미배정';
+          const roomLabel = signal.roomSeatNo ? `${roomName} ${signal.roomSeatNo}번` : roomName;
+          return {
+            key: `late-${signal.seatId}`,
+            title: signal.studentName,
+            detail: signal.note || '지각 입실 이후 수업 흐름을 다시 확인할 필요가 있습니다.',
+            meta: signal.checkedAtLabel ? `입실 ${signal.checkedAtLabel}` : '입실 시간 확인 필요',
+            badge: roomLabel,
+            tone: 'orange' as const,
+            onClick: () => openAdminAttendanceSignal(signal),
+          };
+        }),
+        onOpenAll: adminLateSignals.length > 0 ? () => setIsAttendancePriorityDialogOpen(true) : undefined,
+      },
+      {
+        key: 'panel-consultation',
+        label: '상담',
+        title: '상담 문의/예약',
+        count: counselingTrackOverview.consultationCount,
+        emptyLabel: '열린 상담 문의나 예약 대기가 없습니다.',
+        tone: 'violet' as const,
+        rows: counselingTrackOverview.consultationInbox.map((item) => ({
+          key: item.id,
+          title: item.studentName,
+          detail: item.preview,
+          meta: item.timeLabel,
+          badge: item.badge,
+          tone: item.tone,
+          onClick: () => openCounselTrackDialog(item.targetTab),
+        })),
+        onOpenAll:
+          counselingTrackOverview.consultationCount > 0
+            ? () => openCounselTrackDialog('reservations')
+            : undefined,
+      },
+      {
+        key: 'panel-wifi',
+        label: '요청',
+        title: '방화벽 요청',
+        count: counselingTrackOverview.wifiCount,
+        emptyLabel: '열린 방화벽 요청이 없습니다.',
+        tone: 'amber' as const,
+        rows: counselingTrackOverview.wifiRequests.map((item) => ({
+          key: item.id,
+          title: item.studentName,
+          detail: item.requestedUrl ? `${item.requestedUrl} · ${item.preview}` : item.preview,
+          meta: item.timeLabel,
+          badge: item.badge,
+          tone: item.tone,
+          onClick: () => openCounselTrackDialog(item.targetTab),
+        })),
+        onOpenAll:
+          counselingTrackOverview.wifiCount > 0
+            ? () => openCounselTrackDialog('inquiries')
+            : undefined,
+      },
+      {
+        key: 'panel-parent-request',
+        label: '학부모',
+        title: '학부모 문의',
+        count: counselingTrackOverview.parentRequestCount,
+        emptyLabel: '열린 학부모 문의가 없습니다.',
+        tone: 'teal' as const,
+        rows: counselingTrackOverview.parentRequests.map((item) => ({
+          key: item.id,
+          title: item.parentName ? `${item.studentName} · ${item.parentName}` : item.studentName,
+          detail: item.preview,
+          meta: item.timeLabel,
+          badge: item.badge,
+          tone: item.tone,
+          onClick: () => openCounselTrackDialog(item.targetTab),
+        })),
+        onOpenAll:
+          counselingTrackOverview.parentRequestCount > 0
+            ? () => openCounselTrackDialog('parent')
+            : undefined,
+      },
+    ],
+    [adminLateSignals, adminNoShowSignals, counselingTrackOverview, roomNameById]
+  );
   const handleCreatePointBoost = async () => {
     if (!centerId) return;
 
@@ -3136,6 +3316,50 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     }
   };
   function renderHomeHeroSection() {
+    return (
+      <OperationsInbox
+        headline={homeStatusHeadline}
+        summary={homeStatusMeta.summary}
+        statusLabel={homeStatusMeta.label}
+        statusTone={adminOperationsInboxStatusTone}
+        liveLabel={`${liveDateLabel} ${liveSyncLabel}`}
+        totalOpenCount={adminOperationsInboxTotalOpenCount}
+        summaryChips={adminOperationsInboxSummaryChips}
+        queueItems={adminOperationsInboxQueueItems}
+        panels={adminOperationsInboxPanels}
+        headerActions={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsPointBoostDialogOpen(true)}
+              className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+            >
+              포인트 부스트
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAnnouncementDialogOpen(true)}
+              className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+            >
+              공지 보내기
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsOperationsMemoOpen(true)}
+              className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+            >
+              운영 메모
+            </Button>
+          </>
+        }
+        queueButtonLabel="긴급 흐름"
+        onOpenQueue={() => setIsControlAlertsDialogOpen(true)}
+      />
+    );
+
     // ── KPI cards for the summary bar ──
     const kpiCards = [
       {
