@@ -1520,30 +1520,29 @@ export default function GrowthPage() {
           <button
             type="button"
             onClick={() => setIsPointTrackManualOpen(true)}
-            className="group relative w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]"
+            className="group relative w-full pr-11 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start gap-3">
-                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/80 bg-white text-[#14295F] shadow-[0_16px_28px_-22px_rgba(0,0,0,0.24)]">
-                    <BookOpen className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-aggro-display text-[1.05rem] font-black tracking-tight text-[#14295F]">메뉴얼 보기</p>
-                      <span className="inline-flex rounded-full border border-white/80 bg-white/80 px-2.5 py-1 text-[10px] font-black tracking-[0.14em] text-[#6E7FA7]">
-                        QUICK GUIDE
-                      </span>
-                    </div>
-                    <p className="mt-1.5 max-w-[15.5rem] break-keep pr-2 text-[11px] font-bold leading-[1.4rem] text-[#5F729B]">
-                      상자 확률, 보상 규칙, 시간대 부스트를 한 번에 빠르게 확인해요.
-                    </p>
+            <span className="absolute right-0 top-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F] shadow-[0_14px_24px_-22px_rgba(20,41,95,0.42)] transition-transform duration-200 group-hover:translate-x-0.5">
+              <ChevronRight className="h-4 w-4" />
+            </span>
+
+            <div className="min-w-0">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/80 bg-white text-[#14295F] shadow-[0_16px_28px_-22px_rgba(0,0,0,0.24)]">
+                  <BookOpen className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col items-start gap-1.5">
+                    <p className="font-aggro-display text-[1.05rem] font-black tracking-tight text-[#14295F]">메뉴얼 보기</p>
+                    <span className="inline-flex rounded-full border border-white/80 bg-white/85 px-2.5 py-1 text-[10px] font-black tracking-[0.14em] text-[#6E7FA7]">
+                      QUICK GUIDE
+                    </span>
                   </div>
+                  <p className="mt-2 text-[10.5px] font-bold leading-[1.3rem] text-[#5F729B]">
+                    상자 확률과 보상 규칙, 시간대 부스트를 빠르게 확인해요.
+                  </p>
                 </div>
               </div>
-              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F] shadow-[0_14px_24px_-22px_rgba(20,41,95,0.42)] transition-transform duration-200 group-hover:translate-x-0.5">
-                <ChevronRight className="h-4 w-4" />
-              </span>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
