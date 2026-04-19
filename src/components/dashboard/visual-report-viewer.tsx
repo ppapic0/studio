@@ -634,7 +634,7 @@ function ReportActionBoard({
         </div>
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">다음 액션</p>
-          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>교실 코칭과 가정 대화를 한 번에</p>
+          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>내일 교실 코칭 포인트</p>
         </div>
       </div>
 
@@ -658,34 +658,16 @@ function ReportActionBoard({
             )}
           </div>
         </div>
+      </div>
 
-        <div className="rounded-[1.35rem] border border-amber-100 bg-amber-50/60 px-4 py-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700/70">가정 대화 포인트</p>
-          <p className={cn('mt-2 font-black leading-relaxed tracking-tight text-slate-900', compactMode ? 'line-clamp-2 text-sm' : 'text-base')}>
-            {compactMode
-              ? toCompactCopy(aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.', 68)
-              : aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.'}
-          </p>
-          {compactMode ? (
-            <div className="mt-3 rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">짧게 한마디</p>
-              <p className="mt-1 line-clamp-3 text-sm font-bold leading-relaxed text-slate-700">
-                {toCompactCopy(`${strengthLead} ${buildFamilyQuestion(aiMeta, studentName)}`, 92)}
-              </p>
-            </div>
-          ) : (
-            <div className="mt-3 grid gap-2">
-              <div className="rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">먼저 인정</p>
-                <p className="mt-1 text-sm font-bold leading-relaxed text-slate-700">{strengthLead}</p>
-              </div>
-              <div className="rounded-2xl border border-white/70 bg-white/80 px-3 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700/70">짧게 질문</p>
-                <p className="mt-1 text-sm font-bold leading-relaxed text-slate-700">{buildFamilyQuestion(aiMeta, studentName)}</p>
-              </div>
-            </div>
-          )}
-        </div>
+      <div className="mt-4 rounded-[1.35rem] border border-slate-100 bg-slate-50/70 px-4 py-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">수업에서 먼저 볼 포인트</p>
+        <p className="mt-2 text-sm font-black leading-relaxed tracking-tight text-slate-900 break-keep">
+          {toCompactCopy(improvementLead, 92)}
+        </p>
+        <p className="mt-2 text-xs font-bold leading-relaxed text-slate-600 break-keep">
+          {toCompactCopy(aiMeta.metrics?.trendSummary || strengthLead, 110)}
+        </p>
       </div>
     </div>
   );
