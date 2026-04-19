@@ -3794,7 +3794,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 >
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.18),transparent_58%),radial-gradient(circle_at_top_left,rgba(37,84,212,0.14),transparent_52%)]" />
                   <div className="relative flex h-full flex-col gap-4">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge className="border border-[#dbe7ff] bg-[#f8fbff] text-[#14295F]">운영 그래프</Badge>
@@ -3807,20 +3807,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           집중 시간이 흔들리는 구간과 가장 잘 잡힌 날을 팝업에서 크게 확인할 수 있어요.
                         </p>
                       </div>
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] border border-[#ffd7b6] bg-[#fff3e9] text-[#ff7a16] shadow-[0_16px_30px_-24px_rgba(255,122,22,0.28)]">
+                      <span className="flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-[1rem] border border-[#ffd7b6] bg-[#fff3e9] text-[#ff7a16] shadow-[0_16px_30px_-24px_rgba(255,122,22,0.28)] sm:self-auto">
                         <ArrowUpRight className="h-4 w-4" />
                       </span>
                     </div>
-                    <div className="mt-auto flex items-end justify-between gap-3">
-                      <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-white px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]">
+                    <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="w-full rounded-[1.2rem] border border-[#dbe7ff] bg-white px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)] sm:w-auto">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">최근 평균</p>
                         <p className="font-aggro-display mt-2 text-[1.15rem] font-black leading-none tracking-tight text-[#2554d4]">
                           {hasStudyTrendData ? minutesToLabel(avgStudyMinutes) : '기록 없음'}
                         </p>
                       </div>
-                      <div className="min-w-0 text-right">
+                      <div className="min-w-0 text-left sm:text-right">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c86a10]">최고 집중일</p>
-                        <p className="mt-2 font-aggro-display text-[1.05rem] font-black leading-none tracking-tight text-[#14295F]">
+                        <p className="mt-2 break-keep font-aggro-display text-[1.05rem] font-black leading-tight tracking-tight text-[#14295F]">
                           {hasStudyTrendData ? (peakStudyPoint?.dateLabel ?? '기록 없음') : '아직 없음'}
                         </p>
                         <p className="mt-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#17326B]">팝업 보기</p>
