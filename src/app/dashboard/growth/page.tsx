@@ -700,8 +700,8 @@ export default function GrowthPage() {
 
     return {
       badge: '기본 1배',
-      title: '시간대 부스트 없음',
-      detail: '부스트가 없으면 상자 pt는 기본 1배로 적용돼요.',
+      title: '부스트 없음',
+      detail: '지금은 상자 pt가 기본 1배예요.',
     };
   }, [pointBoostGuide]);
   const studyBoxExampleGuide = useMemo(() => {
@@ -1557,22 +1557,22 @@ export default function GrowthPage() {
               </span>
             </div>
 
-            <div className="mt-3.5 rounded-[1.3rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(244,248,255,0.94)_100%)] px-3.5 py-3.5 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+            <div className="mt-3.5 rounded-[1.3rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(244,248,255,0.94)_100%)] px-4 py-4 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
               <div className="flex items-start gap-3">
                 <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EDF4FF] text-[#17326B]">
                 <Sparkles className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">시간대 부스트</p>
-                    <span className="inline-flex rounded-full bg-[#EAF1FF] px-2 py-1 text-[10px] font-black text-[#2554D7]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">시간대 부스트</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex max-w-full rounded-full bg-[#EAF1FF] px-2 py-1 text-[10px] font-black text-[#2554D7]">
                       {pointBoostCardGuide.badge}
                     </span>
                   </div>
-                  <p className="mt-1 break-keep text-[13px] font-black leading-[1.35rem] text-[#14295F]">
+                  <p className="mt-2 break-keep text-[13px] font-black leading-5 text-[#14295F]">
                     {pointBoostCardGuide.title}
                   </p>
-                  <p className="mt-1 break-keep text-[11px] font-bold leading-[1.15rem] text-[#5F729B]">
+                  <p className="mt-1 break-keep text-[11px] font-bold leading-5 text-[#5F729B]">
                     {pointBoostCardGuide.detail}
                   </p>
                 </div>
