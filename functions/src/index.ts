@@ -7774,19 +7774,46 @@ export const ensureCurrentUserMemberships = functions
     }
 
     const uid = context.auth.uid;
-    const byFieldSnap = await db.collectionGroup("members").where("id", "==", uid).get();
-    const legacyDocSnaps = byFieldSnap.empty
-      ? (await Promise.all(
-          (await db.collection("centers").listDocuments()).map((centerRef) =>
-            centerRef.collection("members").doc(uid).get()
-          )
-        )).filter((docSnap) => docSnap.exists)
-      : [];
+    const centerRefs = await db.collection("centers").listDocuments();
+    const memberDocs = (
+      await Promise.all(
+        centerRefs.map(async (centerRef) => {
+          const directMemberSnap = await centerRef.collection("members").doc(uid).get();
+          if (directMemberSnap.exists) {
+            return directMemberSnap;
+          }
+
+          try {
+            const fallbackMemberSnap = await centerRef
+              .collection("members")
+              .where("id", "==", uid)
+              .limit(1)
+              .get();
+
+            if (fallbackMemberSnap.docs[0]) {
+              return fallbackMemberSnap.docs[0];
+            }
+          } catch (error) {
+            functions.logger.warn("Membership id query failed; scanning center members instead.", {
+              centerId: centerRef.id,
+              uid,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+
+          const scannedMemberSnap = await centerRef.collection("members").get();
+          return (
+            scannedMemberSnap.docs.find((docSnap) => {
+              const raw = docSnap.data() as Record<string, unknown>;
+              return docSnap.id === uid || raw.id === uid;
+            }) || null
+          );
+        })
+      )
+    ).filter((docSnap): docSnap is FirebaseFirestore.DocumentSnapshot => Boolean(docSnap?.exists));
 
     const dedupedDocs = Array.from(
-      new Map(
-        [...byFieldSnap.docs, ...legacyDocSnaps].map((docSnap) => [docSnap.ref.path, docSnap])
-      ).values()
+      new Map(memberDocs.map((docSnap) => [docSnap.ref.path, docSnap])).values()
     );
 
     const repairedCenterIds = new Set<string>();

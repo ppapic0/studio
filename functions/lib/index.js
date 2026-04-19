@@ -6303,11 +6303,36 @@ exports.ensureCurrentUserMemberships = functions
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
     }
     const uid = context.auth.uid;
-    const byFieldSnap = await db.collectionGroup("members").where("id", "==", uid).get();
-    const legacyDocSnaps = byFieldSnap.empty
-        ? (await Promise.all((await db.collection("centers").listDocuments()).map((centerRef) => centerRef.collection("members").doc(uid).get()))).filter((docSnap) => docSnap.exists)
-        : [];
-    const dedupedDocs = Array.from(new Map([...byFieldSnap.docs, ...legacyDocSnaps].map((docSnap) => [docSnap.ref.path, docSnap])).values());
+    const centerRefs = await db.collection("centers").listDocuments();
+    const memberDocs = (await Promise.all(centerRefs.map(async (centerRef) => {
+        const directMemberSnap = await centerRef.collection("members").doc(uid).get();
+        if (directMemberSnap.exists) {
+            return directMemberSnap;
+        }
+        try {
+            const fallbackMemberSnap = await centerRef
+                .collection("members")
+                .where("id", "==", uid)
+                .limit(1)
+                .get();
+            if (fallbackMemberSnap.docs[0]) {
+                return fallbackMemberSnap.docs[0];
+            }
+        }
+        catch (error) {
+            functions.logger.warn("Membership id query failed; scanning center members instead.", {
+                centerId: centerRef.id,
+                uid,
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+        const scannedMemberSnap = await centerRef.collection("members").get();
+        return (scannedMemberSnap.docs.find((docSnap) => {
+            const raw = docSnap.data();
+            return docSnap.id === uid || raw.id === uid;
+        }) || null);
+    }))).filter((docSnap) => Boolean(docSnap === null || docSnap === void 0 ? void 0 : docSnap.exists));
+    const dedupedDocs = Array.from(new Map(memberDocs.map((docSnap) => [docSnap.ref.path, docSnap])).values());
     const repairedCenterIds = new Set();
     for (const docSnap of dedupedDocs) {
         const raw = docSnap.data();
