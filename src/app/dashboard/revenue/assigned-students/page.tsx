@@ -144,7 +144,7 @@ export default function AssignedStudentsPage() {
     setIsSaving(true);
     try {
       const trackMeta = INVOICE_TRACK_META[trackCategory];
-      const title = trackCategory === 'academy' ? '28일 정기 학원 수강료' : '28일 정기 독서실 이용료';
+      const title = trackCategory === 'academy' ? '28일 정기 국어학원 수강료' : '28일 정기 독서실 이용료';
       await issueInvoice(firestore, centerId, studentId, 390000, title, { trackCategory });
       toast({ title: `${trackMeta.label} 인보이스가 추가 발급되었습니다.` });
     } catch (e: any) {
@@ -337,7 +337,7 @@ export default function AssignedStudentsPage() {
                             variant="outline"
                             className="h-11 rounded-xl font-black px-4 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
                           >
-                            {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />} 학원 추가 발급
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />} 국어학원 추가 발급
                           </Button>
                         </div>
                       </div>

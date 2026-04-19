@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 
-import type { Invoice } from './types';
+import type { Invoice, PaymentRecord } from './types';
 
 export type InvoiceTrackCategory = 'studyRoom' | 'academy';
 
@@ -14,7 +14,7 @@ export const INVOICE_TRACK_META: Record<
     accentClass: 'text-blue-700',
   },
   academy: {
-    label: '학원',
+    label: '국어학원',
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     accentClass: 'text-emerald-700',
   },
@@ -115,24 +115,38 @@ export function getInvoiceMonth(invoice: Invoice): string | null {
   return format(date, 'yyyy-MM');
 }
 
-export function buildMonthlyTrackBuckets(invoices: Invoice[]): MonthlyTrackBucket[] {
+export function getPaymentMonth(payment: Pick<PaymentRecord, 'processedAt'>): string | null {
+  const date = toDateSafe(payment.processedAt as TimestampLike);
+  if (!date) return null;
+  return format(date, 'yyyy-MM');
+}
+
+export function buildMonthlyTrackBuckets(
+  invoices: Invoice[],
+  payments: Array<Pick<PaymentRecord, 'invoiceId' | 'amount' | 'status' | 'processedAt'>> = []
+): MonthlyTrackBucket[] {
   const map = new Map<string, MonthlyTrackBucket>();
+  const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]));
+
+  const ensureBucket = (month: string) => {
+    if (!map.has(month)) {
+      map.set(month, emptyMonthlyBucket(month));
+    }
+    return map.get(month)!;
+  };
 
   for (const invoice of invoices) {
     const month = getInvoiceMonth(invoice);
     if (!month) continue;
 
-    if (!map.has(month)) {
-      map.set(month, emptyMonthlyBucket(month));
-    }
-    const bucket = map.get(month)!;
+    const bucket = ensureBucket(month);
     const track = resolveInvoiceTrackCategory(invoice);
     const amount = Math.max(0, toNumber(invoice.finalPrice));
     const status = invoice.status;
     const isBilled = status !== 'void';
-    const isCollected = status === 'paid';
     const isArrears = status === 'issued' || status === 'overdue';
     const isOverdue = status === 'overdue';
+    const isPaid = status === 'paid';
 
     bucket.byTrack[track].invoiceCount += 1;
     bucket.total.invoiceCount += 1;
@@ -141,10 +155,8 @@ export function buildMonthlyTrackBuckets(invoices: Invoice[]): MonthlyTrackBucke
       bucket.byTrack[track].billed += amount;
       bucket.total.billed += amount;
     }
-    if (isCollected) {
-      bucket.byTrack[track].collected += amount;
+    if (isPaid) {
       bucket.byTrack[track].paidInvoiceCount += 1;
-      bucket.total.collected += amount;
       bucket.total.paidInvoiceCount += 1;
     }
     if (isArrears) {
@@ -155,6 +167,20 @@ export function buildMonthlyTrackBuckets(invoices: Invoice[]): MonthlyTrackBucke
       bucket.byTrack[track].overdueInvoiceCount += 1;
       bucket.total.overdueInvoiceCount += 1;
     }
+  }
+
+  for (const payment of payments) {
+    if (payment.status !== 'success') continue;
+    const month = getPaymentMonth(payment);
+    if (!month) continue;
+
+    const sourceInvoice = invoiceById.get(payment.invoiceId);
+    const track = sourceInvoice ? resolveInvoiceTrackCategory(sourceInvoice) : 'studyRoom';
+    const bucket = ensureBucket(month);
+    const amount = Math.max(0, toNumber(payment.amount));
+
+    bucket.byTrack[track].collected += amount;
+    bucket.total.collected += amount;
   }
 
   return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));

@@ -3,11 +3,11 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/app-context';
-import { useCollection, useFirestore, useDoc, useUser } from '@/firebase';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { collection, query, where, doc, getDoc, getDocs, limit, orderBy, setDoc, serverTimestamp, addDoc, Timestamp, updateDoc } from 'firebase/firestore';
-import { KpiDaily, Invoice, AttendanceCurrent, CenterMembership } from '@/lib/types';
-import { INVOICE_TRACK_META, resolveInvoiceTrackCategory, type InvoiceTrackCategory } from '@/lib/invoice-analytics';
+import { collection, query, where, doc, getDocs, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { Invoice, AttendanceCurrent, CenterMembership, PaymentRecord } from '@/lib/types';
+import { getPaymentMonth, INVOICE_TRACK_META, resolveInvoiceTrackCategory, type InvoiceTrackCategory } from '@/lib/invoice-analytics';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -168,24 +168,11 @@ export default function RevenuePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showRiskPanel, setShowRiskPanel] = useState(false);
   const [quickIssueAmount, setQuickIssueAmount] = useState('390000');
-  const [currentChartMonth, setCurrentChartMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [timelineMonth, setTimelineMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [timelineTrackFilter, setTimelineTrackFilter] = useState<'all' | InvoiceTrackCategory>('all');
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
 
-  // 1. KPI 이력 조회
-  const kpiQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isFinanceViewer) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'kpiDaily'),
-      where('date', '>=', `${currentChartMonth}-01`),
-      where('date', '<=', `${currentChartMonth}-31`),
-      orderBy('date', 'asc')
-    );
-  }, [firestore, centerId, currentChartMonth, isFinanceViewer]);
-  const { data: kpiHistory, isLoading: isKpiLoading } = useCollection<KpiDaily>(kpiQuery, { enabled: isFinanceViewer });
-
-  // 2. 인보이스 전체 조회
+  // 1. 인보이스 전체 조회
   const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isFinanceViewer) return null;
     return query(
@@ -194,6 +181,16 @@ export default function RevenuePage() {
     );
   }, [firestore, centerId, isFinanceViewer]);
   const { data: allInvoices, isLoading: isInvoicesLoading } = useCollection<Invoice>(invoicesQuery, { enabled: isFinanceViewer });
+
+  // 2. 실제 수납 로그 조회
+  const paymentsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isFinanceViewer) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'payments'),
+      orderBy('processedAt', 'desc')
+    );
+  }, [firestore, centerId, isFinanceViewer]);
+  const { data: paymentRecords } = useCollection<PaymentRecord>(paymentsQuery, { enabled: isFinanceViewer });
 
   // 3. 현재 좌석/출결 상태 조회
   const attendanceQuery = useMemoFirebase(() => {
@@ -213,52 +210,89 @@ export default function RevenuePage() {
   }, [firestore, centerId, isFinanceViewer]);
   const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery, { enabled: isFinanceViewer });
 
-  // --- 배정 학생 우선순위 계산 (미납/연체 우선) ---
-  const sortedAssignedStudents = useMemo(() => {
-    if (!attendanceList || !allInvoices || !studentMembers) return [];
-    
-    const assignedSeats = attendanceList.filter(a => a.studentId);
-    
-    const list = assignedSeats.map(seat => {
-      const student = studentMembers.find(m => m.id === seat.studentId);
-      const studentInvoices = allInvoices.filter(i => i.studentId === seat.studentId)
-        .sort((a, b) => b.cycleEndDate.toMillis() - a.cycleEndDate.toMillis());
-      const latestInvoice = studentInvoices?.[0];
-      
-      let priority = 0;
-      let overdueDays = 0;
-      
-      if (!latestInvoice) {
-        priority = 100; // 배정 학생인데 인보이스가 없으면 최우선
-      } else if (latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date()) {
-        priority = 90; // 미납/연체 상태는 높은 우선순위
-        overdueDays = differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate());
-      } else if (latestInvoice.status !== 'paid') {
-        priority = 80; // 청구됨(수납 대기) 상태
-      } else {
-        priority = 10; // 수납 완료 상태
-      }
-      
-      return { 
-        seat, 
-        student, 
-        latestInvoice, 
-        priority, 
-        overdueDays 
-      };
-    });
+  const invoiceById = useMemo(() => new Map((allInvoices || []).map((invoice) => [invoice.id, invoice])), [allInvoices]);
+  const seatByStudentId = useMemo(
+    () =>
+      new Map(
+        (attendanceList || [])
+          .filter((seat) => !!seat.studentId)
+          .map((seat) => [seat.studentId as string, seat])
+      ),
+    [attendanceList]
+  );
 
-    // 우선순위 높은 순 -> 마감일 임박 순
-    return list.sort((a, b) => {
-      if (b.priority !== a.priority) return b.priority - a.priority;
-      if (a.latestInvoice && b.latestInvoice) {
-        return a.latestInvoice.cycleEndDate.toMillis() - b.latestInvoice.cycleEndDate.toMillis();
-      }
-      return 0;
-    });
-  }, [attendanceList, allInvoices, studentMembers]);
+  const studentActionQueue = useMemo(() => {
+    if (!allInvoices || !studentMembers) return [];
 
-  const top3Assigned = useMemo(() => sortedAssignedStudents.slice(0, 3), [sortedAssignedStudents]);
+    return studentMembers
+      .map((student) => {
+        const seat = seatByStudentId.get(student.id) || null;
+        const studentInvoices = allInvoices
+          .filter((invoice) => invoice.studentId === student.id)
+          .sort((a, b) => {
+            const aEnd = a.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
+            const bEnd = b.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
+            if (bEnd !== aEnd) return bEnd - aEnd;
+            const aUpdated = a.updatedAt?.toDate?.()?.getTime?.() ?? 0;
+            const bUpdated = b.updatedAt?.toDate?.()?.getTime?.() ?? 0;
+            return bUpdated - aUpdated;
+          });
+
+        const latestInvoice = studentInvoices[0] || null;
+        const totalOutstanding = studentInvoices.reduce((sum, invoice) => {
+          if (invoice.status === 'issued' || invoice.status === 'overdue') {
+            return sum + (Number(invoice.finalPrice) || 0);
+          }
+          return sum;
+        }, 0);
+
+        let priority = 10;
+        let overdueDays = 0;
+        let statusTone: 'critical' | 'warning' | 'neutral' | 'stable' = 'stable';
+        let statusLabel = '수납 완료';
+        let nextAction = '완료 상태 유지';
+
+        if (!latestInvoice) {
+          priority = 100;
+          statusTone = 'neutral';
+          statusLabel = '청구 필요';
+          nextAction = '첫 인보이스를 발행해 주세요.';
+        } else if (latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date()) {
+          priority = 90;
+          overdueDays = differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate());
+          statusTone = 'critical';
+          statusLabel = '미납/연체';
+          nextAction = latestInvoice.nextAction || '즉시 확인 후 학부모 상담이 필요합니다.';
+        } else if (latestInvoice.status !== 'paid') {
+          priority = 80;
+          statusTone = 'warning';
+          statusLabel = '수납 대기';
+          nextAction = latestInvoice.nextAction || '마감일 전에 수납 상태를 확인해 주세요.';
+        }
+
+        return {
+          student,
+          seat,
+          latestInvoice,
+          studentInvoices,
+          priority,
+          overdueDays,
+          totalOutstanding,
+          statusTone,
+          statusLabel,
+          nextAction,
+        };
+      })
+      .sort((a, b) => {
+        if (b.priority !== a.priority) return b.priority - a.priority;
+        const aLatest = a.latestInvoice?.cycleEndDate?.toDate?.()?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+        const bLatest = b.latestInvoice?.cycleEndDate?.toDate?.()?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+        return aLatest - bLatest;
+      });
+  }, [allInvoices, seatByStudentId, studentMembers]);
+
+  const topActionStudents = useMemo(() => studentActionQueue.slice(0, 3), [studentActionQueue]);
+  const studentById = useMemo(() => new Map((studentMembers || []).map((member) => [member.id, member])), [studentMembers]);
 
   const focusedStudent = useMemo(() => {
     if (!focusedStudentId) return null;
@@ -280,6 +314,54 @@ export default function RevenuePage() {
   }, [allInvoices, focusedStudentId]);
 
   const focusedLatestInvoice = focusedStudentInvoices[0] || null;
+  const revenueFocusedStudentId = focusedStudentId || studentActionQueue[0]?.student.id || null;
+  const revenueFocusedStudent = revenueFocusedStudentId ? studentById.get(revenueFocusedStudentId) || null : null;
+  const revenueFocusedStudentSeat = revenueFocusedStudentId ? seatByStudentId.get(revenueFocusedStudentId) || null : null;
+  const revenueFocusedStudentInvoices = useMemo(() => {
+    if (!revenueFocusedStudentId) return [];
+    return (allInvoices || [])
+      .filter((invoice) => invoice.studentId === revenueFocusedStudentId)
+      .sort((a, b) => {
+        const aEnd = a.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
+        const bEnd = b.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
+        if (bEnd !== aEnd) return bEnd - aEnd;
+        const aUpdated = a.updatedAt?.toDate?.()?.getTime?.() ?? 0;
+        const bUpdated = b.updatedAt?.toDate?.()?.getTime?.() ?? 0;
+        return bUpdated - aUpdated;
+      });
+  }, [allInvoices, revenueFocusedStudentId]);
+  const revenueFocusedLatestInvoice = revenueFocusedStudentInvoices[0] || null;
+  const revenueScopedInvoices = useMemo(() => {
+    return revenueFocusedStudentInvoices.filter((invoice) => {
+      if (getTimelineInvoiceMonth(invoice) !== timelineMonth) return false;
+      if (timelineTrackFilter === 'all') return true;
+      return resolveInvoiceTrackCategory(invoice) === timelineTrackFilter;
+    });
+  }, [revenueFocusedStudentInvoices, timelineMonth, timelineTrackFilter]);
+  const revenueFocusedOutstandingAmount = useMemo(
+    () =>
+      revenueFocusedStudentInvoices.reduce((sum, invoice) => {
+        if (invoice.status === 'issued' || invoice.status === 'overdue') {
+          return sum + (Number(invoice.finalPrice) || 0);
+        }
+        return sum;
+      }, 0),
+    [revenueFocusedStudentInvoices]
+  );
+  const revenueFocusedMonthPayments = useMemo(() => {
+    return (paymentRecords || []).filter((payment) => {
+      if (payment.status !== 'success') return false;
+      if (payment.studentId !== revenueFocusedStudentId) return false;
+      if (getPaymentMonth(payment) !== timelineMonth) return false;
+      if (timelineTrackFilter === 'all') return true;
+      const sourceInvoice = invoiceById.get(payment.invoiceId);
+      return sourceInvoice ? resolveInvoiceTrackCategory(sourceInvoice) === timelineTrackFilter : false;
+    });
+  }, [invoiceById, paymentRecords, revenueFocusedStudentId, timelineMonth, timelineTrackFilter]);
+  const revenueFocusedCollectedAmount = useMemo(
+    () => revenueFocusedMonthPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0),
+    [revenueFocusedMonthPayments]
+  );
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -300,7 +382,6 @@ export default function RevenuePage() {
 
   useEffect(() => {
     if (!focusedStudentId) return;
-    setActiveTab('payments');
     if (!allInvoices || allInvoices.length === 0) return;
     const latest = allInvoices.find((invoice) => invoice.studentId === focusedStudentId);
     const month = latest ? getTimelineInvoiceMonth(latest) : null;
@@ -312,8 +393,11 @@ export default function RevenuePage() {
     const fromInvoices = (allInvoices || [])
       .map((invoice) => getTimelineInvoiceMonth(invoice))
       .filter(Boolean) as string[];
-    return Array.from(new Set([timelineMonth, ...recent, ...fromInvoices])).sort((a, b) => b.localeCompare(a));
-  }, [allInvoices, timelineMonth]);
+    const fromPayments = (paymentRecords || [])
+      .map((payment) => getPaymentMonth(payment))
+      .filter(Boolean) as string[];
+    return Array.from(new Set([timelineMonth, ...recent, ...fromInvoices, ...fromPayments])).sort((a, b) => b.localeCompare(a));
+  }, [allInvoices, paymentRecords, timelineMonth]);
 
   const timelineRows = useMemo(() => {
     const rows = (allInvoices || []).filter((invoice) => getTimelineInvoiceMonth(invoice) === timelineMonth);
@@ -337,10 +421,22 @@ export default function RevenuePage() {
     return timelineRows.filter((invoice) => invoice.studentId === focusedStudentId);
   }, [timelineRows, focusedStudentId]);
 
+  const selectedPaymentRows = useMemo(() => {
+    return (paymentRecords || []).filter((payment) => {
+      if (payment.status !== 'success') return false;
+      if (getPaymentMonth(payment) !== timelineMonth) return false;
+      if (focusedStudentId && payment.studentId !== focusedStudentId) return false;
+      if (timelineTrackFilter === 'all') return true;
+
+      const sourceInvoice = invoiceById.get(payment.invoiceId);
+      return sourceInvoice ? resolveInvoiceTrackCategory(sourceInvoice) === timelineTrackFilter : false;
+    });
+  }, [focusedStudentId, invoiceById, paymentRecords, timelineMonth, timelineTrackFilter]);
+
   const timelineTrackLabel = useMemo(() => {
     if (timelineTrackFilter === 'all') return '전체 트랙';
     if (timelineTrackFilter === 'studyRoom') return '독서실';
-    return '학원';
+    return '국어학원';
   }, [timelineTrackFilter]);
 
   const resettableInvoices = useMemo(
@@ -370,40 +466,44 @@ export default function RevenuePage() {
   const hasResettableInvoices = resettableInvoices.length > 0;
 
   const filteredInvoices = useMemo(() => {
-    const baseRows = focusedStudentId
-      ? timelineRows.filter((invoice) => invoice.studentId === focusedStudentId)
-      : timelineRows;
+    const baseRows = scopedTimelineRows;
     if (paymentSubTab === 'all') return baseRows;
     if (paymentSubTab === 'unpaid') return baseRows.filter((invoice) => invoice.status === 'issued' || invoice.status === 'overdue');
     if (paymentSubTab === 'paid') return baseRows.filter((invoice) => invoice.status === 'paid');
     if (paymentSubTab === 'overdue') return baseRows.filter((invoice) => invoice.status === 'overdue');
     return baseRows;
-  }, [timelineRows, paymentSubTab, focusedStudentId]);
+  }, [paymentSubTab, scopedTimelineRows]);
+
+  const selectedMonthCollectedAmount = useMemo(
+    () => selectedPaymentRows.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0),
+    [selectedPaymentRows]
+  );
 
   const timelineSummary = useMemo(() => {
-    return timelineRows.reduce(
+    const summary = scopedTimelineRows.reduce(
       (acc, invoice) => {
         const amount = Number(invoice.finalPrice) || 0;
-        const isCollected = invoice.status === 'paid';
         const isArrears = invoice.status === 'issued' || invoice.status === 'overdue';
         acc.billed += amount;
-        if (isCollected) acc.collected += amount;
         if (isArrears) acc.arrears += amount;
         return acc;
       },
       { billed: 0, collected: 0, arrears: 0 }
     );
-  }, [timelineRows]);
+    summary.collected = selectedMonthCollectedAmount;
+    return summary;
+  }, [scopedTimelineRows, selectedMonthCollectedAmount]);
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const todayKpi = useMemo(() => kpiHistory?.find(k => k.date === todayStr) || kpiHistory?.[kpiHistory.length - 1], [kpiHistory, todayStr]);
-  
-  const metrics = useMemo(() => {
-    if (!kpiHistory) return null;
-    const collected = kpiHistory.reduce((acc, k) => acc + (k.collectedRevenue || 0), 0);
-    const accrued = kpiHistory.reduce((acc, k) => acc + (k.totalRevenue || 0), 0);
-    return { collected, accrued, uncollected: Math.max(0, accrued - collected) };
-  }, [kpiHistory]);
+  const paymentMethodShare = useMemo(() => {
+    const total = selectedPaymentRows.length;
+    if (total === 0) return { card: 0, manual: 0 };
+    const cardCount = selectedPaymentRows.filter((payment) => payment.method === 'card').length;
+    const manualCount = total - cardCount;
+    return {
+      card: Math.round((cardCount / total) * 100),
+      manual: Math.round((manualCount / total) * 100),
+    };
+  }, [selectedPaymentRows]);
 
   const formatWon = (value: number) => '₩' + Math.round(value || 0).toLocaleString();
 
@@ -440,6 +540,20 @@ export default function RevenuePage() {
         title: '수납상황 초기화 실패',
         description: e?.message || '다시 시도해 주세요.',
       });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSingleCollectionReset = async (invoiceId: string) => {
+    if (!firestore || !centerId) return;
+    setIsSaving(true);
+    try {
+      await resetInvoiceCollectionState(firestore, centerId, invoiceId);
+      toast({ title: '선택 인보이스를 수납 대기로 복원했습니다.' });
+      router.refresh();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '복원 실패', description: e?.message || '다시 시도해 주세요.' });
     } finally {
       setIsSaving(false);
     }
@@ -547,7 +661,7 @@ export default function RevenuePage() {
     setIsSaving(true);
     try {
       const trackMeta = INVOICE_TRACK_META[trackCategory];
-      const title = trackCategory === 'academy' ? '28일 정기 학원 수강료' : '28일 정기 독서실 이용료';
+      const title = trackCategory === 'academy' ? '28일 정기 국어학원 수강료' : '28일 정기 독서실 이용료';
       await issueInvoice(firestore, centerId, studentId, amount, title, { trackCategory });
       toast({ title: `${trackMeta.label} 인보이스가 추가 발급되었습니다.` });
     } catch (e: any) {
@@ -568,6 +682,20 @@ export default function RevenuePage() {
       default:
         return <Badge variant="secondary" className="font-black text-[10px] px-2 py-0.5">{status}</Badge>;
     }
+  };
+
+  const updateRevenueRoute = (next: { studentId?: string | null; tab?: 'payments' | 'revenue' | 'ops' }) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const nextTab = next.tab || activeTab;
+    params.set('tab', nextTab);
+
+    if (next.studentId) {
+      params.set('studentId', next.studentId);
+    } else {
+      params.delete('studentId');
+    }
+
+    router.push(`/dashboard/revenue?${params.toString()}`);
   };
 
   if (membershipsLoading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" /></div>;
@@ -616,8 +744,8 @@ export default function RevenuePage() {
           <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">매출 기준 월</Label>
           <Input
             type="month"
-            value={currentChartMonth}
-            onChange={(event) => setCurrentChartMonth(event.target.value)}
+            value={timelineMonth}
+            onChange={(event) => setTimelineMonth(event.target.value || format(new Date(), 'yyyy-MM'))}
             className="h-11 min-w-[180px] rounded-xl border-2 font-black"
           />
         </div>
@@ -743,7 +871,7 @@ export default function RevenuePage() {
                     variant="outline"
                     className="h-11 rounded-xl font-black border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 gap-2"
                   >
-                    {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 학원 인보이스 추가 발행
+                    {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 국어학원 인보이스 추가 발행
                   </Button>
                 </div>
               </CardContent>
@@ -758,7 +886,7 @@ export default function RevenuePage() {
                     <History className="h-5 w-5 text-primary/60" /> 수납 및 미납 관리 · 월별 자동 집계
                   </CardTitle>
                   <CardDescription>
-                    수납/미납 관리에서 입력한 인보이스를 월별·트랙별로 자동 집계합니다. 독서실/학원 데이터를 같은 화면에서 비교할 수 있습니다.
+                    수납/미납 관리에서 입력한 인보이스를 월별·트랙별로 자동 집계합니다. 독서실/국어학원 데이터를 같은 화면에서 비교할 수 있습니다.
                   </CardDescription>
                 </div>
                 <div className={cn('w-full shrink-0', isMobile ? '' : 'max-w-[360px]')}>
@@ -858,7 +986,7 @@ export default function RevenuePage() {
                     className="rounded-lg font-black"
                     onClick={() => setTimelineTrackFilter('academy')}
                   >
-                    학원
+                    국어학원
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -899,13 +1027,13 @@ export default function RevenuePage() {
                 </div>
               </div>
 
-              {timelineRows.length === 0 ? (
+              {scopedTimelineRows.length === 0 ? (
                 <div className="rounded-2xl border border-dashed py-8 text-center text-sm font-semibold text-muted-foreground">
                   선택한 월/트랙에 해당하는 인보이스가 없습니다. 수납/미납 관리에서 먼저 인보이스를 등록해 주세요.
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {timelineRows.slice(0, 12).map((invoice) => {
+                  {scopedTimelineRows.slice(0, 12).map((invoice) => {
                     const track = resolveInvoiceTrackCategory(invoice);
                     const trackMeta = INVOICE_TRACK_META[track];
                     return (
@@ -1054,9 +1182,9 @@ export default function RevenuePage() {
                                 <SelectTrigger className="mt-1 border-none shadow-none focus:ring-0 h-6 p-0 text-right font-black text-[9px] uppercase tracking-widest text-primary/40 hover:text-primary transition-all">
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="rounded-xl border-none shadow-2xl">
+                                  <SelectContent className="rounded-xl border-none shadow-2xl">
                                   <SelectItem value="studyRoom" className="font-bold">독서실</SelectItem>
-                                  <SelectItem value="academy" className="font-bold">학원</SelectItem>
+                                  <SelectItem value="academy" className="font-bold">국어학원</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1092,94 +1220,119 @@ export default function RevenuePage() {
 
             <div className="md:col-span-4 space-y-6">
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 overflow-hidden relative group ring-1 ring-border/50">
-                <div className="absolute -right-4 -top-4 opacity-5 rotate-12 group-hover:scale-110 transition-transform duration-1000"><Armchair className="h-32 w-32" /></div>
+                <div className="absolute -right-4 -top-4 opacity-5 rotate-12 group-hover:scale-110 transition-transform duration-1000">
+                  <Armchair className="h-32 w-32" />
+                </div>
                 <div className="relative z-10 space-y-6">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-black tracking-tighter">배정 학생 우선순위</CardTitle>
-                    <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px]">우선순위</Badge>
+                    <CardTitle className="text-lg font-black tracking-tighter">학생 실수납 액션 큐</CardTitle>
+                    <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black text-[9px]">
+                      우선순위
+                    </Badge>
                   </div>
                   <div className="space-y-3">
-                    {top3Assigned.map(({ seat, student, latestInvoice, isOverdue, overdueDays }: any) => {
-                      const seatIdentity = resolveSeatIdentity(seat);
-                      const seatLabel = formatSeatLabel(seat);
+                    {topActionStudents.map((item) => {
+                      const seatIdentity = item.seat ? resolveSeatIdentity(item.seat) : null;
+                      const seatLabel = item.seat ? formatSeatLabel(item.seat) : '좌석 미배정';
+                      const toneClass =
+                        item.statusTone === 'critical'
+                          ? 'bg-rose-500'
+                          : item.statusTone === 'warning'
+                            ? 'bg-amber-500'
+                            : item.statusTone === 'neutral'
+                              ? 'bg-slate-500'
+                              : 'bg-emerald-500';
+
                       return (
-                        <div key={seat.id} className="flex flex-col p-5 rounded-3xl bg-[#fafafa] border border-border/50 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group/seat">
-                          <div className="flex items-center justify-between mb-4">
+                        <div
+                          key={item.student.id}
+                          className="flex flex-col gap-4 rounded-3xl border border-border/50 bg-[#fafafa] p-5 transition-all duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-xl"
+                        >
+                          <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-2xl bg-white border-2 border-primary/5 flex items-center justify-center font-black text-xs text-primary/40 shadow-inner group-hover/seat:bg-primary group-hover/seat:text-white transition-all">
-                                {seatIdentity.roomSeatNo || seat.seatNo}
+                              <div className="h-10 w-10 rounded-2xl bg-white border-2 border-primary/5 flex items-center justify-center font-black text-xs text-primary/50 shadow-inner">
+                                {seatIdentity?.roomSeatNo || item.seat?.seatNo || item.student.displayName?.charAt(0) || '학'}
                               </div>
-                              <div className="grid">
-                                <span className="font-black text-base tracking-tight">{student?.displayName || '학생'}</span>
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">{seatLabel} · {seat.seatZone || '자유석'}</span>
+                              <div className="grid gap-0.5">
+                                <span className="font-black text-base tracking-tight">{item.student.displayName || '학생'}</span>
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">
+                                  {seatLabel} · {item.seat?.seatZone || '미배정'}
+                                </span>
                               </div>
                             </div>
-                            {latestInvoice ? (
-                              <Badge className={cn(
-                                "font-black text-[9px] border-none px-2 h-5",
-                                latestInvoice.status === 'paid' ? "bg-emerald-500" : (latestInvoice.cycleEndDate.toDate() < new Date() ? "bg-rose-500 animate-pulse" : "bg-amber-500")
-                              )}>
-                                {latestInvoice.status === 'paid' ? '수납 완료' : (latestInvoice.cycleEndDate.toDate() < new Date() ? '미납/연체' : '수납 대기')}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="font-black text-[9px] opacity-40">미청구</Badge>
-                            )}
+                            <Badge className={cn('font-black text-[9px] border-none px-2 h-5 text-white', toneClass)}>
+                              {item.statusLabel}
+                            </Badge>
                           </div>
 
-                          {latestInvoice && (
-                            <div className="space-y-2.5">
-                              <div className="flex justify-between items-center text-[10px] font-bold">
-                                <span className="text-muted-foreground">이전 수납</span>
-                                <span className="text-primary">{latestInvoice.paidAt ? format(latestInvoice.paidAt.toDate(), 'yyyy.MM.dd') : '기록 없음'}</span>
-                              </div>
-                              <div className="flex justify-between items-center text-[10px] font-bold">
-                                <span className="text-muted-foreground">다음 결제 예정</span>
-                                <span className="text-blue-600">{format(latestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd')}</span>
-                              </div>
-                              {latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date() && (
-                                <div className="flex items-center gap-2 p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
-                                  <AlertTriangle className="h-3.5 w-3.5" />
-                                  <span className="text-[10px] font-black uppercase">미납 D+{differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate())}</span>
-                                </div>
-                              )}
+                          <div className="space-y-2.5">
+                            <div className="flex justify-between items-center text-[10px] font-bold">
+                              <span className="text-muted-foreground">최근 마감일</span>
+                              <span className="text-primary">
+                                {item.latestInvoice?.cycleEndDate ? format(item.latestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '인보이스 없음'}
+                              </span>
                             </div>
-                          )}
+                            <div className="flex justify-between items-center text-[10px] font-bold">
+                              <span className="text-muted-foreground">현재 미납 잔액</span>
+                              <span className="text-rose-600">{formatWon(item.totalOutstanding)}</span>
+                            </div>
+                            <p className="rounded-xl bg-white px-3 py-2 text-[10px] font-bold leading-relaxed text-slate-600">
+                              {item.nextAction}
+                            </p>
+                            {item.overdueDays > 0 ? (
+                              <div className="flex items-center gap-2 p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                <span className="text-[10px] font-black uppercase">미납 D+{item.overdueDays}</span>
+                              </div>
+                            ) : null}
+                          </div>
+
                           <div className="grid grid-cols-1 gap-2">
                             <Button
                               size="sm"
-                              onClick={() => createAutoInvoice(seat.studentId!, student?.displayName || '학생', 'studyRoom')}
-                              disabled={isSaving}
-                              variant="outline"
-                              className="w-full h-10 rounded-xl font-black text-xs border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 gap-2"
+                              type="button"
+                              onClick={() => updateRevenueRoute({ studentId: item.student.id, tab: 'payments' })}
+                              className="w-full h-10 rounded-xl font-black text-xs gap-2"
                             >
-                              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 독서실 추가 발급
+                              상세 수납 관리 열기
                             </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => createAutoInvoice(seat.studentId!, student?.displayName || '학생', 'academy')}
-                              disabled={isSaving}
-                              variant="outline"
-                              className="w-full h-10 rounded-xl font-black text-xs border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 gap-2"
-                            >
-                              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 학원 추가 발급
-                            </Button>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => createAutoInvoice(item.student.id, item.student.displayName || '학생', 'studyRoom')}
+                                disabled={isSaving}
+                                variant="outline"
+                                className="h-10 rounded-xl font-black text-xs border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 gap-2"
+                              >
+                                {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 독서실
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => createAutoInvoice(item.student.id, item.student.displayName || '학생', 'academy')}
+                                disabled={isSaving}
+                                variant="outline"
+                                className="h-10 rounded-xl font-black text-xs border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 gap-2"
+                              >
+                                {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 국어학원
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       );
                     })}
-                    
-                    {sortedAssignedStudents.length > 3 && (
+
+                    {studentActionQueue.length > 3 && (
                       <Button asChild variant="ghost" className="w-full h-12 rounded-2xl font-black text-xs text-muted-foreground hover:text-primary border-2 border-dashed">
                         <Link href="/dashboard/revenue/assigned-students">
-                          전체 배정 학생 보기 ({sortedAssignedStudents.length}명) <ChevronRight className="ml-2 h-4 w-4" />
+                          전체 재원생 보기 ({studentActionQueue.length}명) <ChevronRight className="ml-2 h-4 w-4" />
                         </Link>
                       </Button>
                     )}
 
-                    {(!attendanceList || attendanceList.filter(a => a.studentId).length === 0) && (
+                    {studentActionQueue.length === 0 && (
                       <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20">
                         <Users className="h-12 w-12" />
-                        <p className="text-[10px] font-black uppercase">현재 활성 배정 학생이 없습니다.</p>
+                        <p className="text-[10px] font-black uppercase">현재 관리할 재원생이 없습니다.</p>
                       </div>
                     )}
                   </div>
@@ -1191,32 +1344,47 @@ export default function RevenuePage() {
                 <div className="relative z-10 space-y-6">
                   <div className="flex items-center gap-2">
                     <Activity className="h-5 w-5 text-white/80" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white/80 whitespace-nowrap">매출 건전성 지수</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/80 whitespace-nowrap">수납 건전성 스냅샷</span>
                   </div>
                   <div className="grid gap-1">
-                    <h3 className="text-5xl font-black tracking-tighter text-white">{(metrics?.collected && metrics?.accrued) ? Math.round((metrics.collected / metrics.accrued) * 100) : 0}%</h3>
-                    <p className="text-xs font-bold text-white/88">당월 수납 달성률 (수납액/발생액)</p>
+                    <h3 className="text-5xl font-black tracking-tighter text-white">
+                      {timelineSummary.billed > 0 ? Math.round((timelineSummary.collected / timelineSummary.billed) * 100) : 0}%
+                    </h3>
+                    <p className="text-xs font-bold text-white/88">선택 월 수납 달성률 (실수납 / 청구)</p>
                   </div>
                   <div className="space-y-3 pt-4 border-t border-white/12">
                     <div className="flex justify-between items-center rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black uppercase text-white/88">
-                      <span>발생 매출</span>
-                      <span className="text-white">{formatWon(metrics?.accrued || 0)}</span>
+                      <span>청구 금액</span>
+                      <span className="text-white">{formatWon(timelineSummary.billed)}</span>
                     </div>
                     <div className="flex justify-between items-center rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black uppercase text-white/88">
-                      <span>수납 매출</span>
-                      <span className="text-white">{formatWon(metrics?.collected || 0)}</span>
+                      <span>실수납 금액</span>
+                      <span className="text-white">{formatWon(timelineSummary.collected)}</span>
+                    </div>
+                    <div className="flex justify-between items-center rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black uppercase text-white/88">
+                      <span>미납 금액</span>
+                      <span className="text-white">{formatWon(timelineSummary.arrears)}</span>
                     </div>
                   </div>
                 </div>
               </Card>
 
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group ring-1 ring-border/50">
-                <CardTitle className="mb-6 flex items-center gap-2 text-base font-black uppercase tracking-widest text-[#5c6e97]"><PieChart className="h-4 w-4 text-[#2554D7]" /> 결제 수단 비중</CardTitle>
+                <CardTitle className="mb-6 flex items-center gap-2 text-base font-black uppercase tracking-widest text-[#5c6e97]">
+                  <PieChart className="h-4 w-4 text-[#2554D7]" /> 결제 수단 비중
+                </CardTitle>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground whitespace-nowrap">카드 결제 연동</span><span className="text-lg font-black text-blue-600">72%</span></div>
-                  <Progress value={72} className="h-1.5" />
-                  <div className="flex justify-between items-end"><span className="text-xs font-bold text-muted-foreground">계좌/현금</span><span className="text-lg font-black text-emerald-600">28%</span></div>
-                  <Progress value={28} className="h-1.5 bg-muted" />
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">카드 결제</span>
+                    <span className="text-lg font-black text-blue-600">{paymentMethodShare.card}%</span>
+                  </div>
+                  <Progress value={paymentMethodShare.card} className="h-1.5" />
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs font-bold text-muted-foreground">계좌/현금</span>
+                    <span className="text-lg font-black text-emerald-600">{paymentMethodShare.manual}%</span>
+                  </div>
+                  <Progress value={paymentMethodShare.manual} className="h-1.5 bg-muted" />
+                  <p className="text-[11px] font-semibold text-muted-foreground">선택 월 실수납 {selectedPaymentRows.length}건 기준</p>
                 </div>
               </Card>
             </div>
@@ -1224,36 +1392,300 @@ export default function RevenuePage() {
         </TabsContent>
 
         <TabsContent value="revenue" className="space-y-8 animate-in fade-in duration-500">
-          <section className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-4")}>
-            <Card className="rounded-[2.5rem] border-none bg-[linear-gradient(135deg,#16316E_0%,#2457C6_65%,#6FA3FF_100%)] p-8 text-white shadow-[0_28px_60px_-40px_rgba(20,41,95,0.48)] overflow-hidden relative ring-1 ring-white/10">
-              <DollarSign className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12 text-white" />
-              <div className="relative z-10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/80">당월 발생 매출</p>
-                <h3 className="text-4xl font-black tracking-tighter text-white">{formatWon(metrics?.accrued || 0)}</h3>
-                <Badge className="border-none bg-white/16 px-3 text-[10px] text-white whitespace-nowrap">발생 기준</Badge>
-              </div>
-            </Card>
-            <Card className="rounded-[2.5rem] border-none bg-[linear-gradient(135deg,#0F766E_0%,#12B981_60%,#6EE7B7_100%)] p-8 text-white shadow-[0_28px_60px_-40px_rgba(5,150,105,0.4)] overflow-hidden relative ring-1 ring-white/10">
-              <Wallet className="absolute -right-4 -top-4 h-32 w-32 opacity-10 rotate-12 text-white" />
-              <div className="relative z-10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/80">실제 수납 금액</p>
-                <h3 className="text-4xl font-black tracking-tighter text-white">{formatWon(metrics?.collected || 0)}</h3>
-                <Badge className="border-none bg-white/16 px-3 text-[10px] text-white whitespace-nowrap">수납 기준</Badge>
-              </div>
-            </Card>
-            <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-border/50">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2"><Receipt className="h-3 w-3 text-rose-500" /> 미수금 합계</p>
-              <h3 className="text-4xl font-black tracking-tighter text-rose-600">{formatWon(metrics?.uncollected || 0)}</h3>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1 whitespace-nowrap">미수 잔액</p>
-            </Card>
-            <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 ring-1 ring-border/50">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2"><Users className="h-3 w-3 text-blue-500" /> 수납 인원</p>
-              <h3 className="text-4xl font-black tracking-tighter text-primary">{todayKpi?.activeStudentCount || 0}<span className="text-lg opacity-40 ml-1">명</span></h3>
-              <p className="text-[10px] font-bold text-muted-foreground mt-1 whitespace-nowrap">수납 인원</p>
-            </Card>
-          </section>
+          <div className={cn('grid gap-6', isMobile ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.7fr)_380px]')}>
+            <RevenueAnalysis
+              invoices={allInvoices || []}
+              payments={paymentRecords || []}
+              activeStudentCount={(studentMembers || []).length}
+              selectedMonth={timelineMonth}
+              onSelectedMonthChange={setTimelineMonth}
+              trackFilter={timelineTrackFilter}
+              onTrackFilterChange={setTimelineTrackFilter}
+              onSelectStudent={(studentId) => updateRevenueRoute({ studentId, tab: 'revenue' })}
+              focusedStudentId={revenueFocusedStudentId}
+              isMobile={isMobile}
+            />
 
-          <RevenueAnalysis />
+            <div className="space-y-6">
+              <Card className="rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_24px_56px_-42px_rgba(20,41,95,0.24)]">
+                <CardHeader className="gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg font-black tracking-tight text-[#14295F]">학생별 실수납 액션 큐</CardTitle>
+                      <CardDescription>미납, 연체, 수납 대기 학생을 먼저 보고 바로 상세 패널로 연결합니다.</CardDescription>
+                    </div>
+                    <Badge className="rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
+                      {timelineMonth}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {studentActionQueue.slice(0, 8).map((item) => {
+                    const isSelected = revenueFocusedStudentId === item.student.id;
+                    const seatLabel = item.seat ? formatSeatLabel(item.seat) : '좌석 미배정';
+                    const badgeTone =
+                      item.statusTone === 'critical'
+                        ? 'bg-rose-50 text-rose-600 border-rose-100'
+                        : item.statusTone === 'warning'
+                          ? 'bg-amber-50 text-amber-700 border-amber-100'
+                          : item.statusTone === 'neutral'
+                            ? 'bg-slate-100 text-slate-600 border-slate-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-100';
+
+                    return (
+                      <button
+                        key={item.student.id}
+                        type="button"
+                        onClick={() => updateRevenueRoute({ studentId: item.student.id, tab: 'revenue' })}
+                        className={cn(
+                          'w-full rounded-[1.4rem] border px-4 py-4 text-left transition-all',
+                          isSelected
+                            ? 'border-[#2554D7] bg-[#f8fbff] shadow-[0_16px_30px_-24px_rgba(37,84,215,0.45)]'
+                            : 'border-slate-100 bg-white hover:border-[#dbe7ff] hover:bg-[#f8fbff]'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-black text-slate-900">{item.student.displayName || '학생'}</span>
+                              <Badge className={cn('border text-[10px] font-black', badgeTone)}>{item.statusLabel}</Badge>
+                            </div>
+                            <p className="text-[11px] font-semibold text-slate-500">{seatLabel} · {item.seat?.seatZone || '미배정'}</p>
+                            <p className="text-[11px] font-semibold leading-relaxed text-slate-600">{item.nextAction}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">미납 잔액</p>
+                            <p className="dashboard-number mt-1 text-sm text-rose-600">{formatWon(item.totalOutstanding)}</p>
+                            {item.overdueDays > 0 ? (
+                              <p className="mt-1 text-[10px] font-black text-rose-500">D+{item.overdueDays}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_24px_56px_-42px_rgba(20,41,95,0.24)]">
+                <CardHeader className="gap-4 border-b border-[#e7eefc]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <Badge className="rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
+                        선택 학생 실수납 패널
+                      </Badge>
+                      <CardTitle className="text-xl font-black tracking-tight text-[#14295F]">
+                        {revenueFocusedStudent?.displayName || '학생'} 수납 관리
+                      </CardTitle>
+                      <CardDescription>
+                        월 {timelineMonth} · {timelineTrackLabel} 기준 상세와 최근 인보이스를 같이 봅니다.
+                      </CardDescription>
+                    </div>
+                    {focusedStudentId ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-9 rounded-xl font-black text-[#14295F]"
+                        onClick={() => updateRevenueRoute({ studentId: null, tab: 'revenue' })}
+                      >
+                        선택 해제
+                      </Button>
+                    ) : null}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-5 p-5">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-[1.4rem] border border-slate-100 bg-slate-50/80 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">현재 필터</p>
+                      <p className="mt-2 text-sm font-black text-slate-900">{timelineMonth} · {timelineTrackLabel}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-slate-500">{revenueFocusedStudentSeat ? formatSeatLabel(revenueFocusedStudentSeat) : '좌석 미배정'}</p>
+                    </div>
+                    <div className="rounded-[1.4rem] border border-slate-100 bg-slate-50/80 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">최근 상태</p>
+                      <div className="mt-2">{revenueFocusedLatestInvoice ? getStatusBadge(revenueFocusedLatestInvoice.status) : <Badge variant="outline">인보이스 없음</Badge>}</div>
+                      <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                        최근 마감일 {revenueFocusedLatestInvoice?.cycleEndDate ? format(revenueFocusedLatestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '-'}
+                      </p>
+                    </div>
+                    <div className="rounded-[1.4rem] border border-rose-100 bg-rose-50/60 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-600">현재 미납 잔액</p>
+                      <p className="dashboard-number mt-2 text-xl text-rose-600">{formatWon(revenueFocusedOutstandingAmount)}</p>
+                    </div>
+                    <div className="rounded-[1.4rem] border border-emerald-100 bg-emerald-50/60 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">선택 월 실수납</p>
+                      <p className="dashboard-number mt-2 text-xl text-emerald-700">{formatWon(revenueFocusedCollectedAmount)}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-emerald-700/80">{revenueFocusedMonthPayments.length}건 완료</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button
+                      type="button"
+                      onClick={() =>
+                        revenueFocusedStudentId &&
+                        createAutoInvoice(
+                          revenueFocusedStudentId,
+                          revenueFocusedStudent?.displayName || '학생',
+                          'studyRoom',
+                          Number(quickIssueAmount || 390000) || 390000
+                        )
+                      }
+                      disabled={isSaving || !revenueFocusedStudentId}
+                      variant="outline"
+                      className="h-11 rounded-xl font-black border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 gap-2"
+                    >
+                      {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 독서실 추가 발행
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() =>
+                        revenueFocusedStudentId &&
+                        createAutoInvoice(
+                          revenueFocusedStudentId,
+                          revenueFocusedStudent?.displayName || '학생',
+                          'academy',
+                          Number(quickIssueAmount || 390000) || 390000
+                        )
+                      }
+                      disabled={isSaving || !revenueFocusedStudentId}
+                      variant="outline"
+                      className="h-11 rounded-xl font-black border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 gap-2"
+                    >
+                      {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 국어학원 추가 발행
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-black text-[#14295F]">학생 인보이스 상세</p>
+                      <Badge className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-600">
+                        {revenueScopedInvoices.length > 0 ? `${revenueScopedInvoices.length}건` : `최근 ${Math.min(revenueFocusedStudentInvoices.length, 4)}건`}
+                      </Badge>
+                    </div>
+
+                    {(revenueScopedInvoices.length > 0 ? revenueScopedInvoices : revenueFocusedStudentInvoices.slice(0, 4)).map((invoice) => {
+                      const invoiceTrack = resolveInvoiceTrackCategory(invoice);
+                      const trackMeta = INVOICE_TRACK_META[invoiceTrack];
+                      const draftPrice = priceDrafts[invoice.id] ?? String(Math.round(Number(invoice.finalPrice) || 0));
+                      const parsedDraftPrice = parseDraftPrice(draftPrice);
+                      const canSavePrice = parsedDraftPrice !== null && parsedDraftPrice !== Number(invoice.finalPrice || 0);
+
+                      return (
+                        <div key={invoice.id} className="rounded-[1.5rem] border border-slate-100 bg-slate-50/60 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={cn('border text-[10px] font-black', trackMeta.badgeClass)}>{trackMeta.label}</Badge>
+                                {getStatusBadge(invoice.status)}
+                              </div>
+                              <p className="text-sm font-black text-slate-900">
+                                {invoice.cycleStartDate ? format(invoice.cycleStartDate.toDate(), 'MM.dd') : '--.--'} ~{' '}
+                                {invoice.cycleEndDate ? format(invoice.cycleEndDate.toDate(), 'MM.dd') : '--.--'}
+                              </p>
+                              <p className="text-[11px] font-semibold text-slate-500">
+                                마감일 {invoice.cycleEndDate ? format(invoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '-'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className={cn('dashboard-number text-lg', invoice.status === 'paid' ? 'text-emerald-600' : 'text-[#14295F]')}>
+                                {formatWon(invoice.finalPrice)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex items-center gap-1.5">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={draftPrice}
+                              onChange={(event) => handlePriceDraftChange(invoice.id, event.target.value)}
+                              disabled={isSaving}
+                              placeholder="금액"
+                              className="h-9 rounded-xl px-3 text-right text-[11px] font-black"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handlePriceSave(invoice)}
+                              disabled={isSaving || !canSavePrice}
+                              className="h-9 rounded-xl px-3 text-[11px] font-black"
+                            >
+                              금액 저장
+                            </Button>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            <Select
+                              value={invoice.status}
+                              onValueChange={(val: any) => handleStatusChange(invoice.id, val)}
+                              disabled={isSaving}
+                            >
+                              <SelectTrigger className="h-10 rounded-xl border-[#dbe7ff] bg-white text-[11px] font-black text-[#14295F]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-none shadow-2xl">
+                                <SelectItem value="issued" className="font-bold">수납 대기</SelectItem>
+                                <SelectItem value="paid" className="font-bold">수납 완료</SelectItem>
+                                <SelectItem value="overdue" className="font-bold">미납/연체</SelectItem>
+                                <SelectItem value="void" className="font-bold">무효</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={invoiceTrack}
+                              onValueChange={(val: InvoiceTrackCategory) => handleTrackCategoryChange(invoice.id, val)}
+                              disabled={isSaving}
+                            >
+                              <SelectTrigger className="h-10 rounded-xl border-[#dbe7ff] bg-white text-[11px] font-black text-[#14295F]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-none shadow-2xl">
+                                <SelectItem value="studyRoom" className="font-bold">독서실</SelectItem>
+                                <SelectItem value="academy" className="font-bold">국어학원</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            {invoice.status !== 'paid' ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  onClick={() => handleRealPayment(invoice.id)}
+                                  className="h-10 rounded-xl font-black text-xs gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                                >
+                                  <CreditCard className="h-4 w-4" /> 실제 카드 결제
+                                </Button>
+                                <Select onValueChange={(val) => handleStatusChange(invoice.id, 'paid', val)}>
+                                  <SelectTrigger className="h-10 rounded-xl border-emerald-200 bg-white text-xs font-black text-emerald-700">
+                                    <div className="flex items-center gap-2"><RefreshCw className="h-4 w-4" /><SelectValue placeholder="수동 수납 완료" /></div>
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-xl border-none shadow-2xl p-2">
+                                    <SelectItem value="card" className="font-bold py-3 rounded-xl">카드 결제 완료</SelectItem>
+                                    <SelectItem value="transfer" className="font-bold py-3 rounded-xl">계좌 이체 완료</SelectItem>
+                                    <SelectItem value="cash" className="font-bold py-3 rounded-xl">현금 수납 완료</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleSingleCollectionReset(invoice.id)}
+                                disabled={isSaving}
+                                className="h-10 rounded-xl border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 sm:col-span-2"
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" /> 수납 완료 복원
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="ops" className="animate-in fade-in duration-500">
@@ -1290,7 +1722,7 @@ export default function RevenuePage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-600">
-              상세 관리 버튼으로 진입하면 이미 인보이스가 있는 학생도 독서실/학원 인보이스를 추가 발행할 수 있습니다.
+              상세 관리 버튼으로 진입하면 이미 인보이스가 있는 학생도 독서실/국어학원 인보이스를 추가 발행할 수 있습니다.
             </div>
           </div>
 
