@@ -6303,11 +6303,11 @@ exports.ensureCurrentUserMemberships = functions
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
     }
     const uid = context.auth.uid;
-    const [byFieldSnap, byDocIdSnap] = await Promise.all([
-        db.collectionGroup("members").where("id", "==", uid).get(),
-        db.collectionGroup("members").where(admin.firestore.FieldPath.documentId(), "==", uid).get(),
-    ]);
-    const dedupedDocs = Array.from(new Map([...byFieldSnap.docs, ...byDocIdSnap.docs].map((docSnap) => [docSnap.ref.path, docSnap])).values());
+    const byFieldSnap = await db.collectionGroup("members").where("id", "==", uid).get();
+    const legacyDocSnaps = byFieldSnap.empty
+        ? (await Promise.all((await db.collection("centers").listDocuments()).map((centerRef) => centerRef.collection("members").doc(uid).get()))).filter((docSnap) => docSnap.exists)
+        : [];
+    const dedupedDocs = Array.from(new Map([...byFieldSnap.docs, ...legacyDocSnaps].map((docSnap) => [docSnap.ref.path, docSnap])).values());
     const repairedCenterIds = new Set();
     for (const docSnap of dedupedDocs) {
         const raw = docSnap.data();
