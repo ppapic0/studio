@@ -1154,7 +1154,6 @@ export function VisualReportViewer({
               <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
               <ReportInsightBoard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
             </div>
-            <ReportActionBoard aiMeta={normalizedAiMeta} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} compactMode />
           </>
         ) : (
           <>
