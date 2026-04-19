@@ -446,9 +446,9 @@ function ReportInsightBoard({
           <div className="rounded-2xl bg-blue-50 p-2 text-blue-600">
             <TrendingUp className="h-4 w-4" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">핵심 흐름</p>
-            <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>
+            <p className={cn('mt-1 break-keep text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>
               오늘 리포트 한눈 요약
             </p>
           </div>
@@ -1150,7 +1150,7 @@ export function VisualReportViewer({
               onExpand={() => setIsTrendChartDialogOpen(true)}
             />
             <KpiGraphGrid aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
-            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
+            <div className="grid min-w-0 gap-4">
               <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
               <ReportInsightBoard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
             </div>
