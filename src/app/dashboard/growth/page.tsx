@@ -679,6 +679,31 @@ export default function GrowthPage() {
           : '시간대 부스트가 없으면 기본 1배로 적용돼요',
     };
   }, [nowMs, pointBoostEvents]);
+  const pointBoostCardGuide = useMemo(() => {
+    const currentBoost = pointBoostGuide.active[0];
+    if (currentBoost) {
+      return {
+        badge: currentBoost.multiplierLabel,
+        title: '지금 시간대 부스트 진행 중',
+        detail: currentBoost.label,
+      };
+    }
+
+    const nextBoost = pointBoostGuide.upcoming[0];
+    if (nextBoost) {
+      return {
+        badge: 'NEXT',
+        title: `다음 ${nextBoost.multiplierLabel} 부스트`,
+        detail: nextBoost.label,
+      };
+    }
+
+    return {
+      badge: '기본 1배',
+      title: '시간대 부스트 없음',
+      detail: '부스트가 없으면 상자 pt는 기본 1배로 적용돼요.',
+    };
+  }, [pointBoostGuide]);
   const studyBoxExampleGuide = useMemo(() => {
     const lateCommon = studyBoxManualRows.find((row) => row.rarity === 'common')?.lateWeight ?? 0;
     const lateRare = studyBoxManualRows.find((row) => row.rarity === 'rare')?.lateWeight ?? 0;
@@ -1495,7 +1520,7 @@ export default function GrowthPage() {
           <button
             type="button"
             onClick={() => setIsPointTrackManualOpen(true)}
-            className="relative w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]"
+            className="group relative w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -1510,36 +1535,48 @@ export default function GrowthPage() {
                         QUICK GUIDE
                       </span>
                     </div>
-                    <p className="mt-1.5 max-w-[16rem] text-[11px] font-bold leading-[1.35rem] text-[#5F729B]">
-                      상자 확률, 보상 범위, 누적 시간 규칙, 시간대 부스트를 한 장으로 빠르게 볼 수 있어요.
+                    <p className="mt-1.5 max-w-[15.5rem] break-keep pr-2 text-[11px] font-bold leading-[1.4rem] text-[#5F729B]">
+                      상자 확률, 보상 규칙, 시간대 부스트를 한 번에 빠르게 확인해요.
                     </p>
                   </div>
                 </div>
               </div>
-              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F] shadow-[0_14px_24px_-22px_rgba(20,41,95,0.42)]">
+              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#D7E4FF] bg-white text-[#14295F] shadow-[0_14px_24px_-22px_rgba(20,41,95,0.42)] transition-transform duration-200 group-hover:translate-x-0.5">
                 <ChevronRight className="h-4 w-4" />
               </span>
             </div>
 
-            <div className="mt-3.5 flex flex-wrap gap-1.5">
-              <span className="rounded-full border border-white/85 bg-white/88 px-2.5 py-1.5 text-[10px] font-black leading-none text-[#17326B] shadow-sm">
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <span className="rounded-[1rem] border border-white/85 bg-white/88 px-2.5 py-2 text-center text-[10px] font-black leading-tight text-[#17326B] shadow-sm">
                 1시간마다 상자
               </span>
-              <span className="rounded-full border border-white/85 bg-white/88 px-2.5 py-1.5 text-[10px] font-black leading-none text-[#17326B] shadow-sm">
+              <span className="rounded-[1rem] border border-white/85 bg-white/88 px-2.5 py-2 text-center text-[10px] font-black leading-tight text-[#17326B] shadow-sm">
                 하루 최대 {STUDY_BOX_DAILY_LIMIT}개
               </span>
-              <span className="rounded-full border border-white/85 bg-white/88 px-2.5 py-1.5 text-[10px] font-black leading-none text-[#17326B] shadow-sm">
+              <span className="col-span-2 rounded-[1rem] border border-white/85 bg-white/88 px-2.5 py-2 text-center text-[10px] font-black leading-tight text-[#17326B] shadow-sm">
                 5시간부터 레어 확률 상승
               </span>
             </div>
 
-            <div className="mt-3.5 flex items-start gap-3 rounded-[1.25rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,255,0.92)_100%)] px-3.5 py-3 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EDF4FF] text-[#17326B]">
+            <div className="mt-3.5 rounded-[1.3rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(244,248,255,0.94)_100%)] px-3.5 py-3.5 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.28)]">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EDF4FF] text-[#17326B]">
                 <Sparkles className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">시간대 부스트</p>
-                <p className="mt-1 text-[13px] font-black leading-5 text-[#14295F]">{pointBoostGuide.heroLabel}</p>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">시간대 부스트</p>
+                    <span className="inline-flex rounded-full bg-[#EAF1FF] px-2 py-1 text-[10px] font-black text-[#2554D7]">
+                      {pointBoostCardGuide.badge}
+                    </span>
+                  </div>
+                  <p className="mt-1 break-keep text-[13px] font-black leading-[1.35rem] text-[#14295F]">
+                    {pointBoostCardGuide.title}
+                  </p>
+                  <p className="mt-1 break-keep text-[11px] font-bold leading-[1.15rem] text-[#5F729B]">
+                    {pointBoostCardGuide.detail}
+                  </p>
+                </div>
               </div>
             </div>
           </button>
