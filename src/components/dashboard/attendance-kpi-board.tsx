@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAppContext } from '@/contexts/app-context';
 import { cn } from '@/lib/utils';
 import {
   ATTENDANCE_STATUS_LABELS,
@@ -55,25 +56,6 @@ const REQUEST_STATUS_LABELS: Record<RequestFilter, string> = {
   rejected: '반려',
   none: '없음',
 };
-
-function useDesktopLayout() {
-  const [isDesktop, setIsDesktop] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mediaQuery = window.matchMedia('(min-width: 1024px)');
-    const sync = () => setIsDesktop(mediaQuery.matches);
-    sync();
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', sync);
-      return () => mediaQuery.removeEventListener('change', sync);
-    }
-    mediaQuery.addListener(sync);
-    return () => mediaQuery.removeListener(sync);
-  }, []);
-
-  return isDesktop;
-}
 
 function MetricSummaryCard({
   label,
@@ -348,10 +330,112 @@ function DetailStat({
   toneClass?: string;
 }) {
   return (
-    <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[#F8FAFF] px-4 py-4">
+    <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFF_100%)] px-4 py-4 shadow-[0_16px_34px_-34px_rgba(20,41,95,0.3)]">
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
       <p className={cn('mt-2 text-lg font-black tracking-tight text-[#14295F]', toneClass)}>{value}</p>
       <p className="mt-1 text-[11px] font-bold text-slate-500">{hint}</p>
+    </div>
+  );
+}
+
+function formatClockLabel(value: Date | null) {
+  if (!value) return '-';
+  return value.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function ActionRailItem({
+  order,
+  suggestion,
+}: {
+  order: number;
+  suggestion: string;
+}) {
+  return (
+    <div className="rounded-[1.25rem] border border-white/10 bg-white/10 px-3.5 py-3.5">
+      <div className="flex items-start gap-3">
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[11px] font-black text-[#FFB980]">
+          {order}
+        </div>
+        <p className="text-sm font-bold leading-relaxed text-white/92">{suggestion}</p>
+      </div>
+    </div>
+  );
+}
+
+function FocusedDayCard({
+  day,
+}: {
+  day: AttendanceKpiDay | null;
+}) {
+  return (
+    <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-white/95 p-4 shadow-[0_22px_44px_-38px_rgba(20,41,95,0.34)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">선택 날짜 상세</p>
+          <p className="mt-1 text-xs font-bold text-slate-500">현재 선택한 날짜의 실제 운영 기록을 바로 확인합니다.</p>
+        </div>
+        {day ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs font-black',
+                getAttendanceStatusTone(day.status)
+              )}
+            >
+              {ATTENDANCE_STATUS_LABELS[day.status]}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="rounded-full border-[#14295F]/10 bg-[#F7F9FF] px-3 py-1 text-[11px] font-black text-[#14295F]"
+            >
+              {day.dateKey}
+            </Badge>
+          </div>
+        ) : null}
+      </div>
+      {day ? (
+        <>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+              {day.isScheduledDay ? '등원 예정일' : day.isOffDay ? '등원 없음' : '루틴 확인 필요'}
+            </Badge>
+            <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+              공부 {formatMinutesAsLabel(day.studyMinutes)}
+            </Badge>
+            <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+              외출 {day.awayCount > 0 ? `${day.awayCount}회` : '없음'}
+            </Badge>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <DetailStat label="공부 시간" value={formatMinutesAsLabel(day.studyMinutes)} hint={day.dateLabel} />
+            <DetailStat
+              label="등원 오차"
+              value={formatSignedMinutes(day.lateMinutes)}
+              hint={day.expectedArrivalTime || '예정 시각 없음'}
+              toneClass={day.lateMinutes > 0 ? 'text-amber-700' : 'text-emerald-700'}
+            />
+            <DetailStat
+              label="외출"
+              value={day.awayCount > 0 ? `${day.awayCount}회` : '없음'}
+              hint={formatMinutesAsLabel(day.awayMinutes)}
+              toneClass="text-sky-700"
+            />
+            <DetailStat
+              label="하원"
+              value={formatClockLabel(day.checkOutAt)}
+              hint={day.hasCheckoutRecord ? '기록 완료' : '기록 없음'}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="mt-4 rounded-[1.4rem] border border-dashed border-[#14295F]/10 bg-[#F8FAFF] px-4 py-6 text-sm font-bold text-slate-400">
+          선택 가능한 출결 기록이 없습니다.
+        </div>
+      )}
     </div>
   );
 }
@@ -389,125 +473,117 @@ function DetailPanel({
     .slice(-5)
     .reverse();
   const requestPreview = expandedRequests ? row.requestHistory : row.requestHistory.slice(0, 4);
+  const prioritySuggestions = row.suggestions.slice(0, 2);
 
   return (
     <div className="space-y-4 rounded-[2.2rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.35)]">
-      <div className="overflow-hidden rounded-[1.9rem] border border-[#14295F]/10 bg-[linear-gradient(135deg,#F5F8FF_0%,#FFFFFF_60%,#FFF4EA_100%)] p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#14295F]/45">선택 학생 브리프</p>
-            <h3 className="text-[1.75rem] font-black tracking-[-0.04em] text-[#14295F]">{row.studentName}</h3>
-            <p className="text-sm font-bold text-slate-500">{buildAttendanceStudentSubtitle(row)}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {onClose ? (
-              <Button variant="outline" size="sm" className="rounded-full border-[#14295F]/10 bg-white/85 font-black text-[#14295F]" onClick={onClose}>
-                상세 닫기
-              </Button>
-            ) : null}
-            <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', riskMeta.tone)}>{riskMeta.label}</Badge>
-            <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', getRequestStatusTone(row.recentRequestStatus))}>
-              신청 {getRequestStatusLabel(row.recentRequestStatus)}
-            </Badge>
-            <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white/85 px-3 py-1 text-[10px] font-black text-[#14295F]">
-              안정도 {row.stabilityScore}
-            </Badge>
-          </div>
-        </div>
+      <div className="overflow-hidden rounded-[1.95rem] border border-[#14295F]/10 bg-[linear-gradient(135deg,#F5F8FF_0%,#FFFFFF_58%,#FFF4EA_100%)] p-4 shadow-[0_26px_60px_-42px_rgba(20,41,95,0.32)] sm:p-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
+          <div className="rounded-[1.75rem] border border-white/70 bg-white/95 p-5 shadow-[0_22px_44px_-38px_rgba(20,41,95,0.28)]">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-2">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#14295F]/45">선택 학생 브리프</p>
+                <h3 className="text-[1.9rem] font-black tracking-[-0.05em] text-[#14295F]">{row.studentName}</h3>
+                <p className="text-sm font-bold text-slate-500">{buildAttendanceStudentSubtitle(row)}</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {onClose ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full border-[#14295F]/10 bg-white/90 font-black text-[#14295F]"
+                    onClick={onClose}
+                  >
+                    상세 닫기
+                  </Button>
+                ) : null}
+                <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', riskMeta.tone)}>{riskMeta.label}</Badge>
+                <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', getRequestStatusTone(row.recentRequestStatus))}>
+                  신청 {getRequestStatusLabel(row.recentRequestStatus)}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-[#14295F]/10 bg-[#F7F9FF] px-3 py-1 text-[10px] font-black text-[#14295F]"
+                >
+                  안정도 {row.stabilityScore}
+                </Badge>
+              </div>
+            </div>
 
-        <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-          <div className="rounded-[1.5rem] border border-white/60 bg-white/90 p-4 shadow-[0_18px_35px_-35px_rgba(20,41,95,0.25)]">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">오늘 핵심 이슈</p>
-            <p className="mt-2 text-base font-black leading-relaxed text-[#14295F]">{row.topIssue}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-[#F7F9FF] px-3 py-1 text-[11px] font-black text-[#14295F]">
-                출석률 {row.attendanceRate}%
-              </Badge>
-              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
-                지각 {row.lateCount}회
-              </Badge>
-              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
-                결석 {row.absenceCount}회
-              </Badge>
+            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(240px,0.95fr)]">
+              <div className="rounded-[1.55rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">오늘 핵심 이슈</p>
+                <p className="mt-3 text-[1.2rem] font-black leading-relaxed tracking-[-0.03em] text-[#14295F]">{row.topIssue}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-[#F4F7FF] px-3 py-1 text-[11px] font-black text-[#14295F]">
+                    출석 {row.presentDays}/{row.scheduledDays}일
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+                    지각 {row.lateCount}회
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+                    결석 {row.absenceCount}회
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+                    신청 {row.recentRequestCount}건
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                <DetailStat label="출석률" value={`${row.attendanceRate}%`} hint={`지각 ${row.lateCount}회 · 결석 ${row.absenceCount}회`} />
+                <DetailStat label="평균 외출" value={formatMinutesAsLabel(row.averageAwayMinutes)} hint={`${row.awayDayCount}일 · ${row.awayCount}회`} toneClass="text-sky-700" />
+              </div>
             </div>
           </div>
 
-          <div className="rounded-[1.5rem] border border-[#14295F]/10 bg-[#14295F] p-4 text-white shadow-[0_24px_45px_-35px_rgba(20,41,95,0.5)]">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/65">바로 할 일</p>
-            <div className="mt-3 space-y-2">
-              {row.suggestions.length === 0 ? (
-                <div className="rounded-[1.1rem] bg-white/12 px-3 py-3 text-sm font-bold leading-relaxed text-white/90">
-                  추가 조치 없이 현재 흐름을 유지하면 됩니다.
+          <div className="rounded-[1.75rem] border border-[#14295F]/10 bg-[#14295F] p-5 text-white shadow-[0_28px_54px_-38px_rgba(20,41,95,0.55)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">바로 할 일</p>
+                <p className="mt-2 text-sm font-bold leading-relaxed text-white/84">지금 이 학생에게 필요한 운영 후속 조치만 짧게 정리합니다.</p>
+              </div>
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
+                <CheckCircle2 className="size-4 text-[#FFB980]" />
+              </div>
+            </div>
+            <div className="mt-5 space-y-3">
+              {prioritySuggestions.length === 0 ? (
+                <div className="rounded-[1.25rem] border border-white/10 bg-white/10 px-4 py-4 text-sm font-bold leading-relaxed text-white/92">
+                  추가 조치 없이 현재 흐름을 유지하면 됩니다. 오늘은 기록 누락만 가볍게 점검해 주세요.
                 </div>
               ) : (
-                row.suggestions.slice(0, 2).map((suggestion) => (
-                  <div key={suggestion} className="rounded-[1.1rem] bg-white/12 px-3 py-3">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB980]" />
-                      <span className="text-sm font-bold leading-relaxed text-white/92">{suggestion}</span>
-                    </div>
-                  </div>
+                prioritySuggestions.map((suggestion, index) => (
+                  <ActionRailItem key={suggestion} order={index + 1} suggestion={suggestion} />
                 ))
               )}
             </div>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
+              <Badge className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-black text-white/86">
+                최근 신청 {row.recentRequestCount}건
+              </Badge>
+              <Badge className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-black text-white/86">
+                루틴 누락 {row.routineMissingCount}일
+              </Badge>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <DetailStat label="출석률" value={`${row.attendanceRate}%`} hint={`지각 ${row.lateCount}회 · 결석 ${row.absenceCount}회`} />
-        <DetailStat label="평균 외출" value={formatMinutesAsLabel(row.averageAwayMinutes)} hint={`${row.awayDayCount}일 · ${row.awayCount}회`} toneClass="text-sky-700" />
-        <DetailStat label="최근 하원" value={row.latestCheckOutLabel} hint={`하원 기록 완료율 ${row.checkoutCompletionRate}%`} />
-        <DetailStat label="신청 상태" value={getRequestStatusLabel(row.recentRequestStatus)} hint={`최근 신청 ${row.recentRequestCount}건`} />
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)]">
+          <FocusedDayCard day={focusedDay} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <DetailStat label="최근 하원" value={row.latestCheckOutLabel} hint={`하원 기록 완료율 ${row.checkoutCompletionRate}%`} />
+            <DetailStat label="신청 상태" value={getRequestStatusLabel(row.recentRequestStatus)} hint={`최근 신청 ${row.recentRequestCount}건`} />
+            <DetailStat label="외출 빈도" value={`${row.awayCount}회`} hint={`${row.awayDayCount}일 동안 발생`} toneClass="text-sky-700" />
+            <DetailStat label="등원 추세" value={formatSignedMinutes(row.averageArrivalOffsetMinutes)} hint="최근 유효 등원 평균" toneClass={row.averageArrivalOffsetMinutes > 0 ? 'text-amber-700' : 'text-emerald-700'} />
+          </div>
+        </div>
       </div>
 
       <AttendanceTimelineStrip row={row} focusedDateKey={focusedDateKey} onFocusDateKey={setFocusedDateKey} />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-white/92 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">선택 날짜 상세</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">짧은 상태 스트립에서 선택한 하루의 기록입니다.</p>
-            </div>
-            {focusedDay ? (
-              <Badge className={cn('rounded-full border px-3 py-1 text-xs font-black', getAttendanceStatusTone(focusedDay.status))}>
-                {ATTENDANCE_STATUS_LABELS[focusedDay.status]}
-              </Badge>
-            ) : null}
-          </div>
-          {focusedDay ? (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <DetailStat label="공부 시간" value={formatMinutesAsLabel(focusedDay.studyMinutes)} hint={focusedDay.dateKey} />
-              <DetailStat
-                label="등원 오차"
-                value={formatSignedMinutes(focusedDay.lateMinutes)}
-                hint={focusedDay.expectedArrivalTime || '예정 시각 없음'}
-                toneClass={focusedDay.lateMinutes > 0 ? 'text-amber-700' : 'text-emerald-700'}
-              />
-              <DetailStat label="외출" value={focusedDay.awayCount > 0 ? `${focusedDay.awayCount}회` : '없음'} hint={formatMinutesAsLabel(focusedDay.awayMinutes)} toneClass="text-sky-700" />
-              <DetailStat
-                label="하원"
-                value={
-                  focusedDay.checkOutAt
-                    ? focusedDay.checkOutAt.toLocaleTimeString('ko-KR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false,
-                      })
-                    : '-'
-                }
-                hint={focusedDay.hasCheckoutRecord ? '기록 완료' : '기록 없음'}
-              />
-            </div>
-          ) : (
-            <div className="mt-4 rounded-[1.4rem] border border-dashed border-[#14295F]/10 bg-[#F8FAFF] px-4 py-6 text-sm font-bold text-slate-400">
-              선택 가능한 출결 기록이 없습니다.
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-white/92 p-4">
+      <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFF_100%)] p-4 shadow-[0_22px_44px_-38px_rgba(20,41,95,0.28)]">
+        <div className="rounded-[1.5rem] border border-white/70 bg-white/90 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">등원 시각 추이</p>
@@ -524,7 +600,7 @@ function DetailPanel({
               </div>
             ) : (
               recentArrivalTrend.map((day) => (
-                <div key={day.dateKey} className="flex items-center justify-between rounded-[1.25rem] border border-[#14295F]/10 bg-[#F8FAFF] px-3 py-3">
+                <div key={day.dateKey} className="flex items-center justify-between rounded-[1.25rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFF_100%)] px-3 py-3">
                   <div>
                     <p className="text-sm font-black text-[#14295F]">{day.dateLabel}</p>
                     <p className="mt-1 text-[11px] font-bold text-slate-500">{day.expectedArrivalTime || '예정 없음'}</p>
@@ -539,7 +615,7 @@ function DetailPanel({
         </div>
       </div>
 
-      <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-white/92 p-4">
+      <div className="rounded-[1.7rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFF_100%)] p-4 shadow-[0_22px_44px_-38px_rgba(20,41,95,0.28)]">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">신청 이력</p>
@@ -556,7 +632,7 @@ function DetailPanel({
             </div>
           ) : (
             requestPreview.map((request) => (
-              <div key={request.id} className="rounded-[1.25rem] border border-[#14295F]/10 bg-[#F8FAFF] px-3 py-3">
+              <div key={request.id} className="rounded-[1.25rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFF_100%)] px-3 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-black text-[#14295F]">
@@ -603,7 +679,9 @@ export function AttendanceKpiBoard({
   const [showSupplementalMetrics, setShowSupplementalMetrics] = useState(false);
   const [isDesktopDetailOpen, setIsDesktopDetailOpen] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
-  const isDesktop = useDesktopLayout();
+  const { viewMode } = useAppContext();
+  const isMobile = viewMode === 'mobile';
+  const isDesktop = !isMobile;
   const reduceMotion = useReducedMotion();
 
   const { isLoading, error, rows, summary, requestOperations, availableRooms, periodOptions } = useAttendanceKpi({
@@ -648,14 +726,22 @@ export function AttendanceKpiBoard({
     }
     if (!selectedStudentId || !filteredRows.some((row) => row.studentId === selectedStudentId)) {
       setSelectedStudentId(filteredRows[0]!.studentId);
-      setIsDesktopDetailOpen(false);
+      setIsDesktopDetailOpen(isDesktop);
       setMobileDetailOpen(false);
     }
-  }, [filteredRows, selectedStudentId]);
+  }, [filteredRows, isDesktop, selectedStudentId]);
 
   useEffect(() => {
     setShowAllStudents(false);
-  }, [deferredSearch, classFilter, roomFilter, riskFilter, requestFilter, periodDays]);
+    if (!filteredRows.length) return;
+    if (isDesktop) {
+      setIsDesktopDetailOpen(true);
+      setMobileDetailOpen(false);
+      return;
+    }
+    setIsDesktopDetailOpen(false);
+    setMobileDetailOpen(false);
+  }, [deferredSearch, classFilter, filteredRows.length, isDesktop, periodDays, requestFilter, riskFilter, roomFilter]);
 
   const selectedRow = filteredRows.find((row) => row.studentId === selectedStudentId) || filteredRows[0] || null;
   const visibleRows = showAllStudents ? filteredRows : filteredRows.slice(0, 5);
