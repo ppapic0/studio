@@ -355,7 +355,7 @@ function buildCompactInsightCopy(aiMeta: DailyReportAiMeta) {
 }
 
 function buildCompactSignalCopy(value?: string | null, fallback = '핵심 포인트를 정리했습니다.') {
-  return toCompactCopy(value, 42) || fallback;
+  return toCompactCopy(value, 92) || fallback;
 }
 
 function SummaryHeroMetrics({
@@ -459,7 +459,7 @@ function ReportInsightBoard({
           <p className="mt-2 text-sm font-black leading-relaxed tracking-tight text-slate-900 break-keep">{compactInsight}</p>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결</p>
             <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.routineBand || '확인 중'}</p>
@@ -474,7 +474,7 @@ function ReportInsightBoard({
               {aiMeta.growthBand || '성장 흐름 확인'}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3 sm:col-span-2">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">실행</p>
             <p className="mt-2 text-sm font-black text-slate-900">{Math.round(aiMeta.completionRate || 0)}%</p>
             <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep">
@@ -483,7 +483,7 @@ function ReportInsightBoard({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3">
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50/55 px-4 py-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700/70">강점</p>
             <p className="mt-2 text-sm font-black leading-relaxed text-slate-900 break-keep">{strengthLead}</p>
