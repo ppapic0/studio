@@ -2572,7 +2572,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <section className={cn(
             'grid gap-3',
             isAnalysisPresentation
-              ? (isMobile ? 'grid-cols-1 min-[380px]:grid-cols-2 gap-2.5' : 'grid-cols-4 gap-4')
+              ? (isMobile ? 'grid-cols-1 min-[380px]:grid-cols-2 gap-2.5' : 'grid-cols-2 gap-4')
               : (isMobile ? 'grid-cols-2' : 'grid-cols-2 lg:grid-cols-4'),
             isAnalysisPresentation && 'analysis-summary-rail'
           )}>
@@ -2588,32 +2588,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               onClick={() => setIsAvgStudyModalOpen(true)}
               presentationMode={presentationMode}
               progress={(avgStudyMinutes / 180) * 100}
-            />
-            <StatAnalysisCard
-              title="평균 공부 리듬"
-              value={`${rhythmScore}점`}
-              subValue="실제 공부시간 분산 기반 안정성"
-              compactTitle="공부리듬"
-              compactSubValue="분산 안정성"
-              icon={TrendingUp}
-              colorClass="text-emerald-500"
-              isMobile={isMobile}
-              onClick={() => setIsRhythmGuideModalOpen(true)}
-              presentationMode={presentationMode}
-              progress={rhythmScore}
-            />
-            <StatAnalysisCard
-              title="계획 완수율"
-              value={`${avgCompletionRate}%`}
-              subValue="학습 할 일 완료율"
-              compactTitle="완수율"
-              compactSubValue="할 일 완료율"
-              icon={CheckCircle2}
-              colorClass="text-amber-500"
-              isMobile={isMobile}
-              onClick={() => setIsCompletionTrendModalOpen(true)}
-              presentationMode={presentationMode}
-              progress={avgCompletionRate}
             />
             <StatAnalysisCard
               title="상담 진행도"
