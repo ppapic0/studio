@@ -410,7 +410,7 @@ function FocusedDayCard({
               외출 {day.awayCount > 0 ? `${day.awayCount}회` : '없음'}
             </Badge>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <DetailStat label="공부 시간" value={formatMinutesAsLabel(day.studyMinutes)} hint={day.dateLabel} />
             <DetailStat
               label="등원 오차"
@@ -478,7 +478,7 @@ function DetailPanel({
   return (
     <div className="space-y-4 rounded-[2.2rem] border border-[#14295F]/10 bg-white p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.35)]">
       <div className="overflow-hidden rounded-[1.95rem] border border-[#14295F]/10 bg-[linear-gradient(135deg,#F5F8FF_0%,#FFFFFF_58%,#FFF4EA_100%)] p-4 shadow-[0_26px_60px_-42px_rgba(20,41,95,0.32)] sm:p-5">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
+        <div className="grid gap-4">
           <div className="rounded-[1.75rem] border border-white/70 bg-white/95 p-5 shadow-[0_22px_44px_-38px_rgba(20,41,95,0.28)]">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-2">
@@ -510,7 +510,7 @@ function DetailPanel({
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(240px,0.95fr)]">
+            <div className="mt-5 grid gap-3">
               <div className="rounded-[1.55rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">오늘 핵심 이슈</p>
                 <p className="mt-3 text-[1.2rem] font-black leading-relaxed tracking-[-0.03em] text-[#14295F]">{row.topIssue}</p>
@@ -537,7 +537,7 @@ function DetailPanel({
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] border border-[#14295F]/10 bg-[#14295F] p-5 text-white shadow-[0_28px_54px_-38px_rgba(20,41,95,0.55)]">
+          <div className="self-start rounded-[1.75rem] border border-[#14295F]/10 bg-[#14295F] p-5 text-white shadow-[0_28px_54px_-38px_rgba(20,41,95,0.55)]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">바로 할 일</p>
@@ -569,7 +569,7 @@ function DetailPanel({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)]">
+        <div className="mt-4 grid gap-4">
           <FocusedDayCard day={focusedDay} />
           <div className="grid gap-3 sm:grid-cols-2">
             <DetailStat label="최근 하원" value={row.latestCheckOutLabel} hint={`하원 기록 완료율 ${row.checkoutCompletionRate}%`} />
