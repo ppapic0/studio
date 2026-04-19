@@ -76,6 +76,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, PointBoostEvent, type SupportedUniversityThemeKey, type User as UserType, type SupportThreadKind } from '@/lib/types';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
+import { buildDailyReportPreview } from '@/lib/daily-report-preview';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
 import {
   StudentHomeGamePanel,
@@ -3761,7 +3762,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                             </Badge>
                           </div>
                           <p className="text-[11px] font-bold text-muted-foreground line-clamp-1 mt-1">
-                            {report.content.replace(/[🕒✅📊💬🧠]/g, '').trim()}
+                            {buildDailyReportPreview(report, 68)}
                           </p>
                         </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />

@@ -71,6 +71,7 @@ import {
   deleteField,
 } from 'firebase/firestore';
 import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog, LayoutRoomConfig } from '@/lib/types';
+import { buildDailyReportPreview } from '@/lib/daily-report-preview';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -3435,7 +3436,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             </div>
                             <div className="grid min-w-0 leading-tight">
                               <span className="truncate text-sm font-black">{report.studentName} 학생</span>
-                              <p className="max-w-[180px] truncate text-[10px] font-bold text-[#5c6e97]">{report.content.substring(0, 40)}...</p>
+                              <p className="max-w-[180px] truncate text-[10px] font-bold text-[#5c6e97]">{buildDailyReportPreview(report, 42)}</p>
                             </div>
                           </div>
                           <div className={cn("flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-300 shadow-sm transition-all group-hover:bg-emerald-500 group-hover:text-white", report.viewedAt ? "text-emerald-600" : "text-emerald-300")}>
@@ -4349,7 +4350,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                               <Badge className="h-5 border-none bg-amber-50 px-2 text-[10px] font-black text-amber-700">미열람</Badge>
                                             )}
                                           </div>
-                                          <p className="mt-3 line-clamp-2 text-sm font-bold leading-6 text-slate-700">{report.content.substring(0, 100)}...</p>
+                                          <p className="mt-3 line-clamp-2 text-sm font-bold leading-6 text-slate-700">{buildDailyReportPreview(report, 92)}</p>
                                         </div>
                                         <ChevronRight className="mt-1 h-4 w-4 shrink-0 opacity-25" />
                                       </div>

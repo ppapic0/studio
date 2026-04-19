@@ -31,14 +31,8 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
+import { buildDailyReportPreview } from '@/lib/daily-report-preview';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
-
-function getReportPreviewText(content: string) {
-  return content
-    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 export default function StudentReportsPage() {
   const { user } = useUser();
@@ -130,7 +124,7 @@ export default function StudentReportsPage() {
       ) : (
         <div className="grid gap-4">
           {filteredReports.map((report) => {
-            const preview = getReportPreviewText(report.content).slice(0, 60);
+            const preview = buildDailyReportPreview(report, 60);
             return (
               <Card
                 key={report.id}

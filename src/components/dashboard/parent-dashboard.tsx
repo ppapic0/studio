@@ -72,6 +72,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { buildDailyReportPreview } from '@/lib/daily-report-preview';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 import {
   type ParentPortalTab,
@@ -3057,7 +3058,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         id: report.id || `${yesterdayKey}-${studentId}`,
         type: 'weekly_report',
         title: '학습 리포트 도착',
-        body: report.content,
+        body: buildDailyReportPreview(report, 88),
         createdAtLabel: toRelativeLabel((report as any).updatedAt || (report as any).createdAt, liveNowMs),
         createdAtMs: toDateSafe((report as any).updatedAt || (report as any).createdAt)?.getTime() || 0,
         isRead: !!report.viewedAt,

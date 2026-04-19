@@ -294,8 +294,8 @@ function buildOverallSummary({
 }) {
   const headline = aiMeta?.teacherOneLiner?.trim() || buildContentSummarySnippet(content);
   const subline = aiMeta
-    ? `${studentName || '학생'}의 ${dateKey || '오늘'} 리포트입니다. ${toSummaryTone(aiMeta)} ${aiMeta.pedagogyLens ? `${aiMeta.pedagogyLens} 관점으로 핵심만 먼저 정리했습니다.` : ''}`.trim()
-    : `${studentName || '학생'}의 ${dateKey || '오늘'} 리포트입니다. 핵심 흐름을 먼저 보고 아래에서 자세한 코칭을 확인할 수 있어요.`;
+    ? `${studentName || '학생'}의 ${dateKey || '오늘'} 흐름입니다. ${toSummaryTone(aiMeta)}`.trim()
+    : `${studentName || '학생'}의 ${dateKey || '오늘'} 흐름을 한눈에 먼저 정리했습니다.`;
 
   return {
     headline,
@@ -304,19 +304,25 @@ function buildOverallSummary({
 }
 
 function buildInterpretationCopy(aiMeta: DailyReportAiMeta) {
+  const bandSummary = [
+    aiMeta.growthBand ? `흐름 ${aiMeta.growthBand}` : null,
+    aiMeta.completionBand ? `실행 ${aiMeta.completionBand}` : null,
+  ]
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item))
+    .join(' · ');
+
   const parts = [
-    aiMeta.metrics?.trendSummary,
-    aiMeta.growthBand && aiMeta.completionBand
-      ? `오늘 흐름은 ${aiMeta.growthBand}, 실행 밀도는 ${aiMeta.completionBand} 구간으로 읽힙니다.`
-      : null,
+    toCompactCopy(aiMeta.metrics?.trendSummary, 84),
+    bandSummary || null,
     aiMeta.routineBand && aiMeta.routineBand !== '정상'
-      ? `생활 리듬은 ${aiMeta.routineBand} 상태라 학습량보다 시작 루틴을 먼저 바로잡는 것이 중요합니다.`
+      ? `루틴 ${aiMeta.routineBand}`
       : aiMeta.attendanceLabel || null,
   ]
     .map((item) => item?.trim())
     .filter((item): item is string => Boolean(item));
 
-  return parts.join(' ');
+  return parts.join(' · ');
 }
 
 function buildFamilyQuestion(aiMeta: DailyReportAiMeta, studentName?: string) {
@@ -333,6 +339,25 @@ function buildFamilyQuestion(aiMeta: DailyReportAiMeta, studentName?: string) {
   return `${subject} 오늘 가장 잘 풀렸던 순간이 언제였는지 먼저 물어봐 주세요.`;
 }
 
+function buildCompactInsightCopy(aiMeta: DailyReportAiMeta) {
+  const trendSummary = toCompactCopy(aiMeta.metrics?.trendSummary, 58);
+  if (trendSummary) return trendSummary;
+
+  const parts = [
+    aiMeta.growthBand ? `성장 ${aiMeta.growthBand}` : null,
+    aiMeta.completionBand ? `실행 ${aiMeta.completionBand}` : null,
+    aiMeta.routineBand ? `루틴 ${aiMeta.routineBand}` : null,
+  ]
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item));
+
+  return parts.join(' · ') || '오늘 흐름을 한눈에 정리했습니다.';
+}
+
+function buildCompactSignalCopy(value?: string | null, fallback = '핵심 포인트를 정리했습니다.') {
+  return toCompactCopy(value, 42) || fallback;
+}
+
 function SummaryHeroMetrics({
   aiMeta,
   compactMode = false,
@@ -344,29 +369,44 @@ function SummaryHeroMetrics({
 
   const metrics = [
     {
-      label: '오늘 학습',
+      label: compactMode ? '오늘' : '오늘 학습',
       value: formatStudyTime(aiMeta.totalStudyMinutes),
       detail: aiMeta.studyBand || '학습 흐름',
     },
     {
-      label: '계획 완료',
+      label: compactMode ? '완료' : '계획 완료',
       value: `${Math.round(aiMeta.completionRate || 0)}%`,
       detail: aiMeta.completionBand || '실행 밀도',
     },
     {
-      label: '평균 대비',
+      label: compactMode ? '평균대비' : '평균 대비',
       value: formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg),
       detail: formatSignedPercent(aiMeta.metrics?.growthRate),
     },
   ];
 
   return (
-    <div className="mt-5 grid gap-3 sm:grid-cols-3">
+    <div className={cn('mt-5 grid gap-3', compactMode ? 'grid-cols-3' : 'sm:grid-cols-3')}>
       {metrics.map((item) => (
-        <div key={item.label} className="rounded-[1.35rem] border border-white/12 bg-white/10 px-4 py-3 backdrop-blur-sm">
+        <div
+          key={item.label}
+          className={cn(
+            'rounded-[1.35rem] border border-white/12 bg-white/10 backdrop-blur-sm',
+            compactMode ? 'px-3 py-3' : 'px-4 py-3'
+          )}
+        >
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{item.label}</p>
-          <p className="mt-2 text-lg font-black tracking-tight text-white">{item.value}</p>
-          <p className={cn('mt-1 text-xs font-bold text-white/68 break-keep', compactMode && 'leading-relaxed')}>{item.detail}</p>
+          <p
+            className={cn(
+              'font-black tracking-tight text-white break-keep',
+              compactMode ? 'mt-1 text-sm leading-tight sm:text-base' : 'mt-2 text-lg'
+            )}
+          >
+            {item.value}
+          </p>
+          <p className={cn('mt-1 break-keep font-bold text-white/68', compactMode ? 'text-[10px] leading-snug' : 'text-xs leading-relaxed')}>
+            {item.detail}
+          </p>
         </div>
       ))}
     </div>
@@ -393,8 +433,15 @@ function ReportInsightBoard({
   ].filter(Boolean) as string[];
 
   if (compactMode) {
+    const compactInsight = buildCompactInsightCopy(aiMeta);
+    const strengthLead = buildCompactSignalCopy(aiMeta.strengths?.[0], aiMeta.growthBand ? `${aiMeta.growthBand} 흐름 유지` : '오늘 강점을 유지해 주세요.');
+    const improvementLead = buildCompactSignalCopy(
+      aiMeta.improvements?.[0],
+      aiMeta.coachingFocus || (aiMeta.routineBand ? `${aiMeta.routineBand} 루틴 보정` : '먼저 루틴을 가볍게 보정해 주세요.')
+    );
+
     return (
-      <div className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="min-w-0 rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2">
           <div className="rounded-2xl bg-blue-50 p-2 text-blue-600">
             <TrendingUp className="h-4 w-4" />
@@ -407,11 +454,12 @@ function ReportInsightBoard({
           </div>
         </div>
 
-        <p className="mt-4 text-sm font-black leading-relaxed tracking-tight text-slate-900 break-keep">
-          {buildInterpretationCopy(aiMeta)}
-        </p>
+        <div className="mt-4 rounded-[1.35rem] border border-slate-100 bg-slate-50/80 px-4 py-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">한 줄 해석</p>
+          <p className="mt-2 text-sm font-black leading-relaxed tracking-tight text-slate-900 break-keep">{compactInsight}</p>
+        </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결</p>
             <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.routineBand || '확인 중'}</p>
@@ -421,15 +469,33 @@ function ReportInsightBoard({
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">성장</p>
-            <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.growthBand || '분석 중'}</p>
+            <p className="mt-2 text-sm font-black text-slate-900">{formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg)}</p>
             <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep">
-              평균 대비 {formatSignedMinutes(aiMeta.metrics?.deltaMinutesFromAvg)}
+              {aiMeta.growthBand || '성장 흐름 확인'}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">실행</p>
+            <p className="mt-2 text-sm font-black text-slate-900">{Math.round(aiMeta.completionRate || 0)}%</p>
+            <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep">
+              {aiMeta.completionBand || '실행 밀도'}
             </p>
           </div>
         </div>
 
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/55 px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700/70">강점</p>
+            <p className="mt-2 text-sm font-black leading-relaxed text-slate-900 break-keep">{strengthLead}</p>
+          </div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700/70">먼저 보완</p>
+            <p className="mt-2 text-sm font-black leading-relaxed text-slate-900 break-keep">{improvementLead}</p>
+          </div>
+        </div>
+
         <div className="mt-4 flex flex-wrap gap-2">
-          {bandBadges.slice(0, 2).map((item) => (
+          {bandBadges.slice(0, 3).map((item) => (
             <Badge key={item} variant="outline" className="rounded-full border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-700">
               {item}
             </Badge>
@@ -500,6 +566,10 @@ function ReportActionBoard({
   const strengthLead = aiMeta.strengths?.[0] || aiMeta.teacherOneLiner || '오늘 남은 강점을 먼저 인정한 뒤 다음 행동으로 연결해 주세요.';
 
   if (compactMode) {
+    const teacherAction = toCompactCopy(aiMeta.coachingFocus || improvementLead, 56) || '내일 첫 행동을 짧고 선명하게 잡겠습니다.';
+    const homeAction = toCompactCopy(aiMeta.homeTip || strengthLead, 56) || '오늘의 흐름을 짧고 편안하게 확인해 주세요.';
+    const familyQuestion = buildFamilyQuestion(aiMeta, studentName);
+
     return (
       <div className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2">
@@ -514,26 +584,43 @@ function ReportActionBoard({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3">
+        <div className="mt-4 grid gap-3 xl:grid-cols-2">
           <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[#14295F] px-4 py-4 text-white">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">내일 교실 코칭</p>
-            <p className="mt-2 text-sm font-black leading-relaxed tracking-tight break-keep">
-              {aiMeta.coachingFocus || '내일 첫 행동을 짧고 선명하게 잡겠습니다.'}
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">교실 한 줄</p>
+            <p className="mt-2 text-base font-black leading-relaxed tracking-tight break-keep">
+              {teacherAction}
             </p>
-            <p className="mt-2 text-xs font-bold leading-relaxed text-white/75 break-keep">
-              {improvementLead}
-            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {aiMeta.pedagogyLens && (
+                <Badge className="border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white">
+                  {aiMeta.pedagogyLens}
+                </Badge>
+              )}
+              {aiMeta.completionBand && (
+                <Badge className="border-none bg-white/12 px-3 py-1 text-[10px] font-black text-white/88">
+                  실행 {aiMeta.completionBand}
+                </Badge>
+              )}
+            </div>
           </div>
 
           <div className="rounded-[1.35rem] border border-amber-100 bg-amber-50/60 px-4 py-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700/70">가정 한마디</p>
-            <p className="mt-2 text-sm font-black leading-relaxed tracking-tight text-slate-900 break-keep">
-              {aiMeta.homeTip || '오늘의 흐름을 짧고 편안하게 확인해 주세요.'}
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700/70">가정 한 줄</p>
+            <p className="mt-2 text-base font-black leading-relaxed tracking-tight text-slate-900 break-keep">
+              {homeAction}
             </p>
-            <p className="mt-2 text-xs font-bold leading-relaxed text-slate-700 break-keep">
-              {`${strengthLead} ${buildFamilyQuestion(aiMeta, studentName)}`}
-            </p>
+            <p className="mt-3 text-xs font-bold leading-relaxed text-slate-700 break-keep">{toCompactCopy(strengthLead, 52)}</p>
           </div>
+        </div>
+
+        <div className="mt-4 rounded-[1.35rem] border border-slate-100 bg-slate-50/75 px-4 py-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">짧은 대화</p>
+          <p className="mt-2 text-sm font-black leading-relaxed tracking-tight text-slate-900 break-keep">
+            {familyQuestion}
+          </p>
+          <p className="mt-2 text-xs font-bold leading-relaxed text-slate-600 break-keep">
+            {toCompactCopy(improvementLead, 52)}
+          </p>
         </div>
       </div>
     );
@@ -1025,6 +1112,9 @@ export function VisualReportViewer({
                 <CalendarDays className="mr-1 h-3.5 w-3.5" />
                 전체요약
               </Badge>
+              {compactMode && studentName && (
+                <Badge className="border-none bg-white/10 text-white/88 font-black">{studentName}</Badge>
+              )}
               {dateKey && (
                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white/65">{dateKey}</span>
               )}
@@ -1037,10 +1127,32 @@ export function VisualReportViewer({
                 {overallSummary.headline}
               </p>
             )}
-            <p className={cn('font-bold leading-relaxed text-white/80 break-keep', compactMode ? 'mt-4 text-xs sm:text-sm' : 'mt-2 text-sm')}>
-              {overallSummary.subline}
-            </p>
+            {compactMode ? (
+              <div className="mt-4 rounded-[1.35rem] border border-white/12 bg-white/10 px-4 py-4 backdrop-blur-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">한 줄 요약</p>
+                <p className="mt-2 text-sm font-black leading-relaxed tracking-tight text-white break-keep">
+                  {toCompactCopy(overallSummary.headline, 88)}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm font-bold leading-relaxed text-white/80 break-keep">{overallSummary.subline}</p>
+            )}
             <SummaryHeroMetrics aiMeta={normalizedAiMeta} compactMode={compactMode} />
+            {compactMode && normalizedAiMeta && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {[
+                  normalizedAiMeta.growthBand ? `성장 ${normalizedAiMeta.growthBand}` : null,
+                  normalizedAiMeta.completionBand ? `완료 ${normalizedAiMeta.completionBand}` : null,
+                  normalizedAiMeta.routineBand ? `루틴 ${normalizedAiMeta.routineBand}` : null,
+                ]
+                  .filter(Boolean)
+                  .map((item) => (
+                    <Badge key={item} className="border-none bg-white/12 px-3 py-1 text-[11px] font-black text-white/88">
+                      {item}
+                    </Badge>
+                  ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -1048,21 +1160,19 @@ export function VisualReportViewer({
       {normalizedAiMeta && (
         compactMode ? (
           <>
-            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-              <MiniTrendChart
-                aiMeta={normalizedAiMeta}
-                displayHeadingsOnly={displayHeadingsOnly}
-                reportDateKey={dateKey}
-                interactive
-                onExpand={() => setIsTrendChartDialogOpen(true)}
-              />
-              <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
-            </div>
+            <MiniTrendChart
+              aiMeta={normalizedAiMeta}
+              displayHeadingsOnly={displayHeadingsOnly}
+              reportDateKey={dateKey}
+              interactive
+              onExpand={() => setIsTrendChartDialogOpen(true)}
+            />
             <KpiGraphGrid aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
-            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
+              <SignalRadarCard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} />
               <ReportInsightBoard aiMeta={normalizedAiMeta} displayHeadingsOnly={displayHeadingsOnly} compactMode />
-              <ReportActionBoard aiMeta={normalizedAiMeta} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} compactMode />
             </div>
+            <ReportActionBoard aiMeta={normalizedAiMeta} studentName={studentName} displayHeadingsOnly={displayHeadingsOnly} compactMode />
           </>
         ) : (
           <>
