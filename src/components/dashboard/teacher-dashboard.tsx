@@ -2964,22 +2964,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             </CardContent>
           </Card>
 
-          <Card className="admin-surface-dark overflow-hidden rounded-[2rem] border-[#1C3A82] lg:col-span-7">
+          <Card className="admin-surface-elevated overflow-hidden rounded-[2rem] border-[#DCE7FF] shadow-[0_24px_48px_-36px_rgba(20,41,95,0.28)] lg:col-span-7">
             <CardContent className="space-y-4 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <Badge className="h-6 rounded-full border border-white/10 bg-white/10 px-2.5 text-[10px] font-black text-white">학습 온도</Badge>
-                  <p className="mt-3 text-lg font-black tracking-tight text-white">최근 30일 누적 학습 흐름</p>
-                  <p className="mt-1 text-xs font-semibold text-white/58">홈 안에서 오늘 흐름과 장기 흐름을 함께 봅니다.</p>
+                  <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-white px-2.5 text-[10px] font-black text-[#14295F]">학습 온도</Badge>
+                  <p className="mt-3 text-lg font-black tracking-tight text-[#14295F]">최근 30일 누적 학습 흐름</p>
+                  <p className="mt-1 text-xs font-semibold text-[#5C6E97]">홈 안에서 오늘 흐름과 장기 흐름을 함께 봅니다.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {trendLoading ? <Loader2 className="h-4 w-4 animate-spin text-white/70" /> : null}
-                  <Badge className="h-8 rounded-full border border-white/10 bg-white/[0.08] px-3 text-[10px] font-black text-white">
+                  {trendLoading ? <Loader2 className="h-4 w-4 animate-spin text-[#8A98B5]" /> : null}
+                  <Badge className="h-8 rounded-full border border-[#DCE7FF] bg-white px-3 text-[10px] font-black text-[#14295F]">
                     {trendLoading ? '업데이트 중' : '최근 30일'}
                   </Badge>
                 </div>
               </div>
-              <div className="h-[210px] w-full rounded-[1.55rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.02)_100%)] px-1 pb-2 pt-4">
+              <div className="h-[210px] w-full rounded-[1.55rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F6FAFF_100%)] px-1 pb-2 pt-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={centerTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
@@ -2988,9 +2988,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         <stop offset="95%" stopColor="#6EE7B7" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.12)" />
-                    <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.62)' }} />
-                    <YAxis fontSize={9} fontWeight="900" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.62)' }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(20,41,95,0.08)" />
+                    <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} tick={{ fill: '#6E7EA3' }} />
+                    <YAxis fontSize={9} fontWeight="900" axisLine={false} tickLine={false} tick={{ fill: '#6E7EA3' }} />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {
