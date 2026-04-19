@@ -823,7 +823,7 @@ function ParentDashboardTabRail({
                   확인 중인 자녀
                 </Label>
                 <Select value={studentId || linkedStudents[0]?.id || ''} onValueChange={onStudentChange}>
-                  <SelectTrigger className="h-12 rounded-[1.1rem] border border-white/14 bg-white/10 px-4 text-left font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_30px_-26px_rgba(10,20,52,0.42)] backdrop-blur-sm">
+                  <SelectTrigger className="h-12 rounded-[1.1rem] border border-white/14 bg-white/10 px-4 text-left font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_30px_-26px_rgba(10,20,52,0.42)] backdrop-blur-sm data-[placeholder]:text-[#14295F]">
                     <SelectValue placeholder={activeStudentLabel} />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border border-slate-200 bg-white">
