@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAppContext } from '@/contexts/app-context';
 import { useDoc, useFirestore } from '@/firebase';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
+import { getInvoiceCollectionEndDate } from '@/lib/invoice-collection-window';
 import type { Invoice } from '@/lib/types';
 
 type CheckoutPageClientProps = {
@@ -94,7 +95,7 @@ export function CheckoutPageClient({ invoiceId, tossClientKey }: CheckoutPageCli
     );
   }
 
-  const dueDate = typeof invoice.cycleEndDate?.toDate === 'function' ? invoice.cycleEndDate.toDate() : null;
+  const dueDate = getInvoiceCollectionEndDate(invoice);
   const amount = Math.max(0, Math.round(Number(invoice.finalPrice) || 0));
 
   return (
@@ -124,7 +125,7 @@ export function CheckoutPageClient({ invoiceId, tossClientKey }: CheckoutPageCli
             </div>
             <p className="text-lg font-black text-[#14295F]">{invoice.studentName} 학생</p>
             <p className="mt-1 text-[11px] font-bold text-slate-500">
-              결제 마감일 {dueDate ? `${dueDate.getFullYear()}.${String(dueDate.getMonth() + 1).padStart(2, '0')}.${String(dueDate.getDate()).padStart(2, '0')}` : '-'}
+              수납 마감일 {dueDate ? `${dueDate.getFullYear()}.${String(dueDate.getMonth() + 1).padStart(2, '0')}.${String(dueDate.getDate()).padStart(2, '0')}` : '-'}
             </p>
           </div>
 

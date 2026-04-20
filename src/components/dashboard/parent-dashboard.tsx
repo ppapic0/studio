@@ -99,6 +99,7 @@ import {
   buildStartEndInsight,
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
+import { getInvoiceCollectionEndDate } from '@/lib/invoice-collection-window';
 
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -5014,7 +5015,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <div className="space-y-4">
                   {(() => {
                     const invoice = primaryInvoice;
-                    const invoiceDueDate = toDateSafe((invoice as any).cycleEndDate);
+                    const invoiceDueDate = getInvoiceCollectionEndDate(invoice);
                     const statusMeta = getInvoiceStatusMeta(invoice.status);
                     const isActionable = invoice.status === 'issued' || invoice.status === 'overdue';
 
@@ -5110,7 +5111,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
                       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                         {secondaryInvoices.map((invoice) => {
-                          const invoiceDueDate = toDateSafe((invoice as any).cycleEndDate);
+                          const invoiceDueDate = getInvoiceCollectionEndDate(invoice);
                           const statusMeta = getInvoiceStatusMeta(invoice.status);
                           const isActionable = invoice.status === 'issued' || invoice.status === 'overdue';
 

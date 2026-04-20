@@ -101,6 +101,8 @@ export interface Invoice {
   studentName: string;
   cycleStartDate: Timestamp;
   cycleEndDate: Timestamp;
+  collectionStartDate?: Timestamp;
+  collectionEndDate?: Timestamp;
   priceSnapshot: {
     productId: string;
     season: string;

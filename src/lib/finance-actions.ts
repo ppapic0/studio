@@ -14,7 +14,7 @@ import {
   writeBatch,
   deleteDoc,
 } from 'firebase/firestore';
-import { addDays, format, startOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { addDays, endOfDay, format, startOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import {
   BillingProfile,
   BusinessLedgerCategory,
@@ -163,6 +163,85 @@ export async function resetInvoiceCollectionState(
   return { ok: true, deletedPayments: paymentsSnap.size };
 }
 
+export async function clearLegacyInvoiceCollectionData(
+  db: Firestore,
+  centerId: string,
+  invoiceId: string
+) {
+  const invoiceRef = doc(db, 'centers', centerId, 'invoices', invoiceId);
+  const invoiceSnap = await getDoc(invoiceRef);
+
+  if (!invoiceSnap.exists()) throw new Error('인보이스를 찾을 수 없습니다.');
+
+  const paymentsQuery = query(
+    collection(db, `centers/${centerId}/payments`),
+    where('invoiceId', '==', invoiceId)
+  );
+  const paymentsSnap = await getDocs(paymentsQuery);
+
+  const batch = writeBatch(db);
+  const now = serverTimestamp();
+  const affectedDateKeys = new Set<string>();
+
+  paymentsSnap.docs.forEach((paymentDoc) => {
+    const paymentData = paymentDoc.data();
+    const processedAt = paymentData?.processedAt;
+    if (processedAt instanceof Timestamp) {
+      affectedDateKeys.add(format(processedAt.toDate(), 'yyyy-MM-dd'));
+    }
+    batch.delete(paymentDoc.ref);
+  });
+
+  batch.update(invoiceRef, {
+    status: 'void',
+    paidAt: null,
+    paymentMethod: 'none',
+    updatedAt: now,
+  });
+
+  await batch.commit();
+
+  if (affectedDateKeys.size === 0) {
+    affectedDateKeys.add(format(new Date(), 'yyyy-MM-dd'));
+  }
+
+  await Promise.all(Array.from(affectedDateKeys).map((dateKey) => syncDailyKpi(db, centerId, dateKey)));
+
+  return { ok: true, deletedPayments: paymentsSnap.size };
+}
+
+export async function updateInvoiceCollectionWindow(
+  db: Firestore,
+  centerId: string,
+  invoiceId: string,
+  params: {
+    collectionStartDate: Date;
+    collectionEndDate: Date;
+  }
+) {
+  const invoiceRef = doc(db, 'centers', centerId, 'invoices', invoiceId);
+  const invoiceSnap = await getDoc(invoiceRef);
+
+  if (!invoiceSnap.exists()) throw new Error('인보이스를 찾을 수 없습니다.');
+
+  const invoice = invoiceSnap.data() as Invoice;
+  const collectionStartDate = startOfDay(params.collectionStartDate);
+  const collectionEndDate = endOfDay(params.collectionEndDate);
+  const updateData: Record<string, any> = {
+    collectionStartDate: Timestamp.fromDate(collectionStartDate),
+    collectionEndDate: Timestamp.fromDate(collectionEndDate),
+    updatedAt: serverTimestamp(),
+  };
+
+  if (invoice.status === 'issued' || invoice.status === 'overdue') {
+    updateData.status = collectionEndDate.getTime() < Date.now() ? 'overdue' : 'issued';
+  }
+
+  await updateDoc(invoiceRef, updateData);
+
+  return { ok: true };
+}
+
 /**
  * 신규 인보이스 생성 (관리형 독서실 표준 28일 주기 적용)
  */
@@ -196,6 +275,8 @@ export async function issueInvoice(
     studentName: student.name,
     cycleStartDate: Timestamp.fromDate(startDate),
     cycleEndDate: Timestamp.fromDate(endDate),
+    collectionStartDate: Timestamp.fromDate(startDate),
+    collectionEndDate: Timestamp.fromDate(endOfDay(endDate)),
     finalPrice: amount,
     status: 'issued',
     issuedAt: now,

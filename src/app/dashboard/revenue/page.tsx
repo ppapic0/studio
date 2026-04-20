@@ -32,6 +32,13 @@ import {
   matchesBusinessLedgerTrackFilter,
 } from '@/lib/business-ledger';
 import { getPaymentMonth, INVOICE_TRACK_META, resolveInvoiceTrackCategory, type InvoiceTrackCategory } from '@/lib/invoice-analytics';
+import {
+  formatInvoiceCollectionInputDate,
+  getInvoiceCollectionEndDate,
+  getInvoiceCollectionSortTime,
+  getInvoiceCollectionStartDate,
+  isInvoiceCollectionOverdue,
+} from '@/lib/invoice-collection-window';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -114,16 +121,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, addDays, differenceInDays } from 'date-fns';
+import { format, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, subDays, addDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { useToast } from '@/hooks/use-toast';
 import {
+  clearLegacyInvoiceCollectionData,
   createBusinessLedgerEntry,
   deleteBusinessLedgerEntry,
   issueInvoice,
   resetInvoiceCollectionState,
   updateBusinessLedgerEntry,
+  updateInvoiceCollectionWindow,
   updateInvoiceStatus,
 } from '@/lib/finance-actions';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
@@ -198,6 +207,11 @@ type LedgerDraft = {
   memo: string;
 };
 
+type CollectionWindowDraft = {
+  collectionStartDate: string;
+  collectionEndDate: string;
+};
+
 function getDefaultLedgerEntryDate(selectedMonth: string) {
   const today = new Date();
   const currentMonth = format(today, 'yyyy-MM');
@@ -228,6 +242,19 @@ function parseLedgerDate(value: string) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function createCollectionWindowDraft(invoice: Invoice): CollectionWindowDraft {
+  return {
+    collectionStartDate: formatInvoiceCollectionInputDate(
+      getInvoiceCollectionStartDate(invoice),
+      formatInvoiceCollectionInputDate(toDateSafe((invoice as any).issuedAt))
+    ),
+    collectionEndDate: formatInvoiceCollectionInputDate(
+      getInvoiceCollectionEndDate(invoice),
+      formatInvoiceCollectionInputDate(toDateSafe((invoice as any).cycleEndDate))
+    ),
+  };
+}
+
 export default function RevenuePage() {
   const { user } = useUser();
   const { activeMembership, viewMode, membershipsLoading } = useAppContext();
@@ -250,6 +277,8 @@ export default function RevenuePage() {
   const [timelineMonth, setTimelineMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [timelineTrackFilter, setTimelineTrackFilter] = useState<'all' | InvoiceTrackCategory>('all');
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [collectionWindowDrafts, setCollectionWindowDrafts] = useState<Record<string, CollectionWindowDraft>>({});
+  const [financeCutoffDate, setFinanceCutoffDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [ledgerDraft, setLedgerDraft] = useState<LedgerDraft>(() => createDefaultLedgerDraft(format(new Date(), 'yyyy-MM')));
   const [editingLedgerEntryId, setEditingLedgerEntryId] = useState<string | null>(null);
 
@@ -320,8 +349,8 @@ export default function RevenuePage() {
         const studentInvoices = allInvoices
           .filter((invoice) => invoice.studentId === student.id)
           .sort((a, b) => {
-            const aEnd = a.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
-            const bEnd = b.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
+            const aEnd = getInvoiceCollectionSortTime(a);
+            const bEnd = getInvoiceCollectionSortTime(b);
             if (bEnd !== aEnd) return bEnd - aEnd;
             const aUpdated = a.updatedAt?.toDate?.()?.getTime?.() ?? 0;
             const bUpdated = b.updatedAt?.toDate?.()?.getTime?.() ?? 0;
@@ -347,9 +376,10 @@ export default function RevenuePage() {
           statusTone = 'neutral';
           statusLabel = '청구 필요';
           nextAction = '첫 인보이스를 발행해 주세요.';
-        } else if (latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date()) {
+        } else if (latestInvoice.status !== 'paid' && isInvoiceCollectionOverdue(latestInvoice)) {
           priority = 90;
-          overdueDays = differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate());
+          const collectionEndDate = getInvoiceCollectionEndDate(latestInvoice);
+          overdueDays = collectionEndDate ? differenceInDays(new Date(), collectionEndDate) : 0;
           statusTone = 'critical';
           statusLabel = '미납/연체';
           nextAction = latestInvoice.nextAction || '즉시 확인 후 학부모 상담이 필요합니다.';
@@ -375,8 +405,8 @@ export default function RevenuePage() {
       })
       .sort((a, b) => {
         if (b.priority !== a.priority) return b.priority - a.priority;
-        const aLatest = a.latestInvoice?.cycleEndDate?.toDate?.()?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-        const bLatest = b.latestInvoice?.cycleEndDate?.toDate?.()?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+        const aLatest = a.latestInvoice ? getInvoiceCollectionSortTime(a.latestInvoice) : Number.MAX_SAFE_INTEGER;
+        const bLatest = b.latestInvoice ? getInvoiceCollectionSortTime(b.latestInvoice) : Number.MAX_SAFE_INTEGER;
         return aLatest - bLatest;
       });
   }, [allInvoices, seatByStudentId, studentMembers]);
@@ -394,8 +424,8 @@ export default function RevenuePage() {
     return (allInvoices || [])
       .filter((invoice) => invoice.studentId === focusedStudentId)
       .sort((a, b) => {
-        const aEnd = a.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
-        const bEnd = b.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
+        const aEnd = getInvoiceCollectionSortTime(a);
+        const bEnd = getInvoiceCollectionSortTime(b);
         if (bEnd !== aEnd) return bEnd - aEnd;
         const aUpdated = a.updatedAt?.toDate?.()?.getTime?.() ?? 0;
         const bUpdated = b.updatedAt?.toDate?.()?.getTime?.() ?? 0;
@@ -412,8 +442,8 @@ export default function RevenuePage() {
     return (allInvoices || [])
       .filter((invoice) => invoice.studentId === revenueFocusedStudentId)
       .sort((a, b) => {
-        const aEnd = a.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
-        const bEnd = b.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
+        const aEnd = getInvoiceCollectionSortTime(a);
+        const bEnd = getInvoiceCollectionSortTime(b);
         if (bEnd !== aEnd) return bEnd - aEnd;
         const aUpdated = a.updatedAt?.toDate?.()?.getTime?.() ?? 0;
         const bUpdated = b.updatedAt?.toDate?.()?.getTime?.() ?? 0;
@@ -535,8 +565,8 @@ export default function RevenuePage() {
       : rows.filter((invoice) => resolveInvoiceTrackCategory(invoice) === timelineTrackFilter);
 
     return [...trackFiltered].sort((a, b) => {
-      const aEnd = a.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
-      const bEnd = b.cycleEndDate?.toDate?.()?.getTime?.() ?? 0;
+      const aEnd = getInvoiceCollectionSortTime(a);
+      const bEnd = getInvoiceCollectionSortTime(b);
       if (bEnd !== aEnd) return bEnd - aEnd;
 
       const aUpdated = a.updatedAt?.toDate?.()?.getTime?.() ?? 0;
@@ -568,18 +598,38 @@ export default function RevenuePage() {
     return '국어학원';
   }, [timelineTrackFilter]);
 
+  const financeCutoffDateValue = useMemo(() => parseLedgerDate(financeCutoffDate), [financeCutoffDate]);
+
+  const financeScopeInvoices = useMemo(() => {
+    return (allInvoices || []).filter((invoice) => {
+      if (focusedStudentId && invoice.studentId !== focusedStudentId) return false;
+      if (timelineTrackFilter === 'all') return true;
+      return resolveInvoiceTrackCategory(invoice) === timelineTrackFilter;
+    });
+  }, [allInvoices, focusedStudentId, timelineTrackFilter]);
+
   const resettableInvoices = useMemo(
-    () => scopedTimelineRows.filter((invoice) => invoice.status !== 'issued'),
-    [scopedTimelineRows]
+    () =>
+      financeScopeInvoices.filter((invoice) => {
+        if (invoice.status === 'void') return false;
+        if (!financeCutoffDateValue) return false;
+        const issuedAt =
+          toDateSafe((invoice as any).issuedAt) ||
+          getInvoiceCollectionStartDate(invoice) ||
+          getInvoiceCollectionEndDate(invoice);
+        if (!issuedAt) return false;
+        return issuedAt.getTime() <= endOfDay(financeCutoffDateValue).getTime();
+      }),
+    [financeCutoffDateValue, financeScopeInvoices]
   );
 
   const resetScopeLabel = useMemo(() => {
     if (focusedStudent) {
-      return `${timelineMonth} · ${timelineTrackLabel} · ${focusedStudent.displayName || '선택 학생'}`;
+      return `${financeCutoffDate}까지 · ${timelineTrackLabel} · ${focusedStudent.displayName || '선택 학생'}`;
     }
 
-    return `${timelineMonth} · ${timelineTrackLabel}`;
-  }, [timelineMonth, timelineTrackLabel, focusedStudent]);
+    return `${financeCutoffDate}까지 · ${timelineTrackLabel}`;
+  }, [financeCutoffDate, timelineTrackLabel, focusedStudent]);
 
   const resettableSummary = useMemo(() => {
     return resettableInvoices.reduce(
@@ -655,18 +705,18 @@ export default function RevenuePage() {
     setIsSaving(true);
     try {
       for (const invoice of resettableInvoices) {
-        await resetInvoiceCollectionState(firestore, centerId, invoice.id);
+        await clearLegacyInvoiceCollectionData(firestore, centerId, invoice.id);
       }
       setIsResetDialogOpen(false);
       toast({
-        title: '수납상황을 초기화했습니다.',
-        description: `${resetScopeLabel} 범위 ${resettableInvoices.length}건을 수납 대기로 되돌렸습니다.`,
+        title: '운영 시작 이전 수납 데이터를 정리했습니다.',
+        description: `${resetScopeLabel} 범위 ${resettableInvoices.length}건을 비활성화하고 연결 결제 로그를 함께 정리했습니다.`,
       });
       router.refresh();
     } catch (e: any) {
       toast({
         variant: 'destructive',
-        title: '수납상황 초기화 실패',
+        title: '운영 시작 초기화 실패',
         description: e?.message || '다시 시도해 주세요.',
       });
     } finally {
@@ -758,6 +808,71 @@ export default function RevenuePage() {
       router.refresh();
     } catch (e: any) {
       toast({ variant: 'destructive', title: '금액 저장 실패', description: e?.message || '다시 시도해 주세요.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getCollectionWindowDraft = (invoice: Invoice) => {
+    return collectionWindowDrafts[invoice.id] || createCollectionWindowDraft(invoice);
+  };
+
+  const handleCollectionWindowDraftChange = (
+    invoice: Invoice,
+    field: keyof CollectionWindowDraft,
+    nextValue: string
+  ) => {
+    const currentDraft = getCollectionWindowDraft(invoice);
+    setCollectionWindowDrafts((prev) => ({
+      ...prev,
+      [invoice.id]: {
+        ...currentDraft,
+        [field]: nextValue,
+      },
+    }));
+  };
+
+  const handleCollectionWindowSave = async (invoice: Invoice) => {
+    if (!firestore || !centerId) return;
+
+    const draft = getCollectionWindowDraft(invoice);
+    const collectionStartDate = parseLedgerDate(draft.collectionStartDate);
+    const collectionEndDate = parseLedgerDate(draft.collectionEndDate);
+    if (!collectionStartDate || !collectionEndDate) {
+      toast({ variant: 'destructive', title: '수납 기간을 확인해 주세요.' });
+      return;
+    }
+    if (collectionStartDate.getTime() > collectionEndDate.getTime()) {
+      toast({ variant: 'destructive', title: '수납 시작일은 마감일보다 늦을 수 없습니다.' });
+      return;
+    }
+
+    const currentStart = formatInvoiceCollectionInputDate(getInvoiceCollectionStartDate(invoice));
+    const currentEnd = formatInvoiceCollectionInputDate(getInvoiceCollectionEndDate(invoice));
+    if (draft.collectionStartDate === currentStart && draft.collectionEndDate === currentEnd) {
+      toast({ title: '변경된 수납 기간이 없습니다.' });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateInvoiceCollectionWindow(firestore, centerId, invoice.id, {
+        collectionStartDate,
+        collectionEndDate,
+      });
+      setCollectionWindowDrafts((prev) => {
+        const next = { ...prev };
+        delete next[invoice.id];
+        return next;
+      });
+      toast({ title: '수납 기간을 저장했습니다.' });
+      router.refresh();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '수납 기간 저장 실패',
+        description: error?.message || '다시 시도해 주세요.',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -1075,9 +1190,9 @@ export default function RevenuePage() {
                     <p className="mt-1 text-xl font-black text-slate-900">{focusedStudent?.displayName || '학생'}</p>
                   </div>
                   <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-                    <p className="text-[11px] font-bold text-blue-700">최근 결제 마감일</p>
+                    <p className="text-[11px] font-bold text-blue-700">최근 수납 마감일</p>
                     <p className="mt-1 text-xl font-black text-blue-700">
-                      {focusedLatestInvoice?.cycleEndDate ? format(focusedLatestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '-'}
+                      {focusedLatestInvoice ? (getInvoiceCollectionEndDate(focusedLatestInvoice) ? format(getInvoiceCollectionEndDate(focusedLatestInvoice)!, 'yyyy.MM.dd') : '-') : '-'}
                     </p>
                   </div>
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
@@ -1132,7 +1247,7 @@ export default function RevenuePage() {
                     <History className="h-5 w-5 text-primary/60" /> 수납 및 미납 관리 · 월별 자동 집계
                   </CardTitle>
                   <CardDescription>
-                    수납/미납 관리에서 입력한 인보이스를 월별·트랙별로 자동 집계합니다. 독서실/국어학원 데이터를 같은 화면에서 비교할 수 있습니다.
+                    인보이스 타임라인에서 수납 기간을 조정하고, 운영 시작 이전 허수 수납 데이터도 같은 화면에서 정리할 수 있습니다.
                   </CardDescription>
                 </div>
                 <div className={cn('w-full shrink-0', isMobile ? '' : 'max-w-[360px]')}>
@@ -1170,7 +1285,7 @@ export default function RevenuePage() {
                             정리 액션
                           </p>
                           <p className={cn('text-sm font-black tracking-tight', hasResettableInvoices ? 'text-slate-900' : 'text-slate-500')}>
-                            수납상황 초기화
+                            운영 시작 초기화
                           </p>
                           <p className={cn('text-[11px] font-semibold', hasResettableInvoices ? 'text-slate-500' : 'text-slate-400')}>
                             {hasResettableInvoices ? `${resettableInvoices.length}건 · ${formatWon(resettableSummary.amount)}` : '초기화할 상태가 없습니다.'}
@@ -1282,20 +1397,61 @@ export default function RevenuePage() {
                   {scopedTimelineRows.slice(0, 12).map((invoice) => {
                     const track = resolveInvoiceTrackCategory(invoice);
                     const trackMeta = INVOICE_TRACK_META[track];
+                    const collectionWindowDraft = getCollectionWindowDraft(invoice);
+                    const currentCollectionStart = formatInvoiceCollectionInputDate(getInvoiceCollectionStartDate(invoice));
+                    const currentCollectionEnd = formatInvoiceCollectionInputDate(getInvoiceCollectionEndDate(invoice));
+                    const canSaveCollectionWindow =
+                      collectionWindowDraft.collectionStartDate !== currentCollectionStart ||
+                      collectionWindowDraft.collectionEndDate !== currentCollectionEnd;
+                    const collectionStartDate = getInvoiceCollectionStartDate(invoice);
+                    const collectionEndDate = getInvoiceCollectionEndDate(invoice);
                     return (
-                      <div key={`timeline-${invoice.id}`} className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-black text-slate-800">{invoice.studentName}</span>
-                            <Badge className={cn('border text-[10px] font-black', trackMeta.badgeClass)}>{trackMeta.label}</Badge>
-                            {getStatusBadge(invoice.status)}
+                      <div key={`timeline-${invoice.id}`} className="rounded-xl border border-slate-100 px-4 py-3">
+                        <div className={cn('flex items-start justify-between gap-4', isMobile ? 'flex-col' : 'flex-row')}>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm font-black text-slate-800">{invoice.studentName}</span>
+                              <Badge className={cn('border text-[10px] font-black', trackMeta.badgeClass)}>{trackMeta.label}</Badge>
+                              {getStatusBadge(invoice.status)}
+                            </div>
+                            <p className="mt-1 text-[11px] font-bold text-slate-400">
+                              수납 기간 {collectionStartDate ? format(collectionStartDate, 'yyyy.MM.dd') : '-'} ~ {collectionEndDate ? format(collectionEndDate, 'yyyy.MM.dd') : '-'}
+                            </p>
+                            <p className="mt-1 text-[11px] font-bold text-slate-400">
+                              이용 기간 {invoice.cycleStartDate ? format(invoice.cycleStartDate.toDate(), 'yyyy.MM.dd') : '-'} ~ {invoice.cycleEndDate ? format(invoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '-'}
+                            </p>
                           </div>
-                          <p className="text-[11px] font-bold text-slate-400">
-                            마감일 {invoice.cycleEndDate ? format(invoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '-'}
-                          </p>
+                          <div className={cn('text-right', isMobile ? 'w-full' : 'shrink-0')}>
+                            <p className="text-sm font-black text-slate-900">{formatWon(invoice.finalPrice)}</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-black text-slate-900">{formatWon(invoice.finalPrice)}</p>
+                        <div className={cn('mt-3 grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]')}>
+                          <Input
+                            type="date"
+                            value={collectionWindowDraft.collectionStartDate}
+                            onChange={(event) => handleCollectionWindowDraftChange(invoice, 'collectionStartDate', event.target.value)}
+                            disabled={isSaving}
+                            className="h-9 rounded-xl text-xs font-bold"
+                          />
+                          <div className={cn('flex items-center gap-2', isMobile ? 'flex-col' : 'flex-row')}>
+                            <Input
+                              type="date"
+                              value={collectionWindowDraft.collectionEndDate}
+                              onChange={(event) => handleCollectionWindowDraftChange(invoice, 'collectionEndDate', event.target.value)}
+                              disabled={isSaving}
+                              className="h-9 rounded-xl text-xs font-bold"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={canSaveCollectionWindow ? 'default' : 'outline'}
+                              onClick={() => handleCollectionWindowSave(invoice)}
+                              disabled={isSaving || !canSaveCollectionWindow}
+                              className="h-9 rounded-xl px-4 text-[11px] font-black"
+                            >
+                              수납 기간 저장
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1313,7 +1469,7 @@ export default function RevenuePage() {
                     <div className="space-y-1">
                       <CardTitle className="text-2xl font-black tracking-tighter flex items-center gap-2">
                         <History className="h-6 w-6 opacity-40" /> 인보이스 타임라인</CardTitle>
-                      <CardDescription className="font-bold text-xs tracking-widest text-muted-foreground/60 whitespace-nowrap">28일 결제 주기 기준</CardDescription>
+                      <CardDescription className="font-bold text-xs tracking-widest text-muted-foreground/60 whitespace-nowrap">수납 기간 직접 설정 가능</CardDescription>
                       <div className="flex flex-wrap items-center gap-2 pt-1">
                         <Badge variant="outline" className="font-black text-[10px]">
                           조회월 {timelineMonth}
@@ -1375,7 +1531,8 @@ export default function RevenuePage() {
                                   {getStatusBadge(inv.status)}
                                 </div>
                                 <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground">
-                                  <span className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-md whitespace-nowrap"><CalendarCheck className="h-3 w-3" /> 기간: {inv.cycleStartDate ? format(inv.cycleStartDate.toDate(), 'MM.dd') : '--.--'} ~ {inv.cycleEndDate ? format(inv.cycleEndDate.toDate(), 'MM.dd') : '--.--'} (28일)</span>
+                                  <span className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-md whitespace-nowrap"><CalendarCheck className="h-3 w-3" /> 수납: {getInvoiceCollectionStartDate(inv) ? format(getInvoiceCollectionStartDate(inv)!, 'MM.dd') : '--.--'} ~ {getInvoiceCollectionEndDate(inv) ? format(getInvoiceCollectionEndDate(inv)!, 'MM.dd') : '--.--'}</span>
+                                  <span className="flex items-center gap-1 bg-muted/20 px-2 py-0.5 rounded-md whitespace-nowrap">이용: {inv.cycleStartDate ? format(inv.cycleStartDate.toDate(), 'MM.dd') : '--.--'} ~ {inv.cycleEndDate ? format(inv.cycleEndDate.toDate(), 'MM.dd') : '--.--'}</span>
                                   {inv.paidAt && <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> 완료: {format(inv.paidAt.toDate(), 'MM.dd HH:mm')}</span>}
                                 </div>
                               </div>
@@ -1805,9 +1962,9 @@ export default function RevenuePage() {
 
                           <div className="space-y-2.5">
                             <div className="flex justify-between items-center text-[10px] font-bold">
-                              <span className="text-muted-foreground">최근 마감일</span>
+                              <span className="text-muted-foreground">최근 수납 마감</span>
                               <span className="text-primary">
-                                {item.latestInvoice?.cycleEndDate ? format(item.latestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '인보이스 없음'}
+                            {item.latestInvoice ? (getInvoiceCollectionEndDate(item.latestInvoice) ? format(getInvoiceCollectionEndDate(item.latestInvoice)!, 'yyyy.MM.dd') : '인보이스 없음') : '인보이스 없음'}
                               </span>
                             </div>
                             <div className="flex justify-between items-center text-[10px] font-bold">
@@ -2043,7 +2200,7 @@ export default function RevenuePage() {
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">최근 상태</p>
                       <div className="mt-2">{revenueFocusedLatestInvoice ? getStatusBadge(revenueFocusedLatestInvoice.status) : <Badge variant="outline">인보이스 없음</Badge>}</div>
                       <p className="mt-2 text-[11px] font-semibold text-slate-500">
-                        최근 마감일 {revenueFocusedLatestInvoice?.cycleEndDate ? format(revenueFocusedLatestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '-'}
+                        최근 수납 마감 {revenueFocusedLatestInvoice ? (getInvoiceCollectionEndDate(revenueFocusedLatestInvoice) ? format(getInvoiceCollectionEndDate(revenueFocusedLatestInvoice)!, 'yyyy.MM.dd') : '-') : '-'}
                       </p>
                     </div>
                     <div className="rounded-[1.4rem] border border-rose-100 bg-rose-50/60 p-4">
@@ -2118,11 +2275,11 @@ export default function RevenuePage() {
                                 {getStatusBadge(invoice.status)}
                               </div>
                               <p className="text-sm font-black text-slate-900">
-                                {invoice.cycleStartDate ? format(invoice.cycleStartDate.toDate(), 'MM.dd') : '--.--'} ~{' '}
-                                {invoice.cycleEndDate ? format(invoice.cycleEndDate.toDate(), 'MM.dd') : '--.--'}
+                                {getInvoiceCollectionStartDate(invoice) ? format(getInvoiceCollectionStartDate(invoice)!, 'MM.dd') : '--.--'} ~{' '}
+                                {getInvoiceCollectionEndDate(invoice) ? format(getInvoiceCollectionEndDate(invoice)!, 'MM.dd') : '--.--'}
                               </p>
                               <p className="text-[11px] font-semibold text-slate-500">
-                                마감일 {invoice.cycleEndDate ? format(invoice.cycleEndDate.toDate(), 'yyyy.MM.dd') : '-'}
+                                수납 마감 {getInvoiceCollectionEndDate(invoice) ? format(getInvoiceCollectionEndDate(invoice)!, 'yyyy.MM.dd') : '-'}
                               </p>
                             </div>
                             <div className="text-right">
@@ -2297,10 +2454,10 @@ export default function RevenuePage() {
                 <div className="space-y-2">
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-500/80">Collection Reset</p>
                   <AlertDialogTitle className="text-[1.65rem] font-black tracking-tight text-slate-950">
-                    현재 조회 범위 수납상황 초기화
+                    운영 시작 이전 허수 수납 데이터 정리
                   </AlertDialogTitle>
                   <AlertDialogDescription className="max-w-xl text-sm font-semibold leading-relaxed text-slate-600">
-                    {resetScopeLabel} 범위의 수납 상태를 다시 정리합니다. 이미 완료 처리된 건은 결제 로그와 KPI까지 함께 맞춰서 비즈니스 분석 숫자가 바로 정돈됩니다.
+                    {resetScopeLabel} 범위의 허수 인보이스를 운영 시작 이전 데이터로 비활성화합니다. 연결된 결제 로그와 KPI도 함께 정리되어 미납/완납 숫자가 실제 운영 기준으로 다시 맞춰집니다.
                   </AlertDialogDescription>
                 </div>
               </div>
@@ -2315,12 +2472,25 @@ export default function RevenuePage() {
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">적용 범위</p>
                     <p className="text-base font-black tracking-tight text-slate-900">{resetScopeLabel}</p>
                     <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
-                      인보이스는 삭제되지 않고 상태만 다시 수납 대기로 되돌아갑니다.
+                      인보이스 문서는 남기되 `void`로 비활성화하고, 연결된 결제 로그는 함께 정리합니다.
                     </p>
                   </div>
                   <Badge className="border border-rose-100 bg-rose-50 px-3 py-1 text-[10px] font-black text-rose-600 shadow-none">
                     {timelineTrackLabel}
                   </Badge>
+                </div>
+                <div className="mt-4 grid gap-2 sm:max-w-[240px]">
+                  <Label htmlFor="finance-cutoff-date" className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                    운영 시작일
+                  </Label>
+                  <Input
+                    id="finance-cutoff-date"
+                    type="date"
+                    value={financeCutoffDate}
+                    onChange={(event) => setFinanceCutoffDate(event.target.value)}
+                    className="h-11 rounded-2xl border-slate-200 bg-slate-50 font-black"
+                    disabled={isSaving}
+                  />
                 </div>
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-[1.1rem] border border-slate-100 bg-slate-50/80 p-3">
@@ -2346,7 +2516,7 @@ export default function RevenuePage() {
                     <div className="space-y-1">
                       <p className="text-xs font-black tracking-tight text-slate-900">수납 상태 복원</p>
                       <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
-                        완료, 미납, 무효 상태를 다시 수납 대기 기준으로 정리합니다.
+                        컷오프 이전 인보이스를 `void`로 비활성화해 허수 미납과 허수 완납이 더 이상 KPI에 잡히지 않게 합니다.
                       </p>
                     </div>
                   </div>
@@ -2355,7 +2525,7 @@ export default function RevenuePage() {
                     <div className="space-y-1">
                       <p className="text-xs font-black tracking-tight text-slate-900">결제 로그 정리</p>
                       <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
-                        완료 처리된 인보이스의 연결 로그를 함께 정리해 누적 수치가 어긋나지 않게 맞춥니다.
+                        이미 완료 처리된 허수 결제 로그도 함께 삭제해 실수납 수치와 CSV가 실제 운영 기준으로만 남게 합니다.
                       </p>
                     </div>
                   </div>
@@ -2377,7 +2547,7 @@ export default function RevenuePage() {
               <div className="space-y-1">
                 <p className="text-xs font-black tracking-tight text-amber-900">실행 전에 범위를 확인해 주세요.</p>
                 <p className="text-[11px] font-semibold leading-relaxed text-amber-800">
-                  현재 선택한 월, 트랙, 학생 필터가 그대로 적용됩니다. 해당 범위의 수납 운영 데이터를 한 번에 다시 맞추는 용도입니다.
+                  현재 선택한 트랙과 학생 필터가 그대로 적용되며, 선택한 운영 시작일 이전 데이터만 정리합니다. 실제 운영 데이터를 넣기 전 한 번만 실행하는 용도에 가깝습니다.
                 </p>
               </div>
             </div>
@@ -2393,7 +2563,7 @@ export default function RevenuePage() {
                 className="rounded-2xl bg-[linear-gradient(135deg,#E11D48_0%,#F43F5E_100%)] px-5 font-black text-white shadow-[0_18px_36px_-20px_rgba(225,29,72,0.6)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_44px_-20px_rgba(225,29,72,0.7)]"
               >
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarX className="mr-2 h-4 w-4" />}
-                수납상황 초기화
+                운영 시작 초기화
               </Button>
             </AlertDialogFooter>
           </div>

@@ -30,6 +30,7 @@ import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { issueInvoice } from '@/lib/finance-actions';
 import { INVOICE_TRACK_META, type InvoiceTrackCategory } from '@/lib/invoice-analytics';
+import { getInvoiceCollectionEndDate, getInvoiceCollectionSortTime, isInvoiceCollectionOverdue } from '@/lib/invoice-collection-window';
 import { useToast } from '@/hooks/use-toast';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 
@@ -93,7 +94,7 @@ export default function AssignedStudentsPage() {
     let list = assignedSeats.map(seat => {
       const student = studentMembers.find(m => m.id === seat.studentId);
       const studentInvoices = allInvoices.filter(i => i.studentId === seat.studentId)
-        .sort((a, b) => b.cycleEndDate.toMillis() - a.cycleEndDate.toMillis());
+        .sort((a, b) => getInvoiceCollectionSortTime(b) - getInvoiceCollectionSortTime(a));
       const latestInvoice = studentInvoices?.[0];
       
       let priority = 0;
@@ -102,7 +103,7 @@ export default function AssignedStudentsPage() {
       if (!latestInvoice) {
         priority = 100;
         statusKey = 'none';
-      } else if (latestInvoice.status !== 'paid' && latestInvoice.cycleEndDate.toDate() < new Date()) {
+      } else if (latestInvoice.status !== 'paid' && isInvoiceCollectionOverdue(latestInvoice)) {
         priority = 90;
         statusKey = 'overdue';
       } else if (latestInvoice.status !== 'paid') {
@@ -133,7 +134,7 @@ export default function AssignedStudentsPage() {
     return list.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority;
       if (a.latestInvoice && b.latestInvoice) {
-        return a.latestInvoice.cycleEndDate.toMillis() - b.latestInvoice.cycleEndDate.toMillis();
+        return getInvoiceCollectionSortTime(a.latestInvoice) - getInvoiceCollectionSortTime(b.latestInvoice);
       }
       return 0;
     });
@@ -249,7 +250,9 @@ export default function AssignedStudentsPage() {
             <div className="divide-y divide-muted/10">
               {filteredAndSortedStudents.map(({ seat, student, latestInvoice, statusKey }: any) => {
                 const isOverdue = statusKey === 'overdue';
-                const overdueDays = isOverdue ? differenceInDays(new Date(), latestInvoice.cycleEndDate.toDate()) : 0;
+              const overdueDays = isOverdue && getInvoiceCollectionEndDate(latestInvoice)
+                ? differenceInDays(new Date(), getInvoiceCollectionEndDate(latestInvoice)!)
+                : 0;
                 const seatIdentity = resolveSeatIdentity(seat);
                 const seatLabel = formatSeatLabel(seat);
 
@@ -291,7 +294,7 @@ export default function AssignedStudentsPage() {
                             <div className="flex items-center justify-center sm:justify-end gap-2">
                               <CalendarCheck className={cn("h-4 w-4", isOverdue ? "text-rose-600" : "text-blue-600")} />
                               <span className={cn("text-xl font-black tabular-nums tracking-tight", isOverdue ? "text-rose-600" : "text-primary")}>
-                                {format(latestInvoice.cycleEndDate.toDate(), 'yyyy.MM.dd')}
+                              {getInvoiceCollectionEndDate(latestInvoice) ? format(getInvoiceCollectionEndDate(latestInvoice)!, 'yyyy.MM.dd') : '-'}
                               </span>
                             </div>
                             {isOverdue && (
