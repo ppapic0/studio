@@ -58,7 +58,8 @@ const NotificationsContext = createContext<NotificationsContextType>({
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership } = useAppContext();
+  const { activeMembership, activeStudentId } = useAppContext();
+  const studentUid = activeStudentId || user?.uid || null;
 
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [feedbacks, setFeedbacks] = useState<StudentNotification[]>([]);
@@ -72,7 +73,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const rankingRewardsInitialLoad = useRef(true);
 
   useEffect(() => {
-    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') {
+    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student' || !studentUid) {
       setReports([]);
       setLatestReport(null);
       reportsInitialLoad.current = true;
@@ -82,7 +83,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     const centerId = activeMembership.id;
     const q = query(
       collection(firestore, 'centers', centerId, 'dailyReports'),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', studentUid),
       where('status', '==', 'sent')
     );
 
@@ -113,10 +114,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     });
 
     return () => unsubscribe();
-  }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
+  }, [firestore, studentUid, user?.uid, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
-    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') {
+    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student' || !studentUid) {
       setFeedbacks([]);
       setLatestFeedback(null);
       feedbacksInitialLoad.current = true;
@@ -126,7 +127,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     const centerId = activeMembership.id;
     const q = query(
       collection(firestore, 'centers', centerId, 'studentNotifications'),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', studentUid),
       where('type', '==', 'one_line_feedback')
     );
 
@@ -157,10 +158,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     });
 
     return () => unsubscribe();
-  }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
+  }, [firestore, studentUid, user?.uid, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
-    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') {
+    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student' || !studentUid) {
       setRankingRewards([]);
       setLatestRankingReward(null);
       rankingRewardsInitialLoad.current = true;
@@ -170,7 +171,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     const centerId = activeMembership.id;
     const q = query(
       collection(firestore, 'centers', centerId, 'studentNotifications'),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', studentUid),
       where('type', '==', 'ranking_reward')
     );
 
@@ -206,7 +207,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     });
 
     return () => unsubscribe();
-  }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
+  }, [firestore, studentUid, user?.uid, activeMembership?.id, activeMembership?.role]);
 
   return (
     <NotificationsContext.Provider

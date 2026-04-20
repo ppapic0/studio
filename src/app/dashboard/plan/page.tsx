@@ -491,9 +491,10 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
 export default function StudyPlanPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const studentUid = activeStudentId || user?.uid || null;
 
   const isMobile = viewMode === 'mobile';
   const rewardGradient = 'from-[#14295F] via-[#1A3673] to-[#FF8A2A]';
@@ -825,34 +826,34 @@ export default function StudyPlanPage() {
   );
 
   const planItemsQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return null;
+    if (!firestore || !studentUid || !activeMembership || !weekKey || !selectedDateKey) return null;
     return query(
       collection(
         firestore,
         'centers',
         activeMembership.id,
         'plans',
-        user.uid,
+        studentUid,
         'weeks',
         weekKey,
         'items'
       ),
       where('dateKey', '==', selectedDateKey)
     );
-  }, [firestore, user, activeMembership, weekKey, selectedDateKey]);
+  }, [firestore, studentUid, activeMembership, weekKey, selectedDateKey]);
 
   const { data: dailyPlans, isLoading } = useCollection<StudyPlanItem>(planItemsQuery, { enabled: isStudent });
 
   const progressRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-  }, [firestore, activeMembership, user]);
+    if (!firestore || !activeMembership || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', studentUid);
+  }, [firestore, activeMembership, studentUid]);
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isStudent });
 
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-  }, [firestore, activeMembership, user]);
+    if (!firestore || !activeMembership || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
+  }, [firestore, activeMembership, studentUid]);
   const { data: studentProfile, isLoading: isStudentProfileLoading } = useDoc<StudentProfile>(studentProfileRef, {
     enabled: isStudent,
   });
@@ -994,7 +995,7 @@ export default function StudyPlanPage() {
   ]);
 
   const fetchRecentStudyOptions = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !isStudent || recentStudyWeekKeys.length === 0) {
+    if (!firestore || !studentUid || !activeMembership || !isStudent || recentStudyWeekKeys.length === 0) {
       setRecentStudyOptions([]);
       setRecentStudyHistory([]);
       return;
@@ -1011,7 +1012,7 @@ export default function StudyPlanPage() {
               'centers',
               activeMembership.id,
               'plans',
-              user.uid,
+              studentUid,
               'weeks',
               targetWeekKey,
               'items'
@@ -1050,7 +1051,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsRecentStudyLoading(false);
     }
-  }, [activeMembership, buildRecentStudyOption, firestore, isStudent, recentStudyWeekKeys, user]);
+  }, [activeMembership, buildRecentStudyOption, firestore, isStudent, recentStudyWeekKeys, studentUid]);
 
   useEffect(() => {
     void fetchRecentStudyOptions();
@@ -1114,7 +1115,7 @@ export default function StudyPlanPage() {
         ? setDoc(
             studentProfileRef,
               {
-                id: user.uid,
+                id: studentUid || user.uid,
                 name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
                 schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
                 grade: studentProfile?.grade || '학년 미정',
@@ -1774,7 +1775,7 @@ export default function StudyPlanPage() {
           tag: task.tag || null,
           studyPlanWeekId: weekKey,
           centerId: activeMembership.id,
-          studentId: user.uid,
+          studentId: studentUid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -1809,7 +1810,7 @@ export default function StudyPlanPage() {
   }, [markTemplateAsRecent, replaceTodayPlansFromDrafts]);
 
   const handleCopyYesterdayPlan = useCallback(async () => {
-    if (isPast || !selectedDate || !firestore || !user || !activeMembership) return;
+    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !studentUid) return;
 
     const yesterday = addDays(selectedDate, -1);
     const yesterdayWeekKey = format(yesterday, "yyyy-'W'II");
@@ -1824,7 +1825,7 @@ export default function StudyPlanPage() {
             'centers',
             activeMembership.id,
             'plans',
-            user.uid,
+            studentUid,
             'weeks',
             yesterdayWeekKey,
             'items'
@@ -1868,7 +1869,7 @@ export default function StudyPlanPage() {
   }, [checklistTasks.length, replaceTodayPlansFromDrafts]);
 
   const handleMoveUnfinishedToTomorrow = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !selectedDate) return;
+    if (!firestore || !user || !activeMembership || !studentUid || !selectedDate) return;
     const drafts = remainingStudyTasks
       .map((task) => buildTemplateDraftFromTask(task as WithId<StudyPlanItem>));
     if (drafts.length === 0) return;
@@ -1881,7 +1882,7 @@ export default function StudyPlanPage() {
       'centers',
       activeMembership.id,
       'plans',
-      user.uid,
+      studentUid,
       'weeks',
       tomorrowWeekKey,
       'items'
@@ -1911,7 +1912,7 @@ export default function StudyPlanPage() {
           tag: task.tag || null,
           studyPlanWeekId: tomorrowWeekKey,
           centerId: activeMembership.id,
-          studentId: user.uid,
+          studentId: studentUid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -1922,7 +1923,7 @@ export default function StudyPlanPage() {
           'centers',
           activeMembership.id,
           'plans',
-          user.uid,
+          studentUid,
           'weeks',
           weekKey,
           'items',
@@ -1966,7 +1967,7 @@ export default function StudyPlanPage() {
   }, [buildTemplateDraftFromTask, markTemplateAsRecent, remainingStudyTasks, selectedDate, toast]);
 
   const handleDeleteUnfinished = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || remainingStudyTasks.length === 0) return;
+    if (!firestore || !user || !activeMembership || !studentUid || remainingStudyTasks.length === 0) return;
     const shouldDelete = window.confirm('남은 항목을 오늘 계획에서 삭제할까요?');
     if (!shouldDelete) return;
     setIsSubmitting(true);
@@ -1978,7 +1979,7 @@ export default function StudyPlanPage() {
           'centers',
           activeMembership.id,
           'plans',
-          user.uid,
+          studentUid,
           'weeks',
           weekKey,
           'items',
@@ -2071,12 +2072,12 @@ export default function StudyPlanPage() {
   }, [progress?.dailyPointStatus, progressRef, selectedDateKey]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
-    if (!activeMembership || !user || !selectedDateKey) return false;
+    if (!activeMembership || !user || !studentUid || !selectedDateKey) return false;
 
     const penaltyKey = `same_day_routine:${selectedDateKey}`;
     const result = await applyPenaltyEventSecure({
       centerId: activeMembership.id,
-      studentId: user.uid,
+      studentId: studentUid,
       source: 'manual',
       reason,
       pointsDelta: SAME_DAY_ROUTINE_PENALTY_POINTS,
@@ -2104,7 +2105,7 @@ export default function StudyPlanPage() {
       taskBlueprint?: PlannerTaskDraft;
     }
   ) => {
-    if (isPast || !firestore || !user || !activeMembership || !title.trim() || !isStudent || !weekKey || !selectedDateKey) {
+    if (isPast || !firestore || !user || !activeMembership || !studentUid || !title.trim() || !isStudent || !weekKey || !selectedDateKey) {
       return false;
     }
 
@@ -2114,7 +2115,7 @@ export default function StudyPlanPage() {
       'centers',
       activeMembership.id,
       'plans',
-      user.uid,
+      studentUid,
       'weeks',
       weekKey,
       'items'
@@ -2131,7 +2132,7 @@ export default function StudyPlanPage() {
         category,
         studyPlanWeekId: weekKey,
         centerId: activeMembership.id,
-        studentId: user.uid,
+        studentId: studentUid,
         startTime: taskBlueprint?.startTime || null,
         endTime: taskBlueprint?.endTime || null,
         priority: taskBlueprint?.priority || 'medium',
@@ -2289,7 +2290,7 @@ export default function StudyPlanPage() {
   }), [awayEndTime, awayReason, awayStartTime, extraAwayPlans, inTime, isScheduleAbsent, outTime]);
 
   const syncLegacyScheduleItems = useCallback(async (dateKey: string, scheduleDoc: StudentScheduleDoc | null) => {
-    if (!firestore || !user || !activeMembership) return;
+    if (!firestore || !user || !activeMembership || !studentUid) return;
 
     const targetWeekKey = format(new Date(`${dateKey}T00:00:00`), "yyyy-'W'II");
     const itemsRef = collection(
@@ -2297,7 +2298,7 @@ export default function StudyPlanPage() {
       'centers',
       activeMembership.id,
       'plans',
-      user.uid,
+      studentUid,
       'weeks',
       targetWeekKey,
       'items'
@@ -2318,7 +2319,7 @@ export default function StudyPlanPage() {
           category: 'schedule',
           studyPlanWeekId: targetWeekKey,
           centerId: activeMembership.id,
-          studentId: user.uid,
+        studentId: studentUid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -2821,11 +2822,11 @@ export default function StudyPlanPage() {
   }, [firestore, toast, user]);
 
   const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
-    if (isPast || !firestore || !user || !activeMembership || !weekKey) return;
+    if (isPast || !firestore || !user || !activeMembership || !studentUid || !weekKey) return;
     const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
     const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
     const rangeStr = `${formattedStart} ~ ${formattedEnd}`;
-    const docRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', itemId);
+    const docRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', itemId);
     await updateDoc(docRef, { title: `${baseTitle}: ${rangeStr}`, updatedAt: serverTimestamp() });
     if (isToday) {
       await applySameDayRoutinePenalty('당일 출석 루틴 시간 수정');
@@ -2837,8 +2838,8 @@ export default function StudyPlanPage() {
   };
 
   const handleToggleTask = async (item: WithId<StudyPlanItem>) => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey || !selectedDateKey) return;
-    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    if (isPast || !firestore || !user || !activeMembership || !studentUid || !isStudent || !weekKey || !selectedDateKey) return;
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
     const nextState = !item.done;
 
     if (resolveStudyPlanMode(item) === 'volume') {
@@ -2880,6 +2881,7 @@ export default function StudyPlanPage() {
       !firestore ||
       !user ||
       !activeMembership ||
+      !studentUid ||
       !isStudent ||
       !weekKey ||
       !selectedDateKey
@@ -2926,7 +2928,7 @@ export default function StudyPlanPage() {
         'centers',
         activeMembership.id,
         'plans',
-        user.uid,
+      studentUid,
         'weeks',
         weekKey,
         'items',
@@ -2996,8 +2998,8 @@ export default function StudyPlanPage() {
   ]);
 
   const handleCommitStudyActualAmount = async (item: WithId<StudyPlanItem>, nextActualAmount: number) => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
-    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    if (isPast || !firestore || !user || !activeMembership || !studentUid || !isStudent || !weekKey) return;
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
     const safeActualAmount = Math.max(0, Math.round(nextActualAmount));
     const targetAmount = Math.max(0, item.targetAmount || 0);
     const completionPercent = targetAmount > 0
@@ -3024,8 +3026,8 @@ export default function StudyPlanPage() {
   };
 
   const handleUpdateStudyWindow = async (item: WithId<StudyPlanItem>, startTime: string, endTime: string) => {
-    if (isPast || !firestore || !user || !activeMembership || !weekKey) return;
-    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id);
+    if (isPast || !firestore || !user || !activeMembership || !studentUid || !weekKey) return;
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
     await updateDoc(itemRef, {
       startTime,
       endTime,
@@ -3034,9 +3036,9 @@ export default function StudyPlanPage() {
   };
 
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
-    if (isPast || !firestore || !user || !activeMembership || !isStudent || !weekKey) return;
+    if (isPast || !firestore || !user || !activeMembership || !studentUid || !isStudent || !weekKey) return;
 
-    await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items', item.id));
+    await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id));
     if (item.category === 'schedule' && isToday) {
       await applySameDayRoutinePenalty('당일 출석 루틴 삭제');
       toast({
@@ -3048,7 +3050,7 @@ export default function StudyPlanPage() {
   };
 
   const handleApplyTasksToAllWeekdaysLegacy = async () => {
-    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return;
+    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !studentUid || !dailyPlans || dailyPlans.length === 0) return;
     const tasksToCopy = dailyPlans.filter(p => p.category !== 'schedule');
     if (tasksToCopy.length === 0) {
       toast({ variant: "destructive", title: "복사할 학습 계획이 없습니다." });
@@ -3065,13 +3067,13 @@ export default function StudyPlanPage() {
       for (const targetDate of targetDates) {
         const targetDateKey = format(targetDate, 'yyyy-MM-dd');
         const targetWeekKey = format(targetDate, "yyyy-'W'II");
-        const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', targetWeekKey, 'items');
+        const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', targetWeekKey, 'items');
         
         tasksToCopy.forEach(plan => {
           batch.set(doc(itemsCollectionRef), {
             title: plan.title, done: false, weight: plan.weight, dateKey: targetDateKey, category: plan.category || 'study',
             subject: plan.subject || null, targetMinutes: plan.targetMinutes || 0,
-            studyPlanWeekId: targetWeekKey, centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+            studyPlanWeekId: targetWeekKey, centerId: activeMembership.id, studentId: studentUid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
           });
         });
       }
@@ -3087,7 +3089,7 @@ export default function StudyPlanPage() {
   };
 
   const handleApplyRoutineToAllWeekdaysLegacy = async () => {
-    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return;
+    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !studentUid || !dailyPlans || dailyPlans.length === 0) return;
     const routinesToCopy = dailyPlans.filter(p => p.category === 'schedule');
     if (routinesToCopy.length === 0) {
       toast({ variant: "destructive", title: "복사할 생활 루틴이 없습니다." });
@@ -3104,12 +3106,12 @@ export default function StudyPlanPage() {
       for (const targetDate of targetDates) {
         const targetDateKey = format(targetDate, 'yyyy-MM-dd');
         const targetWeekKey = format(targetDate, "yyyy-'W'II");
-        const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', targetWeekKey, 'items');
+        const itemsCollectionRef = collection(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', targetWeekKey, 'items');
         
         routinesToCopy.forEach(plan => {
           batch.set(doc(itemsCollectionRef), {
             title: plan.title, done: false, weight: 0, dateKey: targetDateKey, category: 'schedule',
-            studyPlanWeekId: targetWeekKey, centerId: activeMembership.id, studentId: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+            studyPlanWeekId: targetWeekKey, centerId: activeMembership.id, studentId: studentUid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
           });
         });
       }
@@ -3146,7 +3148,7 @@ export default function StudyPlanPage() {
     kind: 'task' | 'routine',
     options: { weeks: number; weekdays: number[]; itemIds: string[] }
   ) => {
-    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !dailyPlans || dailyPlans.length === 0) return false;
+    if (isPast || !selectedDate || !firestore || !user || !activeMembership || !studentUid || !dailyPlans || dailyPlans.length === 0) return false;
 
     const sourcePlans = (kind === 'task'
       ? dailyPlans.filter(p => p.category !== 'schedule')
@@ -3193,7 +3195,7 @@ export default function StudyPlanPage() {
           'centers',
           activeMembership.id,
           'plans',
-          user.uid,
+          studentUid,
           'weeks',
           targetWeekKey,
           'items'
@@ -3215,7 +3217,7 @@ export default function StudyPlanPage() {
             amountUnitLabel: kind === 'task' ? (plan.amountUnitLabel || null) : null,
             studyPlanWeekId: targetWeekKey,
             centerId: activeMembership.id,
-            studentId: user.uid,
+          studentId: studentUid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });

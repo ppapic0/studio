@@ -466,22 +466,23 @@ function GrowthDetailAccordionItem({
 }
 
 export default function AnalysisTrackPage() {
-  const { viewMode, activeMembership } = useAppContext();
+  const { viewMode, activeMembership, activeStudentId } = useAppContext();
   const { user } = useUser();
   const firestore = useFirestore();
-  const selfParams = useMemo(() => Promise.resolve({ id: user?.uid ?? '' }), [user?.uid]);
+  const studentUid = activeStudentId || user?.uid || '';
+  const selfParams = useMemo(() => Promise.resolve({ id: studentUid }), [studentUid]);
   const isMobile = viewMode === 'mobile';
   const [activeTab, setActiveTab] = useState<AnalysisTab>('growth');
   const growthTabMatchesDesktop = !isMobile || activeTab === 'growth';
 
   const studyLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid || !activeMembership) return null;
+    if (!firestore || !studentUid || !activeMembership) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days'),
+      collection(firestore, 'centers', activeMembership.id, 'studyLogs', studentUid, 'days'),
       orderBy('dateKey', 'desc'),
       limit(14)
     );
-  }, [firestore, user?.uid, activeMembership?.id]);
+  }, [firestore, studentUid, activeMembership?.id]);
 
   const { data: logs } = useCollection<StudyLogDay>(studyLogsQuery);
 
@@ -555,10 +556,10 @@ export default function AnalysisTrackPage() {
   }>({ total: 0, autoClosedCount: 0, completionRate: 0, avgDurationMinutes: 0, loading: true });
 
   useEffect(() => {
-    if (!firestore || !user?.uid || !activeMembership) return;
+    if (!firestore || !studentUid || !activeMembership) return;
     let cancelled = false;
     const centerId = activeMembership.id;
-    const userId = user.uid;
+    const userId = studentUid;
 
     async function loadSessions() {
       const today = new Date();
@@ -611,7 +612,7 @@ export default function AnalysisTrackPage() {
     return () => {
       cancelled = true;
     };
-  }, [firestore, user?.uid, activeMembership?.id]);
+  }, [firestore, studentUid, activeMembership?.id]);
 
   const sessionCards = useMemo(
     () => [

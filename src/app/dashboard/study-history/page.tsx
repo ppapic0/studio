@@ -409,7 +409,7 @@ function ScheduleItemRow({ item, onUpdateRange, onDelete, isPast, isToday, isMob
 export default function StudyHistoryPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -432,13 +432,13 @@ export default function StudyHistoryPage() {
   const linkedStudentIdsKey = linkedStudentIds.join(',');
   const requestedParentStudentId = searchParams.get('parentStudentId');
   const targetUid = useMemo(() => {
-    if (!isParent) return user?.uid;
+    if (!isParent) return activeStudentId || user?.uid;
     if (requestedParentStudentId && (linkedStudentIds.length === 0 || linkedStudentIds.includes(requestedParentStudentId))) {
       return requestedParentStudentId;
     }
     if (linkedStudentIds.length === 0) return undefined;
     return linkedStudentIds[0];
-  }, [isParent, user?.uid, linkedStudentIds, requestedParentStudentId]);
+  }, [activeStudentId, isParent, user?.uid, linkedStudentIds, requestedParentStudentId]);
 
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date | null>(null);

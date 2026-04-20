@@ -34,15 +34,16 @@ const emptyInteractionState: RoutineSocialInteractionState = {
 export default function PlanRoutineExplorePage() {
   const firestore = useFirestore();
   const { user } = useUser();
-  const { activeMembership } = useAppContext();
+  const { activeMembership, activeStudentId } = useAppContext();
   const { toast } = useToast();
   const [interactionState, setInteractionState] = useState<RoutineSocialInteractionState>(emptyInteractionState);
+  const studentUid = activeStudentId || user?.uid || null;
 
   const isStudent = activeMembership?.role === 'student';
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-  }, [activeMembership, firestore, user]);
+    if (!firestore || !activeMembership || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
+  }, [activeMembership, firestore, studentUid]);
   const { data: studentProfile, isLoading } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudent });
 
   const interactionStorageKey = useMemo(

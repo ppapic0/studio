@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useFunctions } from '@/firebase';
-import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { httpsCallable } from 'firebase/functions';
 
@@ -40,6 +40,7 @@ function getSeatActivityRank(status?: string | null): number {
 interface AppContextType {
   memberships: CenterMembership[];
   activeMembership: CenterMembership | null;
+  activeStudentId: string | null;
   membershipsLoading: boolean;
 
   isTimerActive: boolean;
@@ -65,6 +66,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const functions = useFunctions();
   const [memberships, setMemberships] = useState<CenterMembership[]>([]);
   const [activeMembership, setActiveMembership] = useState<CenterMembership | null>(null);
+  const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
   const [membershipsLoading, setMembershipsLoading] = useState(true);
 
   const [isTimerActive, setIsTimerActive] = useState(false);
@@ -98,6 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user || !firestore) {
       setMemberships([]);
       setActiveMembership(null);
+      setActiveStudentId(null);
       setMembershipsLoading(false);
       activeMembershipRef.current = null;
       setCurrentTier(TIERS[0]);
@@ -243,6 +246,82 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
+      setActiveStudentId(null);
+      return;
+    }
+
+    const centerId = activeMembership.id;
+    const directMemberRef = doc(firestore, 'centers', centerId, 'members', user.uid);
+    const directStudentRef = doc(firestore, 'centers', centerId, 'students', user.uid);
+    let unsubscribeFallback = () => {};
+
+    const unsubscribeDirect = onSnapshot(
+      directMemberRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setActiveStudentId(snapshot.id);
+          unsubscribeFallback();
+          unsubscribeFallback = () => {};
+          return;
+        }
+
+        unsubscribeFallback();
+        const resolveFallbackIdentity = async () => {
+          try {
+            const directStudentSnap = await getDoc(directStudentRef);
+            if (directStudentSnap.exists()) {
+              setActiveStudentId(directStudentSnap.id);
+              return;
+            }
+
+            const [memberFallbackSnapshot, studentFallbackSnapshot] = await Promise.all([
+              getDocs(
+                query(
+                  collection(firestore, 'centers', centerId, 'members'),
+                  where('id', '==', user.uid)
+                )
+              ),
+              getDocs(
+                query(
+                  collection(firestore, 'centers', centerId, 'students'),
+                  where('id', '==', user.uid)
+                )
+              ),
+            ]);
+
+            const matchedMemberDoc =
+              memberFallbackSnapshot.docs.find((docSnap) => {
+                const raw = docSnap.data() as Record<string, unknown>;
+                return docSnap.id === user.uid || raw.id === user.uid;
+              }) || null;
+            const matchedStudentDoc =
+              studentFallbackSnapshot.docs.find((docSnap) => {
+                const raw = docSnap.data() as Record<string, unknown>;
+                return docSnap.id === user.uid || raw.id === user.uid;
+              }) || null;
+
+            setActiveStudentId(matchedMemberDoc?.id || matchedStudentDoc?.id || user.uid);
+          } catch {
+            setActiveStudentId(user.uid);
+          }
+        };
+
+        void resolveFallbackIdentity();
+      },
+      () => {
+        setActiveStudentId(user.uid);
+      }
+    );
+
+    return () => {
+      unsubscribeDirect();
+      unsubscribeFallback();
+    };
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+
+  useEffect(() => {
+    const studentId = activeStudentId || user?.uid || null;
+    if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentId) {
       setIsTimerActive(false);
       setStartTime(null);
       return;
@@ -251,7 +330,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const centerId = activeMembership.id;
     const q = query(
       collection(firestore, 'centers', centerId, 'attendanceCurrent'),
-      where('studentId', '==', user.uid)
+      where('studentId', '==', studentId)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -283,18 +362,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+  }, [activeStudentId, user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
-    if (!user || !firestore || !activeMembership || activeMembership.role !== 'student') {
+    const studentId = activeStudentId || user?.uid || null;
+    if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentId) {
       setCurrentTier(TIERS[0]);
       return;
     }
 
     const centerId = activeMembership.id;
     const periodKey = format(new Date(), 'yyyy-MM');
-    const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', user.uid);
-    const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', user.uid);
+    const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
+    const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
 
     let latestLp = 0;
     let latestRank = 999;
@@ -329,7 +409,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubProgress();
       unsubRank();
     };
-  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+  }, [activeStudentId, user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
     if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {
@@ -341,6 +421,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => ({
       memberships,
       activeMembership,
+      activeStudentId,
       membershipsLoading,
       isTimerActive,
       setIsTimerActive,
@@ -356,6 +437,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [
       memberships,
       activeMembership,
+      activeStudentId,
       membershipsLoading,
       isTimerActive,
       startTime,

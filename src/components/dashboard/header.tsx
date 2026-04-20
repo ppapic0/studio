@@ -233,7 +233,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
   const functions = useFunctions();
   const router = useRouter();
   const { toast } = useToast();
-  const { activeMembership, viewMode, setViewMode } = useAppContext();
+  const { activeMembership, activeStudentId, viewMode, setViewMode } = useAppContext();
   const isParentMode = activeMembership?.role === 'parent';
   const isStudentMode = activeMembership?.role === 'student';
   const isMobileView = isParentMode || viewMode === 'mobile';
@@ -255,16 +255,17 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
     return doc(firestore, 'users', user.uid);
   }, [firestore, user?.uid]);
   const { data: userProfile } = useDoc<UserType>(userRef as any);
+  const studentUid = activeStudentId || user?.uid || null;
 
   const studentRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-  }, [firestore, activeMembership?.id, user?.uid]);
+    if (!firestore || !activeMembership || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentRef as any);
   const linkedStudentId =
     activeMembership?.role === 'parent'
       ? activeMembership?.linkedStudentIds?.[0] || null
-      : user?.uid || null;
+      : studentUid;
   const linkedStudentRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership?.id || !linkedStudentId) return null;
     return doc(firestore, 'centers', activeMembership.id, 'students', linkedStudentId);

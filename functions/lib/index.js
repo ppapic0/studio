@@ -842,6 +842,37 @@ async function resolveCenterMembershipRole(db, centerId, uid) {
     }
     return { role: null, status: null };
 }
+async function resolveCenterStudentIdentity(db, centerId, uid) {
+    const [directMemberSnap, directStudentSnap] = await Promise.all([
+        db.doc(`centers/${centerId}/members/${uid}`).get(),
+        db.doc(`centers/${centerId}/students/${uid}`).get(),
+    ]);
+    if (directMemberSnap.exists || directStudentSnap.exists) {
+        return {
+            studentId: uid,
+            memberData: directMemberSnap.exists ? directMemberSnap.data() : null,
+            studentProfileData: directStudentSnap.exists ? directStudentSnap.data() : null,
+            memberExists: directMemberSnap.exists,
+            studentProfileExists: directStudentSnap.exists,
+        };
+    }
+    const [fallbackMemberSnap, fallbackStudentSnap] = await Promise.all([
+        db.collection(`centers/${centerId}/members`).where("id", "==", uid).limit(1).get(),
+        db.collection(`centers/${centerId}/students`).where("id", "==", uid).limit(1).get(),
+    ]);
+    const fallbackMemberDoc = fallbackMemberSnap.empty ? null : fallbackMemberSnap.docs[0];
+    const fallbackStudentDoc = fallbackStudentSnap.empty ? null : fallbackStudentSnap.docs[0];
+    if (!fallbackMemberDoc && !fallbackStudentDoc) {
+        return null;
+    }
+    return {
+        studentId: (fallbackMemberDoc === null || fallbackMemberDoc === void 0 ? void 0 : fallbackMemberDoc.id) || (fallbackStudentDoc === null || fallbackStudentDoc === void 0 ? void 0 : fallbackStudentDoc.id) || uid,
+        memberData: fallbackMemberDoc ? fallbackMemberDoc.data() : null,
+        studentProfileData: fallbackStudentDoc ? fallbackStudentDoc.data() : null,
+        memberExists: Boolean(fallbackMemberDoc),
+        studentProfileExists: Boolean(fallbackStudentDoc),
+    };
+}
 function normalizeParentLinkCodeValue(value) {
     if (typeof value === "string") {
         return value.trim();
@@ -4743,14 +4774,21 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
     const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
     const isTeacherOrAdminCaller = callerRole === "teacher" || isAdminRole(callerRole);
-    const isStudentSelfCaller = callerRole === "student" && context.auth.uid === studentId;
+    const callerIdentity = callerRole === "student"
+        ? await resolveCenterStudentIdentity(db, centerId, context.auth.uid)
+        : null;
+    const effectiveStudentId = callerRole === "student"
+        ? ((callerIdentity === null || callerIdentity === void 0 ? void 0 : callerIdentity.studentId) || context.auth.uid)
+        : studentId;
+    const isStudentSelfCaller = callerRole === "student"
+        && (studentId === effectiveStudentId || studentId === context.auth.uid);
     if (!isTeacherOrAdminCaller && !isStudentSelfCaller) {
         throw new functions.https.HttpsError("permission-denied", "Only authorized members can send notifications.");
     }
     if (isStudentSelfCaller && !["study_start", "study_end", "check_in", "check_out"].includes(eventType)) {
         throw new functions.https.HttpsError("permission-denied", "Students can only notify study start/end events.");
     }
-    const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
+    const studentSnap = await db.doc(`centers/${centerId}/students/${effectiveStudentId}`).get();
     if (!studentSnap.exists) {
         throw new functions.https.HttpsError("failed-precondition", "Student not found.", {
             userMessage: "학생 정보를 찾을 수 없습니다.",
@@ -4761,8 +4799,8 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
     if (isStudentSelfCaller) {
         const todayKey = toDateKey(nowKst);
         const [todayStatSnap, attendanceSnap] = await Promise.all([
-            db.doc(`centers/${centerId}/dailyStudentStats/${todayKey}/students/${studentId}`).get(),
-            db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", studentId).limit(3).get(),
+            db.doc(`centers/${centerId}/dailyStudentStats/${todayKey}/students/${effectiveStudentId}`).get(),
+            db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", effectiveStudentId).limit(3).get(),
         ]);
         const hasAttendanceTrace = attendanceSnap.docs.some((docSnap) => {
             var _a;
@@ -4778,7 +4816,7 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
     const settings = await loadNotificationSettings(db, centerId);
     const queueResult = await queueParentSmsNotification(db, {
         centerId,
-        studentId,
+        studentId: effectiveStudentId,
         studentName,
         eventType,
         eventAt: nowKst,
@@ -5594,11 +5632,11 @@ exports.applyPenaltyEventSecure = functions.region(region).https.onCall(async (d
     }
     const authUid = context.auth.uid;
     const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
-    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const requestedStudentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
     const source = asTrimmedString(data === null || data === void 0 ? void 0 : data.source);
     const penaltyDateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.penaltyDateKey);
     const reasonInput = asTrimmedString(data === null || data === void 0 ? void 0 : data.reason);
-    if (!centerId || !studentId) {
+    if (!centerId || !requestedStudentId) {
         throw new functions.https.HttpsError("invalid-argument", "centerId/studentId is required.", {
             userMessage: "학생 벌점을 반영할 정보를 다시 확인해 주세요.",
         });
@@ -5643,14 +5681,20 @@ exports.applyPenaltyEventSecure = functions.region(region).https.onCall(async (d
             userMessage: "학부모 계정에서는 벌점을 반영할 수 없습니다.",
         });
     }
-    if (membership.role === "student" && studentId !== authUid) {
-        throw new functions.https.HttpsError("permission-denied", "Students can only apply self penalties.", {
-            userMessage: "본인에게만 벌점을 반영할 수 있습니다.",
-        });
-    }
     if (membership.role !== "student" && membership.role !== "teacher" && !isAdminRole(membership.role)) {
         throw new functions.https.HttpsError("permission-denied", "Unsupported membership role.", {
             userMessage: "현재 계정 권한으로는 벌점을 반영할 수 없습니다.",
+        });
+    }
+    const callerIdentity = membership.role === "student"
+        ? await resolveCenterStudentIdentity(db, centerId, authUid)
+        : null;
+    const studentId = membership.role === "student"
+        ? ((callerIdentity === null || callerIdentity === void 0 ? void 0 : callerIdentity.studentId) || authUid)
+        : requestedStudentId;
+    if (membership.role === "student" && requestedStudentId !== studentId && requestedStudentId !== authUid) {
+        throw new functions.https.HttpsError("permission-denied", "Students can only apply self penalties.", {
+            userMessage: "본인에게만 벌점을 반영할 수 있습니다.",
         });
     }
     const [targetMemberSnap, targetStudentSnap, callerMemberSnap] = await Promise.all([
@@ -5658,15 +5702,15 @@ exports.applyPenaltyEventSecure = functions.region(region).https.onCall(async (d
         db.doc(`centers/${centerId}/students/${studentId}`).get(),
         db.doc(`centers/${centerId}/members/${authUid}`).get(),
     ]);
-    const targetMemberData = targetMemberSnap.exists ? targetMemberSnap.data() : null;
-    const targetStudentData = targetStudentSnap.exists ? targetStudentSnap.data() : null;
+    const targetMemberData = (callerIdentity === null || callerIdentity === void 0 ? void 0 : callerIdentity.memberData) || (targetMemberSnap.exists ? targetMemberSnap.data() : null);
+    const targetStudentData = (callerIdentity === null || callerIdentity === void 0 ? void 0 : callerIdentity.studentProfileData) || (targetStudentSnap.exists ? targetStudentSnap.data() : null);
     const targetRole = normalizeMembershipRoleValue(targetMemberData === null || targetMemberData === void 0 ? void 0 : targetMemberData.role);
     if (targetRole && targetRole !== "student") {
         throw new functions.https.HttpsError("failed-precondition", "Target membership is not a student.", {
             userMessage: "학생 계정에만 벌점을 반영할 수 있습니다.",
         });
     }
-    if (!targetMemberSnap.exists && !targetStudentSnap.exists) {
+    if (!targetMemberSnap.exists && !targetStudentSnap.exists && !callerIdentity) {
         throw new functions.https.HttpsError("failed-precondition", "Target student not found.", {
             userMessage: "학생 정보를 찾지 못했습니다.",
         });
@@ -5762,25 +5806,23 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
             userMessage: "학생 본인만 출결 신청을 접수할 수 있습니다.",
         });
     }
-    const [studentMemberSnap, studentProfileSnap] = await Promise.all([
-        db.doc(`centers/${centerId}/members/${authUid}`).get(),
-        db.doc(`centers/${centerId}/students/${authUid}`).get(),
-    ]);
-    if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+    const studentIdentity = await resolveCenterStudentIdentity(db, centerId, authUid);
+    if (!studentIdentity) {
         throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
             userMessage: "학생 정보를 찾지 못했습니다.",
         });
     }
-    const studentMemberData = studentMemberSnap.exists ? studentMemberSnap.data() : null;
-    const studentProfileData = studentProfileSnap.exists ? studentProfileSnap.data() : null;
+    const studentId = studentIdentity.studentId;
+    const studentMemberData = studentIdentity.memberData;
+    const studentProfileData = studentIdentity.studentProfileData;
     const studentName = asTrimmedString((studentMemberData === null || studentMemberData === void 0 ? void 0 : studentMemberData.displayName) || (studentMemberData === null || studentMemberData === void 0 ? void 0 : studentMemberData.name) || (studentProfileData === null || studentProfileData === void 0 ? void 0 : studentProfileData.displayName) || (studentProfileData === null || studentProfileData === void 0 ? void 0 : studentProfileData.name) || context.auth.token.name, "학생");
     const penaltyPointsDelta = ATTENDANCE_REQUEST_PENALTY_POINTS[requestType];
     const requestRef = db.collection(`centers/${centerId}/attendanceRequests`).doc();
     const penaltyLogRef = db.doc(`centers/${centerId}/penaltyLogs/attendance_request_${requestRef.id}`);
-    const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
+    const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
     await db.runTransaction(async (transaction) => {
         transaction.set(requestRef, {
-            studentId: authUid,
+            studentId,
             studentName,
             centerId,
             type: requestType,
@@ -5798,7 +5840,7 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
         }, { merge: true });
         transaction.set(penaltyLogRef, {
             centerId,
-            studentId: authUid,
+            studentId,
             studentName,
             pointsDelta: penaltyPointsDelta,
             reason: `${requestType === "absence" ? "결석" : "지각"} 신청 - ${reason}`,
@@ -5848,21 +5890,21 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
             userMessage: "학생 본인만 보상 상자를 열 수 있습니다.",
         });
     }
-    const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${authUid}/days/${dateKey}`);
-    const progressRef = db.doc(`centers/${centerId}/growthProgress/${authUid}`);
-    const [studentMemberSnap, studentProfileSnap, studyDaySnap, attendanceSnap, progressSnap, sessionsSnap] = await Promise.all([
-        db.doc(`centers/${centerId}/members/${authUid}`).get(),
-        db.doc(`centers/${centerId}/students/${authUid}`).get(),
-        studyDayRef.get(),
-        db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(10).get(),
-        progressRef.get(),
-        studyDayRef.collection("sessions").orderBy("startTime", "asc").get(),
-    ]);
-    if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+    const studentIdentity = await resolveCenterStudentIdentity(db, centerId, authUid);
+    if (!studentIdentity) {
         throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
             userMessage: "학생 정보를 찾지 못했습니다.",
         });
     }
+    const studentId = studentIdentity.studentId;
+    const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+    const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+    const [studyDaySnap, attendanceSnap, progressSnap, sessionsSnap] = await Promise.all([
+        studyDayRef.get(),
+        db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", studentId).limit(10).get(),
+        progressRef.get(),
+        studyDayRef.collection("sessions").orderBy("startTime", "asc").get(),
+    ]);
     const persistedDayMinutes = Math.max(0, Math.floor((_d = parseFiniteNumber((_c = studyDaySnap.data()) === null || _c === void 0 ? void 0 : _c.totalMinutes)) !== null && _d !== void 0 ? _d : 0));
     const nowMs = Date.now();
     const nowDate = new Date(nowMs);
@@ -5913,7 +5955,7 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
     }
     const baseReward = buildDeterministicStudyBoxReward({
         centerId,
-        studentId: authUid,
+        studentId,
         dateKey,
         milestone: hour,
     });
@@ -6111,16 +6153,14 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
             userMessage: "학생 본인만 공부 종료를 기록할 수 있습니다.",
         });
     }
-    const [studentMemberSnap, studentProfileSnap, attendanceSnap] = await Promise.all([
-        db.doc(`centers/${centerId}/members/${authUid}`).get(),
-        db.doc(`centers/${centerId}/students/${authUid}`).get(),
-        db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", authUid).limit(10).get(),
-    ]);
-    if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+    const studentIdentity = await resolveCenterStudentIdentity(db, centerId, authUid);
+    if (!studentIdentity) {
         throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
             userMessage: "학생 정보를 찾지 못했습니다.",
         });
     }
+    const studentId = studentIdentity.studentId;
+    const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", studentId).limit(10).get();
     const preferredSeatDoc = pickPreferredAttendanceSeatDoc(attendanceSnap.docs);
     const seatData = preferredSeatDoc === null || preferredSeatDoc === void 0 ? void 0 : preferredSeatDoc.data();
     const seatStatus = asTrimmedString(seatData === null || seatData === void 0 ? void 0 : seatData.status);
@@ -6139,7 +6179,7 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
     const result = await finalizeStudySession({
         db,
         centerId,
-        studentId: authUid,
+        studentId,
         startMs: resolvedStartTimeMs,
         endMs: nowMs,
         closeSeatRef: (_c = preferredSeatDoc === null || preferredSeatDoc === void 0 ? void 0 : preferredSeatDoc.ref) !== null && _c !== void 0 ? _c : null,

@@ -1288,8 +1288,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
-  const { activeMembership, isTimerActive, setIsTimerActive, startTime, setStartTime, viewMode } = useAppContext();
+  const { activeMembership, activeStudentId, isTimerActive, setIsTimerActive, startTime, setStartTime, viewMode } = useAppContext();
   const rewardTheme = NAVY_REWARD_THEME;
+  const authUid = user?.uid || null;
+  const studentUid = activeStudentId || authUid || null;
+  const studyBoxCacheUid = authUid || studentUid || null;
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
@@ -1374,12 +1377,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [user?.uid]);
 
   const readCarryoverOpenedCache = useCallback((dateKey: string) => {
-    return readStudyBoxOpenedCache(user?.uid, dateKey);
-  }, [user?.uid]);
+    return readStudyBoxOpenedCache(studyBoxCacheUid, dateKey);
+  }, [studyBoxCacheUid]);
 
   const writeCarryoverOpenedCache = useCallback((dateKey: string, values: number[]) => {
-    writeStudyBoxOpenedCache(user?.uid, dateKey, values);
-  }, [user?.uid]);
+    writeStudyBoxOpenedCache(studyBoxCacheUid, dateKey, values);
+  }, [studyBoxCacheUid]);
 
   const hasHandledCarryoverAutoOpen = useCallback((dateKey: string) => {
     if (typeof window === 'undefined') return false;
@@ -1451,9 +1454,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   // 1. 성장 및 통계 데이터 조회
   const progressRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-  }, [firestore, activeMembership?.id, user?.uid]);
+    if (!firestore || !activeMembership || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', studentUid);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: progress, isLoading: isProgressLoading } = useDoc<GrowthProgress>(progressRef, { enabled: isActive });
 
   const userProfileRef = useMemoFirebase(() => {
@@ -1463,9 +1466,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: userProfile } = useDoc<UserType>(userProfileRef, { enabled: isActive });
 
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-  }, [firestore, activeMembership?.id, user?.uid]);
+    if (!firestore || !activeMembership || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isActive });
   const pointBoostEventsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership?.id) return null;
@@ -1517,38 +1520,38 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [isExamDialogOpen]);
 
   const studyLogRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !activeStudyDayKey) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days', activeStudyDayKey);
-  }, [activeStudyDayKey, firestore, activeMembership?.id, user?.uid]);
+    if (!firestore || !activeMembership || !studentUid || !activeStudyDayKey) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'studyLogs', studentUid, 'days', activeStudyDayKey);
+  }, [activeStudyDayKey, firestore, activeMembership?.id, studentUid]);
   const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
   const recentLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !studentUid) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days'),
+      collection(firestore, 'centers', activeMembership.id, 'studyLogs', studentUid, 'days'),
       orderBy('dateKey', 'desc'),
       limit(30)
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: recentLogs } = useCollection<StudyLogDay>(recentLogsQuery, { enabled: isActive });
 
   // 2. 계획 데이터 조회 (어제, 오늘, 내일)
   const targetDays = useMemo(() => [yesterdayKey, todayKey, tomorrowKey], [yesterdayKey, todayKey, tomorrowKey]);
   const allPlansRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !weekKey) return null;
+    if (!firestore || !activeMembership || !studentUid || !weekKey) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
+      collection(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items'),
       where('dateKey', 'in', targetDays)
     );
-  }, [firestore, activeMembership?.id, user?.uid, weekKey, targetDays]);
+  }, [firestore, activeMembership?.id, studentUid, weekKey, targetDays]);
   const { data: fetchedPlans } = useCollection<StudyPlanItem>(allPlansRef, { enabled: isActive });
 
   const weeklyPlansRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || !weekKey) return null;
+    if (!firestore || !activeMembership || !studentUid || !weekKey) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', weekKey, 'items'),
+      collection(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items'),
     );
-  }, [firestore, activeMembership?.id, user?.uid, weekKey]);
+  }, [firestore, activeMembership?.id, studentUid, weekKey]);
   const { data: weeklyPlans } = useCollection<StudyPlanItem>(weeklyPlansRef, { enabled: isActive });
 
   const logMinutesByDateKey = useMemo(() => {
@@ -1561,12 +1564,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   // 3. 나의 신청 내역 조회
   const myRequestsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !studentUid) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'attendanceRequests'),
-      where('studentId', '==', user.uid)
+      where('studentId', '==', studentUid)
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: myRequestsRaw } = useCollection<AttendanceRequest>(myRequestsQuery, { enabled: isActive });
 
   const myRequests = useMemo(() => {
@@ -1577,12 +1580,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [myRequestsRaw]);
 
   const myPenaltyLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !studentUid) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'penaltyLogs'),
-      where('studentId', '==', user.uid)
+      where('studentId', '==', studentUid)
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: myPenaltyLogsRaw } = useCollection<PenaltyLog>(myPenaltyLogsQuery, { enabled: isActive });
 
   const myPenaltyLogs = useMemo(() => {
@@ -1592,13 +1595,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   // 4. 선생님 리포트 조회 (학생 본인 발송 완료본)
   const reportsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !studentUid) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'dailyReports'),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', studentUid),
       where('status', '==', 'sent')
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: teacherReportsRaw, isLoading: isTeacherReportsLoading } = useCollection<DailyReport>(reportsQuery, { enabled: isActive });
 
   const teacherReports = useMemo(() => {
@@ -1607,15 +1610,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [teacherReportsRaw]);
 
   const wifiRequestsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !studentUid || !authUid) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'parentCommunications'),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', studentUid),
       where('senderRole', '==', 'student'),
-      where('senderUid', '==', user.uid),
+      where('senderUid', '==', authUid),
       limit(20)
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, authUid, studentUid]);
   const { data: wifiRequestsRaw } = useCollection<StudentWifiRequestRecord>(wifiRequestsQuery, { enabled: isActive });
 
   const wifiRequests = useMemo(() => {
@@ -1633,12 +1636,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const latestWifiRequestStatusMeta = getWifiRequestStatusMeta(latestWifiRequest?.status);
 
   const attendanceCurrentQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user?.uid) return null;
+    if (!firestore || !activeMembership || !studentUid) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'attendanceCurrent'),
-      where('studentId', '==', user.uid)
+      where('studentId', '==', studentUid)
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: attendanceCurrent, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isActive });
   const attendanceCurrentByStudent = useMemo(() => {
     const bucket = new Map<string, AttendanceCurrent[]>();
@@ -1891,7 +1894,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const handleStudyStartStop = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !progressRef || !activeStudyDayKey || !periodKey) return;
+    if (!firestore || !user || !activeMembership || !studentUid || !progressRef || !activeStudyDayKey || !periodKey) return;
     if (isProcessingAction) {
       const lockAgeMs = actionLockAtRef.current ? Date.now() - actionLockAtRef.current : 0;
       if (lockAgeMs < 15000) return;
@@ -1915,7 +1918,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       let fallbackSeatIdentity: ReturnType<typeof resolveSeatIdentity> | null = null;
       let fallbackSeatZone: string | null = null;
       try {
-        const studentRef = doc(firestore, 'centers', centerId, 'students', user.uid);
+        const studentRef = doc(firestore, 'centers', centerId, 'students', studentUid);
         const studentSnap = await getDoc(studentRef);
         if (studentSnap.exists()) {
           const studentData = studentSnap.data() as Partial<StudentProfile>;
@@ -1928,7 +1931,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
 
         const attendanceCurrentRef = collection(firestore, 'centers', centerId, 'attendanceCurrent');
-        const seatQuery = query(attendanceCurrentRef, where('studentId', '==', user.uid));
+        const seatQuery = query(attendanceCurrentRef, where('studentId', '==', studentUid));
         const seatSnap = await getDocs(seatQuery);
         seatDoc = !seatSnap.empty ? pickPreferredSeatDoc(seatSnap.docs as any[]) : null;
 
@@ -1996,11 +1999,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           void syncAutoAttendanceRecord({
             firestore,
             centerId,
-            studentId: user.uid,
+            studentId: studentUid,
             studentName: user.displayName || '학생',
             targetDate: new Date(nowTs),
             checkInAt: checkInAtForAttendance,
-            confirmedByUserId: user.uid,
+            confirmedByUserId: authUid || user.uid,
           }).catch((syncError: any) => {
             logHandledClientIssue('[student-track] auto attendance sync skipped', syncError);
           });
@@ -2008,7 +2011,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         if (!stopRequestDeduped) {
           void sendKakaoNotification(firestore, centerId, {
-            studentId: user.uid,
+            studentId: studentUid,
             studentName: user.displayName || '\uD559\uC0DD',
             type: 'exit',
           }).catch((notifyError: any) => {
@@ -2053,7 +2056,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         const startSeatRef = seatDoc?.ref || fallbackSeatRef;
         if (startSeatRef) {
           const startSeatPayload: Record<string, any> = {
-            studentId: user.uid,
+            studentId: studentUid,
             status: 'studying',
             lastCheckInAt: Timestamp.fromMillis(nowTs),
             updatedAt: serverTimestamp(),
@@ -2086,7 +2089,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         if (startCommitError && studyLogRef) {
           try {
             await setDoc(studyLogRef, {
-              studentId: user.uid,
+              studentId: studentUid,
               centerId: activeMembership.id,
               dateKey: activeStudyDayKey,
               updatedAt: serverTimestamp(),
@@ -2115,17 +2118,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         void syncAutoAttendanceRecord({
           firestore,
           centerId,
-          studentId: user.uid,
+          studentId: studentUid,
           studentName: user.displayName || '학생',
           targetDate: new Date(nowTs),
           checkInAt: new Date(nowTs),
-          confirmedByUserId: user.uid,
+          confirmedByUserId: authUid || user.uid,
         }).catch((syncError: any) => {
           logHandledClientIssue('[student-track] auto attendance sync skipped', syncError);
         });
 
         void sendKakaoNotification(firestore, centerId, {
-          studentId: user.uid,
+          studentId: studentUid,
           studentName: user.displayName || '\uD559\uC0DD',
           type: 'entry',
         }).catch((notifyError: any) => {
@@ -2166,6 +2169,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     todayStudyLog,
     activeStudyDayKey,
     periodKey,
+    studentUid,
     studyLogRef,
     setIsTimerActive,
     setStartTime,
@@ -2297,7 +2301,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const defaultTitle = '와이파이 방화벽 해제 요청';
       const trimmedTitle = wifiRequestTitle.trim();
       const requestRef = await addDoc(collection(firestore, 'centers', activeMembership.id, 'parentCommunications'), {
-        studentId: user.uid,
+        studentId: studentUid,
         senderRole: 'student',
         senderUid: user.uid,
         senderName: user.displayName || activeMembership.displayName || '학생',
@@ -2317,7 +2321,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       await addDoc(collection(firestore, 'centers', activeMembership.id, 'supportMessages'), {
         centerId: activeMembership.id,
         communicationId: requestRef.id,
-        studentId: user.uid,
+        studentId: studentUid,
         parentUid: null,
         senderRole: 'student',
         senderUid: user.uid,
@@ -2490,38 +2494,38 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const validWeeklyRankEntries = rankSnapshot.weekly;
   const dailyWaitingTopMinutes = Math.max(0, Number(rankSnapshot.dailyWaitingTopMinutes || 0));
   const dailyStudyRank = useMemo(() => {
-    if (!user || validDailyRankEntries.length === 0) return 0;
-    const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === user.uid);
+    if (!studentUid || validDailyRankEntries.length === 0) return 0;
+    const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === studentUid);
     return ownEntry?.rank || 0;
-  }, [user?.uid, validDailyRankEntries]);
+  }, [studentUid, validDailyRankEntries]);
 
   const dailyStudyRankMinutes = useMemo(() => {
     if (dailyStudyRank > 0) {
-      const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === user?.uid);
+      const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === studentUid);
       return Number(ownEntry?.value || 0);
     }
     return Number(todayStudyLog?.totalMinutes || 0);
-  }, [dailyStudyRank, todayStudyLog?.totalMinutes, user?.uid, validDailyRankEntries]);
+  }, [dailyStudyRank, studentUid, todayStudyLog?.totalMinutes, validDailyRankEntries]);
 
   const weeklyStudyRank = useMemo(() => {
-    if (!user || validWeeklyRankEntries.length === 0) return 0;
-    const ownEntry = validWeeklyRankEntries.find((entry) => entry.studentId === user.uid);
+    if (!studentUid || validWeeklyRankEntries.length === 0) return 0;
+    const ownEntry = validWeeklyRankEntries.find((entry) => entry.studentId === studentUid);
     return ownEntry?.rank || 0;
-  }, [user?.uid, validWeeklyRankEntries]);
+  }, [studentUid, validWeeklyRankEntries]);
 
   const weeklyStudyRankMinutes = useMemo(() => {
     if (weeklyStudyRank > 0) {
-      const ownEntry = validWeeklyRankEntries.find((entry) => entry.studentId === user?.uid);
+      const ownEntry = validWeeklyRankEntries.find((entry) => entry.studentId === studentUid);
       return Number(ownEntry?.value || 0);
     }
     return Number(weeklyStudyMinutes || 0);
-  }, [weeklyStudyMinutes, weeklyStudyRank, user?.uid, validWeeklyRankEntries]);
+  }, [weeklyStudyMinutes, weeklyStudyRank, studentUid, validWeeklyRankEntries]);
 
   const monthlyStudyRank = useMemo(() => {
-    if (!user || validRankEntries.length === 0) return 0;
-    const ownEntry = validRankEntries.find((entry) => entry.studentId === user.uid);
+    if (!studentUid || validRankEntries.length === 0) return 0;
+    const ownEntry = validRankEntries.find((entry) => entry.studentId === studentUid);
     return ownEntry?.rank || 0;
-  }, [user?.uid, validRankEntries]);
+  }, [studentUid, validRankEntries]);
 
   const monthlyStudyPercentile = useMemo(() => {
     if (isRankContextLoading) return null;
@@ -2531,9 +2535,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [isRankContextLoading, monthlyStudyRank, studyRankParticipantCount]);
 
   const monthlyStudyRankMinutes = useMemo(() => {
-    const ownEntry = validRankEntries.find((entry) => entry.studentId === user?.uid);
+    const ownEntry = validRankEntries.find((entry) => entry.studentId === studentUid);
     return Number(ownEntry?.value || 0);
-  }, [user?.uid, validRankEntries]);
+  }, [studentUid, validRankEntries]);
   const selfLiveRankStartedAtMs = isTimerActive && startTime ? startTime : 0;
 
   const homeRankMap = useMemo(() => {
@@ -2556,7 +2560,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 dailyRankWindow,
               })
             : baseMinutes;
-          const isSelfLive = Boolean(allowLiveTrack && studentId && studentId === user?.uid && selfLiveRankStartedAtMs > 0);
+          const isSelfLive = Boolean(allowLiveTrack && studentId && studentId === studentUid && selfLiveRankStartedAtMs > 0);
           const isServerLive = Boolean(
             allowLiveTrack
             && studentId
@@ -2583,25 +2587,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     };
 
     const mappedDailyEntries = buildRankPreviewEntries(validDailyRankEntries, 'daily', dailyRankWindow.isLive);
-    const hasDailySelfEntry = Boolean(user?.uid && mappedDailyEntries.some((entry) => entry.studentId === user.uid));
-    const dailySelfFallbackMinutes = user?.uid
+    const hasDailySelfEntry = Boolean(studentUid && mappedDailyEntries.some((entry) => entry.studentId === studentUid));
+    const dailySelfFallbackMinutes = studentUid
       ? getLiveAdjustedStudentRankValue({
           entry: {
-            studentId: user.uid,
+            studentId: studentUid,
             value: dailyStudyRankMinutes,
             liveStatus: null,
             liveStartedAtMs: null,
           },
           range: 'daily',
           nowMs: rankPreviewNowMs,
-          viewerId: user.uid,
+          viewerId: studentUid,
           selfLiveStartedAtMs: selfLiveRankStartedAtMs,
           dailyRankWindow,
         })
       : 0;
     const shouldAddDailySelfFallback = Boolean(
       dailyRankWindow.isLive &&
-      user?.uid &&
+      studentUid &&
       !hasDailySelfEntry &&
       dailySelfFallbackMinutes > 0
     );
@@ -2614,7 +2618,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       ...(shouldAddDailySelfFallback
         ? [{
             rank: 0,
-            studentId: user?.uid || null,
+            studentId: studentUid,
             name: user?.displayName || activeMembership?.displayName || '학생',
             schoolName: studentProfile?.schoolName || null,
             minutes: dailySelfFallbackMinutes,
@@ -2626,8 +2630,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           } satisfies StudentHomeRankPreviewEntry & { value: number; displayNameSnapshot: string }]
         : []),
     ]).map(({ value, displayNameSnapshot, ...entry }) => entry);
-    const dailySelfEntry = user?.uid
-      ? rankedDailyEntries.find((entry) => entry.studentId === user.uid) || null
+    const dailySelfEntry = studentUid
+      ? rankedDailyEntries.find((entry) => entry.studentId === studentUid) || null
       : null;
     const effectiveDailyRank = dailySelfEntry?.rank || dailyStudyRank;
     const effectiveDailyMinutes = Math.max(
@@ -2643,11 +2647,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const monthlyEntries = buildRankPreviewEntries(validRankEntries, 'monthly');
     const weeklyTop = weeklyEntries.slice(0, 3);
     const monthlyTop = monthlyEntries.slice(0, 3);
-    const weeklySelfEntry = user?.uid
-      ? weeklyEntries.find((entry) => entry.studentId === user.uid) ?? null
+    const weeklySelfEntry = studentUid
+      ? weeklyEntries.find((entry) => entry.studentId === studentUid) ?? null
       : null;
-    const monthlySelfEntry = user?.uid
-      ? monthlyEntries.find((entry) => entry.studentId === user.uid) ?? null
+    const monthlySelfEntry = studentUid
+      ? monthlyEntries.find((entry) => entry.studentId === studentUid) ?? null
       : null;
     const effectiveWeeklyRank = weeklySelfEntry?.rank || weeklyStudyRank;
     const effectiveWeeklyMinutes = Math.max(0, Number(weeklySelfEntry?.minutes ?? weeklyStudyRankMinutes ?? 0));
@@ -2864,12 +2868,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [persistedRewardEntries]);
 
   useEffect(() => {
-    const cachedOpenedBoxes = readStudyBoxOpenedCache(user?.uid, activeStudyDayKey);
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey);
     const nextOpenedBoxes = normalizeStudyBoxHours([...persistedOpenedBoxes, ...cachedOpenedBoxes]);
 
     setHomeOpenedBoxes(nextOpenedBoxes);
-    writeStudyBoxOpenedCache(user?.uid, activeStudyDayKey, nextOpenedBoxes);
-  }, [activeStudyDayKey, persistedOpenedBoxes, user?.uid]);
+    writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
+  }, [activeStudyDayKey, persistedOpenedBoxes, studyBoxCacheUid]);
 
   const resolvedCarryoverOpenedBoxes = useMemo(() => {
     const snapshotHours = carryoverOpenedSnapshot.dateKey === previousStudyDayKey
@@ -2947,10 +2951,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         openedHours: renderableTodayStudyBoxState.openedHours,
         rewardByHour,
         centerId: activeMembership?.id,
-        studentId: user?.uid,
+        studentId: studentUid,
         dateKey: activeStudyDayKey,
       }),
-    [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, user?.uid]
+    [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, studentUid]
   );
   const readyBoxes = homeRewardBoxes.filter((box) => box.state === 'ready');
   const carryoverRewardBoxes = useMemo(
@@ -2960,10 +2964,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return remainingCarryoverClaimedBoxes.map((hour) => {
         let reward = carryoverRewardByHour.get(hour) ?? null;
 
-        if (!reward && activeMembership?.id && user?.uid && previousStudyDayKey) {
+        if (!reward && activeMembership?.id && studentUid && previousStudyDayKey) {
           reward = buildDeterministicStudyBoxReward({
             centerId: activeMembership.id,
-            studentId: user.uid,
+            studentId: studentUid,
             dateKey: previousStudyDayKey,
             milestone: hour,
           });
@@ -2984,7 +2988,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       carryoverRewardByHour,
       remainingCarryoverClaimedBoxes,
       previousStudyDayKey,
-      user?.uid,
+      studentUid,
     ]
   );
   const carryoverReadyBoxes = useMemo(
@@ -3071,7 +3075,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [studyTimeTrend]);
 
   useEffect(() => {
-    if (!isActive || !isTimerActive || !progressRef || !activeStudyDayKey || !activeMembership?.id || !user?.uid) return;
+    if (!isActive || !isTimerActive || !progressRef || !activeStudyDayKey || !activeMembership?.id || !studentUid) return;
     if ((studyBoxClaimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY) !== hydratedStudyBoxClaimCacheKey) return;
 
     const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, syncedClaimedBoxes, syncedOpenedBoxes);
@@ -3082,7 +3086,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     homeLiveClaimKeyRef.current = claimKey;
 
     const membershipId = activeMembership.id;
-    const userId = user.uid;
+    const userId = studentUid;
     const rewards = availableMilestones.map((milestone) =>
       buildDeterministicStudyBoxReward({
         centerId: membershipId,
@@ -3151,7 +3155,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     todayPointStatus,
     toast,
     activeMembership?.id,
-    user?.uid,
+    studentUid,
   ]);
 
   const homeQuestList = useMemo(() => {
@@ -3168,7 +3172,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [todayStudyTasks]);
 
   const handleHomeQuestToggle = useCallback(async (taskId: string) => {
-    if (!firestore || !activeMembership || !user || !weekKey || !progressRef) return;
+    if (!firestore || !activeMembership || !user || !studentUid || !weekKey || !progressRef) return;
     if (pendingQuestIdsRef.current.has(taskId)) return;
     const targetTask = todayStudyTasks.find((task) => task.id === taskId);
     if (!targetTask) return;
@@ -3179,7 +3183,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       'centers',
       activeMembership.id,
       'plans',
-      user.uid,
+      studentUid,
       'weeks',
       weekKey,
       'items',
@@ -3267,6 +3271,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     firestore,
     progress?.dailyPointStatus,
     progressRef,
+    studentUid,
     todayKey,
     todayStudyTasks,
     todayTaskCount,
@@ -3306,7 +3311,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const handleRevealHomeBox = useCallback(async () => {
     const isRevealableBox = selectedHomeBox?.state === 'ready';
-    if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !activeVaultDateKey || !activeMembership?.id || !user?.uid) return;
+    if (!selectedHomeBox || !isRevealableBox || isClaimingHomeBox || !activeVaultDateKey || !activeMembership?.id || !studentUid) return;
     const targetHour = selectedHomeBox.hour;
     const targetDateKey = activeVaultDateKey;
     const currentDayStatus = targetDateKey === previousStudyDayKey
@@ -3324,12 +3329,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         };
     const rewardOpenPromise = openStudyRewardBoxSecure({
       centerId: activeMembership.id,
-      studentId: user.uid,
+      studentId: studentUid,
       dateKey: targetDateKey,
       hour: targetHour,
       reward: activeRewardByHour.get(targetHour) || buildDeterministicStudyBoxReward({
         centerId: activeMembership.id,
-        studentId: user.uid,
+        studentId: studentUid,
         dateKey: targetDateKey,
         milestone: targetHour,
       }),
@@ -3370,7 +3375,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         if (targetDateKey === activeStudyDayKey) {
           setHomeOpenedBoxes(nextOpenedBoxes);
           setHomeClaimedBoxes(nextClaimedBoxes);
-          writeStudyBoxOpenedCache(user.uid, activeStudyDayKey, nextOpenedBoxes);
+          writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
           if (nextRewardEntry) {
             setHomeRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
           }
@@ -3429,6 +3434,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     syncedClaimedBoxes,
     syncedOpenedBoxes,
     syncedRewardEntries,
+    studentUid,
     toast,
     activeStudyDayKey,
     todayPointStatus,

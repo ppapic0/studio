@@ -174,7 +174,7 @@ export function AppointmentsPageContent({
 }: AppointmentsPageContentProps) {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode, currentTier } = useAppContext();
+  const { activeMembership, activeStudentId, viewMode, currentTier } = useAppContext();
   const { toast } = useToast();
 
   const isMobile = viewMode === 'mobile';
@@ -230,7 +230,7 @@ export function AppointmentsPageContent({
   // 종속성 안정화
   const centerId = activeMembership?.id;
   const userRole = activeMembership?.role;
-  const studentUid = user?.uid;
+  const studentUid = activeStudentId || user?.uid || null;
   const linkedStudentIds = useMemo(() => activeMembership?.linkedStudentIds || [], [activeMembership?.linkedStudentIds]);
   const linkedIdsKey = JSON.stringify(linkedStudentIds);
 
@@ -589,7 +589,7 @@ export function AppointmentsPageContent({
       const teacher = filteredTeachers?.find(t => t.id === selectedTeacherId);
 
       await addDoc(collection(firestore, 'centers', centerId, 'counselingReservations'), {
-        studentId: user.uid,
+        studentId: studentUid,
         studentName: user.displayName || '학생',
         centerId: centerId,
         teacherId: selectedTeacherId,
@@ -708,7 +708,7 @@ export function AppointmentsPageContent({
       const supportKind = getStudentSupportKind(inquiryType);
       const inquiryContent = inquiryBody.trim();
       const communicationRef = await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
-        studentId: user.uid,
+        studentId: studentUid,
         senderRole: 'student',
         senderUid: user.uid,
         senderName: user.displayName || '학생',
@@ -733,7 +733,7 @@ export function AppointmentsPageContent({
         await addDoc(collection(firestore, 'centers', centerId, 'supportMessages'), {
           centerId,
           communicationId: communicationRef.id,
-          studentId: user.uid,
+          studentId: studentUid,
           parentUid: null,
           senderRole: 'student',
           senderUid: user.uid,
@@ -746,7 +746,7 @@ export function AppointmentsPageContent({
         });
         setSelectedSupportThread({
           id: communicationRef.id,
-          studentId: user.uid,
+          studentId: studentUid || user.uid,
           senderRole: 'student',
           senderUid: user.uid,
           senderName: user.displayName || '학생',

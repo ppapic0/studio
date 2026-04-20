@@ -73,17 +73,18 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
   const firestore = useFirestore();
   const functions = useFunctions();
   const { user } = useUser();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
+  const studentUid = activeStudentId || user?.uid || null;
   const autoRequested = searchParams.get('auto') === '1';
   const autoTriggeredRef = useRef(false);
 
   const centerStudentRef = useMemoFirebase(
     () =>
-      firestore && user && activeMembership?.id
-        ? doc(firestore, 'centers', activeMembership.id, 'students', user.uid)
+      firestore && studentUid && activeMembership?.id
+        ? doc(firestore, 'centers', activeMembership.id, 'students', studentUid)
         : null,
-    [activeMembership?.id, firestore, user?.uid]
+    [activeMembership?.id, firestore, studentUid]
   );
   const { data: studentProfile } = useDoc<StudentProfile>(centerStudentRef, {
     enabled: Boolean(centerStudentRef),
@@ -99,10 +100,10 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
   const currentWeekKey = useMemo(() => format(new Date(), "yyyy-'W'II"), []);
   const currentWeekItemsQuery = useMemoFirebase(
     () =>
-      firestore && user && activeMembership?.id
-        ? collection(firestore, 'centers', activeMembership.id, 'plans', user.uid, 'weeks', currentWeekKey, 'items')
+      firestore && studentUid && activeMembership?.id
+        ? collection(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', currentWeekKey, 'items')
         : null,
-    [activeMembership?.id, currentWeekKey, firestore, user?.uid]
+    [activeMembership?.id, currentWeekKey, firestore, studentUid]
   );
   const { data: currentWeekItems } = useCollection<StudyPlanItem>(currentWeekItemsQuery, {
     enabled: Boolean(currentWeekItemsQuery),
@@ -249,7 +250,7 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
     const writeResults = await Promise.allSettled([
       userProfileRef ? setDoc(userProfileRef, diagnosticMirrorPayload, { merge: true }) : Promise.resolve(),
       activeMembership?.id
-        ? setDoc(doc(firestore, 'centers', activeMembership.id, 'students', user.uid), diagnosticMirrorPayload, { merge: true })
+        ? setDoc(doc(firestore, 'centers', activeMembership.id, 'students', studentUid || user.uid), diagnosticMirrorPayload, { merge: true })
         : Promise.resolve(),
     ]);
 

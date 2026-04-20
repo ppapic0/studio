@@ -165,7 +165,7 @@ export default function DashboardPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const functions = useFunctions();
-  const { activeMembership, membershipsLoading, viewMode } = useAppContext();
+  const { activeMembership, activeStudentId, membershipsLoading, viewMode } = useAppContext();
   const { toast } = useToast();
   const [isInviteSubmitting, setIsInviteSubmitting] = useState(false);
   const [isParentLinkSubmitting, setIsParentLinkSubmitting] = useState(false);
@@ -186,6 +186,7 @@ export default function DashboardPage() {
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const isStudentRole = activeMembership?.role === 'student';
   const isParentRole = activeMembership?.role === 'parent';
+  const studentUid = activeStudentId || user?.uid || null;
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -194,9 +195,9 @@ export default function DashboardPage() {
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserType>(userProfileRef, { enabled: Boolean(user) });
 
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user || activeMembership.role !== 'student') return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-  }, [firestore, activeMembership, user]);
+    if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
+  }, [firestore, activeMembership, studentUid]);
   const { data: studentProfile, isLoading: isStudentProfileLoading } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudentRole });
 
   const inviteForm = useForm<z.infer<typeof inviteFormSchema>>({
@@ -555,7 +556,7 @@ export default function DashboardPage() {
           ? setDoc(
               studentProfileRef,
               {
-                id: user.uid,
+                id: studentUid || user.uid,
                 name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
                 schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
                 grade: studentProfile?.grade || '학년 미정',

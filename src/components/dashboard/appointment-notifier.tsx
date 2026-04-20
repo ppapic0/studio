@@ -21,20 +21,21 @@ import { cn } from '@/lib/utils';
 export function AppointmentNotifier() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
+  const studentUid = activeStudentId || user?.uid || null;
 
   const [notification, setNotification] = useState<any>(null);
   const [isOpen, setIsOpen] = useState(false);
   const isInitialLoad = useRef(true);
 
   useEffect(() => {
-    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student') return;
+    if (!firestore || !user || !activeMembership || activeMembership.role !== 'student' || !studentUid) return;
 
     const centerId = activeMembership.id;
     const q = query(
       collection(firestore, 'centers', centerId, 'counselingReservations'),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', studentUid),
       where('status', 'in', ['confirmed', 'canceled'])
     );
 
@@ -60,7 +61,7 @@ export function AppointmentNotifier() {
     });
 
     return () => unsubscribe();
-  }, [firestore, user?.uid, activeMembership?.id, activeMembership?.role]);
+  }, [firestore, studentUid, user?.uid, activeMembership?.id, activeMembership?.role]);
 
   if (!notification) return null;
 

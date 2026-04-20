@@ -395,9 +395,11 @@ export default function GrowthPage() {
   const { user } = useUser();
   const router = useRouter();
   const { toast } = useToast();
-  const { activeMembership, viewMode, isTimerActive, startTime } = useAppContext();
+  const { activeMembership, activeStudentId, viewMode, isTimerActive, startTime } = useAppContext();
   const firestore = useFirestore();
   const isMobile = viewMode === 'mobile';
+  const studentUid = activeStudentId || user?.uid || null;
+  const studyBoxCacheUid = user?.uid || studentUid || null;
   const [nowMs, setNowMs] = useState(() => Date.now());
   const studyDayContext = useMemo(() => getStudyDayContext(new Date(nowMs)), [nowMs]);
   const activeStudyDayKey = studyDayContext.dateKey;
@@ -429,9 +431,9 @@ export default function GrowthPage() {
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
 
   const progressRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', user.uid);
-  }, [firestore, activeMembership?.id, user?.uid]);
+    if (!firestore || !activeMembership || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', studentUid);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
 
   const userProfileRef = useMemoFirebase(() => {
@@ -441,9 +443,9 @@ export default function GrowthPage() {
   const { data: userProfile } = useDoc<{ phoneNumber?: string }>(userProfileRef, { enabled: Boolean(user) });
 
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', user.uid);
-  }, [firestore, activeMembership?.id, user?.uid]);
+    if (!firestore || !activeMembership || !studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: studentProfile } = useDoc<{ phoneNumber?: string }>(studentProfileRef, {
     enabled: Boolean(activeMembership && user),
   });
@@ -465,13 +467,13 @@ export default function GrowthPage() {
   });
 
   const giftishowOrdersQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !studentUid) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'giftishowOrders'),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', studentUid),
       limit(50)
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: giftishowOrdersRaw } = useCollection<GiftishowOrder>(giftishowOrdersQuery, {
     enabled: Boolean(activeMembership && user),
   });
@@ -485,13 +487,13 @@ export default function GrowthPage() {
   });
 
   const seasonStudyLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !studentUid) return null;
     return query(
-      collection(firestore, 'centers', activeMembership.id, 'studyLogs', user.uid, 'days'),
+      collection(firestore, 'centers', activeMembership.id, 'studyLogs', studentUid, 'days'),
       orderBy('dateKey', 'desc'),
       limit(62)
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, studentUid]);
   const { data: seasonStudyLogs } = useCollection<StudyLogDay>(seasonStudyLogsQuery);
 
   const todayLog = useMemo(() => {
@@ -594,17 +596,17 @@ export default function GrowthPage() {
   }, [persistedRewardEntries]);
 
   useEffect(() => {
-    const cachedOpenedBoxes = readStudyBoxOpenedCache(user?.uid, activeStudyDayKey);
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey);
     const nextOpenedBoxes = normalizeStudyBoxHours([...persistedOpenedBoxes, ...cachedOpenedBoxes]);
 
     setOpenedBoxes(nextOpenedBoxes);
-    writeStudyBoxOpenedCache(user?.uid, activeStudyDayKey, nextOpenedBoxes);
-  }, [activeStudyDayKey, persistedOpenedBoxes, user?.uid]);
+    writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
+  }, [activeStudyDayKey, persistedOpenedBoxes, studyBoxCacheUid]);
 
   useEffect(() => {
-    const cachedOpenedBoxes = readStudyBoxOpenedCache(user?.uid, previousStudyDayKey);
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(studyBoxCacheUid, previousStudyDayKey);
     setCarryoverOpenedBoxes(normalizeStudyBoxHours([...persistedCarryoverOpenedBoxes, ...cachedOpenedBoxes]));
-  }, [persistedCarryoverOpenedBoxes, previousStudyDayKey, user?.uid]);
+  }, [persistedCarryoverOpenedBoxes, previousStudyDayKey, studyBoxCacheUid]);
 
   useEffect(() => {
     setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
@@ -848,10 +850,10 @@ export default function GrowthPage() {
         openedHours: renderableTodayStudyBoxState.openedHours,
         rewardByHour,
         centerId: activeMembership?.id,
-        studentId: user?.uid,
+        studentId: studentUid,
         dateKey: activeStudyDayKey,
       }),
-    [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, user?.uid]
+    [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, studentUid]
   );
   const carryoverReadyHours = useMemo(
     () => {
@@ -873,11 +875,11 @@ export default function GrowthPage() {
         openedHours: carryoverOpenedBoxes,
         rewardByHour: carryoverRewardByHour,
         centerId: activeMembership?.id,
-        studentId: user?.uid,
+        studentId: studentUid,
         dateKey: previousStudyDayKey,
       });
     },
-    [activeMembership?.id, carryoverOpenedBoxes, carryoverRewardByHour, isCarryoverExpired, persistedCarryoverClaimedBoxes, previousStudyDayKey, user?.uid]
+    [activeMembership?.id, carryoverOpenedBoxes, carryoverRewardByHour, isCarryoverExpired, persistedCarryoverClaimedBoxes, previousStudyDayKey, studentUid]
   );
   const activeBoxes = hasCarryoverReadyBoxes ? carryoverBoxes : boxes;
   const readyBoxes = activeBoxes.filter((box) => box.state === 'ready');
@@ -926,7 +928,7 @@ export default function GrowthPage() {
   const isOpeningReward = isClaimingBox && !isRewardRevealed;
 
   useEffect(() => {
-    if (!isTimerActive || !progressRef || !activeMembership?.id || !user?.uid) return;
+    if (!isTimerActive || !progressRef || !activeMembership?.id || !studentUid) return;
     if ((claimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY) !== hydratedClaimCacheKey) return;
 
     const availableMilestones = getAvailableStudyBoxMilestones(liveTodayMinutes, claimedBoxes, openedBoxes);
@@ -939,7 +941,7 @@ export default function GrowthPage() {
     const nextRewards = availableMilestones.map((milestone) =>
       buildDeterministicStudyBoxReward({
         centerId: activeMembership.id,
-        studentId: user.uid,
+        studentId: studentUid,
         dateKey: activeStudyDayKey,
         milestone,
       })
@@ -1014,7 +1016,7 @@ export default function GrowthPage() {
     activeStudyDayKey,
     todayStatus,
     toast,
-    user?.uid,
+    studentUid,
   ]);
 
   const openVault = (hour?: number) => {
@@ -1044,7 +1046,7 @@ export default function GrowthPage() {
   };
 
   const handleRevealBox = async () => {
-    if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !activeMembership?.id || !user?.uid) return;
+    if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !activeMembership?.id || !studentUid) return;
     const targetHour = selectedBox.hour;
     const currentDayStatus = {
       ...activeDayStatus,
@@ -1054,12 +1056,12 @@ export default function GrowthPage() {
     };
     const rewardOpenPromise = openStudyRewardBoxSecure({
       centerId: activeMembership.id,
-      studentId: user.uid,
+      studentId: studentUid,
       dateKey: activeVaultDateKey,
       hour: targetHour,
       reward: activeRewardByHour.get(targetHour) || buildDeterministicStudyBoxReward({
         centerId: activeMembership.id,
-        studentId: user.uid,
+        studentId: studentUid,
         dateKey: activeVaultDateKey,
         milestone: targetHour,
       }),
@@ -1108,13 +1110,13 @@ export default function GrowthPage() {
         if (activeVaultDateKey === activeStudyDayKey) {
           setOpenedBoxes(nextOpenedBoxes);
           setClaimedBoxes(nextClaimedBoxes);
-          writeStudyBoxOpenedCache(user.uid, activeStudyDayKey, nextOpenedBoxes);
+          writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
           if (nextRewardEntry) {
             setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
           }
         } else {
           setCarryoverOpenedBoxes(nextOpenedBoxes);
-          writeStudyBoxOpenedCache(user.uid, activeVaultDateKey, nextOpenedBoxes);
+          writeStudyBoxOpenedCache(studyBoxCacheUid, activeVaultDateKey, nextOpenedBoxes);
         }
         if (typeof result.pointsBalance === 'number') {
           setPointBalance(Math.max(0, result.pointsBalance));

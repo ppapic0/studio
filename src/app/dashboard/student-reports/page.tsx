@@ -37,20 +37,21 @@ import { logHandledClientIssue } from '@/lib/handled-client-log';
 export default function StudentReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeMembership, viewMode } = useAppContext();
+  const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
+  const studentUid = activeStudentId || user?.uid || null;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
 
   const reportsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !user) return null;
+    if (!firestore || !activeMembership || !studentUid) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'dailyReports'),
-      where('studentId', '==', user.uid),
+      where('studentId', '==', studentUid),
       where('status', '==', 'sent'),
     );
-  }, [firestore, activeMembership?.id, user?.uid]);
+  }, [firestore, activeMembership?.id, studentUid]);
 
   const { data: rawReports, isLoading } = useCollection<DailyReport>(reportsQuery);
 
