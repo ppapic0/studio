@@ -15,7 +15,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Activity, AlertTriangle, BellRing, CalendarRange, Loader2, TrendingUp, Users, Wallet } from 'lucide-react';
+import { Activity, AlertTriangle, BellRing, CalendarRange, Download, Loader2, TrendingUp, Users, Wallet } from 'lucide-react';
 import { collection, limit, orderBy, query } from 'firebase/firestore';
 import { eachDayOfInterval, endOfMonth, format, startOfMonth, subMonths } from 'date-fns';
 
@@ -32,13 +32,23 @@ import {
   type MonthlyTrackBucket,
   type TrackMetrics,
 } from '@/lib/invoice-analytics';
-import type { CounselingLog, Invoice, PaymentRecord } from '@/lib/types';
+import {
+  buildBusinessMonthlyCashSummaries,
+  buildCsvContent,
+  buildRecentMonthKeys,
+  buildTaxLedgerDetailRows,
+  downloadCsvFile,
+  getBusinessLedgerMonth,
+  type BusinessTrackFilter,
+} from '@/lib/business-ledger';
+import type { BusinessLedgerEntry, CounselingLog, Invoice, PaymentRecord } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 
 function toNumber(value: unknown): number {
   const num = Number(value);
@@ -156,6 +166,7 @@ function getMonthLabel(month: string) {
 type RevenueAnalysisProps = {
   invoices: Invoice[];
   payments: PaymentRecord[];
+  ledgerEntries: BusinessLedgerEntry[];
   activeStudentCount: number;
   selectedMonth: string;
   onSelectedMonthChange: (month: string) => void;
@@ -169,6 +180,7 @@ type RevenueAnalysisProps = {
 export function RevenueAnalysis({
   invoices,
   payments,
+  ledgerEntries,
   activeStudentCount,
   selectedMonth,
   onSelectedMonthChange,
@@ -180,6 +192,7 @@ export function RevenueAnalysis({
 }: RevenueAnalysisProps) {
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
+  const { toast } = useToast();
 
   const centerId = activeMembership?.id;
   const invoiceById = useMemo(() => new Map(invoices.map((invoice) => [invoice.id, invoice])), [invoices]);
@@ -207,8 +220,9 @@ export function RevenueAnalysis({
   const monthOptions = useMemo(() => {
     const recent = Array.from({ length: 18 }, (_, idx) => format(subMonths(new Date(), idx), 'yyyy-MM'));
     const fromBuckets = monthlyBuckets.map((bucket) => bucket.month);
-    return Array.from(new Set([selectedMonth, ...recent, ...fromBuckets])).sort((a, b) => b.localeCompare(a));
-  }, [monthlyBuckets, selectedMonth]);
+    const fromLedger = ledgerEntries.map((entry) => getBusinessLedgerMonth(entry)).filter(Boolean) as string[];
+    return Array.from(new Set([selectedMonth, ...recent, ...fromBuckets, ...fromLedger])).sort((a, b) => b.localeCompare(a));
+  }, [ledgerEntries, monthlyBuckets, selectedMonth]);
 
   const selectedBucket = useMemo(
     () => monthlyBuckets.find((bucket) => bucket.month === selectedMonth) || emptyBucket(selectedMonth),
@@ -253,6 +267,35 @@ export function RevenueAnalysis({
     [selectedMonthPayments]
   );
 
+  const recentMonthKeys = useMemo(() => buildRecentMonthKeys(selectedMonth, 12), [selectedMonth]);
+  const cashMonthlySummaries = useMemo(
+    () =>
+      buildBusinessMonthlyCashSummaries({
+        invoices,
+        payments,
+        ledgerEntries,
+        trackFilter,
+        months: recentMonthKeys,
+      }),
+    [invoices, ledgerEntries, payments, recentMonthKeys, trackFilter]
+  );
+  const selectedCashSummary = useMemo(
+    () =>
+      cashMonthlySummaries.find((row) => row.month === selectedMonth) || {
+        month: selectedMonth,
+        billed: 0,
+        collected: 0,
+        manualIncome: 0,
+        totalInflow: 0,
+        manualExpense: 0,
+        netCash: 0,
+        arrears: 0,
+        overdueCount: 0,
+        proofPendingCount: 0,
+      },
+    [cashMonthlySummaries, selectedMonth]
+  );
+
   const collectionRate = scopedSummary.billed > 0 ? (selectedMonthCollected / scopedSummary.billed) * 100 : 0;
   const overdueInvoiceCount = selectedMonthInvoices.filter((invoice) => invoice.status === 'overdue').length;
   const actionRequiredInvoiceCount = selectedMonthInvoices.filter(
@@ -276,6 +319,16 @@ export function RevenueAnalysis({
       };
     });
   }, [monthlyBuckets, trackFilter]);
+  const cashFlowChartData = useMemo(
+    () =>
+      cashMonthlySummaries.map((row) => ({
+        month: getMonthLabel(row.month),
+        totalInflow: row.totalInflow,
+        manualExpense: row.manualExpense,
+        netCash: row.netCash,
+      })),
+    [cashMonthlySummaries]
+  );
 
   const selectedMonthSmsLogs = useMemo(
     () => (smsDeliveryLogs || []).filter((log) => toMonthKey(log.sentAt || log.createdAt) === selectedMonth),
@@ -333,6 +386,83 @@ export function RevenueAnalysis({
   }, [selectedMonth, selectedMonthCounselings, selectedMonthLeads, selectedMonthSmsLogs]);
 
   const monthScopeLabel = trackFilter === 'all' ? '센터 전체' : INVOICE_TRACK_META[trackFilter].label;
+  const exportScopeLabel = trackFilter === 'all' ? '전체' : INVOICE_TRACK_META[trackFilter].label;
+
+  const handleExportDetailedCsv = () => {
+    const rows = buildTaxLedgerDetailRows({
+      selectedMonth,
+      trackFilter: trackFilter as BusinessTrackFilter,
+      invoices,
+      payments,
+      ledgerEntries,
+    });
+    if (rows.length === 0) {
+      toast({ title: '내보낼 상세 거래가 없습니다.' });
+      return;
+    }
+
+    const headers = ['기준월', '거래일', '구분', '소스', '트랙', '분류', '항목명', '학생명', '거래처', '결제수단', '증빙상태', '입금액', '출금액', '메모', '원본ID'];
+    const csvContent = buildCsvContent(
+      headers,
+      rows.map((row) => [
+        row.month,
+        row.entryDate,
+        row.directionLabel,
+        row.sourceLabel,
+        row.trackLabel,
+        row.categoryLabel,
+        row.description,
+        row.studentName,
+        row.counterparty,
+        row.paymentMethodLabel,
+        row.proofStatusLabel,
+        row.creditAmount || '',
+        row.debitAmount || '',
+        row.memo,
+        row.originId,
+      ])
+    );
+
+    downloadCsvFile(`세무원장_${selectedMonth}_${exportScopeLabel}.csv`, csvContent);
+    toast({ title: '세무 원장 CSV를 다운로드했습니다.' });
+  };
+
+  const handleExportSummaryCsv = () => {
+    const hasData = cashMonthlySummaries.some(
+      (row) =>
+        row.billed > 0
+        || row.collected > 0
+        || row.manualIncome > 0
+        || row.manualExpense > 0
+        || row.arrears > 0
+        || row.proofPendingCount > 0
+    );
+    if (!hasData) {
+      toast({ title: '내보낼 월별 요약이 없습니다.' });
+      return;
+    }
+
+    const headers = ['월', '트랙범위', '청구금액', '실수납금액', '수기수입금액', '총유입금액', '수기지출금액', '순현금', '미납금액', '연체건수', '증빙대기건수'];
+    const rows = [...cashMonthlySummaries]
+      .sort((left, right) => right.month.localeCompare(left.month))
+      .map((row) => [
+        row.month,
+        exportScopeLabel,
+        row.billed,
+        row.collected,
+        row.manualIncome,
+        row.totalInflow,
+        row.manualExpense,
+        row.netCash,
+        row.arrears,
+        row.overdueCount,
+        row.proofPendingCount,
+      ]);
+    const csvContent = buildCsvContent(headers, rows);
+
+    downloadCsvFile(`세무요약_최근12개월_${exportScopeLabel}.csv`, csvContent);
+    toast({ title: '세무 요약 CSV를 다운로드했습니다.' });
+  };
 
   if (!centerId && invoices.length === 0) {
     return (
@@ -362,14 +492,34 @@ export function RevenueAnalysis({
               </div>
             </div>
 
-            <div className={cn('grid gap-2', isMobile ? 'w-full' : 'min-w-[200px]')}>
+            <div className={cn('grid gap-2', isMobile ? 'w-full' : 'min-w-[280px]')}>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8091bb]">기준 월</p>
-              <Input
-                type="month"
-                value={selectedMonth}
-                onChange={(event) => onSelectedMonthChange(event.target.value || format(new Date(), 'yyyy-MM'))}
-                className="h-11 rounded-xl border-[#d7e4ff] bg-white font-black text-[#14295F]"
-              />
+              <div className={cn('grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-[1fr_auto_auto]')}>
+                <Input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(event) => onSelectedMonthChange(event.target.value || format(new Date(), 'yyyy-MM'))}
+                  className="h-11 rounded-xl border-[#d7e4ff] bg-white font-black text-[#14295F]"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleExportDetailedCsv}
+                  className="h-11 rounded-xl border-[#dbe7ff] bg-white px-4 font-black text-[#14295F] hover:bg-[#f4f7ff]"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  상세 원장 CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleExportSummaryCsv}
+                  className="h-11 rounded-xl border-[#dbe7ff] bg-white px-4 font-black text-[#14295F] hover:bg-[#f4f7ff]"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  월별 요약 CSV
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -500,6 +650,82 @@ export function RevenueAnalysis({
                 <p className="mt-1 text-[11px] font-semibold text-[#8091bb]">액션 필요 {actionRequiredInvoiceCount}건</p>
               </CardContent>
             </Card>
+          </section>
+
+          <section className="space-y-3 rounded-[1.75rem] border border-[#dbe7ff] bg-white/85 p-4 shadow-[0_20px_46px_-36px_rgba(20,41,95,0.22)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-[#14295F]">현금 장부 요약</p>
+                <p className="text-[11px] font-semibold text-[#8091bb]">실수납과 수기 수입·지출을 합친 월별 운영 현금 흐름입니다.</p>
+              </div>
+              <Badge className="rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
+                {monthScopeLabel}
+              </Badge>
+            </div>
+
+            <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'md:grid-cols-4')}>
+              <Card className="rounded-[1.4rem] border border-emerald-100 bg-emerald-50/60 shadow-none">
+                <CardContent className="p-5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">총 유입</p>
+                  <p className="dashboard-number mt-2 text-2xl text-emerald-700">{formatWon(selectedCashSummary.totalInflow)}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-emerald-700/75">실수납 + 수기 수입</p>
+                </CardContent>
+              </Card>
+              <Card className="rounded-[1.4rem] border border-rose-100 bg-rose-50/60 shadow-none">
+                <CardContent className="p-5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-rose-600">총 지출</p>
+                  <p className="dashboard-number mt-2 text-2xl text-rose-600">{formatWon(selectedCashSummary.manualExpense)}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-rose-600/75">수기 지출 기준</p>
+                </CardContent>
+              </Card>
+              <Card className="rounded-[1.4rem] border border-[#dbe7ff] bg-white shadow-none">
+                <CardContent className="p-5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">순현금</p>
+                  <p className={cn('dashboard-number mt-2 text-2xl', selectedCashSummary.netCash >= 0 ? 'text-[#14295F]' : 'text-rose-600')}>
+                    {formatWon(selectedCashSummary.netCash)}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-[#8091bb]">총 유입 - 총 지출</p>
+                </CardContent>
+              </Card>
+              <Card className="rounded-[1.4rem] border border-amber-100 bg-amber-50/70 shadow-none">
+                <CardContent className="p-5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">증빙 대기</p>
+                  <p className="dashboard-number mt-2 text-2xl text-amber-700">{selectedCashSummary.proofPendingCount}건</p>
+                  <p className="mt-1 text-[11px] font-semibold text-amber-700/75">선택 월 지출 기준</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-[#e7eefc] bg-[#fbfdff] p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-[#14295F]">월별 현금 흐름</p>
+                  <p className="text-[11px] font-semibold text-[#8091bb]">최근 12개월 유입, 지출, 순현금 추이</p>
+                </div>
+                <Badge className="rounded-full border border-[#dbe7ff] bg-white px-3 py-1 text-[10px] font-black text-[#14295F]">
+                  총 유입 / 총 지출 / 순현금
+                </Badge>
+              </div>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={cashFlowChartData}>
+                    <CartesianGrid stroke="#e7eefc" strokeDasharray="3 3" />
+                    <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `${Math.round(toNumber(value) / 10000)}만`}
+                    />
+                    <Tooltip formatter={(value: number) => formatWon(value)} />
+                    <Legend />
+                    <Line type="monotone" dataKey="totalInflow" name="총 유입" stroke="#059669" strokeWidth={2.5} dot={false} />
+                    <Bar dataKey="manualExpense" name="총 지출" fill="#FCA5A5" radius={[8, 8, 0, 0]} />
+                    <Line type="monotone" dataKey="netCash" name="순현금" stroke="#2554D7" strokeWidth={2.5} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </section>
         </CardContent>
       </Card>

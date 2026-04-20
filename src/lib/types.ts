@@ -138,6 +138,54 @@ export interface PaymentRecord {
   processedAt: Timestamp;
 }
 
+export type BusinessLedgerDirection = 'income' | 'expense';
+export type BusinessLedgerTrackScope = 'center' | 'studyRoom' | 'academy';
+export type BusinessLedgerPaymentMethod = 'card' | 'transfer' | 'cash' | 'auto_debit' | 'other';
+export type BusinessLedgerProofStatus =
+  | 'not_needed'
+  | 'pending'
+  | 'card_receipt'
+  | 'cash_receipt'
+  | 'tax_invoice'
+  | 'simple_receipt';
+export type BusinessLedgerCategory =
+  | 'other_tuition_income'
+  | 'material_income'
+  | 'subsidy_income'
+  | 'refund_recovery'
+  | 'other_income'
+  | 'rent'
+  | 'payroll'
+  | 'utilities'
+  | 'marketing'
+  | 'sms'
+  | 'supplies'
+  | 'snacks'
+  | 'refund_expense'
+  | 'payment_fee'
+  | 'tax'
+  | 'other_expense';
+
+export interface BusinessLedgerEntry {
+  id: string;
+  centerId: string;
+  entryDate: Timestamp;
+  monthKey: string;
+  direction: BusinessLedgerDirection;
+  trackScope: BusinessLedgerTrackScope;
+  category: BusinessLedgerCategory;
+  description: string;
+  counterparty?: string | null;
+  amount: number;
+  paymentMethod: BusinessLedgerPaymentMethod;
+  proofStatus: BusinessLedgerProofStatus;
+  memo?: string | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  createdByUid: string;
+  updatedByUid: string;
+}
+
 export interface KpiDaily {
   date: string; // YYYY-MM-DD
   totalRevenue: number; 

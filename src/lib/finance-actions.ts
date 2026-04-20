@@ -11,13 +11,37 @@ import {
   Timestamp, 
   Firestore,
   updateDoc,
-  writeBatch
+  writeBatch,
+  deleteDoc,
 } from 'firebase/firestore';
 import { addDays, format, startOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
-import { BillingProfile, Invoice, KpiDaily, StudentProfile } from './types';
+import {
+  BillingProfile,
+  BusinessLedgerCategory,
+  BusinessLedgerDirection,
+  BusinessLedgerPaymentMethod,
+  BusinessLedgerProofStatus,
+  BusinessLedgerTrackScope,
+  Invoice,
+  KpiDaily,
+  StudentProfile,
+} from './types';
 import type { InvoiceTrackCategory } from './invoice-analytics';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+
+export type BusinessLedgerEntryInput = {
+  entryDate: Date;
+  direction: BusinessLedgerDirection;
+  trackScope: BusinessLedgerTrackScope;
+  category: BusinessLedgerCategory;
+  description: string;
+  counterparty?: string | null;
+  amount: number;
+  paymentMethod: BusinessLedgerPaymentMethod;
+  proofStatus: BusinessLedgerProofStatus;
+  memo?: string | null;
+};
 
 /**
  * 수납 상태 수동 업데이트 (고도화)
@@ -191,6 +215,75 @@ export async function issueInvoice(
   await setDoc(invoiceRef, invoiceData);
   
   return { ok: true, invoiceId: invoiceRef.id };
+}
+
+export async function createBusinessLedgerEntry(
+  db: Firestore,
+  centerId: string,
+  actorUid: string,
+  input: BusinessLedgerEntryInput
+) {
+  const entryRef = doc(collection(db, `centers/${centerId}/businessLedgerEntries`));
+  const now = serverTimestamp();
+  const entryDate = startOfDay(input.entryDate);
+
+  await setDoc(entryRef, {
+    centerId,
+    entryDate: Timestamp.fromDate(entryDate),
+    monthKey: format(entryDate, 'yyyy-MM'),
+    direction: input.direction,
+    trackScope: input.trackScope,
+    category: input.category,
+    description: input.description,
+    counterparty: input.counterparty || null,
+    amount: Math.max(0, Math.round(Number(input.amount) || 0)),
+    paymentMethod: input.paymentMethod,
+    proofStatus: input.proofStatus,
+    memo: input.memo || null,
+    createdAt: now,
+    updatedAt: now,
+    createdByUid: actorUid,
+    updatedByUid: actorUid,
+  });
+
+  return { ok: true, entryId: entryRef.id };
+}
+
+export async function updateBusinessLedgerEntry(
+  db: Firestore,
+  centerId: string,
+  entryId: string,
+  actorUid: string,
+  input: BusinessLedgerEntryInput
+) {
+  const entryDate = startOfDay(input.entryDate);
+
+  await updateDoc(doc(db, 'centers', centerId, 'businessLedgerEntries', entryId), {
+    entryDate: Timestamp.fromDate(entryDate),
+    monthKey: format(entryDate, 'yyyy-MM'),
+    direction: input.direction,
+    trackScope: input.trackScope,
+    category: input.category,
+    description: input.description,
+    counterparty: input.counterparty || null,
+    amount: Math.max(0, Math.round(Number(input.amount) || 0)),
+    paymentMethod: input.paymentMethod,
+    proofStatus: input.proofStatus,
+    memo: input.memo || null,
+    updatedAt: serverTimestamp(),
+    updatedByUid: actorUid,
+  });
+
+  return { ok: true };
+}
+
+export async function deleteBusinessLedgerEntry(
+  db: Firestore,
+  centerId: string,
+  entryId: string
+) {
+  await deleteDoc(doc(db, 'centers', centerId, 'businessLedgerEntries', entryId));
+  return { ok: true };
 }
 
 /**

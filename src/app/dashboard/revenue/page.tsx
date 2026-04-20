@@ -6,7 +6,31 @@ import { useAppContext } from '@/contexts/app-context';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { collection, query, where, doc, getDocs, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { Invoice, AttendanceCurrent, CenterMembership, PaymentRecord } from '@/lib/types';
+import {
+  AttendanceCurrent,
+  BusinessLedgerCategory,
+  BusinessLedgerDirection,
+  BusinessLedgerEntry,
+  BusinessLedgerPaymentMethod,
+  BusinessLedgerProofStatus,
+  BusinessLedgerTrackScope,
+  CenterMembership,
+  Invoice,
+  PaymentRecord,
+} from '@/lib/types';
+import {
+  BUSINESS_LEDGER_CATEGORY_META,
+  BUSINESS_LEDGER_CATEGORY_OPTIONS,
+  BUSINESS_LEDGER_DIRECTION_META,
+  BUSINESS_LEDGER_PAYMENT_METHOD_META,
+  BUSINESS_LEDGER_PROOF_STATUS_META,
+  BUSINESS_LEDGER_TRACK_SCOPE_META,
+  formatBusinessLedgerCategoryLabel,
+  formatBusinessLedgerPaymentMethodLabel,
+  formatBusinessLedgerProofStatusLabel,
+  getBusinessLedgerMonth,
+  matchesBusinessLedgerTrackFilter,
+} from '@/lib/business-ledger';
 import { getPaymentMonth, INVOICE_TRACK_META, resolveInvoiceTrackCategory, type InvoiceTrackCategory } from '@/lib/invoice-analytics';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   DollarSign, 
@@ -50,7 +75,11 @@ import {
   History,
   AlertTriangle,
   CalendarX,
-  Search
+  Search,
+  PencilLine,
+  Trash2,
+  NotebookPen,
+  Landmark
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -89,7 +118,14 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, addDays, 
 import { cn } from '@/lib/utils';
 import { RevenueAnalysis } from '@/components/dashboard/revenue-analysis';
 import { useToast } from '@/hooks/use-toast';
-import { resetInvoiceCollectionState, updateInvoiceStatus, issueInvoice } from '@/lib/finance-actions';
+import {
+  createBusinessLedgerEntry,
+  deleteBusinessLedgerEntry,
+  issueInvoice,
+  resetInvoiceCollectionState,
+  updateBusinessLedgerEntry,
+  updateInvoiceStatus,
+} from '@/lib/finance-actions';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { autoCheckPaymentReminders } from '@/lib/kakao-service';
@@ -149,6 +185,49 @@ function getTimelineInvoiceMonth(invoice: Invoice): string | null {
   return format(monthBaseDate, 'yyyy-MM');
 }
 
+type LedgerDraft = {
+  entryDate: string;
+  direction: BusinessLedgerDirection;
+  trackScope: BusinessLedgerTrackScope;
+  category: BusinessLedgerCategory;
+  description: string;
+  counterparty: string;
+  amount: string;
+  paymentMethod: BusinessLedgerPaymentMethod;
+  proofStatus: BusinessLedgerProofStatus;
+  memo: string;
+};
+
+function getDefaultLedgerEntryDate(selectedMonth: string) {
+  const today = new Date();
+  const currentMonth = format(today, 'yyyy-MM');
+  if (selectedMonth === currentMonth) {
+    return format(today, 'yyyy-MM-dd');
+  }
+  return `${selectedMonth}-01`;
+}
+
+function createDefaultLedgerDraft(selectedMonth: string): LedgerDraft {
+  return {
+    entryDate: getDefaultLedgerEntryDate(selectedMonth),
+    direction: 'expense',
+    trackScope: 'center',
+    category: 'other_expense',
+    description: '',
+    counterparty: '',
+    amount: '',
+    paymentMethod: 'transfer',
+    proofStatus: 'pending',
+    memo: '',
+  };
+}
+
+function parseLedgerDate(value: string) {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export default function RevenuePage() {
   const { user } = useUser();
   const { activeMembership, viewMode, membershipsLoading } = useAppContext();
@@ -171,6 +250,8 @@ export default function RevenuePage() {
   const [timelineMonth, setTimelineMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [timelineTrackFilter, setTimelineTrackFilter] = useState<'all' | InvoiceTrackCategory>('all');
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [ledgerDraft, setLedgerDraft] = useState<LedgerDraft>(() => createDefaultLedgerDraft(format(new Date(), 'yyyy-MM')));
+  const [editingLedgerEntryId, setEditingLedgerEntryId] = useState<string | null>(null);
 
   // 1. 인보이스 전체 조회
   const invoicesQuery = useMemoFirebase(() => {
@@ -191,6 +272,15 @@ export default function RevenuePage() {
     );
   }, [firestore, centerId, isFinanceViewer]);
   const { data: paymentRecords } = useCollection<PaymentRecord>(paymentsQuery, { enabled: isFinanceViewer });
+
+  const ledgerEntriesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isFinanceViewer) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'businessLedgerEntries'),
+      orderBy('entryDate', 'desc')
+    );
+  }, [firestore, centerId, isFinanceViewer]);
+  const { data: businessLedgerEntries } = useCollection<BusinessLedgerEntry>(ledgerEntriesQuery, { enabled: isFinanceViewer });
 
   // 3. 현재 좌석/출결 상태 조회
   const attendanceQuery = useMemoFirebase(() => {
@@ -362,6 +452,31 @@ export default function RevenuePage() {
     () => revenueFocusedMonthPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0),
     [revenueFocusedMonthPayments]
   );
+  const selectedMonthLedgerEntries = useMemo(() => {
+    return (businessLedgerEntries || []).filter((entry) => getBusinessLedgerMonth(entry) === timelineMonth);
+  }, [businessLedgerEntries, timelineMonth]);
+  const scopedLedgerEntries = useMemo(() => {
+    return selectedMonthLedgerEntries.filter((entry) => matchesBusinessLedgerTrackFilter(entry.trackScope, timelineTrackFilter));
+  }, [selectedMonthLedgerEntries, timelineTrackFilter]);
+  const ledgerSummary = useMemo(
+    () =>
+      scopedLedgerEntries.reduce(
+        (acc, entry) => {
+          const amount = Math.max(0, Number(entry.amount) || 0);
+          if (entry.direction === 'income') {
+            acc.income += amount;
+          } else {
+            acc.expense += amount;
+            if (entry.proofStatus === 'pending') {
+              acc.proofPendingCount += 1;
+            }
+          }
+          return acc;
+        },
+        { income: 0, expense: 0, proofPendingCount: 0 }
+      ),
+    [scopedLedgerEntries]
+  );
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -388,6 +503,17 @@ export default function RevenuePage() {
     if (month) setTimelineMonth(month);
   }, [focusedStudentId, allInvoices]);
 
+  useEffect(() => {
+    setLedgerDraft((prev) => {
+      if (editingLedgerEntryId) return prev;
+      if (prev.entryDate.startsWith(timelineMonth)) return prev;
+      return {
+        ...prev,
+        entryDate: getDefaultLedgerEntryDate(timelineMonth),
+      };
+    });
+  }, [editingLedgerEntryId, timelineMonth]);
+
   const timelineMonthOptions = useMemo(() => {
     const recent = Array.from({ length: 18 }, (_, idx) => format(subDays(new Date(), idx * 28), 'yyyy-MM'));
     const fromInvoices = (allInvoices || [])
@@ -396,8 +522,11 @@ export default function RevenuePage() {
     const fromPayments = (paymentRecords || [])
       .map((payment) => getPaymentMonth(payment))
       .filter(Boolean) as string[];
-    return Array.from(new Set([timelineMonth, ...recent, ...fromInvoices, ...fromPayments])).sort((a, b) => b.localeCompare(a));
-  }, [allInvoices, paymentRecords, timelineMonth]);
+    const fromLedger = (businessLedgerEntries || [])
+      .map((entry) => getBusinessLedgerMonth(entry))
+      .filter(Boolean) as string[];
+    return Array.from(new Set([timelineMonth, ...recent, ...fromInvoices, ...fromPayments, ...fromLedger])).sort((a, b) => b.localeCompare(a));
+  }, [allInvoices, businessLedgerEntries, paymentRecords, timelineMonth]);
 
   const timelineRows = useMemo(() => {
     const rows = (allInvoices || []).filter((invoice) => getTimelineInvoiceMonth(invoice) === timelineMonth);
@@ -629,6 +758,123 @@ export default function RevenuePage() {
       router.refresh();
     } catch (e: any) {
       toast({ variant: 'destructive', title: '금액 저장 실패', description: e?.message || '다시 시도해 주세요.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const resetLedgerComposer = (month = timelineMonth) => {
+    setEditingLedgerEntryId(null);
+    setLedgerDraft(createDefaultLedgerDraft(month));
+  };
+
+  const handleLedgerDirectionChange = (direction: BusinessLedgerDirection) => {
+    setLedgerDraft((prev) => {
+      const nextCategory = BUSINESS_LEDGER_CATEGORY_META[prev.category]?.direction === direction
+        ? prev.category
+        : BUSINESS_LEDGER_CATEGORY_OPTIONS[direction][BUSINESS_LEDGER_CATEGORY_OPTIONS[direction].length - 1];
+      const nextProofStatus =
+        direction === 'income'
+          ? 'not_needed'
+          : prev.proofStatus === 'not_needed'
+            ? 'pending'
+            : prev.proofStatus;
+      return {
+        ...prev,
+        direction,
+        category: nextCategory,
+        proofStatus: nextProofStatus,
+      };
+    });
+  };
+
+  const handleLedgerSubmit = async () => {
+    if (!firestore || !centerId || !user?.uid) return;
+
+    const parsedDate = parseLedgerDate(ledgerDraft.entryDate);
+    if (!parsedDate) {
+      toast({ variant: 'destructive', title: '거래일을 확인해 주세요.' });
+      return;
+    }
+    if (format(parsedDate, 'yyyy-MM') !== timelineMonth) {
+      toast({ variant: 'destructive', title: '선택 월 안에서만 장부를 입력할 수 있습니다.' });
+      return;
+    }
+
+    const amount = Math.round(Number(ledgerDraft.amount.replace(/[^\d]/g, '')) || 0);
+    if (amount <= 0) {
+      toast({ variant: 'destructive', title: '금액을 입력해 주세요.' });
+      return;
+    }
+    if (!ledgerDraft.description.trim()) {
+      toast({ variant: 'destructive', title: '항목명을 입력해 주세요.' });
+      return;
+    }
+
+    const payload = {
+      entryDate: parsedDate,
+      direction: ledgerDraft.direction,
+      trackScope: ledgerDraft.trackScope,
+      category: ledgerDraft.category,
+      description: ledgerDraft.description.trim(),
+      counterparty: ledgerDraft.counterparty.trim() || null,
+      amount,
+      paymentMethod: ledgerDraft.paymentMethod,
+      proofStatus: ledgerDraft.direction === 'income' ? 'not_needed' : ledgerDraft.proofStatus,
+      memo: ledgerDraft.memo.trim() || null,
+    } as const;
+
+    setIsSaving(true);
+    try {
+      if (editingLedgerEntryId) {
+        await updateBusinessLedgerEntry(firestore, centerId, editingLedgerEntryId, user.uid, payload);
+        toast({ title: '장부 항목을 수정했습니다.' });
+      } else {
+        await createBusinessLedgerEntry(firestore, centerId, user.uid, payload);
+        toast({ title: '장부 항목을 저장했습니다.' });
+      }
+      resetLedgerComposer(timelineMonth);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: editingLedgerEntryId ? '장부 수정 실패' : '장부 저장 실패',
+        description: error?.message || '다시 시도해 주세요.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLedgerEdit = (entry: BusinessLedgerEntry) => {
+    const entryDate = toDateSafe(entry.entryDate);
+    setEditingLedgerEntryId(entry.id);
+    setLedgerDraft({
+      entryDate: entryDate ? format(entryDate, 'yyyy-MM-dd') : getDefaultLedgerEntryDate(timelineMonth),
+      direction: entry.direction,
+      trackScope: entry.trackScope,
+      category: entry.category,
+      description: entry.description || '',
+      counterparty: entry.counterparty || '',
+      amount: String(Math.round(Number(entry.amount) || 0)),
+      paymentMethod: entry.paymentMethod,
+      proofStatus: entry.proofStatus,
+      memo: entry.memo || '',
+    });
+  };
+
+  const handleLedgerDelete = async (entry: BusinessLedgerEntry) => {
+    if (!firestore || !centerId) return;
+    if (typeof window !== 'undefined' && !window.confirm('이 장부 항목을 삭제할까요?')) return;
+
+    setIsSaving(true);
+    try {
+      await deleteBusinessLedgerEntry(firestore, centerId, entry.id);
+      if (editingLedgerEntryId === entry.id) {
+        resetLedgerComposer(timelineMonth);
+      }
+      toast({ title: '장부 항목을 삭제했습니다.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: '장부 삭제 실패', description: error?.message || '다시 시도해 주세요.' });
     } finally {
       setIsSaving(false);
     }
@@ -1219,6 +1465,298 @@ export default function RevenuePage() {
             </div>
 
             <div className="md:col-span-4 space-y-6">
+              <Card className="rounded-[2rem] border border-[#dbe7ff] bg-white shadow-[0_24px_56px_-42px_rgba(20,41,95,0.24)]">
+                <CardHeader className="gap-3 border-b border-[#e7eefc]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <Badge className="rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
+                        월별 장부 입력
+                      </Badge>
+                      <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight text-[#14295F]">
+                        <NotebookPen className="h-5 w-5 text-[#2554D7]" />
+                        수입 · 지출 원장 관리
+                      </CardTitle>
+                      <CardDescription>
+                        {timelineMonth} · {timelineTrackLabel} 기준 거래를 바로 입력하고 세무 정리용 증빙 상태까지 함께 관리합니다.
+                      </CardDescription>
+                    </div>
+                    <div className="rounded-[1.1rem] border border-slate-100 bg-slate-50/80 px-3 py-2 text-right">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">증빙 대기</p>
+                      <p className="dashboard-number mt-1 text-lg text-amber-700">{ledgerSummary.proofPendingCount}건</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-5 p-5">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(['expense', 'income'] as BusinessLedgerDirection[]).map((direction) => {
+                      const isActive = ledgerDraft.direction === direction;
+                      return (
+                        <Button
+                          key={direction}
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleLedgerDirectionChange(direction)}
+                          className={cn(
+                            'h-10 rounded-xl font-black',
+                            isActive
+                              ? direction === 'income'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border-rose-200 bg-rose-50 text-rose-600'
+                              : 'border-[#dbe7ff] bg-white text-[#5c6e97]'
+                          )}
+                        >
+                          {BUSINESS_LEDGER_DIRECTION_META[direction].label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">거래일</Label>
+                      <Input
+                        type="date"
+                        value={ledgerDraft.entryDate}
+                        onChange={(event) => setLedgerDraft((prev) => ({ ...prev, entryDate: event.target.value }))}
+                        disabled={isSaving}
+                        className="h-10 rounded-xl font-black"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">트랙 범위</Label>
+                      <Select
+                        value={ledgerDraft.trackScope}
+                        onValueChange={(value: BusinessLedgerTrackScope) => setLedgerDraft((prev) => ({ ...prev, trackScope: value }))}
+                        disabled={isSaving}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                          {(['center', 'studyRoom', 'academy'] as BusinessLedgerTrackScope[]).map((trackScope) => (
+                            <SelectItem key={trackScope} value={trackScope} className="font-bold">
+                              {BUSINESS_LEDGER_TRACK_SCOPE_META[trackScope].label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">분류</Label>
+                      <Select
+                        value={ledgerDraft.category}
+                        onValueChange={(value: BusinessLedgerCategory) => setLedgerDraft((prev) => ({ ...prev, category: value }))}
+                        disabled={isSaving}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                          {BUSINESS_LEDGER_CATEGORY_OPTIONS[ledgerDraft.direction].map((category) => (
+                            <SelectItem key={category} value={category} className="font-bold">
+                              {BUSINESS_LEDGER_CATEGORY_META[category].label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">결제수단</Label>
+                      <Select
+                        value={ledgerDraft.paymentMethod}
+                        onValueChange={(value: BusinessLedgerPaymentMethod) => setLedgerDraft((prev) => ({ ...prev, paymentMethod: value }))}
+                        disabled={isSaving}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                          {(['transfer', 'card', 'cash', 'auto_debit', 'other'] as BusinessLedgerPaymentMethod[]).map((method) => (
+                            <SelectItem key={method} value={method} className="font-bold">
+                              {BUSINESS_LEDGER_PAYMENT_METHOD_META[method].label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">증빙상태</Label>
+                      <Select
+                        value={ledgerDraft.direction === 'income' ? 'not_needed' : ledgerDraft.proofStatus}
+                        onValueChange={(value: BusinessLedgerProofStatus) => setLedgerDraft((prev) => ({ ...prev, proofStatus: value }))}
+                        disabled={isSaving || ledgerDraft.direction === 'income'}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                          {(['not_needed', 'pending', 'card_receipt', 'cash_receipt', 'tax_invoice', 'simple_receipt'] as BusinessLedgerProofStatus[]).map((status) => (
+                            <SelectItem key={status} value={status} className="font-bold">
+                              {BUSINESS_LEDGER_PROOF_STATUS_META[status].label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">항목명</Label>
+                      <Input
+                        value={ledgerDraft.description}
+                        onChange={(event) => setLedgerDraft((prev) => ({ ...prev, description: event.target.value }))}
+                        disabled={isSaving}
+                        placeholder="예: 4월 센터 월세"
+                        className="h-10 rounded-xl font-black"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">거래처</Label>
+                      <Input
+                        value={ledgerDraft.counterparty}
+                        onChange={(event) => setLedgerDraft((prev) => ({ ...prev, counterparty: event.target.value }))}
+                        disabled={isSaving}
+                        placeholder="예: 건물주, 공급업체"
+                        className="h-10 rounded-xl font-black"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">금액</Label>
+                      <Input
+                        inputMode="numeric"
+                        value={ledgerDraft.amount}
+                        onChange={(event) => setLedgerDraft((prev) => ({ ...prev, amount: event.target.value.replace(/[^\d]/g, '').slice(0, 10) }))}
+                        disabled={isSaving}
+                        placeholder="예: 850000"
+                        className="h-10 rounded-xl text-right font-black"
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">메모</Label>
+                      <Textarea
+                        value={ledgerDraft.memo}
+                        onChange={(event) => setLedgerDraft((prev) => ({ ...prev, memo: event.target.value }))}
+                        disabled={isSaving}
+                        placeholder="세무 메모나 내부 참고 내용을 남겨 주세요."
+                        className="min-h-[92px] rounded-xl font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-slate-100 bg-slate-50/80 px-4 py-3">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">현재 입력 범위</p>
+                      <p className="text-sm font-black text-slate-900">{timelineMonth} · {timelineTrackLabel}</p>
+                      <p className="text-[11px] font-semibold text-slate-500">센터 공통 항목은 전체 트랙에서만 다시 보입니다.</p>
+                    </div>
+                    <p className="dashboard-number text-lg text-[#14295F]">
+                      {ledgerDraft.amount ? formatWon(Number(ledgerDraft.amount)) : '₩0'}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button
+                      type="button"
+                      onClick={handleLedgerSubmit}
+                      disabled={isSaving}
+                      className="h-11 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]"
+                    >
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Landmark className="mr-2 h-4 w-4" />}
+                      {editingLedgerEntryId ? '장부 수정 저장' : '장부 항목 저장'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => resetLedgerComposer(timelineMonth)}
+                      disabled={isSaving}
+                      className="h-11 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]"
+                    >
+                      입력 초기화
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3 border-t border-[#e7eefc] pt-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-[#14295F]">선택 월 장부</p>
+                        <p className="text-[11px] font-semibold text-slate-500">{timelineMonth} · {timelineTrackLabel} 기준 최신순</p>
+                      </div>
+                      <Badge className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-600">
+                        {scopedLedgerEntries.length}건
+                      </Badge>
+                    </div>
+
+                    {scopedLedgerEntries.length === 0 ? (
+                      <div className="rounded-[1.4rem] border border-dashed border-[#dbe7ff] bg-[#f8fbff] px-4 py-8 text-center text-[12px] font-semibold text-[#8091bb]">
+                        선택 월에 등록된 장부 항목이 없습니다.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {scopedLedgerEntries.map((entry) => {
+                          const entryDate = toDateSafe(entry.entryDate);
+                          return (
+                            <div key={entry.id} className="rounded-[1.4rem] border border-slate-100 bg-slate-50/70 p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge className={cn('border text-[10px] font-black', BUSINESS_LEDGER_DIRECTION_META[entry.direction].badgeClass)}>
+                                      {BUSINESS_LEDGER_DIRECTION_META[entry.direction].label}
+                                    </Badge>
+                                    <Badge className={cn('border text-[10px] font-black', BUSINESS_LEDGER_TRACK_SCOPE_META[entry.trackScope].badgeClass)}>
+                                      {BUSINESS_LEDGER_TRACK_SCOPE_META[entry.trackScope].label}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm font-black text-slate-900">{entry.description}</p>
+                                  <p className="text-[11px] font-semibold text-slate-500">
+                                    {entryDate ? format(entryDate, 'yyyy.MM.dd') : '-'} · {formatBusinessLedgerCategoryLabel(entry.category)}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className={cn('dashboard-number text-lg', entry.direction === 'income' ? 'text-emerald-700' : 'text-rose-600')}>
+                                    {formatWon(entry.amount)}
+                                  </p>
+                                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                    {formatBusinessLedgerPaymentMethodLabel(entry.paymentMethod)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 rounded-[1rem] border border-white/80 bg-white/70 px-3 py-2">
+                                <p className="text-[11px] font-semibold text-slate-600">
+                                  거래처 {entry.counterparty || '-'} · 증빙 {formatBusinessLedgerProofStatusLabel(entry.proofStatus)}
+                                </p>
+                                {entry.memo ? <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">{entry.memo}</p> : null}
+                              </div>
+
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => handleLedgerEdit(entry)}
+                                  disabled={isSaving}
+                                  className="h-9 rounded-xl border-[#dbe7ff] bg-white font-black text-[#14295F] hover:bg-[#f4f7ff]"
+                                >
+                                  <PencilLine className="mr-2 h-4 w-4" />
+                                  수정
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => handleLedgerDelete(entry)}
+                                  disabled={isSaving}
+                                  className="h-9 rounded-xl border-rose-200 bg-rose-50 font-black text-rose-600 hover:bg-rose-100"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  삭제
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 overflow-hidden relative group ring-1 ring-border/50">
                 <div className="absolute -right-4 -top-4 opacity-5 rotate-12 group-hover:scale-110 transition-transform duration-1000">
                   <Armchair className="h-32 w-32" />
@@ -1396,6 +1934,7 @@ export default function RevenuePage() {
             <RevenueAnalysis
               invoices={allInvoices || []}
               payments={paymentRecords || []}
+              ledgerEntries={businessLedgerEntries || []}
               activeStudentCount={(studentMembers || []).length}
               selectedMonth={timelineMonth}
               onSelectedMonthChange={setTimelineMonth}
