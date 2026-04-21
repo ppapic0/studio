@@ -106,6 +106,13 @@ export function buildSeatId(roomId: string, roomSeatNo: number) {
   return `${roomId}_seat_${padSeatNo(roomSeatNo)}`;
 }
 
+function isSeatDocumentId(value?: string | null) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return /^seat_\d+$/.test(trimmed) || /^room_\d+_seat_\d+$/.test(trimmed);
+}
+
 export function resolveSeatIdentity(input: SeatIdentityInput) {
   const fallbackSeatNo = Number(input.seatNo || 0);
   const roomId = normalizeRoomId(input.roomId, fallbackSeatNo);
@@ -127,7 +134,10 @@ export function resolveSeatIdentity(input: SeatIdentityInput) {
 export function hasAssignedSeat(input?: SeatIdentityInput | null) {
   if (!input) return false;
   const identity = resolveSeatIdentity(input);
-  return identity.roomSeatNo > 0 || identity.seatNo > 0 || Boolean(identity.seatId);
+  const explicitSeatId =
+    (typeof input.seatId === 'string' && input.seatId.trim()) ||
+    (typeof input.id === 'string' && isSeatDocumentId(input.id) ? input.id.trim() : '');
+  return identity.roomSeatNo > 0 || identity.seatNo > 0 || Boolean(explicitSeatId);
 }
 
 export function getRoomLabel(roomId?: string | null, rooms?: LayoutRoomConfig[]) {
