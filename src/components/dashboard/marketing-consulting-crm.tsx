@@ -569,15 +569,24 @@ export function MarketingConsultingCRM({
 
   const filteredWebsiteRequests = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
-    return websiteRequests.filter((req) => {
-      if (statusFilter !== 'all' && req.status !== statusFilter) return false;
-      if (!keyword) return true;
-      return [req.receiptId, req.studentName, req.school, req.grade, req.consultPhone, req.sourceLabel, req.requestTypeLabel]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(keyword);
-    });
+    return websiteRequests
+      .filter((req) => {
+        if (statusFilter !== 'all' && req.status !== statusFilter) return false;
+        if (!keyword) return true;
+        return [req.receiptId, req.studentName, req.school, req.grade, req.consultPhone, req.sourceLabel, req.requestTypeLabel]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(keyword);
+      })
+      .sort((left, right) => {
+        const leftIsLinked = left.linkedLeadId ? 1 : 0;
+        const rightIsLinked = right.linkedLeadId ? 1 : 0;
+        if (leftIsLinked !== rightIsLinked) {
+          return leftIsLinked - rightIsLinked;
+        }
+        return toDateMs(right.createdAt) - toDateMs(left.createdAt);
+      });
   }, [websiteRequests, searchTerm, statusFilter]);
 
   const filteredWaitlist = useMemo(() => {
