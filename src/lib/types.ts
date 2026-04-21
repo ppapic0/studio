@@ -1045,6 +1045,15 @@ export interface WebsiteConsultSlot {
   updatedByUid?: string | null;
 }
 
+export type WebsiteBookingAccessStatus = 'no_lead' | 'locked' | 'enabled';
+
+export interface WebsiteBookingAccess {
+  isEnabled: boolean;
+  unlockedAt?: string | null;
+  unlockedByUid?: string | null;
+  note?: string | null;
+}
+
 export type WebsiteConsultReservationStatus = 'confirmed' | 'canceled' | 'completed';
 
 export interface WebsiteConsultReservation {

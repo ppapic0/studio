@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   addDoc,
   collection,
@@ -34,6 +34,8 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
 import { canManageLeadRecords, canReadFinance, canTransitionLeadPipeline } from '@/lib/dashboard-access';
+import { getWebsiteBookingAccess } from '@/lib/website-consult';
+import type { WebsiteBookingAccess, WebsiteConsultReservation, WebsiteSeatHoldRequest } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +52,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import {
@@ -126,6 +129,11 @@ interface WebsiteConsultRequest {
   createdAt?: any;
   updatedAt?: any;
   linkedLeadId?: string;
+  linkedConsultReservationId?: string | null;
+  linkedConsultReservationIds?: string[];
+  linkedSeatHoldRequestId?: string | null;
+  linkedSeatHoldRequestIds?: string[];
+  bookingAccess?: WebsiteBookingAccess | null;
 }
 
 interface WebsiteEntryEvent {
@@ -192,6 +200,15 @@ const WAITLIST_STATUS_META: Record<WaitlistStatus, { label: string; className: s
   admitted: { label: '입학완료', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   cancelled: { label: '취소', className: 'bg-slate-100 text-slate-600 border-slate-200' },
 };
+
+const WEBSITE_BOOKING_BADGE_META = {
+  enabled: { label: '예약 가능', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  locked: { label: '대기', className: 'bg-slate-100 text-slate-600 border-slate-200' },
+  reservation_confirmed: { label: '예약완료', className: 'bg-[#eef4ff] text-[#17326B] border-[#dbe5ff]' },
+  reservation_completed: { label: '상담완료', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+  seat_hold_pending: { label: '자리찜 진행중', className: 'bg-[#fff3e9] text-[#c26a1c] border-[#ffd9bd]' },
+  seat_hold_held: { label: '자리찜 확정', className: 'bg-orange-100 text-orange-700 border-orange-200' },
+} as const;
 
 const SERVICE_TYPE_META: Record<ServiceType, { label: string; color: string }> = {
   korean_academy: { label: '국어 학원', color: 'bg-violet-100 text-violet-700 border-violet-200' },
@@ -276,6 +293,31 @@ function getStoredWaitlistQueueNumber(entry: Pick<WaitlistEntry, 'queueNumber'>)
   return typeof entry.queueNumber === 'number' && Number.isFinite(entry.queueNumber) ? entry.queueNumber : null;
 }
 
+function getWebsiteRequestStatusBadge(
+  request: Pick<WebsiteConsultRequest, 'bookingAccess'>,
+  reservation?: WebsiteConsultReservation | null,
+  seatHold?: WebsiteSeatHoldRequest | null
+) {
+  if (seatHold?.status === 'pending_transfer') return WEBSITE_BOOKING_BADGE_META.seat_hold_pending;
+  if (seatHold?.status === 'held') return WEBSITE_BOOKING_BADGE_META.seat_hold_held;
+  if (reservation?.status === 'confirmed') return WEBSITE_BOOKING_BADGE_META.reservation_confirmed;
+  if (reservation?.status === 'completed') return WEBSITE_BOOKING_BADGE_META.reservation_completed;
+  return getWebsiteBookingAccess(request.bookingAccess).isEnabled
+    ? WEBSITE_BOOKING_BADGE_META.enabled
+    : WEBSITE_BOOKING_BADGE_META.locked;
+}
+
+function getWebsiteBookingAccessDescription(request: Pick<WebsiteConsultRequest, 'bookingAccess'>) {
+  const bookingAccess = getWebsiteBookingAccess(request.bookingAccess);
+  if (bookingAccess.isEnabled) {
+    return '센터가 이 어머님 문의 건의 방문예약과 자리찜 진행을 열어 둔 상태입니다.';
+  }
+  return (
+    bookingAccess.note ||
+    '아직 순서가 되지 않아 슬롯과 좌석은 볼 수 있지만 실제 방문예약과 자리찜은 진행할 수 없습니다.'
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function MarketingConsultingCRM({
@@ -309,6 +351,9 @@ export function MarketingConsultingCRM({
   const [waitlistStatusFilter, setWaitlistStatusFilter] = useState<'all' | WaitlistStatus>('all');
   const [waitlistSearch, setWaitlistSearch] = useState('');
   const [selectedDrawer, setSelectedDrawer] = useState<{ type: 'lead' | 'website' | 'waitlist'; id: string } | null>(null);
+  const [websiteBookingAccessEnabled, setWebsiteBookingAccessEnabled] = useState(false);
+  const [websiteBookingAccessNote, setWebsiteBookingAccessNote] = useState('');
+  const [savingWebsiteBookingAccessId, setSavingWebsiteBookingAccessId] = useState<string | null>(null);
 
   // ── Firestore queries ─────────────────────────────────────────────────────
 
@@ -334,6 +379,30 @@ export function MarketingConsultingCRM({
     websiteRequestsQuery,
     { enabled: !!centerId }
   );
+
+  const websiteReservationsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'websiteConsultReservations'),
+      orderBy('createdAt', 'desc'),
+      limit(500)
+    );
+  }, [firestore, centerId]);
+  const { data: websiteReservationsRaw } = useCollection<WebsiteConsultReservation>(websiteReservationsQuery, {
+    enabled: !!centerId,
+  });
+
+  const websiteSeatHoldsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'websiteSeatHoldRequests'),
+      orderBy('createdAt', 'desc'),
+      limit(500)
+    );
+  }, [firestore, centerId]);
+  const { data: websiteSeatHoldsRaw } = useCollection<WebsiteSeatHoldRequest>(websiteSeatHoldsQuery, {
+    enabled: !!centerId,
+  });
 
   const entryEventsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -368,11 +437,30 @@ export function MarketingConsultingCRM({
     () => [...(websiteRequestsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
     [websiteRequestsRaw]
   );
-
-  const pendingWebsiteRequests = useMemo(
-    () => websiteRequests.filter((request) => !request.linkedLeadId),
-    [websiteRequests]
+  const websiteReservations = useMemo(
+    () => [...(websiteReservationsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
+    [websiteReservationsRaw]
   );
+  const websiteSeatHolds = useMemo(
+    () => [...(websiteSeatHoldsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
+    [websiteSeatHoldsRaw]
+  );
+  const latestWebsiteReservationByLeadId = useMemo(() => {
+    const grouped = new Map<string, WebsiteConsultReservation>();
+    websiteReservations.forEach((reservation) => {
+      if (!reservation.leadId || grouped.has(reservation.leadId)) return;
+      grouped.set(reservation.leadId, reservation);
+    });
+    return grouped;
+  }, [websiteReservations]);
+  const latestWebsiteSeatHoldByLeadId = useMemo(() => {
+    const grouped = new Map<string, WebsiteSeatHoldRequest>();
+    websiteSeatHolds.forEach((seatHold) => {
+      if (!seatHold.leadId || grouped.has(seatHold.leadId)) return;
+      grouped.set(seatHold.leadId, seatHold);
+    });
+    return grouped;
+  }, [websiteSeatHolds]);
 
   const waitlist = useMemo<WaitlistEntryWithOrder[]>(() => {
     const sortedEntries = [...(waitlistRaw || [])].sort((a, b) => {
@@ -481,7 +569,7 @@ export function MarketingConsultingCRM({
 
   const filteredWebsiteRequests = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
-    return pendingWebsiteRequests.filter((req) => {
+    return websiteRequests.filter((req) => {
       if (statusFilter !== 'all' && req.status !== statusFilter) return false;
       if (!keyword) return true;
       return [req.receiptId, req.studentName, req.school, req.grade, req.consultPhone, req.sourceLabel, req.requestTypeLabel]
@@ -490,7 +578,7 @@ export function MarketingConsultingCRM({
         .toLowerCase()
         .includes(keyword);
     });
-  }, [pendingWebsiteRequests, searchTerm, statusFilter]);
+  }, [websiteRequests, searchTerm, statusFilter]);
 
   const filteredWaitlist = useMemo(() => {
     const keyword = waitlistSearch.trim().toLowerCase();
@@ -514,6 +602,14 @@ export function MarketingConsultingCRM({
   const selectedWebsiteRequest = useMemo(
     () => (selectedDrawer?.type === 'website' ? websiteRequests.find((request) => request.id === selectedDrawer.id) || null : null),
     [selectedDrawer, websiteRequests]
+  );
+  const selectedWebsiteReservation = useMemo(
+    () => (selectedWebsiteRequest ? latestWebsiteReservationByLeadId.get(selectedWebsiteRequest.id) || null : null),
+    [latestWebsiteReservationByLeadId, selectedWebsiteRequest]
+  );
+  const selectedWebsiteSeatHold = useMemo(
+    () => (selectedWebsiteRequest ? latestWebsiteSeatHoldByLeadId.get(selectedWebsiteRequest.id) || null : null),
+    [latestWebsiteSeatHoldByLeadId, selectedWebsiteRequest]
   );
 
   const selectedWaitlistEntry = useMemo(
@@ -539,11 +635,12 @@ export function MarketingConsultingCRM({
   }, [leads]);
 
   const websiteSummary = useMemo(() => {
-    const total = pendingWebsiteRequests.length;
-    const newCount = pendingWebsiteRequests.filter((r) => r.status === 'new').length;
-    const contactedCount = pendingWebsiteRequests.filter((r) => r.status === 'contacted').length;
-    return { total, newCount, contactedCount };
-  }, [pendingWebsiteRequests]);
+    const total = websiteRequests.length;
+    const newCount = websiteRequests.filter((r) => r.status === 'new').length;
+    const contactedCount = websiteRequests.filter((r) => r.status === 'contacted').length;
+    const enabledCount = websiteRequests.filter((request) => getWebsiteBookingAccess(request.bookingAccess).isEnabled).length;
+    return { total, newCount, contactedCount, enabledCount };
+  }, [websiteRequests]);
 
   const visitSummary = useMemo(() => {
     const events = entryEventsRaw || [];
@@ -565,6 +662,17 @@ export function MarketingConsultingCRM({
     const admitted = waitlist.filter((e) => e.status === 'admitted').length;
     return { total, waiting, waitingAcademy, waitingStudy, admitted };
   }, [waitlist]);
+
+  useEffect(() => {
+    if (!selectedWebsiteRequest) {
+      setWebsiteBookingAccessEnabled(false);
+      setWebsiteBookingAccessNote('');
+      return;
+    }
+    const bookingAccess = getWebsiteBookingAccess(selectedWebsiteRequest.bookingAccess);
+    setWebsiteBookingAccessEnabled(bookingAccess.isEnabled);
+    setWebsiteBookingAccessNote(bookingAccess.note || '');
+  }, [selectedWebsiteRequest]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -675,6 +783,41 @@ export function MarketingConsultingCRM({
     } catch (error) {
       console.error(error);
       toast({ variant: 'destructive', title: '웹 상담 상태 변경 실패', description: '웹사이트 상담폼 상태를 바꾸는 중 오류가 발생했습니다.' });
+    }
+  };
+
+  const handleWebsiteBookingAccessSave = async () => {
+    if (!firestore || !centerId || !selectedWebsiteRequest || !canManageLeadData) return;
+
+    const currentAccess = getWebsiteBookingAccess(selectedWebsiteRequest.bookingAccess);
+    const nextNote = websiteBookingAccessNote.trim();
+    const nextUnlockedAt = websiteBookingAccessEnabled
+      ? currentAccess.unlockedAt || new Date().toISOString()
+      : currentAccess.unlockedAt || null;
+    const nextUnlockedByUid = websiteBookingAccessEnabled
+      ? currentAccess.unlockedByUid || user?.uid || null
+      : currentAccess.unlockedByUid || null;
+
+    setSavingWebsiteBookingAccessId(selectedWebsiteRequest.id);
+    try {
+      await updateDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', selectedWebsiteRequest.id), {
+        bookingAccess: {
+          isEnabled: websiteBookingAccessEnabled,
+          unlockedAt: nextUnlockedAt,
+          unlockedByUid: nextUnlockedByUid,
+          note: nextNote || null,
+        },
+        updatedAt: serverTimestamp(),
+      });
+      toast({
+        title: websiteBookingAccessEnabled ? '웹 예약 권한을 열었습니다.' : '웹 예약 권한을 잠갔습니다.',
+        description: '해당 어머님 문의 건의 방문예약과 자리찜 가능 상태가 갱신되었습니다.',
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: '예약 권한 저장 실패', description: '웹 예약 권한을 저장하는 중 오류가 발생했습니다.' });
+    } finally {
+      setSavingWebsiteBookingAccessId(null);
     }
   };
 
@@ -1052,13 +1195,14 @@ export function MarketingConsultingCRM({
                     <p className="text-sm font-black text-slate-900">웹사이트 상담폼 접수</p>
                   </div>
                   <p className="text-xs font-semibold text-slate-600">
-                    웹사이트에 새로 들어온 문의만 먼저 보여줍니다. 워크벤치로 넘긴 항목은 여기서 숨겨지고 상담 리드 워크벤치에서 이어서 관리합니다.
+                    웹 문의별로 순차 해제 상태와 방문예약, 자리찜 진행 상황을 함께 관리합니다.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge className="border-none bg-transparent text-[#C25A00] shadow-none">확인 대기 {websiteSummary.total}건</Badge>
+                  <Badge className="border-none bg-transparent text-[#C25A00] shadow-none">전체 {websiteSummary.total}건</Badge>
                   <Badge className="border-none bg-transparent text-blue-700 shadow-none">신규 {websiteSummary.newCount}건</Badge>
                   <Badge className="border-none bg-transparent text-amber-700 shadow-none">연락중 {websiteSummary.contactedCount}건</Badge>
+                  <Badge className="border-none bg-transparent text-emerald-700 shadow-none">예약 가능 {websiteSummary.enabledCount}건</Badge>
                 </div>
               </div>
 
@@ -1094,13 +1238,20 @@ export function MarketingConsultingCRM({
                   </div>
                 ) : filteredWebsiteRequests.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-orange-200 bg-white/80 px-4 py-6 text-center text-sm font-semibold text-slate-500">
-                    지금 확인할 새 웹사이트 상담 접수는 없습니다.
+                    지금 확인할 웹사이트 상담 접수는 없습니다.
                   </div>
                 ) : (
                   filteredWebsiteRequests.slice(0, 8).map((request) => (
                     <div key={request.id} className="rounded-xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
                       <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
                         <div className="space-y-1">
+                          {(() => {
+                            const requestBadge = getWebsiteRequestStatusBadge(
+                              request,
+                              latestWebsiteReservationByLeadId.get(request.id),
+                              latestWebsiteSeatHoldByLeadId.get(request.id)
+                            );
+                            return (
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-black text-slate-900">{request.studentName || '(학생명 미입력)'}</p>
                             {request.receiptId ? (
@@ -1129,7 +1280,17 @@ export function MarketingConsultingCRM({
                             <Badge variant="outline" className="text-[10px] font-black">
                               {request.sourceLabel || '웹사이트'}
                             </Badge>
+                            <Badge className={cn('border text-[10px] font-black', requestBadge.className)}>
+                              {requestBadge.label}
+                            </Badge>
+                            {request.linkedLeadId ? (
+                              <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
+                                리드 연결됨
+                              </Badge>
+                            ) : null}
                           </div>
+                            );
+                          })()}
                           <p className="text-xs font-semibold text-slate-600">
                             학교: {request.school || '-'} {request.grade ? `· ${request.grade}` : ''} · 연락처: {request.consultPhone || '-'}
                           </p>
@@ -1993,11 +2154,133 @@ export function MarketingConsultingCRM({
                         </Badge>
                       ) : null}
                       <Badge variant="outline" className="font-black">{selectedWebsiteRequest.sourceLabel || '웹사이트'}</Badge>
+                      <Badge
+                        className={cn(
+                          'border font-black',
+                          getWebsiteRequestStatusBadge(
+                            selectedWebsiteRequest,
+                            selectedWebsiteReservation,
+                            selectedWebsiteSeatHold
+                          ).className
+                        )}
+                      >
+                        {getWebsiteRequestStatusBadge(
+                          selectedWebsiteRequest,
+                          selectedWebsiteReservation,
+                          selectedWebsiteSeatHold
+                        ).label}
+                      </Badge>
                     </div>
                     <p className="mt-3 text-sm font-bold text-slate-500">
                       {selectedWebsiteRequest.linkedLeadId ? '이미 리드 DB로 이동된 접수입니다.' : '아직 리드 DB로 이동되지 않았습니다.'}
                     </p>
                   </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">웹 예약 권한</p>
+                      <p className="mt-2 text-sm font-bold text-slate-700">
+                        순서가 된 어머님 문의 건만 방문예약과 자리찜을 열어드립니다.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-full bg-slate-100 px-3 py-2">
+                      <span className="text-xs font-black text-slate-700">
+                        {websiteBookingAccessEnabled ? '예약 가능' : '대기'}
+                      </span>
+                      <Switch
+                        checked={websiteBookingAccessEnabled}
+                        onCheckedChange={setWebsiteBookingAccessEnabled}
+                        disabled={!canManageLeadData}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">열어준 시각</p>
+                      <p className="mt-2 text-sm font-black text-slate-700">
+                        {getWebsiteBookingAccess(selectedWebsiteRequest.bookingAccess).unlockedAt
+                          ? formatDateTimeLabel(getWebsiteBookingAccess(selectedWebsiteRequest.bookingAccess).unlockedAt)
+                          : '-'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">처리 관리자</p>
+                      <p className="mt-2 text-sm font-black text-slate-700">
+                        {getWebsiteBookingAccess(selectedWebsiteRequest.bookingAccess).unlockedByUid || '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <Label htmlFor="websiteBookingAccessNote" className="text-xs font-black text-slate-700">
+                      관리 메모
+                    </Label>
+                    <Textarea
+                      id="websiteBookingAccessNote"
+                      value={websiteBookingAccessNote}
+                      onChange={(event) => setWebsiteBookingAccessNote(event.target.value)}
+                      placeholder="예: 1차 순번 오픈, 상담 후 자리찜까지 허용"
+                      className="min-h-[96px] rounded-xl"
+                      disabled={!canManageLeadData}
+                    />
+                    <p className="text-[11px] font-semibold leading-5 text-slate-500">
+                      {getWebsiteBookingAccessDescription(selectedWebsiteRequest)}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-[#dbe5ff] bg-[#f7faff] p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#5c6e97]">연결된 예약 상태</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge
+                        className={cn(
+                          'border font-black',
+                          getWebsiteRequestStatusBadge(
+                            selectedWebsiteRequest,
+                            selectedWebsiteReservation,
+                            selectedWebsiteSeatHold
+                          ).className
+                        )}
+                      >
+                        {getWebsiteRequestStatusBadge(
+                          selectedWebsiteRequest,
+                          selectedWebsiteReservation,
+                          selectedWebsiteSeatHold
+                        ).label}
+                      </Badge>
+                      {selectedWebsiteReservation ? (
+                        <Badge variant="outline" className="font-black text-[#17326B]">
+                          방문예약 {selectedWebsiteReservation.startsAt ? formatDateTimeLabel(selectedWebsiteReservation.startsAt) : '-'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="font-black text-slate-600">방문예약 없음</Badge>
+                      )}
+                      {selectedWebsiteSeatHold ? (
+                        <Badge variant="outline" className="font-black text-[#c26a1c]">
+                          자리찜 {selectedWebsiteSeatHold.seatLabel}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="font-black text-slate-600">자리찜 없음</Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {canManageLeadData ? (
+                    <div className="mt-4 flex justify-end">
+                      <Button
+                        type="button"
+                        className="h-10 rounded-xl font-black"
+                        onClick={() => void handleWebsiteBookingAccessSave()}
+                        disabled={savingWebsiteBookingAccessId === selectedWebsiteRequest.id}
+                      >
+                        {savingWebsiteBookingAccessId === selectedWebsiteRequest.id ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : null}
+                        예약 권한 저장
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">바로 할 일</p>

@@ -164,6 +164,15 @@ export async function POST(request: NextRequest) {
       createdAt,
       updatedAt: createdAt,
     };
+    const centerPayload = {
+      ...payload,
+      bookingAccess: {
+        isEnabled: false,
+        unlockedAt: null,
+        unlockedByUid: null,
+        note: null,
+      },
+    };
 
     const batch = adminDb.batch();
     const rootRequestRef = adminDb.collection("marketingConsultRequests").doc(requestId);
@@ -175,7 +184,7 @@ export async function POST(request: NextRequest) {
         .doc(centerId)
         .collection("websiteConsultRequests")
         .doc(requestId);
-      batch.set(centerRequestRef, { ...payload, receiptId });
+      batch.set(centerRequestRef, { ...centerPayload, receiptId });
 
       if (autoWaitlistId) {
         const waitlistRef = adminDb

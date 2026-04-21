@@ -2,6 +2,7 @@ import type {
   AttendanceCurrent,
   LayoutSettings,
   StudentProfile,
+  WebsiteBookingAccess,
   WebsiteConsultReservation,
   WebsiteConsultSlot,
   WebsiteReservationSettings,
@@ -95,6 +96,17 @@ export function isStudyCenterLead(input: {
   requestType?: string | null;
 }) {
   return input.serviceType === 'study_center' || input.requestType?.startsWith('study_center') === true;
+}
+
+export function getWebsiteBookingAccess(
+  access?: Partial<WebsiteBookingAccess> | null
+): WebsiteBookingAccess {
+  return {
+    isEnabled: access?.isEnabled === true,
+    unlockedAt: typeof access?.unlockedAt === 'string' ? access.unlockedAt : null,
+    unlockedByUid: typeof access?.unlockedByUid === 'string' ? access.unlockedByUid : null,
+    note: typeof access?.note === 'string' && access.note.trim() ? access.note.trim() : null,
+  };
 }
 
 export function getWebsiteReservationSettings(

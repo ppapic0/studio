@@ -12,6 +12,7 @@ import { adminDb } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
 import {
   buildLeadLinkPatch,
+  getWebsiteBookingAccess,
   getWebsiteReservationSettings,
   isActiveWebsiteSeatHold,
   isStudyCenterLead,
@@ -126,6 +127,15 @@ export async function POST(request: NextRequest) {
       if (lead.centerId && lead.centerId !== centerId) {
         throw new ApiError(403, '다른 센터 문의 건으로는 자리찜을 신청할 수 없습니다.');
       }
+      if (!centerLeadSnap.exists) {
+        throw new ApiError(403, '아직 순차 안내 전인 문의 건입니다. 센터에서 예약 가능 상태로 열어드린 뒤 다시 시도해주세요.');
+      }
+
+      const centerLead = centerLeadSnap.data() as Record<string, any>;
+      const bookingAccess = getWebsiteBookingAccess(centerLead.bookingAccess);
+      if (!bookingAccess.isEnabled) {
+        throw new ApiError(403, '아직 순차 안내 전인 문의 건입니다. 센터에서 예약 가능 상태로 열어드린 뒤 다시 시도해주세요.');
+      }
 
       const rooms = normalizeLayoutRooms(centerSnap.data()?.layoutSettings || null);
       const room = rooms.find((item) => item.id === roomId);
@@ -217,23 +227,20 @@ export async function POST(request: NextRequest) {
         { merge: true }
       );
 
-      if (centerLeadSnap.exists) {
-        const centerLead = centerLeadSnap.data() as Record<string, any>;
-        transaction.set(
-          centerLeadRef,
-          {
-            linkedSeatHoldRequestId: hold.id,
-            linkedSeatHoldRequestIds: buildLeadLinkPatch(
-              hold.id,
-              Array.isArray(centerLead.linkedSeatHoldRequestIds)
-                ? (centerLead.linkedSeatHoldRequestIds as string[])
-                : []
-            ),
-            updatedAt: createdAt,
-          },
-          { merge: true }
-        );
-      }
+      transaction.set(
+        centerLeadRef,
+        {
+          linkedSeatHoldRequestId: hold.id,
+          linkedSeatHoldRequestIds: buildLeadLinkPatch(
+            hold.id,
+            Array.isArray(centerLead.linkedSeatHoldRequestIds)
+              ? (centerLead.linkedSeatHoldRequestIds as string[])
+              : []
+          ),
+          updatedAt: createdAt,
+        },
+        { merge: true }
+      );
 
       return hold;
     });

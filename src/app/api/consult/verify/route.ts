@@ -10,12 +10,14 @@ import {
 import { adminDb } from '@/lib/firebase-admin';
 import { resolveMarketingCenterId } from '@/lib/marketing-center';
 import {
+  getWebsiteBookingAccess,
   isStudyCenterLead,
   normalizePhone,
   sortIsoLikeDesc,
   toDateMs,
 } from '@/lib/website-consult';
 import type {
+  WebsiteBookingAccessStatus,
   WebsiteConsultReservation,
   WebsiteSeatHoldRequest,
 } from '@/lib/types';
@@ -34,7 +36,10 @@ type LeadCandidate = {
   requestType?: string | null;
   requestTypeLabel?: string | null;
   createdAt?: string | null;
+  bookingAccessStatus: WebsiteBookingAccessStatus;
+  canReserve: boolean;
   canSeatHold: boolean;
+  bookingAccessNote?: string | null;
   latestConsultReservationStatus?: string | null;
   latestSeatHoldStatus?: string | null;
 };
@@ -105,10 +110,17 @@ export async function GET(request: NextRequest) {
 
     const leadIds = new Set(leads.map((lead) => lead.id));
     const centerRef = adminDb.collection('centers').doc(centerId);
-    const [reservationSnapshot, seatHoldSnapshot] = await Promise.all([
+    const centerLeadRefs = leads.map((lead) => centerRef.collection('websiteConsultRequests').doc(lead.id));
+    const [centerLeadSnapshots, reservationSnapshot, seatHoldSnapshot] = await Promise.all([
+      centerLeadRefs.length ? adminDb.getAll(...centerLeadRefs) : Promise.resolve([]),
       centerRef.collection('websiteConsultReservations').limit(300).get(),
       centerRef.collection('websiteSeatHoldRequests').limit(300).get(),
     ]);
+    const centerLeadById = new Map<string, Record<string, unknown>>();
+    centerLeadSnapshots.forEach((snap: any) => {
+      if (!snap?.exists) return;
+      centerLeadById.set(snap.id, snap.data() as Record<string, unknown>);
+    });
 
     const latestReservationByLead = new Map<string, WebsiteConsultReservation>();
     reservationSnapshot.docs.forEach((doc) => {
@@ -130,25 +142,35 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const results: LeadCandidate[] = leads.map((lead) => ({
-      id: lead.id,
-      receiptId: typeof lead.receiptId === 'string' ? lead.receiptId : null,
-      studentName: String(lead.studentName || '학생'),
-      school: typeof lead.school === 'string' ? lead.school : null,
-      grade: typeof lead.grade === 'string' ? lead.grade : null,
-      gender: typeof lead.gender === 'string' ? lead.gender : null,
-      consultPhone: String(lead.consultPhone || normalizedPhone),
-      serviceType: typeof lead.serviceType === 'string' ? lead.serviceType : null,
-      requestType: typeof lead.requestType === 'string' ? lead.requestType : null,
-      requestTypeLabel: typeof lead.requestTypeLabel === 'string' ? lead.requestTypeLabel : null,
-      createdAt: typeof lead.createdAt === 'string' ? lead.createdAt : null,
-      canSeatHold: isStudyCenterLead({
+    const results: LeadCandidate[] = leads.map((lead) => {
+      const bookingAccess = getWebsiteBookingAccess(
+        centerLeadById.get(lead.id)?.bookingAccess as Record<string, unknown> | null | undefined
+      );
+      const isSeatHoldEligible = isStudyCenterLead({
         serviceType: typeof lead.serviceType === 'string' ? lead.serviceType : null,
         requestType: typeof lead.requestType === 'string' ? lead.requestType : null,
-      }),
-      latestConsultReservationStatus: latestReservationByLead.get(lead.id)?.status || null,
-      latestSeatHoldStatus: latestSeatHoldByLead.get(lead.id)?.status || null,
-    }));
+      });
+      const bookingAccessStatus: WebsiteBookingAccessStatus = bookingAccess.isEnabled ? 'enabled' : 'locked';
+      return {
+        id: lead.id,
+        receiptId: typeof lead.receiptId === 'string' ? lead.receiptId : null,
+        studentName: String(lead.studentName || '학생'),
+        school: typeof lead.school === 'string' ? lead.school : null,
+        grade: typeof lead.grade === 'string' ? lead.grade : null,
+        gender: typeof lead.gender === 'string' ? lead.gender : null,
+        consultPhone: String(lead.consultPhone || normalizedPhone),
+        serviceType: typeof lead.serviceType === 'string' ? lead.serviceType : null,
+        requestType: typeof lead.requestType === 'string' ? lead.requestType : null,
+        requestTypeLabel: typeof lead.requestTypeLabel === 'string' ? lead.requestTypeLabel : null,
+        createdAt: typeof lead.createdAt === 'string' ? lead.createdAt : null,
+        bookingAccessStatus,
+        canReserve: bookingAccessStatus === 'enabled',
+        canSeatHold: bookingAccessStatus === 'enabled' && isSeatHoldEligible,
+        bookingAccessNote: bookingAccess.note,
+        latestConsultReservationStatus: latestReservationByLead.get(lead.id)?.status || null,
+        latestSeatHoldStatus: latestSeatHoldByLead.get(lead.id)?.status || null,
+      };
+    });
 
     return noStoreJson({ ok: true, leads: results });
   } catch (error) {

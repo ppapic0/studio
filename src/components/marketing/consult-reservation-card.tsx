@@ -47,7 +47,10 @@ type VerifiedLead = {
   requestType?: string | null;
   requestTypeLabel?: string | null;
   createdAt?: string | null;
+  bookingAccessStatus: "no_lead" | "locked" | "enabled";
+  canReserve: boolean;
   canSeatHold: boolean;
+  bookingAccessNote?: string | null;
   latestConsultReservationStatus?: string | null;
   latestSeatHoldStatus?: string | null;
 };
@@ -120,7 +123,7 @@ type SuccessState =
 type SummaryChipProps = {
   label: string;
   value: string;
-  tone?: "default" | "orange" | "light";
+  tone?: "default" | "orange" | "light" | "accent";
 };
 
 type LeadChoiceCardProps = {
@@ -176,6 +179,8 @@ function SummaryChip({ label, value, tone = "default" }: SummaryChipProps) {
         "rounded-[1.15rem] border px-4 py-3",
         tone === "orange"
           ? "border-[#FF7A16]/25 bg-[#FFF2E8]"
+          : tone === "accent"
+            ? "border-[#FFB273]/24 bg-[#FF7A16]/10"
           : tone === "light"
             ? "border-[#dbe5ff] bg-white"
             : "border-white/10 bg-white/[0.06]"
@@ -186,6 +191,8 @@ function SummaryChip({ label, value, tone = "default" }: SummaryChipProps) {
           "text-[10px] font-black tracking-[0.18em]",
           tone === "orange"
             ? "text-[#FF7A16]"
+            : tone === "accent"
+              ? "text-[#FFB273]"
             : tone === "light"
               ? "text-[#5c6e97]"
               : "text-white/55"
@@ -205,7 +212,38 @@ function SummaryChip({ label, value, tone = "default" }: SummaryChipProps) {
   );
 }
 
+function getConsultReservationStatusLabel(status?: string | null) {
+  if (status === "confirmed") return "예약완료";
+  if (status === "completed") return "상담완료";
+  if (status === "canceled") return "예약취소";
+  return null;
+}
+
+function getSeatHoldStatusLabel(status?: string | null) {
+  if (status === "pending_transfer") return "자리찜 진행중";
+  if (status === "held") return "자리찜 확정";
+  if (status === "canceled") return "자리찜 취소";
+  return null;
+}
+
+function getLeadAccessLabel(lead: VerifiedLead) {
+  return lead.canReserve ? "예약 가능" : "순차 안내 중";
+}
+
+function getLeadAccessDescription(lead: VerifiedLead) {
+  if (lead.canReserve) {
+    return "센터에서 이 문의 건을 예약 가능 상태로 열어 두었습니다. 지금 바로 방문예약을 진행할 수 있습니다.";
+  }
+  return (
+    lead.bookingAccessNote ||
+    "현재는 이 문의 건의 순서가 아직 열리지 않아 슬롯과 좌석 현황만 확인할 수 있습니다. 센터에서 순차적으로 열어드린 뒤 예약이 가능합니다."
+  );
+}
+
 function LeadChoiceCard({ lead, isSelected, onSelect }: LeadChoiceCardProps) {
+  const consultReservationLabel = getConsultReservationStatusLabel(lead.latestConsultReservationStatus);
+  const seatHoldLabel = getSeatHoldStatusLabel(lead.latestSeatHoldStatus);
+
   return (
     <button
       type="button"
@@ -231,20 +269,33 @@ function LeadChoiceCard({ lead, isSelected, onSelect }: LeadChoiceCardProps) {
         ) : null}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
+        <span
+          className={cn(
+            "rounded-full border px-2.5 py-1 text-[10px] font-black",
+            lead.canReserve
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-slate-200 bg-slate-100 text-slate-600"
+          )}
+        >
+          {getLeadAccessLabel(lead)}
+        </span>
         <span className="rounded-full border border-[#14295F]/12 px-2.5 py-1 text-[10px] font-black text-[#14295F]/68">
           {lead.requestTypeLabel || "기존 입학문의"}
         </span>
-        {lead.latestConsultReservationStatus ? (
+        {consultReservationLabel ? (
           <span className="rounded-full border border-[#dbe4ff] bg-[#edf3ff] px-2.5 py-1 text-[10px] font-black text-[#17326B]">
-            상담 {lead.latestConsultReservationStatus}
+            {consultReservationLabel}
           </span>
         ) : null}
-        {lead.latestSeatHoldStatus ? (
+        {seatHoldLabel ? (
           <span className="rounded-full border border-[#ffe2cb] bg-[#fff3e9] px-2.5 py-1 text-[10px] font-black text-[#c26a1c]">
-            자리찜 {lead.latestSeatHoldStatus}
+            {seatHoldLabel}
           </span>
         ) : null}
       </div>
+      {!lead.canReserve ? (
+        <p className="mt-3 text-[11px] font-bold leading-5 text-[#5c6e97]">{getLeadAccessDescription(lead)}</p>
+      ) : null}
     </button>
   );
 }
@@ -409,7 +460,11 @@ export function ConsultReservationCard() {
         return;
       }
       setVerifiedLeads(data.leads);
-      setSelectedLeadId(data.leads[0]?.id || null);
+      const defaultLead = data.leads.find((lead) => lead.canReserve) || data.leads[0] || null;
+      setSelectedLeadId(defaultLead?.id || null);
+      if (!data.leads.some((lead) => lead.canReserve)) {
+        setActionError(getLeadAccessDescription(defaultLead as VerifiedLead));
+      }
     } catch (error) {
       logHandledClientIssue("[consult-reservation-card] verify failed", error);
       setActionError("전화번호 인증 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
@@ -421,6 +476,10 @@ export function ConsultReservationCard() {
   async function handleSubmitAction() {
     if (!action || !selectedLead) {
       setActionError("접수 건을 먼저 선택해 주세요.");
+      return;
+    }
+    if (!selectedLead.canReserve) {
+      setActionError(getLeadAccessDescription(selectedLead));
       return;
     }
 
@@ -528,7 +587,7 @@ export function ConsultReservationCard() {
               실시간 좌석 확인
             </h3>
             <p className="mt-3 break-keep text-sm font-semibold leading-6 text-white/78">
-              기존 입학문의에 남긴 연락처로 인증하면 상담 시간 예약과 빈 좌석번호 확인, 자리찜 신청까지 바로 이어집니다.
+              기존 입학문의에 남긴 연락처로 인증하면 상담 슬롯과 빈 좌석번호를 볼 수 있고, 센터가 순차적으로 열어드린 문의 건만 바로 예약할 수 있습니다.
             </p>
           </div>
           <div className="hidden rounded-full border border-white/10 bg-white/[0.08] p-3 text-white/80 sm:block">
@@ -539,7 +598,7 @@ export function ConsultReservationCard() {
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <SummaryChip label="예약 가능 슬롯" value={`${availableSlotCount}개`} />
           <SummaryChip label="실시간 빈좌석" value={`${seatSummary.availableCount}석`} />
-          <SummaryChip label="자리찜 진행" value={`${seatSummary.heldCount}석`} tone="orange" />
+          <SummaryChip label="자리찜 진행" value={`${seatSummary.heldCount}석`} tone="accent" />
         </div>
 
         <div className="mt-5 rounded-[1.35rem] border border-white/10 bg-white/[0.05] p-4">
@@ -548,7 +607,7 @@ export function ConsultReservationCard() {
             <div className="min-w-0">
               <p className="text-sm font-black text-white">전화번호 인증 후 예약</p>
               <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
-                {activeSettings?.slotGuideText || "센터가 미리 연 상담 시간만 예약할 수 있습니다."}
+                {activeSettings?.slotGuideText || "리드 DB에 등록되고 센터가 예약 가능 상태로 열어준 문의 건만 방문예약과 자리찜을 진행할 수 있습니다."}
               </p>
             </div>
           </div>
@@ -564,7 +623,7 @@ export function ConsultReservationCard() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black tracking-[0.18em] text-white/55">상담 예약 가능 시간</p>
-              <p className="mt-1 text-sm font-semibold text-white/75">센터가 열어둔 시간만 바로 예약할 수 있습니다.</p>
+              <p className="mt-1 text-sm font-semibold text-white/75">슬롯과 좌석 현황은 볼 수 있고, 실제 예약은 순차 해제된 문의 건만 가능합니다.</p>
             </div>
             <Button
               type="button"
@@ -632,7 +691,7 @@ export function ConsultReservationCard() {
                                 : "bg-white/10 text-white/66"
                             )}
                           >
-                            {slot.isAvailable ? "예약 가능" : "예약 마감"}
+                            {slot.isAvailable ? "인증 필요" : "예약 마감"}
                           </span>
                         </div>
                         <p className="mt-2 text-xs font-semibold leading-5 text-white/68">
@@ -654,7 +713,7 @@ export function ConsultReservationCard() {
             <DialogHeader className="text-left">
               <DialogTitle className="text-[1.65rem] font-black tracking-[-0.04em]">실시간 좌석 현황</DialogTitle>
               <DialogDescription className="pt-2 text-sm font-semibold leading-6 text-white/78">
-                빈자리만 선택 가능합니다. 자리찜은 기존 관리형 스터디센터 문의 번호 인증 후 신청할 수 있습니다.
+                빈자리만 선택 가능합니다. 자리찜은 리드 DB에 등록되고 센터가 예약 가능 상태로 열어준 관리형 스터디센터 문의 번호만 신청할 수 있습니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -723,7 +782,7 @@ export function ConsultReservationCard() {
             <DialogHeader className="text-left">
               <DialogTitle className="text-[1.7rem] font-black tracking-[-0.04em]">{actionTitle}</DialogTitle>
               <DialogDescription className="pt-2 text-sm font-semibold leading-6 text-white/78">
-                기존 홍보 입학문의에 남긴 학부모 연락처로 인증한 뒤 진행됩니다.
+                기존 홍보 입학문의에 남긴 학부모 연락처로 인증한 뒤, 센터가 예약 가능 상태로 열어둔 문의 건만 진행됩니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -773,9 +832,9 @@ export function ConsultReservationCard() {
                   </p>
                 </div>
 
-                <div className="rounded-[1.4rem] border border-[#dbe5ff] bg-white p-4">
-                  <label htmlFor="verifyPhone" className="text-sm font-black text-[#14295F]">
-                    학부모 연락처 인증
+                  <div className="rounded-[1.4rem] border border-[#dbe5ff] bg-white p-4">
+                    <label htmlFor="verifyPhone" className="text-sm font-black text-[#14295F]">
+                      학부모 연락처 인증
                   </label>
                   <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                     <input
@@ -800,7 +859,7 @@ export function ConsultReservationCard() {
                     </Button>
                   </div>
                   <p className="mt-2 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                    아직 번호를 남기지 않으셨다면 아래 빠른 입학문의 폼을 먼저 작성해 주세요.
+                    리드 DB에 등록된 번호만 확인되며, 등록 후에도 센터가 순차적으로 예약 가능 상태를 열어드립니다.
                   </p>
                 </div>
 
@@ -820,6 +879,44 @@ export function ConsultReservationCard() {
                         />
                       ))}
                     </div>
+                  </div>
+                ) : null}
+
+                {selectedLead ? (
+                  <div
+                    className={cn(
+                      "rounded-[1.4rem] border p-4",
+                      selectedLead.canReserve
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-slate-200 bg-slate-50"
+                    )}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-black text-[#14295F]">현재 예약 상태</p>
+                      <span
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-[10px] font-black",
+                          selectedLead.canReserve
+                            ? "border-emerald-200 bg-white text-emerald-700"
+                            : "border-slate-200 bg-white text-slate-600"
+                        )}
+                      >
+                        {getLeadAccessLabel(selectedLead)}
+                      </span>
+                      {getConsultReservationStatusLabel(selectedLead.latestConsultReservationStatus) ? (
+                        <span className="rounded-full border border-[#dbe4ff] bg-white px-2.5 py-1 text-[10px] font-black text-[#17326B]">
+                          {getConsultReservationStatusLabel(selectedLead.latestConsultReservationStatus)}
+                        </span>
+                      ) : null}
+                      {getSeatHoldStatusLabel(selectedLead.latestSeatHoldStatus) ? (
+                        <span className="rounded-full border border-[#ffe2cb] bg-white px-2.5 py-1 text-[10px] font-black text-[#c26a1c]">
+                          {getSeatHoldStatusLabel(selectedLead.latestSeatHoldStatus)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-3 text-sm font-semibold leading-6 text-[#14295F]/72">
+                      {getLeadAccessDescription(selectedLead)}
+                    </p>
                   </div>
                 ) : null}
 
@@ -878,6 +975,7 @@ export function ConsultReservationCard() {
                   disabled={
                     submitting ||
                     !selectedLead ||
+                    !selectedLead.canReserve ||
                     (action?.kind === "seat" && (!policyAccepted || !selectedLead.canSeatHold))
                   }
                 >
@@ -886,6 +984,12 @@ export function ConsultReservationCard() {
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       처리 중...
                     </>
+                  ) : !selectedLead ? (
+                    "접수 건을 먼저 선택해 주세요"
+                  ) : !selectedLead.canReserve ? (
+                    "순차 안내 중"
+                  ) : action?.kind === "seat" && !selectedLead.canSeatHold ? (
+                    "관리형 스터디센터 문의만 가능"
                   ) : action?.kind === "slot" ? (
                     "상담 시간 예약 확정하기"
                   ) : (

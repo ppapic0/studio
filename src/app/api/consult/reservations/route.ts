@@ -13,6 +13,7 @@ import { resolveMarketingCenterId } from '@/lib/marketing-center';
 import {
   buildLeadLinkPatch,
   formatSlotLabel,
+  getWebsiteBookingAccess,
   getWebsiteReservationSettings,
   isActiveWebsiteConsultReservation,
   normalizePhone,
@@ -185,6 +186,15 @@ export async function POST(request: NextRequest) {
       if (lead.centerId && lead.centerId !== centerId) {
         throw new ApiError(403, '다른 센터 문의 건으로는 예약할 수 없습니다.');
       }
+      if (!centerLeadSnap.exists) {
+        throw new ApiError(403, '아직 순차 안내 전인 문의 건입니다. 센터에서 예약 가능 상태로 열어드린 뒤 다시 시도해주세요.');
+      }
+
+      const centerLead = centerLeadSnap.data() as Record<string, any>;
+      const bookingAccess = getWebsiteBookingAccess(centerLead.bookingAccess);
+      if (!bookingAccess.isEnabled) {
+        throw new ApiError(403, '아직 순차 안내 전인 문의 건입니다. 센터에서 예약 가능 상태로 열어드린 뒤 다시 시도해주세요.');
+      }
 
       if (!slotSnap.exists) {
         throw new ApiError(404, '선택한 상담 시간이 존재하지 않습니다.');
@@ -244,23 +254,20 @@ export async function POST(request: NextRequest) {
         { merge: true }
       );
 
-      if (centerLeadSnap.exists) {
-        const centerLead = centerLeadSnap.data() as Record<string, any>;
-        transaction.set(
-          centerLeadRef,
-          {
-            linkedConsultReservationId: reservation.id,
-            linkedConsultReservationIds: buildLeadLinkPatch(
-              reservation.id,
-              Array.isArray(centerLead.linkedConsultReservationIds)
-                ? (centerLead.linkedConsultReservationIds as string[])
-                : []
-            ),
-            updatedAt: createdAt,
-          },
-          { merge: true }
-        );
-      }
+      transaction.set(
+        centerLeadRef,
+        {
+          linkedConsultReservationId: reservation.id,
+          linkedConsultReservationIds: buildLeadLinkPatch(
+            reservation.id,
+            Array.isArray(centerLead.linkedConsultReservationIds)
+              ? (centerLead.linkedConsultReservationIds as string[])
+              : []
+          ),
+          updatedAt: createdAt,
+        },
+        { merge: true }
+      );
 
       return {
         reservation,
