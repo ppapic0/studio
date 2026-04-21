@@ -586,7 +586,7 @@ export function ConsultReservationCard() {
               <br />
               실시간 좌석 확인
             </h3>
-            <p className="mt-3 break-keep text-sm font-semibold leading-6 text-white/78">
+            <p className="mt-3 break-keep text-sm font-semibold leading-6 text-white">
               기존 입학문의에 남긴 연락처로 인증하면 상담 슬롯과 빈 좌석번호를 볼 수 있고, 센터가 순차적으로 열어드린 문의 건만 바로 예약할 수 있습니다.
             </p>
           </div>
@@ -606,7 +606,7 @@ export function ConsultReservationCard() {
             <Phone className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB273]" />
             <div className="min-w-0">
               <p className="text-sm font-black text-white">전화번호 인증 후 예약</p>
-              <p className="mt-1 text-xs font-semibold leading-5 text-white/72">
+              <p className="mt-1 text-xs font-semibold leading-5 text-white">
                 {activeSettings?.slotGuideText || "리드 DB에 등록되고 센터가 예약 가능 상태로 열어준 문의 건만 방문예약과 자리찜을 진행할 수 있습니다."}
               </p>
             </div>
@@ -622,8 +622,8 @@ export function ConsultReservationCard() {
         <div className="mt-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black tracking-[0.18em] text-white/55">상담 예약 가능 시간</p>
-              <p className="mt-1 text-sm font-semibold text-white/75">슬롯과 좌석 현황은 볼 수 있고, 실제 예약은 순차 해제된 문의 건만 가능합니다.</p>
+              <p className="text-xs font-black tracking-[0.18em] text-white/90">상담 예약 가능 시간</p>
+              <p className="mt-1 text-sm font-semibold text-white">슬롯과 좌석 현황은 볼 수 있고, 실제 예약은 순차 해제된 문의 건만 가능합니다.</p>
             </div>
             <Button
               type="button"
@@ -644,7 +644,7 @@ export function ConsultReservationCard() {
           ) : groupedSlots.length === 0 ? (
             <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-white/[0.04] px-4 py-8 text-center">
               <p className="text-sm font-black text-white">지금은 공개된 상담 슬롯이 없습니다.</p>
-              <p className="mt-2 text-xs font-semibold leading-5 text-white/66">
+              <p className="mt-2 text-xs font-semibold leading-5 text-white">
                 먼저 빠른 입학문의 폼을 남겨주시면 센터에서 순차적으로 안내드립니다.
               </p>
               <a
