@@ -13,6 +13,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import {
+  CalendarClock,
   Download,
   Flame,
   Globe2,
@@ -62,6 +63,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { WebsiteConsultOperations } from '@/components/dashboard/website-consult-operations';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -336,6 +338,7 @@ export function MarketingConsultingCRM({
   const canTransitionPipeline = canTransitionLeadPipeline(activeMembership?.role);
 
   const [activeTab, setActiveTab] = useState<'leads' | 'waitlist'>('leads');
+  const [leadWorkspaceTab, setLeadWorkspaceTab] = useState<'pipeline' | 'reservations'>('pipeline');
   const [form, setForm] = useState<LeadFormState>(INITIAL_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -1195,6 +1198,37 @@ export function MarketingConsultingCRM({
           </CardHeader>
 
           <CardContent className={cn('space-y-4', isMobile ? 'p-5 pt-0' : 'p-6 pt-0')}>
+            <div className="flex gap-1 rounded-2xl bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => setLeadWorkspaceTab('pipeline')}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-black transition-all',
+                  leadWorkspaceTab === 'pipeline'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                <Megaphone className="h-4 w-4" />
+                리드 현황
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeadWorkspaceTab('reservations')}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-black transition-all',
+                  leadWorkspaceTab === 'reservations'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                <CalendarClock className="h-4 w-4" />
+                예약 운영
+              </button>
+            </div>
+
+            {leadWorkspaceTab === 'pipeline' ? (
+              <>
             {/* ── 웹사이트 상담폼 접수 ── */}
             <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4">
               <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
@@ -1589,6 +1623,7 @@ export function MarketingConsultingCRM({
                 ...(canManageLeadData
                   ? [{ label: editingId ? '입력 초기화' : '상담 리드 등록', icon: <PlusCircle className="h-4 w-4" />, onClick: resetForm }]
                   : []),
+                { label: '예약 운영', icon: <CalendarClock className="h-4 w-4" />, onClick: () => setLeadWorkspaceTab('reservations') },
                 { label: '입학 대기 DB', icon: <ListChecks className="h-4 w-4" />, onClick: () => setActiveTab('waitlist') },
                 ...(canOpenFinance ? [{ label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }] : []),
                 { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
@@ -1797,6 +1832,41 @@ export function MarketingConsultingCRM({
                     다음
                   </Button>
                 </div>
+              </div>
+            )}
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-[1.75rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f7fbff_48%,#eef4ff_100%)] p-5 shadow-[0_24px_52px_-40px_rgba(20,41,95,0.28)]">
+                  <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">Reservation Desk</p>
+                      <h3 className="text-lg font-black tracking-tight text-[#14295F]">방문 가능 일자 열기와 입금 확인을 여기서 바로 처리합니다.</h3>
+                      <p className="text-sm font-semibold leading-6 text-[#5c6e97]">
+                        홍보 리드 DB 안에서 상담 슬롯 공개, 방문예약 확인, 실제 입금 후 자리찜 확정까지 한 흐름으로 관리합니다.
+                      </p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-white px-4 py-3 shadow-[0_18px_38px_-34px_rgba(20,41,95,0.22)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">예약 가능</p>
+                        <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{websiteSummary.enabledCount}건</p>
+                      </div>
+                      <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-white px-4 py-3 shadow-[0_18px_38px_-34px_rgba(20,41,95,0.22)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">방문예약</p>
+                        <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">
+                          {websiteReservations.filter((reservation) => reservation.status === 'confirmed').length}건
+                        </p>
+                      </div>
+                      <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-white px-4 py-3 shadow-[0_18px_38px_-34px_rgba(20,41,95,0.22)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">입금 대기</p>
+                        <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">
+                          {websiteSeatHolds.filter((seatHold) => seatHold.status === 'pending_transfer').length}건
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <WebsiteConsultOperations />
               </div>
             )}
           </CardContent>

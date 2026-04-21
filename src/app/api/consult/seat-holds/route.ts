@@ -24,6 +24,7 @@ import {
   getGlobalSeatNo,
   getRoomLabel,
   normalizeLayoutRooms,
+  PRIMARY_ROOM_ID,
 } from '@/lib/seat-layout';
 import type {
   AttendanceCurrent,
@@ -138,6 +139,13 @@ export async function POST(request: NextRequest) {
       }
 
       const rooms = normalizeLayoutRooms(centerSnap.data()?.layoutSettings || null);
+      const primaryRoom = rooms.find((item) => item.id === PRIMARY_ROOM_ID) || rooms[0];
+      if (!primaryRoom) {
+        throw new ApiError(503, '좌석 배치 정보가 아직 준비되지 않았습니다.');
+      }
+      if (roomId !== primaryRoom.id) {
+        throw new ApiError(400, '현재 공개 좌석은 1호실만 신청할 수 있습니다.');
+      }
       const room = rooms.find((item) => item.id === roomId);
       if (!room) {
         throw new ApiError(400, '존재하지 않는 호실입니다.');

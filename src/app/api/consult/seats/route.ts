@@ -22,6 +22,7 @@ import type {
   WebsiteReservationSettings,
   WebsiteSeatHoldRequest,
 } from '@/lib/types';
+import { PRIMARY_ROOM_ID } from '@/lib/seat-layout';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,12 +75,16 @@ export async function GET(request: NextRequest) {
       settingsSnap.exists ? ({ ...(settingsSnap.data() as WebsiteReservationSettings), id: settingsSnap.id } as WebsiteReservationSettings) : null
     );
 
-    const rooms = buildPublicSeatRooms({
+    const allRooms = buildPublicSeatRooms({
       layoutSettings: centerSnap.data()?.layoutSettings || null,
       students,
       attendanceCurrent,
       seatHoldRequests: seatHolds,
     });
+    const rooms = (() => {
+      const primaryRoom = allRooms.find((room) => room.roomId === PRIMARY_ROOM_ID || room.roomName === '1호실');
+      return primaryRoom ? [primaryRoom] : allRooms.slice(0, 1);
+    })();
     const summary = summarizePublicSeats(rooms);
 
     return noStoreJson({
