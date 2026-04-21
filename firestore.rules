@@ -606,6 +606,25 @@ service cloud.firestore {
         allow delete: if isCenterAdmin(centerId);
       }
 
+      match /websiteConsultSlots/{slotId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /websiteConsultReservations/{reservationId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /websiteSeatHoldRequests/{requestId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /websiteReservationSettings/{settingId} {
+        allow read, write: if isCenterAdmin(centerId);
+      }
+
       match /websiteEntryEvents/{eventId} {
         allow read: if isTeacherOrAdmin(centerId);
         allow write: if isCenterAdmin(centerId);

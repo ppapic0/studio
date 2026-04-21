@@ -4,6 +4,7 @@ import { resolveMarketingCenterId } from '@/lib/marketing-center';
 import { unstable_noStore as noStore } from 'next/cache';
 
 import { ConsultForm } from './consult-form';
+import { ConsultReservationCard } from './consult-reservation-card';
 import { SectionHeading } from './section-heading';
 import { StaggerChildren } from './stagger-children';
 
@@ -120,6 +121,8 @@ export async function ConsultSection({ consult, trustMetrics }: ConsultSectionPr
             <ConsultForm waitlistCount={waitlistCount} />
 
             <div className="space-y-4">
+              <ConsultReservationCard />
+
               {/* 입학 대기 인원 배너 */}
               {waitlistCount > 0 && (
                 <article

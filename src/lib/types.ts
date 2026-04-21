@@ -1031,6 +1031,93 @@ export interface CounselingLog {
   createdAt: Timestamp;
 }
 
+export interface WebsiteConsultSlot {
+  id: string;
+  centerId?: string | null;
+  label?: string | null;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  isPublished: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  createdByUid?: string | null;
+  updatedByUid?: string | null;
+}
+
+export type WebsiteConsultReservationStatus = 'confirmed' | 'canceled' | 'completed';
+
+export interface WebsiteConsultReservation {
+  id: string;
+  centerId?: string | null;
+  leadId: string;
+  consultPhone: string;
+  studentName: string;
+  school?: string | null;
+  grade?: string | null;
+  receiptId?: string | null;
+  requestType?: string | null;
+  requestTypeLabel?: string | null;
+  slotId: string;
+  scheduledAt: string;
+  startsAt: string;
+  endsAt: string;
+  status: WebsiteConsultReservationStatus;
+  createdAt?: string;
+  updatedAt?: string;
+  canceledAt?: string | null;
+  completedAt?: string | null;
+  createdByUid?: string | null;
+  updatedByUid?: string | null;
+}
+
+export type WebsiteSeatHoldRequestStatus = 'pending_transfer' | 'held' | 'canceled';
+
+export interface WebsiteSeatHoldRequest {
+  id: string;
+  centerId?: string | null;
+  leadId: string;
+  consultPhone: string;
+  studentName: string;
+  school?: string | null;
+  grade?: string | null;
+  receiptId?: string | null;
+  requestType?: string | null;
+  requestTypeLabel?: string | null;
+  seatId: string;
+  roomId: string;
+  roomSeatNo: number;
+  seatNo: number;
+  seatLabel: string;
+  status: WebsiteSeatHoldRequestStatus;
+  depositAmount: number;
+  bankAccountDisplay: string;
+  depositorGuide: string;
+  nonRefundableNotice: string;
+  policyAcceptedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  confirmedAt?: string | null;
+  canceledAt?: string | null;
+  createdByUid?: string | null;
+  updatedByUid?: string | null;
+}
+
+export interface WebsiteReservationSettings {
+  id: string;
+  centerId?: string | null;
+  isPublicEnabled?: boolean;
+  bankAccountDisplay: string;
+  depositAmount: number;
+  depositorGuide: string;
+  nonRefundableNotice: string;
+  slotGuideText?: string | null;
+  seatGuideText?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  updatedByUid?: string | null;
+}
+
 export type SupportThreadKind = 'student_question' | 'student_suggestion' | 'wifi_unblock';
 export type SupportThreadSenderRole = 'student' | 'teacher' | 'centerAdmin' | 'parent';
 

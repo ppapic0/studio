@@ -72,6 +72,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { isAdminRole, isTeacherOrAdminRole } from '@/lib/dashboard-access';
+import { WebsiteConsultOperations } from '@/components/dashboard/website-consult-operations';
 
 type ParentCommunicationRecord = {
   id: string;
@@ -1831,7 +1832,9 @@ export function AppointmentsPageContent({
         )}
 
         <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
-          <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={studentSectionCardClass}>
+          <div className="space-y-5">
+            {isAdmin && <WebsiteConsultOperations />}
+            <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={studentSectionCardClass}>
             <CardHeader className={studentSectionHeaderClass}>
               <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
                 <div className="space-y-2">
@@ -1949,6 +1952,7 @@ export function AppointmentsPageContent({
               )}
             </CardContent>
           </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="logs" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
