@@ -1979,6 +1979,40 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => formatSeatLabel(selectedSeat, roomConfigs, '좌석 미지정', persistedSeatLabelsBySeatId),
     [persistedSeatLabelsBySeatId, roomConfigs, selectedSeat]
   );
+  const normalizedSeatLabelDraft = useMemo(
+    () => normalizeSeatLabelValue(seatLabelDraft),
+    [seatLabelDraft]
+  );
+  const seatNumberQuickOptions = useMemo(() => {
+    const numericLabels = new Set<string>();
+    const maxSeatCount = roomConfigs.reduce((max, room) => Math.max(max, room.rows * room.cols), 0);
+
+    for (let index = 1; index <= maxSeatCount; index += 1) {
+      numericLabels.add(String(index));
+    }
+
+    Object.values(persistedSeatLabelsBySeatId).forEach((label) => {
+      const normalized = normalizeSeatLabelValue(label);
+      if (/^\d+$/.test(normalized)) {
+        numericLabels.add(normalized);
+      }
+    });
+
+    if (/^\d+$/.test(selectedSeatDefaultLabel)) {
+      numericLabels.add(selectedSeatDefaultLabel);
+    }
+    if (/^\d+$/.test(selectedSeatDisplayLabel)) {
+      numericLabels.add(selectedSeatDisplayLabel);
+    }
+
+    return Array.from(numericLabels).sort((left, right) => Number(left) - Number(right));
+  }, [persistedSeatLabelsBySeatId, roomConfigs, selectedSeatDefaultLabel, selectedSeatDisplayLabel]);
+  const seatNumberQuickSelectValue = useMemo(() => {
+    if (!normalizedSeatLabelDraft || normalizedSeatLabelDraft === selectedSeatDefaultLabel) {
+      return '__empty__';
+    }
+    return /^\d+$/.test(normalizedSeatLabelDraft) ? normalizedSeatLabelDraft : '__custom__';
+  }, [normalizedSeatLabelDraft, selectedSeatDefaultLabel]);
   const selectedSeatModeLabel = useMemo(
     () => (selectedSeat?.type === 'aisle' ? '통로 모드' : '좌석 모드'),
     [selectedSeat?.type]
@@ -2441,16 +2475,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const handleSeatClick = (seat: AttendanceCurrent) => {
     setSelectedSeat(seat);
     if (isEditMode) {
+      setIsManaging(false);
+      setIsAssigning(false);
       if (seat.studentId) {
-        setIsManaging(true);
         fetchStudentDetails(seat.studentId);
       }
-      else setIsAssigning(true);
-    } else {
-      if (seat.studentId && seat.type !== 'aisle') {
-        setIsManaging(true);
-        fetchStudentDetails(seat.studentId);
-      }
+      return;
+    }
+
+    if (seat.studentId && seat.type !== 'aisle') {
+      setIsManaging(true);
+      fetchStudentDetails(seat.studentId);
     }
   };
 
@@ -3254,12 +3289,110 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       </div>
 
       {isEditMode ? (
-        <div className={cn("rounded-[2rem] border border-[#FFD7B0] bg-[#FFF8F1]", compact ? "p-3.5" : "p-4")}>
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C95A08]">편집 모드 안내</p>
-          <p className="mt-2 text-sm font-black text-[#14295F]">좌석을 눌러 통로, 구역, 배정 설정을 이어서 바꿔주세요.</p>
-          <p className="mt-1 text-xs font-bold leading-5 text-[#8A5A2B]">
-            편집 중에는 도면 오버레이가 상태 보기로 고정됩니다. 그래서 아래 비교 버튼이 아니라 좌석 클릭이 실제 설정 진입점입니다.
-          </p>
+        <div className="space-y-3">
+          <div className={cn("rounded-[2rem] border border-[#FFD7B0] bg-[#FFF8F1]", compact ? "p-3.5" : "p-4")}>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C95A08]">편집 모드 안내</p>
+            <p className="mt-2 text-sm font-black text-[#14295F]">좌석을 눌러 통로, 구역, 번호 설정을 바로 바꿔주세요.</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[#8A5A2B]">
+              편집 중에는 도면 오버레이가 상태 보기로 고정됩니다. 왼쪽 좌석을 누르면 이 패널에서 번호와 설정을 바로 이어서 수정할 수 있습니다.
+            </p>
+          </div>
+
+          <div className={cn("rounded-[2rem] border border-[#D7E4FF] bg-white", compact ? "p-3.5" : "p-4")}>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">선택한 좌석</p>
+            {selectedSeat ? (
+              <div className="mt-3 space-y-3">
+                <div className="rounded-[1.35rem] border border-[#E4ECFA] bg-[#F8FBFF] px-4 py-3">
+                  <p className="text-sm font-black text-[#14295F]">{selectedSeatLabel}</p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-[#5C6E97]">
+                    {selectedSeatModeLabel} · {selectedSeatZoneLabel} · {selectedSeatAssignmentLabel}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    <LayoutGrid className="h-3 w-3" /> 좌석 번호 선택
+                  </Label>
+                  <Select
+                    value={seatNumberQuickSelectValue}
+                    onValueChange={(value) => setSeatLabelDraft(value === '__empty__' ? '' : value)}
+                    disabled={!selectedSeat?.roomSeatNo || isSaving}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl border-2 font-bold shadow-sm">
+                      <SelectValue placeholder="번호 선택" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72 rounded-xl border-none shadow-2xl">
+                      <SelectItem value="__empty__" className="font-bold">기본 순번 사용</SelectItem>
+                      {seatNumberQuickSelectValue === '__custom__' ? (
+                        <SelectItem value="__custom__" disabled className="font-bold">직접 입력값 사용</SelectItem>
+                      ) : null}
+                      {seatNumberQuickOptions.map((option) => (
+                        <SelectItem key={`seat-number-${option}`} value={option} className="font-bold">
+                          {option}번
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2">
+                    <Input
+                      value={seatLabelDraft}
+                      onChange={(event) => setSeatLabelDraft(event.target.value.slice(0, 12))}
+                      placeholder={selectedSeatDefaultLabel || '예: 64'}
+                      className="h-11 rounded-xl border-2 font-bold shadow-sm"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleSaveSeatLabel}
+                      disabled={
+                        isSaving ||
+                        !selectedSeat?.roomSeatNo ||
+                        normalizedSeatLabelDraft === (selectedSeatDisplayLabel || selectedSeatDefaultLabel)
+                      }
+                      className="h-11 rounded-xl px-4 font-black whitespace-nowrap"
+                    >
+                      저장
+                    </Button>
+                  </div>
+                  <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
+                    드롭다운에서 빠르게 고르거나 직접 입력할 수 있습니다. 비워두면 기본 순번 {selectedSeatDefaultLabel || '-'}번을 사용합니다.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAssigning(true)}
+                    disabled={selectedSeat.type === 'aisle'}
+                    className="h-10 rounded-xl border-2 font-black"
+                  >
+                    학생 배정 열기
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedSeat.studentId) {
+                        fetchStudentDetails(selectedSeat.studentId);
+                      }
+                      setIsManaging(true);
+                    }}
+                    disabled={!selectedSeat.studentId}
+                    className="h-10 rounded-xl border-2 font-black"
+                  >
+                    학생 상세 열기
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-[1.35rem] border border-dashed border-[#D7E4FF] bg-[#F8FBFF] px-4 py-4">
+                <p className="text-sm font-black text-[#14295F]">왼쪽 도면에서 좌석을 먼저 눌러주세요.</p>
+                <p className="mt-1 text-xs font-bold leading-5 text-[#5C6E97]">
+                  선택한 좌석의 번호, 통로 여부, 구역 설정을 여기서 바로 바꿀 수 있습니다.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className={cn("flex flex-wrap gap-2", compact && "gap-1.5")}>
@@ -3359,6 +3492,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         'relative aspect-square cursor-pointer overflow-hidden border-2 outline-none shadow-sm transition-all duration-500',
                         compact ? 'min-w-[52px] rounded-[1.1rem] p-1' : 'min-w-[64px] rounded-2xl p-1',
                         'flex flex-col items-center justify-center',
+                        selectedSeat?.id === seat.id && 'ring-4 ring-[#FFB273]/40 ring-offset-2 ring-offset-white',
                         isFilteredOut ? 'border-transparent bg-muted/10 opacity-20 grayscale' :
                         isAisle ? (isEditMode
                           ? 'border-dashed border-[#FFB273] bg-[#FFF7EF] text-[#C95A08] hover:border-[#FF7A16]'
