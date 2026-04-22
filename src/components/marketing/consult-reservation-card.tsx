@@ -752,7 +752,7 @@ export function ConsultReservationCard() {
                   >
                     <div>
                       <p className="text-sm font-black text-white">{group.label}</p>
-                      <p className="mt-1 text-[11px] font-bold text-white/82">
+                      <p className="mt-1 text-[11px] font-bold text-white">
                         {group.slots.length}개 시간
                       </p>
                     </div>
