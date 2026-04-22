@@ -204,6 +204,13 @@ function hasSeatOccupant(seat?: Pick<AttendanceCurrent, 'studentId' | 'manualOcc
   return Boolean(assignedStudentId || getManualSeatOccupantName(seat));
 }
 
+function areSortedStringArraysEqual(left: string[] | null | undefined, right: string[] | null | undefined) {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
 function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
   const explicitDelta = Number((req as any).penaltyPointsDelta);
   if (Number.isFinite(explicitDelta) && explicitDelta > 0) {
@@ -409,6 +416,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [manualSeatOccupantName, setManualSeatOccupantName] = useState('');
   const [seatLabelDraft, setSeatLabelDraft] = useState('');
+  const [optimisticAisleSeatIds, setOptimisticAisleSeatIds] = useState<string[] | null>(null);
   
   const [selectedStudentSessions, setSelectedStudentSessions] = useState<StudySession[]>([]);
   const [selectedStudentReports, setSelectedStudentReports] = useState<DailyReport[]>([]);
@@ -541,6 +549,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => normalizeAisleSeatIds(centerData?.layoutSettings),
     [centerData?.layoutSettings]
   );
+  const hasPersistedAisleSeatIds = useMemo(
+    () => Array.isArray(centerData?.layoutSettings?.aisleSeatIds),
+    [centerData?.layoutSettings]
+  );
   const persistedSeatLabelsBySeatId = useMemo(
     () => normalizeSeatLabelsBySeatId(centerData?.layoutSettings),
     [centerData?.layoutSettings]
@@ -609,8 +621,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       };
     });
   }, [attendanceList, persistedSeatLabelsBySeatId]);
-  const effectiveAisleSeatIds = useMemo(() => {
-    const next = new Set(persistedAisleSeatIds);
+  const legacyAisleSeatIds = useMemo(() => {
+    const next = new Set<string>();
     rawResolvedAttendanceList.forEach((seat) => {
       if (seat.type !== 'aisle') return;
       const canonicalSeatId = buildSeatId(seat.roomId, seat.roomSeatNo);
@@ -619,7 +631,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
     });
     return Array.from(next).sort();
-  }, [persistedAisleSeatIds, rawResolvedAttendanceList]);
+  }, [rawResolvedAttendanceList]);
+  const effectiveAisleSeatIds = useMemo(() => {
+    if (optimisticAisleSeatIds) return optimisticAisleSeatIds;
+    if (hasPersistedAisleSeatIds) return persistedAisleSeatIds;
+    return legacyAisleSeatIds;
+  }, [hasPersistedAisleSeatIds, legacyAisleSeatIds, optimisticAisleSeatIds, persistedAisleSeatIds]);
   const effectiveAisleSeatIdSet = useMemo(
     () => new Set(effectiveAisleSeatIds),
     [effectiveAisleSeatIds]
@@ -634,9 +651,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   );
   useEffect(() => {
     if (!firestore || !centerId || !isActive) return;
-    if (persistedAisleSeatIds.length > 0 || effectiveAisleSeatIds.length === 0) return;
+    if (hasPersistedAisleSeatIds || legacyAisleSeatIds.length === 0) return;
 
-    const migrationKey = `${centerId}:${effectiveAisleSeatIds.join('|')}`;
+    const migrationKey = `${centerId}:${legacyAisleSeatIds.join('|')}`;
     if (aisleLayoutMigrationRef.current === migrationKey) return;
     aisleLayoutMigrationRef.current = migrationKey;
 
@@ -644,7 +661,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       doc(firestore, 'centers', centerId),
       {
         layoutSettings: {
-          aisleSeatIds: effectiveAisleSeatIds,
+          aisleSeatIds: legacyAisleSeatIds,
           updatedAt: serverTimestamp(),
         },
       },
@@ -653,7 +670,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       aisleLayoutMigrationRef.current = null;
       console.warn('[teacher-dashboard] aisle layout migration failed', migrationError);
     });
-  }, [centerId, effectiveAisleSeatIds, firestore, isActive, persistedAisleSeatIds]);
+  }, [centerId, firestore, hasPersistedAisleSeatIds, isActive, legacyAisleSeatIds]);
+  useEffect(() => {
+    if (!optimisticAisleSeatIds) return;
+    if (!hasPersistedAisleSeatIds) return;
+    if (!areSortedStringArraysEqual(optimisticAisleSeatIds, persistedAisleSeatIds)) return;
+    setOptimisticAisleSeatIds(null);
+  }, [hasPersistedAisleSeatIds, optimisticAisleSeatIds, persistedAisleSeatIds]);
+  useEffect(() => {
+    setOptimisticAisleSeatIds(null);
+  }, [centerId]);
 
   const studentsById = useMemo(
     () => new Map((students || []).map((student) => [student.id, student])),
@@ -2259,6 +2285,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       batch.update(doc(firestore, 'centers', centerId), {
         'layoutSettings.seatLabelsBySeatId': nextSeatLabelsBySeatId,
       });
+      setOptimisticAisleSeatIds(nextAisleSeatIds);
       await batch.commit();
 
       if (selectedSeat?.roomId === roomId && (selectedSeat.roomSeatNo ?? 0) > nextMaxCells) {
@@ -2283,6 +2310,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             : `${roomDraft.cols} x ${roomDraft.rows} 구조로 반영했습니다.`,
       });
     } catch (error) {
+      setOptimisticAisleSeatIds(null);
       toast({ variant: 'destructive', title: '도면 저장 실패' });
     } finally {
       setIsSaving(false);
@@ -2375,6 +2403,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         'layoutSettings.seatLabelsBySeatId': nextSeatLabelsBySeatId,
       });
 
+      setOptimisticAisleSeatIds(nextAisleSeatIds);
       await batch.commit();
 
       setRoomDrafts((prev) => {
@@ -2389,6 +2418,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         description: '사용하지 않는 호실 배치를 정리했습니다.',
       });
     } catch (error) {
+      setOptimisticAisleSeatIds(null);
       toast({ variant: 'destructive', title: '호실 삭제 실패' });
     } finally {
       setIsSaving(false);
@@ -3036,6 +3066,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      const optimisticNextAisles = Array.from(nextAisleSeatIds).sort();
+      setOptimisticAisleSeatIds(optimisticNextAisles);
       await batch.commit();
       const nextSeatZone = nextType === 'aisle' ? undefined : selectedSeat.seatZone;
       setSelectedSeat({
@@ -3051,7 +3083,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         setManualSeatOccupantName('');
       }
       toast({ title: nextType === 'aisle' ? "통로로 변경됨" : "좌석으로 변경됨" });
-    } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); } finally { setIsSaving(false); }
+    } catch (e) {
+      setOptimisticAisleSeatIds(null);
+      toast({ variant: "destructive", title: "변경 실패" });
+    } finally { setIsSaving(false); }
   };
 
   const handleSaveManualSeatOccupancy = async () => {
