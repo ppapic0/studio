@@ -99,8 +99,7 @@ const materialPreviews = [
   },
 ];
 
-const koreanMaterialPdfPath = '/materials/2026-korean-nonfiction-2passages-commentary.pdf';
-const koreanMaterialPreviewImagePath = '/materials/2026-korean-nonfiction-2passages-commentary-page1.png';
+const koreanMaterialPdfPath = '/materials/track-social-culture-4-student-handout.pdf';
 
 const studentFits = [
   {
@@ -424,18 +423,18 @@ export default async function ClassPage() {
               </p>
               <div className="mx-auto mb-6 max-w-3xl overflow-hidden rounded-[1.2rem] border border-white/18 bg-white">
                 <div className="flex items-center justify-between border-b border-[#14295F]/10 px-4 py-2.5">
-                  <p className="text-[12px] font-black text-[#14295F]">PDF 1페이지 미리보기</p>
+                  <p className="text-[12px] font-black text-[#14295F]">수업자료 PDF 미리보기</p>
                   <a href={koreanMaterialPdfPath} download className="text-[11.5px] font-black text-[#14295F]/70 hover:text-[#14295F]">
                     다운로드
                   </a>
                 </div>
-                <a href={koreanMaterialPdfPath} target="_blank" rel="noreferrer" className="block bg-white">
-                  <img
-                    src={koreanMaterialPreviewImagePath}
-                    alt="수업자료 PDF 1페이지 미리보기"
-                    className="h-[380px] w-full object-contain sm:h-[360px] lg:h-[420px]"
+                <div className="block bg-white">
+                  <iframe
+                    src={`${koreanMaterialPdfPath}#toolbar=0&navpanes=0&scrollbar=0&page=1`}
+                    title="수업자료 PDF 미리보기"
+                    className="h-[420px] w-full bg-white"
                   />
-                </a>
+                </div>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a
