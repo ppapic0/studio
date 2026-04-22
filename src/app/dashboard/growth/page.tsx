@@ -462,7 +462,11 @@ export default function GrowthPage() {
     if (!firestore || !activeMembership || !user) return null;
     return query(collection(firestore, 'centers', activeMembership.id, 'giftishowProducts'), limit(GIFTISHOW_PRODUCT_FETCH_LIMIT));
   }, [firestore, activeMembership?.id, user?.uid]);
-  const { data: giftishowProductsRaw } = useCollection<GiftishowProduct>(giftishowProductsQuery, {
+  const {
+    data: giftishowProductsRaw,
+    isLoading: isGiftishowProductsLoading,
+    error: giftishowProductsError,
+  } = useCollection<GiftishowProduct>(giftishowProductsQuery, {
     enabled: Boolean(activeMembership && user),
   });
 
@@ -800,6 +804,16 @@ export default function GrowthPage() {
   useEffect(() => {
     setGiftishowPage(1);
   }, [giftishowFilterMode, giftishowSearchQuery, isGiftishowShopOpen]);
+
+  useEffect(() => {
+    if (
+      giftishowFilterMode === 'available' &&
+      giftishowProducts.length > 0 &&
+      availableGiftishowProducts.length === 0
+    ) {
+      setGiftishowFilterMode('all');
+    }
+  }, [availableGiftishowProducts.length, giftishowFilterMode, giftishowProducts.length]);
 
   useEffect(() => {
     if (giftishowPage > totalGiftishowPages) {
@@ -1434,7 +1448,12 @@ export default function GrowthPage() {
             </div>
 
             <div className="mt-4 grid grid-cols-3 gap-2.5">
-              {giftishowPreviewProducts.length > 0 ? (
+              {isGiftishowProductsLoading ? (
+                <span className="col-span-3 inline-flex items-center justify-center rounded-full border border-dashed border-[#D7E4FF] bg-white/88 px-3 py-2 text-[11px] font-black text-[#6E7FA7]">
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  상품을 불러오는 중이에요.
+                </span>
+              ) : giftishowPreviewProducts.length > 0 ? (
                 giftishowPreviewProducts.map((product) => {
                   const previewImage = getGiftishowProductImage(product);
                   return (
@@ -1986,6 +2005,15 @@ export default function GrowthPage() {
               </div>
             </div>
 
+            {!isGiftishowProductsLoading &&
+            giftishowFilterMode === 'all' &&
+            giftishowProducts.length > 0 &&
+            availableGiftishowProducts.length === 0 ? (
+              <div className="rounded-[1.2rem] border border-[#FFE0B2] bg-[#FFF7EC] px-3 py-3 text-xs font-bold leading-5 text-[#915A1E]">
+                지금 바로 요청 가능한 상품이 없어 전체 상품을 먼저 보여드리고 있어요. 요청 버튼은 준비가 끝난 상품부터 자동으로 열립니다.
+              </div>
+            ) : null}
+
             {!hasStudentPhone ? (
               <div className="rounded-[1.2rem] border border-rose-100 bg-rose-50 px-3 py-3 text-xs font-bold leading-5 text-rose-700">
                 학생 휴대폰 번호가 아직 등록되지 않았어요. 프로필 설정에서 번호를 저장하면 상품 요청 버튼이 활성화돼요.
@@ -1994,11 +2022,22 @@ export default function GrowthPage() {
 
             <ScrollArea className="min-h-0 flex-1 pr-1">
               <div className="space-y-3">
-                {filteredGiftishowProducts.length === 0 ? (
+                {isGiftishowProductsLoading ? (
+                  <div className="rounded-[1.4rem] border border-dashed border-[#D7E4FF] bg-white/70 px-4 py-10 text-center text-sm font-bold text-[#6E7FA7]">
+                    <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
+                    상품 목록을 불러오는 중이에요.
+                  </div>
+                ) : giftishowProductsError ? (
+                  <div className="rounded-[1.4rem] border border-dashed border-rose-200 bg-rose-50/90 px-4 py-10 text-center text-sm font-bold text-rose-700">
+                    상품 목록을 불러오지 못했어요. 잠시 뒤 다시 열어보거나 센터에 알려 주세요.
+                  </div>
+                ) : filteredGiftishowProducts.length === 0 ? (
                   <div className="rounded-[1.4rem] border border-dashed border-[#FFD39E] bg-white/70 px-4 py-10 text-center text-sm font-bold text-[#7B5A2A]">
                     {giftishowProducts.length === 0
                       ? '아직 동기화된 상품이 없어요. 센터에서 카탈로그를 연결하면 이곳에서 바로 고를 수 있어요.'
-                      : '검색 결과가 없어요. 다른 키워드로 다시 찾아보세요.'}
+                      : giftishowSearchQuery
+                        ? '검색 결과가 없어요. 다른 키워드로 다시 찾아보세요.'
+                        : '지금 조건에 맞는 상품이 없어요. 전체 보기로 바꾸거나 잠시 후 다시 확인해 주세요.'}
                   </div>
                 ) : (
                   <>
