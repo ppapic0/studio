@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import {
   CalendarClock,
+  CheckCircle2,
   Download,
   Flame,
   Globe2,
@@ -176,6 +177,7 @@ interface WaitlistEntryWithOrder extends WaitlistEntry {
 interface WaitlistModal {
   open: boolean;
   sourceLeadId: string;
+  sourceWebsiteRequestId: string;
   studentName: string;
   parentPhone: string;
   studentPhone: string;
@@ -240,6 +242,7 @@ const INITIAL_FORM = (): LeadFormState => ({
 const INITIAL_WAITLIST_MODAL = (): WaitlistModal => ({
   open: false,
   sourceLeadId: '',
+  sourceWebsiteRequestId: '',
   studentName: '',
   parentPhone: '',
   studentPhone: '',
@@ -435,11 +438,17 @@ export function MarketingConsultingCRM({
     () => [...(leadsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
     [leadsRaw]
   );
+  const leadById = useMemo(() => {
+    return new Map(leads.map((lead) => [lead.id, lead] as const));
+  }, [leads]);
 
   const websiteRequests = useMemo(
     () => [...(websiteRequestsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
     [websiteRequestsRaw]
   );
+  const websiteRequestById = useMemo(() => {
+    return new Map(websiteRequests.map((request) => [request.id, request] as const));
+  }, [websiteRequests]);
   const visibleWebsiteRequests = useMemo(
     () => websiteRequests.filter((request) => !request.linkedLeadId),
     [websiteRequests]
@@ -539,6 +548,28 @@ export function MarketingConsultingCRM({
     }
     return grouped;
   }, [waitlist]);
+  const waitlistWebsiteRequestByEntryId = useMemo(() => {
+    const grouped = new Map<string, WebsiteConsultRequest>();
+
+    waitlist.forEach((entry) => {
+      if (entry.serviceType !== 'study_center') return;
+
+      const directWebsiteRequestId =
+        typeof entry.sourceWebsiteRequestId === 'string' ? entry.sourceWebsiteRequestId.trim() : '';
+      const leadSourceWebsiteRequestId =
+        entry.sourceLeadId && leadById.get(entry.sourceLeadId)?.sourceRequestId
+          ? String(leadById.get(entry.sourceLeadId)?.sourceRequestId).trim()
+          : '';
+      const resolvedWebsiteRequestId = directWebsiteRequestId || leadSourceWebsiteRequestId;
+      if (!resolvedWebsiteRequestId) return;
+
+      const linkedRequest = websiteRequestById.get(resolvedWebsiteRequestId);
+      if (!linkedRequest) return;
+      grouped.set(entry.id, linkedRequest);
+    });
+
+    return grouped;
+  }, [leadById, waitlist, websiteRequestById]);
 
   const LEADS_PER_PAGE = 5;
 
@@ -631,6 +662,10 @@ export function MarketingConsultingCRM({
   const selectedWaitlistEntry = useMemo(
     () => (selectedDrawer?.type === 'waitlist' ? waitlist.find((entry) => entry.id === selectedDrawer.id) || null : null),
     [selectedDrawer, waitlist]
+  );
+  const selectedWaitlistWebsiteRequest = useMemo(
+    () => (selectedWaitlistEntry ? waitlistWebsiteRequestByEntryId.get(selectedWaitlistEntry.id) || null : null),
+    [selectedWaitlistEntry, waitlistWebsiteRequestByEntryId]
   );
 
   const summary = useMemo(() => {
@@ -882,6 +917,30 @@ export function MarketingConsultingCRM({
     });
   };
 
+  const handleWaitlistConsultAccessToggle = async (entry: WaitlistEntryWithOrder) => {
+    const linkedRequest = waitlistWebsiteRequestByEntryId.get(entry.id);
+    if (!linkedRequest) {
+      toast({
+        variant: 'destructive',
+        title: '연결된 웹 문의 없음',
+        description: '이 대기 학생과 연결된 웹 문의 건을 찾지 못해 상담 허용 상태를 바꿀 수 없습니다.',
+      });
+      return;
+    }
+
+    const currentAccess = getWebsiteBookingAccess(linkedRequest.bookingAccess);
+    const fallbackNote =
+      typeof entry.displayQueueNumber === 'number'
+        ? `대기순서 ${entry.displayQueueNumber}번 상담 허용`
+        : `${entry.studentName || '해당 학생'} 상담 허용`;
+
+    await handleWebsiteBookingAccessUpdate(linkedRequest, {
+      isEnabled: !currentAccess.isEnabled,
+      note: currentAccess.note || fallbackNote,
+      source: 'quick',
+    });
+  };
+
   const handleWebsiteDelete = async (requestId: string) => {
     if (!firestore || !centerId || !canManageLeadData) return;
     try {
@@ -982,6 +1041,7 @@ export function MarketingConsultingCRM({
     setWaitlistModal({
       open: true,
       sourceLeadId: lead.id,
+      sourceWebsiteRequestId: lead.source === 'website' ? lead.sourceRequestId || '' : '',
       studentName: lead.studentName || '',
       parentPhone: lead.parentPhone || '',
       studentPhone: lead.studentPhone || '',
@@ -1010,7 +1070,9 @@ export function MarketingConsultingCRM({
 
       const existingEntries = waitlistModal.sourceLeadId
         ? waitlistBySourceLeadId.get(waitlistModal.sourceLeadId) || []
-        : [];
+        : waitlistModal.sourceWebsiteRequestId
+          ? waitlistBySourceWebsiteRequestId.get(waitlistModal.sourceWebsiteRequestId) || []
+          : [];
       const existingActiveServiceTypes = new Set<ServiceType>(
         existingEntries.filter((entry) => entry.status !== 'cancelled').map((entry) => entry.serviceType)
       );
@@ -1042,6 +1104,7 @@ export function MarketingConsultingCRM({
         memo: waitlistModal.memo.trim(),
         waitlistDate: format(new Date(), 'yyyy-MM-dd'),
         sourceLeadId: waitlistModal.sourceLeadId || null,
+        sourceWebsiteRequestId: waitlistModal.sourceWebsiteRequestId || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
           })
@@ -2102,13 +2165,42 @@ export function MarketingConsultingCRM({
                   )}
                 </div>
               ) : (
-                filteredWaitlist.map((entry) => (
+                filteredWaitlist.map((entry) => {
+                  const linkedWebsiteRequest = waitlistWebsiteRequestByEntryId.get(entry.id) || null;
+                  const consultAccessEnabled = linkedWebsiteRequest
+                    ? getWebsiteBookingAccess(linkedWebsiteRequest.bookingAccess).isEnabled
+                    : false;
+                  const isSavingConsultAccess =
+                    !!linkedWebsiteRequest && savingWebsiteBookingAccessId === linkedWebsiteRequest.id;
+
+                  return (
                   <Card key={entry.id} className="rounded-xl border-none shadow-sm ring-1 ring-border/60">
                     <CardContent className={cn('space-y-2', isMobile ? 'p-4' : 'p-5')}>
                       <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-start justify-between')}>
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-base font-black text-slate-800">{entry.studentName}</p>
+                            {canManageLeadData && linkedWebsiteRequest ? (
+                              <Button
+                                type="button"
+                                variant={consultAccessEnabled ? 'default' : 'outline'}
+                                className={cn(
+                                  'h-8 rounded-full px-3 text-[11px] font-black',
+                                  consultAccessEnabled
+                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                    : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                                )}
+                                onClick={() => void handleWaitlistConsultAccessToggle(entry)}
+                                disabled={isSavingConsultAccess}
+                              >
+                                {isSavingConsultAccess ? (
+                                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                ) : consultAccessEnabled ? (
+                                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                ) : null}
+                                {consultAccessEnabled ? '상담 허용됨' : '상담 허용하기'}
+                              </Button>
+                            ) : null}
                             {typeof entry.displayQueueNumber === 'number' && (
                               <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
                                 대기순서 {entry.displayQueueNumber}번
@@ -2125,7 +2217,7 @@ export function MarketingConsultingCRM({
                             <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[entry.serviceType].color)}>
                               {SERVICE_TYPE_META[entry.serviceType].label}
                             </Badge>
-                            {entry.sourceWebsiteRequestId && (
+                            {linkedWebsiteRequest && (
                               <Badge variant="outline" className="text-[10px] font-black text-orange-600">
                                 웹 접수
                               </Badge>
@@ -2189,7 +2281,8 @@ export function MarketingConsultingCRM({
                       </div>
                     </CardContent>
                   </Card>
-                ))
+                );
+                })
               )}
             </div>
           </CardContent>
@@ -2498,6 +2591,53 @@ export function MarketingConsultingCRM({
                     <p className="mt-3 text-sm font-bold text-slate-500">{selectedWaitlistEntry.memo || '저장된 메모가 없습니다.'}</p>
                   </div>
                 </div>
+                {selectedWaitlistWebsiteRequest ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">상담 접수 허용</p>
+                        <p className="mt-2 text-sm font-bold text-slate-700">
+                          체크된 학생만 지금 웹에서 시설 방문 후 접수를 진행할 수 있습니다.
+                        </p>
+                      </div>
+                      <Badge
+                        className={cn(
+                          'border font-black',
+                          getWebsiteBookingAccess(selectedWaitlistWebsiteRequest.bookingAccess).isEnabled
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        )}
+                      >
+                        {getWebsiteBookingAccess(selectedWaitlistWebsiteRequest.bookingAccess).isEnabled ? '허용됨' : '대기'}
+                      </Badge>
+                    </div>
+                    {canManageLeadData ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant={getWebsiteBookingAccess(selectedWaitlistWebsiteRequest.bookingAccess).isEnabled ? 'default' : 'outline'}
+                          className={cn(
+                            'h-10 rounded-xl font-black',
+                            getWebsiteBookingAccess(selectedWaitlistWebsiteRequest.bookingAccess).isEnabled
+                              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                              : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                          )}
+                          onClick={() => void handleWaitlistConsultAccessToggle(selectedWaitlistEntry)}
+                          disabled={savingWebsiteBookingAccessId === selectedWaitlistWebsiteRequest.id}
+                        >
+                          {savingWebsiteBookingAccessId === selectedWaitlistWebsiteRequest.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : getWebsiteBookingAccess(selectedWaitlistWebsiteRequest.bookingAccess).isEnabled ? (
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                          ) : null}
+                          {getWebsiteBookingAccess(selectedWaitlistWebsiteRequest.bookingAccess).isEnabled
+                            ? '상담 허용됨'
+                            : '상담 허용하기'}
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">바로 할 일</p>
                   {canManageLeadData ? (
