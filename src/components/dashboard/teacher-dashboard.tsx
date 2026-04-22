@@ -2313,6 +2313,133 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }));
   };
 
+  const syncRoomLayoutBatch = (
+    batch: ReturnType<typeof writeBatch>,
+    roomId: string,
+    nextRooms: LayoutRoomConfig[],
+    nextAisleSeatIds: string[]
+  ) => {
+    if (!firestore || !centerId) return;
+    const safeFirestore = firestore;
+    const safeCenterId = centerId;
+    const nextAisleSeatIdSet = new Set(nextAisleSeatIds);
+    const roomConfig = nextRooms.find((room) => room.id === roomId);
+    if (!roomConfig) return;
+
+    const roomSeatsToNormalize = resolvedAttendanceList.filter(
+      (seat) => seat.roomId === roomId && seat.roomSeatNo > 0 && seat.roomSeatNo <= roomConfig.rows * roomConfig.cols
+    );
+
+    roomSeatsToNormalize.forEach((seat) => {
+      const canonicalSeatId = buildSeatId(roomId, seat.roomSeatNo);
+      if (!canonicalSeatId) return;
+
+      const normalizedType = nextAisleSeatIdSet.has(canonicalSeatId) ? 'aisle' : 'seat';
+      const manualOccupantName = getManualSeatOccupantName(seat);
+      const studentId = typeof seat.studentId === 'string' ? seat.studentId.trim() : '';
+      const canonicalSeatRef = doc(safeFirestore, 'centers', safeCenterId, 'attendanceCurrent', canonicalSeatId);
+
+      batch.set(
+        canonicalSeatRef,
+        {
+          seatNo: getGlobalSeatNo(roomId, seat.roomSeatNo),
+          roomId,
+          roomSeatNo: seat.roomSeatNo,
+          seatLabel: seat.seatLabel ?? deleteField(),
+          type: normalizedType,
+          studentId: normalizedType === 'aisle' ? null : studentId || null,
+          manualOccupantName:
+            normalizedType === 'aisle' || !manualOccupantName ? deleteField() : manualOccupantName,
+          seatZone: normalizedType === 'aisle' ? deleteField() : seat.seatZone || null,
+          status: normalizedType === 'aisle' ? 'absent' : seat.status || 'absent',
+          lastCheckInAt:
+            normalizedType === 'aisle' || !seat.lastCheckInAt ? deleteField() : seat.lastCheckInAt,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const legacySeatDocId = getLegacySeatDocId(seat);
+      if (legacySeatDocId) {
+        batch.delete(doc(safeFirestore, 'centers', safeCenterId, 'attendanceCurrent', legacySeatDocId));
+      }
+
+      if (!studentId || !studentsById.has(studentId)) return;
+
+      if (normalizedType === 'aisle') {
+        batch.update(doc(safeFirestore, 'centers', safeCenterId, 'students', studentId), {
+          seatNo: 0,
+          seatId: deleteField(),
+          roomId: deleteField(),
+          roomSeatNo: deleteField(),
+          seatLabel: deleteField(),
+          seatZone: deleteField(),
+          updatedAt: serverTimestamp(),
+        });
+        return;
+      }
+
+      batch.update(doc(safeFirestore, 'centers', safeCenterId, 'students', studentId), {
+        seatNo: getGlobalSeatNo(roomId, seat.roomSeatNo),
+        seatId: canonicalSeatId,
+        roomId,
+        roomSeatNo: seat.roomSeatNo,
+        seatLabel: seat.seatLabel ?? deleteField(),
+        seatZone: seat.seatZone || null,
+        updatedAt: serverTimestamp(),
+      });
+    });
+  };
+
+  const handlePersistCurrentRoomLayout = async (roomId: string) => {
+    if (!firestore || !centerId) return;
+
+    const roomConfig = roomConfigs.find((room) => room.id === roomId);
+    if (!roomConfig) return;
+
+    const nextRooms = roomConfigs.map((room) => ({ ...room }));
+    const nextMaxCells = roomConfig.rows * roomConfig.cols;
+    const nextAisleSeatIds = effectiveAisleSeatIds.filter((seatId) => {
+      const parsed = parseSeatId(seatId);
+      if (!parsed) return false;
+      if (parsed.roomId !== roomId) return true;
+      return parsed.roomSeatNo <= nextMaxCells;
+    });
+    const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      batch.set(
+        doc(firestore, 'centers', centerId),
+        {
+          layoutSettings: {
+            aisleSeatIds: nextAisleSeatIds,
+            seatLabelsBySeatId: nextSeatLabelsBySeatId,
+            rows: nextRooms[0]?.rows ?? roomConfig.rows,
+            cols: nextRooms[0]?.cols ?? roomConfig.cols,
+            rooms: nextRooms,
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+      syncRoomLayoutBatch(batch, roomId, nextRooms, nextAisleSeatIds);
+      setOptimisticAisleSeatIds(nextAisleSeatIds);
+      await batch.commit();
+
+      toast({
+        title: `${getRoomLabel(roomId, roomConfigs)} 도면을 다시 저장했습니다.`,
+        description: '현재 보이는 가로·세로, 통로, 좌석 연결 상태를 한 번 더 기준값으로 맞췄습니다.',
+      });
+    } catch (error) {
+      setOptimisticAisleSeatIds(null);
+      toast({ variant: 'destructive', title: '도면 저장 실패' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveRoomSettings = async (roomId: string) => {
     if (!firestore || !centerId) return;
 
@@ -2364,6 +2491,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       });
 
       const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+      syncRoomLayoutBatch(batch, roomId, nextRooms, nextAisleSeatIds);
 
       batch.set(
         doc(firestore, 'centers', centerId),
@@ -2632,13 +2760,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       void handleSaveRoomSettings(roomId);
       return;
     }
-
-    toast({
-      title: '통로와 좌석 변경은 바로 저장됩니다.',
-      description: selectedSeat
-        ? `${selectedSeatLabel} 설정은 즉시 반영되며, 가로·세로 구조를 바꿀 때만 별도 저장이 필요합니다.`
-        : '현재는 가로·세로 구조 변경이 없어 추가 저장이 필요하지 않습니다.',
-    });
+    void handlePersistCurrentRoomLayout(roomId);
   };
 
   const appendPenaltyLogLocally = (log: PenaltyLog) => {
