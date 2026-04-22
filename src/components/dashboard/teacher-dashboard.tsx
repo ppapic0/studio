@@ -480,6 +480,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [trendLoading, setTrendLoading] = useState(false);
   const staleSeatCleanupInFlightRef = useRef(false);
   const aisleLayoutMigrationRef = useRef<string | null>(null);
+  const hasHydratedRoomDraftsRef = useRef(false);
   const liveBoardSectionRef = useRef<HTMLDivElement | null>(null);
   const seatInsightSectionRef = useRef<HTMLDivElement | null>(null);
   const appointmentsSectionRef = useRef<HTMLDivElement | null>(null);
@@ -519,7 +520,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !centerId) return null;
     return doc(firestore, 'centers', centerId);
   }, [firestore, centerId]);
-  const { data: centerData } = useDoc<any>(centerRef);
+  const { data: centerData, isLoading: centerDataLoading } = useDoc<any>(centerRef);
+
+  useEffect(() => {
+    hasHydratedRoomDraftsRef.current = false;
+    hasInitializedRoomViewRef.current = false;
+    aisleLayoutMigrationRef.current = null;
+    setRoomDrafts({});
+    setSelectedRoomView('all');
+  }, [centerId]);
 
   const persistedRooms = useMemo(
     () => normalizeLayoutRooms(centerData?.layoutSettings),
@@ -527,7 +536,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   );
 
   useEffect(() => {
+    if (centerDataLoading) return;
     setRoomDrafts((prev) => {
+      if (!hasHydratedRoomDraftsRef.current) {
+        hasHydratedRoomDraftsRef.current = true;
+        return Object.fromEntries(
+          persistedRooms.map((room) => [room.id, { rows: room.rows, cols: room.cols }])
+        );
+      }
       const next: Record<string, { rows: number; cols: number }> = {};
       persistedRooms.forEach((room) => {
         next[room.id] = {
@@ -537,15 +553,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       });
       return next;
     });
-  }, [persistedRooms]);
+  }, [centerDataLoading, persistedRooms]);
 
   useEffect(() => {
+    if (centerDataLoading) return;
     if (hasInitializedRoomViewRef.current || persistedRooms.length === 0) return;
     hasInitializedRoomViewRef.current = true;
     if (selectedRoomView === 'all') {
       setSelectedRoomView(persistedRooms[0].id);
     }
-  }, [persistedRooms, selectedRoomView]);
+  }, [centerDataLoading, persistedRooms, selectedRoomView]);
 
   useEffect(() => {
     if (persistedRooms.length === 0) {
@@ -721,6 +738,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   );
   useEffect(() => {
     if (!firestore || !centerId || !isActive) return;
+    if (centerDataLoading) return;
     if (hasPersistedAisleSeatIds || legacyAisleSeatIds.length === 0) return;
 
     const migrationKey = `${centerId}:${legacyAisleSeatIds.join('|')}`;
@@ -746,6 +764,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     });
   }, [
     centerId,
+    centerDataLoading,
     firestore,
     hasPersistedAisleSeatIds,
     isActive,

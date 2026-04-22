@@ -78,6 +78,11 @@ function isAttentionSignal(signal: CenterAdminAttendanceSeatSignal) {
   );
 }
 
+function getSeatDisplayLabel(seat: AttendanceCurrent, fallbackRoomSeatNo: number) {
+  const customLabel = typeof seat.seatLabel === 'string' ? seat.seatLabel.trim() : '';
+  return customLabel || String(fallbackRoomSeatNo);
+}
+
 export function CenterAdminAttendanceBoard({
   roomConfigs,
   selectedRoomView,
@@ -210,6 +215,7 @@ export function CenterAdminAttendanceBoard({
                 {Array.from({ length: room.rows }).map((_, rowIndex) => {
                   const roomSeatNo = colIndex * room.rows + rowIndex + 1;
                   const seat = getSeatForRoom(room, roomSeatNo);
+                  const seatDisplayLabel = getSeatDisplayLabel(seat, roomSeatNo);
                   const studentId = typeof seat.studentId === 'string' ? seat.studentId : '';
                   const student = studentId ? studentsById.get(studentId) : undefined;
                   const member = studentId ? studentMembersById.get(studentId) : undefined;
@@ -231,7 +237,7 @@ export function CenterAdminAttendanceBoard({
                         className="relative aspect-square rounded-[1.45rem] border border-dashed border-[#E2EAF8] bg-white/60"
                       >
                         <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#BCD0F0]">
-                          {roomSeatNo}
+                          {seatDisplayLabel}
                         </span>
                       </div>
                     );
@@ -250,7 +256,7 @@ export function CenterAdminAttendanceBoard({
                       )}
                     >
                       <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#14295F]/46">
-                        {roomSeatNo}
+                        {seatDisplayLabel}
                       </span>
                       <div className="flex h-full flex-col justify-end gap-2 pt-5">
                         <p
