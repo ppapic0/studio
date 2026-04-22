@@ -135,7 +135,7 @@ import {
   updateInvoiceCollectionWindow,
   updateInvoiceStatus,
 } from '@/lib/finance-actions';
-import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
+import { formatSeatLabel, getSeatDisplayLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { autoCheckPaymentReminders } from '@/lib/kakao-service';
 import Link from 'next/link';
@@ -1946,7 +1946,7 @@ export default function RevenuePage() {
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-2xl bg-white border-2 border-primary/5 flex items-center justify-center font-black text-xs text-primary/50 shadow-inner">
-                                {seatIdentity?.roomSeatNo || item.seat?.seatNo || item.student.displayName?.charAt(0) || '학'}
+                                {getSeatDisplayLabel(item.seat) || seatIdentity?.roomSeatNo || item.seat?.seatNo || item.student.displayName?.charAt(0) || '학'}
                               </div>
                               <div className="grid gap-0.5">
                                 <span className="font-black text-base tracking-tight">{item.student.displayName || '학생'}</span>

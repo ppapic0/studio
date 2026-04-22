@@ -6,7 +6,8 @@ import type {
 } from '@/lib/types';
 
 type SeatIdentityInput = Partial<Pick<StudentProfile, 'seatId' | 'roomId' | 'roomSeatNo' | 'seatNo'>> &
-  Partial<Pick<AttendanceCurrent, 'id' | 'roomId' | 'roomSeatNo' | 'seatNo'>>;
+  Partial<Pick<StudentProfile, 'seatLabel'>> &
+  Partial<Pick<AttendanceCurrent, 'id' | 'roomId' | 'roomSeatNo' | 'seatNo' | 'seatLabel'>>;
 
 export const PRIMARY_ROOM_ID = 'room_1';
 export const SECONDARY_ROOM_ID = 'room_2';
@@ -28,6 +29,11 @@ function clampGridSize(value: unknown, fallback: number) {
 
 function padSeatNo(value: number) {
   return value.toString().padStart(3, '0');
+}
+
+export function normalizeSeatLabelValue(value: unknown) {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value).trim().slice(0, 12);
 }
 
 export function getDefaultLayoutRooms(rows = DEFAULT_ROWS, cols = DEFAULT_COLS): LayoutRoomConfig[] {
@@ -74,6 +80,18 @@ export function normalizeAisleSeatIds(layoutSettings?: LayoutSettings | Record<s
         .filter(Boolean)
     )
   ).sort();
+}
+
+export function normalizeSeatLabelsBySeatId(layoutSettings?: LayoutSettings | Record<string, unknown> | null) {
+  const source = (layoutSettings as LayoutSettings | undefined)?.seatLabelsBySeatId;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return {} as Record<string, string>;
+
+  return Object.fromEntries(
+    Object.entries(source)
+      .map(([seatId, label]) => [seatId.trim(), normalizeSeatLabelValue(label)] as const)
+      .filter(([seatId, label]) => Boolean(seatId) && Boolean(label))
+      .sort(([left], [right]) => left.localeCompare(right))
+  );
 }
 
 export function normalizeRoomId(roomId?: string | null, seatNo?: number | null) {
@@ -177,6 +195,26 @@ export function hasAssignedSeat(input?: SeatIdentityInput | null) {
   return identity.roomSeatNo > 0 || identity.seatNo > 0 || Boolean(explicitSeatId);
 }
 
+export function getSeatDisplayLabel(
+  input?: SeatIdentityInput | null,
+  seatLabelsBySeatId?: Record<string, string>
+) {
+  if (!input) return '';
+
+  const explicitLabel = normalizeSeatLabelValue(input.seatLabel);
+  if (explicitLabel) return explicitLabel;
+
+  const identity = resolveSeatIdentity(input);
+  const configuredLabel = identity.seatId
+    ? normalizeSeatLabelValue(seatLabelsBySeatId?.[identity.seatId])
+    : '';
+
+  if (configuredLabel) return configuredLabel;
+  if (identity.roomSeatNo > 0) return String(identity.roomSeatNo);
+  if (identity.seatNo > 0) return String(identity.seatNo);
+  return '';
+}
+
 export function getRoomLabel(roomId?: string | null, rooms?: LayoutRoomConfig[]) {
   const normalizedRoomId = normalizeRoomId(roomId);
   const matched = rooms?.find((room) => room.id === normalizedRoomId);
@@ -188,10 +226,12 @@ export function getRoomLabel(roomId?: string | null, rooms?: LayoutRoomConfig[])
 export function formatSeatLabel(
   input?: SeatIdentityInput | null,
   rooms?: LayoutRoomConfig[],
-  fallbackLabel = '좌석 미지정'
+  fallbackLabel = '좌석 미지정',
+  seatLabelsBySeatId?: Record<string, string>
 ) {
   if (!input) return fallbackLabel;
   const identity = resolveSeatIdentity(input);
   if (!identity.roomSeatNo) return fallbackLabel;
-  return `${getRoomLabel(identity.roomId, rooms)} ${identity.roomSeatNo}번`;
+  const seatDisplayLabel = getSeatDisplayLabel(input, seatLabelsBySeatId) || String(identity.roomSeatNo);
+  return `${getRoomLabel(identity.roomId, rooms)} ${seatDisplayLabel}번`;
 }

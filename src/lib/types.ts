@@ -211,6 +211,7 @@ export interface StudentProfile {
   seatId?: string;
   roomId?: string;
   roomSeatNo?: number;
+  seatLabel?: string;
   seatZone?: string;
   targetDailyMinutes: number;
   targetDailyMinutesSource?: 'default' | 'routine' | 'manual';
@@ -834,6 +835,7 @@ export interface LayoutRoomConfig {
 export interface LayoutSettings {
   rooms?: LayoutRoomConfig[];
   aisleSeatIds?: string[];
+  seatLabelsBySeatId?: Record<string, string>;
   rows?: number;
   cols?: number;
   updatedAt?: Timestamp;
@@ -844,6 +846,7 @@ export interface AttendanceCurrent {
   seatNo: number;
   roomId?: string;
   roomSeatNo?: number;
+  seatLabel?: string;
   status: "studying" | "away" | "break" | "absent";
   type?: "seat" | "aisle";
   seatZone?: string;

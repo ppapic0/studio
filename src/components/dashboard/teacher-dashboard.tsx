@@ -142,11 +142,14 @@ import {
   PRIMARY_ROOM_ID,
   buildSeatId,
   formatSeatLabel,
+  getSeatDisplayLabel,
   getGlobalSeatNo,
   getRoomLabel,
   hasAssignedSeat,
   normalizeAisleSeatIds,
   normalizeLayoutRooms,
+  normalizeSeatLabelValue,
+  normalizeSeatLabelsBySeatId,
   parseSeatId,
   resolveSeatIdentity,
 } from '@/lib/seat-layout';
@@ -405,6 +408,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [manualSeatOccupantName, setManualSeatOccupantName] = useState('');
+  const [seatLabelDraft, setSeatLabelDraft] = useState('');
   
   const [selectedStudentSessions, setSelectedStudentSessions] = useState<StudySession[]>([]);
   const [selectedStudentReports, setSelectedStudentReports] = useState<DailyReport[]>([]);
@@ -537,6 +541,24 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => normalizeAisleSeatIds(centerData?.layoutSettings),
     [centerData?.layoutSettings]
   );
+  const persistedSeatLabelsBySeatId = useMemo(
+    () => normalizeSeatLabelsBySeatId(centerData?.layoutSettings),
+    [centerData?.layoutSettings]
+  );
+  const filterSeatLabelsByRooms = (rooms: LayoutRoomConfig[]) => {
+    const roomCellLimitById = new Map(rooms.map((room) => [room.id, room.rows * room.cols]));
+
+    return Object.fromEntries(
+      Object.entries(persistedSeatLabelsBySeatId)
+        .filter(([seatId]) => {
+          const parsed = parseSeatId(seatId);
+          if (!parsed) return false;
+          const maxCells = roomCellLimitById.get(parsed.roomId);
+          return Boolean(maxCells) && parsed.roomSeatNo <= Number(maxCells);
+        })
+        .sort(([left], [right]) => left.localeCompare(right))
+    );
+  };
 
   const selectedRoomConfig =
     selectedRoomView === 'all'
@@ -574,15 +596,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!attendanceList) return [];
     return attendanceList.map((seat) => {
       const identity = resolveSeatIdentity(seat);
+      const configuredSeatLabel =
+        normalizeSeatLabelValue(seat.seatLabel) ||
+        normalizeSeatLabelValue(persistedSeatLabelsBySeatId[identity.seatId]);
       return {
         ...seat,
         roomId: identity.roomId,
         roomSeatNo: identity.roomSeatNo,
         seatNo: identity.seatNo,
+        seatLabel: configuredSeatLabel || undefined,
         type: seat.type || 'seat',
       };
     });
-  }, [attendanceList]);
+  }, [attendanceList, persistedSeatLabelsBySeatId]);
   const effectiveAisleSeatIds = useMemo(() => {
     const next = new Set(persistedAisleSeatIds);
     rawResolvedAttendanceList.forEach((seat) => {
@@ -957,13 +983,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const getSeatForRoom = (room: LayoutRoomConfig, roomSeatNo: number): ResolvedAttendanceSeat => {
     const seatId = buildSeatId(room.id, roomSeatNo);
     const existingSeat = seatById.get(seatId);
-    if (existingSeat) return existingSeat;
+    const configuredSeatLabel =
+      normalizeSeatLabelValue(existingSeat?.seatLabel) ||
+      normalizeSeatLabelValue(persistedSeatLabelsBySeatId[seatId]);
+    if (existingSeat) {
+      return {
+        ...existingSeat,
+        seatLabel: configuredSeatLabel || undefined,
+      };
+    }
 
     return {
       id: seatId,
       roomId: room.id,
       roomSeatNo,
       seatNo: getGlobalSeatNo(room.id, roomSeatNo),
+      seatLabel: configuredSeatLabel || undefined,
       status: 'absent',
       type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : 'seat',
       updatedAt: Timestamp.now(),
@@ -1358,7 +1393,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           title: signal.studentName,
           detail: signal.note || '예정 등원시간이 지났지만 아직 입실 증거가 없습니다.',
           meta: signal.routineExpectedArrivalTime ? `예정 ${signal.routineExpectedArrivalTime}` : '예정 시간 미등록',
-          badge: signal.roomId ? `${getRoomLabel(signal.roomId, roomConfigs)} ${signal.roomSeatNo || ''}`.trim() : '좌석 미배정',
+          badge:
+            signal.roomId && signal.roomSeatNo
+              ? formatSeatLabel(
+                  { roomId: signal.roomId, roomSeatNo: signal.roomSeatNo, seatId: signal.seatId },
+                  roomConfigs,
+                  '좌석 미배정',
+                  persistedSeatLabelsBySeatId
+                )
+              : '좌석 미배정',
           tone: 'rose' as const,
           onClick: () => openTeacherAttendanceSignal(signal),
         })),
@@ -1376,7 +1419,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           title: signal.studentName,
           detail: signal.note || '지각 입실 이후 상태를 다시 확인할 필요가 있습니다.',
           meta: signal.checkedAtLabel ? `입실 ${signal.checkedAtLabel}` : '입실 시간 확인 필요',
-          badge: signal.roomId ? `${getRoomLabel(signal.roomId, roomConfigs)} ${signal.roomSeatNo || ''}`.trim() : '좌석 미배정',
+          badge:
+            signal.roomId && signal.roomSeatNo
+              ? formatSeatLabel(
+                  { roomId: signal.roomId, roomSeatNo: signal.roomSeatNo, seatId: signal.seatId },
+                  roomConfigs,
+                  '좌석 미배정',
+                  persistedSeatLabelsBySeatId
+                )
+              : '좌석 미배정',
           tone: 'orange' as const,
           onClick: () => openTeacherAttendanceSignal(signal),
         })),
@@ -1446,7 +1497,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             : undefined,
       },
     ],
-    [roomConfigs, teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
+    [persistedSeatLabelsBySeatId, roomConfigs, teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
   );
 
   const teacherActionQueue = useMemo(() => {
@@ -1914,9 +1965,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setManualSeatOccupantName(selectedSeatManualOccupantName);
   }, [selectedSeat?.id, selectedSeatManualOccupantName]);
 
+  const selectedSeatDisplayLabel = useMemo(
+    () => getSeatDisplayLabel(selectedSeat, persistedSeatLabelsBySeatId),
+    [persistedSeatLabelsBySeatId, selectedSeat]
+  );
+  const selectedSeatDefaultLabel = selectedSeat?.roomSeatNo ? String(selectedSeat.roomSeatNo) : '';
+
+  useEffect(() => {
+    setSeatLabelDraft(selectedSeatDisplayLabel);
+  }, [selectedSeat?.id, selectedSeatDisplayLabel]);
+
   const selectedSeatLabel = useMemo(
-    () => formatSeatLabel(selectedSeat, roomConfigs),
-    [selectedSeat, roomConfigs]
+    () => formatSeatLabel(selectedSeat, roomConfigs, '좌석 미지정', persistedSeatLabelsBySeatId),
+    [persistedSeatLabelsBySeatId, roomConfigs, selectedSeat]
   );
   const selectedSeatModeLabel = useMemo(
     () => (selectedSeat?.type === 'aisle' ? '통로 모드' : '좌석 모드'),
@@ -2136,6 +2197,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             seatId: deleteField(),
             roomId: deleteField(),
             roomSeatNo: deleteField(),
+            seatLabel: deleteField(),
             seatZone: deleteField(),
             updatedAt: serverTimestamp(),
           });
@@ -2144,11 +2206,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id));
       });
 
+      const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+
       batch.set(
         doc(firestore, 'centers', centerId),
         {
           layoutSettings: {
             aisleSeatIds: nextAisleSeatIds,
+            seatLabelsBySeatId: nextSeatLabelsBySeatId,
             rows: nextRooms[0]?.rows ?? roomDraft.rows,
             cols: nextRooms[0]?.cols ?? roomDraft.cols,
             rooms: nextRooms,
@@ -2157,6 +2222,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      batch.update(doc(firestore, 'centers', centerId), {
+        'layoutSettings.seatLabelsBySeatId': nextSeatLabelsBySeatId,
+      });
       await batch.commit();
 
       if (selectedSeat?.roomId === roomId && (selectedSeat.roomSeatNo ?? 0) > nextMaxCells) {
@@ -2168,7 +2236,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
       const cleanedSeatPreview = conflicts
         .slice(0, 2)
-        .map((seat) => formatSeatLabel(seat, roomConfigs))
+        .map((seat) => formatSeatLabel(seat, roomConfigs, '좌석 미지정', persistedSeatLabelsBySeatId))
         .join(', ');
 
       toast({
@@ -2253,12 +2321,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           order: index + 1,
         }));
       const nextAisleSeatIds = effectiveAisleSeatIds.filter((seatId) => parseSeatId(seatId)?.roomId !== roomId);
+      const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
 
       batch.set(
         doc(firestore, 'centers', centerId),
         {
           layoutSettings: {
             aisleSeatIds: nextAisleSeatIds,
+            seatLabelsBySeatId: nextSeatLabelsBySeatId,
             rows: nextRooms[0]?.rows ?? targetRoom.rows,
             cols: nextRooms[0]?.cols ?? targetRoom.cols,
             rooms: nextRooms,
@@ -2267,6 +2337,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      batch.update(doc(firestore, 'centers', centerId), {
+        'layoutSettings.seatLabelsBySeatId': nextSeatLabelsBySeatId,
+      });
 
       await batch.commit();
 
@@ -2713,6 +2786,102 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const handleSaveSeatLabel = async () => {
+    if (!firestore || !centerId || !selectedSeat) return;
+
+    const roomSeatNo = Number(selectedSeat.roomSeatNo || 0);
+    if (!Number.isFinite(roomSeatNo) || roomSeatNo <= 0) return;
+
+    const seatId = buildSeatId(selectedSeat.roomId || PRIMARY_ROOM_ID, roomSeatNo);
+    if (!seatId) return;
+
+    const normalizedDraft = normalizeSeatLabelValue(seatLabelDraft);
+    const nextCustomSeatLabel =
+      normalizedDraft && normalizedDraft !== String(roomSeatNo) ? normalizedDraft : '';
+    const currentCustomSeatLabel =
+      normalizeSeatLabelValue(persistedSeatLabelsBySeatId[seatId]) ||
+      normalizeSeatLabelValue(selectedSeat.seatLabel);
+
+    if (nextCustomSeatLabel === currentCustomSeatLabel) {
+      toast({
+        title: nextCustomSeatLabel ? '같은 좌석 번호가 이미 적용되어 있습니다.' : '기본 좌석 번호로 이미 설정되어 있습니다.',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      const nextSeatLabelsBySeatId = { ...persistedSeatLabelsBySeatId };
+
+      if (nextCustomSeatLabel) {
+        nextSeatLabelsBySeatId[seatId] = nextCustomSeatLabel;
+      } else {
+        delete nextSeatLabelsBySeatId[seatId];
+      }
+
+      batch.update(doc(firestore, 'centers', centerId), {
+        'layoutSettings.seatLabelsBySeatId': nextSeatLabelsBySeatId,
+        'layoutSettings.updatedAt': serverTimestamp(),
+      });
+
+      const hasSeatDocument = resolvedAttendanceList.some((seat) => seat.id === selectedSeat.id);
+      const seatLabelFieldValue = nextCustomSeatLabel || deleteField();
+
+      if (
+        hasSeatDocument ||
+        selectedSeat.studentId ||
+        selectedSeat.type === 'aisle' ||
+        selectedSeat.seatZone ||
+        getManualSeatOccupantName(selectedSeat)
+      ) {
+        batch.set(
+          doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
+          {
+            seatNo: selectedSeat.seatNo,
+            roomId: selectedSeat.roomId,
+            roomSeatNo: selectedSeat.roomSeatNo,
+            seatLabel: seatLabelFieldValue,
+            type: selectedSeat.type || 'seat',
+            status: selectedSeat.status || 'absent',
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+
+      if (selectedSeat.studentId) {
+        batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), {
+          seatId: selectedSeat.id,
+          seatNo: selectedSeat.seatNo,
+          roomId: selectedSeat.roomId,
+          roomSeatNo: selectedSeat.roomSeatNo,
+          seatLabel: seatLabelFieldValue,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+      setSelectedSeat({
+        ...selectedSeat,
+        seatLabel: nextCustomSeatLabel || undefined,
+      });
+      setSeatLabelDraft(nextCustomSeatLabel || String(roomSeatNo));
+      toast({
+        title: nextCustomSeatLabel ? '좌석 번호를 저장했습니다.' : '좌석 번호를 도면 기본 순번으로 되돌렸습니다.',
+      });
+    } catch (error: any) {
+      console.error('[teacher-dashboard] seat label save failed', error);
+      toast({
+        variant: 'destructive',
+        title: '좌석 번호 저장 실패',
+        description: error?.message || '잠시 후 다시 시도해 주세요.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleUpdateZone = async (zone: string) => {
     if (!firestore || !centerId || !selectedSeat) return;
     const normalizedZone = zone === '미정' ? null : zone;
@@ -2770,6 +2939,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           seatId: deleteField(),
           roomId: deleteField(),
           roomSeatNo: deleteField(),
+          seatLabel: deleteField(),
           seatZone: deleteField(),
           updatedAt: serverTimestamp(),
         });
@@ -2878,6 +3048,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           seatNo: selectedSeat.seatNo,
           roomId: selectedSeat.roomId,
           roomSeatNo: selectedSeat.roomSeatNo,
+          seatLabel: selectedSeat.seatLabel ?? deleteField(),
           seatZone: selectedSeat.seatZone || null,
           lastCheckInAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -2944,6 +3115,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         seatNo: selectedSeat.seatNo,
         roomId: selectedSeat.roomId,
         roomSeatNo: selectedSeat.roomSeatNo,
+        seatLabel: selectedSeat.seatLabel ?? deleteField(),
         seatZone: selectedSeat.seatZone || null,
         updatedAt: serverTimestamp()
       });
@@ -2957,6 +3129,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           seatNo: selectedSeat.seatNo,
           roomId: selectedSeat.roomId,
           roomSeatNo: selectedSeat.roomSeatNo,
+          seatLabel: selectedSeat.seatLabel ?? deleteField(),
           seatZone: selectedSeat.seatZone || null,
           lastCheckInAt: deleteField(),
           updatedAt: serverTimestamp(),
@@ -2980,6 +3153,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         seatId: deleteField(),
         roomId: deleteField(),
         roomSeatNo: deleteField(),
+        seatLabel: deleteField(),
         seatZone: deleteField(),
         updatedAt: serverTimestamp(),
       });
@@ -3169,6 +3343,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     status: seat.status,
                     isEditMode,
                   });
+                  const seatDisplayLabel =
+                    getSeatDisplayLabel(seat, persistedSeatLabelsBySeatId) || String(roomSeatNo);
                   const isAisle = seat.type === 'aisle';
                   const nameTextClass =
                     hasOccupant && overlayPresentation.isDark
@@ -3200,12 +3376,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             hasOccupant && overlayPresentation.isDark ? 'opacity-70' : 'opacity-40'
                           )}
                         >
-                          {roomSeatNo}
+                          {seatDisplayLabel}
                         </span>
                       ) : isEditMode ? (
                         <>
                           <span className={cn('absolute left-1.5 top-1 font-black text-[#C95A08]/75', compact ? 'text-[6px]' : 'text-[7px]')}>
-                            {roomSeatNo}
+                            {seatDisplayLabel}
                           </span>
                           <span className={cn('font-black tracking-tight text-[#C95A08]', compact ? 'text-[8px]' : 'text-[10px]')}>
                             통로
@@ -4127,7 +4303,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       <p className="mt-2 text-xs font-bold leading-relaxed text-rose-700/90">
                         {activeRoomConflicts
                           .slice(0, 5)
-                          .map((seat) => formatSeatLabel(seat, roomConfigs))
+                          .map((seat) => formatSeatLabel(seat, roomConfigs, '좌석 미지정', persistedSeatLabelsBySeatId))
                           .join(', ')}
                         {activeRoomConflicts.length > 5 ? ` 외 ${activeRoomConflicts.length - 5}개` : ''}
                       </p>
@@ -4739,7 +4915,35 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                     <div className="rounded-[1.45rem] border border-[#D7E4FF] bg-[#F8FBFF] px-4 py-3">
                                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">현재 설정</p>
                                       <p className="mt-1 text-sm font-black text-[#14295F]">
-                                        {selectedSeatModeLabel} · {selectedSeatZoneLabel}
+                                        {selectedSeatModeLabel} · {selectedSeatZoneLabel} · 번호 {selectedSeatDisplayLabel || selectedSeatDefaultLabel || '-'}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                                        <LayoutGrid className="h-3 w-3" /> 좌석 번호 설정
+                                      </Label>
+                                      <div className="flex gap-2">
+                                        <Input
+                                          value={seatLabelDraft}
+                                          onChange={(event) => setSeatLabelDraft(event.target.value.slice(0, 12))}
+                                          placeholder={selectedSeatDefaultLabel || '예: 64'}
+                                          className="h-12 rounded-xl border-2 font-bold shadow-sm"
+                                        />
+                                        <Button
+                                          type="button"
+                                          onClick={handleSaveSeatLabel}
+                                          disabled={
+                                            isSaving ||
+                                            !selectedSeat?.roomSeatNo ||
+                                            normalizeSeatLabelValue(seatLabelDraft) === (selectedSeatDisplayLabel || selectedSeatDefaultLabel)
+                                          }
+                                          className="h-12 rounded-xl px-4 font-black whitespace-nowrap"
+                                        >
+                                          번호 저장
+                                        </Button>
+                                      </div>
+                                      <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
+                                        비워두거나 기본 번호 {selectedSeatDefaultLabel || '-'}와 같게 저장하면 도면 기본 순번으로 돌아갑니다.
                                       </p>
                                     </div>
                                     <div className="space-y-2">

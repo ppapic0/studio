@@ -32,7 +32,7 @@ import { issueInvoice } from '@/lib/finance-actions';
 import { INVOICE_TRACK_META, type InvoiceTrackCategory } from '@/lib/invoice-analytics';
 import { getInvoiceCollectionEndDate, getInvoiceCollectionSortTime, isInvoiceCollectionOverdue } from '@/lib/invoice-collection-window';
 import { useToast } from '@/hooks/use-toast';
-import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
+import { formatSeatLabel, getSeatDisplayLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 
 export default function AssignedStudentsPage() {
   const firestore = useFirestore();
@@ -265,7 +265,7 @@ export default function AssignedStudentsPage() {
                         isOverdue ? "bg-rose-50 text-rose-600 border-rose-100 animate-pulse" : 
                         "bg-primary/5 text-primary border-primary/10 group-hover:bg-primary group-hover:text-white"
                       )}>
-                        {seatIdentity.roomSeatNo || seat.seatNo}
+                        {getSeatDisplayLabel(seat) || seatIdentity.roomSeatNo || seat.seatNo}
                       </div>
                       <div className="grid gap-1.5 min-w-0">
                         <div className="flex items-center gap-3">
