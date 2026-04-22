@@ -640,9 +640,6 @@ export function ConsultReservationCard() {
               <br />
               실시간 좌석 확인
             </h3>
-            <p className="mt-3 break-keep text-sm font-semibold leading-6 text-white">
-              방문 상담 가능한 시간과 {publicRoomLabel} 실시간 좌석을 먼저 확인할 수 있고, 실제 예약은 홍보리드 DB에서 예약 가능 상태로 열린 문의 건만 진행됩니다.
-            </p>
           </div>
           <div className="hidden rounded-full border border-white/10 bg-white/[0.08] p-3 text-white/80 sm:block">
             <CalendarDays className="h-5 w-5" />
