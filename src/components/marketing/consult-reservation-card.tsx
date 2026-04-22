@@ -662,7 +662,7 @@ export function ConsultReservationCard() {
           {!slotPanelOpen ? (
             <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-white/[0.04] px-4 py-6 text-center">
               <p className="text-sm font-black text-white">열어둔 상담 시간을 확인하려면 버튼을 눌러주세요.</p>
-              <p className="mt-2 text-xs font-semibold leading-5 text-white/72">
+              <p className="mt-2 text-xs font-semibold leading-5 text-white">
                 예약 단계에서는 홍보리드 DB에 남긴 학부모 연락처 확인과 예약 가능 여부를 다시 확인합니다.
               </p>
             </div>
@@ -679,7 +679,7 @@ export function ConsultReservationCard() {
               </p>
               <a
                 href="#consult-form"
-                className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-white/12 px-4 text-xs font-black text-white/86 transition hover:bg-white/[0.08]"
+                className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-white/12 px-4 text-xs font-black text-white transition hover:bg-white/[0.08]"
               >
                 상담 폼 먼저 작성하기
               </a>
