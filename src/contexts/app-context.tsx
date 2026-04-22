@@ -320,7 +320,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
-    const studentId = activeStudentId || user?.uid || null;
+    const studentId = user?.uid || null;
     if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentId) {
       setIsTimerActive(false);
       setStartTime(null);
@@ -333,39 +333,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
       where('studentId', '==', studentId)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (snapshot.empty) {
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (snapshot.empty) {
+          setIsTimerActive(false);
+          setStartTime(null);
+          return;
+        }
+
+        const seat = [...snapshot.docs]
+          .sort((a, b) => {
+            const aSeat = a.data() as Record<string, any>;
+            const bSeat = b.data() as Record<string, any>;
+            const rankDiff = getSeatActivityRank(aSeat?.status) - getSeatActivityRank(bSeat?.status);
+            if (rankDiff !== 0) return rankDiff;
+
+            const aTime = aSeat?.lastCheckInAt?.toMillis?.() || aSeat?.updatedAt?.toMillis?.() || 0;
+            const bTime = bSeat?.lastCheckInAt?.toMillis?.() || bSeat?.updatedAt?.toMillis?.() || 0;
+            return bTime - aTime;
+          })[0]?.data() as Record<string, any> | undefined;
+
+        if (seat?.lastCheckInAt && ACTIVE_ATTENDANCE_STATUSES.includes(seat.status)) {
+          setIsTimerActive(true);
+          setStartTime(seat.lastCheckInAt.toMillis());
+        } else {
+          setIsTimerActive(false);
+          setStartTime(null);
+        }
+      },
+      () => {
         setIsTimerActive(false);
         setStartTime(null);
-        return;
       }
-
-      const seat = [...snapshot.docs]
-        .sort((a, b) => {
-          const aSeat = a.data() as Record<string, any>;
-          const bSeat = b.data() as Record<string, any>;
-          const rankDiff = getSeatActivityRank(aSeat?.status) - getSeatActivityRank(bSeat?.status);
-          if (rankDiff !== 0) return rankDiff;
-
-          const aTime = aSeat?.lastCheckInAt?.toMillis?.() || aSeat?.updatedAt?.toMillis?.() || 0;
-          const bTime = bSeat?.lastCheckInAt?.toMillis?.() || bSeat?.updatedAt?.toMillis?.() || 0;
-          return bTime - aTime;
-        })[0]?.data() as Record<string, any> | undefined;
-
-      if (seat?.lastCheckInAt && ACTIVE_ATTENDANCE_STATUSES.includes(seat.status)) {
-        setIsTimerActive(true);
-        setStartTime(seat.lastCheckInAt.toMillis());
-      } else {
-        setIsTimerActive(false);
-        setStartTime(null);
-      }
-    });
+    );
 
     return () => unsubscribe();
-  }, [activeStudentId, user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
-    const studentId = activeStudentId || user?.uid || null;
+    const studentId = user?.uid || null;
     if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentId) {
       setCurrentTier(TIERS[0]);
       return;
@@ -391,25 +398,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const unsubProgress = onSnapshot(progressRef, (snap) => {
-      if (snap.exists()) {
-        latestLp = snap.data().seasonLp || 0;
+    const unsubProgress = onSnapshot(
+      progressRef,
+      (snap) => {
+        if (snap.exists()) {
+          latestLp = snap.data().seasonLp || 0;
+          updateTierState();
+        }
+      },
+      () => {
+        latestLp = 0;
         updateTierState();
       }
-    });
+    );
 
-    const unsubRank = onSnapshot(rankRef, (snap) => {
-      if (snap.exists()) {
-        latestRank = snap.data().rank || 999;
+    const unsubRank = onSnapshot(
+      rankRef,
+      (snap) => {
+        if (snap.exists()) {
+          latestRank = snap.data().rank || 999;
+          updateTierState();
+        }
+      },
+      () => {
+        latestRank = 999;
         updateTierState();
       }
-    });
+    );
 
     return () => {
       unsubProgress();
       unsubRank();
     };
-  }, [activeStudentId, user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
     if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {

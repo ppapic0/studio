@@ -1291,8 +1291,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { activeMembership, activeStudentId, isTimerActive, setIsTimerActive, startTime, setStartTime, viewMode } = useAppContext();
   const rewardTheme = NAVY_REWARD_THEME;
   const authUid = user?.uid || null;
-  const studentUid = activeStudentId || authUid || null;
-  const studyBoxCacheUid = authUid || studentUid || null;
+  const studentDocId = activeStudentId || authUid || null;
+  const studentUid = authUid || studentDocId || null;
+  const studyBoxCacheUid = authUid || studentDocId || null;
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
@@ -1465,9 +1466,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: userProfile } = useDoc<UserType>(userProfileRef, { enabled: isActive });
 
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentUid) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
-  }, [firestore, activeMembership?.id, studentUid]);
+    if (!firestore || !activeMembership || !studentDocId) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentDocId);
+  }, [firestore, activeMembership?.id, studentDocId]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, { enabled: isActive });
   const pointBoostEventsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership?.id) return null;
@@ -1917,15 +1918,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       let fallbackSeatIdentity: ReturnType<typeof resolveSeatIdentity> | null = null;
       let fallbackSeatZone: string | null = null;
       try {
-        const studentRef = doc(firestore, 'centers', centerId, 'students', studentUid);
-        const studentSnap = await getDoc(studentRef);
-        if (studentSnap.exists()) {
-          const studentData = studentSnap.data() as Partial<StudentProfile>;
-          const identity = resolveSeatIdentity(studentData);
-          if (identity.seatId && identity.seatNo > 0) {
-            fallbackSeatIdentity = identity;
-            fallbackSeatZone = studentData?.seatZone || null;
-            fallbackSeatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', identity.seatId);
+        const studentRef = studentDocId
+          ? doc(firestore, 'centers', centerId, 'students', studentDocId)
+          : null;
+        if (studentRef) {
+          const studentSnap = await getDoc(studentRef);
+          if (studentSnap.exists()) {
+            const studentData = studentSnap.data() as Partial<StudentProfile>;
+            const identity = resolveSeatIdentity(studentData);
+            if (identity.seatId && identity.seatNo > 0) {
+              fallbackSeatIdentity = identity;
+              fallbackSeatZone = studentData?.seatZone || null;
+              fallbackSeatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', identity.seatId);
+            }
           }
         }
 
@@ -2047,7 +2052,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         };
         let wroteSomething = false;
 
-        if (isFirstCheckInToday) {
+        const canWriteProgressDirectly = Boolean(progress);
+
+        if (isFirstCheckInToday && canWriteProgressDirectly) {
           // Students can mark today's check-in status directly, but stat bonuses stay server-managed.
           batch.set(progressRef, checkInProgressUpdate, { merge: true });
           wroteSomething = true;
@@ -2073,8 +2080,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           wroteSomething = true;
         }
 
-        if (!wroteSomething) {
+        if (!wroteSomething && studyLogRef) {
+          batch.set(studyLogRef, {
+            studentId: studentUid,
+            centerId: activeMembership.id,
+            dateKey: activeStudyDayKey,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+          wroteSomething = true;
+        }
+
+        if (!wroteSomething && canWriteProgressDirectly) {
           batch.set(progressRef, { updatedAt: serverTimestamp() }, { merge: true });
+          wroteSomething = true;
         }
 
         let startCommitError: any = null;
@@ -2093,7 +2111,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               dateKey: activeStudyDayKey,
               updatedAt: serverTimestamp(),
             }, { merge: true });
-            if (isFirstCheckInToday) {
+            if (isFirstCheckInToday && canWriteProgressDirectly) {
               await setDoc(progressRef, checkInProgressUpdate, { merge: true });
             }
             usedStartFallback = true;
