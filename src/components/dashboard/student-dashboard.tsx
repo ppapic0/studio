@@ -1433,7 +1433,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const activeStudyDayKey = studyDayContext.dateKey;
   const previousStudyDayKey = studyDayContext.previousDateKey;
   const weekKey = today ? format(today, "yyyy-'W'II") : '';
-  const periodKey = today ? format(today, 'yyyy-MM') : '';
   const weekDateKeys = useMemo(
     () => (today
       ? eachDayOfInterval({ start: startOfWeek(today, { weekStartsOn: 1 }), end: today }).map((date) => format(date, 'yyyy-MM-dd'))
@@ -1894,7 +1893,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const handleStudyStartStop = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !studentUid || !progressRef || !activeStudyDayKey || !periodKey) return;
+    if (!firestore || !user || !activeMembership || !studentUid || !progressRef || !activeStudyDayKey) return;
     if (isProcessingAction) {
       const lockAgeMs = actionLockAtRef.current ? Date.now() - actionLockAtRef.current : 0;
       if (lockAgeMs < 15000) return;
@@ -2168,7 +2167,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     progress,
     todayStudyLog,
     activeStudyDayKey,
-    periodKey,
     studentUid,
     studyLogRef,
     setIsTimerActive,
