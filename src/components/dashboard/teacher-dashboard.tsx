@@ -49,7 +49,8 @@ import {
   Eye,
   MapPin,
   ShieldAlert,
-  RotateCcw
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
 import { useCollection, useFirestore, useDoc, useMemoFirebase, useUser } from '@/firebase';
 import { useAppContext, TIERS } from '@/contexts/app-context';
@@ -2096,6 +2097,105 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const handleDeleteRoom = async (roomId: string) => {
+    if (!firestore || !centerId) return;
+
+    const targetRoom = persistedRoomMap.get(roomId);
+    if (!targetRoom) return;
+    if (roomId === PRIMARY_ROOM_ID || persistedRooms.length <= 1) {
+      toast({
+        variant: 'destructive',
+        title: '기본 호실은 삭제할 수 없습니다.',
+        description: '1호실은 최소 한 개는 유지되어야 합니다.',
+      });
+      return;
+    }
+
+    const assignedStudents = (students || []).filter((student) => {
+      const identity = resolveSeatIdentity(student);
+      return identity.roomId === roomId && identity.roomSeatNo > 0;
+    });
+    const occupiedSeats = resolvedAttendanceList.filter(
+      (seat) => seat.roomId === roomId && (Boolean(seat.studentId) || Boolean(getManualSeatOccupantName(seat)))
+    );
+
+    if (assignedStudents.length > 0 || occupiedSeats.length > 0) {
+      const previewNames = Array.from(
+        new Set(
+          [
+            ...assignedStudents.map((student) => student.name).filter(Boolean),
+            ...occupiedSeats
+              .map((seat) => getManualSeatOccupantName(seat))
+              .filter(Boolean),
+          ]
+        )
+      )
+        .slice(0, 3)
+        .join(', ');
+
+      toast({
+        variant: 'destructive',
+        title: `${targetRoom.name}에는 아직 사용 중 좌석이 있습니다.`,
+        description: previewNames
+          ? `${previewNames} 좌석을 먼저 비운 뒤 다시 삭제해 주세요.`
+          : '배정 또는 임시 사용중 좌석을 먼저 정리해 주세요.',
+      });
+      return;
+    }
+
+    if (!window.confirm(`${targetRoom.name}을(를) 삭제할까요? 비어 있는 좌석 설정과 통로 설정도 함께 정리됩니다.`)) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      resolvedAttendanceList
+        .filter((seat) => seat.roomId === roomId)
+        .forEach((seat) => {
+          batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id));
+        });
+
+      const nextRooms = persistedRooms
+        .filter((room) => room.id !== roomId)
+        .map((room, index) => ({
+          ...room,
+          order: index + 1,
+        }));
+
+      batch.set(
+        doc(firestore, 'centers', centerId),
+        {
+          layoutSettings: {
+            rows: nextRooms[0]?.rows ?? targetRoom.rows,
+            cols: nextRooms[0]?.cols ?? targetRoom.cols,
+            rooms: nextRooms,
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      await batch.commit();
+
+      setRoomDrafts((prev) => {
+        const next = { ...prev };
+        delete next[roomId];
+        return next;
+      });
+      setSelectedRoomView(nextRooms[0]?.id ?? 'all');
+
+      toast({
+        title: `${targetRoom.name}을 삭제했습니다.`,
+        description: '사용하지 않는 호실 배치를 정리했습니다.',
+      });
+    } catch (error) {
+      toast({ variant: 'destructive', title: '호실 삭제 실패' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const fetchStudentDetails = async (studentId: string) => {
     if (!firestore || !centerId) return;
     setSessionsLoading(true);
@@ -3782,6 +3882,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
                   {isEditMode ? (
                     <div className="rounded-[2rem] border border-[#FFD7B0] bg-white/90 p-4 shadow-sm">
+                      <p className="mb-3 text-xs font-bold leading-5 text-[#8A5A2B]">
+                        통로/좌석 전환은 바로 저장되고, 아래 저장 버튼은 가로·세로 구조를 바꿨을 때만 활성화됩니다.
+                      </p>
                       <div className={cn("flex flex-wrap items-center gap-3", isMobile ? "" : "justify-between")}>
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="flex items-center gap-2 rounded-2xl border border-[#FFE3C4] bg-[#FFF8F1] px-3 py-2 shadow-sm">
@@ -3811,6 +3914,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           <Badge className="h-8 rounded-full border-none bg-[#FFF2E8] px-3.5 text-[10px] font-black text-[#C95A08]">
                             {selectedRoomSummary?.hasUnsavedChanges ? '미저장 변경 있음' : '현재 배치 기준'}
                           </Badge>
+                          {selectedRoomConfig.id !== PRIMARY_ROOM_ID && roomConfigs.length > 1 ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void handleDeleteRoom(selectedRoomConfig.id)}
+                              disabled={isSaving}
+                              className="h-11 rounded-xl border-rose-200 bg-white font-black text-rose-600 hover:bg-rose-50"
+                            >
+                              <Trash2 className="mr-1.5 h-4 w-4" />
+                              {selectedRoomConfig.name} 삭제
+                            </Button>
+                          ) : null}
                           <Button
                             type="button"
                             variant="outline"

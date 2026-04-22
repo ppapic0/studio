@@ -53,7 +53,7 @@ export function normalizeLayoutRooms(layoutSettings?: LayoutSettings | Record<st
       }))
       .sort((a, b) => a.order - b.order);
 
-    if (normalized.length >= 2) {
+    if (normalized.length > 0) {
       return normalized;
     }
   }
