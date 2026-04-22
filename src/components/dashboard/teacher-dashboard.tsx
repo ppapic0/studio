@@ -221,6 +221,37 @@ function getSeatCanvasId(
   return typeof seat?.id === 'string' ? seat.id : '';
 }
 
+function getSeatUpdatedAtMs(seat?: Pick<AttendanceCurrent, 'updatedAt'> | null) {
+  const candidate = (seat?.updatedAt as any)?.toMillis?.();
+  return Number.isFinite(candidate) ? Number(candidate) : 0;
+}
+
+function shouldPreferResolvedSeatCandidate(
+  candidate: ResolvedAttendanceSeat,
+  current: ResolvedAttendanceSeat,
+  canonicalSeatId: string
+) {
+  const candidateUpdatedAt = getSeatUpdatedAtMs(candidate);
+  const currentUpdatedAt = getSeatUpdatedAtMs(current);
+  if (candidateUpdatedAt !== currentUpdatedAt) {
+    return candidateUpdatedAt > currentUpdatedAt;
+  }
+
+  const candidateUsesCanonicalDoc = (candidate.seatDocId || candidate.id) === canonicalSeatId;
+  const currentUsesCanonicalDoc = (current.seatDocId || current.id) === canonicalSeatId;
+  if (candidateUsesCanonicalDoc !== currentUsesCanonicalDoc) {
+    return candidateUsesCanonicalDoc;
+  }
+
+  return Boolean(candidate.studentId || getManualSeatOccupantName(candidate)) &&
+    !Boolean(current.studentId || getManualSeatOccupantName(current));
+}
+
+function getLegacySeatDocId(seat?: Pick<ResolvedAttendanceSeat, 'id' | 'seatDocId'> | null) {
+  const legacySeatDocId = typeof seat?.seatDocId === 'string' ? seat.seatDocId.trim() : '';
+  return legacySeatDocId && legacySeatDocId !== seat?.id ? legacySeatDocId : '';
+}
+
 function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
   const explicitDelta = Number((req as any).penaltyPointsDelta);
   if (Number.isFinite(explicitDelta) && explicitDelta > 0) {
@@ -233,6 +264,7 @@ function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
 type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomId: string;
   roomSeatNo: number;
+  seatDocId?: string;
 };
 
 const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: string }> = [
@@ -418,7 +450,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<number>(Date.now());
-  const [selectedSeat, setSelectedSeat] = useState<AttendanceCurrent | null>(null);
+  const [selectedSeat, setSelectedSeat] = useState<ResolvedAttendanceSeat | null>(null);
   const [isManaging, setIsManaging] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -616,19 +648,41 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const rawResolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(() => {
     if (!attendanceList) return [];
-    return attendanceList.map((seat) => {
+    const dedupedSeats = new Map<string, ResolvedAttendanceSeat>();
+
+    attendanceList.forEach((seat) => {
       const identity = resolveSeatIdentity(seat);
+      const canvasSeatId =
+        buildSeatId(identity.roomId, identity.roomSeatNo) ||
+        identity.seatId ||
+        (typeof seat.id === 'string' ? seat.id : '');
       const configuredSeatLabel =
         normalizeSeatLabelValue(seat.seatLabel) ||
-        normalizeSeatLabelValue(persistedSeatLabelsBySeatId[identity.seatId]);
-      return {
+        normalizeSeatLabelValue(persistedSeatLabelsBySeatId[canvasSeatId || identity.seatId]);
+      const normalizedSeat: ResolvedAttendanceSeat = {
         ...seat,
-        roomId: identity.roomId,
+        id: canvasSeatId || seat.id,
+        seatDocId: seat.id,
+        roomId: identity.roomId || PRIMARY_ROOM_ID,
         roomSeatNo: identity.roomSeatNo,
         seatNo: identity.seatNo,
         seatLabel: configuredSeatLabel || undefined,
         type: seat.type || 'seat',
       };
+      const dedupeKey = normalizedSeat.id || normalizedSeat.seatDocId || '';
+      if (!dedupeKey) return;
+
+      const currentSeat = dedupedSeats.get(dedupeKey);
+      if (!currentSeat || shouldPreferResolvedSeatCandidate(normalizedSeat, currentSeat, dedupeKey)) {
+        dedupedSeats.set(dedupeKey, normalizedSeat);
+      }
+    });
+
+    return Array.from(dedupedSeats.values()).sort((left, right) => {
+      if (left.roomId !== right.roomId) {
+        return left.roomId.localeCompare(right.roomId);
+      }
+      return Number(left.roomSeatNo || 0) - Number(right.roomSeatNo || 0);
     });
   }, [attendanceList, persistedSeatLabelsBySeatId]);
   const legacyAisleSeatIds = useMemo(() => {
@@ -706,9 +760,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const mapped = new Map<string, ResolvedAttendanceSeat>();
       resolvedAttendanceList.forEach((seat) => {
         mapped.set(seat.id, seat);
-        const canonicalSeatId = buildSeatId(seat.roomId, seat.roomSeatNo);
-        if (canonicalSeatId && (seat.id === canonicalSeatId || !mapped.has(canonicalSeatId))) {
-          mapped.set(canonicalSeatId, seat);
+        if (seat.seatDocId && seat.seatDocId !== seat.id) {
+          mapped.set(seat.seatDocId, seat);
         }
       });
       return mapped;
@@ -2284,6 +2337,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         }
 
         batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id));
+        const legacySeatDocId = getLegacySeatDocId(seat);
+        if (legacySeatDocId) {
+          batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+        }
       });
 
       const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
@@ -2394,6 +2451,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         .filter((seat) => seat.roomId === roomId)
         .forEach((seat) => {
           batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id));
+          const legacySeatDocId = getLegacySeatDocId(seat);
+          if (legacySeatDocId) {
+            batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+          }
         });
 
       const nextRooms = persistedRooms
@@ -2523,8 +2584,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleSeatClick = (seat: AttendanceCurrent) => {
-    const normalizedSeat: AttendanceCurrent = {
+    const normalizedSeat: ResolvedAttendanceSeat = {
       ...seat,
+      roomId: seat.roomId || PRIMARY_ROOM_ID,
+      roomSeatNo: Number(seat.roomSeatNo || 0),
       type: effectiveAisleSeatIdSet.has(getSeatCanvasId(seat)) ? 'aisle' : 'seat',
     };
     setSelectedSeat(normalizedSeat);
@@ -2728,6 +2791,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     try {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
+      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
       const prevStatus = selectedSeat.status;
       const nowDate = new Date();
       const todayDateKey = format(nowDate, 'yyyy-MM-dd');
@@ -2769,7 +2833,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ...(nextStatus === 'studying' ? { lastCheckInAt: serverTimestamp() } : {})
       };
 
-      batch.update(seatRef, updateData);
+      batch.set(seatRef, updateData, { merge: true });
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
 
       appendAttendanceEventToBatch(batch, firestore, centerId, {
         studentId,
@@ -2916,6 +2983,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
+      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
       const nextSeatLabelsBySeatId = { ...persistedSeatLabelsBySeatId };
 
       if (nextCustomSeatLabel) {
@@ -2954,6 +3022,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         );
       }
 
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
+
       if (selectedSeat.studentId) {
         batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), {
           seatId: selectedSeat.id,
@@ -2968,6 +3040,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       await batch.commit();
       setSelectedSeat({
         ...selectedSeat,
+        seatDocId: selectedSeat.id,
         seatLabel: nextCustomSeatLabel || undefined,
       });
       setSeatLabelDraft(nextCustomSeatLabel || String(roomSeatNo));
@@ -2991,18 +3064,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const normalizedZone = zone === '미정' ? null : zone;
     setIsSaving(true);
     try {
+      const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
-      await setDoc(seatRef, {
+      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
+      batch.set(seatRef, {
         seatNo: selectedSeat.seatNo,
         roomId: selectedSeat.roomId,
         roomSeatNo: selectedSeat.roomSeatNo,
         seatZone: normalizedZone ?? deleteField(),
         updatedAt: serverTimestamp(),
       }, { merge: true });
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
       
       if (selectedSeat.studentId) {
         const studentRef = doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId);
-        await updateDoc(studentRef, {
+        batch.update(studentRef, {
           seatId: selectedSeat.id,
           seatNo: selectedSeat.seatNo,
           roomId: selectedSeat.roomId,
@@ -3011,9 +3089,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           updatedAt: serverTimestamp(),
         });
       }
+      await batch.commit();
       
       toast({ title: "구역 설정이 완료되었습니다." });
-      setSelectedSeat({ ...selectedSeat, seatZone: normalizedZone ?? undefined });
+      setSelectedSeat({ ...selectedSeat, seatDocId: selectedSeat.id, seatZone: normalizedZone ?? undefined });
     } catch (e) {
       toast({ variant: "destructive", title: "설정 실패" });
     } finally {
@@ -3027,10 +3106,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const targetSeatId =
       getSeatCanvasId(selectedSeat) ||
       buildSeatId(selectedSeat.roomId || PRIMARY_ROOM_ID, selectedSeat.roomSeatNo ?? 0);
+    const legacySeatDocId = getLegacySeatDocId(selectedSeat);
     const previousSelectedSeat = selectedSeat;
-    const nextSelectedSeat: AttendanceCurrent = {
+    const nextSelectedSeat: ResolvedAttendanceSeat = {
       ...selectedSeat,
       type: nextType,
+      seatDocId: selectedSeat.id,
       studentId: nextType === 'aisle' ? undefined : selectedSeat.studentId,
       manualOccupantName: nextType === 'aisle' ? undefined : selectedSeat.manualOccupantName,
       seatZone: nextType === 'aisle' ? undefined : selectedSeat.seatZone,
@@ -3117,6 +3198,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
       const optimisticNextAisles = Array.from(nextAisleSeatIds).sort();
       setOptimisticAisleSeatIds(optimisticNextAisles);
       setSelectedSeat(nextSelectedSeat);
@@ -3151,7 +3235,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
     setIsSaving(true);
     try {
-      await setDoc(
+      const batch = writeBatch(firestore);
+      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
+      batch.set(
         doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
         {
           studentId: null,
@@ -3168,8 +3254,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
+      await batch.commit();
       setSelectedSeat({
         ...selectedSeat,
+        seatDocId: selectedSeat.id,
         studentId: undefined,
         manualOccupantName: occupantName,
         status: 'studying',
@@ -3188,7 +3279,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
     setIsSaving(true);
     try {
-      await setDoc(
+      const batch = writeBatch(firestore);
+      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
+      batch.set(
         doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
         {
           studentId: null,
@@ -3203,8 +3296,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
+      await batch.commit();
       setSelectedSeat({
         ...selectedSeat,
+        seatDocId: selectedSeat.id,
         studentId: undefined,
         manualOccupantName: undefined,
         status: 'absent',
@@ -3223,6 +3321,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
+      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
       batch.update(doc(firestore, 'centers', centerId, 'students', student.id), {
         seatId: selectedSeat.id,
         seatNo: selectedSeat.seatNo,
@@ -3249,6 +3348,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
       await batch.commit();
       toast({ title: `${student.name} 학생 배정 완료` });
       setIsAssigning(false);
@@ -3261,6 +3363,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
+      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
       batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), {
         seatNo: 0,
         seatId: deleteField(),
@@ -3284,6 +3387,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
       await batch.commit();
       toast({ title: "배정 해제 완료" });
       setIsManaging(false);
