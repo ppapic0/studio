@@ -2832,9 +2832,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         { merge: true }
       );
       await batch.commit();
+      const nextSeatZone = nextType === 'aisle' ? undefined : selectedSeat.seatZone;
+      setSelectedSeat({
+        ...selectedSeat,
+        type: nextType,
+        studentId: nextType === 'aisle' ? undefined : selectedSeat.studentId,
+        manualOccupantName: nextType === 'aisle' ? undefined : selectedSeat.manualOccupantName,
+        seatZone: nextSeatZone,
+        status: 'absent',
+        lastCheckInAt: undefined,
+      });
+      if (nextType === 'aisle') {
+        setManualSeatOccupantName('');
+      }
       toast({ title: nextType === 'aisle' ? "통로로 변경됨" : "좌석으로 변경됨" });
-      setIsManaging(false);
-      setIsAssigning(false);
     } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); } finally { setIsSaving(false); }
   };
 
@@ -3068,24 +3079,33 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ))}
       </div>
 
-      <div className={cn("flex flex-wrap gap-2", compact && "gap-1.5")}>
-        {SEAT_OVERLAY_OPTIONS.map((option) => (
-          <Button
-            key={option.value}
-            type="button"
-            variant={activeSeatOverlayMode === option.value ? 'default' : 'outline'}
-            disabled={isEditMode && option.value !== 'status'}
-            onClick={() => setSeatOverlayMode(option.value)}
-            className={cn(
-              "rounded-2xl font-black",
-              compact ? "h-10 min-w-[88px] px-3 text-[12px]" : isMobile ? "h-10 flex-1 min-w-[92px] px-4" : "h-11 px-4",
-              activeSeatOverlayMode === option.value ? "bg-[#14295F] text-white" : "border-2 bg-white/80 text-[#14295F]"
-            )}
-          >
-            {option.label}
-          </Button>
-        ))}
-      </div>
+      {isEditMode ? (
+        <div className={cn("rounded-[2rem] border border-[#FFD7B0] bg-[#FFF8F1]", compact ? "p-3.5" : "p-4")}>
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C95A08]">편집 모드 안내</p>
+          <p className="mt-2 text-sm font-black text-[#14295F]">좌석을 눌러 통로, 구역, 배정 설정을 이어서 바꿔주세요.</p>
+          <p className="mt-1 text-xs font-bold leading-5 text-[#8A5A2B]">
+            편집 중에는 도면 오버레이가 상태 보기로 고정됩니다. 그래서 아래 비교 버튼이 아니라 좌석 클릭이 실제 설정 진입점입니다.
+          </p>
+        </div>
+      ) : (
+        <div className={cn("flex flex-wrap gap-2", compact && "gap-1.5")}>
+          {SEAT_OVERLAY_OPTIONS.map((option) => (
+            <Button
+              key={option.value}
+              type="button"
+              variant={activeSeatOverlayMode === option.value ? 'default' : 'outline'}
+              onClick={() => setSeatOverlayMode(option.value)}
+              className={cn(
+                "rounded-2xl font-black",
+                compact ? "h-10 min-w-[88px] px-3 text-[12px]" : isMobile ? "h-10 flex-1 min-w-[92px] px-4" : "h-11 px-4",
+                activeSeatOverlayMode === option.value ? "bg-[#14295F] text-white" : "border-2 bg-white/80 text-[#14295F]"
+              )}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      )}
 
       <div className={cn("rounded-[2rem] border border-[#D7E4FF] bg-[#F7FAFF]", compact ? "p-3.5" : "p-4")}>
         <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">범례</p>
@@ -3164,13 +3184,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         compact ? 'min-w-[52px] rounded-[1.1rem] p-1' : 'min-w-[64px] rounded-2xl p-1',
                         'flex flex-col items-center justify-center',
                         isFilteredOut ? 'border-transparent bg-muted/10 opacity-20 grayscale' :
-                        isAisle ? 'border-transparent bg-transparent text-transparent hover:bg-muted/10' :
+                        isAisle ? (isEditMode
+                          ? 'border-dashed border-[#FFB273] bg-[#FFF7EF] text-[#C95A08] hover:border-[#FF7A16]'
+                          : 'border-transparent bg-transparent text-transparent hover:bg-muted/10') :
                         hasOccupant ? overlayPresentation.surfaceClass :
                         'border-primary/40 bg-white text-primary/5 hover:border-primary/60',
-                        isEditMode && isAisle && 'border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20'
+                        isEditMode && isAisle && 'shadow-none'
                       )}
                     >
-                      {!isAisle && (
+                      {!isAisle ? (
                         <span
                           className={cn(
                             'absolute left-1.5 top-1 font-black',
@@ -3180,7 +3202,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         >
                           {roomSeatNo}
                         </span>
-                      )}
+                      ) : isEditMode ? (
+                        <>
+                          <span className={cn('absolute left-1.5 top-1 font-black text-[#C95A08]/75', compact ? 'text-[6px]' : 'text-[7px]')}>
+                            {roomSeatNo}
+                          </span>
+                          <span className={cn('font-black tracking-tight text-[#C95A08]', compact ? 'text-[8px]' : 'text-[10px]')}>
+                            통로
+                          </span>
+                        </>
+                      ) : null}
                       {hasManualOccupant && !isAisle && (
                         <Badge
                           variant="outline"
@@ -4713,7 +4744,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                     </div>
                                     <div className="space-y-2">
                                       <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500"><MapPin className="h-3 w-3" /> 좌석 구역 설정</Label>
-                                      <Select value={selectedSeat.seatZone || '미정'} onValueChange={handleUpdateZone}>
+                                      <Select
+                                        value={selectedSeat.seatZone || '미정'}
+                                        onValueChange={handleUpdateZone}
+                                        disabled={selectedSeat?.type === 'aisle' || isSaving}
+                                      >
                                         <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
                                           <SelectValue placeholder="구역 선택" />
                                         </SelectTrigger>
@@ -4725,13 +4760,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                           <SelectItem value="자유석" className="font-bold">자유석</SelectItem>
                                         </SelectContent>
                                       </Select>
+                                      {selectedSeat?.type === 'aisle' ? (
+                                        <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
+                                          통로 상태에서는 구역 설정이 잠깁니다. 좌석으로 다시 전환하면 바로 변경할 수 있습니다.
+                                        </p>
+                                      ) : null}
                                     </div>
-                                    <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving} className="h-12 w-full rounded-xl font-black shadow-lg shadow-rose-100">
+                                    <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving || !selectedSeat?.studentId} className="h-12 w-full rounded-xl font-black shadow-lg shadow-rose-100">
                                       좌석 배정 해제
                                     </Button>
                                     <Button variant="outline" onClick={handleToggleCellType} disabled={isSaving} className="h-11 w-full rounded-xl border-2 font-black gap-2">
                                       <ArrowRightLeft className="h-4 w-4" />
-                                      통로로 전환하기
+                                      {selectedSeat?.type === 'aisle' ? '좌석으로 다시 전환' : '통로로 전환하기'}
                                     </Button>
                                   </div>
                                 ) : (
