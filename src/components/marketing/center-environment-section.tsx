@@ -29,12 +29,9 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <span className="eyebrow-badge">{centerEnvironment.eyebrow}</span>
-              <h2 className="mt-4 break-keep text-[clamp(1.55rem,7.9vw,2.8rem)] font-black leading-[1.14] text-[#14295F]">
+              <h2 className="font-aggro-display mt-4 break-keep text-[clamp(1.7rem,8vw,3rem)] font-black leading-[1.08] tracking-[-0.04em] text-[#14295F]">
                 {centerEnvironment.title}
               </h2>
-              <p className="mt-4 break-keep text-[13.5px] font-semibold leading-[1.8] text-[#425A75] sm:text-[15px]">
-                {centerEnvironment.description}
-              </p>
 
               <div className="mt-5 flex flex-wrap gap-2.5">
                 {centerEnvironment.highlights.map((item) => (
@@ -60,9 +57,6 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
                   </p>
                 </div>
               </div>
-              <p className="mt-4 break-keep text-[13px] font-semibold leading-[1.72] text-[#51667D]">
-                전경은 공간 분위기를 먼저 보여주고, 아래에서는 좌석 타입별 특징을 사진과 함께 바로 확인할 수 있게 구성했습니다.
-              </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {centerEnvironment.photos.slice(1).map((photo) => (
                   <span
@@ -92,25 +86,17 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
               </span>
             </div>
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.9fr)] lg:items-end">
-              <div className="relative aspect-[16/11] overflow-hidden rounded-[1.35rem] border border-[#14295F]/10 bg-white">
-                {overviewPhoto.image ? (
-                  <Image
-                    src={overviewPhoto.image}
-                    alt={overviewPhoto.alt}
-                    fill
-                    sizes="(max-width: 1024px) 92vw, 68vw"
-                    className="object-cover"
-                    priority
-                  />
-                ) : null}
-              </div>
-              <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-5">
-                <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">SPACE OVERVIEW</p>
-                <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.8] text-[#52667D] sm:text-[15px]">
-                  {overviewPhoto.summary}
-                </p>
-              </div>
+            <div className="mt-4 relative aspect-[16/11] overflow-hidden rounded-[1.35rem] border border-[#14295F]/10 bg-white">
+              {overviewPhoto.image ? (
+                <Image
+                  src={overviewPhoto.image}
+                  alt={overviewPhoto.alt}
+                  fill
+                  sizes="(max-width: 1024px) 92vw, 92vw"
+                  className="object-cover"
+                  priority
+                />
+              ) : null}
             </div>
           </article>
         ) : null}
