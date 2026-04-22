@@ -599,6 +599,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => normalizeSeatLabelsBySeatId(centerData?.layoutSettings),
     [centerData?.layoutSettings]
   );
+  const persistedLayoutRoomsSnapshot = useMemo(
+    () => (persistedRooms.length > 0 ? persistedRooms.map((room) => ({ ...room })) : roomConfigs.map((room) => ({ ...room }))),
+    [persistedRooms, roomConfigs]
+  );
+  const persistedLayoutRows = persistedLayoutRoomsSnapshot[0]?.rows ?? 7;
+  const persistedLayoutCols = persistedLayoutRoomsSnapshot[0]?.cols ?? 10;
   const filterSeatLabelsByRooms = (rooms: LayoutRoomConfig[]) => {
     const roomCellLimitById = new Map(rooms.map((room) => [room.id, room.rows * room.cols]));
 
@@ -725,7 +731,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       doc(firestore, 'centers', centerId),
       {
         layoutSettings: {
+          rooms: persistedLayoutRoomsSnapshot,
+          rows: persistedLayoutRows,
+          cols: persistedLayoutCols,
           aisleSeatIds: legacyAisleSeatIds,
+          seatLabelsBySeatId: filterSeatLabelsByRooms(persistedLayoutRoomsSnapshot),
           updatedAt: serverTimestamp(),
         },
       },
@@ -734,7 +744,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       aisleLayoutMigrationRef.current = null;
       console.warn('[teacher-dashboard] aisle layout migration failed', migrationError);
     });
-  }, [centerId, firestore, hasPersistedAisleSeatIds, isActive, legacyAisleSeatIds]);
+  }, [
+    centerId,
+    firestore,
+    hasPersistedAisleSeatIds,
+    isActive,
+    legacyAisleSeatIds,
+    persistedLayoutCols,
+    persistedLayoutRoomsSnapshot,
+    persistedLayoutRows,
+    persistedSeatLabelsBySeatId,
+  ]);
   useEffect(() => {
     if (!optimisticAisleSeatIds) return;
     if (!hasPersistedAisleSeatIds) return;
@@ -3192,7 +3212,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         doc(firestore, 'centers', centerId),
         {
           layoutSettings: {
+            rooms: persistedLayoutRoomsSnapshot,
+            rows: persistedLayoutRows,
+            cols: persistedLayoutCols,
             aisleSeatIds: Array.from(nextAisleSeatIds).sort(),
+            seatLabelsBySeatId: filterSeatLabelsByRooms(persistedLayoutRoomsSnapshot),
             updatedAt: serverTimestamp(),
           },
         },
