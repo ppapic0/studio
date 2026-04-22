@@ -1304,8 +1304,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const rewardTheme = NAVY_REWARD_THEME;
   const authUid = user?.uid || null;
   const studentDocId = activeStudentId || authUid || null;
-  const studentUid = authUid || studentDocId || null;
-  const studyBoxCacheUid = authUid || studentDocId || null;
+  const studentUid = studentDocId || authUid || null;
+  const studyBoxCacheUid = studentDocId || authUid || null;
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);

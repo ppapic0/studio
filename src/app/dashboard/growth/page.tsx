@@ -400,8 +400,8 @@ export default function GrowthPage() {
   const isMobile = viewMode === 'mobile';
   const authUid = user?.uid || null;
   const studentDocId = activeStudentId || authUid || null;
-  const studentUid = authUid || studentDocId || null;
-  const studyBoxCacheUid = authUid || studentUid || null;
+  const studentUid = studentDocId || authUid || null;
+  const studyBoxCacheUid = studentUid || authUid || null;
   const [nowMs, setNowMs] = useState(() => Date.now());
   const studyDayContext = useMemo(() => getStudyDayContext(new Date(nowMs)), [nowMs]);
   const activeStudyDayKey = studyDayContext.dateKey;

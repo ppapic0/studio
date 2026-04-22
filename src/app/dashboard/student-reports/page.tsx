@@ -40,7 +40,7 @@ export default function StudentReportsPage() {
   const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
   const authUid = user?.uid || null;
-  const studentUid = authUid || activeStudentId || null;
+  const studentUid = activeStudentId || authUid || null;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);

@@ -470,7 +470,7 @@ export default function AnalysisTrackPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const authUid = user?.uid || '';
-  const studentUid = authUid || activeStudentId || '';
+  const studentUid = activeStudentId || authUid || '';
   const selfParams = useMemo(() => Promise.resolve({ id: studentUid }), [studentUid]);
   const isMobile = viewMode === 'mobile';
   const [activeTab, setActiveTab] = useState<AnalysisTab>('growth');

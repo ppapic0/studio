@@ -496,7 +496,7 @@ export default function StudyPlanPage() {
   const searchParams = useSearchParams();
   const authUid = user?.uid || null;
   const studentDocId = activeStudentId || authUid || null;
-  const studentUid = authUid || studentDocId || null;
+  const studentUid = studentDocId || authUid || null;
 
   const isMobile = viewMode === 'mobile';
   const rewardGradient = 'from-[#14295F] via-[#1A3673] to-[#FF8A2A]';

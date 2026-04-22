@@ -245,7 +245,8 @@ export function AppointmentsPageContent({
   const centerId = activeMembership?.id;
   const userRole = activeMembership?.role;
   const authUid = user?.uid || null;
-  const studentUid = authUid || activeStudentId || null;
+  const studentUid = activeStudentId || authUid || null;
+  const studentSenderUid = authUid || null;
   const linkedStudentIds = useMemo(() => activeMembership?.linkedStudentIds || [], [activeMembership?.linkedStudentIds]);
   const linkedIdsKey = JSON.stringify(linkedStudentIds);
 
@@ -342,12 +343,12 @@ export function AppointmentsPageContent({
     const baseRef = collection(firestore, 'centers', centerId, 'parentCommunications');
 
     if (isStaff) return query(baseRef);
-    if (isStudent) return query(baseRef, where('senderUid', '==', studentUid));
+    if (isStudent && studentSenderUid) return query(baseRef, where('senderUid', '==', studentSenderUid));
 
     return null;
-  }, [firestore, centerId, studentUid, canAccessCommunications, isStaff, isStudent, shouldLoadCommunications]);
+  }, [firestore, centerId, studentUid, studentSenderUid, canAccessCommunications, isStaff, isStudent, shouldLoadCommunications]);
   const { data: rawParentCommunications, isLoading: parentCommsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, {
-    enabled: canAccessCommunications && !!centerId && !!studentUid && shouldLoadCommunications,
+    enabled: canAccessCommunications && !!centerId && !!(isStudent ? studentSenderUid : studentUid) && shouldLoadCommunications,
   });
 
   const supportMessagesQuery = useMemoFirebase(() => {
@@ -416,8 +417,8 @@ export function AppointmentsPageContent({
   }, [parentCommunications, parentTypeFilter, parentStatusFilter, isStaff]);
 
   const studentInquiries = useMemo(
-    () => parentCommunications.filter((item) => item.senderRole === 'student' || item.senderUid === studentUid),
-    [parentCommunications, studentUid]
+    () => parentCommunications.filter((item) => item.senderRole === 'student' || item.senderUid === studentSenderUid),
+    [parentCommunications, studentSenderUid]
   );
 
   const availableSeasons = useMemo(() => {

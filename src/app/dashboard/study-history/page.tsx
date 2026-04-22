@@ -433,7 +433,7 @@ export default function StudyHistoryPage() {
   const requestedParentStudentId = searchParams.get('parentStudentId');
   const authUid = user?.uid;
   const targetUid = useMemo(() => {
-    if (!isParent) return authUid || activeStudentId;
+    if (!isParent) return activeStudentId || authUid;
     if (requestedParentStudentId && (linkedStudentIds.length === 0 || linkedStudentIds.includes(requestedParentStudentId))) {
       return requestedParentStudentId;
     }

@@ -60,7 +60,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const firestore = useFirestore();
   const { activeMembership, activeStudentId } = useAppContext();
   const authUid = user?.uid || null;
-  const studentUid = authUid || activeStudentId || null;
+  const studentUid = activeStudentId || authUid || null;
 
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [feedbacks, setFeedbacks] = useState<StudentNotification[]>([]);

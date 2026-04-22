@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useFunctions } from '@/firebase';
-import { collection, onSnapshot, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { httpsCallable } from 'firebase/functions';
 
@@ -251,12 +251,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const centerId = activeMembership.id;
-    const directMemberRef = doc(firestore, 'centers', centerId, 'members', user.uid);
     const directStudentRef = doc(firestore, 'centers', centerId, 'students', user.uid);
+    const studentFallbackQuery = query(
+      collection(firestore, 'centers', centerId, 'students'),
+      where('id', '==', user.uid)
+    );
     let unsubscribeFallback = () => {};
 
     const unsubscribeDirect = onSnapshot(
-      directMemberRef,
+      directStudentRef,
       (snapshot) => {
         if (snapshot.exists()) {
           setActiveStudentId(snapshot.id);
@@ -266,47 +269,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         unsubscribeFallback();
-        const resolveFallbackIdentity = async () => {
-          try {
-            const directStudentSnap = await getDoc(directStudentRef);
-            if (directStudentSnap.exists()) {
-              setActiveStudentId(directStudentSnap.id);
-              return;
-            }
-
-            const [memberFallbackSnapshot, studentFallbackSnapshot] = await Promise.all([
-              getDocs(
-                query(
-                  collection(firestore, 'centers', centerId, 'members'),
-                  where('id', '==', user.uid)
-                )
-              ),
-              getDocs(
-                query(
-                  collection(firestore, 'centers', centerId, 'students'),
-                  where('id', '==', user.uid)
-                )
-              ),
-            ]);
-
-            const matchedMemberDoc =
-              memberFallbackSnapshot.docs.find((docSnap) => {
-                const raw = docSnap.data() as Record<string, unknown>;
-                return docSnap.id === user.uid || raw.id === user.uid;
-              }) || null;
+        unsubscribeFallback = onSnapshot(
+          studentFallbackQuery,
+          (fallbackSnapshot) => {
             const matchedStudentDoc =
-              studentFallbackSnapshot.docs.find((docSnap) => {
+              fallbackSnapshot.docs.find((docSnap) => {
                 const raw = docSnap.data() as Record<string, unknown>;
                 return docSnap.id === user.uid || raw.id === user.uid;
               }) || null;
 
-            setActiveStudentId(matchedMemberDoc?.id || matchedStudentDoc?.id || user.uid);
-          } catch {
+            setActiveStudentId(matchedStudentDoc?.id || user.uid);
+          },
+          () => {
             setActiveStudentId(user.uid);
           }
-        };
-
-        void resolveFallbackIdentity();
+        );
       },
       () => {
         setActiveStudentId(user.uid);
@@ -320,7 +297,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
-    const studentId = user?.uid || null;
+    const studentId = activeStudentId || user?.uid || null;
     if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentId) {
       setIsTimerActive(false);
       setStartTime(null);
@@ -369,10 +346,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsubscribe();
-  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+  }, [activeStudentId, user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
-    const studentId = user?.uid || null;
+    const studentId = activeStudentId || user?.uid || null;
     if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentId) {
       setCurrentTier(TIERS[0]);
       return;
@@ -430,7 +407,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubProgress();
       unsubRank();
     };
-  }, [user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
+  }, [activeStudentId, user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
   useEffect(() => {
     if (activeMembership?.role === 'parent' && viewMode !== 'mobile') {

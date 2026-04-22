@@ -24,7 +24,7 @@ export function AppointmentNotifier() {
   const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
   const authUid = user?.uid || null;
-  const studentUid = authUid || activeStudentId || null;
+  const studentUid = activeStudentId || authUid || null;
 
   const [notification, setNotification] = useState<any>(null);
   const [isOpen, setIsOpen] = useState(false);

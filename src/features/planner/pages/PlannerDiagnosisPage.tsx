@@ -77,7 +77,7 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
   const isMobile = viewMode === 'mobile';
   const authUid = user?.uid || null;
   const studentDocId = activeStudentId || authUid || null;
-  const studentUid = authUid || studentDocId || null;
+  const studentUid = studentDocId || authUid || null;
   const autoRequested = searchParams.get('auto') === '1';
   const autoTriggeredRef = useRef(false);
 

@@ -256,7 +256,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
   }, [firestore, user?.uid]);
   const { data: userProfile } = useDoc<UserType>(userRef as any);
   const authUid = user?.uid || null;
-  const studentUid = authUid || activeStudentId || null;
+  const studentUid = activeStudentId || authUid || null;
   const studentDocId = activeStudentId || authUid || null;
 
   const studentRef = useMemoFirebase(() => {
