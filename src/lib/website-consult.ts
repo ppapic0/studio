@@ -30,6 +30,7 @@ export const DEFAULT_WEBSITE_SEAT_GUIDE =
 export type PublicSeatStatus = 'available' | 'occupied' | 'held';
 
 export type PublicSeatCell = {
+  cellType: 'seat' | 'aisle';
   seatId: string;
   roomId: string;
   roomName: string;
@@ -147,6 +148,7 @@ export function buildPublicSeatRooms(params: {
   const rooms = normalizeLayoutRooms(params.layoutSettings);
   const occupiedSeatIds = new Set<string>();
   const heldSeatIds = new Set<string>();
+  const aisleSeatIds = new Set<string>();
 
   (params.students || []).forEach((student) => {
     if (!Number.isFinite(student.roomSeatNo) || Number(student.roomSeatNo) <= 0) return;
@@ -155,10 +157,14 @@ export function buildPublicSeatRooms(params: {
   });
 
   (params.attendanceCurrent || []).forEach((attendance) => {
-    if (attendance.type === 'aisle') return;
     if (!Number.isFinite(attendance.roomSeatNo) || Number(attendance.roomSeatNo) <= 0) return;
     const roomId = attendance.roomId?.trim() || rooms[0]?.id || 'room_1';
-    occupiedSeatIds.add(buildSeatId(roomId, Number(attendance.roomSeatNo)));
+    const seatId = buildSeatId(roomId, Number(attendance.roomSeatNo));
+    if (attendance.type === 'aisle') {
+      aisleSeatIds.add(seatId);
+      return;
+    }
+    occupiedSeatIds.add(seatId);
   });
 
   (params.seatHoldRequests || []).forEach((hold) => {
@@ -172,12 +178,28 @@ export function buildPublicSeatRooms(params: {
 
     for (let roomSeatNo = 1; roomSeatNo <= totalSeats; roomSeatNo += 1) {
       const seatId = buildSeatId(room.id, roomSeatNo);
+      if (aisleSeatIds.has(seatId)) {
+        seats.push({
+          cellType: 'aisle',
+          seatId: '',
+          roomId: room.id,
+          roomName: getRoomLabel(room.id, rooms),
+          roomSeatNo,
+          seatNo: 0,
+          label: `${getRoomLabel(room.id, rooms)} 통로`,
+          status: 'available',
+          statusLabel: '',
+        });
+        continue;
+      }
+
       const isOccupied = occupiedSeatIds.has(seatId);
       const isHeld = !isOccupied && heldSeatIds.has(seatId);
       const status: PublicSeatStatus = isOccupied ? 'occupied' : isHeld ? 'held' : 'available';
       const seatNo = getGlobalSeatNo(room.id, roomSeatNo);
 
       seats.push({
+        cellType: 'seat',
         seatId,
         roomId: room.id,
         roomName: getRoomLabel(room.id, rooms),
@@ -202,7 +224,7 @@ export function buildPublicSeatRooms(params: {
 }
 
 export function summarizePublicSeats(rooms: PublicSeatRoom[]): PublicSeatSummary {
-  const allSeats = rooms.flatMap((room) => room.seats);
+  const allSeats = rooms.flatMap((room) => room.seats).filter((seat) => seat.cellType === 'seat');
   const availableCount = allSeats.filter((seat) => seat.status === 'available').length;
   const occupiedCount = allSeats.filter((seat) => seat.status === 'occupied').length;
   const heldCount = allSeats.filter((seat) => seat.status === 'held').length;

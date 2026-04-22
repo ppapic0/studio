@@ -26,33 +26,6 @@ import { PRIMARY_ROOM_ID } from '@/lib/seat-layout';
 
 export const dynamic = 'force-dynamic';
 
-function normalizePublicRoomName(value?: string | null) {
-  return typeof value === 'string' ? value.replace(/\s+/g, '') : '';
-}
-
-function getPublicRoomPriority(room: {
-  roomId: string;
-  roomName: string;
-  seats: Array<{ seatNo: number }>;
-}) {
-  if (room.roomId === PRIMARY_ROOM_ID) return 0;
-
-  const normalizedRoomName = normalizePublicRoomName(room.roomName);
-  if (normalizedRoomName === '1호실') return 1;
-
-  const namedRoomMatch = normalizedRoomName.match(/^(\d+)호실$/);
-  if (namedRoomMatch) {
-    return 10 + Number.parseInt(namedRoomMatch[1] || '999', 10);
-  }
-
-  const lowestSeatNo = room.seats.reduce((best, seat) => {
-    if (!Number.isFinite(seat.seatNo) || seat.seatNo <= 0) return best;
-    return Math.min(best, seat.seatNo);
-  }, Number.MAX_SAFE_INTEGER);
-
-  return lowestSeatNo === Number.MAX_SAFE_INTEGER ? 9999 : 100 + lowestSeatNo;
-}
-
 export async function GET(request: NextRequest) {
   const rateLimit = applyIpRateLimit(request, 'consult:seat-read', {
     max: 30,
@@ -108,23 +81,8 @@ export async function GET(request: NextRequest) {
       attendanceCurrent,
       seatHoldRequests: seatHolds,
     });
-    const rooms = (() => {
-      const sortedRooms = [...allRooms].sort((left, right) => getPublicRoomPriority(left) - getPublicRoomPriority(right));
-      const primaryRoom = sortedRooms[0];
-      if (!primaryRoom) return [];
-
-      const shouldExposeAsPrimaryRoom =
-        primaryRoom.roomId === PRIMARY_ROOM_ID ||
-        normalizePublicRoomName(primaryRoom.roomName) === '1호실' ||
-        primaryRoom.seats.some((seat) => seat.seatNo === 1);
-
-      return [
-        {
-          ...primaryRoom,
-          roomName: shouldExposeAsPrimaryRoom ? '1호실' : primaryRoom.roomName,
-        },
-      ];
-    })();
+    const primaryRoom = allRooms.find((room) => room.roomId === PRIMARY_ROOM_ID) || allRooms[0] || null;
+    const rooms = primaryRoom ? [primaryRoom] : [];
     const summary = summarizePublicSeats(rooms);
 
     return noStoreJson({

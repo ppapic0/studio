@@ -158,6 +158,16 @@ export async function POST(request: NextRequest) {
         throw new ApiError(400, '좌석 정보가 일치하지 않습니다. 다시 선택해 주세요.');
       }
 
+      const isAisleSeat = attendanceSnap.docs.some((doc) => {
+        const attendance = doc.data() as AttendanceCurrent;
+        if (attendance.type !== 'aisle') return false;
+        const attendanceRoomId = attendance.roomId?.trim() || rooms[0]?.id || 'room_1';
+        return Number(attendance.roomSeatNo) === roomSeatNo && attendanceRoomId === roomId;
+      });
+      if (isAisleSeat) {
+        throw new ApiError(400, '통로로 설정된 칸은 자리찜을 신청할 수 없습니다.');
+      }
+
       const occupiedByStudent = studentsSnap.docs.some((doc) => {
         const student = doc.data() as StudentProfile;
         const studentRoomId = student.roomId?.trim() || rooms[0]?.id || 'room_1';

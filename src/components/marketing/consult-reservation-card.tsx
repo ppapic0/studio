@@ -56,6 +56,7 @@ type VerifiedLead = {
 };
 
 type PublicSeat = {
+  cellType: "seat" | "aisle";
   seatId: string;
   roomId: string;
   roomName: string;
@@ -393,6 +394,7 @@ export function ConsultReservationCard() {
   );
   const activeSettings = settings;
   const availableSlotCount = useMemo(() => slots.filter((slot) => slot.isAvailable).length, [slots]);
+  const publicRoomLabel = seatRooms[0]?.roomName || "1호실";
 
   function resetActionState(nextAction: ReservationAction | null) {
     setAction(nextAction);
@@ -409,7 +411,7 @@ export function ConsultReservationCard() {
   }
 
   function openSeatReservation(seat: PublicSeat) {
-    if (seat.status !== "available") return;
+    if (seat.cellType !== "seat" || seat.status !== "available") return;
     resetActionState({ kind: "seat", seat });
     setSeatDialogOpen(false);
   }
@@ -593,7 +595,7 @@ export function ConsultReservationCard() {
               실시간 좌석 확인
             </h3>
             <p className="mt-3 break-keep text-sm font-semibold leading-6 text-white">
-              방문 상담 가능한 시간과 1호실 실시간 좌석을 먼저 확인할 수 있고, 실제 예약은 홍보리드 DB에서 예약 가능 상태로 열린 문의 건만 진행됩니다.
+              방문 상담 가능한 시간과 {publicRoomLabel} 실시간 좌석을 먼저 확인할 수 있고, 실제 예약은 홍보리드 DB에서 예약 가능 상태로 열린 문의 건만 진행됩니다.
             </p>
           </div>
           <div className="hidden rounded-full border border-white/10 bg-white/[0.08] p-3 text-white/80 sm:block">
@@ -603,7 +605,7 @@ export function ConsultReservationCard() {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <SummaryChip label="공개된 상담 슬롯" value={`${availableSlotCount}개`} />
-          <SummaryChip label="1호실 빈좌석" value={`${seatSummary.availableCount}석`} />
+          <SummaryChip label={`${publicRoomLabel} 빈좌석`} value={`${seatSummary.availableCount}석`} />
           <SummaryChip label="자리찜 진행" value={`${seatSummary.heldCount}석`} tone="accent" />
         </div>
 
@@ -740,7 +742,7 @@ export function ConsultReservationCard() {
             <DialogHeader className="text-left">
               <DialogTitle className="text-[1.65rem] font-black tracking-[-0.04em]">실시간 좌석 현황</DialogTitle>
               <DialogDescription className="pt-2 text-sm font-semibold leading-6 text-white/78">
-                지금은 1호실 좌석만 공개됩니다. 자리찜은 홍보리드 DB에 등록된 관리형 스터디센터 문의 건 중 센터가 예약 가능 상태로 열어둔 번호만 신청할 수 있습니다.
+                지금은 {publicRoomLabel} 좌석만 공개되며, 운영실 실제 배치 기준으로 통로 칸은 비워서 보여드립니다. 자리찜은 홍보리드 DB에 등록된 관리형 스터디센터 문의 건 중 센터가 예약 가능 상태로 열어둔 번호만 신청할 수 있습니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -768,33 +770,58 @@ export function ConsultReservationCard() {
                     <div>
                       <p className="text-lg font-black tracking-tight text-[#14295F]">{room.roomName}</p>
                       <p className="mt-1 text-xs font-semibold text-[#5c6e97]">
-                        실제 좌석번호 기준으로 공개됩니다.
+                        운영실 실제 배치 기준으로 공개됩니다.
                       </p>
                     </div>
                     <span className="rounded-full bg-[#14295F]/6 px-3 py-1 text-[10px] font-black tracking-[0.16em] text-[#14295F]/68">
-                      {room.seats.filter((seat) => seat.status === "available").length}석 가능
+                      {room.seats.filter((seat) => seat.cellType === "seat" && seat.status === "available").length}석 가능
                     </span>
                   </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-5 lg:grid-cols-7">
-                    {room.seats.map((seat) => (
-                      <button
-                        key={seat.seatId}
-                        type="button"
-                        onClick={() => openSeatReservation(seat)}
-                        disabled={seat.status !== "available"}
-                        className={cn(
-                          "rounded-[1rem] border px-3 py-3 text-left transition",
-                          seat.status === "available"
-                            ? "border-emerald-200 bg-emerald-50 hover:-translate-y-0.5 hover:border-emerald-300"
-                            : seat.status === "held"
-                              ? "border-[#ffd7b6] bg-[#fff3e8] text-[#b7641d]"
-                              : "border-slate-200 bg-slate-100 text-slate-500"
-                        )}
-                      >
-                        <p className="text-sm font-black">{seat.roomSeatNo}번</p>
-                        <p className="mt-1 text-[11px] font-bold">{seat.statusLabel}</p>
-                      </button>
-                    ))}
+                  <div className="mt-4 overflow-x-auto pb-1">
+                    <div
+                      className="inline-grid gap-2.5"
+                      style={{
+                        gridTemplateColumns: `repeat(${room.cols}, minmax(78px, 90px))`,
+                      }}
+                    >
+                      {Array.from({ length: room.cols }).map((_, colIndex) => (
+                        <div key={`${room.roomId}_${colIndex}`} className="flex flex-col gap-2.5">
+                          {Array.from({ length: room.rows }).map((__, rowIndex) => {
+                            const seat = room.seats[colIndex * room.rows + rowIndex];
+                            const cellKey = `${room.roomId}_${colIndex}_${rowIndex}`;
+
+                            if (!seat || seat.cellType === "aisle") {
+                              return (
+                                <div
+                                  key={cellKey}
+                                  className="aspect-square rounded-[1rem] bg-transparent"
+                                />
+                              );
+                            }
+
+                            return (
+                              <button
+                                key={seat.seatId || cellKey}
+                                type="button"
+                                onClick={() => openSeatReservation(seat)}
+                                disabled={seat.status !== "available"}
+                                className={cn(
+                                  "aspect-square rounded-[1rem] border px-3 py-3 text-left transition",
+                                  seat.status === "available"
+                                    ? "border-emerald-200 bg-emerald-50 hover:-translate-y-0.5 hover:border-emerald-300"
+                                    : seat.status === "held"
+                                      ? "border-[#ffd7b6] bg-[#fff3e8] text-[#b7641d]"
+                                      : "border-slate-200 bg-slate-100 text-slate-500"
+                                )}
+                              >
+                                <p className="text-sm font-black">{seat.roomSeatNo}번</p>
+                                <p className="mt-1 text-[11px] font-bold">{seat.statusLabel}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </section>
               ))}
