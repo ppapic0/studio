@@ -2045,24 +2045,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!roomDraft || !persistedRoom) return;
 
     const conflicts = roomResizeConflicts.get(roomId) || [];
-    if (conflicts.length > 0) {
-      const preview = conflicts
-        .slice(0, 3)
-        .map((seat) => formatSeatLabel(seat, roomConfigs))
-        .join(', ');
-      toast({
-        variant: 'destructive',
-        title: '축소 저장을 진행할 수 없습니다.',
-        description:
-          conflicts.length > 3
-            ? `${preview} 외 ${conflicts.length - 3}개 셀에 배정 또는 통로 설정이 남아 있습니다. 먼저 정리해 주세요.`
-            : `${preview} 셀에 배정 또는 통로 설정이 남아 있습니다. 먼저 정리해 주세요.`,
-      });
-      return;
-    }
+    const nextMaxCells = roomDraft.rows * roomDraft.cols;
 
     setIsSaving(true);
     try {
+      const batch = writeBatch(firestore);
       const nextRooms = persistedRooms.map((room) =>
         room.id === roomId
           ? {
@@ -2073,7 +2060,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           : room
       );
 
-      await setDoc(
+      conflicts.forEach((seat) => {
+        const assignedStudentId = typeof seat.studentId === 'string' ? seat.studentId.trim() : '';
+        if (assignedStudentId && studentsById.has(assignedStudentId)) {
+          batch.update(doc(firestore, 'centers', centerId, 'students', assignedStudentId), {
+            seatNo: 0,
+            seatId: deleteField(),
+            roomId: deleteField(),
+            roomSeatNo: deleteField(),
+            seatZone: deleteField(),
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id));
+      });
+
+      batch.set(
         doc(firestore, 'centers', centerId),
         {
           layoutSettings: {
@@ -2085,10 +2088,28 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      await batch.commit();
+
+      if (selectedSeat?.roomId === roomId && (selectedSeat.roomSeatNo ?? 0) > nextMaxCells) {
+        setSelectedSeat(null);
+        setIsManaging(false);
+        setIsAssigning(false);
+        setManualSeatOccupantName('');
+      }
+
+      const cleanedSeatPreview = conflicts
+        .slice(0, 2)
+        .map((seat) => formatSeatLabel(seat, roomConfigs))
+        .join(', ');
 
       toast({
         title: `${getRoomLabel(roomId, roomConfigs)} 도면이 저장되었습니다.`,
-        description: `${roomDraft.cols} x ${roomDraft.rows} 구조로 반영했습니다.`,
+        description:
+          conflicts.length > 0
+            ? conflicts.length > 2
+              ? `${roomDraft.cols} x ${roomDraft.rows} 구조로 반영하고 ${cleanedSeatPreview} 외 ${conflicts.length - 2}개 셀 설정을 함께 정리했습니다.`
+              : `${roomDraft.cols} x ${roomDraft.rows} 구조로 반영하고 ${cleanedSeatPreview} 셀 설정을 함께 정리했습니다.`
+            : `${roomDraft.cols} x ${roomDraft.rows} 구조로 반영했습니다.`,
       });
     } catch (error) {
       toast({ variant: 'destructive', title: '도면 저장 실패' });
@@ -3977,8 +3998,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     <div className="rounded-[2rem] border border-rose-200 bg-rose-50/85 p-4 shadow-sm">
                       <div className="flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 text-rose-600" />
-                        <p className="text-sm font-black text-rose-700">축소 저장 전 정리가 필요한 셀이 있습니다.</p>
+                        <p className="text-sm font-black text-rose-700">축소 저장 시 함께 정리될 셀이 있습니다.</p>
                       </div>
+                      <p className="mt-2 text-xs font-bold leading-relaxed text-rose-700/90">
+                        저장하면 아래 셀의 배정, 임시 사용중, 통로 설정이 자동으로 정리됩니다.
+                      </p>
                       <p className="mt-2 text-xs font-bold leading-relaxed text-rose-700/90">
                         {activeRoomConflicts
                           .slice(0, 5)
