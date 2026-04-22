@@ -440,6 +440,10 @@ export function MarketingConsultingCRM({
     () => [...(websiteRequestsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
     [websiteRequestsRaw]
   );
+  const visibleWebsiteRequests = useMemo(
+    () => websiteRequests.filter((request) => !request.linkedLeadId),
+    [websiteRequests]
+  );
   const websiteReservations = useMemo(
     () => [...(websiteReservationsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
     [websiteReservationsRaw]
@@ -572,7 +576,7 @@ export function MarketingConsultingCRM({
 
   const filteredWebsiteRequests = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
-    return websiteRequests
+    return visibleWebsiteRequests
       .filter((req) => {
         if (statusFilter !== 'all' && req.status !== statusFilter) return false;
         if (!keyword) return true;
@@ -590,7 +594,7 @@ export function MarketingConsultingCRM({
         }
         return toDateMs(right.createdAt) - toDateMs(left.createdAt);
       });
-  }, [websiteRequests, searchTerm, statusFilter]);
+  }, [visibleWebsiteRequests, searchTerm, statusFilter]);
 
   const filteredWaitlist = useMemo(() => {
     const keyword = waitlistSearch.trim().toLowerCase();
@@ -647,12 +651,12 @@ export function MarketingConsultingCRM({
   }, [leads]);
 
   const websiteSummary = useMemo(() => {
-    const total = websiteRequests.length;
-    const newCount = websiteRequests.filter((r) => r.status === 'new').length;
-    const contactedCount = websiteRequests.filter((r) => r.status === 'contacted').length;
-    const enabledCount = websiteRequests.filter((request) => getWebsiteBookingAccess(request.bookingAccess).isEnabled).length;
+    const total = visibleWebsiteRequests.length;
+    const newCount = visibleWebsiteRequests.filter((r) => r.status === 'new').length;
+    const contactedCount = visibleWebsiteRequests.filter((r) => r.status === 'contacted').length;
+    const enabledCount = visibleWebsiteRequests.filter((request) => getWebsiteBookingAccess(request.bookingAccess).isEnabled).length;
     return { total, newCount, contactedCount, enabledCount };
-  }, [websiteRequests]);
+  }, [visibleWebsiteRequests]);
 
   const visitSummary = useMemo(() => {
     const events = entryEventsRaw || [];
