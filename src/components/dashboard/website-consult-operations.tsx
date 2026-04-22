@@ -11,6 +11,7 @@ import {
   query,
   setDoc,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import {
   Armchair,
@@ -54,6 +55,7 @@ type SlotFormState = {
   date: string;
   startTime: string;
   endTime: string;
+  repeatUntilTime: string;
   label: string;
   isPublished: boolean;
 };
@@ -114,18 +116,35 @@ function formatTimeInput(date: Date) {
   }).format(date);
 }
 
+function addMinutesToTimeInput(time: string, minutes: number) {
+  const [hour, minute] = time.split(':').map((value) => Number.parseInt(value, 10));
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time;
+  const base = new Date();
+  base.setHours(hour, minute, 0, 0);
+  base.setMinutes(base.getMinutes() + minutes);
+  return formatTimeInput(base);
+}
+
+function buildSlotDateTime(date: string, time: string) {
+  return new Date(`${date}T${time}:00+09:00`);
+}
+
+function getSlotRangeKey(startsAtIso: string, endsAtIso: string) {
+  return `${startsAtIso}|${endsAtIso}`;
+}
+
 function getDefaultSlotForm(): SlotFormState {
   const start = new Date();
   start.setMinutes(0, 0, 0);
   start.setHours(start.getHours() + 1);
-
-  const end = new Date(start);
-  end.setMinutes(end.getMinutes() + 40);
+  const startTime = formatTimeInput(start);
+  const endTime = addMinutesToTimeInput(startTime, 30);
 
   return {
     date: formatDateInput(start),
-    startTime: formatTimeInput(start),
-    endTime: formatTimeInput(end),
+    startTime,
+    endTime,
+    repeatUntilTime: endTime,
     label: '',
     isPublished: true,
   };
@@ -260,6 +279,19 @@ export function WebsiteConsultOperations() {
         .sort((a, b) => toDateMs(a.startsAt) - toDateMs(b.startsAt)),
     [slotDocs, activeReservationCountBySlot]
   );
+  const existingSlotRangeKeys = useMemo(
+    () =>
+      new Set(
+        slots
+          .map((slot) =>
+            typeof slot.startsAt === 'string' && typeof slot.endsAt === 'string'
+              ? getSlotRangeKey(slot.startsAt, slot.endsAt)
+              : ''
+          )
+          .filter(Boolean)
+      ),
+    [slots]
+  );
 
   const summary = useMemo(
     () => ({
@@ -314,8 +346,8 @@ export function WebsiteConsultOperations() {
       return;
     }
 
-    const startsAt = new Date(`${slotForm.date}T${slotForm.startTime}:00+09:00`);
-    const endsAt = new Date(`${slotForm.date}T${slotForm.endTime}:00+09:00`);
+    const startsAt = buildSlotDateTime(slotForm.date, slotForm.startTime);
+    const endsAt = buildSlotDateTime(slotForm.date, slotForm.endTime);
     if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
       toast({ variant: 'destructive', title: '상담 시작/종료 시간을 다시 확인해 주세요.' });
       return;
@@ -325,6 +357,15 @@ export function WebsiteConsultOperations() {
         variant: 'destructive',
         title: '이미 지난 시간은 공개되지 않습니다.',
         description: '공개 화면에는 종료 시간이 남아 있는 상담 슬롯만 노출됩니다. 미래 시간으로 다시 만들어 주세요.',
+      });
+      return;
+    }
+    const slotRangeKey = getSlotRangeKey(startsAt.toISOString(), endsAt.toISOString());
+    if (existingSlotRangeKeys.has(slotRangeKey)) {
+      toast({
+        variant: 'destructive',
+        title: '같은 시간의 상담 슬롯이 이미 있습니다.',
+        description: '기존 슬롯을 확인한 뒤 다른 시간대로 만들어 주세요.',
       });
       return;
     }
@@ -347,6 +388,128 @@ export function WebsiteConsultOperations() {
       toast({ title: '새 상담 슬롯을 만들었습니다.' });
     } catch (error: any) {
       toast({ variant: 'destructive', title: '슬롯 생성에 실패했습니다.', description: error?.message });
+    } finally {
+      setIsSavingSlot(false);
+    }
+  }
+
+  async function handleCreateSlotSeries() {
+    if (!slotForm.date || !slotForm.startTime || !slotForm.endTime || !slotForm.repeatUntilTime) {
+      toast({ variant: 'destructive', title: '날짜와 시작/종료/반복 종료 시간을 모두 입력해 주세요.' });
+      return;
+    }
+
+    const firstStartsAt = buildSlotDateTime(slotForm.date, slotForm.startTime);
+    const firstEndsAt = buildSlotDateTime(slotForm.date, slotForm.endTime);
+    const repeatUntil = buildSlotDateTime(slotForm.date, slotForm.repeatUntilTime);
+    const slotDurationMs = firstEndsAt.getTime() - firstStartsAt.getTime();
+    const slotDurationMinutes = Math.round(slotDurationMs / (1000 * 60));
+
+    if (
+      Number.isNaN(firstStartsAt.getTime()) ||
+      Number.isNaN(firstEndsAt.getTime()) ||
+      Number.isNaN(repeatUntil.getTime()) ||
+      firstEndsAt <= firstStartsAt
+    ) {
+      toast({ variant: 'destructive', title: '상담 시작/종료 시간을 다시 확인해 주세요.' });
+      return;
+    }
+
+    if (slotDurationMinutes !== 30) {
+      toast({
+        variant: 'destructive',
+        title: '30분 간격 묶음 생성은 30분 슬롯만 지원합니다.',
+        description: '예: 08:00 시작, 08:30 종료처럼 먼저 30분 슬롯으로 맞춰 주세요.',
+      });
+      return;
+    }
+
+    if (repeatUntil.getTime() < firstEndsAt.getTime()) {
+      toast({
+        variant: 'destructive',
+        title: '반복 종료 시간은 첫 슬롯 종료 시간보다 늦어야 합니다.',
+      });
+      return;
+    }
+
+    const slotCollectionRef = collection(firestore, 'centers', centerId, 'websiteConsultSlots');
+    const queuedRangeKeys = new Set<string>();
+    const nextSlots: Array<{
+      centerId: string;
+      label: string;
+      startsAt: string;
+      endsAt: string;
+      capacity: number;
+      isPublished: boolean;
+      createdAt: string;
+      updatedAt: string;
+      createdByUid: string | null;
+      updatedByUid: string | null;
+    }> = [];
+    let skippedPastCount = 0;
+    let skippedDuplicateCount = 0;
+
+    for (
+      let cursorStart = new Date(firstStartsAt), cursorEnd = new Date(firstEndsAt);
+      cursorEnd.getTime() <= repeatUntil.getTime();
+      cursorStart = new Date(cursorStart.getTime() + slotDurationMs), cursorEnd = new Date(cursorEnd.getTime() + slotDurationMs)
+    ) {
+      if (cursorEnd.getTime() <= Date.now()) {
+        skippedPastCount += 1;
+        continue;
+      }
+
+      const startsAtIso = cursorStart.toISOString();
+      const endsAtIso = cursorEnd.toISOString();
+      const rangeKey = getSlotRangeKey(startsAtIso, endsAtIso);
+      if (existingSlotRangeKeys.has(rangeKey) || queuedRangeKeys.has(rangeKey)) {
+        skippedDuplicateCount += 1;
+        continue;
+      }
+
+      queuedRangeKeys.add(rangeKey);
+      nextSlots.push({
+        centerId,
+        label: slotForm.label.trim(),
+        startsAt: startsAtIso,
+        endsAt: endsAtIso,
+        capacity: 1,
+        isPublished: slotForm.isPublished,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdByUid: user?.uid || null,
+        updatedByUid: user?.uid || null,
+      });
+    }
+
+    if (nextSlots.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: '새로 만들 상담 슬롯이 없습니다.',
+        description:
+          skippedPastCount > 0 || skippedDuplicateCount > 0
+            ? `지난 시간 ${skippedPastCount}개, 이미 있는 시간 ${skippedDuplicateCount}개는 자동으로 제외했습니다.`
+            : '반복 범위를 다시 확인해 주세요.',
+      });
+      return;
+    }
+
+    setIsSavingSlot(true);
+    try {
+      const batch = writeBatch(firestore);
+      nextSlots.forEach((slot) => {
+        batch.set(doc(slotCollectionRef), slot);
+      });
+      await batch.commit();
+      toast({
+        title: `${nextSlots.length}개의 상담 슬롯을 만들었습니다.`,
+        description:
+          skippedPastCount > 0 || skippedDuplicateCount > 0
+            ? `지난 시간 ${skippedPastCount}개, 이미 있는 시간 ${skippedDuplicateCount}개는 건너뛰었습니다.`
+            : '30분 간격 슬롯을 한 번에 등록했습니다.',
+      });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: '묶음 슬롯 생성에 실패했습니다.', description: error?.message });
     } finally {
       setIsSavingSlot(false);
     }
@@ -589,6 +752,18 @@ export function WebsiteConsultOperations() {
                   className="h-11 rounded-xl border-[#dbe5ff] font-bold text-[#14295F]"
                 />
               </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label className="text-sm font-black text-[#14295F]">30분 간격 반복 종료 시간</Label>
+                <Input
+                  type="time"
+                  value={slotForm.repeatUntilTime}
+                  onChange={(event) => setSlotForm((prev) => ({ ...prev, repeatUntilTime: event.target.value }))}
+                  className="h-11 rounded-xl border-[#dbe5ff] font-bold text-[#14295F]"
+                />
+                <p className="text-xs font-semibold text-[#5c6e97]">
+                  예: 08:00~08:30으로 첫 슬롯을 맞춘 뒤, 반복 종료를 18:00으로 넣으면 30분 상담이 한 번에 생성됩니다.
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center justify-between rounded-[1.25rem] border border-[#dbe5ff] bg-[#f8fbff] px-4 py-3">
@@ -602,15 +777,27 @@ export function WebsiteConsultOperations() {
               />
             </div>
 
-            <Button
-              type="button"
-              className="h-11 rounded-xl bg-[#FF7A16] text-white hover:bg-[#e86d11]"
-              onClick={() => void handleCreateSlot()}
-              disabled={isSavingSlot}
-            >
-              {isSavingSlot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-2 h-4 w-4" />}
-              상담 슬롯 만들기
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                className="h-11 rounded-xl bg-[#FF7A16] text-white hover:bg-[#e86d11]"
+                onClick={() => void handleCreateSlot()}
+                disabled={isSavingSlot}
+              >
+                {isSavingSlot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-2 h-4 w-4" />}
+                상담 슬롯 만들기
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-xl border-[#FFCFAB] bg-[#FFF6EE] font-black text-[#C95A08] hover:bg-[#FFF1E4]"
+                onClick={() => void handleCreateSlotSeries()}
+                disabled={isSavingSlot}
+              >
+                {isSavingSlot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-2 h-4 w-4" />}
+                30분 간격으로 여러 개 만들기
+              </Button>
+            </div>
 
             <div className="space-y-3">
               {slotsLoading ? (
