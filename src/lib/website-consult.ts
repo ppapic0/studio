@@ -10,10 +10,12 @@ import type {
 } from '@/lib/types';
 import {
   buildSeatId,
+  getSeatDisplayLabel,
   getGlobalSeatNo,
   getRoomLabel,
   normalizeAisleSeatIds,
   normalizeLayoutRooms,
+  normalizeSeatLabelsBySeatId,
 } from '@/lib/seat-layout';
 
 export const WEBSITE_RESERVATION_SETTINGS_DOC_ID = 'default';
@@ -47,6 +49,7 @@ export type PublicSeatCell = {
   roomName: string;
   roomSeatNo: number;
   seatNo: number;
+  displayLabel: string;
   label: string;
   status: PublicSeatStatus;
   statusLabel: string;
@@ -190,6 +193,7 @@ export function buildPublicSeatRooms(params: {
   const occupiedSeatIds = new Set<string>();
   const heldSeatIds = new Set<string>();
   const aisleSeatIds = new Set<string>(normalizeAisleSeatIds(params.layoutSettings));
+  const seatLabelsBySeatId = normalizeSeatLabelsBySeatId(params.layoutSettings);
 
   (params.students || []).forEach((student) => {
     if (!Number.isFinite(student.roomSeatNo) || Number(student.roomSeatNo) <= 0) return;
@@ -229,6 +233,7 @@ export function buildPublicSeatRooms(params: {
           roomName: getRoomLabel(room.id, rooms),
           roomSeatNo,
           seatNo: 0,
+          displayLabel: '',
           label: `${getRoomLabel(room.id, rooms)} 통로`,
           status: 'available',
           statusLabel: '',
@@ -240,6 +245,15 @@ export function buildPublicSeatRooms(params: {
       const isHeld = !isOccupied && heldSeatIds.has(seatId);
       const status: PublicSeatStatus = isOccupied ? 'occupied' : isHeld ? 'held' : 'available';
       const seatNo = getGlobalSeatNo(room.id, roomSeatNo);
+      const displayLabel =
+        getSeatDisplayLabel(
+          {
+            roomId: room.id,
+            roomSeatNo,
+            seatId,
+          },
+          seatLabelsBySeatId
+        ) || String(roomSeatNo);
 
       seats.push({
         cellType: 'seat',
@@ -248,7 +262,8 @@ export function buildPublicSeatRooms(params: {
         roomName: getRoomLabel(room.id, rooms),
         roomSeatNo,
         seatNo,
-        label: `${getRoomLabel(room.id, rooms)} ${roomSeatNo}번`,
+        displayLabel,
+        label: `${getRoomLabel(room.id, rooms)} ${displayLabel}번`,
         status,
         statusLabel: getSeatStatusLabel(status),
       });

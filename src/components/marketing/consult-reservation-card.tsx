@@ -63,6 +63,7 @@ type PublicSeat = {
   roomName: string;
   roomSeatNo: number;
   seatNo: number;
+  displayLabel: string;
   label: string;
   status: "available" | "occupied" | "held";
   statusLabel: string;
@@ -857,7 +858,7 @@ export function ConsultReservationCard() {
                                       : "border-slate-200 bg-slate-100 text-slate-500"
                                 )}
                               >
-                                <p className="text-sm font-black">{seat.roomSeatNo}번</p>
+                                <p className="text-sm font-black">{seat.displayLabel || seat.roomSeatNo}번</p>
                                 <p className="mt-1 text-[11px] font-bold">{seat.statusLabel}</p>
                               </button>
                             );
