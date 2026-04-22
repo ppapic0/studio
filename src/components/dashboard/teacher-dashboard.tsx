@@ -71,7 +71,7 @@ import {
   getDoc,
   deleteField,
 } from 'firebase/firestore';
-import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog, LayoutRoomConfig } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, StudyLogDay, CounselingReservation, CenterMembership, StudySession, StudyPlanItem, DailyReport, DailyStudentStat, GrowthProgress, AttendanceRequest, PenaltyLog, LayoutRoomConfig, SeatGenderPolicy } from '@/lib/types';
 import { buildDailyReportPreview } from '@/lib/daily-report-preview';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, subDays, eachDayOfInterval } from 'date-fns';
@@ -142,10 +142,13 @@ import {
   PRIMARY_ROOM_ID,
   buildSeatId,
   formatSeatLabel,
+  getSeatGenderPolicyLabel,
   getSeatDisplayLabel,
   getGlobalSeatNo,
   getRoomLabel,
   hasAssignedSeat,
+  normalizeSeatGenderBySeatId,
+  normalizeSeatGenderPolicy,
   normalizeAisleSeatIds,
   normalizeLayoutRooms,
   normalizeSeatLabelValue,
@@ -265,6 +268,7 @@ type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomId: string;
   roomSeatNo: number;
   seatDocId?: string;
+  seatGenderPolicy?: SeatGenderPolicy;
 };
 
 const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: string }> = [
@@ -616,22 +620,46 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => normalizeSeatLabelsBySeatId(centerData?.layoutSettings),
     [centerData?.layoutSettings]
   );
+  const persistedSeatGenderBySeatId = useMemo(
+    () => normalizeSeatGenderBySeatId(centerData?.layoutSettings),
+    [centerData?.layoutSettings]
+  );
   const persistedLayoutRoomsSnapshot = useMemo(
     () => (persistedRooms.length > 0 ? persistedRooms.map((room) => ({ ...room })) : roomConfigs.map((room) => ({ ...room }))),
     [persistedRooms, roomConfigs]
   );
   const persistedLayoutRows = persistedLayoutRoomsSnapshot[0]?.rows ?? 7;
   const persistedLayoutCols = persistedLayoutRoomsSnapshot[0]?.cols ?? 10;
-  const filterSeatLabelsByRooms = (rooms: LayoutRoomConfig[]) => {
+  const filterSeatLabelsByRooms = (
+    rooms: LayoutRoomConfig[],
+    source: Record<string, string> = persistedSeatLabelsBySeatId
+  ) => {
     const roomCellLimitById = new Map(rooms.map((room) => [room.id, room.rows * room.cols]));
 
     return Object.fromEntries(
-      Object.entries(persistedSeatLabelsBySeatId)
+      Object.entries(source)
         .filter(([seatId]) => {
           const parsed = parseSeatId(seatId);
           if (!parsed) return false;
           const maxCells = roomCellLimitById.get(parsed.roomId);
           return Boolean(maxCells) && parsed.roomSeatNo <= Number(maxCells);
+        })
+        .sort(([left], [right]) => left.localeCompare(right))
+    );
+  };
+  const filterSeatGenderByRooms = (
+    rooms: LayoutRoomConfig[],
+    source: Record<string, SeatGenderPolicy> = persistedSeatGenderBySeatId
+  ) => {
+    const roomCellLimitById = new Map(rooms.map((room) => [room.id, room.rows * room.cols]));
+
+    return Object.fromEntries(
+      Object.entries(source)
+        .filter(([seatId, policy]) => {
+          const parsed = parseSeatId(seatId);
+          if (!parsed) return false;
+          const maxCells = roomCellLimitById.get(parsed.roomId);
+          return Boolean(maxCells) && parsed.roomSeatNo <= Number(maxCells) && policy !== 'all';
         })
         .sort(([left], [right]) => left.localeCompare(right))
     );
@@ -682,6 +710,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const configuredSeatLabel =
         normalizeSeatLabelValue(seat.seatLabel) ||
         normalizeSeatLabelValue(persistedSeatLabelsBySeatId[canvasSeatId || identity.seatId]);
+      const configuredSeatGenderPolicy = normalizeSeatGenderPolicy(
+        seat.seatGenderPolicy || persistedSeatGenderBySeatId[canvasSeatId || identity.seatId]
+      );
       const normalizedSeat: ResolvedAttendanceSeat = {
         ...seat,
         id: canvasSeatId || seat.id,
@@ -690,6 +721,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         roomSeatNo: identity.roomSeatNo,
         seatNo: identity.seatNo,
         seatLabel: configuredSeatLabel || undefined,
+        seatGenderPolicy: configuredSeatGenderPolicy,
         type: seat.type || 'seat',
       };
       const dedupeKey = normalizedSeat.id || normalizedSeat.seatDocId || '';
@@ -707,7 +739,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       }
       return Number(left.roomSeatNo || 0) - Number(right.roomSeatNo || 0);
     });
-  }, [attendanceList, persistedSeatLabelsBySeatId]);
+  }, [attendanceList, persistedSeatGenderBySeatId, persistedSeatLabelsBySeatId]);
   const legacyAisleSeatIds = useMemo(() => {
     const next = new Set<string>();
     rawResolvedAttendanceList.forEach((seat) => {
@@ -754,6 +786,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           cols: persistedLayoutCols,
           aisleSeatIds: legacyAisleSeatIds,
           seatLabelsBySeatId: filterSeatLabelsByRooms(persistedLayoutRoomsSnapshot),
+          seatGenderBySeatId: filterSeatGenderByRooms(persistedLayoutRoomsSnapshot),
           updatedAt: serverTimestamp(),
         },
       },
@@ -772,6 +805,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     persistedLayoutCols,
     persistedLayoutRoomsSnapshot,
     persistedLayoutRows,
+    persistedSeatGenderBySeatId,
     persistedSeatLabelsBySeatId,
   ]);
   useEffect(() => {
@@ -1114,6 +1148,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const configuredSeatLabel =
       normalizeSeatLabelValue(existingSeat?.seatLabel) ||
       normalizeSeatLabelValue(persistedSeatLabelsBySeatId[seatId]);
+    const configuredSeatGenderPolicy = normalizeSeatGenderPolicy(
+      existingSeat?.seatGenderPolicy || persistedSeatGenderBySeatId[seatId]
+    );
     if (existingSeat) {
       return {
         ...existingSeat,
@@ -1121,6 +1158,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         roomSeatNo,
         seatNo: getGlobalSeatNo(room.id, roomSeatNo),
         seatLabel: configuredSeatLabel || undefined,
+        seatGenderPolicy: configuredSeatGenderPolicy,
         type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : 'seat',
       };
     }
@@ -1131,6 +1169,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       roomSeatNo,
       seatNo: getGlobalSeatNo(room.id, roomSeatNo),
       seatLabel: configuredSeatLabel || undefined,
+      seatGenderPolicy: configuredSeatGenderPolicy,
       status: 'absent',
       type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : 'seat',
       updatedAt: Timestamp.now(),
@@ -2115,6 +2154,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => formatSeatLabel(selectedSeat, roomConfigs, '좌석 미지정', persistedSeatLabelsBySeatId),
     [persistedSeatLabelsBySeatId, roomConfigs, selectedSeat]
   );
+  const selectedSeatGenderPolicy = useMemo(
+    () =>
+      selectedSeat?.type === 'aisle'
+        ? 'all'
+        : normalizeSeatGenderPolicy(
+            selectedSeat?.seatGenderPolicy || persistedSeatGenderBySeatId[selectedSeatCanvasId]
+          ),
+    [persistedSeatGenderBySeatId, selectedSeat?.seatGenderPolicy, selectedSeat?.type, selectedSeatCanvasId]
+  );
+  const selectedSeatGenderLabel = useMemo(
+    () => (selectedSeat?.type === 'aisle' ? '성별 미사용' : getSeatGenderPolicyLabel(selectedSeatGenderPolicy)),
+    [selectedSeat?.type, selectedSeatGenderPolicy]
+  );
   const normalizedSeatLabelDraft = useMemo(
     () => normalizeSeatLabelValue(seatLabelDraft),
     [seatLabelDraft]
@@ -2365,6 +2417,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           roomId,
           roomSeatNo: seat.roomSeatNo,
           seatLabel: seat.seatLabel ?? deleteField(),
+          seatGenderPolicy:
+            normalizedType === 'aisle' || normalizeSeatGenderPolicy(seat.seatGenderPolicy) === 'all'
+              ? deleteField()
+              : normalizeSeatGenderPolicy(seat.seatGenderPolicy),
           type: normalizedType,
           studentId: normalizedType === 'aisle' ? null : studentId || null,
           manualOccupantName:
@@ -2425,6 +2481,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       return parsed.roomSeatNo <= nextMaxCells;
     });
     const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+    const nextSeatGenderBySeatId = filterSeatGenderByRooms(nextRooms);
 
     setIsSaving(true);
     try {
@@ -2435,6 +2492,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           layoutSettings: {
             aisleSeatIds: nextAisleSeatIds,
             seatLabelsBySeatId: nextSeatLabelsBySeatId,
+            seatGenderBySeatId: nextSeatGenderBySeatId,
             rows: nextRooms[0]?.rows ?? roomConfig.rows,
             cols: nextRooms[0]?.cols ?? roomConfig.cols,
             rooms: nextRooms,
@@ -2510,6 +2568,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       });
 
       const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+      const nextSeatGenderBySeatId = filterSeatGenderByRooms(nextRooms);
       syncRoomLayoutBatch(batch, roomId, nextRooms, nextAisleSeatIds);
 
       batch.set(
@@ -2518,6 +2577,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           layoutSettings: {
             aisleSeatIds: nextAisleSeatIds,
             seatLabelsBySeatId: nextSeatLabelsBySeatId,
+            seatGenderBySeatId: nextSeatGenderBySeatId,
             rows: nextRooms[0]?.rows ?? roomDraft.rows,
             cols: nextRooms[0]?.cols ?? roomDraft.cols,
             rooms: nextRooms,
@@ -2528,6 +2588,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       );
       batch.update(doc(firestore, 'centers', centerId), {
         'layoutSettings.seatLabelsBySeatId': nextSeatLabelsBySeatId,
+        'layoutSettings.seatGenderBySeatId': nextSeatGenderBySeatId,
       });
       setOptimisticAisleSeatIds(nextAisleSeatIds);
       await batch.commit();
@@ -2632,6 +2693,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         }));
       const nextAisleSeatIds = effectiveAisleSeatIds.filter((seatId) => parseSeatId(seatId)?.roomId !== roomId);
       const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+      const nextSeatGenderBySeatId = filterSeatGenderByRooms(nextRooms);
 
       batch.set(
         doc(firestore, 'centers', centerId),
@@ -2639,6 +2701,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           layoutSettings: {
             aisleSeatIds: nextAisleSeatIds,
             seatLabelsBySeatId: nextSeatLabelsBySeatId,
+            seatGenderBySeatId: nextSeatGenderBySeatId,
             rows: nextRooms[0]?.rows ?? targetRoom.rows,
             cols: nextRooms[0]?.cols ?? targetRoom.cols,
             rooms: nextRooms,
@@ -2649,6 +2712,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       );
       batch.update(doc(firestore, 'centers', centerId), {
         'layoutSettings.seatLabelsBySeatId': nextSeatLabelsBySeatId,
+        'layoutSettings.seatGenderBySeatId': nextSeatGenderBySeatId,
       });
 
       setOptimisticAisleSeatIds(nextAisleSeatIds);
@@ -2751,11 +2815,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleSeatClick = (seat: AttendanceCurrent) => {
+    const seatCanvasId = getSeatCanvasId(seat);
     const normalizedSeat: ResolvedAttendanceSeat = {
       ...seat,
       roomId: seat.roomId || PRIMARY_ROOM_ID,
       roomSeatNo: Number(seat.roomSeatNo || 0),
-      type: effectiveAisleSeatIdSet.has(getSeatCanvasId(seat)) ? 'aisle' : 'seat',
+      seatGenderPolicy: normalizeSeatGenderPolicy(persistedSeatGenderBySeatId[seatCanvasId]),
+      type: effectiveAisleSeatIdSet.has(seatCanvasId) ? 'aisle' : 'seat',
     };
     setSelectedSeat(normalizedSeat);
     if (isEditMode) {
@@ -3175,6 +3241,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             roomId: selectedSeat.roomId,
             roomSeatNo: selectedSeat.roomSeatNo,
             seatLabel: seatLabelFieldValue,
+            seatGenderPolicy:
+              selectedSeat.type === 'aisle' || selectedSeatGenderPolicy === 'all'
+                ? deleteField()
+                : selectedSeatGenderPolicy,
             type: selectedSeat.type || 'seat',
             status: selectedSeat.status || 'absent',
             updatedAt: serverTimestamp(),
@@ -3233,6 +3303,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         roomId: selectedSeat.roomId,
         roomSeatNo: selectedSeat.roomSeatNo,
         seatZone: normalizedZone ?? deleteField(),
+        seatGenderPolicy: selectedSeatGenderPolicy === 'all' ? deleteField() : selectedSeatGenderPolicy,
         updatedAt: serverTimestamp(),
       }, { merge: true });
       if (legacySeatDocId) {
@@ -3261,6 +3332,81 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
   };
 
+  const handleUpdateSeatGender = async (policy: string) => {
+    if (!firestore || !centerId || !selectedSeat || selectedSeat.type === 'aisle') return;
+
+    const roomSeatNo = Number(selectedSeat.roomSeatNo || 0);
+    if (!Number.isFinite(roomSeatNo) || roomSeatNo <= 0) return;
+
+    const seatId = buildSeatId(selectedSeat.roomId || PRIMARY_ROOM_ID, roomSeatNo);
+    if (!seatId) return;
+
+    const normalizedPolicy = normalizeSeatGenderPolicy(policy);
+    if (normalizedPolicy === selectedSeatGenderPolicy) {
+      toast({
+        title:
+          normalizedPolicy === 'all'
+            ? '이미 공용 좌석으로 설정되어 있습니다.'
+            : `${getSeatGenderPolicyLabel(normalizedPolicy)} 설정이 이미 적용되어 있습니다.`,
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
+      const nextSeatGenderBySeatId = { ...persistedSeatGenderBySeatId };
+
+      if (normalizedPolicy === 'all') {
+        delete nextSeatGenderBySeatId[seatId];
+      } else {
+        nextSeatGenderBySeatId[seatId] = normalizedPolicy;
+      }
+
+      batch.update(doc(firestore, 'centers', centerId), {
+        'layoutSettings.seatGenderBySeatId': nextSeatGenderBySeatId,
+        'layoutSettings.updatedAt': serverTimestamp(),
+      });
+
+      batch.set(
+        doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
+        {
+          seatNo: selectedSeat.seatNo,
+          roomId: selectedSeat.roomId,
+          roomSeatNo: selectedSeat.roomSeatNo,
+          seatGenderPolicy: normalizedPolicy === 'all' ? deleteField() : normalizedPolicy,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
+
+      await batch.commit();
+
+      setSelectedSeat({
+        ...selectedSeat,
+        seatDocId: selectedSeat.id,
+        seatGenderPolicy: normalizedPolicy,
+      });
+
+      toast({
+        title:
+          normalizedPolicy === 'all'
+            ? '공용 좌석으로 변경했습니다.'
+            : `${getSeatGenderPolicyLabel(normalizedPolicy)}으로 설정했습니다.`,
+      });
+    } catch (error) {
+      console.error('[teacher-dashboard] seat gender update failed', error);
+      toast({ variant: 'destructive', title: '좌석 성별 설정 실패' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleToggleCellType = async () => {
     if (!firestore || !centerId || !selectedSeat) return;
     const nextType = selectedSeat.type === 'aisle' ? 'seat' : 'aisle';
@@ -3276,6 +3422,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       studentId: nextType === 'aisle' ? undefined : selectedSeat.studentId,
       manualOccupantName: nextType === 'aisle' ? undefined : selectedSeat.manualOccupantName,
       seatZone: nextType === 'aisle' ? undefined : selectedSeat.seatZone,
+      seatGenderPolicy: nextType === 'aisle' ? 'all' : selectedSeatGenderPolicy,
       status: 'absent',
       lastCheckInAt: undefined,
     };
@@ -3284,9 +3431,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
       const nextAisleSeatIds = new Set(effectiveAisleSeatIds);
+      const nextSeatGenderSource = { ...persistedSeatGenderBySeatId };
       if (targetSeatId) {
         if (nextType === 'aisle') {
           nextAisleSeatIds.add(targetSeatId);
+          delete nextSeatGenderSource[targetSeatId];
         } else {
           nextAisleSeatIds.delete(targetSeatId);
         }
@@ -3311,6 +3460,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             roomId: selectedSeat.roomId,
             roomSeatNo: selectedSeat.roomSeatNo,
             seatZone: deleteField(),
+            seatGenderPolicy: deleteField(),
             status: 'absent',
             lastCheckInAt: deleteField(),
             updatedAt: serverTimestamp(),
@@ -3328,6 +3478,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             roomId: selectedSeat.roomId,
             roomSeatNo: selectedSeat.roomSeatNo,
             seatZone: deleteField(),
+            seatGenderPolicy: deleteField(),
             status: 'absent',
             lastCheckInAt: deleteField(),
             updatedAt: serverTimestamp(),
@@ -3343,12 +3494,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             seatNo: selectedSeat.seatNo,
             roomId: selectedSeat.roomId,
             roomSeatNo: selectedSeat.roomSeatNo,
+            seatGenderPolicy: selectedSeatGenderPolicy === 'all' ? deleteField() : selectedSeatGenderPolicy,
             lastCheckInAt: deleteField(),
             updatedAt: serverTimestamp(),
           },
           { merge: true }
         );
       }
+      const nextSeatGenderBySeatId = filterSeatGenderByRooms(
+        persistedLayoutRoomsSnapshot,
+        nextSeatGenderSource
+      );
       batch.set(
         doc(firestore, 'centers', centerId),
         {
@@ -3358,6 +3514,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             cols: persistedLayoutCols,
             aisleSeatIds: Array.from(nextAisleSeatIds).sort(),
             seatLabelsBySeatId: filterSeatLabelsByRooms(persistedLayoutRoomsSnapshot),
+            seatGenderBySeatId: nextSeatGenderBySeatId,
             updatedAt: serverTimestamp(),
           },
         },
@@ -3654,7 +3811,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 <div className="rounded-[1.35rem] border border-[#E4ECFA] bg-[#F8FBFF] px-4 py-3">
                   <p className="text-sm font-black text-[#14295F]">{selectedSeatLabel}</p>
                   <p className="mt-1 text-xs font-bold leading-5 text-[#5C6E97]">
-                    {selectedSeatModeLabel} · {selectedSeatZoneLabel} · {selectedSeatAssignmentLabel}
+                    {selectedSeatModeLabel} · {selectedSeatZoneLabel} · {selectedSeatGenderLabel} · {selectedSeatAssignmentLabel}
                   </p>
                 </div>
 
@@ -3704,6 +3861,31 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
                     드롭다운에서 빠르게 고르거나 직접 입력할 수 있습니다. 비워두면 기본 순번 {selectedSeatDefaultLabel || '-'}번을 사용합니다.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    <Users className="h-3 w-3" /> 좌석 성별 설정
+                  </Label>
+                  <Select
+                    value={selectedSeat?.type === 'aisle' ? 'all' : selectedSeatGenderPolicy}
+                    onValueChange={handleUpdateSeatGender}
+                    disabled={selectedSeat?.type === 'aisle' || isSaving}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl border-2 font-bold shadow-sm">
+                      <SelectValue placeholder="성별 구분 선택" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                      <SelectItem value="all" className="font-bold">공용</SelectItem>
+                      <SelectItem value="male" className="font-bold">남학생 전용</SelectItem>
+                      <SelectItem value="female" className="font-bold">여학생 전용</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
+                    {selectedSeat?.type === 'aisle'
+                      ? '통로 상태에서는 성별 좌석 구분을 쓰지 않습니다. 좌석으로 전환한 뒤 설정해 주세요.'
+                      : '홍보페이지 실시간 좌석 보기와 좌석예약 단계에도 같은 기준이 그대로 반영됩니다.'}
                   </p>
                 </div>
 
@@ -5422,7 +5604,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                     <div className="rounded-[1.45rem] border border-[#D7E4FF] bg-[#F8FBFF] px-4 py-3">
                                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">현재 설정</p>
                                       <p className="mt-1 text-sm font-black text-[#14295F]">
-                                        {selectedSeatModeLabel} · {selectedSeatZoneLabel} · 번호 {selectedSeatDisplayLabel || selectedSeatDefaultLabel || '-'}
+                                        {selectedSeatModeLabel} · {selectedSeatZoneLabel} · {selectedSeatGenderLabel} · 번호 {selectedSeatDisplayLabel || selectedSeatDefaultLabel || '-'}
                                       </p>
                                     </div>
                                     <div className="space-y-2">
@@ -5476,6 +5658,32 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                           통로 상태에서는 구역 설정이 잠깁니다. 좌석으로 다시 전환하면 바로 변경할 수 있습니다.
                                         </p>
                                       ) : null}
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500"><Users className="h-3 w-3" /> 좌석 성별 설정</Label>
+                                      <Select
+                                        value={selectedSeat?.type === 'aisle' ? 'all' : selectedSeatGenderPolicy}
+                                        onValueChange={handleUpdateSeatGender}
+                                        disabled={selectedSeat?.type === 'aisle' || isSaving}
+                                      >
+                                        <SelectTrigger className="h-12 rounded-xl border-2 font-bold shadow-sm">
+                                          <SelectValue placeholder="성별 구분 선택" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                                          <SelectItem value="all" className="font-bold">공용</SelectItem>
+                                          <SelectItem value="male" className="font-bold">남학생 전용</SelectItem>
+                                          <SelectItem value="female" className="font-bold">여학생 전용</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      {selectedSeat?.type === 'aisle' ? (
+                                        <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
+                                          통로 상태에서는 성별 좌석 구분이 잠깁니다. 좌석으로 다시 전환하면 바로 변경할 수 있습니다.
+                                        </p>
+                                      ) : (
+                                        <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
+                                          공개 좌석 보기와 좌석예약에서도 이 성별 기준이 그대로 적용됩니다.
+                                        </p>
+                                      )}
                                     </div>
                                     <Button variant="destructive" onClick={unassignStudentFromSeat} disabled={isSaving || !selectedSeat?.studentId} className="h-12 w-full rounded-xl font-black shadow-lg shadow-rose-100">
                                       좌석 배정 해제
@@ -6224,7 +6432,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   <div className="rounded-[1.45rem] border border-white/14 bg-white/10 px-4 py-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">현재 구역</p>
                     <p className="mt-2 text-base font-black text-white">{selectedSeatZoneLabel}</p>
-                    <p className="mt-1 text-xs font-semibold text-white/72">좌석 컨텍스트를 먼저 고정합니다.</p>
+                    <p className="mt-1 text-xs font-semibold text-white/72">성별 기준: {selectedSeatGenderLabel}</p>
                   </div>
                   <div className="rounded-[1.45rem] border border-white/14 bg-white/10 px-4 py-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">좌석 상태</p>
@@ -6257,7 +6465,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5C6E97]">Seat Control</p>
                       <p className="mt-2 text-xl font-black tracking-tight text-[#14295F]">좌석 관리</p>
                       <p className="mt-2 text-sm font-semibold leading-6 text-[#5C6E97]">
-                        좌석과 통로 상태를 먼저 정리하고, 좌석인 경우에만 구역을 고정합니다.
+                        좌석과 통로 상태를 먼저 정리하고, 좌석인 경우 구역과 성별 기준까지 함께 고정합니다.
                       </p>
                     </div>
                     <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
@@ -6296,29 +6504,54 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       </div>
 
                       {selectedSeat?.type !== 'aisle' ? (
-                        <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-[#F7FAFF] p-5">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-[#14295F]" />
-                            <Label className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5C6E97]">
-                              좌석 구역 설정
-                            </Label>
+                        <div className="space-y-4">
+                          <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-[#F7FAFF] p-5">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-[#14295F]" />
+                              <Label className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5C6E97]">
+                                좌석 구역 설정
+                              </Label>
+                            </div>
+                            <p className="mt-3 text-base font-black text-[#14295F]">현재 구역: {selectedSeatZoneLabel}</p>
+                            <p className="mt-2 text-sm font-semibold leading-6 text-[#5C6E97]">
+                              배정 전에 구역을 고정하면 학생 운영과 좌석 분류가 더 안정적으로 이어집니다.
+                            </p>
+                            <Select value={selectedSeat?.seatZone || '미정'} onValueChange={handleUpdateZone}>
+                              <SelectTrigger className="mt-5 h-12 rounded-[1.05rem] border border-[#D7E4FF] bg-white px-4 font-black text-[#14295F] shadow-none">
+                                <SelectValue placeholder="구역 선택" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-none shadow-2xl">
+                                <SelectItem value="미정" className="font-bold text-[#14295F]">미정</SelectItem>
+                                <SelectItem value="A존 (집중)" className="font-bold text-[#14295F]">A존 (집중)</SelectItem>
+                                <SelectItem value="B존 (표준)" className="font-bold text-[#14295F]">B존 (표준)</SelectItem>
+                                <SelectItem value="고정석" className="font-bold text-[#14295F]">고정석</SelectItem>
+                                <SelectItem value="자유석" className="font-bold text-[#14295F]">자유석</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <p className="mt-3 text-base font-black text-[#14295F]">현재 구역: {selectedSeatZoneLabel}</p>
-                          <p className="mt-2 text-sm font-semibold leading-6 text-[#5C6E97]">
-                            배정 전에 구역을 고정하면 학생 운영과 좌석 분류가 더 안정적으로 이어집니다.
-                          </p>
-                          <Select value={selectedSeat?.seatZone || '미정'} onValueChange={handleUpdateZone}>
-                            <SelectTrigger className="mt-5 h-12 rounded-[1.05rem] border border-[#D7E4FF] bg-white px-4 font-black text-[#14295F] shadow-none">
-                              <SelectValue placeholder="구역 선택" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-none shadow-2xl">
-                              <SelectItem value="미정" className="font-bold text-[#14295F]">미정</SelectItem>
-                              <SelectItem value="A존 (집중)" className="font-bold text-[#14295F]">A존 (집중)</SelectItem>
-                              <SelectItem value="B존 (표준)" className="font-bold text-[#14295F]">B존 (표준)</SelectItem>
-                              <SelectItem value="고정석" className="font-bold text-[#14295F]">고정석</SelectItem>
-                              <SelectItem value="자유석" className="font-bold text-[#14295F]">자유석</SelectItem>
-                            </SelectContent>
-                          </Select>
+
+                          <div className="rounded-[1.7rem] border border-[#D7E4FF] bg-[#F7FAFF] p-5">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-[#14295F]" />
+                              <Label className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5C6E97]">
+                                좌석 성별 설정
+                              </Label>
+                            </div>
+                            <p className="mt-3 text-base font-black text-[#14295F]">현재 기준: {selectedSeatGenderLabel}</p>
+                            <p className="mt-2 text-sm font-semibold leading-6 text-[#5C6E97]">
+                              홍보페이지 좌석 보기와 좌석예약 단계에서도 같은 성별 기준을 사용합니다.
+                            </p>
+                            <Select value={selectedSeatGenderPolicy} onValueChange={handleUpdateSeatGender} disabled={isSaving}>
+                              <SelectTrigger className="mt-5 h-12 rounded-[1.05rem] border border-[#D7E4FF] bg-white px-4 font-black text-[#14295F] shadow-none">
+                                <SelectValue placeholder="성별 구분 선택" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-none shadow-2xl">
+                                <SelectItem value="all" className="font-bold text-[#14295F]">공용</SelectItem>
+                                <SelectItem value="male" className="font-bold text-[#14295F]">남학생 전용</SelectItem>
+                                <SelectItem value="female" className="font-bold text-[#14295F]">여학생 전용</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       ) : (
                         <div className="rounded-[1.7rem] bg-[#14295F] p-5 text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">

@@ -832,10 +832,13 @@ export interface LayoutRoomConfig {
   order: number;
 }
 
+export type SeatGenderPolicy = 'all' | 'male' | 'female';
+
 export interface LayoutSettings {
   rooms?: LayoutRoomConfig[];
   aisleSeatIds?: string[];
   seatLabelsBySeatId?: Record<string, string>;
+  seatGenderBySeatId?: Record<string, SeatGenderPolicy>;
   rows?: number;
   cols?: number;
   updatedAt?: Timestamp;
@@ -847,6 +850,7 @@ export interface AttendanceCurrent {
   roomId?: string;
   roomSeatNo?: number;
   seatLabel?: string;
+  seatGenderPolicy?: SeatGenderPolicy;
   status: "studying" | "away" | "break" | "absent";
   type?: "seat" | "aisle";
   seatZone?: string;
@@ -1103,6 +1107,8 @@ export interface WebsiteSeatHoldRequest {
   roomSeatNo: number;
   seatNo: number;
   seatLabel: string;
+  seatGenderPolicy?: SeatGenderPolicy | null;
+  seatGenderLabel?: string | null;
   status: WebsiteSeatHoldRequestStatus;
   depositAmount: number;
   bankAccountDisplay: string;

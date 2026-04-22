@@ -22,9 +22,15 @@ import {
 } from '@/lib/website-consult';
 import {
   buildSeatId,
+  getSeatDisplayLabel,
+  getSeatGenderPolicyLabel,
   getGlobalSeatNo,
   getRoomLabel,
+  isSeatGenderPolicyCompatible,
   normalizeLayoutRooms,
+  normalizeSeatGenderBySeatId,
+  normalizeSeatLabelsBySeatId,
+  normalizeLeadGender,
   PRIMARY_ROOM_ID,
 } from '@/lib/seat-layout';
 import type {
@@ -159,6 +165,19 @@ export async function POST(request: NextRequest) {
         throw new ApiError(400, '좌석 정보가 일치하지 않습니다. 다시 선택해 주세요.');
       }
 
+      const seatGenderBySeatId = normalizeSeatGenderBySeatId(centerSnap.data()?.layoutSettings || null);
+      const seatGenderPolicy = seatGenderBySeatId[seatId] || 'all';
+      const normalizedLeadGender = normalizeLeadGender(lead.gender);
+      if (!isSeatGenderPolicyCompatible(seatGenderPolicy, lead.gender)) {
+        const seatGenderLabel = getSeatGenderPolicyLabel(seatGenderPolicy);
+        throw new ApiError(
+          403,
+          normalizedLeadGender
+            ? `${seatGenderLabel} 좌석입니다. 학생 성별에 맞는 좌석을 선택해 주세요.`
+            : `${seatGenderLabel} 좌석은 학생 성별 확인 후에만 예약할 수 있습니다. 공용 좌석을 선택해 주세요.`
+        );
+      }
+
       const isAisleSeat = attendanceSnap.docs.some((doc) => {
         const attendance = doc.data() as AttendanceCurrent;
         if (attendance.type !== 'aisle') return false;
@@ -199,7 +218,16 @@ export async function POST(request: NextRequest) {
       const settings = getWebsiteReservationSettings(
         settingsSnap.exists ? ({ id: settingsSnap.id, ...settingsSnap.data() } as WebsiteReservationSettings) : null
       );
-      const seatLabel = `${getRoomLabel(roomId, rooms)} ${roomSeatNo}번`;
+      const displaySeatLabel =
+        getSeatDisplayLabel(
+          {
+            roomId,
+            roomSeatNo,
+            seatId,
+          },
+          normalizeSeatLabelsBySeatId(centerSnap.data()?.layoutSettings || null)
+        ) || String(roomSeatNo);
+      const seatLabel = `${getRoomLabel(roomId, rooms)} ${displaySeatLabel}번`;
       const seatNo = getGlobalSeatNo(roomId, roomSeatNo);
 
       const hold: WebsiteSeatHoldRequest = {
@@ -218,6 +246,8 @@ export async function POST(request: NextRequest) {
         roomSeatNo,
         seatNo,
         seatLabel,
+        seatGenderPolicy,
+        seatGenderLabel: getSeatGenderPolicyLabel(seatGenderPolicy),
         status: 'pending_transfer',
         depositAmount: settings.depositAmount,
         bankAccountDisplay: settings.bankAccountDisplay,

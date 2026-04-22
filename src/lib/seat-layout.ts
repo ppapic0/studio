@@ -2,6 +2,7 @@ import type {
   AttendanceCurrent,
   LayoutRoomConfig,
   LayoutSettings,
+  SeatGenderPolicy,
   StudentProfile,
 } from '@/lib/types';
 
@@ -92,6 +93,79 @@ export function normalizeSeatLabelsBySeatId(layoutSettings?: LayoutSettings | Re
       .filter(([seatId, label]) => Boolean(seatId) && Boolean(label))
       .sort(([left], [right]) => left.localeCompare(right))
   );
+}
+
+export function normalizeSeatGenderPolicy(value: unknown): SeatGenderPolicy {
+  if (typeof value !== 'string') return 'all';
+
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 'all';
+
+  if (
+    normalized === 'male' ||
+    normalized === 'man' ||
+    normalized === 'boy' ||
+    normalized === 'm' ||
+    normalized === '남' ||
+    normalized === '남자' ||
+    normalized === '남학생'
+  ) {
+    return 'male';
+  }
+
+  if (
+    normalized === 'female' ||
+    normalized === 'woman' ||
+    normalized === 'girl' ||
+    normalized === 'f' ||
+    normalized === '여' ||
+    normalized === '여자' ||
+    normalized === '여학생'
+  ) {
+    return 'female';
+  }
+
+  return 'all';
+}
+
+export function normalizeSeatGenderBySeatId(layoutSettings?: LayoutSettings | Record<string, unknown> | null) {
+  const source = (layoutSettings as LayoutSettings | undefined)?.seatGenderBySeatId;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    return {} as Record<string, SeatGenderPolicy>;
+  }
+
+  return Object.fromEntries(
+    Object.entries(source)
+      .map(([seatId, policy]) => [seatId.trim(), normalizeSeatGenderPolicy(policy)] as const)
+      .filter(([seatId, policy]) => Boolean(seatId) && policy !== 'all')
+      .sort(([left], [right]) => left.localeCompare(right))
+  );
+}
+
+export function getSeatGenderPolicyLabel(policy?: SeatGenderPolicy | null) {
+  const normalized = normalizeSeatGenderPolicy(policy);
+  if (normalized === 'male') return '남학생 전용';
+  if (normalized === 'female') return '여학생 전용';
+  return '공용';
+}
+
+export function getSeatGenderPolicyShortLabel(policy?: SeatGenderPolicy | null) {
+  const normalized = normalizeSeatGenderPolicy(policy);
+  if (normalized === 'male') return '남자';
+  if (normalized === 'female') return '여자';
+  return '공용';
+}
+
+export function normalizeLeadGender(value: unknown): 'male' | 'female' | null {
+  const normalized = normalizeSeatGenderPolicy(value);
+  if (normalized === 'all') return null;
+  return normalized;
+}
+
+export function isSeatGenderPolicyCompatible(policy?: SeatGenderPolicy | null, leadGender?: unknown) {
+  const normalizedPolicy = normalizeSeatGenderPolicy(policy);
+  if (normalizedPolicy === 'all') return true;
+  return normalizeLeadGender(leadGender) === normalizedPolicy;
 }
 
 export function normalizeRoomId(roomId?: string | null, seatNo?: number | null) {

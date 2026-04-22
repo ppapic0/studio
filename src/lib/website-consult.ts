@@ -10,13 +10,17 @@ import type {
 } from '@/lib/types';
 import {
   buildSeatId,
+  getSeatGenderPolicyLabel,
+  getSeatGenderPolicyShortLabel,
   getSeatDisplayLabel,
   getGlobalSeatNo,
   getRoomLabel,
   normalizeAisleSeatIds,
   normalizeLayoutRooms,
+  normalizeSeatGenderBySeatId,
   normalizeSeatLabelsBySeatId,
 } from '@/lib/seat-layout';
+import type { SeatGenderPolicy } from '@/lib/types';
 
 export const WEBSITE_RESERVATION_SETTINGS_DOC_ID = 'default';
 export const DEFAULT_WEBSITE_BANK_ACCOUNT_DISPLAY =
@@ -51,6 +55,9 @@ export type PublicSeatCell = {
   seatNo: number;
   displayLabel: string;
   label: string;
+  seatGenderPolicy: SeatGenderPolicy;
+  seatGenderLabel: string;
+  seatGenderShortLabel: string;
   status: PublicSeatStatus;
   statusLabel: string;
 };
@@ -194,6 +201,7 @@ export function buildPublicSeatRooms(params: {
   const heldSeatIds = new Set<string>();
   const aisleSeatIds = new Set<string>(normalizeAisleSeatIds(params.layoutSettings));
   const seatLabelsBySeatId = normalizeSeatLabelsBySeatId(params.layoutSettings);
+  const seatGenderBySeatId = normalizeSeatGenderBySeatId(params.layoutSettings);
 
   (params.students || []).forEach((student) => {
     if (!Number.isFinite(student.roomSeatNo) || Number(student.roomSeatNo) <= 0) return;
@@ -235,6 +243,9 @@ export function buildPublicSeatRooms(params: {
           seatNo: 0,
           displayLabel: '',
           label: `${getRoomLabel(room.id, rooms)} 통로`,
+          seatGenderPolicy: 'all',
+          seatGenderLabel: '',
+          seatGenderShortLabel: '',
           status: 'available',
           statusLabel: '',
         });
@@ -245,6 +256,7 @@ export function buildPublicSeatRooms(params: {
       const isHeld = !isOccupied && heldSeatIds.has(seatId);
       const status: PublicSeatStatus = isOccupied ? 'occupied' : isHeld ? 'held' : 'available';
       const seatNo = getGlobalSeatNo(room.id, roomSeatNo);
+      const seatGenderPolicy = seatGenderBySeatId[seatId] || 'all';
       const displayLabel =
         getSeatDisplayLabel(
           {
@@ -264,6 +276,9 @@ export function buildPublicSeatRooms(params: {
         seatNo,
         displayLabel,
         label: `${getRoomLabel(room.id, rooms)} ${displayLabel}번`,
+        seatGenderPolicy,
+        seatGenderLabel: getSeatGenderPolicyLabel(seatGenderPolicy),
+        seatGenderShortLabel: getSeatGenderPolicyShortLabel(seatGenderPolicy),
         status,
         statusLabel: getSeatStatusLabel(status),
       });

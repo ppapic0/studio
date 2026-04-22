@@ -15,6 +15,13 @@ import { cn } from "@/lib/utils";
 import { getSafeErrorMessage } from "@/lib/exposed-error";
 import { logHandledClientIssue } from "@/lib/handled-client-log";
 import { DEFAULT_WEBSITE_SLOT_GUIDE } from "@/lib/website-consult";
+import {
+  getSeatGenderPolicyLabel,
+  getSeatGenderPolicyShortLabel,
+  isSeatGenderPolicyCompatible,
+  normalizeLeadGender,
+} from "@/lib/seat-layout";
+import type { SeatGenderPolicy } from "@/lib/types";
 
 type PublicSettings = {
   isPublicEnabled?: boolean;
@@ -65,6 +72,9 @@ type PublicSeat = {
   seatNo: number;
   displayLabel: string;
   label: string;
+  seatGenderPolicy: SeatGenderPolicy;
+  seatGenderLabel: string;
+  seatGenderShortLabel: string;
   status: "available" | "occupied" | "held";
   statusLabel: string;
 };
@@ -241,6 +251,31 @@ function getLeadAccessDescription(lead: VerifiedLead) {
     lead.bookingAccessNote ||
     "현재는 이 문의 건의 순서가 아직 열리지 않아 방문 가능 시간과 좌석 현황만 확인할 수 있습니다. 센터에서 순차적으로 열어드린 뒤 접수가 가능합니다."
   );
+}
+
+function getSeatGenderBadgeTone(policy: SeatGenderPolicy) {
+  if (policy === "male") return "border-sky-200 bg-sky-50 text-sky-700";
+  if (policy === "female") return "border-rose-200 bg-rose-50 text-rose-700";
+  return "border-slate-200 bg-white/80 text-slate-600";
+}
+
+function getSeatGenderReservationMessage(lead: VerifiedLead | null, seat: PublicSeat | null) {
+  if (!seat || seat.cellType !== "seat") return null;
+  if (seat.seatGenderPolicy === "all") return null;
+
+  const seatGenderLabel = getSeatGenderPolicyLabel(seat.seatGenderPolicy);
+  const normalizedLeadGender = normalizeLeadGender(lead?.gender);
+
+  if (!lead) {
+    return `${seatGenderLabel} 좌석입니다. 전화번호 인증 후 학생 성별에 맞는지 확인한 뒤 좌석예약이 진행됩니다.`;
+  }
+  if (!normalizedLeadGender) {
+    return `${seatGenderLabel} 좌석이라 학생 성별 정보가 확인되어야 합니다. 공용 좌석을 선택하거나 센터에 문의해 주세요.`;
+  }
+  if (!isSeatGenderPolicyCompatible(seat.seatGenderPolicy, lead.gender)) {
+    return `${seatGenderLabel} 좌석이라 현재 인증된 학생 정보로는 좌석예약을 진행할 수 없습니다. 성별이 맞는 좌석을 선택해 주세요.`;
+  }
+  return `${seatGenderLabel} 좌석으로 확인되었습니다. 현재 인증된 학생 정보 기준으로 좌석예약이 가능합니다.`;
 }
 
 function LeadChoiceCard({ lead, isSelected, onSelect }: LeadChoiceCardProps) {
@@ -458,6 +493,21 @@ export function ConsultReservationCard() {
     () => verifiedLeads.find((lead) => lead.id === selectedLeadId) || null,
     [verifiedLeads, selectedLeadId]
   );
+  const activeSeatAction = action?.kind === "seat" ? action.seat : null;
+  const selectedSeatGenderMessage = useMemo(
+    () => getSeatGenderReservationMessage(selectedLead, activeSeatAction),
+    [activeSeatAction, selectedLead]
+  );
+  const isSelectedSeatGenderBlocked = useMemo(
+    () =>
+      Boolean(
+        activeSeatAction &&
+          selectedLead &&
+          activeSeatAction.seatGenderPolicy !== "all" &&
+          !isSeatGenderPolicyCompatible(activeSeatAction.seatGenderPolicy, selectedLead?.gender)
+      ),
+    [activeSeatAction, selectedLead, selectedLead?.gender]
+  );
   const activeSettings = settings;
   const availableSlotCount = useMemo(() => slots.filter((slot) => slot.isAvailable).length, [slots]);
   const publicRoomLabel = seatRooms[0]?.roomName || "1호실";
@@ -549,6 +599,13 @@ export function ConsultReservationCard() {
 
     if (action.kind === "seat" && !selectedLead.canSeatHold) {
       setActionError("관리형 스터디센터 문의 건만 좌석예약을 신청할 수 있습니다.");
+      return;
+    }
+    if (action.kind === "seat" && !isSeatGenderPolicyCompatible(action.seat.seatGenderPolicy, selectedLead.gender)) {
+      setActionError(
+        getSeatGenderReservationMessage(selectedLead, action.seat) ||
+          "선택한 좌석의 성별 기준과 인증된 학생 정보가 맞지 않습니다."
+      );
       return;
     }
     if (action.kind === "seat" && !policyAccepted) {
@@ -885,7 +942,17 @@ export function ConsultReservationCard() {
                                 )}
                               >
                                 <p className="text-sm font-black">{seat.displayLabel || seat.roomSeatNo}번</p>
-                                <p className="mt-1 text-[11px] font-bold">{seat.statusLabel}</p>
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                  <span
+                                    className={cn(
+                                      "rounded-full border px-2 py-0.5 text-[10px] font-black",
+                                      getSeatGenderBadgeTone(seat.seatGenderPolicy)
+                                    )}
+                                  >
+                                    {seat.seatGenderShortLabel}
+                                  </span>
+                                  <span className="text-[11px] font-bold">{seat.statusLabel}</span>
+                                </div>
                               </button>
                             );
                           })}
@@ -907,6 +974,7 @@ export function ConsultReservationCard() {
               <DialogTitle className="text-[1.7rem] font-black tracking-[-0.04em]">{actionTitle}</DialogTitle>
               <DialogDescription className="pt-2 text-sm font-semibold leading-6 text-white/78">
                 홍보리드 DB에 등록된 학부모 연락처와 일치하는지 먼저 확인한 뒤, 센터가 예약 가능 상태로 열어둔 문의 건만 진행됩니다.
+                {activeSeatAction ? " 좌석별 남녀 지정이 있는 경우 학생 성별 기준까지 다시 확인합니다." : ""}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -999,7 +1067,10 @@ export function ConsultReservationCard() {
                           key={lead.id}
                           lead={lead}
                           isSelected={lead.id === selectedLeadId}
-                          onSelect={setSelectedLeadId}
+                          onSelect={(leadId) => {
+                            setSelectedLeadId(leadId);
+                            setActionError(null);
+                          }}
                         />
                       ))}
                     </div>
@@ -1040,6 +1111,34 @@ export function ConsultReservationCard() {
                     </div>
                     <p className="mt-3 text-sm font-semibold leading-6 text-[#14295F]/72">
                       {getLeadAccessDescription(selectedLead)}
+                    </p>
+                  </div>
+                ) : null}
+
+                {activeSeatAction ? (
+                  <div
+                    className={cn(
+                      "rounded-[1.35rem] border px-4 py-4",
+                      isSelectedSeatGenderBlocked
+                        ? "border-rose-200 bg-rose-50"
+                        : "border-[#dbe4ff] bg-white"
+                    )}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-black text-[#14295F]">
+                        {activeSeatAction.displayLabel || activeSeatAction.roomSeatNo}번 좌석
+                      </p>
+                      <span
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-[10px] font-black",
+                          getSeatGenderBadgeTone(activeSeatAction.seatGenderPolicy)
+                        )}
+                      >
+                        {activeSeatAction.seatGenderLabel}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold leading-6 text-[#14295F]/72">
+                      {selectedSeatGenderMessage || "공용 좌석이라 인증된 학생 정보와 관계없이 좌석예약을 진행할 수 있습니다."}
                     </p>
                   </div>
                 ) : null}
@@ -1100,7 +1199,8 @@ export function ConsultReservationCard() {
                     submitting ||
                     !selectedLead ||
                     !selectedLead.canReserve ||
-                    (action?.kind === "seat" && (!policyAccepted || !selectedLead.canSeatHold))
+                    (action?.kind === "seat" &&
+                      (!policyAccepted || !selectedLead.canSeatHold || isSelectedSeatGenderBlocked))
                   }
                 >
                   {submitting ? (
@@ -1114,6 +1214,8 @@ export function ConsultReservationCard() {
                     "순차 안내 중"
                   ) : action?.kind === "seat" && !selectedLead.canSeatHold ? (
                     "관리형 스터디센터 문의만 가능"
+                  ) : action?.kind === "seat" && isSelectedSeatGenderBlocked ? (
+                    "성별 기준에 맞는 좌석 선택 필요"
                   ) : action?.kind === "slot" ? (
                     "방문 시간 접수 확정하기"
                   ) : (
