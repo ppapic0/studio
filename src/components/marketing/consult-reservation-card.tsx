@@ -735,7 +735,7 @@ export function ConsultReservationCard() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-black text-white">{group.label}</p>
-                    <span className="text-[11px] font-bold text-white/56">{group.slots.length}개 슬롯</span>
+                    <span className="text-[11px] font-bold text-white">{group.slots.length}개 슬롯</span>
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {group.slots.map((slot) => (
