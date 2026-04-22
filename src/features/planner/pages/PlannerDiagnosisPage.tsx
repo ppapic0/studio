@@ -75,16 +75,18 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
   const { user } = useUser();
   const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
-  const studentUid = activeStudentId || user?.uid || null;
+  const authUid = user?.uid || null;
+  const studentDocId = activeStudentId || authUid || null;
+  const studentUid = authUid || studentDocId || null;
   const autoRequested = searchParams.get('auto') === '1';
   const autoTriggeredRef = useRef(false);
 
   const centerStudentRef = useMemoFirebase(
     () =>
-      firestore && studentUid && activeMembership?.id
-        ? doc(firestore, 'centers', activeMembership.id, 'students', studentUid)
+      firestore && studentDocId && activeMembership?.id
+        ? doc(firestore, 'centers', activeMembership.id, 'students', studentDocId)
         : null,
-    [activeMembership?.id, firestore, studentUid]
+    [activeMembership?.id, firestore, studentDocId]
   );
   const { data: studentProfile } = useDoc<StudentProfile>(centerStudentRef, {
     enabled: Boolean(centerStudentRef),
@@ -249,8 +251,8 @@ export function PlannerDiagnosisPage({ studentName }: PlannerDiagnosisPageProps)
 
     const writeResults = await Promise.allSettled([
       userProfileRef ? setDoc(userProfileRef, diagnosticMirrorPayload, { merge: true }) : Promise.resolve(),
-      activeMembership?.id
-        ? setDoc(doc(firestore, 'centers', activeMembership.id, 'students', studentUid || user.uid), diagnosticMirrorPayload, { merge: true })
+      activeMembership?.id && studentDocId
+        ? setDoc(doc(firestore, 'centers', activeMembership.id, 'students', studentDocId), diagnosticMirrorPayload, { merge: true })
         : Promise.resolve(),
     ]);
 

@@ -398,8 +398,10 @@ export default function GrowthPage() {
   const { activeMembership, activeStudentId, viewMode, isTimerActive, startTime } = useAppContext();
   const firestore = useFirestore();
   const isMobile = viewMode === 'mobile';
-  const studentUid = activeStudentId || user?.uid || null;
-  const studyBoxCacheUid = user?.uid || studentUid || null;
+  const authUid = user?.uid || null;
+  const studentDocId = activeStudentId || authUid || null;
+  const studentUid = authUid || studentDocId || null;
+  const studyBoxCacheUid = authUid || studentUid || null;
   const [nowMs, setNowMs] = useState(() => Date.now());
   const studyDayContext = useMemo(() => getStudyDayContext(new Date(nowMs)), [nowMs]);
   const activeStudyDayKey = studyDayContext.dateKey;
@@ -443,9 +445,9 @@ export default function GrowthPage() {
   const { data: userProfile } = useDoc<{ phoneNumber?: string }>(userProfileRef, { enabled: Boolean(user) });
 
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentUid) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
-  }, [firestore, activeMembership?.id, studentUid]);
+    if (!firestore || !activeMembership || !studentDocId) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentDocId);
+  }, [firestore, activeMembership?.id, studentDocId]);
   const { data: studentProfile } = useDoc<{ phoneNumber?: string }>(studentProfileRef, {
     enabled: Boolean(activeMembership && user),
   });

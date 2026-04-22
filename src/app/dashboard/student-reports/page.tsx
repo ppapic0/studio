@@ -39,7 +39,8 @@ export default function StudentReportsPage() {
   const firestore = useFirestore();
   const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
-  const studentUid = activeStudentId || user?.uid || null;
+  const authUid = user?.uid || null;
+  const studentUid = authUid || activeStudentId || null;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);

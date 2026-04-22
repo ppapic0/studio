@@ -255,17 +255,19 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
     return doc(firestore, 'users', user.uid);
   }, [firestore, user?.uid]);
   const { data: userProfile } = useDoc<UserType>(userRef as any);
-  const studentUid = activeStudentId || user?.uid || null;
+  const authUid = user?.uid || null;
+  const studentUid = authUid || activeStudentId || null;
+  const studentDocId = activeStudentId || authUid || null;
 
   const studentRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentUid) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
-  }, [firestore, activeMembership?.id, studentUid]);
+    if (!firestore || !activeMembership || !studentDocId) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentDocId);
+  }, [firestore, activeMembership?.id, studentDocId]);
   const { data: studentProfile } = useDoc<StudentProfile>(studentRef as any);
   const linkedStudentId =
     activeMembership?.role === 'parent'
       ? activeMembership?.linkedStudentIds?.[0] || null
-      : studentUid;
+      : studentDocId;
   const linkedStudentRef = useMemoFirebase(() => {
     if (!firestore || !activeMembership?.id || !linkedStudentId) return null;
     return doc(firestore, 'centers', activeMembership.id, 'students', linkedStudentId);

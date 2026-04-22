@@ -44,7 +44,8 @@ export function DashboardShell({
   const isStudentMode = role === 'student';
   const isParentMode = activeMembership?.role === 'parent';
   const isMobileView = isParentMode || viewMode === 'mobile';
-  const studentUid = activeStudentId || user?.uid || null;
+  const authUid = user?.uid || null;
+  const studentDocId = activeStudentId || authUid || null;
   const studentRouteKey = useMemo(
     () => (isStudentMode ? getStudentDashboardRouteKey(pathname) : null),
     [isStudentMode, pathname]
@@ -58,11 +59,11 @@ export function DashboardShell({
   });
   const studentProfileRef = useMemoFirebase(
     () => (
-      firestore && studentUid && activeMembership?.id && isStudentMode
-        ? doc(firestore, 'centers', activeMembership.id, 'students', studentUid)
+      firestore && studentDocId && activeMembership?.id && isStudentMode
+        ? doc(firestore, 'centers', activeMembership.id, 'students', studentDocId)
         : null
     ),
-    [activeMembership?.id, firestore, isStudentMode, studentUid]
+    [activeMembership?.id, firestore, isStudentMode, studentDocId]
   );
   const { data: studentProfile } = useDoc<StudentProfile>(studentProfileRef, {
     enabled: isStudentMode && Boolean(studentProfileRef),

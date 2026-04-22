@@ -244,7 +244,8 @@ export function AppointmentsPageContent({
   // 종속성 안정화
   const centerId = activeMembership?.id;
   const userRole = activeMembership?.role;
-  const studentUid = activeStudentId || user?.uid || null;
+  const authUid = user?.uid || null;
+  const studentUid = authUid || activeStudentId || null;
   const linkedStudentIds = useMemo(() => activeMembership?.linkedStudentIds || [], [activeMembership?.linkedStudentIds]);
   const linkedIdsKey = JSON.stringify(linkedStudentIds);
 

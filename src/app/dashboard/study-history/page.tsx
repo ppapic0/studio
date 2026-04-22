@@ -431,14 +431,15 @@ export default function StudyHistoryPage() {
   }, [activeMembership?.linkedStudentIds, parentMember?.linkedStudentIds]);
   const linkedStudentIdsKey = linkedStudentIds.join(',');
   const requestedParentStudentId = searchParams.get('parentStudentId');
+  const authUid = user?.uid;
   const targetUid = useMemo(() => {
-    if (!isParent) return activeStudentId || user?.uid;
+    if (!isParent) return authUid || activeStudentId;
     if (requestedParentStudentId && (linkedStudentIds.length === 0 || linkedStudentIds.includes(requestedParentStudentId))) {
       return requestedParentStudentId;
     }
     if (linkedStudentIds.length === 0) return undefined;
     return linkedStudentIds[0];
-  }, [activeStudentId, isParent, user?.uid, linkedStudentIds, requestedParentStudentId]);
+  }, [activeStudentId, authUid, isParent, linkedStudentIds, requestedParentStudentId]);
 
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [selectedDateForPlan, setSelectedDateForPlan] = useState<Date | null>(null);

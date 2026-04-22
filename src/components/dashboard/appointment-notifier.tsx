@@ -23,7 +23,8 @@ export function AppointmentNotifier() {
   const firestore = useFirestore();
   const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const isMobile = viewMode === 'mobile';
-  const studentUid = activeStudentId || user?.uid || null;
+  const authUid = user?.uid || null;
+  const studentUid = authUid || activeStudentId || null;
 
   const [notification, setNotification] = useState<any>(null);
   const [isOpen, setIsOpen] = useState(false);

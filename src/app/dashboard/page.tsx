@@ -186,7 +186,8 @@ export default function DashboardPage() {
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const isStudentRole = activeMembership?.role === 'student';
   const isParentRole = activeMembership?.role === 'parent';
-  const studentUid = activeStudentId || user?.uid || null;
+  const authUid = user?.uid || null;
+  const studentDocId = activeStudentId || authUid || null;
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -195,9 +196,9 @@ export default function DashboardPage() {
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserType>(userProfileRef, { enabled: Boolean(user) });
 
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentUid) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
-  }, [firestore, activeMembership, studentUid]);
+    if (!firestore || !activeMembership || activeMembership.role !== 'student' || !studentDocId) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentDocId);
+  }, [firestore, activeMembership, studentDocId]);
   const { data: studentProfile, isLoading: isStudentProfileLoading } = useDoc<StudentProfile>(studentProfileRef, { enabled: isStudentRole });
 
   const inviteForm = useForm<z.infer<typeof inviteFormSchema>>({
@@ -556,7 +557,7 @@ export default function DashboardPage() {
           ? setDoc(
               studentProfileRef,
               {
-                id: studentUid || user.uid,
+                id: authUid || user.uid,
                 name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
                 schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
                 grade: studentProfile?.grade || '학년 미정',

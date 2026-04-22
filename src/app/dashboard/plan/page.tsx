@@ -494,7 +494,9 @@ export default function StudyPlanPage() {
   const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const { toast } = useToast();
   const searchParams = useSearchParams();
-  const studentUid = activeStudentId || user?.uid || null;
+  const authUid = user?.uid || null;
+  const studentDocId = activeStudentId || authUid || null;
+  const studentUid = authUid || studentDocId || null;
 
   const isMobile = viewMode === 'mobile';
   const rewardGradient = 'from-[#14295F] via-[#1A3673] to-[#FF8A2A]';
@@ -851,9 +853,9 @@ export default function StudyPlanPage() {
   const { data: progress } = useDoc<GrowthProgress>(progressRef, { enabled: isStudent });
 
   const studentProfileRef = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentUid) return null;
-    return doc(firestore, 'centers', activeMembership.id, 'students', studentUid);
-  }, [firestore, activeMembership, studentUid]);
+    if (!firestore || !activeMembership || !studentDocId) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'students', studentDocId);
+  }, [firestore, activeMembership, studentDocId]);
   const { data: studentProfile, isLoading: isStudentProfileLoading } = useDoc<StudentProfile>(studentProfileRef, {
     enabled: isStudent,
   });
