@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 const centerIntroPoints = [
   { icon: Wifi, title: '학습 집중 환경/휴대폰 수거 관리', detail: '허용 사이트 중심 와이파이 운영\n러셀형 프리미엄 좌석 운영' },
-  { icon: Smartphone, title: '질문진료 & 학습관리 앱 운영', detail: '현황과 피드백을 바로 연결' },
+  { icon: Smartphone, title: '학습상담 & 학습관리 앱 운영', detail: '현황과 피드백을 바로 연결' },
   { icon: BookOpenCheck, title: '실전 모의 운영', detail: '더프리미엄 · 이감 · 한수 · 서바이벌 프로' },
   { icon: Sparkles, title: '상벌점 제도 운영', detail: '엄격한 규정과 체계적인 관리로 학습 분위기 조성' },
 ] as const;
