@@ -437,6 +437,18 @@ function normalizeRequestedUrl(value: string) {
   return parsed.toString();
 }
 
+function normalizeWifiMacAddress(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const hexOnly = trimmed.replace(/[^0-9a-f]/gi, '').toUpperCase();
+  if (hexOnly.length !== 12) {
+    throw new Error('invalid-mac');
+  }
+
+  return hexOnly.match(/.{1,2}/g)?.join(':') || null;
+}
+
 function getWifiRequestStatusMeta(status?: string) {
   switch (status) {
     case 'done':
@@ -1311,6 +1323,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isWifiRequestDialogOpen, setIsWifiRequestDialogOpen] = useState(false);
   const [wifiRequestTitle, setWifiRequestTitle] = useState('');
   const [wifiRequestUrl, setWifiRequestUrl] = useState('');
+  const [wifiRequestMacAddress, setWifiRequestMacAddress] = useState('');
   const [wifiRequestReason, setWifiRequestReason] = useState('');
   const [isWifiRequestSubmitting, setIsWifiRequestSubmitting] = useState(false);
   const [selectedTeacherReport, setSelectedTeacherReport] = useState<DailyReport | null>(null);
@@ -2293,6 +2306,25 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return;
     }
 
+    let normalizedMacAddress: string | null = null;
+    try {
+      normalizedMacAddress = normalizeWifiMacAddress(wifiRequestMacAddress);
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'MAC 주소를 정확히 입력해 주세요.',
+      });
+      return;
+    }
+
+    if (!normalizedMacAddress) {
+      toast({
+        variant: 'destructive',
+        title: '기기 MAC 주소를 입력해 주세요.',
+      });
+      return;
+    }
+
     let normalizedUrl: string | null = null;
     try {
       normalizedUrl = normalizeRequestedUrl(wifiRequestUrl);
@@ -2316,6 +2348,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     try {
       const defaultTitle = '와이파이 방화벽 해제 요청';
       const trimmedTitle = wifiRequestTitle.trim();
+      const requestBody = `사용 이유: ${trimmedReason}\nMAC 주소: ${normalizedMacAddress}`;
       const requestRef = await addDoc(collection(firestore, 'centers', activeMembership.id, 'parentCommunications'), {
         studentId: studentUid,
         senderRole: 'student',
@@ -2324,12 +2357,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         type: 'request',
         requestCategory: 'request',
         title: trimmedTitle || defaultTitle,
-        body: trimmedReason,
+        body: requestBody,
         supportKind: 'wifi_unblock' as SupportThreadKind,
         requestedUrl: normalizedUrl,
         status: 'requested',
         latestMessageAt: serverTimestamp(),
-        latestMessagePreview: trimmedReason.length > 90 ? `${trimmedReason.slice(0, 90)}…` : trimmedReason,
+        latestMessagePreview: requestBody.length > 90 ? `${requestBody.slice(0, 90)}…` : requestBody,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -2342,7 +2375,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         senderRole: 'student',
         senderUid: user.uid,
         senderName: user.displayName || activeMembership.displayName || '학생',
-        body: trimmedReason,
+        body: requestBody,
         supportKind: 'wifi_unblock' as SupportThreadKind,
         requestedUrl: normalizedUrl,
         createdAt: serverTimestamp(),
@@ -2351,10 +2384,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
       toast({
         title: '와이파이 해제 요청이 등록되었습니다.',
-        description: '상담트랙과 동일한 요청으로 전달되며 확인 후 처리됩니다.',
+        description: '업체 전달 방식이라 처리까지 하루 이상 소요될 수 있습니다.',
       });
       setWifiRequestTitle('');
       setWifiRequestUrl('');
+      setWifiRequestMacAddress('');
       setWifiRequestReason('');
       setIsWifiRequestDialogOpen(false);
     } catch (error: any) {
@@ -4114,7 +4148,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black tracking-tight">와이파이 방화벽 해제 요청</DialogTitle>
                   <DialogDescription className="text-white/78 font-bold">
-                    상담트랙과 동일한 요청으로 전달돼요. 필요한 사이트 주소와 사용 이유를 적어 주세요.
+                    상담트랙과 동일하게 업체로 전달돼요. 처리까지 하루 이상 소요될 수 있어 MAC 주소와 함께 보내 주세요.
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -4122,6 +4156,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
                 <div className={cn("p-8 space-y-6", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4" : "")}>
                   <div className="grid gap-4 rounded-[2rem] border border-[#E7EDF8] bg-white p-6 shadow-[0_18px_42px_-34px_rgba(10,28,72,0.18)]">
+                    <div className="rounded-2xl border border-[#FFD9B7] bg-[#FFF6ED] px-4 py-3 text-[12px] font-bold leading-5 text-[#9A4F14]">
+                      업체에 전달하는 방식이라 처리까지 하루 이상 걸릴 수 있어요. 본인 기기 MAC 주소를 꼭 함께 남겨 주세요.
+                    </div>
                     <div className="space-y-1.5">
                       <Label className="ml-1 text-[10px] font-black uppercase text-muted-foreground">요청 제목 (선택)</Label>
                       <Input
@@ -4142,6 +4179,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-3 ml-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">기기 MAC 주소</Label>
+                        <span className={cn("text-[9px] font-bold", wifiRequestMacAddress.trim().length === 0 ? "text-rose-500" : "text-emerald-600")}>
+                          {wifiRequestMacAddress.trim().length > 0 ? '작성됨' : '필수'}
+                        </span>
+                      </div>
+                      <Input
+                        value={wifiRequestMacAddress}
+                        onChange={(event) => setWifiRequestMacAddress(event.target.value)}
+                        placeholder="예: AA:BB:CC:DD:EE:FF"
+                        className="h-12 rounded-xl border-2 font-bold uppercase"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-3 ml-1">
                         <Label className="text-[10px] font-black uppercase text-muted-foreground">사용 이유</Label>
                         <span className={cn("text-[9px] font-bold", wifiRequestReason.trim().length === 0 ? "text-rose-500" : "text-emerald-600")}>
                           {wifiRequestReason.trim().length > 0 ? '작성됨' : '필수'}
@@ -4156,7 +4207,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <Button
                       onClick={handleWifiRequestSubmit}
-                      disabled={isWifiRequestSubmitting || !wifiRequestUrl.trim() || !wifiRequestReason.trim()}
+                      disabled={isWifiRequestSubmitting || !wifiRequestUrl.trim() || !wifiRequestMacAddress.trim() || !wifiRequestReason.trim()}
                       className="h-14 rounded-2xl bg-[#FF7A16] font-black text-white hover:bg-[#E86C10]"
                     >
                       {isWifiRequestSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : '해제 요청 보내기'}

@@ -148,6 +148,18 @@ function normalizeRequestedUrl(value: string) {
   return parsed.toString();
 }
 
+function normalizeWifiMacAddress(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const hexOnly = trimmed.replace(/[^0-9a-f]/gi, '').toUpperCase();
+  if (hexOnly.length !== 12) {
+    throw new Error('invalid-mac');
+  }
+
+  return hexOnly.match(/.{1,2}/g)?.join(':') || null;
+}
+
 function isStudentChatEnabledThread(item: Pick<ParentCommunicationRecord, 'senderRole' | 'supportKind'>) {
   return item.senderRole === 'student'
     && (item.supportKind === 'wifi_unblock' || item.supportKind === 'student_suggestion');
@@ -201,6 +213,7 @@ export function AppointmentsPageContent({
   const [inquiryTitle, setInquiryTitle] = useState('');
   const [inquiryBody, setInquiryBody] = useState('');
   const [firewallUrl, setFirewallUrl] = useState('');
+  const [firewallMacAddress, setFirewallMacAddress] = useState('');
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [threadDrafts, setThreadDrafts] = useState<Record<string, string>>({});
   const [selectedSupportThread, setSelectedSupportThread] = useState<ParentCommunicationRecord | null>(null);
@@ -683,6 +696,7 @@ export function AppointmentsPageContent({
     }
 
     let normalizedUrl: string | null = null;
+    let normalizedMacAddress: string | null = null;
     if (inquiryType === 'firewall') {
       try {
         normalizedUrl = normalizeRequestedUrl(firewallUrl);
@@ -692,6 +706,18 @@ export function AppointmentsPageContent({
       }
       if (!normalizedUrl) {
         toast({ variant: 'destructive', title: '해제 요청 URL을 입력해 주세요.' });
+        return;
+      }
+
+      try {
+        normalizedMacAddress = normalizeWifiMacAddress(firewallMacAddress);
+      } catch {
+        toast({ variant: 'destructive', title: 'MAC 주소를 정확히 입력해 주세요.' });
+        return;
+      }
+
+      if (!normalizedMacAddress) {
+        toast({ variant: 'destructive', title: '기기 MAC 주소를 입력해 주세요.' });
         return;
       }
     }
@@ -707,7 +733,10 @@ export function AppointmentsPageContent({
             ? '학생 질문'
             : '학생 건의사항';
       const supportKind = getStudentSupportKind(inquiryType);
-      const inquiryContent = inquiryBody.trim();
+      const inquiryContent =
+        inquiryType === 'firewall' && normalizedMacAddress
+          ? `사용 이유: ${inquiryBody.trim()}\nMAC 주소: ${normalizedMacAddress}`
+          : inquiryBody.trim();
       const communicationRef = await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
         studentId: studentUid,
         senderRole: 'student',
@@ -764,10 +793,14 @@ export function AppointmentsPageContent({
           latestMessagePreview: inquiryContent.length > 90 ? `${inquiryContent.slice(0, 90)}…` : inquiryContent,
         });
       }
-      toast({ title: inquiryType === 'firewall' ? '와이파이 해제 요청이 등록되었습니다.' : '문의가 등록되었습니다.' });
+      toast({
+        title: inquiryType === 'firewall' ? '와이파이 해제 요청이 등록되었습니다.' : '문의가 등록되었습니다.',
+        description: inquiryType === 'firewall' ? '업체 전달 방식이라 처리까지 하루 이상 소요될 수 있습니다.' : undefined,
+      });
       setInquiryTitle('');
       setInquiryBody('');
       setFirewallUrl('');
+      setFirewallMacAddress('');
       setInquiryType('question');
     } catch (e: any) {
       toast({ variant: 'destructive', title: '문의 등록에 실패했습니다.', description: e?.message });
@@ -2144,12 +2177,23 @@ export function AppointmentsPageContent({
                     />
                   </div>
                   {inquiryType === 'firewall' && (
-                    <Input
-                      value={firewallUrl}
-                      onChange={(e) => setFirewallUrl(e.target.value)}
-                      placeholder="예: classroom.google.com 또는 https://classroom.google.com"
-                      className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && studentTrackInputClass)}
-                    />
+                    <div className="space-y-3">
+                      <div className={cn("rounded-2xl border px-4 py-3 text-xs font-bold leading-5", isStudentTrackTheme ? "border-white/15 bg-white/[0.06] text-white/80" : "border-[#FFD9B7] bg-[#FFF6ED] text-[#9A4F14]")}>
+                        업체에 전달하는 방식이라 처리까지 하루 이상 소요될 수 있어요. 해제 요청 URL과 함께 본인 기기 MAC 주소를 꼭 남겨 주세요.
+                      </div>
+                      <Input
+                        value={firewallUrl}
+                        onChange={(e) => setFirewallUrl(e.target.value)}
+                        placeholder="예: classroom.google.com 또는 https://classroom.google.com"
+                        className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && studentTrackInputClass)}
+                      />
+                      <Input
+                        value={firewallMacAddress}
+                        onChange={(e) => setFirewallMacAddress(e.target.value)}
+                        placeholder="기기 MAC 주소 예: AA:BB:CC:DD:EE:FF"
+                        className={cn("h-11 rounded-xl border-2 font-bold uppercase", isStudentTrackTheme && studentTrackInputClass)}
+                      />
+                    </div>
                   )}
                   <Textarea
                     value={inquiryBody}
@@ -2166,7 +2210,7 @@ export function AppointmentsPageContent({
                   <div className="flex justify-end">
                     <Button
                       onClick={handleSubmitInquiry}
-                      disabled={isSubmitting || !inquiryBody.trim() || (inquiryType === 'firewall' && !firewallUrl.trim())}
+                      disabled={isSubmitting || !inquiryBody.trim() || (inquiryType === 'firewall' && (!firewallUrl.trim() || !firewallMacAddress.trim()))}
                       className={cn("rounded-xl font-black h-11 px-6", counselingCtaClass)}
                     >
                       {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : '등록하기'}
