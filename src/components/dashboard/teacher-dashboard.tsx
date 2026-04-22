@@ -189,6 +189,15 @@ function formatDurationMinutes(totalMinutes: number): string {
   return `${Math.floor(safeMinutes / 60)}시간 ${safeMinutes % 60}분`;
 }
 
+function getManualSeatOccupantName(seat?: Pick<AttendanceCurrent, 'manualOccupantName'> | null) {
+  return typeof seat?.manualOccupantName === 'string' ? seat.manualOccupantName.trim() : '';
+}
+
+function hasSeatOccupant(seat?: Pick<AttendanceCurrent, 'studentId' | 'manualOccupantName'> | null) {
+  const assignedStudentId = typeof seat?.studentId === 'string' ? seat.studentId.trim() : '';
+  return Boolean(assignedStudentId || getManualSeatOccupantName(seat));
+}
+
 function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
   const explicitDelta = Number((req as any).penaltyPointsDelta);
   if (Number.isFinite(explicitDelta) && explicitDelta > 0) {
@@ -392,6 +401,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [manualSeatOccupantName, setManualSeatOccupantName] = useState('');
   
   const [selectedStudentSessions, setSelectedStudentSessions] = useState<StudySession[]>([]);
   const [selectedStudentReports, setSelectedStudentReports] = useState<DailyReport[]>([]);
@@ -438,6 +448,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     activeMembership?.role === 'centerAdmin' ||
     activeMembership?.role === 'owner';
   const canResetPenalty =
+    activeMembership?.role === 'centerAdmin' ||
+    activeMembership?.role === 'owner';
+  const canManageManualSeatOccupancy =
     activeMembership?.role === 'centerAdmin' ||
     activeMembership?.role === 'owner';
   const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -899,7 +912,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       let physicalSeats = 0;
       let studying = 0;
       let away = 0;
-      let assigned = 0;
+      let occupied = 0;
 
       for (let roomSeatNo = 1; roomSeatNo <= room.rows * room.cols; roomSeatNo += 1) {
         const seat = getSeatForRoom(room, roomSeatNo);
@@ -907,13 +920,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         physicalSeats += 1;
 
         const member = seat.studentId ? studentMembersById.get(seat.studentId) : null;
+        const hasManualOccupant = Boolean(getManualSeatOccupantName(seat));
         const isIncluded =
           selectedClass === 'all'
             ? true
-            : Boolean(member && member.className === selectedClass && member.status === 'active');
+            : hasManualOccupant
+              ? true
+              : Boolean(member && member.className === selectedClass && member.status === 'active');
 
         if (!isIncluded) continue;
-        if (seat.studentId) assigned += 1;
+        if (hasSeatOccupant(seat)) occupied += 1;
         if (seat.status === 'studying') studying += 1;
         if (seat.status === 'away' || seat.status === 'break') away += 1;
       }
@@ -923,8 +939,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         physicalSeats,
         studying,
         away,
-        assigned,
-        availableSeats: Math.max(0, physicalSeats - assigned),
+        assigned: occupied,
+        availableSeats: Math.max(0, physicalSeats - occupied),
         hasUnsavedChanges:
           room.rows !== (persistedRoomMap.get(room.id)?.rows ?? room.rows) ||
           room.cols !== (persistedRoomMap.get(room.id)?.cols ?? room.cols),
@@ -1798,7 +1814,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       const conflicts = resolvedAttendanceList
         .filter((seat) => seat.roomId === room.id)
         .filter((seat) => seat.roomSeatNo > maxCells)
-        .filter((seat) => Boolean(seat.studentId) || Boolean(seat.seatZone) || seat.type === 'aisle')
+        .filter(
+          (seat) =>
+            Boolean(seat.studentId) ||
+            Boolean(seat.seatZone) ||
+            Boolean(getManualSeatOccupantName(seat)) ||
+            seat.type === 'aisle'
+        )
         .sort((a, b) => a.roomSeatNo - b.roomSeatNo);
       conflictMap.set(room.id, conflicts);
     });
@@ -1816,6 +1838,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!selectedSeat?.studentId) return null;
     return studentsById.get(selectedSeat.studentId) || null;
   }, [studentsById, selectedSeat?.studentId]);
+  const selectedSeatManualOccupantName = useMemo(
+    () => getManualSeatOccupantName(selectedSeat),
+    [selectedSeat?.manualOccupantName]
+  );
+  const selectedSeatHasManualOccupant = useMemo(
+    () => Boolean(selectedSeatManualOccupantName),
+    [selectedSeatManualOccupantName]
+  );
+
+  useEffect(() => {
+    setManualSeatOccupantName(selectedSeatManualOccupantName);
+  }, [selectedSeat?.id, selectedSeatManualOccupantName]);
 
   const selectedSeatLabel = useMemo(
     () => formatSeatLabel(selectedSeat, roomConfigs),
@@ -1831,18 +1865,22 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   );
   const selectedSeatAssignmentLabel = useMemo(() => {
     if (selectedSeat?.type === 'aisle') return '학생 배정 비활성';
+    if (selectedSeatManualOccupantName) return '임시 사용중 좌석';
     if (selectedSeat?.studentId) return '현재 배정된 좌석';
     return '즉시 배정 가능';
-  }, [selectedSeat?.studentId, selectedSeat?.type]);
+  }, [selectedSeat?.studentId, selectedSeat?.type, selectedSeatManualOccupantName]);
   const selectedSeatAvailabilityCopy = useMemo(() => {
     if (selectedSeat?.type === 'aisle') {
       return '현재는 이동 동선 확보용 통로로 설정되어 있습니다.';
+    }
+    if (selectedSeatManualOccupantName) {
+      return `${selectedSeatManualOccupantName} 이름으로 임시 사용중 처리된 좌석입니다.`;
     }
     if (selectedSeat?.studentId) {
       return '배정 정보가 연결된 좌석입니다.';
     }
     return '학생을 바로 연결할 수 있는 빈 좌석입니다.';
-  }, [selectedSeat?.studentId, selectedSeat?.type]);
+  }, [selectedSeat?.studentId, selectedSeat?.type, selectedSeatManualOccupantName]);
   const unassignedStudentCountLabel = useMemo(
     () => `${unassignedStudents.length}명 대기`,
     [unassignedStudents]
@@ -2539,11 +2577,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           {
             type: 'aisle',
             studentId: null,
+            manualOccupantName: deleteField(),
             seatNo: selectedSeat.seatNo,
             roomId: selectedSeat.roomId,
             roomSeatNo: selectedSeat.roomSeatNo,
             seatZone: deleteField(),
             status: 'absent',
+            lastCheckInAt: deleteField(),
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -2554,11 +2594,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           {
             type: 'aisle',
             studentId: null,
+            manualOccupantName: deleteField(),
             seatNo: selectedSeat.seatNo,
             roomId: selectedSeat.roomId,
             roomSeatNo: selectedSeat.roomSeatNo,
             seatZone: deleteField(),
             status: 'absent',
+            lastCheckInAt: deleteField(),
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -2568,9 +2610,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           seatRef,
           {
             type: nextType,
+            manualOccupantName: deleteField(),
             seatNo: selectedSeat.seatNo,
             roomId: selectedSeat.roomId,
             roomSeatNo: selectedSeat.roomSeatNo,
+            lastCheckInAt: deleteField(),
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -2581,6 +2625,91 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       setIsManaging(false);
       setIsAssigning(false);
     } catch (e) { toast({ variant: "destructive", title: "변경 실패" }); } finally { setIsSaving(false); }
+  };
+
+  const handleSaveManualSeatOccupancy = async () => {
+    if (!firestore || !centerId || !selectedSeat || !canManageManualSeatOccupancy) return;
+    if (selectedSeat.type === 'aisle') {
+      toast({ variant: "destructive", title: "통로는 임시 사용중으로 표시할 수 없습니다." });
+      return;
+    }
+    if (selectedSeat.studentId) {
+      toast({ variant: "destructive", title: "이미 학생이 배정된 좌석입니다." });
+      return;
+    }
+
+    const occupantName = manualSeatOccupantName.trim();
+    if (!occupantName) {
+      toast({ variant: "destructive", title: "임시 사용중 이름을 입력해 주세요." });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await setDoc(
+        doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
+        {
+          studentId: null,
+          manualOccupantName: occupantName,
+          type: 'seat',
+          status: 'studying',
+          seatNo: selectedSeat.seatNo,
+          roomId: selectedSeat.roomId,
+          roomSeatNo: selectedSeat.roomSeatNo,
+          seatZone: selectedSeat.seatZone || null,
+          lastCheckInAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      setSelectedSeat({
+        ...selectedSeat,
+        studentId: undefined,
+        manualOccupantName: occupantName,
+        status: 'studying',
+      });
+      toast({ title: `${occupantName} 이름으로 임시 사용중 처리했습니다.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "임시 사용중 저장 실패" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClearManualSeatOccupancy = async () => {
+    if (!firestore || !centerId || !selectedSeat || !canManageManualSeatOccupancy) return;
+    if (!getManualSeatOccupantName(selectedSeat)) return;
+
+    setIsSaving(true);
+    try {
+      await setDoc(
+        doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
+        {
+          studentId: null,
+          manualOccupantName: deleteField(),
+          type: 'seat',
+          status: 'absent',
+          seatNo: selectedSeat.seatNo,
+          roomId: selectedSeat.roomId,
+          roomSeatNo: selectedSeat.roomSeatNo,
+          lastCheckInAt: deleteField(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      setSelectedSeat({
+        ...selectedSeat,
+        studentId: undefined,
+        manualOccupantName: undefined,
+        status: 'absent',
+      });
+      setManualSeatOccupantName('');
+      toast({ title: "임시 사용중 상태를 해제했습니다." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "임시 사용중 해제 실패" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const assignStudentToSeat = async (student: StudentProfile) => {
@@ -2600,12 +2729,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
         {
           studentId: student.id,
+          manualOccupantName: deleteField(),
           status: 'absent',
           type: 'seat',
           seatNo: selectedSeat.seatNo,
           roomId: selectedSeat.roomId,
           roomSeatNo: selectedSeat.roomSeatNo,
           seatZone: selectedSeat.seatZone || null,
+          lastCheckInAt: deleteField(),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -2634,10 +2765,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id),
         {
           studentId: null,
+          manualOccupantName: deleteField(),
           seatNo: selectedSeat.seatNo,
           roomId: selectedSeat.roomId,
           roomSeatNo: selectedSeat.roomSeatNo,
           status: 'absent',
+          lastCheckInAt: deleteField(),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -2787,7 +2920,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   const student = seat.studentId ? studentsById.get(seat.studentId) : undefined;
                   const studentMember = seat.studentId ? studentMembersById.get(seat.studentId) : undefined;
                   const occupantId = typeof seat.studentId === 'string' ? seat.studentId : '';
-                  const occupantName = student?.name || studentMember?.displayName || (occupantId ? '배정됨' : '');
+                  const manualOccupantName = getManualSeatOccupantName(seat);
+                  const hasManualOccupant = Boolean(manualOccupantName);
+                  const hasOccupant = Boolean(occupantId) || hasManualOccupant;
+                  const occupantName =
+                    student?.name ||
+                    studentMember?.displayName ||
+                    manualOccupantName ||
+                    (occupantId ? '배정됨' : '');
                   const isFilteredOut = selectedClass !== 'all' && studentMember?.className !== selectedClass;
                   const seatSignal =
                     (occupantId ? seatSignalsBySeatId.get(seat.id) : null) ||
@@ -2800,7 +2940,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   });
                   const isAisle = seat.type === 'aisle';
                   const nameTextClass =
-                    occupantId && overlayPresentation.isDark ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]' : 'text-slate-950';
+                    hasOccupant && overlayPresentation.isDark
+                      ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]'
+                      : 'text-slate-950';
 
                   return (
                     <div
@@ -2812,7 +2954,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         'flex flex-col items-center justify-center',
                         isFilteredOut ? 'border-transparent bg-muted/10 opacity-20 grayscale' :
                         isAisle ? 'border-transparent bg-transparent text-transparent hover:bg-muted/10' :
-                        occupantId ? overlayPresentation.surfaceClass :
+                        hasOccupant ? overlayPresentation.surfaceClass :
                         'border-primary/40 bg-white text-primary/5 hover:border-primary/60',
                         isEditMode && isAisle && 'border-dashed border-muted-foreground/20 bg-muted/5 text-muted-foreground/20'
                       )}
@@ -2822,11 +2964,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           className={cn(
                             'absolute left-1.5 top-1 font-black',
                             compact ? 'text-[6px]' : 'text-[7px]',
-                            occupantId && overlayPresentation.isDark ? 'opacity-70' : 'opacity-40'
+                            hasOccupant && overlayPresentation.isDark ? 'opacity-70' : 'opacity-40'
                           )}
                         >
                           {roomSeatNo}
                         </span>
+                      )}
+                      {hasManualOccupant && !isAisle && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'absolute left-1 top-1 border-none px-1 font-black',
+                            compact ? 'h-3 text-[5px]' : 'h-3.5 text-[6px]',
+                            overlayPresentation.flagClass
+                          )}
+                        >
+                          임시
+                        </Badge>
                       )}
                       {seat.seatZone && !isAisle && isEditMode && (
                         <Badge
@@ -2834,7 +2988,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           className={cn(
                             'absolute right-1 top-1 border-none px-1 font-black',
                             compact ? 'h-3 text-[5px]' : 'h-3.5 text-[6px]',
-                            occupantId ? overlayPresentation.flagClass : 'bg-primary/5 text-primary/40'
+                            hasOccupant ? overlayPresentation.flagClass : 'bg-primary/5 text-primary/40'
                           )}
                         >
                           {seat.seatZone.charAt(0)}
@@ -2842,7 +2996,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       )}
                       {isAisle ? (
                         isEditMode && <MapIcon className={cn(compact ? 'h-2.5 w-2.5' : 'h-3 w-3', 'opacity-40')} />
-                      ) : occupantId ? (
+                      ) : hasOccupant ? (
                         <div
                           className={cn(
                             'flex h-full w-full flex-col items-center justify-center text-center',
@@ -3578,7 +3732,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               <p className="dashboard-number mt-1 text-2xl text-[#2554D7]">{room.studying}</p>
                             </div>
                             <div className="rounded-[1.4rem] border border-emerald-100 bg-emerald-50/70 p-3">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-[#5c6e97]">배정 좌석</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#5c6e97]">사용 좌석</p>
                               <p className="dashboard-number mt-1 text-2xl text-emerald-600">{room.assigned}</p>
                             </div>
                             <div className="rounded-[1.4rem] border border-[#D7E4FF] bg-[#F8FBFF] p-3">
@@ -3685,7 +3839,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             학습 중 {selectedRoomSummary?.studying ?? 0}
                           </span>
                           <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black text-emerald-700">
-                            배정 좌석 {selectedRoomSummary?.assigned ?? 0}
+                            사용 좌석 {selectedRoomSummary?.assigned ?? 0}
                           </span>
                           <span className="inline-flex items-center rounded-full bg-[#F1F6FF] px-3 py-1 text-[10px] font-black text-[#14295F]">
                             가용 좌석 {selectedRoomSummary?.availableSeats ?? 0}
@@ -4072,7 +4226,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           <p className="dashboard-number mt-2 text-[1.35rem] text-[#C95A08]">{room.away}</p>
                         </div>
                         <div className="rounded-[1.1rem] border border-[#DCE7FF] bg-[#F7FAFF] px-3 py-3">
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">배정 좌석</p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">사용 좌석</p>
                           <p className="dashboard-number mt-2 text-[1.35rem] text-[#14295F]">{room.assigned}</p>
                         </div>
                         <div className="rounded-[1.1rem] border border-[#DCE7FF] bg-white px-3 py-3">
@@ -5101,7 +5255,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/62">배정 상태</p>
                     <p className="mt-2 text-base font-black text-white">{selectedSeatAssignmentLabel}</p>
                     <p className="mt-1 text-xs font-semibold text-white/72">
-                      {selectedSeat?.type === 'aisle' ? '학생 검색은 숨김 처리됩니다.' : '빈 좌석일 때만 학생 배정을 이어갑니다.'}
+                      {selectedSeat?.type === 'aisle'
+                        ? '학생 검색은 숨김 처리됩니다.'
+                        : selectedSeatHasManualOccupant
+                          ? '임시 사용중을 해제한 뒤 실제 학생 배정을 이어갈 수 있습니다.'
+                          : '빈 좌석일 때만 학생 배정을 이어갑니다.'}
                     </p>
                   </div>
                 </div>
@@ -5208,78 +5366,157 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       </p>
                     </div>
                     <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
-                      {selectedSeat?.type === 'aisle' ? '배정 잠금' : unassignedStudentCountLabel}
+                      {selectedSeat?.type === 'aisle'
+                        ? '배정 잠금'
+                        : selectedSeatHasManualOccupant
+                          ? '임시 사용중'
+                          : unassignedStudentCountLabel}
                     </div>
                   </div>
 
                   {selectedSeat?.type !== 'aisle' ? (
                     <div className="mt-6 space-y-4">
-                      <div className="relative">
-                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5C6E97]" />
-                        <Input
-                          placeholder="학생 이름으로 검색"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="h-12 rounded-[1.05rem] border border-[#D7E4FF] bg-[#F7FAFF] pl-11 font-black text-[#14295F] placeholder:text-[#7F91B3]"
-                        />
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
-                          {unassignedStudentCountLabel}
-                        </div>
-                        <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
-                          {searchTerm.trim() ? `검색어 ${searchTerm.trim()}` : '전체 미배정 보기'}
-                        </div>
-                      </div>
-
-                      <ScrollArea className="h-[340px] pr-4">
-                        <div className="space-y-3">
-                          {unassignedStudents.length === 0 ? (
-                            <div className="rounded-[1.8rem] bg-[#14295F] p-6 text-center text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">
-                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">
-                                {searchTerm.trim() ? 'Search Empty' : 'No Candidate'}
-                              </p>
-                              <p className="mt-3 text-lg font-black text-white">
-                                {searchTerm.trim() ? '검색 결과가 없습니다.' : '미배정 학생이 없습니다.'}
-                              </p>
-                              <p className="mt-2 text-sm font-semibold leading-6 text-white/78">
-                                {searchTerm.trim()
-                                  ? '다른 이름으로 다시 찾거나 검색어를 지우고 전체 학생을 확인해 주세요.'
-                                  : '현재는 바로 연결할 수 있는 학생이 없어서 배정 카드가 비어 있습니다.'}
+                      {canManageManualSeatOccupancy ? (
+                        <div className="rounded-[1.6rem] border border-[#D7E4FF] bg-[#F7FAFF] p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-black text-[#14295F]">회원가입 전 학생 임시 사용중</p>
+                              <p className="mt-1 text-xs font-semibold leading-5 text-[#5C6E97]">
+                                실제 등록 전 학생이나 선예약 좌석을 운영실에서 먼저 막아둘 수 있습니다.
                               </p>
                             </div>
+                            {selectedSeatHasManualOccupant ? (
+                              <Badge className="border-none bg-[#14295F] text-[10px] font-black text-white">
+                                {selectedSeatManualOccupantName}
+                              </Badge>
+                            ) : (
+                              <Badge className="border-none bg-white text-[10px] font-black text-[#14295F]">
+                                빈 좌석
+                              </Badge>
+                            )}
+                          </div>
+                          {selectedSeat?.studentId ? (
+                            <div className="mt-4 rounded-[1.2rem] bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#5C6E97]">
+                              현재는 실제 학생이 배정된 좌석이라 임시 사용중 등록이 잠겨 있습니다.
+                            </div>
                           ) : (
-                            unassignedStudents.map((student) => (
-                              <button
-                                key={student.id}
-                                type="button"
-                                onClick={() => assignStudentToSeat(student)}
-                                className="flex w-full items-center justify-between rounded-[1.6rem] border border-[#D7E4FF] bg-[#F7FAFF] px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:border-[#9CB6F6] hover:shadow-[0_18px_34px_rgba(20,41,95,0.1)]"
-                              >
-                                <div className="flex min-w-0 items-center gap-3">
-                                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] bg-white text-base font-black text-[#14295F] shadow-[0_12px_24px_rgba(20,41,95,0.08)]">
-                                    {student.name.charAt(0)}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="truncate text-sm font-black text-[#14295F]">{student.name}</p>
-                                    <p className="mt-1 truncate text-xs font-semibold text-[#5C6E97]">
-                                      {student.schoolName || '학교 미등록'}
-                                      {student.grade ? ` · ${student.grade}` : ''}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
-                                    배정
-                                  </span>
-                                  <ChevronRight className="h-4 w-4 text-[#14295F]" />
-                                </div>
-                              </button>
-                            ))
+                            <>
+                              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                <Input
+                                  value={manualSeatOccupantName}
+                                  onChange={(event) => setManualSeatOccupantName(event.target.value)}
+                                  placeholder="예: 대기 등록 김민준"
+                                  className="h-12 rounded-[1.05rem] border border-[#D7E4FF] bg-white font-black text-[#14295F] placeholder:text-[#7F91B3]"
+                                />
+                                <Button
+                                  type="button"
+                                  onClick={() => void handleSaveManualSeatOccupancy()}
+                                  disabled={isSaving || !manualSeatOccupantName.trim()}
+                                  className="h-12 rounded-[1.05rem] bg-[#14295F] px-5 font-black text-white hover:bg-[#10224e]"
+                                >
+                                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                                  {selectedSeatHasManualOccupant ? '임시 사용중 수정' : '임시 사용중 등록'}
+                                </Button>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {selectedSeatHasManualOccupant ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => void handleClearManualSeatOccupancy()}
+                                    disabled={isSaving}
+                                    className="h-10 rounded-[1rem] border-[#D7E4FF] font-black text-[#14295F]"
+                                  >
+                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                    임시 사용중 해제
+                                  </Button>
+                                ) : null}
+                                <p className="self-center text-[11px] font-semibold leading-5 text-[#5C6E97]">
+                                  등록 후에는 임시 사용중을 해제하고 실제 학생 배정으로 이어가면 됩니다.
+                                </p>
+                              </div>
+                            </>
                           )}
                         </div>
-                      </ScrollArea>
+                      ) : null}
+
+                      {selectedSeatHasManualOccupant ? (
+                        <div className="rounded-[1.8rem] bg-[#14295F] p-6 text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">Manual Hold</p>
+                          <p className="mt-3 text-lg font-black text-white">임시 사용중 좌석입니다.</p>
+                          <p className="mt-2 text-sm font-semibold leading-6 text-white/78">
+                            {selectedSeatManualOccupantName} 이름으로 사용 중이라 학생 배정 리스트를 잠시 숨겨두었습니다. 먼저 임시 사용중을 해제한 뒤 실제 학생을 연결해 주세요.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="relative">
+                            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5C6E97]" />
+                            <Input
+                              placeholder="학생 이름으로 검색"
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="h-12 rounded-[1.05rem] border border-[#D7E4FF] bg-[#F7FAFF] pl-11 font-black text-[#14295F] placeholder:text-[#7F91B3]"
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
+                              {unassignedStudentCountLabel}
+                            </div>
+                          <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
+                            {searchTerm.trim() ? `검색어 ${searchTerm.trim()}` : '전체 미배정 보기'}
+                          </div>
+                          </div>
+                          <ScrollArea className="h-[340px] pr-4">
+                            <div className="space-y-3">
+                              {unassignedStudents.length === 0 ? (
+                                <div className="rounded-[1.8rem] bg-[#14295F] p-6 text-center text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">
+                                    {searchTerm.trim() ? 'Search Empty' : 'No Candidate'}
+                                  </p>
+                                  <p className="mt-3 text-lg font-black text-white">
+                                    {searchTerm.trim() ? '검색 결과가 없습니다.' : '미배정 학생이 없습니다.'}
+                                  </p>
+                                  <p className="mt-2 text-sm font-semibold leading-6 text-white/78">
+                                    {searchTerm.trim()
+                                      ? '다른 이름으로 다시 찾거나 검색어를 지우고 전체 학생을 확인해 주세요.'
+                                      : '현재는 바로 연결할 수 있는 학생이 없어서 배정 카드가 비어 있습니다.'}
+                                  </p>
+                                </div>
+                              ) : (
+                                unassignedStudents.map((student) => (
+                                  <button
+                                    key={student.id}
+                                    type="button"
+                                    onClick={() => assignStudentToSeat(student)}
+                                    className="flex w-full items-center justify-between rounded-[1.6rem] border border-[#D7E4FF] bg-[#F7FAFF] px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:border-[#9CB6F6] hover:shadow-[0_18px_34px_rgba(20,41,95,0.1)]"
+                                  >
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] bg-white text-base font-black text-[#14295F] shadow-[0_12px_24px_rgba(20,41,95,0.08)]">
+                                        {student.name.charAt(0)}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-black text-[#14295F]">{student.name}</p>
+                                        <p className="mt-1 truncate text-xs font-semibold text-[#5C6E97]">
+                                          {student.schoolName || '학교 미등록'}
+                                          {student.grade ? ` · ${student.grade}` : ''}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
+                                        배정
+                                      </span>
+                                      <ChevronRight className="h-4 w-4 text-[#14295F]" />
+                                    </div>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div className="mt-6 rounded-[1.8rem] bg-[#14295F] p-6 text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">

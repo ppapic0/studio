@@ -20,12 +20,16 @@ export const DEFAULT_WEBSITE_BANK_ACCOUNT_DISPLAY =
   '1005104905953 / 김재윤(트랙 관리형 스터디센터)';
 export const DEFAULT_WEBSITE_DEPOSITOR_GUIDE = '학생이름(학교)로 보내주세요.';
 export const DEFAULT_WEBSITE_DEPOSIT_AMOUNT = 50000;
-export const DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE =
+const LEGACY_WEBSITE_NON_REFUNDABLE_NOTICE =
   '자리찜 예약금 5만원은 상담 취소 또는 단순 변심 시에도 환불되지 않습니다.';
+export const DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE =
+  '좌석예약 예약금 5만원은 상담 취소 또는 단순 변심 시에도 환불되지 않습니다.';
 export const DEFAULT_WEBSITE_SLOT_GUIDE =
   '상담 시간은 센터가 미리 연 고정 슬롯만 예약할 수 있습니다.';
-export const DEFAULT_WEBSITE_SEAT_GUIDE =
+const LEGACY_WEBSITE_SEAT_GUIDE =
   '빈 좌석번호를 확인한 뒤 원하는 자리를 선택해 자리찜을 신청할 수 있습니다.';
+export const DEFAULT_WEBSITE_SEAT_GUIDE =
+  '빈 좌석번호를 확인한 뒤 원하는 자리를 선택해 좌석예약을 신청할 수 있습니다.';
 
 export type PublicSeatStatus = 'available' | 'occupied' | 'held';
 
@@ -92,6 +96,21 @@ export function isActiveWebsiteSeatHold(status?: WebsiteSeatHoldRequest['status'
   return status === 'pending_transfer' || status === 'held';
 }
 
+export function isAttendanceSeatOccupied(attendance?: Partial<AttendanceCurrent> | null) {
+  if (!attendance || attendance.type === 'aisle') return false;
+  const manualOccupantName =
+    typeof attendance.manualOccupantName === 'string' ? attendance.manualOccupantName.trim() : '';
+
+  if (manualOccupantName) return true;
+  if (typeof attendance.studentId === 'string' && attendance.studentId.trim()) return true;
+
+  return (
+    attendance.status === 'studying' ||
+    attendance.status === 'away' ||
+    attendance.status === 'break'
+  );
+}
+
 export function isStudyCenterLead(input: {
   serviceType?: string | null;
   requestType?: string | null;
@@ -113,6 +132,15 @@ export function getWebsiteBookingAccess(
 export function getWebsiteReservationSettings(
   settings?: Partial<WebsiteReservationSettings> | null
 ): WebsiteReservationSettings {
+  const normalizedNonRefundableNotice =
+    settings?.nonRefundableNotice?.trim() === LEGACY_WEBSITE_NON_REFUNDABLE_NOTICE
+      ? DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE
+      : settings?.nonRefundableNotice?.trim();
+  const normalizedSeatGuideText =
+    settings?.seatGuideText?.trim() === LEGACY_WEBSITE_SEAT_GUIDE
+      ? DEFAULT_WEBSITE_SEAT_GUIDE
+      : settings?.seatGuideText?.trim();
+
   return {
     id: WEBSITE_RESERVATION_SETTINGS_DOC_ID,
     centerId: settings?.centerId ?? null,
@@ -124,9 +152,9 @@ export function getWebsiteReservationSettings(
         : DEFAULT_WEBSITE_DEPOSIT_AMOUNT,
     depositorGuide: settings?.depositorGuide?.trim() || DEFAULT_WEBSITE_DEPOSITOR_GUIDE,
     nonRefundableNotice:
-      settings?.nonRefundableNotice?.trim() || DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE,
+      normalizedNonRefundableNotice || DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE,
     slotGuideText: settings?.slotGuideText?.trim() || DEFAULT_WEBSITE_SLOT_GUIDE,
-    seatGuideText: settings?.seatGuideText?.trim() || DEFAULT_WEBSITE_SEAT_GUIDE,
+    seatGuideText: normalizedSeatGuideText || DEFAULT_WEBSITE_SEAT_GUIDE,
     createdAt: settings?.createdAt,
     updatedAt: settings?.updatedAt,
     updatedByUid: settings?.updatedByUid ?? null,
@@ -135,7 +163,7 @@ export function getWebsiteReservationSettings(
 
 function getSeatStatusLabel(status: PublicSeatStatus) {
   if (status === 'occupied') return '사용 중';
-  if (status === 'held') return '자리찜 진행';
+  if (status === 'held') return '좌석예약 진행';
   return '빈자리';
 }
 
@@ -164,7 +192,9 @@ export function buildPublicSeatRooms(params: {
       aisleSeatIds.add(seatId);
       return;
     }
-    occupiedSeatIds.add(seatId);
+    if (isAttendanceSeatOccupied(attendance)) {
+      occupiedSeatIds.add(seatId);
+    }
   });
 
   (params.seatHoldRequests || []).forEach((hold) => {

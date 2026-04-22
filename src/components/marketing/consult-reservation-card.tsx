@@ -221,9 +221,9 @@ function getConsultReservationStatusLabel(status?: string | null) {
 }
 
 function getSeatHoldStatusLabel(status?: string | null) {
-  if (status === "pending_transfer") return "자리찜 진행중";
-  if (status === "held") return "자리찜 확정";
-  if (status === "canceled") return "자리찜 취소";
+  if (status === "pending_transfer") return "좌석예약 진행중";
+  if (status === "held") return "좌석예약 확정";
+  if (status === "canceled") return "좌석예약 취소";
   return null;
 }
 
@@ -492,7 +492,7 @@ export function ConsultReservationCard() {
     }
 
     if (action.kind === "seat" && !selectedLead.canSeatHold) {
-      setActionError("관리형 스터디센터 문의 건만 자리찜을 신청할 수 있습니다.");
+      setActionError("관리형 스터디센터 문의 건만 좌석예약을 신청할 수 있습니다.");
       return;
     }
     if (action.kind === "seat" && !policyAccepted) {
@@ -551,12 +551,12 @@ export function ConsultReservationCard() {
           depositorGuide?: string;
         };
         if (!response.ok || !data.ok) {
-          setActionError(getSafeErrorMessage(data.message, "자리찜 신청에 실패했습니다."));
+          setActionError(getSafeErrorMessage(data.message, "좌석예약 신청에 실패했습니다."));
           return;
         }
         setSuccess({
           kind: "seat",
-          title: "자리찜 신청이 접수되었습니다.",
+          title: "좌석예약 신청이 접수되었습니다.",
           description: "입금 전까지는 확정이 아니며, 입금 확인 후 센터가 수동으로 확정합니다.",
           detail: `${data.seatLabel || action.seat.label} · 예약금 ${formatCurrency(
             data.depositAmount || activeSettings?.depositAmount || 50000
@@ -573,7 +573,7 @@ export function ConsultReservationCard() {
   }
 
   const actionTitle =
-    action?.kind === "slot" ? "전화번호 인증 후 상담 예약" : "전화번호 인증 후 자리찜 신청";
+    action?.kind === "slot" ? "전화번호 인증 후 상담 예약" : "전화번호 인증 후 좌석예약 신청";
 
   return (
     <>
@@ -606,7 +606,7 @@ export function ConsultReservationCard() {
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <SummaryChip label="공개된 상담 슬롯" value={`${availableSlotCount}개`} />
           <SummaryChip label={`${publicRoomLabel} 빈좌석`} value={`${seatSummary.availableCount}석`} />
-          <SummaryChip label="자리찜 진행" value={`${seatSummary.heldCount}석`} tone="accent" />
+          <SummaryChip label="좌석예약 진행" value={`${seatSummary.heldCount}석`} tone="accent" />
         </div>
 
         <div className="mt-5 rounded-[1.35rem] border border-[#FFB273]/20 bg-[#FFF2E8] p-4">
@@ -616,7 +616,7 @@ export function ConsultReservationCard() {
               <p className="text-sm font-black text-[#14295F]">온라인 예약은 순차 오픈 방식입니다</p>
               <p className="mt-1 text-xs font-semibold leading-5 text-[#14295F]/78">
                 {activeSettings?.slotGuideText ||
-                  "홍보리드 DB에 등록된 연락처를 먼저 확인하고, 센터가 열어둔 문의 건만 방문예약과 자리찜을 진행할 수 있습니다."}
+                  "홍보리드 DB에 등록된 연락처를 먼저 확인하고, 센터가 열어둔 문의 건만 방문예약과 좌석예약을 진행할 수 있습니다."}
               </p>
             </div>
           </div>
@@ -742,7 +742,7 @@ export function ConsultReservationCard() {
             <DialogHeader className="text-left">
               <DialogTitle className="text-[1.65rem] font-black tracking-[-0.04em]">실시간 좌석 현황</DialogTitle>
               <DialogDescription className="pt-2 text-sm font-semibold leading-6 text-white/78">
-                지금은 {publicRoomLabel} 좌석만 공개되며, 운영실 실제 배치 기준으로 통로 칸은 비워서 보여드립니다. 자리찜은 홍보리드 DB에 등록된 관리형 스터디센터 문의 건 중 센터가 예약 가능 상태로 열어둔 번호만 신청할 수 있습니다.
+                지금은 {publicRoomLabel} 좌석만 공개되며, 운영실 실제 배치 기준으로 통로 칸은 비워서 보여드립니다. 좌석예약은 홍보리드 DB에 등록된 관리형 스터디센터 문의 건 중 센터가 예약 가능 상태로 열어둔 번호만 신청할 수 있습니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -751,13 +751,13 @@ export function ConsultReservationCard() {
             <div className="grid gap-3 sm:grid-cols-3">
               <SummaryChip label="빈자리" value={`${seatSummary.availableCount}석`} tone="orange" />
               <SummaryChip label="사용 중" value={`${seatSummary.occupiedCount}석`} tone="light" />
-              <SummaryChip label="자리찜 진행" value={`${seatSummary.heldCount}석`} tone="light" />
+              <SummaryChip label="좌석예약 진행" value={`${seatSummary.heldCount}석`} tone="light" />
             </div>
 
             <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-bold text-[#14295F]/72">
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5">빈자리</span>
               <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5">사용 중</span>
-              <span className="rounded-full border border-[#ffd9bd] bg-[#fff3e9] px-3 py-1.5">자리찜 진행</span>
+              <span className="rounded-full border border-[#ffd9bd] bg-[#fff3e9] px-3 py-1.5">좌석예약 진행</span>
             </div>
 
             <div className="mt-6 space-y-5">
@@ -882,7 +882,7 @@ export function ConsultReservationCard() {
                   <p className="mt-2 text-xs font-semibold leading-5 text-[#14295F]/65">
                     {action?.kind === "slot"
                       ? "연락처 인증 후 즉시 상담 시간이 확정됩니다."
-                      : "연락처 인증과 환불 불가 동의 후 자리찜 입금대기로 접수됩니다."}
+                      : "연락처 인증과 환불 불가 동의 후 좌석예약 입금대기로 접수됩니다."}
                   </p>
                 </div>
 
@@ -979,7 +979,7 @@ export function ConsultReservationCard() {
                     <div className="flex items-start gap-3">
                       <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#c26a1c]" />
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-[#14295F]">5만원 자리찜 입금 안내</p>
+                        <p className="text-sm font-black text-[#14295F]">5만원 좌석예약 입금 안내</p>
                         <p className="mt-2 text-sm font-black text-[#14295F]">{activeSettings.bankAccountDisplay}</p>
                         <p className="mt-2 text-xs font-semibold leading-5 text-[#14295F]/72">
                           예약금 {formatCurrency(activeSettings.depositAmount)}원 · {activeSettings.depositorGuide}
@@ -997,12 +997,12 @@ export function ConsultReservationCard() {
                         className="mt-1 h-4 w-4 rounded border-[#FF7A16]/35 text-[#FF7A16] focus:ring-[#FF7A16]"
                       />
                       <span className="text-sm font-black leading-6 text-[#14295F]">
-                        자리찜 예약금은 상담 취소 시에도 환불되지 않는다는 내용을 확인했고 동의합니다.
+                        좌석예약 예약금은 상담 취소 시에도 환불되지 않는다는 내용을 확인했고 동의합니다.
                       </span>
                     </label>
                     {!selectedLead.canSeatHold ? (
                       <p className="mt-3 text-xs font-black text-rose-600">
-                        선택한 문의 건은 관리형 스터디센터 문의가 아니어서 자리찜을 신청할 수 없습니다.
+                        선택한 문의 건은 관리형 스터디센터 문의가 아니어서 좌석예약을 신청할 수 없습니다.
                       </p>
                     ) : null}
                   </div>
@@ -1047,7 +1047,7 @@ export function ConsultReservationCard() {
                   ) : action?.kind === "slot" ? (
                     "상담 시간 예약 확정하기"
                   ) : (
-                    "자리찜 신청 접수하기"
+                    "좌석예약 신청 접수하기"
                   )}
                 </Button>
               </div>

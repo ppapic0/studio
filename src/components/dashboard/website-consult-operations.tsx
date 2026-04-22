@@ -385,9 +385,9 @@ export function WebsiteConsultOperations() {
         canceledAt: nextStatus === 'canceled' ? new Date().toISOString() : null,
         updatedByUid: user?.uid || null,
       });
-      toast({ title: nextStatus === 'held' ? '자리찜을 확정했습니다.' : '자리찜을 해제했습니다.' });
+      toast({ title: nextStatus === 'held' ? '좌석예약을 확정했습니다.' : '좌석예약을 해제했습니다.' });
     } catch (error: any) {
-      toast({ variant: 'destructive', title: '자리찜 상태 변경에 실패했습니다.', description: error?.message });
+      toast({ variant: 'destructive', title: '좌석예약 상태 변경에 실패했습니다.', description: error?.message });
     } finally {
       setProcessingId(null);
     }
@@ -400,7 +400,7 @@ export function WebsiteConsultOperations() {
           { label: '공개 슬롯', value: `${summary.publishedSlots}개`, icon: <CalendarClock className="h-4 w-4" /> },
           { label: '예약 확정', value: `${summary.confirmedReservations}건`, icon: <CheckCircle2 className="h-4 w-4" /> },
           { label: '입금 대기', value: `${summary.pendingSeatHolds}건`, icon: <Receipt className="h-4 w-4" /> },
-          { label: '자리찜 확정', value: `${summary.heldSeats}건`, icon: <Armchair className="h-4 w-4" /> },
+          { label: '좌석예약 확정', value: `${summary.heldSeats}건`, icon: <Armchair className="h-4 w-4" /> },
         ].map((item) => (
           <div
             key={item.label}
@@ -427,7 +427,7 @@ export function WebsiteConsultOperations() {
             <div className="flex items-center justify-between rounded-[1.25rem] border border-[#dbe5ff] bg-[#f8fbff] px-4 py-3">
               <div>
                 <p className="text-sm font-black text-[#14295F]">공개 웹 예약 열기</p>
-                <p className="mt-1 text-xs font-semibold text-[#5c6e97]">끄면 홍보 웹에서 상담 예약과 자리찜 신청이 모두 막힙니다.</p>
+                <p className="mt-1 text-xs font-semibold text-[#5c6e97]">끄면 홍보 웹에서 상담 예약과 좌석예약 신청이 모두 막힙니다.</p>
               </div>
               <Switch
                 checked={settingsForm.isPublicEnabled}
@@ -487,7 +487,7 @@ export function WebsiteConsultOperations() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label className="text-sm font-black text-[#14295F]">좌석/자리찜 안내</Label>
+                <Label className="text-sm font-black text-[#14295F]">좌석/좌석예약 안내</Label>
                 <Textarea
                   value={settingsForm.seatGuideText}
                   onChange={(event) =>
@@ -714,9 +714,9 @@ export function WebsiteConsultOperations() {
 
         <Card className="rounded-[2rem] border-[#dbe5ff] shadow-[0_28px_60px_-44px_rgba(20,41,95,0.34)]">
           <CardHeader>
-            <CardTitle className="text-xl font-black text-[#14295F]">자리찜 요청 목록</CardTitle>
+            <CardTitle className="text-xl font-black text-[#14295F]">좌석예약 요청 목록</CardTitle>
             <CardDescription className="font-semibold text-[#5c6e97]">
-              입금대기 확인 후 자리찜 확정 또는 해제를 진행합니다.
+              입금대기 확인 후 좌석예약 확정 또는 해제를 진행합니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -726,7 +726,7 @@ export function WebsiteConsultOperations() {
               </div>
             ) : seatHolds.length === 0 ? (
               <div className="rounded-[1.25rem] border border-dashed border-[#dbe5ff] bg-[#f8fbff] px-4 py-8 text-center text-sm font-bold text-[#5c6e97]">
-                아직 들어온 자리찜 요청이 없습니다.
+                아직 들어온 좌석예약 요청이 없습니다.
               </div>
             ) : (
               seatHolds.map((seatHold) => (

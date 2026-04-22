@@ -14,6 +14,7 @@ import {
   buildLeadLinkPatch,
   getWebsiteBookingAccess,
   getWebsiteReservationSettings,
+  isAttendanceSeatOccupied,
   isActiveWebsiteSeatHold,
   isStudyCenterLead,
   normalizePhone,
@@ -63,11 +64,11 @@ export async function POST(request: NextRequest) {
     windowMs: 10 * 60 * 1000,
   });
   if (!rateLimit.ok) {
-    return tooManyRequestsJson(rateLimit.retryAfterSeconds, '자리찜 신청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
+    return tooManyRequestsJson(rateLimit.retryAfterSeconds, '좌석예약 신청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
   }
 
   if (!hasTrustedBrowserContext(request)) {
-    return forbiddenJson('허용되지 않은 자리찜 요청입니다.');
+    return forbiddenJson('허용되지 않은 좌석예약 요청입니다.');
   }
 
   try {
@@ -123,10 +124,10 @@ export async function POST(request: NextRequest) {
         throw new ApiError(403, '입력한 연락처와 접수된 연락처가 일치하지 않습니다.');
       }
       if (!isStudyCenterLead(lead)) {
-        throw new ApiError(409, '관리형 스터디센터 문의 건만 자리찜을 신청할 수 있습니다.');
+        throw new ApiError(409, '관리형 스터디센터 문의 건만 좌석예약을 신청할 수 있습니다.');
       }
       if (lead.centerId && lead.centerId !== centerId) {
-        throw new ApiError(403, '다른 센터 문의 건으로는 자리찜을 신청할 수 없습니다.');
+        throw new ApiError(403, '다른 센터 문의 건으로는 좌석예약을 신청할 수 없습니다.');
       }
       if (!centerLeadSnap.exists) {
         throw new ApiError(403, '아직 순차 안내 전인 문의 건입니다. 센터에서 예약 가능 상태로 열어드린 뒤 다시 시도해주세요.');
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
         return Number(attendance.roomSeatNo) === roomSeatNo && attendanceRoomId === roomId;
       });
       if (isAisleSeat) {
-        throw new ApiError(400, '통로로 설정된 칸은 자리찜을 신청할 수 없습니다.');
+        throw new ApiError(400, '통로로 설정된 칸은 좌석예약을 신청할 수 없습니다.');
       }
 
       const occupiedByStudent = studentsSnap.docs.some((doc) => {
@@ -179,7 +180,7 @@ export async function POST(request: NextRequest) {
 
       const occupiedByAttendance = attendanceSnap.docs.some((doc) => {
         const attendance = doc.data() as AttendanceCurrent;
-        if (attendance.type === 'aisle') return false;
+        if (!isAttendanceSeatOccupied(attendance)) return false;
         const attendanceRoomId = attendance.roomId?.trim() || rooms[0]?.id || 'room_1';
         return Number(attendance.roomSeatNo) === roomSeatNo && attendanceRoomId === roomId;
       });
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
         return isActiveWebsiteSeatHold(currentHold.status);
       });
       if (alreadyHeld) {
-        throw new ApiError(409, '방금 다른 보호자가 먼저 자리찜을 신청했습니다. 다른 자리를 선택해 주세요.');
+        throw new ApiError(409, '방금 다른 보호자가 먼저 좌석예약을 신청했습니다. 다른 자리를 선택해 주세요.');
       }
 
       const settings = getWebsiteReservationSettings(
@@ -279,7 +280,7 @@ export async function POST(request: NextRequest) {
     return noStoreJson(
       {
         ok: false,
-        message: apiError?.message || '자리찜 신청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        message: apiError?.message || '좌석예약 신청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       },
       { status: apiError?.status || 500 }
     );

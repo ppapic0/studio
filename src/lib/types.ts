@@ -846,6 +846,7 @@ export interface AttendanceCurrent {
   status: "studying" | "away" | "break" | "absent";
   type?: "seat" | "aisle";
   seatZone?: string;
+  manualOccupantName?: string | null;
   updatedAt: Timestamp;
   lastCheckInAt?: Timestamp;
   studentId?: string; 

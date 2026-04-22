@@ -208,8 +208,8 @@ const WEBSITE_BOOKING_BADGE_META = {
   locked: { label: '대기', className: 'bg-slate-100 text-slate-600 border-slate-200' },
   reservation_confirmed: { label: '예약완료', className: 'bg-[#eef4ff] text-[#17326B] border-[#dbe5ff]' },
   reservation_completed: { label: '상담완료', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
-  seat_hold_pending: { label: '자리찜 진행중', className: 'bg-[#fff3e9] text-[#c26a1c] border-[#ffd9bd]' },
-  seat_hold_held: { label: '자리찜 확정', className: 'bg-orange-100 text-orange-700 border-orange-200' },
+  seat_hold_pending: { label: '좌석예약 진행중', className: 'bg-[#fff3e9] text-[#c26a1c] border-[#ffd9bd]' },
+  seat_hold_held: { label: '좌석예약 확정', className: 'bg-orange-100 text-orange-700 border-orange-200' },
 } as const;
 
 const SERVICE_TYPE_META: Record<ServiceType, { label: string; color: string }> = {
@@ -312,11 +312,11 @@ function getWebsiteRequestStatusBadge(
 function getWebsiteBookingAccessDescription(request: Pick<WebsiteConsultRequest, 'bookingAccess'>) {
   const bookingAccess = getWebsiteBookingAccess(request.bookingAccess);
   if (bookingAccess.isEnabled) {
-    return '센터가 이 어머님 문의 건의 방문예약과 자리찜 진행을 열어 둔 상태입니다.';
+    return '센터가 이 어머님 문의 건의 방문예약과 좌석예약 진행을 열어 둔 상태입니다.';
   }
   return (
     bookingAccess.note ||
-    '아직 순서가 되지 않아 슬롯과 좌석은 볼 수 있지만 실제 방문예약과 자리찜은 진행할 수 없습니다.'
+    '아직 순서가 되지 않아 슬롯과 좌석은 볼 수 있지만 실제 방문예약과 좌석예약은 진행할 수 없습니다.'
   );
 }
 
@@ -827,7 +827,7 @@ export function MarketingConsultingCRM({
       });
       toast({
         title: websiteBookingAccessEnabled ? '웹 예약 권한을 열었습니다.' : '웹 예약 권한을 잠갔습니다.',
-        description: '해당 어머님 문의 건의 방문예약과 자리찜 가능 상태가 갱신되었습니다.',
+      description: '해당 어머님 문의 건의 방문예약과 좌석예약 가능 상태가 갱신되었습니다.',
       });
     } catch (error) {
       console.error(error);
@@ -1132,7 +1132,7 @@ export function MarketingConsultingCRM({
             <p className="text-sm font-black text-slate-900">웹사이트 상담폼 접수</p>
           </div>
           <p className="text-xs font-semibold text-slate-600">
-            방문상담 탭에서 웹 문의 확인, 순차 오픈, 방문예약/자리찜 진행까지 한 번에 관리합니다.
+                  방문상담 탭에서 웹 문의 확인, 순차 오픈, 방문예약/좌석예약 진행까지 한 번에 관리합니다.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1849,7 +1849,7 @@ export function MarketingConsultingCRM({
                       <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">Reservation Desk</p>
                       <h3 className="text-lg font-black tracking-tight text-[#14295F]">방문상담 운영 설정을 여기서 모두 처리합니다.</h3>
                       <p className="text-sm font-semibold leading-6 text-[#5c6e97]">
-                        웹 상담 접수 확인, 예약 가능 상태 순차 오픈, 상담 슬롯 공개, 방문예약 확인, 입금 후 자리찜 확정까지 같은 탭에서 관리합니다.
+                  웹 상담 접수 확인, 예약 가능 상태 순차 오픈, 상담 슬롯 공개, 방문예약 확인, 입금 후 좌석예약 확정까지 같은 탭에서 관리합니다.
                       </p>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-3">
@@ -2266,7 +2266,7 @@ export function MarketingConsultingCRM({
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">웹 예약 권한</p>
                       <p className="mt-2 text-sm font-bold text-slate-700">
-                        순서가 된 어머님 문의 건만 방문예약과 자리찜을 열어드립니다.
+                        순서가 된 어머님 문의 건만 방문예약과 좌석예약을 열어드립니다.
                       </p>
                     </div>
                     <div className="flex items-center gap-3 rounded-full bg-slate-100 px-3 py-2">
@@ -2306,7 +2306,7 @@ export function MarketingConsultingCRM({
                       id="websiteBookingAccessNote"
                       value={websiteBookingAccessNote}
                       onChange={(event) => setWebsiteBookingAccessNote(event.target.value)}
-                      placeholder="예: 1차 순번 오픈, 상담 후 자리찜까지 허용"
+                        placeholder="예: 1차 순번 오픈, 상담 후 좌석예약까지 허용"
                       className="min-h-[96px] rounded-xl"
                       disabled={!canManageLeadData}
                     />
@@ -2343,10 +2343,10 @@ export function MarketingConsultingCRM({
                       )}
                       {selectedWebsiteSeatHold ? (
                         <Badge variant="outline" className="font-black text-[#c26a1c]">
-                          자리찜 {selectedWebsiteSeatHold.seatLabel}
+                              좌석예약 {selectedWebsiteSeatHold.seatLabel}
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="font-black text-slate-600">자리찜 없음</Badge>
+                            <Badge variant="outline" className="font-black text-slate-600">좌석예약 없음</Badge>
                       )}
                     </div>
                   </div>
