@@ -676,7 +676,9 @@ export function MarketingConsultingCRM({
     const waitingAcademy = waitlist.filter((e) => e.status === 'waiting' && e.serviceType === 'korean_academy').length;
     const waitingStudy = waitlist.filter((e) => e.status === 'waiting' && e.serviceType === 'study_center').length;
     const admitted = waitlist.filter((e) => e.status === 'admitted').length;
-    return { total, waiting, waitingAcademy, waitingStudy, admitted };
+    const admittedAcademy = waitlist.filter((e) => e.status === 'admitted' && e.serviceType === 'korean_academy').length;
+    const admittedStudy = waitlist.filter((e) => e.status === 'admitted' && e.serviceType === 'study_center').length;
+    return { total, waiting, waitingAcademy, waitingStudy, admitted, admittedAcademy, admittedStudy };
   }, [waitlist]);
 
   useEffect(() => {
@@ -1937,7 +1939,19 @@ export function MarketingConsultingCRM({
               <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
                 <CardContent className="p-4">
                   <p className="text-[11px] font-bold text-muted-foreground">입학완료</p>
-                  <p className="mt-1 text-2xl font-black text-emerald-600">{waitlistSummary.admitted}</p>
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                      <p className="text-[10px] font-bold text-emerald-700">국어</p>
+                      <p className="mt-1 text-xl font-black text-emerald-600">{waitlistSummary.admittedAcademy}</p>
+                    </div>
+                    <div className="rounded-lg bg-sky-50 px-3 py-2">
+                      <p className="text-[10px] font-bold text-sky-700">센터</p>
+                      <p className="mt-1 text-xl font-black text-sky-600">{waitlistSummary.admittedStudy}</p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+                    합계 <span className="font-black text-emerald-700">{waitlistSummary.admitted}</span>
+                  </p>
                 </CardContent>
               </Card>
             </div>
