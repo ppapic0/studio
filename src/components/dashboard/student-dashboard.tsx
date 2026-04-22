@@ -1922,6 +1922,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return;
     }
 
+    if (!isTimerActive) {
+      toast({
+        title: '키오스크에서 시작해 주세요.',
+        description: '학생 앱에서는 공부 시작을 할 수 없어요. 준비된 키오스크에서 6자리 번호를 입력한 뒤 진행해 주세요.',
+      });
+      return;
+    }
+
     actionLockAtRef.current = Date.now();
     setIsProcessingAction(true);
     try {
@@ -3522,6 +3530,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         primaryActionLabel={isTimerActive ? '공부 종료하기' : '집중 시작하기'}
         onPrimaryAction={handleStudyStartStop}
         primaryActionActive={isTimerActive}
+        studyControlMode="kiosk"
         sessionTimerLabel={isTimerActive ? formatHeroSessionTimer(localSeconds) : null}
         totalAvailableBoxes={visibleReadyBoxCount}
         boxStatusLabel={visibleReadyBoxCount > 0 ? 'BOX READY' : isNearNextBox ? 'ALMOST' : 'CHARGING'}

@@ -488,6 +488,7 @@ export function StudentHomeGamePanel({
   primaryActionLabel,
   onPrimaryAction,
   primaryActionActive,
+  studyControlMode,
   sessionTimerLabel,
   totalAvailableBoxes,
   boxStatusLabel,
@@ -538,6 +539,7 @@ export function StudentHomeGamePanel({
   primaryActionLabel: string;
   onPrimaryAction: () => void;
   primaryActionActive: boolean;
+  studyControlMode?: "button" | "kiosk";
   sessionTimerLabel: string | null;
   totalAvailableBoxes: number;
   boxStatusLabel: string;
@@ -588,6 +590,7 @@ export function StudentHomeGamePanel({
     return { id: `trend-mark-${index}`, label };
   });
   const hasMoreReadyBoxes = (vaultReadyBoxCount ?? totalAvailableBoxes) > 0;
+  const isKioskControlled = studyControlMode === "kiosk";
   const [isPointHistoryOpen, setIsPointHistoryOpen] = useState(false);
   const [selectedBoxSnapshot, setSelectedBoxSnapshot] = useState<StudentHomeRewardBox | null>(null);
   const rankPreview = selectedHomeRank.preview.slice(0, 3);
@@ -604,7 +607,9 @@ export function StudentHomeGamePanel({
       ? selectedHomeRank.description.trim()
       : rankPreview.length > 0
         ? "상위 3명만 빠르게 보여줍니다."
-        : "공부를 시작하면 순위가 바로 반영됩니다.";
+        : isKioskControlled
+          ? "키오스크에서 출석하면 순위가 바로 반영됩니다."
+          : "공부를 시작하면 순위가 바로 반영됩니다.";
   const recentActivityDays = useMemo(() => {
     if (!dailyPointStatus) return 0;
     return Object.keys(dailyPointStatus).sort((a, b) => b.localeCompare(a)).slice(0, 30).length;
@@ -733,18 +738,44 @@ export function StudentHomeGamePanel({
                 </div>
               </div>
 
-              <Button
-                type="button"
-                onClick={onPrimaryAction}
-                variant={primaryActionActive ? "secondary" : "dark"}
-                className={cn(
-                  "point-track-hero-cta mt-4 h-12 w-full rounded-[1.1rem] text-base font-black",
-                  !primaryActionActive && "border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.94)] text-[var(--text-on-light)]",
-                )}
-              >
-                {primaryActionActive ? <Timer className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4 fill-current" />}
-                {primaryActionLabel}
-              </Button>
+              {isKioskControlled ? (
+                <div className="mt-4 rounded-[1.1rem] border border-white/14 bg-[rgba(255,255,255,0.1)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/14 bg-white/12 text-[var(--text-accent-soft-fixed)]">
+                      <Lock className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="surface-chip surface-chip--accent px-2.5 py-1 text-[10px]">KIOSK ONLY</span>
+                        <span className="surface-chip surface-chip--dark px-2.5 py-1 text-[10px]">
+                          {primaryActionActive ? "공부중" : "앱 시작 잠금"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-black text-white">
+                        {primaryActionActive ? "현재 공부중 상태예요" : "공부 시작은 키오스크에서 진행해 주세요"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-on-dark-soft)]">
+                        {primaryActionActive
+                          ? "종료나 상태 변경은 준비된 키오스크에서 6자리 번호를 입력한 뒤 진행해 주세요."
+                          : "학생 앱에서는 직접 시작할 수 없어요. 준비된 키오스크에서 6자리 번호를 입력한 뒤 시작해 주세요."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={onPrimaryAction}
+                  variant={primaryActionActive ? "secondary" : "dark"}
+                  className={cn(
+                    "point-track-hero-cta mt-4 h-12 w-full rounded-[1.1rem] text-base font-black",
+                    !primaryActionActive && "border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.94)] text-[var(--text-on-light)]",
+                  )}
+                >
+                  {primaryActionActive ? <Timer className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4 fill-current" />}
+                  {primaryActionLabel}
+                </Button>
+              )}
             </div>
 
             <div className="surface-card surface-card--secondary on-dark rounded-[1.5rem] p-4">
