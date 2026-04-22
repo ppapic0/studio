@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Armchair, CalendarDays, CheckCircle2, Loader2, Phone, ShieldAlert } from "lucide-react";
+import { Armchair, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Loader2, Phone, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -317,6 +317,7 @@ export function ConsultReservationCard() {
   const [slotError, setSlotError] = useState<string | null>(null);
   const [seatDialogOpen, setSeatDialogOpen] = useState(false);
   const [slotPanelOpen, setSlotPanelOpen] = useState(false);
+  const [expandedSlotDayKey, setExpandedSlotDayKey] = useState<string | null>(null);
   const [action, setAction] = useState<ReservationAction | null>(null);
   const [phone, setPhone] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -447,6 +448,12 @@ export function ConsultReservationCard() {
     }));
   }, [slots]);
 
+  useEffect(() => {
+    if (!expandedSlotDayKey) return;
+    if (groupedSlots.some((group) => group.key === expandedSlotDayKey)) return;
+    setExpandedSlotDayKey(null);
+  }, [expandedSlotDayKey, groupedSlots]);
+
   const selectedLead = useMemo(
     () => verifiedLeads.find((lead) => lead.id === selectedLeadId) || null,
     [verifiedLeads, selectedLeadId]
@@ -478,10 +485,12 @@ export function ConsultReservationCard() {
   async function handleToggleSlotPanel() {
     if (slotPanelOpen) {
       setSlotPanelOpen(false);
+      setExpandedSlotDayKey(null);
       return;
     }
 
     setSlotPanelOpen(true);
+    setExpandedSlotDayKey(null);
     await refreshPublicData({ showLoading: true, resetError: true });
   }
 
@@ -734,45 +743,64 @@ export function ConsultReservationCard() {
                   key={group.key}
                   className="rounded-[1.25rem] border border-white/10 bg-white/[0.04] p-4"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-black text-white">{group.label}</p>
-                    <span className="text-[11px] font-bold text-white">{group.slots.length}개 시간</span>
-                  </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {group.slots.map((slot) => (
-                      <button
-                        key={slot.id}
-                        type="button"
-                        onClick={() => slot.isAvailable && openSlotReservation(slot)}
-                        disabled={!slot.isAvailable || !activeSettings?.isPublicEnabled}
-                        className={cn(
-                          "rounded-[1rem] border px-4 py-3 text-left transition",
-                          slot.isAvailable
-                            ? "border-white/12 bg-white/[0.08] hover:-translate-y-0.5 hover:bg-white/[0.12]"
-                            : "border-white/8 bg-white/[0.03] opacity-55"
-                        )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedSlotDayKey((currentKey) => (currentKey === group.key ? null : group.key))
+                    }
+                    className="flex w-full items-center justify-between gap-3 text-left"
+                  >
+                    <div>
+                      <p className="text-sm font-black text-white">{group.label}</p>
+                      <p className="mt-1 text-[11px] font-bold text-white/82">
+                        {group.slots.length}개 시간
+                      </p>
+                    </div>
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/[0.08] text-white">
+                      {expandedSlotDayKey === group.key ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </span>
+                  </button>
+                  {expandedSlotDayKey === group.key ? (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {group.slots.map((slot) => (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => slot.isAvailable && openSlotReservation(slot)}
+                          disabled={!slot.isAvailable || !activeSettings?.isPublicEnabled}
+                          className={cn(
+                            "rounded-[1rem] border px-4 py-3 text-left transition",
+                            slot.isAvailable
+                              ? "border-white/12 bg-white/[0.08] hover:-translate-y-0.5 hover:bg-white/[0.12]"
+                              : "border-white/8 bg-white/[0.03] opacity-55"
+                          )}
                         >
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-black text-white">
                               {formatKoreanTime(slot.startsAt)} - {formatKoreanTime(slot.endsAt)}
                             </p>
-                          <span
-                            className={cn(
-                              "rounded-full px-2.5 py-1 text-[10px] font-black",
-                              slot.isAvailable
-                                ? "bg-[#FFF2E8] text-[#FF7A16]"
-                                : "bg-white/10 text-white"
-                            )}
-                          >
-                            {slot.isAvailable ? "전화번호 인증 후 접수" : "접수 마감"}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs font-semibold leading-5 text-white">
-                          {slot.label}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
+                            <span
+                              className={cn(
+                                "rounded-full px-2.5 py-1 text-[10px] font-black",
+                                slot.isAvailable
+                                  ? "bg-[#FFF2E8] text-[#FF7A16]"
+                                  : "bg-white/10 text-white"
+                              )}
+                            >
+                              {slot.isAvailable ? "전화번호 인증 후 접수" : "접수 마감"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-xs font-semibold leading-5 text-white">
+                            {slot.label}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
