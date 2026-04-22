@@ -216,7 +216,7 @@ function SummaryChip({ label, value, tone = "default" }: SummaryChipProps) {
 
 function getConsultReservationStatusLabel(status?: string | null) {
   if (status === "confirmed") return "예약완료";
-  if (status === "completed") return "상담완료";
+  if (status === "completed") return "방문완료";
   if (status === "canceled") return "예약취소";
   return null;
 }
@@ -234,11 +234,11 @@ function getLeadAccessLabel(lead: VerifiedLead) {
 
 function getLeadAccessDescription(lead: VerifiedLead) {
   if (lead.canReserve) {
-    return "센터에서 이 문의 건을 예약 가능 상태로 열어 두었습니다. 아래 공개된 시간 중에서 방문 상담 예약을 진행할 수 있습니다.";
+    return "센터에서 이 문의 건을 접수 가능 상태로 열어 두었습니다. 아래 공개된 시간 중에서 시설 방문 후 접수를 진행할 수 있습니다.";
   }
   return (
     lead.bookingAccessNote ||
-    "현재는 이 문의 건의 순서가 아직 열리지 않아 상담 시간과 좌석 현황만 확인할 수 있습니다. 센터에서 순차적으로 열어드린 뒤 예약이 가능합니다."
+    "현재는 이 문의 건의 순서가 아직 열리지 않아 방문 가능 시간과 좌석 현황만 확인할 수 있습니다. 센터에서 순차적으로 열어드린 뒤 접수가 가능합니다."
   );
 }
 
@@ -346,7 +346,7 @@ export function ConsultReservationCard() {
       const seatData = (await seatRes.json()) as SeatResponse;
 
       if (!slotRes.ok || !slotData.ok) {
-        throw new Error(getSafeErrorMessage(slotData.message, "상담 예약 정보를 불러오지 못했습니다."));
+        throw new Error(getSafeErrorMessage(slotData.message, "방문 접수 정보를 불러오지 못했습니다."));
       }
       if (!seatRes.ok || !seatData.ok) {
         throw new Error(getSafeErrorMessage(seatData.message, "좌석 현황을 불러오지 못했습니다."));
@@ -382,7 +382,7 @@ export function ConsultReservationCard() {
 
         if (!mounted) return;
         if (!slotRes.ok || !slotData.ok) {
-          throw new Error(getSafeErrorMessage(slotData.message, "상담 예약 정보를 불러오지 못했습니다."));
+          throw new Error(getSafeErrorMessage(slotData.message, "방문 접수 정보를 불러오지 못했습니다."));
         }
         if (!seatRes.ok || !seatData.ok) {
           throw new Error(getSafeErrorMessage(seatData.message, "좌석 현황을 불러오지 못했습니다."));
@@ -505,7 +505,7 @@ export function ConsultReservationCard() {
       if (!data.leads.length) {
         setVerifiedLeads([]);
         setSelectedLeadId(null);
-        setActionError("이 번호로 접수된 홍보 리드가 없습니다. 먼저 아래 상담 폼을 작성해 주세요.");
+        setActionError("이 번호로 접수된 홍보 리드가 없습니다. 먼저 아래 입학 문의 폼을 작성해 주세요.");
         return;
       }
       const sortedLeads = [...data.leads].sort((left, right) => {
@@ -566,13 +566,13 @@ export function ConsultReservationCard() {
           scheduledAt?: string;
         };
         if (!response.ok || !data.ok) {
-          setActionError(getSafeErrorMessage(data.message, "상담 예약에 실패했습니다."));
+          setActionError(getSafeErrorMessage(data.message, "방문 접수에 실패했습니다."));
           return;
         }
         setSuccess({
           kind: "slot",
-          title: "상담 예약이 완료되었습니다.",
-          description: "센터에서 별도 확인 연락 없이 바로 일정이 확정됩니다.",
+          title: "시설 방문 후 접수가 완료되었습니다.",
+          description: "센터에서 별도 확인 연락 없이 바로 방문 일정이 확정됩니다.",
           detail: `${selectedLead.studentName} 학생 · ${data.slotLabel || formatKoreanTime(action.slot.startsAt)} 예약`,
         });
       } else {
@@ -619,7 +619,7 @@ export function ConsultReservationCard() {
   }
 
   const actionTitle =
-    action?.kind === "slot" ? "전화번호 인증 후 상담 예약" : "전화번호 인증 후 좌석예약 신청";
+    action?.kind === "slot" ? "전화번호 인증 후 방문 접수" : "전화번호 인증 후 좌석예약 신청";
 
   return (
     <>
@@ -634,9 +634,9 @@ export function ConsultReservationCard() {
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-black tracking-[0.22em] text-[#FFB273]">VISIT RESERVATION</p>
+            <p className="text-[10px] font-black tracking-[0.22em] text-[#FFB273]">VISIT INTAKE</p>
             <h3 className="mt-2 break-keep text-[1.55rem] font-black tracking-[-0.04em] text-white sm:text-[1.9rem]">
-              상담 예약과
+              시설 방문 후 접수와
               <br />
               실시간 좌석 확인
             </h3>
@@ -647,7 +647,7 @@ export function ConsultReservationCard() {
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <SummaryChip label="공개된 상담 슬롯" value={`${availableSlotCount}개`} />
+          <SummaryChip label="공개된 방문 시간" value={`${availableSlotCount}개`} />
           <SummaryChip label={`${publicRoomLabel} 빈좌석`} value={`${seatSummary.availableCount}석`} />
           <SummaryChip label="좌석예약 진행" value={`${seatSummary.heldCount}석`} tone="accent" />
         </div>
@@ -656,7 +656,7 @@ export function ConsultReservationCard() {
           <div className="flex items-start gap-3">
             <Phone className="mt-0.5 h-4 w-4 shrink-0 text-[#FF7A16]" />
             <div className="min-w-0">
-              <p className="text-sm font-black text-[#14295F]">온라인 예약은 순차 오픈 방식입니다</p>
+              <p className="text-sm font-black text-[#14295F]">온라인 방문 접수는 순차 오픈 방식입니다</p>
               <p className="mt-1 text-xs font-semibold leading-5 text-[#14295F]/78">
                 {activeSettings?.slotGuideText ||
                   DEFAULT_WEBSITE_SLOT_GUIDE}
@@ -674,9 +674,9 @@ export function ConsultReservationCard() {
         <div className="mt-5 space-y-4">
           <div className={cn("flex gap-3", "flex-col sm:flex-row sm:items-center sm:justify-between")}>
             <div>
-              <p className="text-xs font-black tracking-[0.18em] text-white/90">방문 상담 가능한 시간</p>
+              <p className="text-xs font-black tracking-[0.18em] text-white/90">시설 방문 가능한 시간</p>
               <p className="mt-1 text-sm font-semibold text-white">
-                버튼을 누르면 센터가 열어둔 상담 시간을 볼 수 있고, 실제 예약은 전화번호 인증 후 예약 가능 상태인 문의 건만 가능합니다.
+                버튼을 누르면 센터가 열어둔 방문 가능 시간을 볼 수 있고, 실제 방문 후 접수는 전화번호 인증 후 접수 가능 상태인 문의 건만 가능합니다.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -687,7 +687,7 @@ export function ConsultReservationCard() {
                 disabled={!activeSettings?.isPublicEnabled}
               >
                 <CalendarDays className="mr-2 h-4 w-4" />
-                {slotPanelOpen ? "방문 상담 가능한 시간 닫기" : "방문 상담 가능한 시간 보기"}
+                {slotPanelOpen ? "방문 가능 시간 닫기" : "방문 가능 시간 보기"}
               </Button>
               <Button
                 type="button"
@@ -703,19 +703,19 @@ export function ConsultReservationCard() {
 
           {!slotPanelOpen ? (
             <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-white/[0.04] px-4 py-6 text-center">
-              <p className="text-sm font-black text-white">열어둔 상담 시간을 확인하려면 버튼을 눌러주세요.</p>
+              <p className="text-sm font-black text-white">열어둔 방문 가능 시간을 확인하려면 버튼을 눌러주세요.</p>
               <p className="mt-2 text-xs font-semibold leading-5 text-white">
-                예약 단계에서는 홍보리드 DB에 남긴 학부모 연락처 확인과 예약 가능 여부를 다시 확인합니다.
+                접수 단계에서는 홍보리드 DB에 남긴 학부모 연락처 확인과 방문 후 접수 가능 여부를 다시 확인합니다.
               </p>
             </div>
           ) : isLoading ? (
             <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.04] px-4 py-8 text-center text-sm font-bold text-white/70">
               <Loader2 className="mx-auto h-5 w-5 animate-spin text-white/60" />
-              <p className="mt-3">예약 가능한 상담 시간을 불러오고 있습니다.</p>
+              <p className="mt-3">방문 가능한 시간을 불러오고 있습니다.</p>
             </div>
           ) : groupedSlots.length === 0 ? (
             <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-white/[0.04] px-4 py-8 text-center">
-              <p className="text-sm font-black text-white">지금은 공개된 상담 슬롯이 없습니다.</p>
+              <p className="text-sm font-black text-white">지금은 공개된 방문 가능 시간이 없습니다.</p>
               <p className="mt-2 text-xs font-semibold leading-5 text-white">
                 먼저 빠른 입학문의 폼을 남겨주시면 센터에서 순차적으로 안내드립니다.
               </p>
@@ -723,7 +723,7 @@ export function ConsultReservationCard() {
                 href="#consult-form"
                 className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-white/12 px-4 text-xs font-black text-white transition hover:bg-white/[0.08]"
               >
-                상담 폼 먼저 작성하기
+                입학 문의 폼 먼저 작성하기
               </a>
             </div>
           ) : (
@@ -735,7 +735,7 @@ export function ConsultReservationCard() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-black text-white">{group.label}</p>
-                    <span className="text-[11px] font-bold text-white">{group.slots.length}개 슬롯</span>
+                    <span className="text-[11px] font-bold text-white">{group.slots.length}개 시간</span>
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {group.slots.map((slot) => (
@@ -763,7 +763,7 @@ export function ConsultReservationCard() {
                                 : "bg-white/10 text-white"
                             )}
                           >
-                            {slot.isAvailable ? "전화번호 인증 후 예약" : "예약 마감"}
+                            {slot.isAvailable ? "전화번호 인증 후 접수" : "접수 마감"}
                           </span>
                         </div>
                         <p className="mt-2 text-xs font-semibold leading-5 text-white">
@@ -924,7 +924,7 @@ export function ConsultReservationCard() {
                   </p>
                   <p className="mt-2 text-xs font-semibold leading-5 text-[#14295F]/65">
                     {action?.kind === "slot"
-                      ? "연락처 인증 후 즉시 상담 시간이 확정됩니다."
+                      ? "연락처 인증 후 즉시 방문 시간이 확정됩니다."
                       : "연락처 인증과 환불 불가 동의 후 좌석예약 입금대기로 접수됩니다."}
                   </p>
                 </div>
@@ -956,7 +956,7 @@ export function ConsultReservationCard() {
                     </Button>
                   </div>
                   <p className="mt-2 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                    홍보리드 DB에 등록된 학부모 연락처와 일치해야 하며, 센터가 순차적으로 예약 가능 상태를 연 문의 건만 예약할 수 있습니다.
+                    홍보리드 DB에 등록된 학부모 연락처와 일치해야 하며, 센터가 순차적으로 접수 가능 상태를 연 문의 건만 방문 후 접수할 수 있습니다.
                   </p>
                 </div>
 
@@ -989,7 +989,7 @@ export function ConsultReservationCard() {
                     )}
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-black text-[#14295F]">현재 예약 상태</p>
+                      <p className="text-sm font-black text-[#14295F]">현재 접수 상태</p>
                       <span
                         className={cn(
                           "rounded-full border px-2.5 py-1 text-[10px] font-black",
@@ -1040,7 +1040,7 @@ export function ConsultReservationCard() {
                         className="mt-1 h-4 w-4 rounded border-[#FF7A16]/35 text-[#FF7A16] focus:ring-[#FF7A16]"
                       />
                       <span className="text-sm font-black leading-6 text-[#14295F]">
-                        좌석예약 예약금은 상담 취소 시에도 환불되지 않는다는 내용을 확인했고 동의합니다.
+                        좌석예약 예약금은 방문 취소 시에도 환불되지 않는다는 내용을 확인했고 동의합니다.
                       </span>
                     </label>
                     {!selectedLead.canSeatHold ? (
@@ -1054,11 +1054,11 @@ export function ConsultReservationCard() {
                 {actionError ? (
                   <div className="rounded-[1.2rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                     {actionError}
-                    {actionError.includes("먼저 아래 상담 폼") ? (
+                    {actionError.includes("먼저 아래 입학 문의 폼") ? (
                       <>
                         {" "}
                         <a href="#consult-form" className="underline underline-offset-2">
-                          지금 상담 폼 작성하기
+                          지금 입학 문의 폼 작성하기
                         </a>
                       </>
                     ) : null}
@@ -1088,7 +1088,7 @@ export function ConsultReservationCard() {
                   ) : action?.kind === "seat" && !selectedLead.canSeatHold ? (
                     "관리형 스터디센터 문의만 가능"
                   ) : action?.kind === "slot" ? (
-                    "상담 시간 예약 확정하기"
+                    "방문 시간 접수 확정하기"
                   ) : (
                     "좌석예약 신청 접수하기"
                   )}

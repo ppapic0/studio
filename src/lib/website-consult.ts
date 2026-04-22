@@ -24,13 +24,15 @@ export const DEFAULT_WEBSITE_DEPOSIT_AMOUNT = 50000;
 const LEGACY_WEBSITE_NON_REFUNDABLE_NOTICE =
   '자리찜 예약금 5만원은 상담 취소 또는 단순 변심 시에도 환불되지 않습니다.';
 export const DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE =
-  '좌석예약 예약금 5만원은 상담 취소 또는 단순 변심 시에도 환불되지 않습니다.';
+  '좌석예약 예약금 5만원은 방문 취소 또는 단순 변심 시에도 환불되지 않습니다.';
 const LEGACY_WEBSITE_SLOT_GUIDE =
   '상담 시간은 센터가 미리 연 고정 슬롯만 예약할 수 있습니다.';
 const SECONDARY_LEGACY_WEBSITE_SLOT_GUIDE =
   '홍보리드 DB에 등록된 연락처를 먼저 확인하고, 센터가 열어둔 문의 건만 방문예약과 좌석예약을 진행할 수 있습니다.';
-export const DEFAULT_WEBSITE_SLOT_GUIDE =
+const TERTIARY_LEGACY_WEBSITE_SLOT_GUIDE =
   '현재 방문 상담은 대기 순서에 따라 순차적으로 연락드리고 있습니다. 센터에서 연락을 드린 분에 한해 방문 상담 신청을 부탁드리며, 대기 순서에 맞지 않게 먼저 방문 상담을 신청해 주셔도 실제 방문 상담은 진행되지 않는 점 양해 부탁드립니다.';
+export const DEFAULT_WEBSITE_SLOT_GUIDE =
+  '현재 시설 방문 후 접수는 대기 순서에 따라 순차적으로 연락드리고 있습니다. 센터에서 연락을 드린 분에 한해 시설 방문 후 접수를 부탁드리며, 대기 순서에 맞지 않게 먼저 방문 후 접수를 신청해 주셔도 실제 방문 후 접수는 진행되지 않는 점 양해 부탁드립니다.';
 const LEGACY_WEBSITE_SEAT_GUIDE =
   '빈 좌석번호를 확인한 뒤 원하는 자리를 선택해 자리찜을 신청할 수 있습니다.';
 export const DEFAULT_WEBSITE_SEAT_GUIDE =
@@ -143,7 +145,8 @@ export function getWebsiteReservationSettings(
       : settings?.nonRefundableNotice?.trim();
   const normalizedSlotGuideText =
     settings?.slotGuideText?.trim() === LEGACY_WEBSITE_SLOT_GUIDE ||
-    settings?.slotGuideText?.trim() === SECONDARY_LEGACY_WEBSITE_SLOT_GUIDE
+    settings?.slotGuideText?.trim() === SECONDARY_LEGACY_WEBSITE_SLOT_GUIDE ||
+    settings?.slotGuideText?.trim() === TERTIARY_LEGACY_WEBSITE_SLOT_GUIDE
       ? DEFAULT_WEBSITE_SLOT_GUIDE
       : settings?.slotGuideText?.trim();
   const normalizedSeatGuideText =
@@ -302,5 +305,5 @@ export function formatSlotLabel(slot: Pick<WebsiteConsultSlot, 'label' | 'starts
         hour: '2-digit',
         minute: '2-digit',
       }).format(end);
-  return [startLabel, endLabel].filter(Boolean).join(' - ') || '상담 슬롯';
+  return [startLabel, endLabel].filter(Boolean).join(' - ') || '방문 시간';
 }
