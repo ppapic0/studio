@@ -71,6 +71,7 @@ type SettingsFormState = {
 const SLOT_STATUS_META = {
   available: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   booked: 'border-[#ffd9bd] bg-[#fff4eb] text-[#c26a1c]',
+  ended: 'border-slate-200 bg-slate-100 text-slate-500',
   hidden: 'border-slate-200 bg-slate-100 text-slate-600',
 } as const;
 
@@ -95,11 +96,36 @@ function getTodayDateInput() {
   }).format(new Date());
 }
 
+function formatDateInput(date: Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function formatTimeInput(date: Date) {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}
+
 function getDefaultSlotForm(): SlotFormState {
+  const start = new Date();
+  start.setMinutes(0, 0, 0);
+  start.setHours(start.getHours() + 1);
+
+  const end = new Date(start);
+  end.setMinutes(end.getMinutes() + 40);
+
   return {
-    date: getTodayDateInput(),
-    startTime: '14:00',
-    endTime: '14:40',
+    date: formatDateInput(start),
+    startTime: formatTimeInput(start),
+    endTime: formatTimeInput(end),
     label: '',
     isPublished: true,
   };
@@ -237,7 +263,7 @@ export function WebsiteConsultOperations() {
 
   const summary = useMemo(
     () => ({
-      publishedSlots: slots.filter((slot) => slot.isPublished).length,
+      publishedSlots: slots.filter((slot) => slot.isPublished && toDateMs(slot.endsAt) >= Date.now()).length,
       confirmedReservations: reservations.filter((item) => item.status === 'confirmed').length,
       pendingSeatHolds: seatHolds.filter((item) => item.status === 'pending_transfer').length,
       heldSeats: seatHolds.filter((item) => item.status === 'held').length,
@@ -292,6 +318,14 @@ export function WebsiteConsultOperations() {
     const endsAt = new Date(`${slotForm.date}T${slotForm.endTime}:00+09:00`);
     if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
       toast({ variant: 'destructive', title: '상담 시작/종료 시간을 다시 확인해 주세요.' });
+      return;
+    }
+    if (endsAt.getTime() <= Date.now()) {
+      toast({
+        variant: 'destructive',
+        title: '이미 지난 시간은 공개되지 않습니다.',
+        description: '공개 화면에는 종료 시간이 남아 있는 상담 슬롯만 노출됩니다. 미래 시간으로 다시 만들어 주세요.',
+      });
       return;
     }
 
@@ -590,8 +624,11 @@ export function WebsiteConsultOperations() {
               ) : (
                 slots.map((slot) => {
                   const activeCount = slot.reservationCount || 0;
+                  const isEnded = toDateMs(slot.endsAt) < Date.now();
                   const slotTone = !slot.isPublished
                     ? SLOT_STATUS_META.hidden
+                    : isEnded
+                      ? SLOT_STATUS_META.ended
                     : activeCount > 0
                       ? SLOT_STATUS_META.booked
                       : SLOT_STATUS_META.available;
@@ -609,7 +646,7 @@ export function WebsiteConsultOperations() {
                           </p>
                         </div>
                         <Badge className={cn('border font-black', slotTone)}>
-                          {!slot.isPublished ? '숨김' : activeCount > 0 ? `${activeCount}팀 예약` : '예약 가능'}
+                          {!slot.isPublished ? '숨김' : isEnded ? '종료됨' : activeCount > 0 ? `${activeCount}팀 예약` : '예약 가능'}
                         </Badge>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
